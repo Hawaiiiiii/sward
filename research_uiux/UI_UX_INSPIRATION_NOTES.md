@@ -1,4 +1,4 @@
-# UI/UX Inspiration Notes
+# <img src="../docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> UI/UX Inspiration Notes
 
 This file extracts reusable design and engineering patterns for original projects. It does not copy assets or proprietary code.
 

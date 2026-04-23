@@ -1,4 +1,4 @@
-# Patch Hook Index
+# <img src="../docs/assets/branding/icon_debug.png" width="30" alt="SWARD debug icon"/> Patch Hook Index
 
 Machine-readable inventory: `research_uiux/data/patch_hooks.json`
 

@@ -1,4 +1,4 @@
-# Code-to-Layout Correlation
+# <img src="../docs/assets/branding/icon_debug.png" width="30" alt="SWARD debug icon"/> Code-to-Layout Correlation
 
 Machine-readable inventory: `research_uiux/data/layout_code_correlation.json`
 
