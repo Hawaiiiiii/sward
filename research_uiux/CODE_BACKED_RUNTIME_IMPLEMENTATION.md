@@ -8,6 +8,8 @@
 
 Phase 21 turns the generic template pack into a buildable, reusable C++ reference runtime.
 
+Phase 24 expands that base into a small multi-language port-kit layer. See [`REUSABLE_PORT_KITS.md`](./REUSABLE_PORT_KITS.md).
+
 Implementation root:
 
 - `research_uiux/runtime_reference/`

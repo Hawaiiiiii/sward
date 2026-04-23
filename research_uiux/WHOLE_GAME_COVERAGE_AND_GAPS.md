@@ -29,6 +29,10 @@
   - `ppc_context.h`
   - `ppc_config.h`
   - `shader_cache.cpp`
+- The reusable runtime/template productization layer now includes:
+  - native C++ reference profiles
+  - a C ABI wrapper plus verified C example
+  - a managed C# reference port
 - The UI asset workspace currently indexes:
   - `6751` UI-relevant asset entries across the installed build plus extracted roots
   - `17454` extracted files under `extracted_assets`
@@ -86,9 +90,10 @@ What it still does not justify:
 
 The current workspace is:
 
-- `100%` complete against the tracked research plan through Phase `23`
+- `100%` complete against the tracked research plan through Phase `24`
 - strong for UI/UX reverse-engineering and template extraction
 - strong for local executable-backed timing/state archaeology
+- strong for reusable runtime/template productization across C++, C, and C#
 - partial for whole-game loose-file asset extraction
 - not equivalent to the original full source code of Sonic Unleashed
 

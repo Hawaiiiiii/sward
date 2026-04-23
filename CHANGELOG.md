@@ -22,6 +22,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 - grouped the current evidence into `13` reusable screen/system families and resolved `56` generated PPC seams into the active archaeology layer
 - updated the research workspace README, asset index, checklist, and repo-facing README for the new cross-reference phase
 
+### Phase 24 reusable port kits
+
+- added [`research_uiux/REUSABLE_PORT_KITS.md`](./research_uiux/REUSABLE_PORT_KITS.md)
+- expanded [`research_uiux/runtime_reference/`](./research_uiux/runtime_reference/) with reusable profile factories for pause, title-menu, and autosave-toast screen families
+- added a C ABI wrapper plus a verified native C example over the generic runtime
+- added a self-contained C# managed reference port under [`research_uiux/runtime_reference/csharp_reference/`](./research_uiux/runtime_reference/csharp_reference/)
+- verified the native build with `C:\Program Files\CMake\bin\cmake.exe` and the managed build with `external_tools/dotnet8/dotnet.exe`
+
 ### Phase 22 coverage audit and markdown presentation pass
 
 - added [`research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md`](./research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md) to answer the direct whole-game-source vs translated-output vs extracted-asset question with verified local counts
@@ -125,6 +133,7 @@ The repo now contains:
 - a subtitle/cutscene presentation report that bridges subtitle timing resources, `PlayMovie` sequences, and readable runtime controls
 - a visual taxonomy/style guide for boss HUD, result, and save systems grounded in the local atlas layer
 - a buildable generic runtime reference that turns the template pack into executable C++ code
+- a reusable multi-language port-kit layer across C++, C, and C#
 
 The repo still does not contain:
 
