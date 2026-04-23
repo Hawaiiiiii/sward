@@ -255,3 +255,21 @@ That follow-on map resolves `6` gameplay HUD layout families:
 - hash/source-path-backed: `ui_playscreen`, `ui_playscreen_ev`, `ui_playscreen_ev_hit`, `ui_playscreen_su`
 
 The machine-readable payload lives in `research_uiux/data/gameplay_hud_core_map.json`, and the human-readable breakdown lives in `research_uiux/GAMEPLAY_HUD_CORE_RECOVERY.md`.
+
+## Phase 31 Follow-On: CSD / UI Foundation
+
+The next follow-on pass now turns the lower-level scene/widget substrate into a named layer instead of leaving it implicit below the screen families:
+
+- `CSD / UI Foundation`
+
+That pass now:
+
+- keeps the local-only mirrored source tree reproducible under `SONIC UNLEASHED/` from the supplied path dump
+- maps `5` direct `CSD/*` / `Menu/*` seed paths plus `12` mirrored support paths and `5` closely related consumer/widget paths
+- groups the foundation into `3` reusable abstractions:
+  - CSD project pipeline
+  - framed window / help widget stack
+  - town dialog / shop widgets
+- anchors the layer around `MakeCsdProjectMidAsmHook`, `CCsdProject::Make`, `CCsdPlatformMirage::Draw`, `CCsdPlatformMirage::DrawNoTex`, and `CHelpWindow::MsgRequestHelp::Impl`
+
+The machine-readable payload lives in `research_uiux/data/csd_ui_foundation_map.json`, and the human-readable breakdown lives in `research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md`.

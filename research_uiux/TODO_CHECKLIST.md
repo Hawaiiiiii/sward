@@ -229,11 +229,11 @@
 
 ## Phase 31 - CSD / UI Foundation Humanization
 
-- [ ] Maintain the local-only mirrored source tree under `SONIC UNLEASHED/` from the supplied path dump without publishing that mirror itself.
-- [ ] Map the `CSD/*`, `Menu/*`, and closely related core/manager files into reusable scene/widget abstractions.
-- [ ] Generate a machine-readable CSD/UI foundation humanization map.
-- [ ] Generate a human-readable CSD/UI foundation report.
-- [ ] Update source-path coverage docs and the checklist audit for the new humanization layer.
+- [x] Maintain the local-only mirrored source tree under `SONIC UNLEASHED/` from the supplied path dump without publishing that mirror itself.
+- [x] Map the `CSD/*`, `Menu/*`, and closely related core/manager files into reusable scene/widget abstractions.
+- [x] Generate a machine-readable CSD/UI foundation humanization map.
+- [x] Generate a human-readable CSD/UI foundation report.
+- [x] Update source-path coverage docs and the checklist audit for the new humanization layer.
 
 ## Completion Audit
 
@@ -309,3 +309,7 @@
 - [x] Follow-on phase audit on `2026-04-23`: generated `research_uiux\data\ui_source_path_manifest.json` and `research_uiux\UI_SOURCE_PATH_RECOVERY_AND_HUMANIZATION_PLAN.md`.
 - [x] Follow-on phase audit on `2026-04-23`: organized `108` seeded UI-centric source paths into `16` families, with `77` paths (`71.3%`) now bridged into the archaeology layer and `37` paths (`34.3%`) already backed by runtime contracts.
 - [x] Follow-on phase audit on `2026-04-23`: isolated `13` strong debug-tool host candidates and `18` still named-only UI-family paths as the clearest next humanization/debug-sandbox gaps.
+- [x] Follow-on phase audit on `2026-04-23 18:35:59 +02:00`: refreshed the local-only `SONIC UNLEASHED/` source-tree scaffold directly from `Match SU OG source code folders and locations.txt`.
+- [x] Follow-on phase audit on `2026-04-23 18:35:59 +02:00`: added `research_uiux\tools\build_csd_ui_foundation_map.py`, `research_uiux\CSD_UI_FOUNDATION_HUMANIZATION.md`, and `research_uiux\data\csd_ui_foundation_map.json`.
+- [x] Follow-on phase audit on `2026-04-23 18:35:59 +02:00`: mapped `5` direct `CSD/*` / `Menu/*` seed paths, `5` closely related consumer/widget paths, and `12` mirrored support paths into `3` reusable abstractions.
+- [x] Follow-on phase audit on `2026-04-23 18:35:59 +02:00`: refreshed `research_uiux\data\ui_source_path_manifest.json` and raised the measured UI-seed bridge to `90` paths (`83.3%`) mapped, leaving `5` named-only gaps.

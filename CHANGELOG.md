@@ -11,6 +11,16 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 31 CSD / UI foundation humanization
+
+- added [`research_uiux/tools/build_csd_ui_foundation_map.py`](./research_uiux/tools/build_csd_ui_foundation_map.py)
+- added [`research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md`](./research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md)
+- added the machine-readable foundation map under `research_uiux/data/csd_ui_foundation_map.json`
+- added [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py) to keep the local-only `SONIC UNLEASHED/` mirror scaffold reproducible from the root path dump
+- mapped `5` direct `CSD/*` / `Menu/*` seed paths, `5` closely related consumer/widget paths, and `12` mirrored support paths into `3` reusable abstractions
+- refreshed the source-path manifest so the measured UI-seed bridge rises to `90 / 108` paths (`83.3%`) mapped into archaeology systems, leaving only `5` named-only gaps in the current UI-focused seed
+- anchored the foundation layer around `MakeCsdProjectMidAsmHook`, `CCsdProject::Make`, `CCsdPlatformMirage::Draw`, `CCsdPlatformMirage::DrawNoTex`, and `CHelpWindow::MsgRequestHelp::Impl`
+
 ### Phase 30 gameplay HUD core recovery
 
 - added [`research_uiux/tools/build_gameplay_hud_core_map.py`](./research_uiux/tools/build_gameplay_hud_core_map.py)

@@ -21,6 +21,11 @@ SYSTEM_DISPLAY = {
     "save_and_ending": "Save And Ending",
     "tornado_defense": "Tornado Defense / EX Stage",
     "subtitle_cutscene_presentation": "Subtitle / Cutscene Presentation",
+    "sonic_stage_hud": "Sonic Stage HUD",
+    "werehog_stage_hud": "Werehog Stage HUD",
+    "extra_stage_hud": "Extra Stage / Tornado Defense HUD",
+    "super_sonic_hud": "Super Sonic / Final HUD Bridge",
+    "csd_ui_foundation": "CSD / UI Foundation",
 }
 
 RUNTIME_CONTRACTS = {
@@ -42,6 +47,34 @@ STATUS_ORDER = {
 
 def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def load_system_index(repo_root: Path, archaeology_json: Path) -> dict[str, dict]:
+    archaeology = read_json(archaeology_json)
+    systems = {system["system_id"]: system for system in archaeology.get("systems", [])}
+
+    gameplay_hud_json = repo_root / "research_uiux/data/gameplay_hud_core_map.json"
+    if gameplay_hud_json.exists():
+        gameplay_payload = read_json(gameplay_hud_json)
+        for system in gameplay_payload.get("systems", []):
+            systems[system["system_id"]] = {
+                "system_id": system["system_id"],
+                "screen_name": system.get("screen_name", SYSTEM_DISPLAY.get(system["system_id"], system["system_id"])),
+                "layout_ids": [layout["layout_id"] for layout in system.get("layout_families", [])],
+                "host_code_files": system.get("host_paths", []),
+                "generated_seams": system.get("readable_hooks", {}).get("constructor_seams", [])
+                + system.get("readable_hooks", {}).get("update_seams", []),
+                "state_tags": [],
+            }
+
+    foundation_json = repo_root / "research_uiux/data/csd_ui_foundation_map.json"
+    if foundation_json.exists():
+        foundation_payload = read_json(foundation_json)
+        foundation_system = foundation_payload.get("foundation_system")
+        if foundation_system:
+            systems[foundation_system["system_id"]] = foundation_system
+
+    return systems
 
 
 def relpath(repo_root: Path, path: Path | str | None) -> str | None:
@@ -118,6 +151,33 @@ def classify_source_path(relative_path: str) -> dict:
             "candidate_system_ids": ["boss_hud"],
             "debug_tool_candidate": False,
             "notes": "Boss HUD/name plate classes that line up with extracted boss gauge/name layouts.",
+        }
+
+    if lowered.startswith("hud/sonic/") or lowered.startswith("player/character/sonic/hud/"):
+        return {
+            "family_id": "stage_hud_core",
+            "family_name": "Stage HUD Core",
+            "candidate_system_ids": ["sonic_stage_hud"],
+            "debug_tool_candidate": False,
+            "notes": "Day-stage HUD shell plus Sonic-specific guide/homing sidecars.",
+        }
+
+    if lowered.startswith("hud/evil/") or lowered.startswith("player/character/evilsonic/hud/"):
+        return {
+            "family_id": "stage_hud_core",
+            "family_name": "Stage HUD Core",
+            "candidate_system_ids": ["werehog_stage_hud"],
+            "debug_tool_candidate": False,
+            "notes": "Werehog stage HUD shell plus target/guide helper overlays.",
+        }
+
+    if lowered.startswith("hud/item/"):
+        return {
+            "family_id": "stage_hud_core",
+            "family_name": "Stage HUD Core",
+            "candidate_system_ids": [],
+            "debug_tool_candidate": False,
+            "notes": "In-stage item-get surface that still sits adjacent to the gameplay HUD map without a fully isolated host family.",
         }
 
     if lowered.startswith("hud/pause/") or lowered.startswith("hud/generalwindow/") or lowered.startswith("hud/helpwindow/"):
@@ -236,29 +296,11 @@ def classify_source_path(relative_path: str) -> dict:
             "notes": "EX-stage/Tornado Defense HUD and QTE surface.",
         }
 
-    if lowered.startswith("player/character/") and "/hud/" in lowered:
-        return {
-            "family_id": "stage_hud_core",
-            "family_name": "Stage HUD Core",
-            "candidate_system_ids": [],
-            "debug_tool_candidate": False,
-            "notes": "Player-facing in-stage HUD helpers that are still under-described in the current archaeology layer.",
-        }
-
-    if lowered.startswith("hud/sonic/") or lowered.startswith("hud/evil/") or lowered.startswith("hud/item/"):
-        return {
-            "family_id": "stage_hud_core",
-            "family_name": "Stage HUD Core",
-            "candidate_system_ids": [],
-            "debug_tool_candidate": False,
-            "notes": "Main Sonic/Evil stage HUD plus item-get displays that remain a gap in the current system map.",
-        }
-
     if lowered.startswith("csd/") or lowered.startswith("menu/"):
         return {
             "family_id": "csd_ui_foundation",
             "family_name": "CSD / UI Foundation",
-            "candidate_system_ids": [],
+            "candidate_system_ids": ["csd_ui_foundation"],
             "debug_tool_candidate": False,
             "notes": "Core CellSpriteDraw project/mirage bridge layer and generic text-box foundation.",
         }
@@ -297,8 +339,7 @@ def humanization_priority(status: str, family_id: str) -> str:
 
 
 def build_payload(repo_root: Path, input_txt: Path, archaeology_json: Path, contracts_dir: Path) -> dict:
-    archaeology = read_json(archaeology_json)
-    systems = {system["system_id"]: system for system in archaeology.get("systems", [])}
+    systems = load_system_index(repo_root, archaeology_json)
 
     entries = []
     family_groups: dict[str, list[dict]] = defaultdict(list)
@@ -492,20 +533,20 @@ def write_markdown(payload: dict, output_path: Path) -> None:
             "",
             "- The generated translated PPC layer is present, but the clean human-readable organization layer is still incomplete.",
             "- This phase gives the UI/UX subset of the executable path dump a stable naming scaffold, so future translated-code cleanup can follow original source-family names instead of raw `sub_XXXXXXXX` clusters alone.",
-            "- The strongest already-recovered path families are title/menu, pause, loading/start, world map, mission-result, save/ending, boss HUD, town/media-room, and cutscene/subtitle presentation.",
-            "- The clearest remaining UI/UX gaps are the gameplay HUD core, the lower-level CSD foundation, and the debug/tool surfaces we can repurpose into a standalone UI capability sandbox.",
+            "- The strongest already-recovered path families are title/menu, pause, loading/start, world map, mission-result, save/ending, gameplay HUD core, town/media-room, and the lower-level CSD foundation layer.",
+            "- The clearest remaining UI/UX gaps are the debug/tool host surfaces, the subtitle/cutscene family still lacking a runtime-contract bridge, and broader expansion beyond the current UI-focused seed.",
             "",
             "## Debug Tool Direction",
             "",
             "- The best current hosts for a local debug executable/menu build are the debug/test game modes plus the tool/preview surfaces grouped under `Tooling / Debug UI`.",
             "- The current contract-backed runtime layer is already strong enough to prototype a standalone screen selector for title, pause, loading, result, autosave, and world-map flows.",
-            "- The missing bridge for a richer debug tool is not raw translation anymore; it is source-path-backed naming plus a broader gameplay HUD/system contract set.",
+            "- The missing bridge for a richer debug tool is no longer raw translation; it is turning the source-path-backed families into named local debug screens and widening contract coverage beyond the current reusable subset.",
             "",
             "## Next Local Work",
             "",
             "1. Expand this seed from the UI/UX subset into a broader whole-dump manifest without drowning the repo in raw path noise.",
-            "2. Start a source-path-backed humanization pass over translated seams for the uncovered families, especially gameplay HUD core and CSD foundations.",
-            "3. Build a dedicated local debug screen selector over the current runtime contracts, then add new contracts as more path families become semantically recovered.",
+            "2. Start placing humanized translated findings into the local-only `SONIC UNLEASHED/` mirror under source-family names instead of leaving them as report-only notes.",
+            "3. Grow the standalone debug selector from contract-backed console runs into a source-path-named UI sandbox, then add gameplay-HUD and subtitle/cutscene contract coverage.",
         ]
     )
 

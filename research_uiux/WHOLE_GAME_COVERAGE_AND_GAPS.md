@@ -16,7 +16,7 @@
 | In-scope readable Unleashed Recompiled UI/runtime/patch layer | Indexed and documented | `100%` of the files we targeted and scanned |
 | Original SEGA human-authored game source | Not available locally | `0%` verified |
 | Generated translated PowerPC C++ and shader layer from owned inputs | Present locally | `100%` of the current generation goal |
-| UI-centric source-path seed bridged into the archaeology layer | Partial but measured | `71.3%` |
+| UI-centric source-path seed bridged into the archaeology layer | Partial but measured | `83.3%` |
 | UI-centric source-path seed already backed by runtime contracts | Partial | `34.3%` |
 | Whole-game asset corpus extracted into readable loose files | Not complete | no defensible exact percentage yet |
 | Template-grade UI/UX recovery for the studied screens | Strong | high confidence, but not a whole-game `1:1` portability claim |
@@ -39,6 +39,8 @@
   - a tracked UI-focused source-path seed at `research_uiux/source_path_seeds/UI_SOURCE_PATHS_FROM_EXECUTABLE.txt`
   - a machine-readable manifest at `research_uiux/data/ui_source_path_manifest.json`
   - a human-readable bridge report at `research_uiux/UI_SOURCE_PATH_RECOVERY_AND_HUMANIZATION_PLAN.md`
+  - a dedicated CSD/UI foundation map at `research_uiux/data/csd_ui_foundation_map.json`
+  - a human-readable foundation report at `research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md`
 - The UI asset workspace currently indexes:
   - `6840` UI-relevant asset entries across the installed build plus extracted roots
   - `17792` extracted files under `extracted_assets`
@@ -103,12 +105,13 @@ What it still does not justify:
 
 The current workspace is:
 
-- `100%` complete against the tracked research plan through Phase `30`
+- `100%` complete against the tracked research plan through Phase `31`
 - strong for UI/UX reverse-engineering and template extraction
 - strong for local executable-backed timing/state archaeology
 - strong for reusable runtime/template productization across C++, C, and C#
 - strong for measured UI source-path organization inside the seeded UI/UX subset
 - now materially stronger for in-stage gameplay HUD ownership and family separation
+- now materially stronger for lower-level CSD/project/widget naming and source-family organization
 - partial for whole-game loose-file asset extraction
 - not yet equivalent to a whole-game clean human-readable source tree
 
@@ -117,9 +120,9 @@ The current workspace is:
 If the goal is to move closer to a broader `1:1` UI portability basis, the next concrete work would be:
 
 1. Expand the current UI-focused source-path seed into a broader manifest so the humanization pass can cover more than the current `108` UI-centric paths.
-2. Start a source-path-backed cleanup pass for the uncovered `CSD/*` / `Menu/*` foundation families that still sit below the newly grouped gameplay HUD layer.
-3. Continue correlating generated PPC seams against extracted layouts and readable patch hosts for the remaining UI families.
-4. Build the first dedicated standalone UI debug selector over the current contract-backed runtime screens, then widen that selector as new families land.
+2. Start placing renamed translated findings into the local-only `SONIC UNLEASHED/` scaffold under source-family paths instead of leaving them only in reports.
+3. Continue correlating generated PPC seams against extracted layouts and readable patch hosts for the remaining UI families, especially the last unresolved gameplay-HUD and subtitle/cutscene edges.
+4. Grow the current standalone selector into a richer source-path-named debug sandbox, then widen it with gameplay-HUD and cutscene-capable contracts.
 
 > [!NOTE]
-> After the Phase 29/30 selector-and-HUD pass, the next bottleneck is even clearer: more value now comes from source-family naming and `CSD/*` foundation humanization than from blindly expecting every high-scoring archive to hide another `.yncp`.
+> After the Phase 31 foundation pass, the next bottleneck is even clearer: more value now comes from actually placing renamed translated findings into the mirrored source-family tree and widening the debug sandbox than from blindly expecting every high-scoring archive to hide another `.yncp`.
