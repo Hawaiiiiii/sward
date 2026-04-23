@@ -10,7 +10,7 @@ This repository keeps the **publishable** R&D layer in git, while the actual pri
 Clone this repository with submodules:
 
 ```bash
-git clone --recurse-submodules https://github.com/Hawaiiiiii/project-sonic-world-adventure-r-and-d.git
+git clone --recurse-submodules https://github.com/Hawaiiiiii/sward.git
 ```
 
 ### Windows

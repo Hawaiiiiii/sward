@@ -1,8 +1,10 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/hedge-dev/UnleashedRecompResources/refs/heads/main/images/logo/Logo.png" width="512"/>
+    <img src="./docs/assets/branding/logo_sward.png" width="900"/>
 </p>
 
 # Project Sonic World Adventure R&D
+
+Also referred to in this workspace as **SWARD**.
 
 Research and Development workspace around Sonic Unleashed HD / Unleashed Recompiled, focused on UI/UX behavior, state machines, menu architecture, overlays, transitions, animation timing, and reusable design-engineering patterns.
 
@@ -33,6 +35,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 
 - Open-source handwritten runtime, UI, and patch code from the Unleashed Recompiled layer
 - Build scripts, presets, and project metadata
+- Local repository branding assets under [`docs/assets/branding/`](./docs/assets/branding)
 - Research scripts under [`research_uiux/tools/`](./research_uiux/tools)
 - Publishable research notes such as:
   - [`research_uiux/UI_CODE_INDEX.md`](./research_uiux/UI_CODE_INDEX.md)
@@ -68,6 +71,9 @@ The goal here is different from the upstream end-user distribution goal. This re
 - local-only asset-backed archaeology
 - publishable tooling and documentation
 - transferable templates and architecture patterns
+
+> [!TIP]
+> The codebase itself consistently uses the `SWA` shorthand, which aligns with `Sonic World Adventure`. For the repository-facing identity, this workspace uses the shorter **SWARD** label.
 
 ## Repository Layout
 

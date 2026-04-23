@@ -7,7 +7,7 @@ body:
     attributes:
       label: Validation
       options:
-      - label: I have checked the [Issues](https://github.com/Hawaiiiiii/project-sonic-world-adventure-r-and-d/issues) page to see if my problem has already been reported
+      - label: I have checked the [Issues](https://github.com/Hawaiiiiii/sward/issues) page to see if my problem has already been reported
         required: true
       - label: If this is a behavior-accuracy issue, I have confirmed it against original-hardware footage or documented local research evidence
         required: false
