@@ -15,6 +15,9 @@ def stem(name: str) -> str:
 
 
 PRIMARY_FAMILY_IDS = {
+    "application_world_shell": "frontend_system_shell",
+    "camera_shell": "frontend_camera_shell",
+    "frontend_sequence_shell": "frontend_sequence_shell",
     "loading_and_start": "loading_and_boot",
     "mission_result_family": "mission_result",
     "pause_stack": "pause_stack",
@@ -27,9 +30,39 @@ PRIMARY_FAMILY_IDS = {
     "werehog_stage_hud": "stage_hud_core",
     "world_map_stack": "world_map_stack",
     "boss_hud": "boss_ui",
+    "town_ui": "town_ui",
 }
 
 EXTRA_SELECTOR_PATHS = {
+    "application_world_shell": [
+        "System/Application.cpp",
+        "System/ApplicationDocument.cpp",
+        "System/Game.cpp",
+        "System/GameDocument.cpp",
+        "System/World.cpp",
+        "System/GameMode/GameModeBoot.cpp",
+        "System/GameMode/GameModeMainMenu.cpp",
+        "System/GameMode/GameModeStage.cpp",
+        "System/GameMode/Title/TitleManager.cpp",
+        "System/GameMode/Title/TitleMenu.cpp",
+        "System/GameMode/Title/TitleStateIntro.cpp",
+        "System/GameMode/Title/TitleStateWorldMap.cpp",
+        "System/GameMode/WorldMap/WorldMapSelect.cpp",
+    ],
+    "camera_shell": [
+        "Camera/Controller/FreeCamera.cpp",
+        "Camera/Controller/GoalCamera.cpp",
+        "Camera/Controller/TownShopCamera.cpp",
+        "Camera/Controller/TownTalkCamera.cpp",
+        "Replay/Camera/ReplayFreeCamera.cpp",
+        "Replay/Camera/ReplayRelativeCamera.cpp",
+    ],
+    "frontend_sequence_shell": [
+        "Sequence/Core/SequenceHandleUnit.cpp",
+        "Sequence/Core/SequenceManagerImpl.cpp",
+        "Sequence/Unit/SequenceUnitFactory.cpp",
+        "Sequence/Unit/SequenceUnitUnlockAchievement.cpp",
+    ],
     "subtitle_cutscene_presentation": [
         "Tool/InspirePreview/InspireObject.cpp",
         "Tool/InspirePreview/InspirePreview.cpp",
@@ -54,6 +87,13 @@ EXTRA_SELECTOR_PATHS = {
     ],
     "extra_stage_hud": [
         "System/GameMode/GameModeStageMotionTest.cpp",
+    ],
+    "town_ui": [
+        "Town/TownManager.cpp",
+        "Town/TalkWindow.cpp",
+        "Town/ShopWindow.cpp",
+        "HUD/MediaRoom/MediaRoom.cpp",
+        "HUD/MediaRoom/MediaRoomDetail.cpp",
     ],
 }
 
@@ -197,7 +237,7 @@ def write_markdown(entries: list[dict], output_path: Path) -> None:
         "",
         '# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Source-Path-Named Debug Selector',
         "",
-        "Phase 33 upgrades the standalone selector from contract-stem browsing into source-family browsing.",
+        "This generated layer upgrades the standalone selector from contract-stem browsing into source-family browsing.",
         "",
         "> [!IMPORTANT]",
         "> This still runs on the repo-safe runtime contracts. The new part is the naming layer: the selector can now speak in recovered source-family terms such as `TitleMenu.cpp`, `HudPause.cpp`, and `WorldMapSelect.cpp` instead of only `title`, `pause`, or raw contract filenames.",
@@ -236,8 +276,8 @@ def write_markdown(entries: list[dict], output_path: Path) -> None:
             "## Selector Direction",
             "",
             "- The selector can now treat source-family aliases as first-class launch tokens.",
-            "- The current launch set now spans the bundled frontend, cutscene, gameplay-HUD, and boss/final runtime families, while keeping the tokens aligned with the mirrored source-family tree and the executable path dump.",
-            "- The next value is widening readable translated ownership and adding broader town/camera/application/world host coverage on top of this named selector layer.",
+        "- The current launch set now spans the bundled frontend, town, camera, application/world, cutscene, gameplay-HUD, and boss/final runtime families, while keeping the tokens aligned with the mirrored source-family tree and the executable path dump.",
+        "- The next value is widening readable translated ownership and pushing more host families through the same source-path-named launch flow.",
         ]
     )
 

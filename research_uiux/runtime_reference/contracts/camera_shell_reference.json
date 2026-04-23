@@ -1,0 +1,45 @@
+{
+  "screen_id": "CameraShellReference",
+  "timeline_bands": [
+    { "id": "camera_intro", "seconds": 0.5 },
+    { "id": "camera_navigate", "seconds": 0.18 },
+    { "id": "camera_confirm", "seconds": 0.28 },
+    { "id": "camera_cancel", "seconds": 0.2 },
+    { "id": "camera_outro", "seconds": 0.4 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "camera_boot", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "camera_shell_in", "timeline_band_id": "camera_intro", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "camera_shell_idle", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "Navigate", "enter_scene": "camera_shell_cycle", "timeline_band_id": "camera_navigate", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "Confirm", "enter_scene": "camera_shell_focus", "timeline_band_id": "camera_confirm", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "Cancel", "enter_scene": "camera_shell_release", "timeline_band_id": "camera_cancel", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "camera_shell_out", "timeline_band_id": "camera_outro", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "camera_closed", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "viewport_frame", "role": "backdrop", "interactive": false },
+    { "id": "focus_marker", "role": "content", "interactive": true },
+    { "id": "path_overlay", "role": "sidecar", "interactive": false },
+    { "id": "replay_stamp", "role": "footer", "interactive": false },
+    { "id": "prompt_strip", "role": "prompt", "interactive": false },
+    { "id": "camera_flash", "role": "transient_fx", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Boot": [],
+    "Intro": ["backdrop", "content", "sidecar", "footer"],
+    "Idle": ["backdrop", "content", "sidecar", "footer", "prompt"],
+    "Navigate": ["backdrop", "content", "sidecar", "footer", "transient_fx"],
+    "Confirm": ["backdrop", "content", "sidecar", "footer", "transient_fx"],
+    "Cancel": ["backdrop", "content", "sidecar", "footer"],
+    "Outro": ["backdrop", "content", "footer"],
+    "Closed": []
+  },
+  "prompt_slots": [
+    { "slot_id": "prev", "button": "LB", "label": "Previous Camera", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "next", "button": "RB", "label": "Next Camera", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "focus", "button": "Y", "label": "Focus Shot", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "reset", "button": "Start", "label": "Reset Camera", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "cancel", "button": "B", "label": "Exit Camera Shell", "visible_states": ["Idle"], "required_predicates": [] }
+  ]
+}

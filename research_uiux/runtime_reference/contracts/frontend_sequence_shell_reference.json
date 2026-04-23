@@ -1,0 +1,47 @@
+{
+  "screen_id": "FrontendSequenceShellReference",
+  "source_system": "frontend_sequence_shell",
+  "notes": "Sequence-core and unit-factory shell contract derived from SequenceManager/HandleUnit ownership, stage-change and movie wrappers, and frontend achievement/message dispatch.",
+  "timeline_bands": [
+    { "id": "queue_prepare", "seconds": 0.32 },
+    { "id": "route_cycle", "seconds": 0.24 },
+    { "id": "unit_dispatch", "seconds": 0.38 },
+    { "id": "unlock_burst", "seconds": 0.56 },
+    { "id": "route_return", "seconds": 0.3 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "ShellBoot", "enter_scene": "sequence_boot", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "QueuePrepare", "enter_scene": "sequence_queue_prepare", "timeline_band_id": "queue_prepare", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "RouteIdle", "enter_scene": "sequence_idle", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "RouteCycle", "enter_scene": "sequence_route_cycle", "timeline_band_id": "route_cycle", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "UnitDispatch", "enter_scene": "sequence_unit_dispatch", "timeline_band_id": "unit_dispatch", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "UnlockBurst", "enter_scene": "sequence_unlock_burst", "timeline_band_id": "unlock_burst", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "RouteReturn", "enter_scene": "sequence_route_return", "timeline_band_id": "route_return", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "sequence_closed", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "sequence_backdrop", "role": "backdrop", "interactive": false },
+    { "id": "unit_queue", "role": "content", "interactive": true },
+    { "id": "route_badge", "role": "sidecar", "interactive": false },
+    { "id": "unlock_toast", "role": "transient_fx", "interactive": false },
+    { "id": "loading_gate", "role": "loading_gate", "interactive": false },
+    { "id": "prompt_strip", "role": "prompt", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Boot": [],
+    "Intro": ["backdrop", "content", "sidecar"],
+    "Idle": ["backdrop", "content", "sidecar", "prompt"],
+    "Navigate": ["backdrop", "content", "sidecar", "prompt"],
+    "Confirm": ["backdrop", "content", "sidecar", "loading_gate"],
+    "Cancel": ["backdrop", "content", "transient_fx"],
+    "Outro": ["backdrop", "content", "loading_gate"],
+    "Closed": []
+  },
+  "prompt_slots": [
+    { "slot_id": "previous_unit", "button": "LB", "label": "Previous Unit", "visible_states": ["Idle"], "required_predicates": ["has_previous_unit"] },
+    { "slot_id": "next_unit", "button": "RB", "label": "Next Unit", "visible_states": ["Idle"], "required_predicates": ["has_next_unit"] },
+    { "slot_id": "dispatch_unit", "button": "A", "label": "Dispatch Unit", "visible_states": ["Idle"], "required_predicates": ["can_dispatch"] },
+    { "slot_id": "unlock_probe", "button": "Y", "label": "Achievement Probe", "visible_states": ["Idle"], "required_predicates": ["can_unlock"] },
+    { "slot_id": "route_back", "button": "B", "label": "Return", "visible_states": ["Idle"], "required_predicates": ["can_cancel"] }
+  ]
+}

@@ -55,6 +55,41 @@ GAMEPLAY_HUD_GROUPS = {
     },
 }
 
+SHELL_GROUPS = {
+    "town_ui": {
+        "group_id": "town_media_room_hosts",
+        "display_name": "Town / Media Room Hosts",
+        "priority": "high",
+        "primary_contract_file_name": "town_ui_reference.json",
+        "extra_alias_tokens": ["TownManager.cpp", "TalkWindow.cpp", "ShopWindow.cpp", "MediaRoom.cpp"],
+        "note": "Town, shop, talk, and media-room ownership tied back to the town shell runtime contract.",
+    },
+    "camera_shell": {
+        "group_id": "camera_replay_hosts",
+        "display_name": "Camera / Replay Hosts",
+        "priority": "medium",
+        "primary_contract_file_name": "camera_shell_reference.json",
+        "extra_alias_tokens": ["FreeCamera.cpp", "ReplayFreeCamera.cpp", "GoalCamera.cpp"],
+        "note": "Free, replay, goal, and town-support camera hosts driven through the camera/replay shell contract.",
+    },
+    "frontend_sequence_shell": {
+        "group_id": "frontend_sequence_hosts",
+        "display_name": "Frontend Sequence Hosts",
+        "priority": "high",
+        "primary_contract_file_name": "frontend_sequence_shell_reference.json",
+        "extra_alias_tokens": ["SequenceManagerImpl.cpp", "SequenceHandleUnit.cpp", "SequenceUnitFactory.cpp"],
+        "note": "Sequence-core and unit-factory hosts driven through the recovered frontend sequence shell contract.",
+    },
+    "application_world_shell": {
+        "group_id": "application_world_shell_hosts",
+        "display_name": "Application / World Shell Hosts",
+        "priority": "high",
+        "primary_contract_file_name": "application_world_shell_reference.json",
+        "extra_alias_tokens": ["Application.cpp", "GameModeBoot.cpp", "TitleMenu.cpp", "WorldMapSelect.cpp"],
+        "note": "Application, document, gamemode, title, and world-shell ownership tied to the portable app/world contract.",
+    },
+}
+
 
 def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8-sig"))
@@ -189,10 +224,66 @@ def build_gameplay_hud_host_entries(hud_payload: dict) -> list[dict]:
     return entries
 
 
-def build_host_entries(frontend_payload: dict, hud_payload: dict) -> list[dict]:
-    entries = build_frontend_host_entries(frontend_payload) + build_gameplay_hud_host_entries(hud_payload)
+def build_shell_host_entries(manifest_payload: dict) -> list[dict]:
+    entries: list[dict] = []
+
+    for system in manifest_payload.get("systems", []):
+        config = SHELL_GROUPS.get(system["system_id"])
+        if not config:
+            continue
+
+        for entry in manifest_payload.get("entries", []):
+            if system["system_id"] not in entry.get("matched_system_ids", []):
+                continue
+
+            relative_source_path = entry["relative_source_path"]
+            alias_tokens = unique_ordered(
+                [
+                    config["display_name"],
+                    config["group_id"],
+                    system["screen_name"],
+                    system["system_id"],
+                    entry["family_name"],
+                    entry["family_id"],
+                    relative_source_path,
+                    Path(relative_source_path).name,
+                    config["primary_contract_file_name"],
+                    Path(config["primary_contract_file_name"]).stem,
+                    *config["extra_alias_tokens"],
+                ]
+            )
+
+            entries.append(
+                {
+                    "group_id": config["group_id"],
+                    "group_display_name": config["display_name"],
+                    "priority": config["priority"],
+                    "relative_source_path": relative_source_path,
+                    "host_display_name": Path(relative_source_path).name,
+                    "primary_contract_file_name": config["primary_contract_file_name"],
+                    "alias_tokens": alias_tokens,
+                    "notes": config["note"],
+                }
+            )
+
     entries.sort(key=lambda item: (item["group_display_name"], item["host_display_name"]))
     return entries
+
+
+def build_host_entries(frontend_payload: dict, hud_payload: dict, manifest_payload: dict) -> list[dict]:
+    entries = (
+        build_frontend_host_entries(frontend_payload)
+        + build_gameplay_hud_host_entries(hud_payload)
+        + build_shell_host_entries(manifest_payload)
+    )
+    deduped: list[dict] = []
+    seen_paths: set[str] = set()
+    for entry in sorted(entries, key=lambda item: (item["group_display_name"], item["host_display_name"])):
+        if entry["relative_source_path"] in seen_paths:
+            continue
+        seen_paths.add(entry["relative_source_path"])
+        deduped.append(entry)
+    return deduped
 
 
 def write_header(entries: list[dict], output_path: Path) -> None:
@@ -249,18 +340,21 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate richer debug workbench host metadata from the frontend shell recovery layer.")
     parser.add_argument("--input", default="research_uiux/data/frontend_shell_recovery.json", help="Frontend shell recovery JSON.")
     parser.add_argument("--hud-input", default="research_uiux/data/gameplay_hud_core_map.json", help="Gameplay HUD core map JSON.")
+    parser.add_argument("--manifest-input", default="research_uiux/data/ui_source_path_manifest.json", help="Broader source-path manifest JSON.")
     parser.add_argument("--output-header", default="research_uiux/runtime_reference/include/sward/ui_runtime/debug_workbench_data.hpp", help="Generated workbench metadata header.")
     parser.add_argument("--output-json", default="research_uiux/data/debug_workbench_host_map.json", help="Tracked debug workbench host JSON.")
     args = parser.parse_args()
 
     input_path = Path(args.input).resolve()
     hud_input_path = Path(args.hud_input).resolve()
+    manifest_input_path = Path(args.manifest_input).resolve()
     output_header = Path(args.output_header).resolve()
     output_json = Path(args.output_json).resolve()
 
     frontend_payload = read_json(input_path)
     hud_payload = read_json(hud_input_path)
-    entries = build_host_entries(frontend_payload, hud_payload)
+    manifest_payload = read_json(manifest_input_path)
+    entries = build_host_entries(frontend_payload, hud_payload, manifest_payload)
 
     output_header.parent.mkdir(parents=True, exist_ok=True)
     output_json.parent.mkdir(parents=True, exist_ok=True)

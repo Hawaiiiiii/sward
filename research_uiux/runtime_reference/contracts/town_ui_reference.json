@@ -1,0 +1,47 @@
+{
+  "screen_id": "TownUiReference",
+  "timeline_bands": [
+    { "id": "town_intro", "seconds": 0.7 },
+    { "id": "town_navigate", "seconds": 0.22 },
+    { "id": "town_confirm", "seconds": 0.32 },
+    { "id": "town_cancel", "seconds": 0.24 },
+    { "id": "town_outro", "seconds": 0.52 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "town_boot", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "town_shell_in", "timeline_band_id": "town_intro", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "town_shell_idle", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "Navigate", "enter_scene": "town_shell_browse", "timeline_band_id": "town_navigate", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "Confirm", "enter_scene": "town_shell_commit", "timeline_band_id": "town_confirm", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "Cancel", "enter_scene": "town_shell_back", "timeline_band_id": "town_cancel", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "town_shell_out", "timeline_band_id": "town_outro", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "town_closed", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "town_backdrop", "role": "backdrop", "interactive": false },
+    { "id": "townscreen_frame", "role": "content", "interactive": true },
+    { "id": "dialog_balloon", "role": "content", "interactive": true },
+    { "id": "shop_frame", "role": "content", "interactive": true },
+    { "id": "media_room_panel", "role": "content", "interactive": true },
+    { "id": "footer_strip", "role": "footer", "interactive": false },
+    { "id": "prompt_strip", "role": "prompt", "interactive": false },
+    { "id": "focus_flash", "role": "transient_fx", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Boot": [],
+    "Intro": ["backdrop", "content", "footer"],
+    "Idle": ["backdrop", "content", "footer", "prompt"],
+    "Navigate": ["backdrop", "content", "footer", "transient_fx"],
+    "Confirm": ["backdrop", "content", "footer", "transient_fx"],
+    "Cancel": ["backdrop", "content", "footer"],
+    "Outro": ["backdrop", "content", "footer"],
+    "Closed": []
+  },
+  "prompt_slots": [
+    { "slot_id": "accept", "button": "A", "label": "Select / Talk", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "cancel", "button": "B", "label": "Back", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "prev", "button": "LB", "label": "Previous Tab", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "next", "button": "RB", "label": "Next Tab", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "detail", "button": "X", "label": "Inspect Detail", "visible_states": ["Idle"], "required_predicates": [] }
+  ]
+}

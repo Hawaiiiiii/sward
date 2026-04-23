@@ -13,6 +13,7 @@ GAMEPLAY_HUD_GROUPS = {
         "paths": [
             "HUD/Sonic/HudSonicStage.cpp",
             "HUD/Sonic/SonicMainDisplay.cpp",
+            "HUD/Item/HudItemGet.cpp",
             "Player/Character/Sonic/Hud/SonicHudGuide.cpp",
             "Player/Character/Sonic/Hud/SonicHudHomingAttack.cpp",
         ],
@@ -24,6 +25,7 @@ GAMEPLAY_HUD_GROUPS = {
             ("so_speed_gauge", "gauge", "Speed/boost gauge band."),
             ("so_ringenagy_gauge", "gauge", "Ring-energy gauge band."),
             ("u_info", "sidecar", "Bonus/info sidecar cluster."),
+            ("item_get_overlay", "transient_fx", "Shared item-get overlay probe for the in-stage HUD shell."),
         ],
     },
     "werehog_stage_hud": {
@@ -122,6 +124,13 @@ TOWN_BINDINGS = {
     "HUD/MediaRoom/MediaRoomSelectItem.cpp": [("ui_mediaroom", "Town_Labo_Common/ui_mediaroom.yncp", "Media Room item-selection step.")],
     "Town/ShopWindow.cpp": [("ui_shop", "Town_Common/ui_shop.yncp", "Shop buy/sell framing.")],
     "Town/ShopParamManager.cpp": [("ui_shop", "Town_Common/ui_shop.yncp", "Shop catalog data backing.")],
+    "Town/HotdogParamManager.cpp": [("ui_townscreen", "Town_Common/ui_townscreen.yncp", "Town challenge/hotdog parameter backing.")],
+    "Town/HotdogSaveManager.cpp": [("ui_townscreen", "Town_Common/ui_townscreen.yncp", "Town challenge save-data ownership.")],
+    "Town/ItemParamManager.cpp": [("ui_townscreen", "Town_Common/ui_townscreen.yncp", "Town item parameter catalog.")],
+    "Town/KyojuParamManager.cpp": [("ui_townscreen", "Town_Common/ui_townscreen.yncp", "Town NPC parameter backing.")],
+    "Town/KyojuPresentManager.cpp": [("ui_townscreen", "Town_Common/ui_townscreen.yncp", "Town present/event dispatch.")],
+    "Town/SunafkinParamManager.cpp": [("ui_townscreen", "Town_Common/ui_townscreen.yncp", "Town vendor parameter backing.")],
+    "Town/TimeTableManager.cpp": [("ui_townscreen", "Town_Common/ui_townscreen.yncp", "Town schedule/day-night routing.")],
     "Town/TalkWindow.cpp": [("ui_balloon", "Town_Common/ui_balloon.yncp", "Conversation balloon shell."), ("ui_townscreen", "Town_Common/ui_townscreen.yncp", "Town lower-third shell.")],
     "Town/DialogScript.cpp": [("ui_balloon", "Town_Common/ui_balloon.yncp", "Conversation script ownership."), ("ui_townscreen", "Town_Common/ui_townscreen.yncp", "Town message routing.")],
     "Town/TownManager.cpp": [("ui_townscreen", "Town_Common/ui_townscreen.yncp", "Town-level screen manager."), ("ui_balloon", "Town_Common/ui_balloon.yncp", "Balloon/dialog dispatch.")],
@@ -132,8 +141,51 @@ TOWN_BINDINGS = {
 CAMERA_BINDINGS = {
     "Camera/Controller/FreeCamera.cpp": [("Tooling / Debug UI", "Tool/InspirePreview/InspirePreview.cpp", "Free-view inspection host beside the debug sandbox.")],
     "Camera/Controller/GoalCamera.cpp": [("Mission Result Family", "HUD/Common/Result/HudResult.cpp", "Goal/result presentation camera handoff.")],
+    "Camera/Controller/Player2DBossCamera.cpp": [("Boss / Final HUD Hosts", "Boss/BossHudVitality.cpp", "2D boss camera shell adjacent to boss HUD timing.")],
+    "Camera/Controller/Player3DBossCamera.cpp": [("Boss / Final HUD Hosts", "Boss/BossHudVitality.cpp", "3D boss camera shell adjacent to vitality/nameplate ownership.")],
+    "Camera/Controller/Player3DFinalDarkGaiaCamera.cpp": [("Boss / Final HUD Hosts", "Boss/BossHudSuperSonic.cpp", "Final Dark Gaia camera bridge into Super Sonic/final HUD.")],
+    "Camera/Controller/PlayerSuperSonicCamera.cpp": [("Boss / Final HUD Hosts", "Boss/BossHudSuperSonic.cpp", "Super Sonic camera pairing with final HUD contract.")],
     "Replay/Camera/ReplayFreeCamera.cpp": [("Frontend Camera Shell", "Camera/Controller/FreeCamera.cpp", "Replay-oriented inspection camera.")],
     "Replay/Camera/ReplayRelativeCamera.cpp": [("Frontend Camera Shell", "Camera/Controller/GoalCamera.cpp", "Replay-relative presentation camera.")],
+}
+
+SEQUENCE_BINDINGS = {
+    "Sequence/Core/SequenceHandleUnit.cpp": [
+        ("Frontend Sequence Hosts", "Sequence/Unit/SequenceUnitFactory.cpp", "frontend_sequence_shell_reference.json", "Core sequence handle shell that advances per-unit ownership."),
+    ],
+    "Sequence/Core/SequenceManagerImpl.cpp": [
+        ("Frontend Sequence Hosts", "Sequence/Core/SequenceHandleUnit.cpp", "frontend_sequence_shell_reference.json", "Sequence-manager shell that owns route dispatch across frontend units."),
+    ],
+    "Sequence/Unit/SequenceUnitFactory.cpp": [
+        ("Frontend Sequence Hosts", "Sequence/Core/SequenceManagerImpl.cpp", "frontend_sequence_shell_reference.json", "Unit-factory shell that maps sequence ids to concrete UI/cutscene handlers."),
+    ],
+    "Sequence/Unit/SequenceUnitUnlockAchievement.cpp": [
+        ("Frontend Sequence Hosts", "Sequence/Core/SequenceManagerImpl.cpp", "frontend_sequence_shell_reference.json", "Achievement-unlock unit routed through the shared sequence shell."),
+    ],
+    "Sequence/Unit/SequenceUnitCallHelpWindow.cpp": [
+        ("Pause Stack", "HUD/HelpWindow/HelpWindow.cpp", "pause_menu_reference.json", "Help-window callout unit that routes into the pause/help contract."),
+    ],
+    "Sequence/Unit/SequenceUnitChangeStage.cpp": [
+        ("Loading / Boot / Install", "HUD/Loading/Loading.cpp", "loading_transition_reference.json", "Stage-change sequence unit that routes into the loading shell."),
+    ],
+    "Sequence/Unit/SequenceUnitMicroSequence.cpp": [
+        ("Subtitle / Cutscene Presentation", "Tool/InspirePreview/InspirePreview.cpp", "subtitle_cutscene_reference.json", "Micro-sequence shell that stays adjacent to cutscene/timeline playback."),
+    ],
+    "Sequence/Unit/SequenceUnitPlayMovie.cpp": [
+        ("Subtitle / Cutscene Presentation", "Tool/InspirePreview/InspirePreview.cpp", "subtitle_cutscene_reference.json", "Movie sequence unit that routes into subtitle/cutscene playback."),
+    ],
+    "Sequence/Unit/SequenceUnitSendMediaRoomMessage.cpp": [
+        ("Town / Media Room Hosts", "HUD/MediaRoom/MediaRoom.cpp", "town_ui_reference.json", "Media-room message dispatch routed through the town/media-room shell."),
+    ],
+    "Sequence/Unit/SequenceUnitSendTownMessage.cpp": [
+        ("Town / Media Room Hosts", "Town/TownManager.cpp", "town_ui_reference.json", "Town message dispatch routed through the town shell."),
+    ],
+    "Sequence/Utility/SequenceChangeStageUnit.cpp": [
+        ("Loading / Boot / Install", "Sequence/Unit/SequenceUnitChangeStage.cpp", "loading_transition_reference.json", "Stage-change utility wrapper above the loading shell."),
+    ],
+    "Sequence/Utility/SequencePlayMovieWrapper.cpp": [
+        ("Subtitle / Cutscene Presentation", "Sequence/Unit/SequenceUnitPlayMovie.cpp", "subtitle_cutscene_reference.json", "Movie-wrapper helper around the cutscene sequence unit."),
+    ],
 }
 
 SYSTEM_BINDINGS = {
@@ -191,6 +243,57 @@ SYSTEM_BINDINGS = {
     "System/GameMode/GameModeStage.cpp": [
         ("Gameplay HUD Hosts", "HUD/Sonic/HudSonicStage.cpp", "sonic_stage_hud_reference.json", "Stage-mode bootstrap for in-stage HUD ownership."),
         ("Subtitle / Cutscene Presentation", "System/GameMode/GameModeStageMovie.cpp", "subtitle_cutscene_reference.json", "Stage-mode movie/cutscene handoff."),
+    ],
+    "System/GameMode/GameModeBoot.cpp": [
+        ("Application / World Shell Hosts", "System/Application.cpp", "application_world_shell_reference.json", "Boot flow shell for the wider application/world runtime contract."),
+    ],
+    "System/GameMode/GameModeMainMenu.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/Title/TitleMenu.cpp", "application_world_shell_reference.json", "Main menu gamemode shell above the title/menu host layer."),
+    ],
+    "System/GameMode/GameModeStageMovie.cpp": [
+        ("Subtitle / Cutscene Presentation", "Tool/InspirePreview/InspirePreview.cpp", "subtitle_cutscene_reference.json", "Stage movie bridge into Inspire/cutscene presentation."),
+    ],
+    "System/GameMode/Title/TitleManager.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/Title/TitleMenu.cpp", "application_world_shell_reference.json", "Title manager ownership for the application/world shell."),
+    ],
+    "System/GameMode/Title/TitleMenu.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/Title/TitleMenu.cpp", "application_world_shell_reference.json", "Title menu host inside the wider app/world shell."),
+        ("Title / Main Menu", "System/GameMode/Title/TitleMenu.cpp", "title_menu_reference.json", "Direct title/menu contract anchor."),
+    ],
+    "System/GameMode/Title/TitleStateIntro.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/Title/TitleManager.cpp", "application_world_shell_reference.json", "Title intro dispatch state."),
+    ],
+    "System/GameMode/Title/TitleStateWorldMap.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/WorldMap/WorldMapSelect.cpp", "application_world_shell_reference.json", "Title-to-world-map bridge state."),
+        ("World Map Stack", "System/GameMode/WorldMap/WorldMapSelect.cpp", "world_map_reference.json", "World map handoff anchor."),
+    ],
+    "System/GameMode/MainMenu/MainMenuManager.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/Title/TitleMenu.cpp", "application_world_shell_reference.json", "Frontend main-menu manager shell."),
+        ("Title / Main Menu", "System/GameMode/Title/TitleMenu.cpp", "title_menu_reference.json", "Direct main menu manager anchor."),
+    ],
+    "System/GameMode/WorldMap/WorldMapListBox.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/WorldMap/WorldMapSelect.cpp", "application_world_shell_reference.json", "World map listbox shell inside the application/world host bucket."),
+        ("World Map Stack", "System/GameMode/WorldMap/WorldMapSelect.cpp", "world_map_reference.json", "Direct world map list ownership."),
+    ],
+    "System/GameMode/WorldMap/WorldMapMission.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/WorldMap/WorldMapSelect.cpp", "application_world_shell_reference.json", "World map mission selector shell."),
+        ("World Map Stack", "System/GameMode/WorldMap/WorldMapSelect.cpp", "world_map_reference.json", "World map mission ownership."),
+    ],
+    "System/GameMode/WorldMap/WorldMapObject.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/WorldMap/WorldMapSelect.cpp", "application_world_shell_reference.json", "World map object shell."),
+        ("World Map Stack", "System/GameMode/WorldMap/WorldMapSelect.cpp", "world_map_reference.json", "World map object ownership."),
+    ],
+    "System/GameMode/WorldMap/WorldMapSelect.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/WorldMap/WorldMapSelect.cpp", "application_world_shell_reference.json", "Primary world map selection host in the broader shell."),
+        ("World Map Stack", "System/GameMode/WorldMap/WorldMapSelect.cpp", "world_map_reference.json", "Direct world map contract anchor."),
+    ],
+    "System/GameMode/WorldMap/WorldMapSimpleInfo.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/WorldMap/WorldMapSelect.cpp", "application_world_shell_reference.json", "World map info sidecar shell."),
+        ("World Map Stack", "System/GameMode/WorldMap/WorldMapSelect.cpp", "world_map_reference.json", "World map simple-info ownership."),
+    ],
+    "System/GameMode/WorldMap/WorldMapTutorial.cpp": [
+        ("Application / World Shell Hosts", "System/GameMode/WorldMap/WorldMapSelect.cpp", "application_world_shell_reference.json", "World map tutorial/guide shell."),
+        ("World Map Stack", "System/GameMode/WorldMap/WorldMapSelect.cpp", "world_map_reference.json", "World map tutorial ownership."),
     ],
     "System/GameMode/Loader/DatabaseTree.cpp": [
         ("Loading / Boot / Install", "HUD/Loading/Loading.cpp", "loading_transition_reference.json", "Database/load-tree shell."),
@@ -479,6 +582,53 @@ def render_camera_source(relative_source_path: str, entry: dict[str, Any]) -> st
     return "\n".join(lines)
 
 
+def render_sequence_source(relative_source_path: str, entry: dict[str, Any]) -> str:
+    bindings = SEQUENCE_BINDINGS[relative_source_path]
+    lines = make_header(
+        relative_source_path,
+        entry,
+        [
+            "Research SU.txt",
+            "research_uiux/data/ui_source_path_manifest.json",
+            "research_uiux/runtime_reference/contracts/*.json",
+        ],
+    )
+    stem = Path(relative_source_path).stem
+    lines.extend(
+        [
+            "struct SequenceOwnershipBinding",
+            "{",
+            "    std::string_view ownerFamily;",
+            "    std::string_view sourcePath;",
+            "    std::string_view contractFile;",
+            "    std::string_view notes;",
+            "};",
+            "",
+            f"struct {stem}Shell",
+            "{",
+            "    [[nodiscard]] static constexpr auto BuildSequenceBindings()",
+            "    {",
+            f"        return std::array<SequenceOwnershipBinding, {len(bindings)}>{{",
+        ]
+    )
+    for index, (owner_family, source_path, contract_file, notes) in enumerate(bindings):
+        lines.append("            SequenceOwnershipBinding{")
+        lines.append(f'                "{cpp_string(owner_family)}",')
+        lines.append(f'                "{cpp_string(source_path)}",')
+        lines.append(f'                "{cpp_string(contract_file)}",')
+        lines.append(f'                "{cpp_string(notes)}",')
+        lines.append("            }" + ("," if index + 1 != len(bindings) else ""))
+    lines.extend(
+        [
+            "        };",
+            "    }",
+            "};",
+        ]
+    )
+    lines.extend(make_footer())
+    return "\n".join(lines)
+
+
 def render_system_source(relative_source_path: str, entry: dict[str, Any]) -> str:
     bindings = SYSTEM_BINDINGS[relative_source_path]
     lines = make_header(
@@ -605,6 +755,22 @@ def build_target_groups(entries_by_path: dict[str, dict[str, Any]], gameplay_pay
 
     groups.append(
         {
+            "group_id": "frontend_sequence_sources",
+            "display_name": "Frontend Sequence Sources",
+            "purpose": "Readable local-only sequence-core and sequence-unit scaffolds tied back to the new frontend sequence shell and its downstream runtime families.",
+            "targets": [
+                {
+                    "relative_source_path": relative_source_path,
+                    "entry": lookup_entry(entries_by_path, relative_source_path),
+                    "renderer": "sequence",
+                }
+                for relative_source_path in SEQUENCE_BINDINGS
+            ],
+        }
+    )
+
+    groups.append(
+        {
             "group_id": "application_world_sources",
             "display_name": "Application / World Shell Sources",
             "purpose": "Readable local-only system-shell scaffolds linking application/world/stage hosts back to current runtime families.",
@@ -634,6 +800,8 @@ def render_target(target: dict[str, Any]) -> str:
         return render_town_source(relative_source_path, entry)
     if renderer == "camera":
         return render_camera_source(relative_source_path, entry)
+    if renderer == "sequence":
+        return render_sequence_source(relative_source_path, entry)
     return render_system_source(relative_source_path, entry)
 
 
@@ -646,7 +814,7 @@ def write_tracked_markdown(summary_payload: dict[str, Any], output_path: Path) -
         "",
         '# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Local Debug-Oriented Source Tree Expansion',
         "",
-        "Phase 41 widens the local-only readable source layer from the first menu/cutscene hosts into gameplay HUD, stage-test, town, camera, and application/world shell paths.",
+        "This pass widens the local-only readable source layer from the first menu/cutscene hosts into gameplay HUD, stage-test, town, camera, sequence, and application/world shell paths.",
         "",
         "> [!IMPORTANT]",
         "> These files stay local-only under `SONIC UNLEASHED/`. The tracked repo carries the materializer plus the summary, not the mirrored files themselves.",
@@ -672,7 +840,7 @@ def write_tracked_markdown(summary_payload: dict[str, Any], output_path: Path) -
             "",
             "- Gameplay HUD hosts now have local-only readable ownership scaffolds tied to the new runtime contracts.",
             "- Stage-test game modes now read like probe hosts instead of only path-dump notes.",
-            "- Town/media-room, camera, and application/world shells now carry readable ownership bindings instead of remaining note-only placeholders.",
+            "- Town/media-room, camera, sequence, and application/world shells now carry readable ownership bindings instead of remaining note-only placeholders.",
             "- The mirrored local source tree is materially closer to a debug-oriented source layout instead of a note staging area.",
         ]
     )
@@ -701,7 +869,6 @@ def write_local_readme(mirror_root: Path, total_humanized_count: int) -> None:
                 "",
                 "Generated by:",
                 "- `research_uiux/tools/materialize_source_family_notes.py`",
-                "- `research_uiux/tools/materialize_humanized_debug_hosts.py`",
                 "- `research_uiux/tools/materialize_local_debug_source_tree.py`",
                 "",
             ]

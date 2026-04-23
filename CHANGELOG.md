@@ -9,6 +9,49 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 > [!NOTE]
 > This changelog tracks the publishable repo layer. Local-only extracted assets, generated PPC output, staged tools, and private inputs stay outside git history by design.
 
+## 2026-04-24
+
+### Phase 46 sequence and item source deepening
+
+- added [`research_uiux/SEQUENCE_AND_ITEM_SOURCE_DEEPENING.md`](./research_uiux/SEQUENCE_AND_ITEM_SOURCE_DEEPENING.md)
+- deepened the local-only `SONIC UNLEASHED/` readable source layer to `102` `.cpp` scaffolds
+- added `12` local-only readable sequence-shell scaffolds plus the `HUD/Item/HudItemGet.cpp` gameplay-HUD scaffold without publishing that mirror itself
+- refreshed the tracked summary under [`research_uiux/data/local_debug_source_tree_expansion.json`](./research_uiux/data/local_debug_source_tree_expansion.json)
+
+### Phase 45 frontend sequence shell runtime bridge
+
+- added [`research_uiux/FRONTEND_SEQUENCE_SHELL_RUNTIME_BRIDGE.md`](./research_uiux/FRONTEND_SEQUENCE_SHELL_RUNTIME_BRIDGE.md)
+- added the bundled contract [`research_uiux/runtime_reference/contracts/frontend_sequence_shell_reference.json`](./research_uiux/runtime_reference/contracts/frontend_sequence_shell_reference.json)
+- extended the native runtime, C ABI, and C# managed reference layers with `FrontendSequenceShell`
+- refreshed the broader source-path manifest to `220` paths with `163` archaeology-mapped entries, `154` contract-backed entries, `57` debug-host candidates, and `0` named-only gaps
+- widened the source-family selector to `16` launch families and the workbench to `133` hosts across `10` groups, including the new frontend-sequence host bucket
+
+### Phase 44 local debug source tree deepening
+
+- added [`research_uiux/LOCAL_DEBUG_SOURCE_TREE_DEEPENING.md`](./research_uiux/LOCAL_DEBUG_SOURCE_TREE_DEEPENING.md)
+- deepened the local-only `SONIC UNLEASHED/` readable source layer to `92` `.cpp` scaffolds
+- widened the town/media-room, camera/replay, and application/world shell ownership stubs inside the local-only mirror without publishing that tree
+- refreshed the tracked summary under [`research_uiux/data/local_debug_source_tree_expansion.json`](./research_uiux/data/local_debug_source_tree_expansion.json)
+
+### Phase 43 persistent debug shell and workbench
+
+- added [`research_uiux/PERSISTENT_DEBUG_SHELL_AND_WORKBENCH.md`](./research_uiux/PERSISTENT_DEBUG_SHELL_AND_WORKBENCH.md)
+- upgraded [`research_uiux/runtime_reference/examples/ui_debug_selector.cpp`](./research_uiux/runtime_reference/examples/ui_debug_selector.cpp) so interactive runs loop back to the menu and direct runs support `--stay-open`
+- upgraded [`research_uiux/runtime_reference/examples/ui_debug_workbench.cpp`](./research_uiux/runtime_reference/examples/ui_debug_workbench.cpp) so interactive runs loop back to the group browser and direct runs support `--stay-open`
+- widened the generated workbench host map to `129` hosts across `9` groups, including town/media-room, camera/replay, and application/world shell families
+- verified the selector/workbench locally from `b/rr44`, including direct launches for `TownManager.cpp`, `FreeCamera.cpp`, `Application.cpp`, `TitleManager.cpp`, and `WorldMapSelect.cpp`
+
+### Phase 42 town, camera, and application shell runtime bridge
+
+- added [`research_uiux/TOWN_CAMERA_APPLICATION_RUNTIME_CONTRACTS.md`](./research_uiux/TOWN_CAMERA_APPLICATION_RUNTIME_CONTRACTS.md)
+- added bundled contract files under [`research_uiux/runtime_reference/contracts/`](./research_uiux/runtime_reference/contracts/) for:
+  - `town_ui_reference.json`
+  - `camera_shell_reference.json`
+  - `application_world_shell_reference.json`
+- extended the native runtime, C ABI, and C# managed reference layers with `TownUi`, `CameraShell`, and `ApplicationWorldShell`
+- refreshed the broader source-path manifest to `220` paths with `158` archaeology-mapped entries, `149` contract-backed entries, `57` debug-host candidates, and `5` named-only gaps
+- refreshed the source-family selector metadata to `15` launch families, including town, camera/replay, and application/world shell coverage
+
 ## 2026-04-23
 
 ### Phase 41 local debug-oriented source tree expansion

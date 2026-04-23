@@ -65,6 +65,26 @@ ScreenContract makeBossHudContract()
     return loadBundledContract(ReferenceProfile::BossHud);
 }
 
+ScreenContract makeTownUiContract()
+{
+    return loadBundledContract(ReferenceProfile::TownUi);
+}
+
+ScreenContract makeCameraShellContract()
+{
+    return loadBundledContract(ReferenceProfile::CameraShell);
+}
+
+ScreenContract makeApplicationWorldShellContract()
+{
+    return loadBundledContract(ReferenceProfile::ApplicationWorldShell);
+}
+
+ScreenContract makeFrontendSequenceShellContract()
+{
+    return loadBundledContract(ReferenceProfile::FrontendSequenceShell);
+}
+
 ScreenContract makeContract(ReferenceProfile profile)
 {
     return loadBundledContract(profile);
@@ -98,6 +118,14 @@ std::string_view toString(ReferenceProfile profile)
         return "SuperSonicHud";
     case ReferenceProfile::BossHud:
         return "BossHud";
+    case ReferenceProfile::TownUi:
+        return "TownUi";
+    case ReferenceProfile::CameraShell:
+        return "CameraShell";
+    case ReferenceProfile::ApplicationWorldShell:
+        return "ApplicationWorldShell";
+    case ReferenceProfile::FrontendSequenceShell:
+        return "FrontendSequenceShell";
     }
 
     return "Unknown";

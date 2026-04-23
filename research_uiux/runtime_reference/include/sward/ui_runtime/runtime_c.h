@@ -65,6 +65,10 @@ typedef enum sward_ui_profile_id
     SWARD_UI_PROFILE_EXTRA_STAGE_HUD = 9,
     SWARD_UI_PROFILE_SUPER_SONIC_HUD = 10,
     SWARD_UI_PROFILE_BOSS_HUD = 11,
+    SWARD_UI_PROFILE_TOWN_UI = 12,
+    SWARD_UI_PROFILE_CAMERA_SHELL = 13,
+    SWARD_UI_PROFILE_APPLICATION_WORLD_SHELL = 14,
+    SWARD_UI_PROFILE_FRONTEND_SEQUENCE_SHELL = 15,
 } sward_ui_profile_id;
 
 typedef struct sward_ui_prompt_view

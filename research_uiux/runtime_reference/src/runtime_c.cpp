@@ -57,6 +57,14 @@ ReferenceProfile fromCProfile(sward_ui_profile_id profileId)
         return ReferenceProfile::SuperSonicHud;
     case SWARD_UI_PROFILE_BOSS_HUD:
         return ReferenceProfile::BossHud;
+    case SWARD_UI_PROFILE_TOWN_UI:
+        return ReferenceProfile::TownUi;
+    case SWARD_UI_PROFILE_CAMERA_SHELL:
+        return ReferenceProfile::CameraShell;
+    case SWARD_UI_PROFILE_APPLICATION_WORLD_SHELL:
+        return ReferenceProfile::ApplicationWorldShell;
+    case SWARD_UI_PROFILE_FRONTEND_SEQUENCE_SHELL:
+        return ReferenceProfile::FrontendSequenceShell;
     }
 
     return ReferenceProfile::PauseMenu;
@@ -402,6 +410,14 @@ const char* sward_ui_to_string_profile(sward_ui_profile_id profile_id)
         return "SuperSonicHud";
     case SWARD_UI_PROFILE_BOSS_HUD:
         return "BossHud";
+    case SWARD_UI_PROFILE_TOWN_UI:
+        return "TownUi";
+    case SWARD_UI_PROFILE_CAMERA_SHELL:
+        return "CameraShell";
+    case SWARD_UI_PROFILE_APPLICATION_WORLD_SHELL:
+        return "ApplicationWorldShell";
+    case SWARD_UI_PROFILE_FRONTEND_SEQUENCE_SHELL:
+        return "FrontendSequenceShell";
     }
 
     return "Unknown";

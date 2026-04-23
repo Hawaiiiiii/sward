@@ -6,6 +6,7 @@
 #include <cctype>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -271,36 +272,72 @@ void driveRuntime(const ContractEntry& entry)
     std::cout << "Final state: " << toString(runtime.state()) << '\n';
 }
 
-[[nodiscard]] std::optional<std::size_t> selectInteractiveIndex(const std::vector<ContractEntry>& entries)
+void waitForEnter(std::string_view prompt)
 {
-    printEntryList(entries);
-    std::cout << "\nSelect contract number: ";
+    std::cout << prompt;
+    std::string line;
+    std::getline(std::cin, line);
+}
 
+[[nodiscard]] bool promptReturnToMenu()
+{
+    std::cout << "\nPress Enter to return to the menu, or type q to quit: ";
     std::string line;
     if (!std::getline(std::cin, line))
-        return std::nullopt;
+        return false;
 
-    std::istringstream parser(line);
-    std::size_t value = 0;
-    if (!(parser >> value) || value == 0 || value > entries.size())
-        return std::nullopt;
-    return value - 1;
+    const std::string normalized = normalizeToken(line);
+    return normalized != "q" && normalized != "quit" && normalized != "exit";
+}
+
+[[nodiscard]] std::optional<std::size_t> selectInteractiveIndex(const std::vector<ContractEntry>& entries)
+{
+    while (true)
+    {
+        printEntryList(entries);
+        std::cout << "\nSelect contract number (or q to quit): ";
+
+        std::string line;
+        if (!std::getline(std::cin, line))
+            return std::nullopt;
+
+        const std::string normalized = normalizeToken(line);
+        if (normalized == "q" || normalized == "quit" || normalized == "exit")
+            return std::nullopt;
+
+        std::istringstream parser(line);
+        std::size_t value = 0;
+        if ((parser >> value) && value > 0 && value <= entries.size())
+            return value - 1;
+
+        std::cout << "Invalid contract selection.\n\n";
+    }
 }
 
 [[nodiscard]] std::optional<std::size_t> selectInteractiveFamilyIndex(const std::vector<ResolvedFamilyEntry>& families)
 {
-    printFamilyList(families);
-    std::cout << "\nSelect family number: ";
+    while (true)
+    {
+        printFamilyList(families);
+        std::cout << "\nSelect family number (or q to quit, or c for raw contracts): ";
 
-    std::string line;
-    if (!std::getline(std::cin, line))
-        return std::nullopt;
+        std::string line;
+        if (!std::getline(std::cin, line))
+            return std::nullopt;
 
-    std::istringstream parser(line);
-    std::size_t value = 0;
-    if (!(parser >> value) || value == 0 || value > families.size())
-        return std::nullopt;
-    return value - 1;
+        const std::string normalized = normalizeToken(line);
+        if (normalized == "q" || normalized == "quit" || normalized == "exit")
+            return std::nullopt;
+        if (normalized == "c" || normalized == "contract" || normalized == "contracts")
+            return std::numeric_limits<std::size_t>::max();
+
+        std::istringstream parser(line);
+        std::size_t value = 0;
+        if ((parser >> value) && value > 0 && value <= families.size())
+            return value - 1;
+
+        std::cout << "Invalid family selection.\n\n";
+    }
 }
 
 [[nodiscard]] std::optional<std::size_t> findEntryIndex(const std::vector<ContractEntry>& entries, std::string_view token)
@@ -375,42 +412,54 @@ int main(int argc, char** argv)
     {
         const std::vector<ContractEntry> bundledEntries = loadBundledEntries();
         const std::vector<ResolvedFamilyEntry> families = resolveFamilyEntries(bundledEntries);
-        if (argc > 1)
+        std::vector<std::string> arguments(argv + 1, argv + argc);
+        const auto stayOpenIt = std::find(arguments.begin(), arguments.end(), "--stay-open");
+        const bool stayOpen = stayOpenIt != arguments.end();
+        if (stayOpen)
+            arguments.erase(stayOpenIt);
+
+        if (!arguments.empty())
         {
-            const std::string command = argv[1];
+            const std::string& command = arguments[0];
             if (command == "--list")
             {
                 printEntryList(bundledEntries);
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
                 return 0;
             }
 
             if (command == "--list-families")
             {
                 printFamilyList(families);
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
                 return 0;
             }
 
             if (command == "--path")
             {
-                if (argc < 3)
+                if (arguments.size() < 2)
                 {
                     std::cerr << "--path requires a contract file path.\n";
                     return 1;
                 }
 
-                driveRuntime(loadExplicitEntry(argv[2]));
+                driveRuntime(loadExplicitEntry(arguments[1]));
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
                 return 0;
             }
 
             if (command == "--family")
             {
-                if (argc < 3)
+                if (arguments.size() < 2)
                 {
                     std::cerr << "--family requires a family token.\n";
                     return 1;
                 }
 
-                const auto familyIndex = findFamilyIndex(families, argv[2]);
+                const auto familyIndex = findFamilyIndex(families, arguments[1]);
                 if (!familyIndex.has_value())
                 {
                     std::cerr << "Unknown family token. Use --list-families to inspect the available launch families.\n";
@@ -418,18 +467,20 @@ int main(int argc, char** argv)
                 }
 
                 driveRuntime(bundledEntries[families[*familyIndex].contractIndex]);
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
                 return 0;
             }
 
             if (command == "--index")
             {
-                if (argc < 3)
+                if (arguments.size() < 2)
                 {
                     std::cerr << "--index requires a 1-based contract number.\n";
                     return 1;
                 }
 
-                const auto index = parseIndexArgument(argv[2], bundledEntries.size());
+                const auto index = parseIndexArgument(arguments[1], bundledEntries.size());
                 if (!index.has_value())
                 {
                     std::cerr << "Invalid contract index.\n";
@@ -437,6 +488,8 @@ int main(int argc, char** argv)
                 }
 
                 driveRuntime(bundledEntries[*index]);
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
                 return 0;
             }
 
@@ -444,6 +497,8 @@ int main(int argc, char** argv)
             if (familyIndex.has_value())
             {
                 driveRuntime(bundledEntries[families[*familyIndex].contractIndex]);
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
                 return 0;
             }
 
@@ -455,18 +510,33 @@ int main(int argc, char** argv)
             }
 
             driveRuntime(bundledEntries[*entryIndex]);
+            if (stayOpen)
+                waitForEnter("\nPress Enter to exit...");
             return 0;
         }
 
-        const auto familyIndex = selectInteractiveFamilyIndex(families);
-        if (!familyIndex.has_value())
+        while (true)
         {
-            std::cerr << "No valid family selection was provided.\n";
-            return 1;
-        }
+            const auto familyIndex = selectInteractiveFamilyIndex(families);
+            if (!familyIndex.has_value())
+                return 0;
 
-        driveRuntime(bundledEntries[families[*familyIndex].contractIndex]);
-        return 0;
+            if (*familyIndex == std::numeric_limits<std::size_t>::max())
+            {
+                const auto entryIndex = selectInteractiveIndex(bundledEntries);
+                if (!entryIndex.has_value())
+                    return 0;
+
+                driveRuntime(bundledEntries[*entryIndex]);
+            }
+            else
+            {
+                driveRuntime(bundledEntries[families[*familyIndex].contractIndex]);
+            }
+
+            if (!promptReturnToMenu())
+                return 0;
+        }
     }
     catch (const std::exception& exception)
     {

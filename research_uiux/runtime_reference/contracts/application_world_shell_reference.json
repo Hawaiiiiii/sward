@@ -1,0 +1,45 @@
+{
+  "screen_id": "ApplicationWorldShellReference",
+  "timeline_bands": [
+    { "id": "shell_intro", "seconds": 0.62 },
+    { "id": "shell_navigate", "seconds": 0.26 },
+    { "id": "shell_confirm", "seconds": 0.34 },
+    { "id": "shell_cancel", "seconds": 0.24 },
+    { "id": "shell_outro", "seconds": 0.48 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "app_boot", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "app_shell_in", "timeline_band_id": "shell_intro", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "app_world_idle", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "Navigate", "enter_scene": "app_route_browse", "timeline_band_id": "shell_navigate", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "Confirm", "enter_scene": "app_stage_attach", "timeline_band_id": "shell_confirm", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "Cancel", "enter_scene": "app_shell_back", "timeline_band_id": "shell_cancel", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "app_shell_out", "timeline_band_id": "shell_outro", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "app_closed", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "shell_backdrop", "role": "backdrop", "interactive": false },
+    { "id": "route_table", "role": "content", "interactive": true },
+    { "id": "stage_banner", "role": "content", "interactive": false },
+    { "id": "world_state", "role": "sidecar", "interactive": false },
+    { "id": "prompt_strip", "role": "prompt", "interactive": false },
+    { "id": "loading_curtain", "role": "transient_fx", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Boot": [],
+    "Intro": ["backdrop", "content", "sidecar"],
+    "Idle": ["backdrop", "content", "sidecar", "prompt"],
+    "Navigate": ["backdrop", "content", "sidecar", "transient_fx"],
+    "Confirm": ["backdrop", "content", "sidecar", "transient_fx"],
+    "Cancel": ["backdrop", "content", "sidecar"],
+    "Outro": ["backdrop", "content"],
+    "Closed": []
+  },
+  "prompt_slots": [
+    { "slot_id": "attach", "button": "A", "label": "Attach Stage", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "back", "button": "B", "label": "Back Out", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "reload", "button": "X", "label": "Reload Shell", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "overlay", "button": "Y", "label": "Toggle World Overlay", "visible_states": ["Idle"], "required_predicates": [] },
+    { "slot_id": "boot", "button": "Start", "label": "Boot Flow", "visible_states": ["Idle"], "required_predicates": [] }
+  ]
+}

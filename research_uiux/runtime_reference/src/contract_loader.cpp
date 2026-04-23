@@ -407,6 +407,14 @@ private:
         return "super_sonic_hud_reference.json";
     case ReferenceProfile::BossHud:
         return "boss_hud_reference.json";
+    case ReferenceProfile::TownUi:
+        return "town_ui_reference.json";
+    case ReferenceProfile::CameraShell:
+        return "camera_shell_reference.json";
+    case ReferenceProfile::ApplicationWorldShell:
+        return "application_world_shell_reference.json";
+    case ReferenceProfile::FrontendSequenceShell:
+        return "frontend_sequence_shell_reference.json";
     }
 
     throw std::runtime_error("Unknown reference profile.");
@@ -517,6 +525,10 @@ std::vector<std::filesystem::path> bundledContractPaths()
     result.push_back(root / "extra_stage_hud_reference.json");
     result.push_back(root / "super_sonic_hud_reference.json");
     result.push_back(root / "boss_hud_reference.json");
+    result.push_back(root / "town_ui_reference.json");
+    result.push_back(root / "camera_shell_reference.json");
+    result.push_back(root / "application_world_shell_reference.json");
+    result.push_back(root / "frontend_sequence_shell_reference.json");
     return result;
 }
 } // namespace sward::ui_runtime

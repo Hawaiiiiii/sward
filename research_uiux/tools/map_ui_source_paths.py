@@ -27,6 +27,9 @@ SYSTEM_DISPLAY = {
     "extra_stage_hud": "Extra Stage / Tornado Defense HUD",
     "super_sonic_hud": "Super Sonic / Final HUD Bridge",
     "csd_ui_foundation": "CSD / UI Foundation",
+    "frontend_sequence_shell": "Frontend Sequence Shell",
+    "camera_shell": "Camera / Replay Shell",
+    "application_world_shell": "Application / World Shell",
 }
 
 RUNTIME_CONTRACTS = {
@@ -42,6 +45,10 @@ RUNTIME_CONTRACTS = {
     "extra_stage_hud": "extra_stage_hud_reference.json",
     "super_sonic_hud": "super_sonic_hud_reference.json",
     "boss_hud": "boss_hud_reference.json",
+    "town_ui": "town_ui_reference.json",
+    "frontend_sequence_shell": "frontend_sequence_shell_reference.json",
+    "camera_shell": "camera_shell_reference.json",
+    "application_world_shell": "application_world_shell_reference.json",
 }
 
 STATUS_ORDER = {
@@ -96,6 +103,64 @@ def load_system_index(repo_root: Path, archaeology_json: Path) -> dict[str, dict
         foundation_system = foundation_payload.get("foundation_system")
         if foundation_system:
             systems[foundation_system["system_id"]] = foundation_system
+
+    synthetic_systems = {
+        "camera_shell": {
+            "system_id": "camera_shell",
+            "screen_name": SYSTEM_DISPLAY["camera_shell"],
+            "layout_ids": [],
+            "host_code_files": [
+                "Camera/Controller/FreeCamera.cpp",
+                "Camera/Controller/GoalCamera.cpp",
+                "Camera/Controller/TownShopCamera.cpp",
+                "Camera/Controller/TownTalkCamera.cpp",
+                "Replay/Camera/ReplayFreeCamera.cpp",
+                "Replay/Camera/ReplayRelativeCamera.cpp",
+            ],
+            "generated_seams": [],
+            "state_tags": ["camera_shell", "replay_shell", "focus_cycle", "preview_host"],
+        },
+        "frontend_sequence_shell": {
+            "system_id": "frontend_sequence_shell",
+            "screen_name": SYSTEM_DISPLAY["frontend_sequence_shell"],
+            "layout_ids": [],
+            "host_code_files": [
+                "Sequence/Core/SequenceHandleUnit.cpp",
+                "Sequence/Core/SequenceManagerImpl.cpp",
+                "Sequence/Unit/SequenceUnitFactory.cpp",
+                "Sequence/Unit/SequenceUnitUnlockAchievement.cpp",
+                "Sequence/Unit/SequenceUnitChangeStage.cpp",
+                "Sequence/Unit/SequenceUnitMicroSequence.cpp",
+                "Sequence/Unit/SequenceUnitPlayMovie.cpp",
+                "Sequence/Utility/SequenceChangeStageUnit.cpp",
+                "Sequence/Utility/SequencePlayMovieWrapper.cpp",
+            ],
+            "generated_seams": [],
+            "state_tags": ["sequence_shell", "route_dispatch", "frontend_handoff", "unit_factory"],
+        },
+        "application_world_shell": {
+            "system_id": "application_world_shell",
+            "screen_name": SYSTEM_DISPLAY["application_world_shell"],
+            "layout_ids": [],
+            "host_code_files": [
+                "System/Application.cpp",
+                "System/ApplicationDocument.cpp",
+                "System/Game.cpp",
+                "System/GameDocument.cpp",
+                "System/World.cpp",
+                "System/GameMode/GameModeBoot.cpp",
+                "System/GameMode/GameModeMainMenu.cpp",
+                "System/GameMode/GameModeStage.cpp",
+                "System/GameMode/Title/TitleManager.cpp",
+                "System/GameMode/Title/TitleMenu.cpp",
+                "System/GameMode/WorldMap/WorldMapSelect.cpp",
+            ],
+            "generated_seams": [],
+            "state_tags": ["application_shell", "world_shell", "gamemode_shell", "frontend_dispatch"],
+        },
+    }
+    for system_id, system in synthetic_systems.items():
+        systems.setdefault(system_id, system)
 
     return systems
 
@@ -211,9 +276,9 @@ def classify_source_path(relative_path: str) -> dict:
         return {
             "family_id": "stage_hud_core",
             "family_name": "Stage HUD Core",
-            "candidate_system_ids": [],
+            "candidate_system_ids": ["sonic_stage_hud", "werehog_stage_hud"],
             "debug_tool_candidate": False,
-            "notes": "In-stage item-get surface that still sits adjacent to the gameplay HUD map without a fully isolated host family.",
+            "notes": "In-stage item-get overlay that appears to sit alongside the shared day/night gameplay HUD shell rather than a standalone frontend family.",
         }
 
     if lowered.startswith("hud/pause/") or lowered.startswith("hud/generalwindow/") or lowered.startswith("hud/helpwindow/"):
@@ -247,7 +312,7 @@ def classify_source_path(relative_path: str) -> dict:
         return {
             "family_id": "loading_and_boot",
             "family_name": "Loading / Boot / Install",
-            "candidate_system_ids": ["loading_and_start"],
+            "candidate_system_ids": ["loading_and_start", "application_world_shell"],
             "debug_tool_candidate": False,
             "notes": "Loading, install, and stage-logo/start handoff surfaces.",
         }
@@ -256,7 +321,7 @@ def classify_source_path(relative_path: str) -> dict:
         return {
             "family_id": "world_map_stack",
             "family_name": "World Map Stack",
-            "candidate_system_ids": ["world_map_stack"],
+            "candidate_system_ids": ["world_map_stack", "application_world_shell"],
             "debug_tool_candidate": False,
             "notes": "World map list/select/object/tutorial flow.",
         }
@@ -309,7 +374,7 @@ def classify_source_path(relative_path: str) -> dict:
         return {
             "family_id": "save_and_ending",
             "family_name": "Save / Ending Flow",
-            "candidate_system_ids": ["save_and_ending"],
+            "candidate_system_ids": ["save_and_ending", "application_world_shell"],
             "debug_tool_candidate": False,
             "notes": "Autosave and clear-flag sequencing around endings/save icon behavior.",
         }
@@ -352,7 +417,7 @@ def classify_source_path(relative_path: str) -> dict:
         return {
             "family_id": "save_and_ending",
             "family_name": "Save / Ending Flow",
-            "candidate_system_ids": ["save_and_ending"],
+            "candidate_system_ids": ["save_and_ending", "application_world_shell"],
             "debug_tool_candidate": False,
             "notes": "Ending text/image flow and save-test surfaces.",
         }
@@ -370,7 +435,7 @@ def classify_source_path(relative_path: str) -> dict:
         return {
             "family_id": "title_menu",
             "family_name": "Title / Main Menu",
-            "candidate_system_ids": ["title_menu", "loading_and_start"],
+            "candidate_system_ids": ["title_menu", "loading_and_start", "application_world_shell"],
             "debug_tool_candidate": False,
             "notes": "Title/menu ownership, intro handoff, and stage-title/menu entry surfaces.",
         }
@@ -401,7 +466,7 @@ def classify_source_path(relative_path: str) -> dict:
         return {
             "family_id": "tooling_debug_ui",
             "family_name": "Tooling / Debug UI",
-            "candidate_system_ids": [],
+            "candidate_system_ids": ["camera_shell"],
             "debug_tool_candidate": True,
             "notes": "Free/replay camera controllers that look more like debug and inspection hosts than final frontend ownership.",
         }
@@ -410,7 +475,7 @@ def classify_source_path(relative_path: str) -> dict:
         return {
             "family_id": "frontend_camera_shell",
             "family_name": "Frontend Camera Shell",
-            "candidate_system_ids": [],
+            "candidate_system_ids": ["camera_shell"],
             "debug_tool_candidate": False,
             "notes": "Camera-side support around menu, town, goal, replay, and debug-facing presentation flows.",
         }
@@ -419,16 +484,16 @@ def classify_source_path(relative_path: str) -> dict:
         return {
             "family_id": "frontend_sequence_shell",
             "family_name": "Frontend Sequence Shell",
-            "candidate_system_ids": [],
+            "candidate_system_ids": ["frontend_sequence_shell"],
             "debug_tool_candidate": False,
-            "notes": "Sequence orchestration that still sits adjacent to the UI stack without a tighter recovered screen family.",
+            "notes": "Sequence orchestration and unit-factory shell that now has a dedicated recovered runtime/debug family.",
         }
 
     if lowered.startswith("system/gamemode/"):
         return {
             "family_id": "frontend_gamemode_shell",
             "family_name": "GameMode / Frontend Shell",
-            "candidate_system_ids": [],
+            "candidate_system_ids": ["application_world_shell"],
             "debug_tool_candidate": False,
             "notes": "Higher-level game-mode orchestration around menu, stage, frontend, and handoff shells that still need finer recovery.",
         }
@@ -437,7 +502,7 @@ def classify_source_path(relative_path: str) -> dict:
         return {
             "family_id": "frontend_system_shell",
             "family_name": "Frontend System Shell",
-            "candidate_system_ids": [],
+            "candidate_system_ids": ["application_world_shell"],
             "debug_tool_candidate": False,
             "notes": "Application, document, world, and stage-level system hosts adjacent to the UI stack.",
         }
@@ -671,19 +736,19 @@ def write_markdown(payload: dict, output_path: Path) -> None:
             "- The generated translated PPC layer is present, but the clean human-readable organization layer is still incomplete.",
             "- This phase gives the current source-path subset a stable naming scaffold, so future translated-code cleanup can follow original source-family names instead of raw `sub_XXXXXXXX` clusters alone.",
             "- The strongest already-recovered path families are title/menu, pause, loading/start, world map, mission-result, save/ending, gameplay HUD core, town/media-room, and the lower-level CSD foundation layer.",
-            "- The clearest remaining UI/UX gaps are the debug/tool host surfaces, the broader town/camera/application/world shell paths that are now named but still not semantically folded into recovered screen families, and the still note-heavy translated ownership layer inside the local mirror.",
+            "- The clearest remaining UI/UX gaps are the still note-heavy translated ownership layer inside the local mirror, the incomplete gameplay/asset correlation outside the current contract families, and the broader whole-game source-path set that still needs to be humanized in waves.",
             "",
             "## Debug Tool Direction",
             "",
             "- The best current hosts for a local debug executable/menu build are the debug/test game modes plus the tool/preview surfaces grouped under `Tooling / Debug UI`.",
-            "- The current contract-backed runtime layer is already strong enough to drive the standalone selector and workbench across frontend, cutscene, gameplay-HUD, boss/final, and stage-test-adjacent host families.",
+            "- The current contract-backed runtime layer is already strong enough to drive the standalone selector and workbench across frontend, town, camera, application/world, cutscene, gameplay-HUD, boss/final, and stage-test-adjacent host families.",
             "- The missing bridge for a richer debug tool is no longer raw translation; it is turning more of the source-path-backed families into readable translated ownership and widening host coverage beyond the current reusable subset.",
             "",
             "## Next Local Work",
             "",
             "1. Keep widening the current source-path seed in defensible chunks instead of flooding the repo with raw whole-dump noise.",
             "2. Keep replacing local-only `SONIC UNLEASHED/` note/scaffold files with cleaner translated ownership under the recovered source-family paths.",
-            "3. Expand the selector/workbench coverage further into town, camera, application/world shell, and other still named-only families.",
+            "3. Keep expanding selector/workbench coverage and mirrored translated ownership until the local-only tree behaves like a readable debug-oriented source base instead of a scaffold set.",
         ]
     )
 

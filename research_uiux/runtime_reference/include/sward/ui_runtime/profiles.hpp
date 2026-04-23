@@ -20,6 +20,10 @@ enum class ReferenceProfile
     ExtraStageHud,
     SuperSonicHud,
     BossHud,
+    TownUi,
+    CameraShell,
+    ApplicationWorldShell,
+    FrontendSequenceShell,
 };
 
 [[nodiscard]] ScreenContract makePauseMenuContract();
@@ -34,6 +38,10 @@ enum class ReferenceProfile
 [[nodiscard]] ScreenContract makeExtraStageHudContract();
 [[nodiscard]] ScreenContract makeSuperSonicHudContract();
 [[nodiscard]] ScreenContract makeBossHudContract();
+[[nodiscard]] ScreenContract makeTownUiContract();
+[[nodiscard]] ScreenContract makeCameraShellContract();
+[[nodiscard]] ScreenContract makeApplicationWorldShellContract();
+[[nodiscard]] ScreenContract makeFrontendSequenceShellContract();
 [[nodiscard]] ScreenContract makeContract(ReferenceProfile profile);
 [[nodiscard]] std::string_view toString(ReferenceProfile profile);
 } // namespace sward::ui_runtime

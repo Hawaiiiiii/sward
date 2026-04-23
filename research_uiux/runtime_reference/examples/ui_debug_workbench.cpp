@@ -275,11 +275,38 @@ void driveRuntime(const ContractEntry& entry, const DebugWorkbenchHostEntry* hos
     std::cout << "Final state: " << toString(runtime.state()) << '\n';
 }
 
+void waitForEnter(std::string_view prompt)
+{
+    std::cout << prompt;
+    std::string line;
+    std::getline(std::cin, line);
+}
+
+[[nodiscard]] bool promptReturnToMenu()
+{
+    std::cout << "\nPress Enter to return to the menu, or type q to quit: ";
+    std::string line;
+    if (!std::getline(std::cin, line))
+        return false;
+
+    const std::string normalized = normalizeToken(line);
+    return normalized != "q" && normalized != "quit" && normalized != "exit";
+}
+
 [[nodiscard]] std::optional<std::size_t> findHostIndex(const std::vector<ResolvedHostEntry>& hosts, std::string_view token)
 {
     const std::string needle = normalizeToken(token);
     if (needle.empty())
         return std::nullopt;
+
+    for (std::size_t index = 0; index < hosts.size(); ++index)
+    {
+        const auto& host = *hosts[index].metadata;
+        if (normalizeToken(host.relativeSourcePath) == needle)
+            return index;
+        if (normalizeToken(host.hostDisplayName) == needle)
+            return index;
+    }
 
     for (std::size_t index = 0; index < hosts.size(); ++index)
     {
@@ -294,7 +321,11 @@ void driveRuntime(const ContractEntry& entry, const DebugWorkbenchHostEntry* hos
             return index;
         if (normalizeToken(host.primaryContractFileName).find(needle) != std::string::npos)
             return index;
+    }
 
+    for (std::size_t index = 0; index < hosts.size(); ++index)
+    {
+        const auto& host = *hosts[index].metadata;
         for (const auto alias : splitBlob(host.aliasBlob))
         {
             if (normalizeToken(alias).find(needle) != std::string::npos)
@@ -372,13 +403,24 @@ void printHostList(const std::vector<ResolvedHostEntry>& hosts, const std::optio
 
 [[nodiscard]] std::optional<std::size_t> selectInteractiveIndex(std::size_t maxValue, std::string_view prompt)
 {
-    std::cout << prompt;
+    while (true)
+    {
+        std::cout << prompt;
 
-    std::string line;
-    if (!std::getline(std::cin, line))
-        return std::nullopt;
+        std::string line;
+        if (!std::getline(std::cin, line))
+            return std::nullopt;
 
-    return parseIndexArgument(line, maxValue);
+        const std::string normalized = normalizeToken(line);
+        if (normalized == "q" || normalized == "quit" || normalized == "exit")
+            return std::nullopt;
+
+        const auto parsed = parseIndexArgument(line, maxValue);
+        if (parsed.has_value())
+            return parsed;
+
+        std::cout << "Invalid selection.\n\n";
+    }
 }
 
 [[nodiscard]] ContractEntry loadExplicitEntry(const std::filesystem::path& path)
@@ -395,30 +437,40 @@ int main(int argc, char** argv)
         const std::vector<ResolvedHostEntry> hosts = resolveHostEntries(bundledEntries);
         const std::vector<GroupEntry> groups = buildGroups(hosts);
 
-        if (argc > 1)
+        std::vector<std::string> arguments(argv + 1, argv + argc);
+        const auto stayOpenIt = std::find(arguments.begin(), arguments.end(), "--stay-open");
+        const bool stayOpen = stayOpenIt != arguments.end();
+        if (stayOpen)
+            arguments.erase(stayOpenIt);
+
+        if (!arguments.empty())
         {
-            const std::string command = argv[1];
+            const std::string& command = arguments[0];
             if (command == "--list-groups")
             {
                 printGroupList(groups);
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
                 return 0;
             }
 
             if (command == "--list-hosts")
             {
                 printHostList(hosts);
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
                 return 0;
             }
 
             if (command == "--group")
             {
-                if (argc < 3)
+                if (arguments.size() < 2)
                 {
                     std::cerr << "--group requires a group token.\n";
                     return 1;
                 }
 
-                const auto groupIndex = findGroupIndex(groups, argv[2]);
+                const auto groupIndex = findGroupIndex(groups, arguments[1]);
                 if (!groupIndex.has_value())
                 {
                     std::cerr << "Unknown host group. Use --list-groups to inspect the available groups.\n";
@@ -426,18 +478,20 @@ int main(int argc, char** argv)
                 }
 
                 printHostList(hosts, groups[*groupIndex]);
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
                 return 0;
             }
 
             if (command == "--host")
             {
-                if (argc < 3)
+                if (arguments.size() < 2)
                 {
                     std::cerr << "--host requires a host token.\n";
                     return 1;
                 }
 
-                const auto hostIndex = findHostIndex(hosts, argv[2]);
+                const auto hostIndex = findHostIndex(hosts, arguments[1]);
                 if (!hostIndex.has_value())
                 {
                     std::cerr << "Unknown host token. Use --list-hosts to inspect the available hosts.\n";
@@ -445,18 +499,22 @@ int main(int argc, char** argv)
                 }
 
                 driveRuntime(bundledEntries[hosts[*hostIndex].contractIndex], hosts[*hostIndex].metadata);
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
                 return 0;
             }
 
             if (command == "--path")
             {
-                if (argc < 3)
+                if (arguments.size() < 2)
                 {
                     std::cerr << "--path requires a contract file path.\n";
                     return 1;
                 }
 
-                driveRuntime(loadExplicitEntry(argv[2]), nullptr);
+                driveRuntime(loadExplicitEntry(arguments[1]), nullptr);
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
                 return 0;
             }
 
@@ -468,29 +526,30 @@ int main(int argc, char** argv)
             }
 
             driveRuntime(bundledEntries[hosts[*hostIndex].contractIndex], hosts[*hostIndex].metadata);
+            if (stayOpen)
+                waitForEnter("\nPress Enter to exit...");
             return 0;
         }
 
-        printGroupList(groups);
-        const auto groupIndex = selectInteractiveIndex(groups.size(), "\nSelect group number: ");
-        if (!groupIndex.has_value())
+        while (true)
         {
-            std::cerr << "No valid group selection was provided.\n";
-            return 1;
-        }
+            printGroupList(groups);
+            const auto groupIndex = selectInteractiveIndex(groups.size(), "\nSelect group number (or q to quit): ");
+            if (!groupIndex.has_value())
+                return 0;
 
-        const auto& group = groups[*groupIndex];
-        printHostList(hosts, group);
-        const auto hostLocalIndex = selectInteractiveIndex(group.hostIndices.size(), "\nSelect host number: ");
-        if (!hostLocalIndex.has_value())
-        {
-            std::cerr << "No valid host selection was provided.\n";
-            return 1;
-        }
+            const auto& group = groups[*groupIndex];
+            printHostList(hosts, group);
+            const auto hostLocalIndex = selectInteractiveIndex(group.hostIndices.size(), "\nSelect host number (or q to quit): ");
+            if (!hostLocalIndex.has_value())
+                return 0;
 
-        const std::size_t hostIndex = group.hostIndices[*hostLocalIndex];
-        driveRuntime(bundledEntries[hosts[hostIndex].contractIndex], hosts[hostIndex].metadata);
-        return 0;
+            const std::size_t hostIndex = group.hostIndices[*hostLocalIndex];
+            driveRuntime(bundledEntries[hosts[hostIndex].contractIndex], hosts[hostIndex].metadata);
+
+            if (!promptReturnToMenu())
+                return 0;
+        }
     }
     catch (const std::exception& exception)
     {

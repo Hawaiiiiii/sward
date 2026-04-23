@@ -304,6 +304,39 @@
 - [x] Refresh the local-only `SONIC UNLEASHED\_meta\` manifests and counts for the widened readable source layer.
 - [x] Generate a tracked JSON summary plus a human-readable report for the widened local-only source-tree expansion.
 
+## Phase 42 - Town / Camera / Application Shell Runtime Bridge
+
+- [x] Add bundled runtime contracts for town/media-room, camera/replay, and application/world shell families.
+- [x] Wire the new shell contracts through the native runtime, C ABI, and C# managed reference layers.
+- [x] Refresh the broader source-path manifest and selector metadata so those shell families stop being archaeology-only or shell-only where the contracts now exist.
+- [x] Generate a dedicated report for the new shell-contract bridge.
+
+## Phase 43 - Persistent Debug Shell UX And Workbench Expansion
+
+- [x] Upgrade the native selector/workbench interactive flows so they loop back to the menu/group browser instead of exiting after one launch.
+- [x] Add a direct `--stay-open` behavior for one-shot selector/workbench launches.
+- [x] Expand the generated workbench host map so town, camera, title, world-map, and application/world shell hosts become first-class direct launch targets.
+- [x] Generate a dedicated report for the persistent debug-shell/workbench pass.
+
+## Phase 44 - Local Debug Source Tree Deepening
+
+- [x] Deepen the local-only readable source mirror with broader town, camera, and application/world shell ownership scaffolds.
+- [x] Refresh the local-only `SONIC UNLEASHED\_meta\` manifests and tracked source-tree summary counts after the deeper pass.
+- [x] Generate a dedicated report for the deeper local debug-oriented source-tree layer.
+
+## Phase 45 - Frontend Sequence Shell Runtime Bridge
+
+- [x] Add a bundled runtime contract for the generic frontend sequence-core / unit-factory shell.
+- [x] Wire the new sequence-shell contract through the native runtime, C ABI, and C# managed reference layers.
+- [x] Refresh the broader source-path manifest plus selector/workbench metadata so the remaining `Sequence/*` core/factory shell paths stop being `named_seed_only`.
+- [x] Generate a dedicated report for the new sequence-shell bridge.
+
+## Phase 46 - Sequence And Item Source Deepening
+
+- [x] Deepen the local-only readable source mirror with sequence-core, sequence-unit, and item-overlay ownership scaffolds.
+- [x] Refresh the local-only `SONIC UNLEASHED\_meta\` manifests and tracked source-tree summary counts after the sequence/item pass.
+- [x] Generate a dedicated report for the widened sequence/item debug-oriented source layer.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -405,3 +438,7 @@
 - [x] Follow-on phase audit on `2026-04-23`: widened the generated selector metadata to `12` launch families and the generated workbench map to `40` host entries, including gameplay-HUD and stage-test groups.
 - [x] Follow-on phase audit on `2026-04-23`: verified the selector and workbench locally under `b\rr41`, including `HudSonicStage.cpp`, `HudEvilStage.cpp`, `HudExQte.cpp`, `BossHudSuperSonic.cpp`, and `GameModeStageForwardTest.cpp`.
 - [x] Follow-on phase audit on `2026-04-23`: added `research_uiux\tools\materialize_local_debug_source_tree.py`, generated `research_uiux\data\local_debug_source_tree_expansion.json`, and widened the local-only readable source tree to `68` `.cpp` scaffolds under `SONIC UNLEASHED\`.
+- [x] Follow-on phase audit on `2026-04-24`: added the bundled `frontend_sequence_shell_reference.json` contract and extended the native runtime, C ABI, and C# managed reference layers with `FrontendSequenceShell`.
+- [x] Follow-on phase audit on `2026-04-24`: refreshed the broader source-path manifest to `220` paths with `163` archaeology-mapped entries, `154` contract-backed entries, `57` debug-host candidates, and `0` named-only gaps.
+- [x] Follow-on phase audit on `2026-04-24`: widened the selector to `16` launch families and the workbench to `133` hosts across `10` groups, including the new frontend-sequence host bucket.
+- [x] Follow-on phase audit on `2026-04-24`: deepened the local-only readable source mirror to `102` `.cpp` scaffolds under `SONIC UNLEASHED\`, including `12` sequence-shell scaffolds and `HUD\Item\HudItemGet.cpp`.

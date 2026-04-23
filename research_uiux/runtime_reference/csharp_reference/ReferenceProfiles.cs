@@ -14,6 +14,10 @@ public enum ReferenceProfile
     ExtraStageHud,
     SuperSonicHud,
     BossHud,
+    TownUi,
+    CameraShell,
+    ApplicationWorldShell,
+    FrontendSequenceShell,
 }
 
 public static class ReferenceProfiles
@@ -33,6 +37,10 @@ public static class ReferenceProfiles
             ReferenceProfile.ExtraStageHud => "extra_stage_hud_reference.json",
             ReferenceProfile.SuperSonicHud => "super_sonic_hud_reference.json",
             ReferenceProfile.BossHud => "boss_hud_reference.json",
+            ReferenceProfile.TownUi => "town_ui_reference.json",
+            ReferenceProfile.CameraShell => "camera_shell_reference.json",
+            ReferenceProfile.ApplicationWorldShell => "application_world_shell_reference.json",
+            ReferenceProfile.FrontendSequenceShell => "frontend_sequence_shell_reference.json",
             _ => throw new InvalidOperationException("Unknown reference profile."),
         });
 
