@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 16 deep dive: boss HUD, result, and save-load flow
+
+- added [`research_uiux/BOSS_RESULT_SAVE_LOAD_DEEP_DIVE.md`](./research_uiux/BOSS_RESULT_SAVE_LOAD_DEEP_DIVE.md)
+- ran a focused local support extraction over `ActionCommon.arl`, `ExStageTails_Common.arl`, and `SonicActionCommonGeneral.arl`
+- closed the earlier `ui_result_ex` gap by confirming real extracted `ui_result.yncp` and `ui_result_ex.yncp` packages
+- tied boss HUD, mission-result overlays, autosave, and loading transitions back to the `#Application` sequence graph
+- re-ran the local asset/layout indexes, expanding the local-only workspace to `3503` combined asset hits and `23` parsed layout files
+
 ### `d0a8b48` `Crack open pause, status, and world map flow`
 
 - added [`research_uiux/PAUSE_STATUS_WORLDMAP_DEEP_DIVE.md`](./research_uiux/PAUSE_STATUS_WORLDMAP_DEEP_DIVE.md)
@@ -56,6 +64,7 @@ The repo now contains:
 - readable UI/patch analysis
 - repo-safe branding and documentation
 - report-level correlation between extracted local layouts and readable code
+- dedicated deep dives for pause/world-map and boss/result/save-load flow
 
 The repo still does not contain:
 

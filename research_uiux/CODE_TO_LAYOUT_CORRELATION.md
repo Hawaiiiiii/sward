@@ -15,6 +15,9 @@ Machine-readable inventory: `research_uiux/data/layout_code_correlation.json`
 > `strong` means the readable code wraps the same game subsystem/state without exposing the raw layout string.
 > `contextual` means the readable code is adjacent support infrastructure rather than a direct asset-name seam.
 
+> [!TIP]
+> A follow-on Phase 16 probe added additional gameplay/result layouts under `extracted_assets/phase16_support_archives`, including `ui_result.yncp`, `ui_result_ex.yncp`, `ui_missionscreen.yncp`, and `ui_misson.yncp`. The extended synthesis lives in [`BOSS_RESULT_SAVE_LOAD_DEEP_DIVE.md`](./BOSS_RESULT_SAVE_LOAD_DEEP_DIVE.md).
+
 ## `ui_boss_gauge`
 
 - Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/ui_broader_archives/BossCommon/ui_boss_gauge.yncp`
