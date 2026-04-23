@@ -5,52 +5,55 @@
 # <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> UI Source-Path Recovery And Humanization Plan
 
 > [!IMPORTANT]
-> This report is scoped to the UI/UX-focused source-path seed extracted from the broader Xbox 360 path dump the user supplied. It is a naming and organization bridge, not a claim that the whole game has already been humanized into clean source.
+> This report is scoped to the current SWARD source-path seed extracted from the broader Xbox 360 path dump the user supplied. It is a naming and organization bridge, not a claim that the whole game has already been humanized into clean source.
 
 ## Status Snapshot
 
 | Target | State | Percentage |
 |---|---|---:|
-| UI-centric source-path seed organized into families | Complete for this phase | `100.0%` |
-| UI-centric source-path seed mapped into the current archaeology layer | Partial but strong | `83.3%` |
-| UI-centric source-path seed already backed by portable runtime contracts | Partial | `34.3%` |
-| UI-centric source-path seed still only named/debug-targeted and not semantically recovered | Open gap | `16.7%` |
+| Current source-path seed organized into families | Complete for this phase | `100.0%` |
+| Current source-path seed mapped into the current archaeology layer | Partial but strong | `50.0%` |
+| Current source-path seed already backed by portable runtime contracts | Partial | `17.3%` |
+| Current source-path seed still only named/debug-targeted and not semantically recovered | Open gap | `50.0%` |
 
 ## Exact Counts
 
-- Seeded source paths: `108`
-- Family groups: `16`
-- Paths mapped to current archaeology systems: `90`
-- Paths already backed by runtime contracts: `37`
-- Paths that are strong debug-tool host candidates: `13`
-- Paths that remain named-only after this phase: `5`
+- Seeded source paths: `220`
+- Family groups: `19`
+- Paths mapped to current archaeology systems: `110`
+- Paths already backed by runtime contracts: `38`
+- Paths that are strong debug-tool host candidates: `57`
+- Paths that remain named-only after this phase: `53`
 
 ## Coverage Buckets
 
 | Bucket | Count | Meaning |
 |---|---:|---|
-| `contract_backed` | `37` | Path family already lands on a recovered archaeology system with a portable runtime contract. |
-| `archaeology_mapped` | `53` | Path family is tied to a recovered system, but not yet exercised by the runtime contract pack. |
-| `debug_tool_candidate` | `13` | Debug/tool/game-mode surface that looks like a good host for the future UI capability sandbox. |
-| `named_seed_only` | `5` | We now have the source-path name organized, but the family still needs extraction/correlation/humanization work. |
+| `contract_backed` | `38` | Path family already lands on a recovered archaeology system with a portable runtime contract. |
+| `archaeology_mapped` | `72` | Path family is tied to a recovered system, but not yet exercised by the runtime contract pack. |
+| `debug_tool_candidate` | `57` | Debug/tool/game-mode surface that looks like a good host for the future UI capability sandbox. |
+| `named_seed_only` | `53` | We now have the source-path name organized, but the family still needs extraction/correlation/humanization work. |
 
 ## Family Breakdown
 
 | Family | Paths | Current bridge | Runtime-backed |
 |---|---:|---|---|
-| Subtitle / Cutscene Presentation | `18` | `Subtitle / Cutscene Presentation` | No |
-| Tooling / Debug UI | `13` | Not yet in archaeology | No |
-| Town / Media Room UI | `12` | `Town UI` | No |
+| Tooling / Debug UI | `57` | Not yet in archaeology | No |
+| Frontend System Shell | `33` | Not yet in archaeology | No |
+| Subtitle / Cutscene Presentation | `32` | `Subtitle / Cutscene Presentation` | No |
+| Town / Media Room UI | `17` | `Town UI` | No |
+| Frontend Sequence Shell | `10` | Not yet in archaeology | No |
 | Stage HUD Core | `9` | `Werehog Stage HUD`, `Sonic Stage HUD` | No |
 | Title / Main Menu | `9` | `Title Menu`, `Loading And Start/Clear` | `title_menu_reference.json`, `loading_transition_reference.json` |
-| Save / Ending Flow | `8` | `Save And Ending` | `autosave_toast_reference.json` |
+| Save / Ending Flow | `7` | `Save And Ending` | `autosave_toast_reference.json` |
 | World Map Stack | `7` | `World Map Stack` | `world_map_reference.json` |
+| Frontend Camera Shell | `6` | Not yet in archaeology | No |
 | Pause Stack | `6` | `Pause Stack` | `pause_menu_reference.json` |
 | Boss HUD | `5` | `Boss HUD` | No |
 | CSD / UI Foundation | `5` | `CSD / UI Foundation` | No |
+| Loading / Boot / Install | `5` | `Loading And Start/Clear` | `loading_transition_reference.json` |
 | Mission Result Family | `4` | `Mission Result Family`, `Item Result` | `mission_result_reference.json` |
-| UI Misc | `4` | Not yet in archaeology | No |
-| Loading / Boot / Install | `3` | `Loading And Start/Clear` | `loading_transition_reference.json` |
+| GameMode / Frontend Shell | `3` | Not yet in archaeology | No |
 | Mission Briefing / Gate | `3` | `Mission Briefing And Gate` | No |
 | Status Overlay | `1` | `Status Overlay` | No |
 | Tornado Defense / EX HUD | `1` | `Tornado Defense / EX Stage` | No |
@@ -59,11 +62,11 @@
 
 | Archaeology system | Seed paths | Layout IDs | Runtime contract |
 |---|---:|---|---|
-| Subtitle / Cutscene Presentation | `18` | None | No |
-| Loading And Start/Clear | `12` | `ui_loading`, `ui_start` | `loading_transition_reference.json` |
-| Town UI | `12` | `ui_balloon`, `ui_shop`, `ui_townscreen`, `ui_mediaroom` | No |
+| Subtitle / Cutscene Presentation | `32` | None | No |
+| Town UI | `17` | `ui_balloon`, `ui_shop`, `ui_townscreen`, `ui_mediaroom` | No |
+| Loading And Start/Clear | `14` | `ui_loading`, `ui_start` | `loading_transition_reference.json` |
 | Title Menu | `9` | `ui_mainmenu` | `title_menu_reference.json` |
-| Save And Ending | `8` | `ui_saveicon`, `ui_end` | `autosave_toast_reference.json` |
+| Save And Ending | `7` | `ui_saveicon`, `ui_end` | `autosave_toast_reference.json` |
 | World Map Stack | `7` | `ui_worldmap`, `ui_worldmap_help` | `world_map_reference.json` |
 | Pause Stack | `6` | `ui_pause`, `ui_general`, `ui_help` | `pause_menu_reference.json` |
 | Boss HUD | `5` | `ui_boss_gauge`, `ui_boss_name` | No |
@@ -79,10 +82,9 @@
 ## What This Means Right Now
 
 - The generated translated PPC layer is present, but the clean human-readable organization layer is still incomplete.
-- This phase gives the UI/UX subset of the executable path dump a stable naming scaffold, so future translated-code cleanup can follow original source-family names instead of raw `sub_XXXXXXXX` clusters alone.
+- This phase gives the current source-path subset a stable naming scaffold, so future translated-code cleanup can follow original source-family names instead of raw `sub_XXXXXXXX` clusters alone.
 - The strongest already-recovered path families are title/menu, pause, loading/start, world map, mission-result, save/ending, gameplay HUD core, town/media-room, and the lower-level CSD foundation layer.
-- Phase 32 now places that scaffold back into the local-only `SONIC UNLEASHED/` mirror as `108` `*.sward.md` note files, so the path families are no longer report-only.
-- The clearest remaining UI/UX gaps are the debug/tool host surfaces, the subtitle/cutscene family still lacking a runtime-contract bridge, and broader expansion beyond the current UI-focused seed.
+- The clearest remaining UI/UX gaps are the debug/tool host surfaces, the subtitle/cutscene family still lacking a runtime-contract bridge, and the system-shell paths that are now named but still not semantically folded into recovered screen families.
 
 ## Debug Tool Direction
 
@@ -92,6 +94,6 @@
 
 ## Next Local Work
 
-1. Expand this seed from the UI/UX subset into a broader whole-dump manifest without drowning the repo in raw path noise.
-2. Grow the new local placement layer from note files into cleaner translated-file ownership under the mirrored source-family paths.
+1. Keep widening the current source-path seed in defensible chunks instead of flooding the repo with raw whole-dump noise.
+2. Start placing humanized translated findings into the local-only `SONIC UNLEASHED/` mirror under source-family names instead of leaving them as report-only notes.
 3. Grow the standalone debug selector from contract-backed console runs into a source-path-named UI sandbox, then add gameplay-HUD and subtitle/cutscene contract coverage.

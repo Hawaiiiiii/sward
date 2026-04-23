@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 34 broader UI-adjacent source-path manifest
+
+- added [`research_uiux/tools/build_broader_ui_adjacent_source_seed.py`](./research_uiux/tools/build_broader_ui_adjacent_source_seed.py)
+- added [`research_uiux/source_path_seeds/UI_ADJACENT_SOURCE_PATHS_FROM_MATCH_DUMP.txt`](./research_uiux/source_path_seeds/UI_ADJACENT_SOURCE_PATHS_FROM_MATCH_DUMP.txt)
+- refreshed the local source-path manifest to a broader `220`-path UI-adjacent/debug/system subset grouped into `19` families
+- raised the current source-path bridge from a narrow UI-only slice into a wider layer with `110` archaeology-mapped paths, `38` contract-backed paths, `57` debug-host candidates, and `53` named-only gaps
+- refreshed the local-only `SONIC UNLEASHED/` placement note layer to `220` `*.sward.md` notes without publishing that mirror itself
+- widened the selector-family metadata so source-family tokens such as `GameModeBoot.cpp`, `EndingManager.cpp`, and `MainMenuManager.cpp` now resolve through the contract-backed runtime layer where applicable
+
 ### Phase 33 source-path-named debug selector
 
 - added [`research_uiux/tools/build_source_family_selector_data.py`](./research_uiux/tools/build_source_family_selector_data.py)

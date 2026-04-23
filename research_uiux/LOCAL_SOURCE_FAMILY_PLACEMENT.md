@@ -4,22 +4,22 @@
 
 # <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Local Source-Family Placement
 
-Phase 32 starts the actual placement step that the previous source-path reports kept pointing at: the local-only `SONIC UNLEASHED/` scaffold now carries per-path SWARD note files instead of only empty folders.
+Phase 32 starts the actual placement step that the previous source-path reports kept pointing at, and the later broader-manifest pass widens it: the local-only `SONIC UNLEASHED/` scaffold now carries per-path SWARD note files instead of only empty folders.
 
 > [!IMPORTANT]
 > These placements are local-only on purpose. They are research-side anchors for future translated cleanup and debug-tool work, not publishable reconstructed source files.
 
 ## Snapshot
 
-- Local-only note files created: `108`
-- Contract-backed placements: `37`
-- Archaeology-mapped placements without runtime contracts: `53`
-- Debug-host candidates: `13`
-- Named-only placeholders still waiting on stronger recovery: `5`
-- Direct host anchors: `13`
-- Family-member anchors: `77`
-- Debug-host anchors: `13`
-- Placeholder-only anchors: `5`
+- Local-only note files created: `220`
+- Contract-backed placements in the current wider manifest: `38`
+- Archaeology-mapped placements without runtime contracts: `72`
+- Debug-host candidates: `57`
+- Named-only placeholders still waiting on stronger recovery: `53`
+- Family-member anchors with recovered system context: `67`
+- Debug-host anchors: `57`
+- Placeholder-only anchors: `96`
+- Direct original-source host anchors: `0` in the broader pass, because the readable host layer still points more often at patch/runtime ownership than at recovered original source-family files
 
 ## Output Shape
 
@@ -49,22 +49,22 @@ Each local note currently records:
 
 ## Strong Examples
 
-- `System/GameMode/Title/TitleMenu.cpp`
+- `System/GameMode/GameModeBoot.cpp`
   - contract-backed
-  - bridges to `Title Menu` and `Loading And Start/Clear`
-  - already points at `ui_mainmenu`, `ui_loading`, `ui_start`, and the strongest title/loading seam set
+  - now resolves into the `Loading And Start/Clear` selector family
+  - gives the broader pass a real boot/start alias instead of only the older `Loading.cpp` seed
 - `HUD/Pause/HudPause.cpp`
   - contract-backed
   - already sits on the `Pause Stack`
+- `System/GameMode/Ending/EndingManager.cpp`
+  - contract-backed
+  - now resolves into the `Save And Ending` family alongside autosave/clear-flag sequencing
 - `System/GameMode/WorldMap/WorldMapSelect.cpp`
   - contract-backed
   - already sits on the `World Map Stack`
-- `CSD/CsdProject.cpp`
-  - archaeology-mapped
-  - now lands in the `CSD / UI Foundation` layer instead of a generic named-only bucket
 - `System/GameMode/GameModeMenuSelectDebug.cpp`
   - debug-host candidate
-  - now has a concrete local placement note even before a richer debug sandbox is built
+  - now has a concrete local placement note inside a much larger debug/tool host layer even before a richer debug sandbox is built
 
 ## Why This Matters
 
@@ -80,10 +80,10 @@ The mirror now behaves like a staging tree for:
 ## Remaining Gap
 
 - these notes are still notes, not cleaned translated `.cpp` replacements
-- subtitle/cutscene and debug/tool surfaces still need stronger runtime/debug bridges
-- the current placement set is still limited by the older `108`-path UI-centric seed
+- subtitle/cutscene, sequence-shell, camera-shell, and system-shell surfaces still need stronger recovered ownership
+- the broader pass widened the mirror successfully, but much of that new surface is still shell-level rather than semantically humanized
 
 The next two beats stay the same:
 
-1. expand the debug selector from contract names into source-path-named families
-2. widen the seed beyond the original `108` UI-centric paths so the mirror can grow with a broader source-family map
+1. keep converting shell-level placements into named translated ownership under the same source-family paths
+2. keep widening the debug selector and runtime contracts beyond the current six contract-backed families

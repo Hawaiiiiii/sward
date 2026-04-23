@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -43,6 +44,22 @@ STATUS_ORDER = {
     "debug_tool_candidate": 2,
     "named_seed_only": 3,
 }
+
+
+DEBUG_GAMEMODE_SUFFIXES = (
+    "gamemodemenuselectdebug.cpp",
+    "gamemodestageselectdebug.cpp",
+    "gamemodemainmenu_test.cpp",
+    "gamemodestageachievementtest.cpp",
+    "gamemodestageeviltest.cpp",
+    "gamemodestageforwardtest.cpp",
+    "gamemodestageinstalltest.cpp",
+    "gamemodestageloadxml.cpp",
+    "gamemodestagemotiontest.cpp",
+    "gamemodestagesavetest.cpp",
+    "gamemodestagescreenshot.cpp",
+    "gamemodestageswapdisktest.cpp",
+)
 
 
 def read_json(path: Path) -> dict:
@@ -109,7 +126,7 @@ def normalize_source_path(raw: str) -> str | None:
     if not line or line.startswith("#"):
         return None
 
-    normalized = line.replace("\\", "/")
+    normalized = re.sub(r"/+", "/", line.replace("\\", "/"))
     lower = normalized.lower()
 
     anchor = "/swa/source/"
@@ -135,13 +152,13 @@ def classify_source_path(relative_path: str) -> dict:
             "notes": "Editor, preview, debug, and profiling surfaces that can host a standalone UI sandbox.",
         }
 
-    if lowered.endswith("gamemodemenuselectdebug.cpp") or lowered.endswith("gamemodestageselectdebug.cpp") or lowered.endswith("gamemodemainmenu_test.cpp"):
+    if any(lowered.endswith(suffix) for suffix in DEBUG_GAMEMODE_SUFFIXES):
         return {
             "family_id": "tooling_debug_ui",
             "family_name": "Tooling / Debug UI",
             "candidate_system_ids": [],
             "debug_tool_candidate": True,
-            "notes": "Debug-oriented game modes that look like likely entry points for a future UI capability sandbox.",
+            "notes": "Debug-oriented game modes and test hosts that look like likely entry points for a future UI capability sandbox.",
         }
 
     if lowered.startswith("boss/") and ("hud" in lowered or "bosshud" in lowered or "nameplate" in lowered):
@@ -198,7 +215,7 @@ def classify_source_path(relative_path: str) -> dict:
             "notes": "Status/progress overlay family.",
         }
 
-    if lowered.startswith("hud/loading/") or lowered.endswith("gamemodestageinstall.cpp") or lowered.endswith("gamemodestagelogo.cpp"):
+    if lowered.startswith("hud/loading/") or lowered.startswith("hud/install/") or lowered.endswith("gamemodeboot.cpp") or lowered.endswith("gamemodestageinstall.cpp") or lowered.endswith("gamemodestagelogo.cpp"):
         return {
             "family_id": "loading_and_boot",
             "family_name": "Loading / Boot / Install",
@@ -260,6 +277,15 @@ def classify_source_path(relative_path: str) -> dict:
             "notes": "Autosave and clear-flag sequencing around endings/save icon behavior.",
         }
 
+    if lowered.startswith("sequence/") and ("playmovie" in lowered or "microsequence" in lowered):
+        return {
+            "family_id": "subtitle_cutscene",
+            "family_name": "Subtitle / Cutscene Presentation",
+            "candidate_system_ids": ["subtitle_cutscene_presentation"],
+            "debug_tool_candidate": False,
+            "notes": "Sequence-layer movie and micro-sequence wrappers tied to cutscene/subtitle presentation.",
+        }
+
     if lowered.startswith("system/gamemode/ending/") or lowered.endswith("gamemodeending.cpp") or lowered.endswith("gamemodestagesavetest.cpp") or lowered.endswith("saveloadtest.cpp"):
         return {
             "family_id": "save_and_ending",
@@ -269,7 +295,7 @@ def classify_source_path(relative_path: str) -> dict:
             "notes": "Ending text/image flow and save-test surfaces.",
         }
 
-    if lowered.startswith("inspire/") or lowered.startswith("movie/") or lowered.startswith("sequence/") or lowered.endswith("gamemodestagemovie.cpp"):
+    if lowered.startswith("inspire/") or lowered.startswith("movie/") or lowered.endswith("gamemodestagemovie.cpp"):
         return {
             "family_id": "subtitle_cutscene",
             "family_name": "Subtitle / Cutscene Presentation",
@@ -303,6 +329,42 @@ def classify_source_path(relative_path: str) -> dict:
             "candidate_system_ids": ["csd_ui_foundation"],
             "debug_tool_candidate": False,
             "notes": "Core CellSpriteDraw project/mirage bridge layer and generic text-box foundation.",
+        }
+
+    if lowered.startswith("camera/") or lowered.startswith("replay/camera/"):
+        return {
+            "family_id": "frontend_camera_shell",
+            "family_name": "Frontend Camera Shell",
+            "candidate_system_ids": [],
+            "debug_tool_candidate": False,
+            "notes": "Camera-side support around menu, town, goal, replay, and debug-facing presentation flows.",
+        }
+
+    if lowered.startswith("sequence/"):
+        return {
+            "family_id": "frontend_sequence_shell",
+            "family_name": "Frontend Sequence Shell",
+            "candidate_system_ids": [],
+            "debug_tool_candidate": False,
+            "notes": "Sequence orchestration that still sits adjacent to the UI stack without a tighter recovered screen family.",
+        }
+
+    if lowered.startswith("system/gamemode/"):
+        return {
+            "family_id": "frontend_gamemode_shell",
+            "family_name": "GameMode / Frontend Shell",
+            "candidate_system_ids": [],
+            "debug_tool_candidate": False,
+            "notes": "Higher-level game-mode orchestration around menu, stage, frontend, and handoff shells that still need finer recovery.",
+        }
+
+    if lowered.startswith("system/"):
+        return {
+            "family_id": "frontend_system_shell",
+            "family_name": "Frontend System Shell",
+            "candidate_system_ids": [],
+            "debug_tool_candidate": False,
+            "notes": "Application, document, world, and stage-level system hosts adjacent to the UI stack.",
         }
 
     return {
@@ -471,16 +533,16 @@ def write_markdown(payload: dict, output_path: Path) -> None:
         '# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> UI Source-Path Recovery And Humanization Plan',
         "",
         "> [!IMPORTANT]",
-        "> This report is scoped to the UI/UX-focused source-path seed extracted from the broader Xbox 360 path dump the user supplied. It is a naming and organization bridge, not a claim that the whole game has already been humanized into clean source.",
+        "> This report is scoped to the current SWARD source-path seed extracted from the broader Xbox 360 path dump the user supplied. It is a naming and organization bridge, not a claim that the whole game has already been humanized into clean source.",
         "",
         "## Status Snapshot",
         "",
         "| Target | State | Percentage |",
         "|---|---|---:|",
-        f"| UI-centric source-path seed organized into families | Complete for this phase | `{percentage(summary['input_path_count'], summary['input_path_count']):.1f}%` |",
-        f"| UI-centric source-path seed mapped into the current archaeology layer | Partial but strong | `{summary['mapped_to_archaeology_pct']:.1f}%` |",
-        f"| UI-centric source-path seed already backed by portable runtime contracts | Partial | `{summary['runtime_contract_backed_pct']:.1f}%` |",
-        f"| UI-centric source-path seed still only named/debug-targeted and not semantically recovered | Open gap | `{percentage(summary['named_seed_only_count'] + summary['debug_tool_candidate_count'], summary['input_path_count']):.1f}%` |",
+        f"| Current source-path seed organized into families | Complete for this phase | `{percentage(summary['input_path_count'], summary['input_path_count']):.1f}%` |",
+        f"| Current source-path seed mapped into the current archaeology layer | Partial but strong | `{summary['mapped_to_archaeology_pct']:.1f}%` |",
+        f"| Current source-path seed already backed by portable runtime contracts | Partial | `{summary['runtime_contract_backed_pct']:.1f}%` |",
+        f"| Current source-path seed still only named/debug-targeted and not semantically recovered | Open gap | `{percentage(summary['named_seed_only_count'] + summary['debug_tool_candidate_count'], summary['input_path_count']):.1f}%` |",
         "",
         "## Exact Counts",
         "",
@@ -532,9 +594,9 @@ def write_markdown(payload: dict, output_path: Path) -> None:
             "## What This Means Right Now",
             "",
             "- The generated translated PPC layer is present, but the clean human-readable organization layer is still incomplete.",
-            "- This phase gives the UI/UX subset of the executable path dump a stable naming scaffold, so future translated-code cleanup can follow original source-family names instead of raw `sub_XXXXXXXX` clusters alone.",
+            "- This phase gives the current source-path subset a stable naming scaffold, so future translated-code cleanup can follow original source-family names instead of raw `sub_XXXXXXXX` clusters alone.",
             "- The strongest already-recovered path families are title/menu, pause, loading/start, world map, mission-result, save/ending, gameplay HUD core, town/media-room, and the lower-level CSD foundation layer.",
-            "- The clearest remaining UI/UX gaps are the debug/tool host surfaces, the subtitle/cutscene family still lacking a runtime-contract bridge, and broader expansion beyond the current UI-focused seed.",
+            "- The clearest remaining UI/UX gaps are the debug/tool host surfaces, the subtitle/cutscene family still lacking a runtime-contract bridge, and the system-shell paths that are now named but still not semantically folded into recovered screen families.",
             "",
             "## Debug Tool Direction",
             "",
@@ -544,7 +606,7 @@ def write_markdown(payload: dict, output_path: Path) -> None:
             "",
             "## Next Local Work",
             "",
-            "1. Expand this seed from the UI/UX subset into a broader whole-dump manifest without drowning the repo in raw path noise.",
+            "1. Keep widening the current source-path seed in defensible chunks instead of flooding the repo with raw whole-dump noise.",
             "2. Start placing humanized translated findings into the local-only `SONIC UNLEASHED/` mirror under source-family names instead of leaving them as report-only notes.",
             "3. Grow the standalone debug selector from contract-backed console runs into a source-path-named UI sandbox, then add gameplay-HUD and subtitle/cutscene contract coverage.",
         ]

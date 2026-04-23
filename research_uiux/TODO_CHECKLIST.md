@@ -251,10 +251,10 @@
 
 ## Phase 34 - Broader UI-Adjacent Source-Path Manifest
 
-- [ ] Widen the source-path seed beyond the current `108` UI-centric entries into a broader UI-adjacent/debug/system subset.
-- [ ] Generate a refreshed machine-readable broader manifest locally.
-- [ ] Generate a tracked human-readable report with the widened coverage counts and gaps.
-- [ ] Update the relevant coverage/source-path docs and checklist audit.
+- [x] Widen the source-path seed beyond the current `108` UI-centric entries into a broader UI-adjacent/debug/system subset.
+- [x] Generate a refreshed machine-readable broader manifest locally.
+- [x] Generate a tracked human-readable report with the widened coverage counts and gaps.
+- [x] Update the relevant coverage/source-path docs and checklist audit.
 
 ## Completion Audit
 
@@ -340,3 +340,6 @@
 - [x] Follow-on phase audit on `2026-04-23 20:01:00 +02:00`: added `research_uiux\tools\build_source_family_selector_data.py`, `research_uiux\SOURCE_PATH_NAMED_DEBUG_SELECTOR.md`, and the generated selector metadata header under `research_uiux\runtime_reference\include\sward\ui_runtime\source_family_selector_data.hpp`.
 - [x] Follow-on phase audit on `2026-04-23 20:01:00 +02:00`: upgraded `sward_ui_runtime_debug_selector` so it supports `--list-families`, `--family <token>`, and direct source-family inputs such as `TitleMenu.cpp`, `HudPause.cpp`, and `WorldMapSelect.cpp`.
 - [x] Follow-on phase audit on `2026-04-23 20:01:00 +02:00`: re-verified the selector locally from `b\rr33\Release\`, confirming source-family launches for title, pause, and world-map flows.
+- [x] Follow-on phase audit on `2026-04-23 21:05:00 +02:00`: added `research_uiux\tools\build_broader_ui_adjacent_source_seed.py` plus the tracked broader seed `research_uiux\source_path_seeds\UI_ADJACENT_SOURCE_PATHS_FROM_MATCH_DUMP.txt`.
+- [x] Follow-on phase audit on `2026-04-23 21:05:00 +02:00`: refreshed the local `ui_source_path_manifest.json` to `220` source paths across `19` families, with `110` archaeology-mapped entries, `38` contract-backed entries, `57` debug-host candidates, and `53` named-only gaps.
+- [x] Follow-on phase audit on `2026-04-23 21:05:00 +02:00`: widened the local-only `SONIC UNLEASHED\**\*.sward.md` layer to `220` placement notes and refreshed the selector metadata so aliases such as `GameModeBoot.cpp`, `EndingManager.cpp`, and `MainMenuManager.cpp` now resolve where contracts already exist.

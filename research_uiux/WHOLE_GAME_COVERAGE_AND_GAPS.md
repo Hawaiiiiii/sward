@@ -16,8 +16,8 @@
 | In-scope readable Unleashed Recompiled UI/runtime/patch layer | Indexed and documented | `100%` of the files we targeted and scanned |
 | Original SEGA human-authored game source | Not available locally | `0%` verified |
 | Generated translated PowerPC C++ and shader layer from owned inputs | Present locally | `100%` of the current generation goal |
-| UI-centric source-path seed bridged into the archaeology layer | Partial but measured | `83.3%` |
-| UI-centric source-path seed already backed by runtime contracts | Partial | `34.3%` |
+| Broader UI-adjacent source-path seed bridged into the archaeology layer | Partial but measured | `50.0%` |
+| Broader UI-adjacent source-path seed already backed by runtime contracts | Partial | `17.3%` |
 | Whole-game asset corpus extracted into readable loose files | Not complete | no defensible exact percentage yet |
 | Template-grade UI/UX recovery for the studied screens | Strong | high confidence, but not a whole-game `1:1` portability claim |
 
@@ -37,10 +37,12 @@
   - a managed C# reference port
 - The source-path bridge layer now includes:
   - a tracked UI-focused source-path seed at `research_uiux/source_path_seeds/UI_SOURCE_PATHS_FROM_EXECUTABLE.txt`
+  - a tracked broader UI-adjacent seed at `research_uiux/source_path_seeds/UI_ADJACENT_SOURCE_PATHS_FROM_MATCH_DUMP.txt`
   - a machine-readable manifest at `research_uiux/data/ui_source_path_manifest.json`
   - a human-readable bridge report at `research_uiux/UI_SOURCE_PATH_RECOVERY_AND_HUMANIZATION_PLAN.md`
   - a dedicated CSD/UI foundation map at `research_uiux/data/csd_ui_foundation_map.json`
   - a human-readable foundation report at `research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md`
+  - a local-only mirrored note layer now widened to `220` `*.sward.md` placement notes under `SONIC UNLEASHED/`
 - The UI asset workspace currently indexes:
   - `6840` UI-relevant asset entries across the installed build plus extracted roots
   - `17792` extracted files under `extracted_assets`
@@ -71,7 +73,7 @@ What it gives us:
 - callable/function-level seams for readable patch correlation
 - enough low-level visibility to recover timings, state branches, and host relationships
 - enough structure to drive portable JSON runtime contracts across the current C++, C, and C# reference kits
-- enough structure to start organizing translated findings under original source-family names for the UI/UX subset
+- enough structure to start organizing translated findings under original source-family names for a broader UI-adjacent/debug/system subset
 
 What it does not give us:
 
@@ -105,11 +107,11 @@ What it still does not justify:
 
 The current workspace is:
 
-- `100%` complete against the tracked research plan through Phase `31`
+- `100%` complete against the tracked research plan through Phase `34`
 - strong for UI/UX reverse-engineering and template extraction
 - strong for local executable-backed timing/state archaeology
 - strong for reusable runtime/template productization across C++, C, and C#
-- strong for measured UI source-path organization inside the seeded UI/UX subset
+- strong for measured source-path organization inside the widened `220`-path UI-adjacent/debug/system subset
 - now materially stronger for in-stage gameplay HUD ownership and family separation
 - now materially stronger for lower-level CSD/project/widget naming and source-family organization
 - now materially stronger for local-only source-family placement inside the mirrored `SONIC UNLEASHED/` tree
@@ -120,10 +122,10 @@ The current workspace is:
 
 If the goal is to move closer to a broader `1:1` UI portability basis, the next concrete work would be:
 
-1. Expand the current UI-focused source-path seed into a broader manifest so the humanization pass can cover more than the current `108` UI-centric paths.
-2. Grow the new local-only `SONIC UNLEASHED/` placement layer from `*.sward.md` notes into cleaner renamed translated ownership under those source-family paths.
-3. Continue correlating generated PPC seams against extracted layouts and readable patch hosts for the remaining UI families, especially the last unresolved gameplay-HUD and subtitle/cutscene edges.
-4. Grow the current standalone selector into a richer source-path-named debug sandbox, then widen it with gameplay-HUD and cutscene-capable contracts.
+1. Turn the new system-shell, sequence-shell, camera-shell, and debug-host buckets into tighter recovered ownership instead of leaving them as named shells.
+2. Grow the local-only `SONIC UNLEASHED/` placement layer from `*.sward.md` notes into cleaner renamed translated ownership under those source-family paths.
+3. Continue correlating generated PPC seams against extracted layouts and readable patch hosts for the remaining UI families, especially subtitle/cutscene and the broader system-host layer.
+4. Grow the current selector into a richer source-path-named debug sandbox, then widen it with gameplay-HUD and cutscene-capable contracts.
 
 > [!NOTE]
-> After the Phase 32 placement pass, the next bottleneck is even clearer: more value now comes from widening and deepening the mirrored source-family tree plus the debug sandbox than from blindly expecting every high-scoring archive to hide another `.yncp`.
+> After the broader Phase 34 manifest pass, the next bottleneck is even clearer: more value now comes from semantically recovering the newly named system/debug shells plus widening the debug sandbox than from blindly expecting every high-scoring archive to hide another `.yncp`.

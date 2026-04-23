@@ -15,16 +15,16 @@ Phase 33 upgrades the standalone selector from contract-stem browsing into sourc
 
 | Family | Contract | Seed paths | Example anchors |
 |---|---|---:|---|
-| Loading And Start/Clear | `loading_transition_reference.json` | `3` | `HUD/Loading/Loading.cpp`, `System/GameMode/GameModeStageInstall.cpp`, `System/GameMode/GameModeStageLogo.cpp` |
+| Loading And Start/Clear | `loading_transition_reference.json` | `5` | `HUD/Install/InstallDisplay.cpp`, `HUD/Loading/Loading.cpp`, `System/GameMode/GameModeBoot.cpp` |
 | Mission Result Family | `mission_result_reference.json` | `4` | `HUD/Common/Result/HudResult.cpp`, `HUD/Mission/HudMissionFinish.cpp`, `HUD/Mission/HudSelectMissionFailed.cpp` |
 | Pause Stack | `pause_menu_reference.json` | `6` | `HUD/GeneralWindow/GeneralWindow.cpp`, `HUD/HelpWindow/HelpWindow.cpp`, `HUD/Pause/HudPause.cpp` |
-| Save And Ending | `autosave_toast_reference.json` | `8` | `Sequence/Unit/SequenceUnitAutoSave.cpp`, `Sequence/Unit/SequenceUnitRegisterClearFlag.cpp`, `System/GameMode/Ending/EndingImageList.cpp` |
+| Save And Ending | `autosave_toast_reference.json` | `7` | `Sequence/Unit/SequenceUnitAutoSave.cpp`, `Sequence/Unit/SequenceUnitRegisterClearFlag.cpp`, `System/GameMode/Ending/EndingImageList.cpp` |
 | Title Menu | `title_menu_reference.json` | `9` | `HUD/StageSelect/HudStageSelect.cpp`, `System/GameMode/GameModeMainMenu.cpp`, `System/GameMode/GameModeStageMainMenu.cpp` |
 | World Map Stack | `world_map_reference.json` | `7` | `System/GameMode/Title/TitleStateWorldMap.cpp`, `System/GameMode/WorldMap/WorldMapListBox.cpp`, `System/GameMode/WorldMap/WorldMapMission.cpp` |
 
 ## Example Family Tokens
 
-- `Loading And Start/Clear`: `Loading.cpp`, `GameModeStageInstall.cpp`, `GameModeStageLogo.cpp`, `Loading And Start/Clear`, `loading_and_start`
+- `Loading And Start/Clear`: `InstallDisplay.cpp`, `Loading.cpp`, `GameModeBoot.cpp`, `Loading And Start/Clear`, `loading_and_start`
 - `Mission Result Family`: `HudResult.cpp`, `HudMissionFinish.cpp`, `HudSelectMissionFailed.cpp`, `Mission Result Family`, `mission_result_family`
 - `Pause Stack`: `GeneralWindow.cpp`, `HelpWindow.cpp`, `HudPause.cpp`, `Pause Stack`, `pause_stack`
 - `Save And Ending`: `SequenceUnitAutoSave.cpp`, `SequenceUnitRegisterClearFlag.cpp`, `EndingImageList.cpp`, `Save And Ending`, `save_and_ending`
