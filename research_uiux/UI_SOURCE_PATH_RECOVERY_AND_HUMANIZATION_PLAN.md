@@ -12,49 +12,49 @@
 | Target | State | Percentage |
 |---|---|---:|
 | Current source-path seed organized into families | Complete for this phase | `100.0%` |
-| Current source-path seed mapped into the current archaeology layer | Partial but strong | `50.0%` |
-| Current source-path seed already backed by portable runtime contracts | Partial | `17.3%` |
-| Current source-path seed still only named/debug-targeted and not semantically recovered | Open gap | `50.0%` |
+| Current source-path seed mapped into the current archaeology layer | Partial but strong | `53.6%` |
+| Current source-path seed already backed by portable runtime contracts | Partial | `19.1%` |
+| Current source-path seed still only named/debug-targeted and not semantically recovered | Open gap | `46.4%` |
 
 ## Exact Counts
 
 - Seeded source paths: `220`
 - Family groups: `19`
-- Paths mapped to current archaeology systems: `110`
-- Paths already backed by runtime contracts: `38`
-- Paths that are strong debug-tool host candidates: `57`
-- Paths that remain named-only after this phase: `53`
+- Paths mapped to current archaeology systems: `118`
+- Paths already backed by runtime contracts: `42`
+- Paths that are strong debug-tool host candidates: `60`
+- Paths that remain named-only after this phase: `42`
 
 ## Coverage Buckets
 
 | Bucket | Count | Meaning |
 |---|---:|---|
-| `contract_backed` | `38` | Path family already lands on a recovered archaeology system with a portable runtime contract. |
-| `archaeology_mapped` | `72` | Path family is tied to a recovered system, but not yet exercised by the runtime contract pack. |
-| `debug_tool_candidate` | `57` | Debug/tool/game-mode surface that looks like a good host for the future UI capability sandbox. |
-| `named_seed_only` | `53` | We now have the source-path name organized, but the family still needs extraction/correlation/humanization work. |
+| `contract_backed` | `42` | Path family already lands on a recovered archaeology system with a portable runtime contract. |
+| `archaeology_mapped` | `76` | Path family is tied to a recovered system, but not yet exercised by the runtime contract pack. |
+| `debug_tool_candidate` | `60` | Debug/tool/game-mode surface that looks like a good host for the future UI capability sandbox. |
+| `named_seed_only` | `42` | We now have the source-path name organized, but the family still needs extraction/correlation/humanization work. |
 
 ## Family Breakdown
 
 | Family | Paths | Current bridge | Runtime-backed |
 |---|---:|---|---|
-| Tooling / Debug UI | `57` | Not yet in archaeology | No |
+| Tooling / Debug UI | `60` | Not yet in archaeology | No |
 | Frontend System Shell | `33` | Not yet in archaeology | No |
 | Subtitle / Cutscene Presentation | `32` | `Subtitle / Cutscene Presentation` | No |
-| Town / Media Room UI | `17` | `Town UI` | No |
-| Frontend Sequence Shell | `10` | Not yet in archaeology | No |
+| Town / Media Room UI | `21` | `Town UI` | No |
 | Stage HUD Core | `9` | `Werehog Stage HUD`, `Sonic Stage HUD` | No |
 | Title / Main Menu | `9` | `Title Menu`, `Loading And Start/Clear` | `title_menu_reference.json`, `loading_transition_reference.json` |
+| Loading / Boot / Install | `8` | `Loading And Start/Clear` | `loading_transition_reference.json` |
+| Pause Stack | `7` | `Pause Stack` | `pause_menu_reference.json` |
 | Save / Ending Flow | `7` | `Save And Ending` | `autosave_toast_reference.json` |
 | World Map Stack | `7` | `World Map Stack` | `world_map_reference.json` |
-| Frontend Camera Shell | `6` | Not yet in archaeology | No |
-| Pause Stack | `6` | `Pause Stack` | `pause_menu_reference.json` |
 | Boss HUD | `5` | `Boss HUD` | No |
 | CSD / UI Foundation | `5` | `CSD / UI Foundation` | No |
-| Loading / Boot / Install | `5` | `Loading And Start/Clear` | `loading_transition_reference.json` |
+| Frontend Sequence Shell | `4` | Not yet in archaeology | No |
 | Mission Result Family | `4` | `Mission Result Family`, `Item Result` | `mission_result_reference.json` |
 | GameMode / Frontend Shell | `3` | Not yet in archaeology | No |
 | Mission Briefing / Gate | `3` | `Mission Briefing And Gate` | No |
+| Frontend Camera Shell | `1` | Not yet in archaeology | No |
 | Status Overlay | `1` | `Status Overlay` | No |
 | Tornado Defense / EX HUD | `1` | `Tornado Defense / EX Stage` | No |
 
@@ -63,12 +63,12 @@
 | Archaeology system | Seed paths | Layout IDs | Runtime contract |
 |---|---:|---|---|
 | Subtitle / Cutscene Presentation | `32` | None | No |
-| Town UI | `17` | `ui_balloon`, `ui_shop`, `ui_townscreen`, `ui_mediaroom` | No |
-| Loading And Start/Clear | `14` | `ui_loading`, `ui_start` | `loading_transition_reference.json` |
+| Town UI | `21` | `ui_balloon`, `ui_shop`, `ui_townscreen`, `ui_mediaroom` | No |
+| Loading And Start/Clear | `17` | `ui_loading`, `ui_start` | `loading_transition_reference.json` |
 | Title Menu | `9` | `ui_mainmenu` | `title_menu_reference.json` |
+| Pause Stack | `7` | `ui_pause`, `ui_general`, `ui_help` | `pause_menu_reference.json` |
 | Save And Ending | `7` | `ui_saveicon`, `ui_end` | `autosave_toast_reference.json` |
 | World Map Stack | `7` | `ui_worldmap`, `ui_worldmap_help` | `world_map_reference.json` |
-| Pause Stack | `6` | `ui_pause`, `ui_general`, `ui_help` | `pause_menu_reference.json` |
 | Boss HUD | `5` | `ui_boss_gauge`, `ui_boss_name` | No |
 | CSD / UI Foundation | `5` | `ui_balloon`, `ui_general`, `ui_help`, `ui_mainmenu`, `ui_mediaroom`, `ui_pause`, `ui_shop`, `ui_status`, `ui_townscreen`, `ui_worldmap`, `ui_worldmap_help` | No |
 | Mission Result Family | `4` | `ui_result`, `ui_result_ex` | `mission_result_reference.json` |

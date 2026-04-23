@@ -1,0 +1,714 @@
+{
+  "summary": {
+    "group_count": 7,
+    "targeted_path_count": 46,
+    "bridged_path_count": 13,
+    "bridged_path_pct": 28.3,
+    "contract_backed_path_count": 4,
+    "contract_backed_path_pct": 8.7,
+    "unresolved_shell_path_count": 10,
+    "unresolved_shell_path_pct": 21.7
+  },
+  "local_hints": [
+    {
+      "hint_id": "install_debug_menu_from_title",
+      "summary": "The supplied local TCRF-derived note set says a preview-build Install debug menu was reachable from the title screen, which strengthens the case for title/menu-adjacent debug hosts."
+    },
+    {
+      "hint_id": "debug_operation_tool",
+      "summary": "The supplied local TCRF-derived note set says a Debug Operation Tool could stay open through gameplay/cutscene transitions, which makes the debug-host layer relevant for a future mixed gameplay/frontend sandbox."
+    },
+    {
+      "hint_id": "inspire_preview_hosts",
+      "summary": "The supplied local TCRF-derived note set explicitly names InspirePreview and InspirePreview2nd as launchable preview tools, which strongly supports treating those files as cutscene/subtitle preview hosts."
+    },
+    {
+      "hint_id": "unused_trials_via_debug",
+      "summary": "The supplied local TCRF-derived note set says unused trials could be reached through debug tools, which supports prioritizing menu/stage debug game modes as future UI sandbox hosts."
+    }
+  ],
+  "priority_groups": [
+    {
+      "group_id": "cutscene_preview_hosts",
+      "display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "path_count": 12,
+      "likely_target_system_ids": [
+        "subtitle_cutscene_presentation"
+      ],
+      "likely_runtime_contracts": [],
+      "rationale": "These preview, movie, and sequence surfaces are the strongest current path toward a cutscene/subtitle-capable debug sandbox instead of a title-only selector.",
+      "hint_ids": [
+        "debug_operation_tool",
+        "inspire_preview_hosts"
+      ],
+      "status_counts": {
+        "contract_backed": 0,
+        "archaeology_mapped": 5,
+        "debug_tool_candidate": 7,
+        "named_seed_only": 0
+      },
+      "sample_paths": [
+        "Tool/InspirePreview/InspirePreview.cpp",
+        "Tool/InspirePreview/InspirePreviewMenu.cpp",
+        "Tool/InspirePreview/InspireObject.cpp",
+        "Tool/InspirePreview2nd/InspirePreview2nd.cpp",
+        "Tool/InspirePreview2nd/InspirePreview2ndMenu.cpp",
+        "Tool/MotionCameraTool/MotionCameraTool.cpp"
+      ],
+      "entries": [
+        {
+          "relative_source_path": "Tool/InspirePreview/InspirePreview.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "Tool/InspirePreview/InspirePreviewMenu.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "Tool/InspirePreview/InspireObject.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "Tool/InspirePreview2nd/InspirePreview2nd.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "Tool/InspirePreview2nd/InspirePreview2ndMenu.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "Tool/MotionCameraTool/MotionCameraTool.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "Tool/MotionCameraTool/MotionCameraMenu.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "System/GameMode/GameModeStageMovie.cpp",
+          "family_id": "subtitle_cutscene",
+          "family_name": "Subtitle / Cutscene Presentation",
+          "status": "archaeology_mapped",
+          "matched_system_ids": [
+            "subtitle_cutscene_presentation"
+          ],
+          "runtime_contracts": [],
+          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+        },
+        {
+          "relative_source_path": "Movie/MovieManager.cpp",
+          "family_id": "subtitle_cutscene",
+          "family_name": "Subtitle / Cutscene Presentation",
+          "status": "archaeology_mapped",
+          "matched_system_ids": [
+            "subtitle_cutscene_presentation"
+          ],
+          "runtime_contracts": [],
+          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+        },
+        {
+          "relative_source_path": "Sequence/Unit/SequenceUnitPlayMovie.cpp",
+          "family_id": "subtitle_cutscene",
+          "family_name": "Subtitle / Cutscene Presentation",
+          "status": "archaeology_mapped",
+          "matched_system_ids": [
+            "subtitle_cutscene_presentation"
+          ],
+          "runtime_contracts": [],
+          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+        },
+        {
+          "relative_source_path": "Sequence/Unit/SequenceUnitMicroSequence.cpp",
+          "family_id": "subtitle_cutscene",
+          "family_name": "Subtitle / Cutscene Presentation",
+          "status": "archaeology_mapped",
+          "matched_system_ids": [
+            "subtitle_cutscene_presentation"
+          ],
+          "runtime_contracts": [],
+          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+        },
+        {
+          "relative_source_path": "Sequence/Utility/SequencePlayMovieWrapper.cpp",
+          "family_id": "subtitle_cutscene",
+          "family_name": "Subtitle / Cutscene Presentation",
+          "status": "archaeology_mapped",
+          "matched_system_ids": [
+            "subtitle_cutscene_presentation"
+          ],
+          "runtime_contracts": [],
+          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+        }
+      ]
+    },
+    {
+      "group_id": "menu_debug_hosts",
+      "display_name": "Menu / Stage Debug Hosts",
+      "priority": "immediate",
+      "path_count": 3,
+      "likely_target_system_ids": [
+        "title_menu",
+        "loading_and_start"
+      ],
+      "likely_runtime_contracts": [
+        "title_menu_reference.json",
+        "loading_transition_reference.json"
+      ],
+      "rationale": "These are the most obvious menu-level and stage-selection debug hosts for a future standalone UI browser executable.",
+      "hint_ids": [
+        "install_debug_menu_from_title",
+        "unused_trials_via_debug"
+      ],
+      "status_counts": {
+        "contract_backed": 0,
+        "archaeology_mapped": 0,
+        "debug_tool_candidate": 3,
+        "named_seed_only": 0
+      },
+      "sample_paths": [
+        "System/GameMode/GameModeMainMenu_Test.cpp",
+        "System/GameMode/GameModeMenuSelectDebug.cpp",
+        "System/GameMode/GameModeStageSelectDebug.cpp"
+      ],
+      "entries": [
+        {
+          "relative_source_path": "System/GameMode/GameModeMainMenu_Test.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "System/GameMode/GameModeMenuSelectDebug.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "System/GameMode/GameModeStageSelectDebug.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        }
+      ]
+    },
+    {
+      "group_id": "stage_test_hosts",
+      "display_name": "Stage Test / Validation Hosts",
+      "priority": "high",
+      "path_count": 9,
+      "likely_target_system_ids": [
+        "loading_and_start",
+        "save_and_ending",
+        "sonic_stage_hud",
+        "werehog_stage_hud"
+      ],
+      "likely_runtime_contracts": [
+        "loading_transition_reference.json",
+        "autosave_toast_reference.json"
+      ],
+      "rationale": "These hosts look like the bridge between frontend/menu debug control and in-stage validation surfaces such as loading, save flow, screenshots, and gameplay HUD probes.",
+      "hint_ids": [
+        "unused_trials_via_debug"
+      ],
+      "status_counts": {
+        "contract_backed": 0,
+        "archaeology_mapped": 0,
+        "debug_tool_candidate": 9,
+        "named_seed_only": 0
+      },
+      "sample_paths": [
+        "System/GameMode/GameModeStageAchievementTest.cpp",
+        "System/GameMode/GameModeStageEvilTest.cpp",
+        "System/GameMode/GameModeStageForwardTest.cpp",
+        "System/GameMode/GameModeStageInstallTest.cpp",
+        "System/GameMode/GameModeStageLoadXML.cpp",
+        "System/GameMode/GameModeStageMotionTest.cpp"
+      ],
+      "entries": [
+        {
+          "relative_source_path": "System/GameMode/GameModeStageAchievementTest.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "System/GameMode/GameModeStageEvilTest.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "System/GameMode/GameModeStageForwardTest.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "System/GameMode/GameModeStageInstallTest.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "System/GameMode/GameModeStageLoadXML.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "System/GameMode/GameModeStageMotionTest.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "System/GameMode/GameModeStageSaveTest.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "System/GameMode/GameModeStageScreenshot.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "System/GameMode/GameModeStageSwapDiskTest.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        }
+      ]
+    },
+    {
+      "group_id": "pause_help_and_loading_dispatch",
+      "display_name": "Pause / Help / Loading Dispatch",
+      "priority": "high",
+      "path_count": 4,
+      "likely_target_system_ids": [
+        "pause_stack",
+        "loading_and_start"
+      ],
+      "likely_runtime_contracts": [
+        "pause_menu_reference.json",
+        "loading_transition_reference.json"
+      ],
+      "rationale": "These sequence-layer dispatchers are now concrete bridges into the current pause/help and loading/start runtime contracts.",
+      "hint_ids": [],
+      "status_counts": {
+        "contract_backed": 4,
+        "archaeology_mapped": 0,
+        "debug_tool_candidate": 0,
+        "named_seed_only": 0
+      },
+      "sample_paths": [
+        "Sequence/Unit/SequenceUnitCallHelpWindow.cpp",
+        "Sequence/Unit/SequenceUnitChangeStage.cpp",
+        "Sequence/Unit/SequenceUnitSwapDisk.cpp",
+        "Sequence/Utility/SequenceChangeStageUnit.cpp"
+      ],
+      "entries": [
+        {
+          "relative_source_path": "Sequence/Unit/SequenceUnitCallHelpWindow.cpp",
+          "family_id": "pause_stack",
+          "family_name": "Pause Stack",
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "pause_stack"
+          ],
+          "runtime_contracts": [
+            "pause_menu_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
+        },
+        {
+          "relative_source_path": "Sequence/Unit/SequenceUnitChangeStage.cpp",
+          "family_id": "loading_and_boot",
+          "family_name": "Loading / Boot / Install",
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "loading_and_start"
+          ],
+          "runtime_contracts": [
+            "loading_transition_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
+        },
+        {
+          "relative_source_path": "Sequence/Unit/SequenceUnitSwapDisk.cpp",
+          "family_id": "loading_and_boot",
+          "family_name": "Loading / Boot / Install",
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "loading_and_start"
+          ],
+          "runtime_contracts": [
+            "loading_transition_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
+        },
+        {
+          "relative_source_path": "Sequence/Utility/SequenceChangeStageUnit.cpp",
+          "family_id": "loading_and_boot",
+          "family_name": "Loading / Boot / Install",
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "loading_and_start"
+          ],
+          "runtime_contracts": [
+            "loading_transition_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
+        }
+      ]
+    },
+    {
+      "group_id": "town_dispatch_hosts",
+      "display_name": "Town / Media-Room Dispatch Hosts",
+      "priority": "high",
+      "path_count": 4,
+      "likely_target_system_ids": [
+        "town_ui"
+      ],
+      "likely_runtime_contracts": [],
+      "rationale": "These camera and sequence dispatch surfaces now form a tighter bridge into the town/media-room frontend family.",
+      "hint_ids": [],
+      "status_counts": {
+        "contract_backed": 0,
+        "archaeology_mapped": 4,
+        "debug_tool_candidate": 0,
+        "named_seed_only": 0
+      },
+      "sample_paths": [
+        "Camera/Controller/TownShopCamera.cpp",
+        "Camera/Controller/TownTalkCamera.cpp",
+        "Sequence/Unit/SequenceUnitSendMediaRoomMessage.cpp",
+        "Sequence/Unit/SequenceUnitSendTownMessage.cpp"
+      ],
+      "entries": [
+        {
+          "relative_source_path": "Camera/Controller/TownShopCamera.cpp",
+          "family_id": "town_ui",
+          "family_name": "Town / Media Room UI",
+          "status": "archaeology_mapped",
+          "matched_system_ids": [
+            "town_ui"
+          ],
+          "runtime_contracts": [],
+          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+        },
+        {
+          "relative_source_path": "Camera/Controller/TownTalkCamera.cpp",
+          "family_id": "town_ui",
+          "family_name": "Town / Media Room UI",
+          "status": "archaeology_mapped",
+          "matched_system_ids": [
+            "town_ui"
+          ],
+          "runtime_contracts": [],
+          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+        },
+        {
+          "relative_source_path": "Sequence/Unit/SequenceUnitSendMediaRoomMessage.cpp",
+          "family_id": "town_ui",
+          "family_name": "Town / Media Room UI",
+          "status": "archaeology_mapped",
+          "matched_system_ids": [
+            "town_ui"
+          ],
+          "runtime_contracts": [],
+          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+        },
+        {
+          "relative_source_path": "Sequence/Unit/SequenceUnitSendTownMessage.cpp",
+          "family_id": "town_ui",
+          "family_name": "Town / Media Room UI",
+          "status": "archaeology_mapped",
+          "matched_system_ids": [
+            "town_ui"
+          ],
+          "runtime_contracts": [],
+          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+        }
+      ]
+    },
+    {
+      "group_id": "frontend_app_shell",
+      "display_name": "Application / World Shell",
+      "priority": "medium",
+      "path_count": 9,
+      "likely_target_system_ids": [],
+      "likely_runtime_contracts": [],
+      "rationale": "These files look like app/world ownership shells rather than screen implementations, but they are the layer that will eventually need named translated ownership once the debug executable stops being purely menu-bound.",
+      "hint_ids": [],
+      "status_counts": {
+        "contract_backed": 0,
+        "archaeology_mapped": 0,
+        "debug_tool_candidate": 0,
+        "named_seed_only": 9
+      },
+      "sample_paths": [
+        "System/Application.cpp",
+        "System/ApplicationDocument.cpp",
+        "System/ApplicationSetting.cpp",
+        "System/Game.cpp",
+        "System/GameDocument.cpp",
+        "System/NextStagePreloadingManager.cpp"
+      ],
+      "entries": [
+        {
+          "relative_source_path": "System/Application.cpp",
+          "family_id": "frontend_system_shell",
+          "family_name": "Frontend System Shell",
+          "status": "named_seed_only",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+        },
+        {
+          "relative_source_path": "System/ApplicationDocument.cpp",
+          "family_id": "frontend_system_shell",
+          "family_name": "Frontend System Shell",
+          "status": "named_seed_only",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+        },
+        {
+          "relative_source_path": "System/ApplicationSetting.cpp",
+          "family_id": "frontend_system_shell",
+          "family_name": "Frontend System Shell",
+          "status": "named_seed_only",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+        },
+        {
+          "relative_source_path": "System/Game.cpp",
+          "family_id": "frontend_system_shell",
+          "family_name": "Frontend System Shell",
+          "status": "named_seed_only",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+        },
+        {
+          "relative_source_path": "System/GameDocument.cpp",
+          "family_id": "frontend_system_shell",
+          "family_name": "Frontend System Shell",
+          "status": "named_seed_only",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+        },
+        {
+          "relative_source_path": "System/NextStagePreloadingManager.cpp",
+          "family_id": "frontend_system_shell",
+          "family_name": "Frontend System Shell",
+          "status": "named_seed_only",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+        },
+        {
+          "relative_source_path": "System/StageListManager.cpp",
+          "family_id": "frontend_system_shell",
+          "family_name": "Frontend System Shell",
+          "status": "named_seed_only",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+        },
+        {
+          "relative_source_path": "System/StageManager.cpp",
+          "family_id": "frontend_system_shell",
+          "family_name": "Frontend System Shell",
+          "status": "named_seed_only",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+        },
+        {
+          "relative_source_path": "System/World.cpp",
+          "family_id": "frontend_system_shell",
+          "family_name": "Frontend System Shell",
+          "status": "named_seed_only",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+        }
+      ]
+    },
+    {
+      "group_id": "free_camera_and_replay_hosts",
+      "display_name": "Free Camera / Replay Hosts",
+      "priority": "medium",
+      "path_count": 5,
+      "likely_target_system_ids": [],
+      "likely_runtime_contracts": [],
+      "rationale": "These are better treated as inspection and traversal hosts for the future debug sandbox than as ordinary frontend camera ownership.",
+      "hint_ids": [
+        "debug_operation_tool"
+      ],
+      "status_counts": {
+        "contract_backed": 0,
+        "archaeology_mapped": 0,
+        "debug_tool_candidate": 4,
+        "named_seed_only": 1
+      },
+      "sample_paths": [
+        "Tool/FreeCameraTool/FreeCameraTool.cpp",
+        "Camera/Controller/FreeCamera.cpp",
+        "Camera/Controller/GoalCamera.cpp",
+        "Replay/Camera/ReplayFreeCamera.cpp",
+        "Replay/Camera/ReplayRelativeCamera.cpp"
+      ],
+      "entries": [
+        {
+          "relative_source_path": "Tool/FreeCameraTool/FreeCameraTool.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "Camera/Controller/FreeCamera.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "Camera/Controller/GoalCamera.cpp",
+          "family_id": "frontend_camera_shell",
+          "family_name": "Frontend Camera Shell",
+          "status": "named_seed_only",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+        },
+        {
+          "relative_source_path": "Replay/Camera/ReplayFreeCamera.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        },
+        {
+          "relative_source_path": "Replay/Camera/ReplayRelativeCamera.cpp",
+          "family_id": "tooling_debug_ui",
+          "family_name": "Tooling / Debug UI",
+          "status": "debug_tool_candidate",
+          "matched_system_ids": [],
+          "runtime_contracts": [],
+          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+        }
+      ]
+    }
+  ],
+  "top_host_candidates": [
+    {
+      "relative_source_path": "System/GameMode/GameModeMenuSelectDebug.cpp",
+      "reason": "Best current menu-debug host for a future selector-driven frontend executable."
+    },
+    {
+      "relative_source_path": "System/GameMode/GameModeStageSelectDebug.cpp",
+      "reason": "Best current stage-debug host for jumping from frontend control into gameplay-facing validation."
+    },
+    {
+      "relative_source_path": "Tool/InspirePreview/InspirePreview.cpp",
+      "reason": "Strongest cutscene preview host named directly by the supplied local note set."
+    },
+    {
+      "relative_source_path": "Tool/InspirePreview2nd/InspirePreview2nd.cpp",
+      "reason": "Newer cutscene preview host for isolated prerendered sequence checks."
+    },
+    {
+      "relative_source_path": "Tool/FreeCameraTool/FreeCameraTool.cpp",
+      "reason": "Inspection host for a future debug sandbox where menu/UI overlays and world traversal coexist."
+    },
+    {
+      "relative_source_path": "Tool/MotionCameraTool/MotionCameraTool.cpp",
+      "reason": "Camera-preview host that complements cutscene/timeline validation."
+    }
+  ]
+}

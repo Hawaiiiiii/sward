@@ -32,6 +32,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the first beat that actually places those recovered families back into the local-only `SONIC UNLEASHED/` scaffold, start with [`research_uiux/LOCAL_SOURCE_FAMILY_PLACEMENT.md`](./research_uiux/LOCAL_SOURCE_FAMILY_PLACEMENT.md).
 
+> [!TIP]
+> For the tightened answer to "which hosts should the future UI debug executable actually sit on first?", start with [`research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`](./research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
@@ -60,6 +63,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - A broader UI-adjacent source-path seed via [`research_uiux/source_path_seeds/UI_ADJACENT_SOURCE_PATHS_FROM_MATCH_DUMP.txt`](./research_uiux/source_path_seeds/UI_ADJACENT_SOURCE_PATHS_FROM_MATCH_DUMP.txt)
 - A source-tree mirror helper for the local-only `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py)
 - A local source-family note materializer for the `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_family_notes.py`](./research_uiux/tools/materialize_source_family_notes.py)
+- A tracked shell/debug host recovery layer via [`research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`](./research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md)
 - Publishable research notes such as:
 - [`research_uiux/UI_CODE_INDEX.md`](./research_uiux/UI_CODE_INDEX.md)
 - [`research_uiux/PATCH_HOOK_INDEX.md`](./research_uiux/PATCH_HOOK_INDEX.md)

@@ -206,6 +206,15 @@ def classify_source_path(relative_path: str) -> dict:
             "notes": "Pause shell, item/skill lists, and framed window/help sidecars.",
         }
 
+    if lowered == "sequence/unit/sequenceunitcallhelpwindow.cpp":
+        return {
+            "family_id": "pause_stack",
+            "family_name": "Pause Stack",
+            "candidate_system_ids": ["pause_stack"],
+            "debug_tool_candidate": False,
+            "notes": "Sequence-layer dispatcher that appears to hand off into the shared help window surface.",
+        }
+
     if lowered.startswith("hud/status/"):
         return {
             "family_id": "status_overlay",
@@ -242,6 +251,15 @@ def classify_source_path(relative_path: str) -> dict:
             "notes": "Town dialogs, shops, item/media-room menu shells, and town managers.",
         }
 
+    if lowered in ("camera/controller/townshopcamera.cpp", "camera/controller/towntalkcamera.cpp"):
+        return {
+            "family_id": "town_ui",
+            "family_name": "Town / Media Room UI",
+            "candidate_system_ids": ["town_ui"],
+            "debug_tool_candidate": False,
+            "notes": "Town conversation/shop camera controllers that sit beside the town UI shell.",
+        }
+
     if lowered.startswith("hud/mission/") or lowered.startswith("system/mission/"):
         if "finish" in lowered or "failed" in lowered or lowered.endswith("objmissionclear.cpp"):
             return {
@@ -275,6 +293,31 @@ def classify_source_path(relative_path: str) -> dict:
             "candidate_system_ids": ["save_and_ending"],
             "debug_tool_candidate": False,
             "notes": "Autosave and clear-flag sequencing around endings/save icon behavior.",
+        }
+
+    if lowered in (
+        "sequence/unit/sequenceunitchangestage.cpp",
+        "sequence/unit/sequenceunitswapdisk.cpp",
+        "sequence/utility/sequencechangestageunit.cpp",
+    ):
+        return {
+            "family_id": "loading_and_boot",
+            "family_name": "Loading / Boot / Install",
+            "candidate_system_ids": ["loading_and_start"],
+            "debug_tool_candidate": False,
+            "notes": "Sequence-layer stage-change and swap-disk handoffs that still resolve into the loading/start shell.",
+        }
+
+    if lowered in (
+        "sequence/unit/sequenceunitsendmediaroommessage.cpp",
+        "sequence/unit/sequenceunitsendtownmessage.cpp",
+    ):
+        return {
+            "family_id": "town_ui",
+            "family_name": "Town / Media Room UI",
+            "candidate_system_ids": ["town_ui"],
+            "debug_tool_candidate": False,
+            "notes": "Sequence-layer message dispatch into town and media-room surfaces.",
         }
 
     if lowered.startswith("sequence/") and ("playmovie" in lowered or "microsequence" in lowered):
@@ -329,6 +372,19 @@ def classify_source_path(relative_path: str) -> dict:
             "candidate_system_ids": ["csd_ui_foundation"],
             "debug_tool_candidate": False,
             "notes": "Core CellSpriteDraw project/mirage bridge layer and generic text-box foundation.",
+        }
+
+    if lowered in (
+        "camera/controller/freecamera.cpp",
+        "replay/camera/replayfreecamera.cpp",
+        "replay/camera/replayrelativecamera.cpp",
+    ):
+        return {
+            "family_id": "tooling_debug_ui",
+            "family_name": "Tooling / Debug UI",
+            "candidate_system_ids": [],
+            "debug_tool_candidate": True,
+            "notes": "Free/replay camera controllers that look more like debug and inspection hosts than final frontend ownership.",
         }
 
     if lowered.startswith("camera/") or lowered.startswith("replay/camera/"):

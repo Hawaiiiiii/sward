@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 35 frontend shell and debug host recovery
+
+- added [`research_uiux/tools/build_frontend_shell_recovery.py`](./research_uiux/tools/build_frontend_shell_recovery.py)
+- added [`research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`](./research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md)
+- added the machine-readable shell/debug host map under [`research_uiux/data/frontend_shell_recovery.json`](./research_uiux/data/frontend_shell_recovery.json)
+- tightened [`research_uiux/tools/map_ui_source_paths.py`](./research_uiux/tools/map_ui_source_paths.py) so pause/help dispatch, stage-change sequencing, town dispatch, and free/replay camera paths stop living in generic shell buckets
+- refreshed the broader source-path manifest to `220` paths with `118` archaeology-mapped entries, `42` contract-backed entries, `60` debug-host candidates, and `42` named-only gaps
+- narrowed the immediate shell/debug recovery pass to `46` targeted host paths, of which `13` now bridge into archaeology systems and `4` already land on current runtime contracts
+
 ### Phase 34 broader UI-adjacent source-path manifest
 
 - added [`research_uiux/tools/build_broader_ui_adjacent_source_seed.py`](./research_uiux/tools/build_broader_ui_adjacent_source_seed.py)

@@ -256,6 +256,13 @@
 - [x] Generate a tracked human-readable report with the widened coverage counts and gaps.
 - [x] Update the relevant coverage/source-path docs and checklist audit.
 
+## Phase 35 - Frontend Shell And Debug Host Recovery
+
+- [x] Tighten the widened shell/debug layer into concrete host/dispatch buckets instead of leaving it as generic system/sequence/camera spillover.
+- [x] Generate `research_uiux\data\frontend_shell_recovery.json`.
+- [x] Generate `research_uiux\FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`.
+- [x] Refresh the broader source-path manifest, local-only `SONIC UNLEASHED\**\*.sward.md` note layer, and selector metadata where the tighter ownership changes land.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -343,3 +350,7 @@
 - [x] Follow-on phase audit on `2026-04-23 21:05:00 +02:00`: added `research_uiux\tools\build_broader_ui_adjacent_source_seed.py` plus the tracked broader seed `research_uiux\source_path_seeds\UI_ADJACENT_SOURCE_PATHS_FROM_MATCH_DUMP.txt`.
 - [x] Follow-on phase audit on `2026-04-23 21:05:00 +02:00`: refreshed the local `ui_source_path_manifest.json` to `220` source paths across `19` families, with `110` archaeology-mapped entries, `38` contract-backed entries, `57` debug-host candidates, and `53` named-only gaps.
 - [x] Follow-on phase audit on `2026-04-23 21:05:00 +02:00`: widened the local-only `SONIC UNLEASHED\**\*.sward.md` layer to `220` placement notes and refreshed the selector metadata so aliases such as `GameModeBoot.cpp`, `EndingManager.cpp`, and `MainMenuManager.cpp` now resolve where contracts already exist.
+- [x] Follow-on phase audit on `2026-04-23`: tightened `research_uiux\tools\map_ui_source_paths.py` so pause/help dispatch, stage-change sequencing, town dispatch, and free/replay camera paths no longer sit in the same generic shell buckets.
+- [x] Follow-on phase audit on `2026-04-23`: added `research_uiux\tools\build_frontend_shell_recovery.py`, `research_uiux\data\frontend_shell_recovery.json`, and `research_uiux\FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`.
+- [x] Follow-on phase audit on `2026-04-23`: refreshed the broader `ui_source_path_manifest.json` to `220` source paths with `118` archaeology-mapped entries, `42` contract-backed entries, `60` debug-host candidates, and `42` named-only gaps.
+- [x] Follow-on phase audit on `2026-04-23`: narrowed the new shell/debug pass to `46` targeted host paths with `13` archaeology bridges, `4` contract-backed dispatch anchors, and `10` still shell-only paths after the tighter recovery sweep.

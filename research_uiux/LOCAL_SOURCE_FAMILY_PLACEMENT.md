@@ -12,13 +12,13 @@ Phase 32 starts the actual placement step that the previous source-path reports 
 ## Snapshot
 
 - Local-only note files created: `220`
-- Contract-backed placements in the current wider manifest: `38`
-- Archaeology-mapped placements without runtime contracts: `72`
-- Debug-host candidates: `57`
-- Named-only placeholders still waiting on stronger recovery: `53`
-- Family-member anchors with recovered system context: `67`
-- Debug-host anchors: `57`
-- Placeholder-only anchors: `96`
+- Contract-backed placements in the current wider manifest: `42`
+- Archaeology-mapped placements without runtime contracts: `76`
+- Debug-host candidates: `60`
+- Named-only placeholders still waiting on stronger recovery: `42`
+- Family-member anchors with recovered system context: `105`
+- Debug-host anchors: `60`
+- Placeholder-only anchors: `42`
 - Direct original-source host anchors: `0` in the broader pass, because the readable host layer still points more often at patch/runtime ownership than at recovered original source-family files
 
 ## Output Shape
@@ -62,6 +62,12 @@ Each local note currently records:
 - `System/GameMode/WorldMap/WorldMapSelect.cpp`
   - contract-backed
   - already sits on the `World Map Stack`
+- `Sequence/Unit/SequenceUnitCallHelpWindow.cpp`
+  - contract-backed
+  - now resolves into the `Pause Stack` dispatch layer through `pause_menu_reference.json`
+- `Sequence/Unit/SequenceUnitChangeStage.cpp`
+  - contract-backed
+  - now resolves into the `Loading And Start/Clear` dispatch layer through `loading_transition_reference.json`
 - `System/GameMode/GameModeMenuSelectDebug.cpp`
   - debug-host candidate
   - now has a concrete local placement note inside a much larger debug/tool host layer even before a richer debug sandbox is built
