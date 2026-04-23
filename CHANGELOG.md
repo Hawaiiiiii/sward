@@ -11,6 +11,17 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 23 full UI archaeology cross-reference
+
+- added [`research_uiux/tools/build_ui_archaeology_database.py`](./research_uiux/tools/build_ui_archaeology_database.py)
+- added [`research_uiux/FULL_UI_ARCHAEOLOGY_CROSS_REFERENCE.md`](./research_uiux/FULL_UI_ARCHAEOLOGY_CROSS_REFERENCE.md)
+- added [`research_uiux/data/ui_archaeology_database.json`](./research_uiux/data/ui_archaeology_database.json)
+- safely extracted a broader town/common-flow archive batch into `extracted_assets/phase23_crossref_archives`
+- expanded the extracted asset inventory to `6751` matched entries and the parsed layout layer to `28` files / `26` merged layout IDs
+- upgraded the correlation layer so `ui_balloon`, `ui_shop`, `ui_townscreen`, `ui_mediaroom`, `ui_gate`, `ui_missionscreen`, `ui_misson`, `ui_exstage`, `ui_prov_playscreen`, `ui_result`, `ui_result_ex`, and `ui_start` have explicit roles, while `ui_qte` is now evidence-backed instead of unresolved
+- grouped the current evidence into `13` reusable screen/system families and resolved `56` generated PPC seams into the active archaeology layer
+- updated the research workspace README, asset index, checklist, and repo-facing README for the new cross-reference phase
+
 ### Phase 22 coverage audit and markdown presentation pass
 
 - added [`research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md`](./research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md) to answer the direct whole-game-source vs translated-output vs extracted-asset question with verified local counts

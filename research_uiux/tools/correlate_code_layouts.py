@@ -16,12 +16,25 @@ SOURCE_SUFFIXES = {".cpp", ".cc", ".cxx", ".h", ".hpp", ".hh", ".inl", ".toml"}
 
 LAYOUT_ROLES = {
     "ui_mainmenu": "title_menu",
+    "ui_balloon": "town_dialog_balloon",
+    "ui_shop": "town_shop_menu",
+    "ui_townscreen": "town_overlay",
+    "ui_mediaroom": "mediaroom_menu",
     "ui_general": "shared_window_shell",
     "ui_pause": "pause_menu",
     "ui_status": "status_overlay",
+    "ui_gate": "mission_gate_overlay",
     "ui_itemresult": "item_result_overlay",
+    "ui_missionscreen": "mission_briefing_overlay",
+    "ui_misson": "mission_briefing_window",
     "ui_help": "help_overlay",
     "ui_loading": "loading_transition",
+    "ui_exstage": "exstage_hud",
+    "ui_prov_playscreen": "tornado_defense_hud",
+    "ui_qte": "tornado_defense_qte",
+    "ui_result": "mission_result_overlay",
+    "ui_result_ex": "exstage_result_overlay",
+    "ui_start": "start_clear_prompt",
     "ui_worldmap": "world_map",
     "ui_worldmap_help": "world_map_help_overlay",
     "ui_saveicon": "save_overlay",
@@ -35,8 +48,29 @@ LAYOUT_PATCH_FILES = {
         "UnleashedRecomp/patches/CTitleStateIntro_patches.cpp",
         "UnleashedRecomp/patches/CTitleStateMenu_patches.cpp",
     ],
+    "ui_balloon": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+    ],
+    "ui_shop": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+    ],
+    "ui_townscreen": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+    ],
+    "ui_mediaroom": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+    ],
     "ui_pause": [
         "UnleashedRecomp/patches/CHudPause_patches.cpp",
+    ],
+    "ui_gate": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+    ],
+    "ui_missionscreen": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+    ],
+    "ui_misson": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
     ],
     "ui_worldmap": [
         "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
@@ -45,6 +79,41 @@ LAYOUT_PATCH_FILES = {
     "ui_worldmap_help": [
         "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
         "UnleashedRecomp/patches/input_patches.cpp",
+    ],
+    "ui_exstage": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+        "UnleashedRecomp/patches/fps_patches.cpp",
+    ],
+    "ui_prov_playscreen": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+        "UnleashedRecomp/patches/object_patches.cpp",
+        "UnleashedRecomp/patches/fps_patches.cpp",
+    ],
+    "ui_qte": [
+        "UnleashedRecomp/patches/misc_patches.cpp",
+        "UnleashedRecomp/patches/object_patches.cpp",
+        "UnleashedRecomp/patches/fps_patches.cpp",
+    ],
+    "ui_result": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+    ],
+    "ui_result_ex": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+    ],
+    "ui_start": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+    ],
+    "ui_saveicon": [
+        "UnleashedRecomp/patches/resident_patches.cpp",
+    ],
+    "ui_end": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+    ],
+    "ui_boss_gauge": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+    ],
+    "ui_boss_name": [
+        "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
     ],
 }
 
@@ -79,6 +148,38 @@ MANUAL_HINTS = {
             "evidence": "contextual",
             "patterns": ["# Title", "UseAlternateTitleMidAsmHook", "AddPrimitive2DMidAsmHook"],
             "reason": "Declares title-specific hook sites on the original title render path even though the layout name itself is not exposed in readable C++.",
+        },
+    ],
+    "ui_balloon": [
+        {
+            "path": "UnleashedRecomp/install/hashes/game.cpp",
+            "evidence": "contextual",
+            "patterns": ['"Item/item_balloon.dds"'],
+            "reason": "The install hash table preserves the shared town-balloon texture asset by name, which lines up with the extracted `ui_balloon` talk/item window package.",
+        },
+    ],
+    "ui_shop": [
+        {
+            "path": "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+            "evidence": "direct",
+            "patterns": ["ui_shop/footer/shop_footer"],
+            "reason": "Direct layout-path rules expose the dedicated shop footer prompt row from the extracted `ui_shop` package.",
+        },
+    ],
+    "ui_townscreen": [
+        {
+            "path": "UnleashedRecomp/locale/config_locale.cpp",
+            "evidence": "contextual",
+            "patterns": ["CONFIG_DEFINE_LOCALE(TimeOfDayTransition)", "ETimeOfDayTransition::PlayStation"],
+            "reason": "Readable config/localization evidence exposes the town time-of-day transition policy that sits adjacent to the extracted `ui_townscreen` overlay family.",
+        },
+    ],
+    "ui_mediaroom": [
+        {
+            "path": "UnleashedRecomp/install/hashes/game.cpp",
+            "evidence": "contextual",
+            "patterns": ['"Sound/bgm_sys_mediaroom.csb"'],
+            "reason": "The install hash table exposes the dedicated Media Room BGM cue, confirming this layout belongs to a distinct menu-family presentation rather than a generic town shell.",
         },
     ],
     "ui_general": [
@@ -147,12 +248,36 @@ MANUAL_HINTS = {
             "reason": "The readable UI layer reuses a title/header frame style that closely matches the extracted `ui_status` title-shell structure.",
         },
     ],
+    "ui_gate": [
+        {
+            "path": "UnleashedRecomp/install/hashes/game.cpp",
+            "evidence": "contextual",
+            "patterns": ['"Hint/BossGate.dds"'],
+            "reason": "The install hash table preserves a dedicated boss-gate hint texture, which fits the extracted `ui_gate` status-window package.",
+        },
+    ],
     "ui_itemresult": [
         {
             "path": "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
             "evidence": "direct",
             "patterns": ["ui_itemresult/footer/result_footer", "ui_itemresult/main/iresult_title"],
             "reason": "Direct layout-path rules expose the footer prompt row and title treatment from the extracted item-result layout.",
+        },
+    ],
+    "ui_missionscreen": [
+        {
+            "path": "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+            "evidence": "direct",
+            "patterns": ["ui_missionscreen/player_count", "ui_missionscreen/score_count", "ui_missionscreen/lap_count"],
+            "reason": "Direct layout-path rules expose mission HUD counters for player, time, score, item, and lap display groups.",
+        },
+    ],
+    "ui_misson": [
+        {
+            "path": "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+            "evidence": "direct",
+            "patterns": ["ui_misson/header/misson_title_B", "ui_misson/window/bg_B2/position/bg"],
+            "reason": "Direct layout-path rules expose the misson-title header shell and stretchable mission window background from the extracted package.",
         },
     ],
     "ui_help": [
@@ -181,6 +306,78 @@ MANUAL_HINTS = {
             "evidence": "contextual",
             "patterns": ["Loading black-bar alpha overlays"],
             "reason": "The readable black-bar layer aligns with the loading layout's authored letterbox and black-bar scene families.",
+        },
+    ],
+    "ui_exstage": [
+        {
+            "path": "UnleashedRecomp/patches/fps_patches.cpp",
+            "evidence": "strong",
+            "patterns": ["// Tornado Defense boss increments timers without respecting delta time.", "sub_82B00D00"],
+            "reason": "Readable frame-rate fixes target the ExStage boss battle update seam that owns the extracted `ui_exstage` combat HUD timing.",
+        },
+    ],
+    "ui_prov_playscreen": [
+        {
+            "path": "UnleashedRecomp/patches/aspect_ratio_patches.cpp",
+            "evidence": "direct",
+            "patterns": ["ui_prov_playscreen/so_speed_gauge", "ui_prov_playscreen/ring_get_effect"],
+            "reason": "Direct layout-path rules expose the Tornado Defense play-screen gauges, info blocks, and ring-get effect branches.",
+        },
+        {
+            "path": "UnleashedRecomp/patches/object_patches.cpp",
+            "evidence": "strong",
+            "patterns": ["Tornado Defense bullet particles are colored by the button prompt", "sub_82B14CC0"],
+            "reason": "Readable object patches tie Tornado Defense weapon feedback directly to controller-prompt coloration, matching the extracted play-screen HUD family.",
+        },
+        {
+            "path": "UnleashedRecomp/patches/fps_patches.cpp",
+            "evidence": "strong",
+            "patterns": ["// Tornado Defense boss increments timers without respecting delta time.", "sub_82B00D00"],
+            "reason": "Readable timing fixes confirm that Tornado Defense HUD behavior is driven by a dedicated ExStage boss battle update seam.",
+        },
+    ],
+    "ui_qte": [
+        {
+            "path": "UnleashedRecomp/patches/misc_patches.cpp",
+            "evidence": "strong",
+            "patterns": ["Only allow enemy QTE prompts to get through.", "DisableEvilControlTutorialMidAsmHook"],
+            "reason": "Readable mission/tutorial filtering proves the game distinguishes enemy QTE prompts as a discrete control-prompt stream.",
+        },
+        {
+            "path": "UnleashedRecomp/patches/object_patches.cpp",
+            "evidence": "strong",
+            "patterns": ["Tornado Defense bullet particles are colored by the button prompt", "sub_82B14CC0"],
+            "reason": "Readable object patches tie Tornado Defense visual feedback to button-prompt identity, matching the extracted `ui_qte` controller-prompt layout.",
+        },
+        {
+            "path": "UnleashedRecomp/patches/fps_patches.cpp",
+            "evidence": "contextual",
+            "patterns": ["// Tornado Defense boss increments timers without respecting delta time.", "sub_82B00D00"],
+            "reason": "Readable Tornado Defense timing fixes place the QTE layout inside the same ExStage battle loop as the extracted play-screen HUD.",
+        },
+    ],
+    "ui_result": [
+        {
+            "path": "UnleashedRecomp/install/hashes/game.cpp",
+            "evidence": "contextual",
+            "patterns": ['"Sound/bgm_sys_result.csb"', '"Sound/vs_result_sonic_e.csb"'],
+            "reason": "The install hash table exposes dedicated result-screen music cues that align with the extracted mission-result layout family.",
+        },
+    ],
+    "ui_result_ex": [
+        {
+            "path": "UnleashedRecomp/install/hashes/game.cpp",
+            "evidence": "contextual",
+            "patterns": ['"Sound/bgm_sys_result.csb"', '"Sound/vs_result_evil_e.csb"'],
+            "reason": "The install hash table exposes dedicated result-screen music cues for the extended/ex-stage result branch.",
+        },
+    ],
+    "ui_start": [
+        {
+            "path": "UnleashedRecomp/locale/config_locale.cpp",
+            "evidence": "contextual",
+            "patterns": ["CONFIG_DEFINE_LOCALE(TimeOfDayTransition)", "spinning medal loading screen"],
+            "reason": "Readable time-of-day transition policy sits adjacent to the extracted start/clear prompt package used during state handoff screens.",
         },
     ],
     "ui_worldmap": [

@@ -1,16 +1,12 @@
-<p align="right">
-    <img src="../docs/assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
-</p>
-
-# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Code-to-Layout Correlation
+# Code-to-Layout Correlation
 
 Machine-readable inventory: `research_uiux/data/layout_code_correlation.json`
 
 ## Summary
 
-- Layout files correlated: `13`
-- Direct-correlation layouts: `9`
-- Strong-correlation layouts: `3`
+- Layout files correlated: `26`
+- Direct-correlation layouts: `21`
+- Strong-correlation layouts: `4`
 - Context-only layouts: `1`
 - Unresolved layouts: `0`
 
@@ -18,9 +14,6 @@ Machine-readable inventory: `research_uiux/data/layout_code_correlation.json`
 > `direct` means the readable code names the extracted layout or scene path explicitly.
 > `strong` means the readable code wraps the same game subsystem/state without exposing the raw layout string.
 > `contextual` means the readable code is adjacent support infrastructure rather than a direct asset-name seam.
-
-> [!TIP]
-> A follow-on Phase 16 probe added additional gameplay/result layouts under `extracted_assets/phase16_support_archives`, including `ui_result.yncp`, `ui_result_ex.yncp`, `ui_missionscreen.yncp`, and `ui_misson.yncp`. The extended synthesis lives in [`BOSS_RESULT_SAVE_LOAD_DEEP_DIVE.md`](./BOSS_RESULT_SAVE_LOAD_DEEP_DIVE.md).
 
 ## `ui_boss_gauge`
 
@@ -66,6 +59,56 @@ Machine-readable inventory: `research_uiux/data/layout_code_correlation.json`
 - `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:381`
   - evidence line: `{ HashStr("ui_boss_name/name_so/pale"), { UNSTRETCH_HORIZONTAL } },`
   - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+
+## `ui_exstage`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase16_support_archives/ExStageTails_Common/ui_exstage.yncp`
+- Archive group: `ExStageTails_Common`
+- Inferred role: `exstage_hud`
+- Correlation verdict: `direct`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:383`
+  - evidence line: `// ui_exstage`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:384`
+  - evidence line: `{ HashStr("ui_exstage/shield/L_gauge"), { ALIGN_BOTTOM_LEFT | SCALE } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:385`
+  - evidence line: `{ HashStr("ui_exstage/shield/L_gauge_effect"), { ALIGN_BOTTOM_LEFT | SCALE } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:386`
+  - evidence line: `{ HashStr("ui_exstage/shield/L_gauge_effect_2"), { ALIGN_BOTTOM_LEFT | SCALE } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `strong` `UnleashedRecomp/patches/fps_patches.cpp:140`
+  - evidence line: `// Tornado Defense boss increments timers without respecting delta time.`
+  - why it matters: Readable frame-rate fixes target the ExStage boss battle update seam that owns the extracted `ui_exstage` combat HUD timing.
+
+## `ui_result_ex`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase16_support_archives/ExStageTails_Common/ui_result_ex.yncp`
+- Archive group: `ExStageTails_Common`
+- Inferred role: `exstage_result_overlay`
+- Correlation verdict: `direct`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:671`
+  - evidence line: `// ui_result_ex`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:672`
+  - evidence line: `{ HashStr("ui_result_ex/footer/result_footer"), { ALIGN_BOTTOM } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:673`
+  - evidence line: `{ HashStr("ui_result_ex/main/result_title"), { ALIGN_TOP | OFFSET_SCALE_LEFT, 688.0f } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:674`
+  - evidence line: `{ HashStr("ui_result_ex/main/result_title/title_bg/center"), { ALIGN_TOP | EXTEND_LEFT } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `contextual` `UnleashedRecomp/install/hashes/game.cpp:8112`
+  - evidence line: `{ "Sound/bgm_sys_result.csb", 1 },`
+  - why it matters: The install hash table exposes dedicated result-screen music cues for the extended/ex-stage result branch.
 
 ## `ui_help`
 
@@ -130,6 +173,131 @@ Machine-readable inventory: `research_uiux/data/layout_code_correlation.json`
   - why it matters: Readable source references the extracted layout name or an exact layout/scene path. Direct readable patch evidence references `ui_loading.yncp`, patches its animation data, and swaps controller-platform string variants inside the same loading project.
 - `contextual` `UnleashedRecomp/ui/black_bar.cpp`
   - why it matters: The readable black-bar layer aligns with the loading layout's authored letterbox and black-bar scene families.
+
+## `ui_mediaroom`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase23_crossref_archives/Town_Labo_Common/ui_mediaroom.yncp`
+- Archive group: `Town_Labo_Common`
+- Inferred role: `mediaroom_menu`
+- Correlation verdict: `direct`
+- Scene cues: `footer, header, window`
+- Animation cues: `Intro_Anim, DefaultAnim`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:434`
+  - evidence line: `// ui_mediaroom`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:435`
+  - evidence line: `{ HashStr("ui_mediaroom/header/bg/img_1"), { EXTEND_LEFT } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:436`
+  - evidence line: `{ HashStr("ui_mediaroom/header/bg/img_10"), { EXTEND_RIGHT } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:437`
+  - evidence line: `{ HashStr("ui_mediaroom/header/frame/img_1"), { EXTEND_LEFT } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `contextual` `UnleashedRecomp/install/hashes/game.cpp:8105`
+  - evidence line: `{ "Sound/bgm_sys_mediaroom.csb", 1 },`
+  - why it matters: The install hash table exposes the dedicated Media Room BGM cue, confirming this layout belongs to a distinct menu-family presentation rather than a generic town shell.
+
+## `ui_missionscreen`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase16_support_archives/ActionCommon/ui_missionscreen.yncp`
+- Archive group: `ActionCommon`
+- Inferred role: `mission_briefing_overlay`
+- Correlation verdict: `direct`
+- Scene cues: `item_count, lap_count, laptime_count, player_count, position, score_count, time_count`
+- Animation cues: `normal_ev, normal_so, conditional_timer_ev, conditional_timer_so, conditional_meet_ev, conditional_meet_so, conditional_get, DefaultAnim`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:440`
+  - evidence line: `// ui_missionscreen`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:441`
+  - evidence line: `{ HashStr("ui_missionscreen/player_count"), { ALIGN_TOP_LEFT | SCALE } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path. Direct layout-path rules expose mission HUD counters for player, time, score, item, and lap display groups.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:442`
+  - evidence line: `{ HashStr("ui_missionscreen/time_count"), { ALIGN_TOP_LEFT | SCALE } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:443`
+  - evidence line: `{ HashStr("ui_missionscreen/time_count/position_S/bg_1"), { ALIGN_TOP_LEFT | SCALE | EXTEND_LEFT } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+
+## `ui_misson`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase16_support_archives/ActionCommon/ui_misson.yncp`
+- Archive group: `ActionCommon`
+- Inferred role: `mission_briefing_window`
+- Correlation verdict: `direct`
+- Scene cues: `bg`
+- Animation cues: `Intro_Anim`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:478`
+  - evidence line: `// ui_misson`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:479`
+  - evidence line: `{ HashStr("ui_misson/bg"), { STRETCH } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:480`
+  - evidence line: `{ HashStr("ui_misson/footer/footer_B"), { ALIGN_BOTTOM } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:481`
+  - evidence line: `{ HashStr("ui_misson/header/misson_title_B"), { ALIGN_TOP | OFFSET_SCALE_LEFT, 638.0f } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path. Direct layout-path rules expose the misson-title header shell and stretchable mission window background from the extracted package.
+
+## `ui_gate`
+
+- Asset variants: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase16_support_archives/ActionCommon/ui_gate.yncp, C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase23_crossref_archives/Town_EggManBase_Common/ui_gate.yncp`
+- Archive group: `ActionCommon`
+- Inferred role: `mission_gate_overlay`
+- Correlation verdict: `direct`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:396`
+  - evidence line: `// ui_gate`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:397`
+  - evidence line: `{ HashStr("ui_gate/footer/status_footer"), { ALIGN_BOTTOM } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:398`
+  - evidence line: `{ HashStr("ui_gate/header/status_title"), { ALIGN_TOP | OFFSET_SCALE_LEFT, 652.0f } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:399`
+  - evidence line: `{ HashStr("ui_gate/header/status_title/title_bg/center"), { ALIGN_TOP | EXTEND_LEFT } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `contextual` `UnleashedRecomp/install/hashes/game.cpp:6351`
+  - evidence line: `{ "Hint/BossGate.dds", 2 },`
+  - why it matters: The install hash table preserves a dedicated boss-gate hint texture, which fits the extracted `ui_gate` status-window package.
+
+## `ui_result`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase16_support_archives/ActionCommon/ui_result.yncp`
+- Archive group: `ActionCommon`
+- Inferred role: `mission_result_overlay`
+- Correlation verdict: `direct`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:619`
+  - evidence line: `// ui_result`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:620`
+  - evidence line: `{ HashStr("ui_result/footer/result_footer"), { ALIGN_BOTTOM } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:621`
+  - evidence line: `{ HashStr("ui_result/main/result_title"), { ALIGN_TOP | OFFSET_SCALE_LEFT, 688.0f } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:622`
+  - evidence line: `{ HashStr("ui_result/main/result_title/title_bg/center"), { ALIGN_TOP | EXTEND_LEFT } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `contextual` `UnleashedRecomp/install/hashes/game.cpp:8112`
+  - evidence line: `{ "Sound/bgm_sys_result.csb", 1 },`
+  - why it matters: The install hash table exposes dedicated result-screen music cues that align with the extracted mission-result layout family.
 
 ## `ui_pause`
 
@@ -239,6 +407,33 @@ Machine-readable inventory: `research_uiux/data/layout_code_correlation.json`
   - evidence line: `name = "EndingTextAllocMidAsmHook"`
   - why it matters: Declares the ending/staff-roll hook sites that align with the extracted `ui_end` project.
 
+## `ui_start`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase16_support_archives/ActionCommon/ui_start.yncp`
+- Archive group: `ActionCommon`
+- Inferred role: `start_clear_prompt`
+- Correlation verdict: `direct`
+- Scene cues: `Clear, Failed, Game_over, Start`
+- Animation cues: `Intro_Anim, Intro_Anim_act`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:715`
+  - evidence line: `// ui_start`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:716`
+  - evidence line: `{ HashStr("ui_start/Clear/position/bg/bg_1"), { STRETCH } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:717`
+  - evidence line: `{ HashStr("ui_start/Clear/position/bg/bg_2"), { STRETCH } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:718`
+  - evidence line: `{ HashStr("ui_start/Start/img/bg/bg_1"), { STRETCH } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `contextual` `UnleashedRecomp/locale/config_locale.cpp:162`
+  - evidence line: `CONFIG_DEFINE_LOCALE(TimeOfDayTransition)`
+  - why it matters: Readable time-of-day transition policy sits adjacent to the extracted start/clear prompt package used during state handoff screens.
+
 ## `ui_status`
 
 - Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/ui_extended_archives/SystemCommonCore/ui_status.yncp`
@@ -302,6 +497,120 @@ Machine-readable inventory: `research_uiux/data/layout_code_correlation.json`
 - `sub_825882B8` via `UnleashedRecomp/patches/CTitleStateMenu_patches.cpp`
   - generated location: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.40.cpp:42336`
   - readable relationship: core title menu update seam wrapped by options/install logic
+
+## `ui_prov_playscreen`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase16_support_archives/ExStageTails_Common/ui_prov_playscreen.yncp`
+- Archive group: `ExStageTails_Common`
+- Inferred role: `tornado_defense_hud`
+- Correlation verdict: `direct`
+- Scene cues: `bg, info_1, info_2, ring_get_effect, so_ringenagy_gauge, so_speed_gauge`
+- Animation cues: `Size_Anim, DefaultAnim, Count_Anim, Score_Anim, Time_Anim, Intro_Anim`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:603`
+  - evidence line: `// ui_prov_playscreen`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:604`
+  - evidence line: `{ HashStr("ui_prov_playscreen/so_speed_gauge"), { ALIGN_BOTTOM_LEFT | SCALE | TORNADO_DEFENSE } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path. Direct layout-path rules expose the Tornado Defense play-screen gauges, info blocks, and ring-get effect branches.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:605`
+  - evidence line: `{ HashStr("ui_prov_playscreen/so_ringenagy_gauge"), { ALIGN_BOTTOM_LEFT | SCALE | TORNADO_DEFENSE } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:606`
+  - evidence line: `{ HashStr("ui_prov_playscreen/bg"), { ALIGN_TOP_LEFT | SCALE | TORNADO_DEFENSE } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `strong` `UnleashedRecomp/patches/fps_patches.cpp:140`
+  - evidence line: `// Tornado Defense boss increments timers without respecting delta time.`
+  - why it matters: Readable timing fixes confirm that Tornado Defense HUD behavior is driven by a dedicated ExStage boss battle update seam.
+- `strong` `UnleashedRecomp/patches/object_patches.cpp:74`
+  - evidence line: `// Tornado Defense bullet particles are colored by the button prompt, which differs on PlayStation 3.`
+  - why it matters: Readable object patches tie Tornado Defense weapon feedback directly to controller-prompt coloration, matching the extracted play-screen HUD family.
+
+## `ui_qte`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase16_support_archives/ExStageTails_Common/ui_qte.yncp`
+- Archive group: `ExStageTails_Common`
+- Inferred role: `tornado_defense_qte`
+- Correlation verdict: `strong`
+
+### Readable Correlations
+
+- `strong` `UnleashedRecomp/patches/misc_patches.cpp:38`
+  - evidence line: `// Only allow enemy QTE prompts to get through.`
+  - why it matters: Readable mission/tutorial filtering proves the game distinguishes enemy QTE prompts as a discrete control-prompt stream.
+- `strong` `UnleashedRecomp/patches/object_patches.cpp:74`
+  - evidence line: `// Tornado Defense bullet particles are colored by the button prompt, which differs on PlayStation 3.`
+  - why it matters: Readable object patches tie Tornado Defense visual feedback to button-prompt identity, matching the extracted `ui_qte` controller-prompt layout.
+- `contextual` `UnleashedRecomp/patches/fps_patches.cpp:140`
+  - evidence line: `// Tornado Defense boss increments timers without respecting delta time.`
+  - why it matters: Readable Tornado Defense timing fixes place the QTE layout inside the same ExStage battle loop as the extracted play-screen HUD.
+
+## `ui_balloon`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase23_crossref_archives/Town_Common/ui_balloon.yncp`
+- Archive group: `Town_Common`
+- Inferred role: `town_dialog_balloon`
+- Correlation verdict: `direct`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:369`
+  - evidence line: `// ui_balloon`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:370`
+  - evidence line: `{ HashStr("ui_balloon/window/bg"), { STRETCH } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:371`
+  - evidence line: `{ HashStr("ui_balloon/window/footer"), { ALIGN_BOTTOM } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `contextual` `UnleashedRecomp/install/hashes/game.cpp:7134`
+  - evidence line: `{ "Item/item_balloon.dds", 2 },`
+  - why it matters: The install hash table preserves the shared town-balloon texture asset by name, which lines up with the extracted `ui_balloon` talk/item window package.
+
+## `ui_townscreen`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase23_crossref_archives/Town_Common/ui_townscreen.yncp`
+- Archive group: `Town_Common`
+- Inferred role: `town_overlay`
+- Correlation verdict: `direct`
+- Scene cues: `cam, footer, info, time, time_effect`
+- Animation cues: `Size_Anim, Effect_Anim, Usual_12_Anim, Usual_1_Anim, Usual_2_Anim, Usual_3_Anim, Usual_ev_Anim, Usual_so_Anim`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:751`
+  - evidence line: `// ui_townscreen`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:752`
+  - evidence line: `{ HashStr("ui_townscreen/time"), { ALIGN_TOP_RIGHT | SCALE } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:753`
+  - evidence line: `{ HashStr("ui_townscreen/time_effect"), { ALIGN_TOP_RIGHT | SCALE } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:754`
+  - evidence line: `{ HashStr("ui_townscreen/info"), { ALIGN_TOP_LEFT | SCALE } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `contextual` `UnleashedRecomp/locale/config_locale.cpp:162`
+  - evidence line: `CONFIG_DEFINE_LOCALE(TimeOfDayTransition)`
+  - why it matters: Readable config/localization evidence exposes the town time-of-day transition policy that sits adjacent to the extracted `ui_townscreen` overlay family.
+
+## `ui_shop`
+
+- Asset path: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/phase23_crossref_archives/Town_Common/ui_shop.yncp`
+- Archive group: `Town_Common`
+- Inferred role: `town_shop_menu`
+- Correlation verdict: `direct`
+
+### Readable Correlations
+
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:712`
+  - evidence line: `// ui_shop`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path.
+- `direct` `UnleashedRecomp/patches/aspect_ratio_patches.cpp:713`
+  - evidence line: `{ HashStr("ui_shop/footer/shop_footer"), { ALIGN_BOTTOM } },`
+  - why it matters: Readable source references the extracted layout name or an exact layout/scene path. Direct layout-path rules expose the dedicated shop footer prompt row from the extracted `ui_shop` package.
 
 ## `ui_worldmap`
 

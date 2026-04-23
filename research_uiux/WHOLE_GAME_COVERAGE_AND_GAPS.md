@@ -30,12 +30,14 @@
   - `ppc_config.h`
   - `shader_cache.cpp`
 - The UI asset workspace currently indexes:
-  - `3538` UI-relevant asset entries across the installed build plus extracted roots
-  - `3556` extracted files under `extracted_assets`
-  - `23` parsed `.xncp` / `.yncp` layout files
-  - `13` merged code-to-layout correlation entries
+  - `6751` UI-relevant asset entries across the installed build plus extracted roots
+  - `17454` extracted files under `extracted_assets`
+  - `28` parsed `.xncp` / `.yncp` layout files
+  - `26` merged code-to-layout correlation entries
   - `24` subtitle resource XML files tied back to `9` matched scene IDs
   - `6` taxonomy layouts across boss HUD, result, and save families
+  - `13` grouped archaeology systems in `ui_archaeology_database.json`
+  - `56` generated PPC seams actively tied into the current archaeology layer
 
 ## What Does Not Exist Locally
 
@@ -84,7 +86,7 @@ What it still does not justify:
 
 The current workspace is:
 
-- `100%` complete against the tracked research plan through Phase `22`
+- `100%` complete against the tracked research plan through Phase `23`
 - strong for UI/UX reverse-engineering and template extraction
 - strong for local executable-backed timing/state archaeology
 - partial for whole-game loose-file asset extraction
