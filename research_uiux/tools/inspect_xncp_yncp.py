@@ -10,6 +10,50 @@ from typing import Any
 
 
 SHIFT_JIS = "shift_jis"
+ANIMATION_FLAG_BITS = [
+    (1, "HideFlag"),
+    (2, "XPosition"),
+    (4, "YPosition"),
+    (8, "Rotation"),
+    (16, "XScale"),
+    (32, "YScale"),
+    (64, "SubImage"),
+    (128, "Color"),
+    (256, "GradientTL"),
+    (512, "GradientBL"),
+    (1024, "GradientTR"),
+    (2048, "GradientBR"),
+]
+KEYFRAME_TYPE_NAMES = {
+    0: "Const",
+    1: "Linear",
+    2: "Hermite",
+}
+NAME_FAMILY_TAGS = [
+    "intro",
+    "usual",
+    "outro",
+    "idle",
+    "select",
+    "move",
+    "scroll",
+    "size",
+    "switch",
+    "loop",
+    "rev",
+    "window",
+    "footer",
+    "gauge",
+    "name",
+    "event",
+    "so",
+    "ev",
+    "chip",
+    "tails",
+    "sonic",
+    "360",
+    "ps3",
+]
 
 
 class ParseError(RuntimeError):
@@ -217,6 +261,85 @@ def parse_animation_dictionary(view: BinaryView, offset: int, origin: int, endia
     }
 
 
+def decode_animation_flags(flags: int) -> list[str]:
+    return [name for bit, name in ANIMATION_FLAG_BITS if flags & bit]
+
+
+def parse_keyframe(view: BinaryView, offset: int, endian: str) -> dict[str, Any]:
+    keyframe_type = view.u32(offset + 8, endian)
+    return {
+        "frame": view.u32(offset, endian),
+        "value": round_float(view.f32(offset + 4, endian)),
+        "type": KEYFRAME_TYPE_NAMES.get(keyframe_type, f"Unknown_{keyframe_type}"),
+        "in_tangent": round_float(view.f32(offset + 12, endian)),
+        "out_tangent": round_float(view.f32(offset + 16, endian)),
+        "field14": view.u32(offset + 20, endian),
+    }
+
+
+def parse_cast_animation_subdata(view: BinaryView, offset: int, origin: int, endian: str, track_type: str) -> dict[str, Any]:
+    keyframe_count = view.u32(offset + 4, endian)
+    data_offset = view.u32(offset + 8, endian)
+    keyframes = [
+        parse_keyframe(view, origin + data_offset + (24 * index), endian)
+        for index in range(keyframe_count)
+    ] if data_offset else []
+    return {
+        "field00": view.u32(offset, endian),
+        "track_type": track_type,
+        "keyframe_count": keyframe_count,
+        "keyframes": keyframes,
+    }
+
+
+def parse_cast_animation_data(view: BinaryView, offset: int, origin: int, endian: str) -> dict[str, Any]:
+    flags = view.u32(offset, endian)
+    data_offset = view.u32(offset + 4, endian)
+    track_types = decode_animation_flags(flags)
+    sub_data = [
+        parse_cast_animation_subdata(view, origin + data_offset + (12 * index), origin, endian, track_type)
+        for index, track_type in enumerate(track_types)
+    ] if data_offset else []
+    return {
+        "flags": flags,
+        "track_types": track_types,
+        "sub_data": sub_data,
+    }
+
+
+def parse_group_animation_data(view: BinaryView, offset: int, origin: int, endian: str) -> dict[str, Any]:
+    cast_count = view.u32(offset, endian)
+    cast_data_offset = view.u32(offset + 4, endian)
+    casts = [
+        parse_cast_animation_data(view, origin + cast_data_offset + (8 * index), origin, endian)
+        for index in range(cast_count)
+    ] if cast_data_offset else []
+    return {
+        "cast_count": cast_count,
+        "casts": casts,
+    }
+
+
+def parse_animation_keyframe_data(view: BinaryView, offset: int, origin: int, endian: str) -> dict[str, Any]:
+    group_count = view.u32(offset, endian)
+    group_data_offset = view.u32(offset + 4, endian)
+    groups = [
+        parse_group_animation_data(view, origin + group_data_offset + (8 * index), origin, endian)
+        for index in range(group_count)
+    ] if group_data_offset else []
+    return {
+        "group_count": group_count,
+        "groups": groups,
+    }
+
+
+def parse_animation_frame_data(view: BinaryView, offset: int, endian: str) -> dict[str, Any]:
+    return {
+        "field00": view.u32(offset, endian),
+        "frame_count": round_float(view.f32(offset + 4, endian)),
+    }
+
+
 def parse_scene(view: BinaryView, offset: int, origin: int, endian: str) -> dict[str, Any]:
     version = view.u32(offset, endian)
     z_index = round_float(view.f32(offset + 4, endian))
@@ -250,8 +373,16 @@ def parse_scene(view: BinaryView, offset: int, origin: int, endian: str) -> dict
         parse_cast_dictionary(view, origin + cast_dictionary_offset + (12 * index), origin, endian)
         for index in range(cast_count)
     ]
+    animation_keyframe_data_list = [
+        parse_animation_keyframe_data(view, origin + animation_keyframe_data_list_offset + (8 * index), origin, endian)
+        for index in range(animation_count)
+    ]
     animation_dictionaries = [
         parse_animation_dictionary(view, origin + animation_dictionary_offset + (8 * index), origin, endian)
+        for index in range(animation_count)
+    ]
+    animation_frame_data_list = [
+        parse_animation_frame_data(view, origin + animation_frame_data_list_offset + (8 * index), endian)
         for index in range(animation_count)
     ]
 
@@ -274,7 +405,9 @@ def parse_scene(view: BinaryView, offset: int, origin: int, endian: str) -> dict
         "subimages": subimages,
         "cast_groups": cast_groups,
         "cast_dictionaries": cast_dictionaries,
+        "animation_keyframe_data_list": animation_keyframe_data_list,
         "animation_dictionaries": animation_dictionaries,
+        "animation_frame_data_list": animation_frame_data_list,
     }
 
 
@@ -494,6 +627,128 @@ def parse_fapc(path: Path) -> dict[str, Any]:
     }
 
 
+def extract_name_family_tags(name: str) -> list[str]:
+    lowered = name.lower()
+    return [tag for tag in NAME_FAMILY_TAGS if tag in lowered]
+
+
+def cast_name_lookup(scene: dict[str, Any]) -> dict[tuple[int, int], str]:
+    return {
+        (item["group_index"], item["cast_index"]): item["name"]
+        for item in scene["cast_dictionaries"]
+    }
+
+
+def compute_group_hierarchy_stats(cast_group: dict[str, Any], names_by_cast: dict[int, str]) -> dict[str, Any]:
+    cast_count = len(cast_group["casts"])
+    hierarchy = cast_group["hierarchy"]
+    roots: list[int] = []
+    seen_roots: set[int] = set()
+    next_index = cast_group["root_cast_index"]
+    while 0 <= next_index < cast_count and next_index not in seen_roots:
+        seen_roots.add(next_index)
+        roots.append(next_index)
+        next_index = hierarchy[next_index]["next_index"]
+
+    visited: set[int] = set()
+    leaf_count = 0
+    max_depth = 0
+
+    def walk(index: int, depth: int) -> None:
+        nonlocal leaf_count, max_depth
+        if index in visited or not (0 <= index < cast_count):
+            return
+        visited.add(index)
+        max_depth = max(max_depth, depth)
+        child_index = hierarchy[index]["child_index"]
+        if child_index < 0:
+            leaf_count += 1
+            return
+        sibling_seen: set[int] = set()
+        cursor = child_index
+        while 0 <= cursor < cast_count and cursor not in sibling_seen:
+            sibling_seen.add(cursor)
+            walk(cursor, depth + 1)
+            cursor = hierarchy[cursor]["next_index"]
+
+    for root_index in roots:
+        walk(root_index, 0)
+
+    return {
+        "root_cast_indices": roots,
+        "root_cast_names": [names_by_cast.get(index, f"cast_{index}") for index in roots],
+        "reachable_cast_count": len(visited),
+        "leaf_count": leaf_count,
+        "max_depth": max_depth,
+    }
+
+
+def summarize_animation_data(
+    scene: dict[str, Any],
+    scene_cast_names: dict[tuple[int, int], str],
+) -> tuple[list[dict[str, Any]], Counter[str], Counter[str]]:
+    animation_summaries: list[dict[str, Any]] = []
+    scene_track_type_counts: Counter[str] = Counter()
+    scene_keyframe_type_counts: Counter[str] = Counter()
+
+    for index, animation_dictionary in enumerate(scene["animation_dictionaries"]):
+        frame_data = scene["animation_frame_data_list"][index] if index < len(scene["animation_frame_data_list"]) else {"field00": 0, "frame_count": 0.0}
+        keyframe_data = scene["animation_keyframe_data_list"][index] if index < len(scene["animation_keyframe_data_list"]) else {"groups": []}
+        track_type_counts: Counter[str] = Counter()
+        keyframe_type_counts: Counter[str] = Counter()
+        cast_rollups: list[dict[str, Any]] = []
+        total_keyframes = 0
+
+        for group_index, group in enumerate(keyframe_data["groups"]):
+            for cast_index, cast_animation in enumerate(group["casts"]):
+                cast_name = scene_cast_names.get((group_index, cast_index), f"group{group_index}_cast{cast_index}")
+                cast_track_types: list[str] = []
+                cast_keyframe_count = 0
+                for track in cast_animation["sub_data"]:
+                    track_type = track["track_type"]
+                    cast_track_types.append(track_type)
+                    track_type_counts[track_type] += 1
+                    scene_track_type_counts[track_type] += 1
+                    cast_keyframe_count += track["keyframe_count"]
+                    total_keyframes += track["keyframe_count"]
+                    for keyframe in track["keyframes"]:
+                        keyframe_type_counts[keyframe["type"]] += 1
+                        scene_keyframe_type_counts[keyframe["type"]] += 1
+                if cast_track_types:
+                    cast_rollups.append(
+                        {
+                            "group_index": group_index,
+                            "cast_index": cast_index,
+                            "cast_name": cast_name,
+                            "track_count": len(cast_track_types),
+                            "track_types": sorted(set(cast_track_types)),
+                            "keyframe_count": cast_keyframe_count,
+                        }
+                    )
+
+        cast_rollups.sort(
+            key=lambda item: (-item["keyframe_count"], -item["track_count"], item["cast_name"])
+        )
+        frame_count = frame_data["frame_count"]
+        animation_summaries.append(
+            {
+                "animation_name": animation_dictionary["name"],
+                "animation_index": animation_dictionary["index"],
+                "frame_count": frame_count,
+                "field00": frame_data["field00"],
+                "timeline_seconds": round_float(frame_count / scene["animation_framerate"]) if scene["animation_framerate"] else 0.0,
+                "track_type_counts": dict(sorted(track_type_counts.items())),
+                "keyframe_type_counts": dict(sorted(keyframe_type_counts.items())),
+                "active_cast_count": len(cast_rollups),
+                "total_tracks": sum(track_type_counts.values()),
+                "total_keyframes": total_keyframes,
+                "top_cast_tracks": cast_rollups[:12],
+            }
+        )
+
+    return animation_summaries, scene_track_type_counts, scene_keyframe_type_counts
+
+
 def scene_summary(
     scene: dict[str, Any],
     scene_name: str,
@@ -512,6 +767,7 @@ def scene_summary(
         for index in used_texture_indices
         if 0 <= index < len(texture_names)
     ]
+    scene_cast_names = cast_name_lookup(scene)
 
     font_casts = []
     for group_index, cast_group in enumerate(scene["cast_groups"]):
@@ -525,6 +781,22 @@ def scene_summary(
                         "font_characters": cast.get("font_characters", ""),
                     }
                 )
+    group_hierarchy = [
+        compute_group_hierarchy_stats(
+            cast_group,
+            {
+                cast_index: scene_cast_names.get((group_index, cast_index), f"cast_{cast_index}")
+                for cast_index in range(len(cast_group["casts"]))
+            },
+        )
+        for group_index, cast_group in enumerate(scene["cast_groups"])
+    ]
+    animation_summaries, track_type_counts, keyframe_type_counts = summarize_animation_data(scene, scene_cast_names)
+    frame_counts = [item["frame_count"] for item in animation_summaries]
+    animation_family_counts: Counter[str] = Counter()
+    for animation_summary in animation_summaries:
+        for tag in extract_name_family_tags(animation_summary["animation_name"]):
+            animation_family_counts[tag] += 1
 
     return {
         "scene_name": scene_name,
@@ -540,6 +812,16 @@ def scene_summary(
         "animation_names": [item["name"] for item in sorted_animations],
         "used_texture_names": used_texture_names,
         "font_casts": font_casts,
+        "group_hierarchy": group_hierarchy,
+        "animation_summaries": animation_summaries,
+        "track_type_counts": dict(sorted(track_type_counts.items())),
+        "keyframe_type_counts": dict(sorted(keyframe_type_counts.items())),
+        "animation_family_counts": dict(sorted(animation_family_counts.items())),
+        "frame_count_range": [
+            min(frame_counts) if frame_counts else 0.0,
+            max(frame_counts) if frame_counts else 0.0,
+        ],
+        "unique_frame_counts": sorted(set(frame_counts)),
     }
 
 
@@ -574,6 +856,52 @@ def canonical_digest(parsed: dict[str, Any]) -> dict[str, Any]:
     counters: Counter[str] = Counter()
     counters["node_count"] = 1 if root else 0
     walk_node(root, project.get("project_name", "root"), [item["name"] for item in texture_list.get("textures", [])], scene_summaries, counters)
+    scene_family_counts: Counter[str] = Counter()
+    animation_family_counts: Counter[str] = Counter()
+    track_type_counts: Counter[str] = Counter()
+    keyframe_type_counts: Counter[str] = Counter()
+    longest_animations: list[dict[str, Any]] = []
+    deepest_scenes: list[dict[str, Any]] = []
+    unique_frame_counts: set[float] = set()
+
+    for scene in scene_summaries:
+        for tag in extract_name_family_tags(scene["scene_name"]):
+            scene_family_counts[tag] += 1
+        for tag, count in scene["animation_family_counts"].items():
+            animation_family_counts[tag] += count
+        for track_type, count in scene["track_type_counts"].items():
+            track_type_counts[track_type] += count
+        for keyframe_type, count in scene["keyframe_type_counts"].items():
+            keyframe_type_counts[keyframe_type] += count
+        for frame_count in scene["unique_frame_counts"]:
+            unique_frame_counts.add(frame_count)
+        for animation_summary in scene["animation_summaries"]:
+            longest_animations.append(
+                {
+                    "scene_name": scene["scene_name"],
+                    "node_path": scene["node_path"],
+                    "animation_name": animation_summary["animation_name"],
+                    "frame_count": animation_summary["frame_count"],
+                    "timeline_seconds": animation_summary["timeline_seconds"],
+                    "total_keyframes": animation_summary["total_keyframes"],
+                }
+            )
+        deepest_scenes.append(
+            {
+                "scene_name": scene["scene_name"],
+                "node_path": scene["node_path"],
+                "max_group_depth": max((item["max_depth"] for item in scene["group_hierarchy"]), default=0),
+                "animation_count": scene["animation_count"],
+                "cast_count": scene["cast_count"],
+            }
+        )
+
+    longest_animations.sort(
+        key=lambda item: (-item["frame_count"], -item["total_keyframes"], item["scene_name"], item["animation_name"])
+    )
+    deepest_scenes.sort(
+        key=lambda item: (-item["max_group_depth"], -item["cast_count"], item["scene_name"])
+    )
 
     return {
         "project_name": project.get("project_name", ""),
@@ -582,6 +910,13 @@ def canonical_digest(parsed: dict[str, Any]) -> dict[str, Any]:
         "font_names": [item["name"] for item in sorted(project.get("fonts", {}).get("font_ids", []), key=lambda value: value["index"])],
         "texture_names": [item["name"] for item in texture_list.get("textures", [])],
         "scene_summaries": scene_summaries,
+        "scene_family_counts": dict(sorted(scene_family_counts.items())),
+        "animation_family_counts": dict(sorted(animation_family_counts.items())),
+        "track_type_counts": dict(sorted(track_type_counts.items())),
+        "keyframe_type_counts": dict(sorted(keyframe_type_counts.items())),
+        "unique_frame_counts": sorted(unique_frame_counts),
+        "longest_animations": longest_animations[:20],
+        "deepest_scenes": deepest_scenes[:10],
         "totals": dict(counters),
     }
 
