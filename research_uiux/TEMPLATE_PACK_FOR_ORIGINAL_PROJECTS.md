@@ -1,4 +1,8 @@
-# <img src="../docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> Template Pack For Original Projects
+<p align="right">
+    <img src="../docs/assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
+</p>
+
+# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Template Pack For Original Projects
 
 ## Summary
 

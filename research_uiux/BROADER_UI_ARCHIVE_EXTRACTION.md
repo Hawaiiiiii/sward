@@ -1,4 +1,8 @@
-# <img src="../docs/assets/branding/icon_extra.png" width="30" alt="SWARD extra icon"/> Broader UI Archive Extraction
+<p align="right">
+    <img src="../docs/assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
+</p>
+
+# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Broader UI Archive Extraction
 
 Asset root: `C:/Users/DavidErikGarciaArena/Documents/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/Unleashed Recomp - Windows (Complete Installation) 1.0.3/game`
 

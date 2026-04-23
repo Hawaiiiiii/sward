@@ -1,4 +1,8 @@
-# Project Sonic World Adventure R&D Publishing Scope
+<p align="right">
+    <img src="./docs/assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
+</p>
+
+# <img src="./docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Project Sonic World Adventure R&D Publishing Scope
 
 This repository is the publishable layer of Project Sonic World Adventure R&D, a local Sonic Unleashed UI/UX research workspace.
 

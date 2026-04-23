@@ -1,8 +1,8 @@
 <p align="center">
-    <img src="./docs/assets/branding/icon_extra.png" width="108" alt="SWARD extra icon"/>
+    <img src="./docs/assets/branding/icon_sward.png" width="132" alt="SWARD icon"/>
 </p>
 
-# <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD extra icon"/> Changelog
+# <img src="./docs/assets/branding/icon_sward.png" width="36" alt="SWARD icon"/> Changelog
 
 Project history for **Project Sonic World Adventure R&D / SWARD**.
 
@@ -10,6 +10,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 > This changelog tracks the publishable repo layer. Local-only extracted assets, generated PPC output, staged tools, and private inputs stay outside git history by design.
 
 ## 2026-04-23
+
+### Phase 22 coverage audit and markdown presentation pass
+
+- added [`research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md`](./research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md) to answer the direct whole-game-source vs translated-output vs extracted-asset question with verified local counts
+- normalized the project-owned markdown headers around the larger `icon_sward` presentation
+- enlarged the root README section icons and added the original-size `icon_sward` footer mark
+- updated the repo-facing README, the research workspace README, and the checklist audit for the new coverage/branding pass
 
 ### Phase 21 code-backed runtime reference implementation
 

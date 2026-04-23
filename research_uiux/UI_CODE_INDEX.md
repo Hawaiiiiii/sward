@@ -1,4 +1,8 @@
-# <img src="../docs/assets/branding/icon_debug.png" width="30" alt="SWARD debug icon"/> UI Code Index
+<p align="right">
+    <img src="../docs/assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
+</p>
+
+# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> UI Code Index
 
 Machine-readable inventory: `research_uiux/data/ui_code_index.json`
 

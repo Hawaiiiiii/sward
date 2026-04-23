@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-    <img src="./docs/assets/branding/icon_sward.png" width="108" alt="SWARD icon"/>
+    <img src="./docs/assets/branding/icon_sward.png" width="144" alt="SWARD icon"/>
 </p>
 
 # Project Sonic World Adventure R&D
@@ -24,7 +24,10 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > Project history now lives in [`CHANGELOG.md`](./CHANGELOG.md). The fastest way into the current R&D layer is the report stack under [`research_uiux/`](./research_uiux/).
 
-## <img src="./docs/assets/branding/icon_sward.png" width="24" alt="SWARD icon"/> What This Repository Is
+> [!TIP]
+> For the direct answer to "how much of the game is actually recovered here?", start with [`research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md`](./research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md).
+
+## <img src="./docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
 
@@ -38,7 +41,7 @@ This project keeps a documented, versioned R&D environment for studying:
 
 The codebase includes a snapshot of the open-source Unleashed Recompiled integration layer plus research automation that helps index readable UI code, patch hooks, and local research outputs.
 
-## <img src="./docs/assets/branding/icon_debug.png" width="24" alt="SWARD debug icon"/> What Lives Here
+## <img src="./docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> What Lives Here
 
 - Open-source handwritten runtime, UI, and patch code from the Unleashed Recompiled layer
 - Build scripts, presets, and project metadata
@@ -58,10 +61,11 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
   - [`research_uiux/CODE_BACKED_RUNTIME_IMPLEMENTATION.md`](./research_uiux/CODE_BACKED_RUNTIME_IMPLEMENTATION.md)
   - [`research_uiux/TEMPLATE_PACK_FOR_ORIGINAL_PROJECTS.md`](./research_uiux/TEMPLATE_PACK_FOR_ORIGINAL_PROJECTS.md)
   - [`research_uiux/UI_UX_INSPIRATION_NOTES.md`](./research_uiux/UI_UX_INSPIRATION_NOTES.md)
+  - [`research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md`](./research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md)
 - [`CHANGELOG.md`](./CHANGELOG.md) for the repo timeline from initial publication to the latest research beat
 - Repo policy under [`REPO_PUBLISHING_SCOPE.md`](./REPO_PUBLISHING_SCOPE.md)
 
-## <img src="./docs/assets/branding/icon_extra.png" width="24" alt="SWARD extra icon"/> What Stays Local
+## <img src="./docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> What Stays Local
 
 - `UnleashedRecompLib/private/`
 - `UnleashedRecompLib/ppc/`
@@ -75,7 +79,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 > [!TIP]
 > The ignore boundary for those local-only materials is enforced in [`.gitignore`](./.gitignore). If you expand the local research workspace, keep that boundary intact.
 
-## <img src="./docs/assets/branding/icon_sward.png" width="24" alt="SWARD icon"/> Relationship to Upstream
+## <img src="./docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> Relationship to Upstream
 
 This repository builds on the open-source work of:
 
@@ -93,7 +97,7 @@ The goal here is different from the upstream end-user distribution goal. This re
 > [!TIP]
 > The codebase itself consistently uses the `SWA` shorthand, which aligns with `Sonic World Adventure`. For the repository-facing identity, this workspace uses the shorter **SWARD** label.
 
-## <img src="./docs/assets/branding/icon_extra.png" width="24" alt="SWARD extra icon"/> Repository Layout
+## <img src="./docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> Repository Layout
 
 ```text
 .
@@ -109,7 +113,7 @@ The goal here is different from the upstream end-user distribution goal. This re
 `-- .github/workflows/               # repo validation workflows
 ```
 
-## <img src="./docs/assets/branding/icon_debug.png" width="24" alt="SWARD debug icon"/> Local Workflow
+## <img src="./docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> Local Workflow
 
 1. Clone the repository with submodules.
 2. Keep private game inputs local under `UnleashedRecompLib/private/`.
@@ -124,7 +128,7 @@ Supporting docs:
 - [`CHANGELOG.md`](./CHANGELOG.md)
 - [`REPO_PUBLISHING_SCOPE.md`](./REPO_PUBLISHING_SCOPE.md)
 
-## <img src="./docs/assets/branding/icon_debug.png" width="24" alt="SWARD debug icon"/> CI Modes
+## <img src="./docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> CI Modes
 
 > [!NOTE]
 > This repository supports two validation modes.
@@ -134,7 +138,7 @@ Supporting docs:
 
 That split is intentional. Public-safe automation should pass without requiring proprietary inputs, while full runtime builds remain possible in controlled environments.
 
-## <img src="./docs/assets/branding/icon_sward.png" width="24" alt="SWARD icon"/> Contributing
+## <img src="./docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> Contributing
 
 Contributions are welcome for:
 
@@ -156,10 +160,14 @@ Do not contribute:
 > [!IMPORTANT]
 > By contributing, keep the repo publishable. If a change depends on owned game data, structure it so the code and notes can be committed while the proprietary inputs remain local.
 
-## <img src="./docs/assets/branding/icon_extra.png" width="24" alt="SWARD extra icon"/> Rights and Attribution
+## <img src="./docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> Rights and Attribution
 
 - Sonic Unleashed, its code, art, audio, and shipped game assets belong to SEGA / Sonic Team.
 - Unleashed Recompiled and its upstream open-source code remain subject to their original authorship and license notices.
 - This repository preserves those upstream notices and keeps local-only proprietary materials outside published history.
 
 See [`COPYING`](./COPYING) for the repository license text already present in this codebase.
+
+<p align="center">
+    <img src="./docs/assets/branding/icon_sward.png" alt="SWARD icon"/>
+</p>

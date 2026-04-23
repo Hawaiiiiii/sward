@@ -1,4 +1,8 @@
-# Runtime Reference
+<p align="right">
+    <img src="../../docs/assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
+</p>
+
+# <img src="../../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Runtime Reference
 
 This directory contains a generic C++ reference implementation of the SWARD template-pack concepts.
 

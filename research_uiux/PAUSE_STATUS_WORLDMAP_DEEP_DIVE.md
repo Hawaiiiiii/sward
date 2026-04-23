@@ -1,4 +1,8 @@
-# <img src="../docs/assets/branding/icon_sward.png" width="30" alt="SWARD icon"/> Pause / Status / WorldMap Deep Dive
+<p align="right">
+    <img src="../docs/assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
+</p>
+
+# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Pause / Status / WorldMap Deep Dive
 
 This report narrows the workspace onto three closely related UI families that matter most for template-grade UI/UX reuse:
 

@@ -1,4 +1,8 @@
-# Building the Local Asset-Backed Workspace
+<p align="right">
+    <img src="./assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
+</p>
+
+# <img src="./assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Building the Local Asset-Backed Workspace
 
 This repository keeps the **publishable** R&D layer in git, while the actual private game inputs and generated translation outputs remain local-only.
 

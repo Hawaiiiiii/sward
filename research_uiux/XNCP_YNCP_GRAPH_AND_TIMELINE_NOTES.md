@@ -1,4 +1,8 @@
-# <img src="../docs/assets/branding/icon_debug.png" width="30" alt="SWARD debug icon"/> XNCP / YNCP Graph And Timeline Notes
+<p align="right">
+    <img src="../docs/assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
+</p>
+
+# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> XNCP / YNCP Graph And Timeline Notes
 
 Machine-readable inventory: `research_uiux/data/layout_deep_analysis.json`
 

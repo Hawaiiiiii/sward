@@ -1,4 +1,8 @@
-# <img src="../docs/assets/branding/icon_extra.png" width="30" alt="SWARD extra icon"/> Multilingual UI And Subtitle Coverage
+<p align="right">
+    <img src="../docs/assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
+</p>
+
+# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Multilingual UI And Subtitle Coverage
 
 Machine-readable inventory: `research_uiux/data/multilingual_ui_coverage.json`
 

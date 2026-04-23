@@ -1,4 +1,8 @@
-# Dumping for Local R&D Use
+<p align="right">
+    <img src="./assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
+</p>
+
+# <img src="./assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Dumping for Local R&D Use
 
 Use this guide only to acquire files for your **local** build and research workspace.
 

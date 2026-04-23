@@ -1,4 +1,8 @@
-# <img src="../docs/assets/branding/icon_debug.png" width="30" alt="SWARD debug icon"/> Boss HUD / Mission-Result / Save-Load Deep Dive
+<p align="right">
+    <img src="../docs/assets/branding/icon_sward.png" width="116" alt="SWARD icon"/>
+</p>
+
+# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Boss HUD / Mission-Result / Save-Load Deep Dive
 
 Support roots used in this pass:
 
