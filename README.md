@@ -29,6 +29,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the underlying scene/widget layer that now bridges `CSD/*`, `Menu/*`, and the local-only mirrored source tree, start with [`research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md`](./research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md).
 
+> [!TIP]
+> For the first beat that actually places those recovered families back into the local-only `SONIC UNLEASHED/` scaffold, start with [`research_uiux/LOCAL_SOURCE_FAMILY_PLACEMENT.md`](./research_uiux/LOCAL_SOURCE_FAMILY_PLACEMENT.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
@@ -54,6 +57,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - Portable runtime contracts under [`research_uiux/runtime_reference/contracts/`](./research_uiux/runtime_reference/contracts)
 - A first contract-backed screen browser via [`research_uiux/STANDALONE_UI_DEBUG_SELECTOR.md`](./research_uiux/STANDALONE_UI_DEBUG_SELECTOR.md)
 - A source-tree mirror helper for the local-only `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py)
+- A local source-family note materializer for the `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_family_notes.py`](./research_uiux/tools/materialize_source_family_notes.py)
 - Publishable research notes such as:
 - [`research_uiux/UI_CODE_INDEX.md`](./research_uiux/UI_CODE_INDEX.md)
 - [`research_uiux/PATCH_HOOK_INDEX.md`](./research_uiux/PATCH_HOOK_INDEX.md)
@@ -63,6 +67,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - [`research_uiux/GAMEPLAY_HUD_CORE_RECOVERY.md`](./research_uiux/GAMEPLAY_HUD_CORE_RECOVERY.md)
 - [`research_uiux/UI_SOURCE_PATH_RECOVERY_AND_HUMANIZATION_PLAN.md`](./research_uiux/UI_SOURCE_PATH_RECOVERY_AND_HUMANIZATION_PLAN.md)
 - [`research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md`](./research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md)
+- [`research_uiux/LOCAL_SOURCE_FAMILY_PLACEMENT.md`](./research_uiux/LOCAL_SOURCE_FAMILY_PLACEMENT.md)
 - [`research_uiux/STANDALONE_UI_DEBUG_SELECTOR.md`](./research_uiux/STANDALONE_UI_DEBUG_SELECTOR.md)
 - [`research_uiux/PAUSE_STATUS_WORLDMAP_DEEP_DIVE.md`](./research_uiux/PAUSE_STATUS_WORLDMAP_DEEP_DIVE.md)
 - [`research_uiux/BOSS_RESULT_SAVE_LOAD_DEEP_DIVE.md`](./research_uiux/BOSS_RESULT_SAVE_LOAD_DEEP_DIVE.md)
@@ -88,7 +93,9 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - `external_tools/`
 - `local_build_env/`
 - `SONIC UNLEASHED/`
+- `SONIC UNLEASHED/**/*.sward.md`
 - `Match SU OG source code folders and locations.txt`
+- `Research SU.txt`
 - machine-specific build trees and caches
 - research reports or JSON catalogs that directly enumerate proprietary extracted content or generated translated code
 

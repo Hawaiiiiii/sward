@@ -112,6 +112,7 @@ The current workspace is:
 - strong for measured UI source-path organization inside the seeded UI/UX subset
 - now materially stronger for in-stage gameplay HUD ownership and family separation
 - now materially stronger for lower-level CSD/project/widget naming and source-family organization
+- now materially stronger for local-only source-family placement inside the mirrored `SONIC UNLEASHED/` tree
 - partial for whole-game loose-file asset extraction
 - not yet equivalent to a whole-game clean human-readable source tree
 
@@ -120,9 +121,9 @@ The current workspace is:
 If the goal is to move closer to a broader `1:1` UI portability basis, the next concrete work would be:
 
 1. Expand the current UI-focused source-path seed into a broader manifest so the humanization pass can cover more than the current `108` UI-centric paths.
-2. Start placing renamed translated findings into the local-only `SONIC UNLEASHED/` scaffold under source-family paths instead of leaving them only in reports.
+2. Grow the new local-only `SONIC UNLEASHED/` placement layer from `*.sward.md` notes into cleaner renamed translated ownership under those source-family paths.
 3. Continue correlating generated PPC seams against extracted layouts and readable patch hosts for the remaining UI families, especially the last unresolved gameplay-HUD and subtitle/cutscene edges.
 4. Grow the current standalone selector into a richer source-path-named debug sandbox, then widen it with gameplay-HUD and cutscene-capable contracts.
 
 > [!NOTE]
-> After the Phase 31 foundation pass, the next bottleneck is even clearer: more value now comes from actually placing renamed translated findings into the mirrored source-family tree and widening the debug sandbox than from blindly expecting every high-scoring archive to hide another `.yncp`.
+> After the Phase 32 placement pass, the next bottleneck is even clearer: more value now comes from widening and deepening the mirrored source-family tree plus the debug sandbox than from blindly expecting every high-scoring archive to hide another `.yncp`.

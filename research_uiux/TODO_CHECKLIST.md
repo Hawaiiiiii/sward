@@ -235,6 +235,27 @@
 - [x] Generate a human-readable CSD/UI foundation report.
 - [x] Update source-path coverage docs and the checklist audit for the new humanization layer.
 
+## Phase 32 - Local Source-Family Placement
+
+- [x] Materialize local-only `*.sward.md` placement notes beside the mirrored `SONIC UNLEASHED/` source-family paths.
+- [x] Generate a local-only placement manifest under `SONIC UNLEASHED/_meta/`.
+- [x] Generate a tracked human-readable report describing the placement layer and its counts.
+- [x] Update repo-facing/source-path docs and the checklist audit for the new placement layer.
+
+## Phase 33 - Source-Path-Named Debug Selector
+
+- [ ] Expand the standalone debug selector from contract-name browsing to source-path/family-name browsing.
+- [ ] Add a tracked selector-family index or equivalent generated runtime metadata.
+- [ ] Verify the selector locally against source-family tokens rather than only contract stems.
+- [ ] Update runtime docs and the checklist audit for the new selector layer.
+
+## Phase 34 - Broader UI-Adjacent Source-Path Manifest
+
+- [ ] Widen the source-path seed beyond the current `108` UI-centric entries into a broader UI-adjacent/debug/system subset.
+- [ ] Generate a refreshed machine-readable broader manifest locally.
+- [ ] Generate a tracked human-readable report with the widened coverage counts and gaps.
+- [ ] Update the relevant coverage/source-path docs and checklist audit.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -313,3 +334,6 @@
 - [x] Follow-on phase audit on `2026-04-23 18:35:59 +02:00`: added `research_uiux\tools\build_csd_ui_foundation_map.py`, `research_uiux\CSD_UI_FOUNDATION_HUMANIZATION.md`, and `research_uiux\data\csd_ui_foundation_map.json`.
 - [x] Follow-on phase audit on `2026-04-23 18:35:59 +02:00`: mapped `5` direct `CSD/*` / `Menu/*` seed paths, `5` closely related consumer/widget paths, and `12` mirrored support paths into `3` reusable abstractions.
 - [x] Follow-on phase audit on `2026-04-23 18:35:59 +02:00`: refreshed `research_uiux\data\ui_source_path_manifest.json` and raised the measured UI-seed bridge to `90` paths (`83.3%`) mapped, leaving `5` named-only gaps.
+- [x] Follow-on phase audit on `2026-04-23 19:35:09 +02:00`: added `research_uiux\tools\materialize_source_family_notes.py` and generated the local-only `SONIC UNLEASHED\**\*.sward.md` note layer.
+- [x] Follow-on phase audit on `2026-04-23 19:35:09 +02:00`: materialized `108` local-only placement notes, split into `13` direct host anchors, `77` family-member anchors, `13` debug-host candidates, and `5` named-only placeholders.
+- [x] Follow-on phase audit on `2026-04-23 19:35:09 +02:00`: added `research_uiux\LOCAL_SOURCE_FAMILY_PLACEMENT.md` and refreshed the local-only mirror metadata under `SONIC UNLEASHED\_meta\`.

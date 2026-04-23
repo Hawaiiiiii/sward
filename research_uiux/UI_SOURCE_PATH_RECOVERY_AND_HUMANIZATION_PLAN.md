@@ -81,6 +81,7 @@
 - The generated translated PPC layer is present, but the clean human-readable organization layer is still incomplete.
 - This phase gives the UI/UX subset of the executable path dump a stable naming scaffold, so future translated-code cleanup can follow original source-family names instead of raw `sub_XXXXXXXX` clusters alone.
 - The strongest already-recovered path families are title/menu, pause, loading/start, world map, mission-result, save/ending, gameplay HUD core, town/media-room, and the lower-level CSD foundation layer.
+- Phase 32 now places that scaffold back into the local-only `SONIC UNLEASHED/` mirror as `108` `*.sward.md` note files, so the path families are no longer report-only.
 - The clearest remaining UI/UX gaps are the debug/tool host surfaces, the subtitle/cutscene family still lacking a runtime-contract bridge, and broader expansion beyond the current UI-focused seed.
 
 ## Debug Tool Direction
@@ -92,5 +93,5 @@
 ## Next Local Work
 
 1. Expand this seed from the UI/UX subset into a broader whole-dump manifest without drowning the repo in raw path noise.
-2. Start placing humanized translated findings into the local-only `SONIC UNLEASHED/` mirror under source-family names instead of leaving them as report-only notes.
+2. Grow the new local placement layer from note files into cleaner translated-file ownership under the mirrored source-family paths.
 3. Grow the standalone debug selector from contract-backed console runs into a source-path-named UI sandbox, then add gameplay-HUD and subtitle/cutscene contract coverage.

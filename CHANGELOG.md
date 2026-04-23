@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 32 local source-family placement
+
+- added [`research_uiux/tools/materialize_source_family_notes.py`](./research_uiux/tools/materialize_source_family_notes.py)
+- added [`research_uiux/LOCAL_SOURCE_FAMILY_PLACEMENT.md`](./research_uiux/LOCAL_SOURCE_FAMILY_PLACEMENT.md)
+- generated the local-only placement manifest under `SONIC UNLEASHED/_meta/source_family_note_manifest.json`
+- turned the mirrored `SONIC UNLEASHED/` scaffold into a usable staging tree by materializing `108` local-only `*.sward.md` source-family notes
+- split those local placements into `13` direct host anchors, `77` family-member anchors, `13` debug-host candidates, and `5` named-only placeholders
+- refreshed the local-only mirror README so the suffix and intent of the note layer are explicit
+
 ### Phase 31 CSD / UI foundation humanization
 
 - added [`research_uiux/tools/build_csd_ui_foundation_map.py`](./research_uiux/tools/build_csd_ui_foundation_map.py)
