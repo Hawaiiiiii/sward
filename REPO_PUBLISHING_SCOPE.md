@@ -1,6 +1,6 @@
-# Repository Publishing Scope
+# Project Sonic World Adventure R&D Publishing Scope
 
-This repository is the publishable layer of a local Sonic Unleashed UI/UX research workspace.
+This repository is the publishable layer of Project Sonic World Adventure R&D, a local Sonic Unleashed UI/UX research workspace.
 
 ## Included
 

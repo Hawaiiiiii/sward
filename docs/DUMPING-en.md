@@ -1,6 +1,11 @@
-# Dumping
+# Dumping for Local R&D Use
 
-### Pre-requisites
+Use this guide only to acquire files for your **local** build and research workspace.
+
+> [!WARNING]
+> Dumped files, extracted assets, title update contents, and any generated translation output stay local-only. Do not commit or publish them from this repository.
+
+## Pre-requisites
 - Xbox 360 (modifications not necessary)
 - Xbox 360 Hard Drive (20 GB minimum)
 - Xbox 360 Hard Drive Transfer Cable (or a compatible SATA to USB adapter)
@@ -18,7 +23,7 @@
 >
 > To know which is which, the first revision cable is gray, whereas the latest revision (which supports any Xbox 360 hard drive) is black.
 
-### Instructions
+## Instructions
 
 > [!NOTE]
 > If you have a digital copy of Sonic Unleashed, skip to step 4.
@@ -65,4 +70,4 @@
 > Once you've verified it, close the **Package Viewer** window and proceed to the next step.
 
 15. Right-click on the file that begins with `TU_19KA20I` and click **Copy Selected to Local Disk**, then navigate to the folder you created in step 7 and select it. Velocity will now begin copying the title update to your PC.
-16. Once the transfer is complete, you should now have all of the necessary files for installation. [Return to the readme and proceed to the next step](/README.md#how-to-install).
+16. Once the transfer is complete, you should now have the local files required for installation or research preparation. Return to [`docs/BUILDING.md`](./BUILDING.md) for the local asset-backed workspace flow.

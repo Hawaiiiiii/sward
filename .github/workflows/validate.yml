@@ -3,16 +3,90 @@ on:
   workflow_call:
     secrets:
       ASSET_REPO:
-        required: true
+        required: false
       ASSET_REPO_TOKEN:
-        required: true
+        required: false
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-  
+
 jobs:
+  preflight:
+    name: Validation Preflight
+    runs-on: ubuntu-24.04
+    outputs:
+      has_private_assets: ${{ steps.flags.outputs.has_private_assets }}
+
+    steps:
+      - id: flags
+        shell: bash
+        run: |
+          if [[ -n "${{ secrets.ASSET_REPO }}" && -n "${{ secrets.ASSET_REPO_TOKEN }}" ]]; then
+            echo "has_private_assets=true" >> "$GITHUB_OUTPUT"
+            echo "Private asset secrets detected. Full build validation is enabled."
+          else
+            echo "has_private_assets=false" >> "$GITHUB_OUTPUT"
+            echo "Private asset secrets are not configured. Running publishable-scope validation only."
+          fi
+
+  validate-publishable-scope:
+    name: Validate Publishable Scope
+    runs-on: ubuntu-24.04
+    needs: preflight
+    if: needs.preflight.outputs.has_private_assets != 'true'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Validate Repository Identity
+        run: |
+          grep -q "Project Sonic World Adventure R&D" README.md
+          grep -q "Project Sonic World Adventure R&D" REPO_PUBLISHING_SCOPE.md
+
+      - name: Validate Publish Boundary
+        run: |
+          grep -q '^/extracted_assets/' .gitignore
+          grep -q '^/UnleashedRecompLib/private/' .gitignore
+          grep -q '^/UnleashedRecompLib/ppc/' .gitignore
+          grep -q '^/research_uiux/data/' .gitignore
+
+      - name: Validate Research Tooling
+        run: |
+          test -f research_uiux/tools/scan_ui_code.py
+          test -f research_uiux/tools/scan_assets.py
+          test -f research_uiux/tools/map_patch_hooks.py
+          test -f research_uiux/tools/extract_state_keywords.py
+          test -f research_uiux/tools/inspect_xncp_yncp.py
+
+      - name: Validate CMake Presets
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path("CMakePresets.json").read_text(encoding="utf-8"))
+          presets = {preset["name"] for preset in data.get("configurePresets", [])}
+          required = {
+              "linux-debug",
+              "linux-relwithdebinfo",
+              "linux-release",
+              "x64-Clang-Debug",
+              "x64-Clang-RelWithDebInfo",
+              "x64-Clang-Release",
+          }
+          missing = sorted(required - presets)
+          if missing:
+              raise SystemExit(f"Missing presets: {missing}")
+          print("CMake preset validation passed.")
+          PY
+
   build-linux:
     name: Build Linux
+    needs: preflight
+    if: needs.preflight.outputs.has_private_assets == 'true'
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -38,7 +112,7 @@ jobs:
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ccache-${{ runner.os }}-${{ matrix.preset }}
-  
+
       - name: Cache vcpkg
         uses: actions/cache@v4
         with:
@@ -62,7 +136,7 @@ jobs:
 
       - name: Prepare Project
         run: cp ./private/* ./UnleashedRecompLib/private
-  
+
       - name: Configure Project
         env:
           CCACHE_DIR: /tmp/ccache
@@ -78,8 +152,11 @@ jobs:
         with:
           name: UnleashedRecomp-Linux-${{ env.CMAKE_PRESET }}
           path: ./out/build/${{ env.CMAKE_PRESET }}/UnleashedRecomp/UnleashedRecomp
+
   build-windows:
     name: Build Windows
+    needs: preflight
+    if: needs.preflight.outputs.has_private_assets == 'true'
     runs-on: windows-latest
     strategy:
       matrix:
@@ -119,7 +196,7 @@ jobs:
         run: |
           choco install ninja
           Remove-Item -Path "C:\ProgramData\Chocolatey\bin\ccache.exe" -Force -ErrorAction SilentlyContinue
-      
+
       - name: Configure Developer Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
 
@@ -134,7 +211,7 @@ jobs:
 
       - name: Build Project
         run: cmake --build .\out\build\${{ env.CMAKE_PRESET }} --target UnleashedRecomp
-      
+
       - name: Pack Release
         run: |
           New-Item -ItemType Directory -Path .\release
@@ -157,8 +234,11 @@ jobs:
         with:
           name: UnleashedRecomp-Windows-${{ env.CMAKE_PRESET }}-PDB
           path: .\out\build\${{ env.CMAKE_PRESET }}\UnleashedRecomp\UnleashedRecomp.pdb
+
   build-flatpak:
     name: Build Flatpak
+    needs: preflight
+    if: needs.preflight.outputs.has_private_assets == 'true'
     runs-on: ubuntu-24.04
     env:
       FLATPAK_ID: io.github.hedge_dev.unleashedrecomp
@@ -190,7 +270,7 @@ jobs:
           key: ccache-${{ runner.os }}
 
       - name: Prepare Project
-        run: cp ./private/* ./UnleashedRecompLib/private  
+        run: cp ./private/* ./UnleashedRecompLib/private
 
       - name: Prepare Flatpak
         run: |
