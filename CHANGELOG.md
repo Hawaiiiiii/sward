@@ -11,6 +11,16 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 25 broader remaining UI and common-flow extraction
+
+- added [`research_uiux/tools/summarize_commonflow_extraction.py`](./research_uiux/tools/summarize_commonflow_extraction.py)
+- added [`research_uiux/COMMON_FLOW_LOCALIZATION_EXTRACTION.md`](./research_uiux/COMMON_FLOW_LOCALIZATION_EXTRACTION.md)
+- ranked `357` remaining UI/common-flow archive candidates after the earlier archaeology passes
+- safely extracted a focused `24`-directory English common-flow/localization slice into `extracted_assets/phase25_commonflow_archives`
+- confirmed this batch was loose-file heavy rather than layout heavy, adding `338` files with `54` `.dds`, `261` `.fco`, and `15` `.fte` payloads but no new `.yncp` packages
+- re-ran the asset scan to `6840` combined matched entries, with `5112` extracted-side matches and `89` indexed hits inside the Phase 25 extraction root
+- documented the growing emphasis on correlation/state labeling over blind archive hunting for the next beats
+
 ### Phase 23 full UI archaeology cross-reference
 
 - added [`research_uiux/tools/build_ui_archaeology_database.py`](./research_uiux/tools/build_ui_archaeology_database.py)

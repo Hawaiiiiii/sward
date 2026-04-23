@@ -34,14 +34,15 @@
   - a C ABI wrapper plus verified C example
   - a managed C# reference port
 - The UI asset workspace currently indexes:
-  - `6751` UI-relevant asset entries across the installed build plus extracted roots
-  - `17454` extracted files under `extracted_assets`
+  - `6840` UI-relevant asset entries across the installed build plus extracted roots
+  - `17792` extracted files under `extracted_assets`
   - `28` parsed `.xncp` / `.yncp` layout files
   - `26` merged code-to-layout correlation entries
   - `24` subtitle resource XML files tied back to `9` matched scene IDs
   - `6` taxonomy layouts across boss HUD, result, and save families
   - `13` grouped archaeology systems in `ui_archaeology_database.json`
   - `56` generated PPC seams actively tied into the current archaeology layer
+  - `89` indexed Phase 25 loose-file hits across the new common-flow/localization extraction root
 
 ## What Does Not Exist Locally
 
@@ -105,3 +106,6 @@ If the goal is to move closer to a broader `1:1` UI portability basis, the next 
 2. Push the layout parser deeper into scene graphs, animation channels, and per-scene timeline naming across more extracted layouts.
 3. Continue correlating generated PPC seams against extracted layouts and readable patch hosts for the remaining UI families.
 4. Extend the generic runtime reference so more recovered screen contracts can be exercised in standalone examples.
+
+> [!NOTE]
+> The new Phase 25 common-flow slice improves the loose localized support layer, but it also makes the next bottleneck clearer: more value now comes from seam/state labeling and contract-building than from blindly expecting every high-scoring archive to hide another `.yncp`.
