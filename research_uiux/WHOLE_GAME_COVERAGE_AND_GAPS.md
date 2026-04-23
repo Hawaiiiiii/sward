@@ -90,6 +90,7 @@ That includes:
 - fades, bars, static, and transition timing
 - subtitle/cutscene presentation cues
 - boss HUD/result/save families
+- gameplay HUD core families across Sonic, Werehog, Extra Stage, and Super Sonic variants
 - reusable runtime contracts and template-pack structures
 
 What it still does not justify:
@@ -102,11 +103,12 @@ What it still does not justify:
 
 The current workspace is:
 
-- `100%` complete against the tracked research plan through Phase `24`
+- `100%` complete against the tracked research plan through Phase `30`
 - strong for UI/UX reverse-engineering and template extraction
 - strong for local executable-backed timing/state archaeology
 - strong for reusable runtime/template productization across C++, C, and C#
 - strong for measured UI source-path organization inside the seeded UI/UX subset
+- now materially stronger for in-stage gameplay HUD ownership and family separation
 - partial for whole-game loose-file asset extraction
 - not yet equivalent to a whole-game clean human-readable source tree
 
@@ -115,9 +117,9 @@ The current workspace is:
 If the goal is to move closer to a broader `1:1` UI portability basis, the next concrete work would be:
 
 1. Expand the current UI-focused source-path seed into a broader manifest so the humanization pass can cover more than the current `108` UI-centric paths.
-2. Start a source-path-backed cleanup pass for the uncovered families, especially gameplay HUD core and the CSD/UI foundation layer.
+2. Start a source-path-backed cleanup pass for the uncovered `CSD/*` / `Menu/*` foundation families that still sit below the newly grouped gameplay HUD layer.
 3. Continue correlating generated PPC seams against extracted layouts and readable patch hosts for the remaining UI families.
 4. Build the first dedicated standalone UI debug selector over the current contract-backed runtime screens, then widen that selector as new families land.
 
 > [!NOTE]
-> The new Phase 28 source-path bridge makes the next bottleneck clearer again: more value now comes from source-family naming, debug-screen productization, and targeted gameplay-HUD/CSD recovery than from blindly expecting every high-scoring archive to hide another `.yncp`.
+> After the Phase 29/30 selector-and-HUD pass, the next bottleneck is even clearer: more value now comes from source-family naming and `CSD/*` foundation humanization than from blindly expecting every high-scoring archive to hide another `.yncp`.

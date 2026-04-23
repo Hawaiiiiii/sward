@@ -221,11 +221,11 @@
 
 ## Phase 30 - Gameplay HUD Core Recovery
 
-- [ ] Anchor the stage HUD family around `ui_playscreen`, `ui_playscreen_ev`, `ui_playscreen_ev_hit`, and `ui_playscreen_su`.
-- [ ] Tie `HUD/Sonic`, `HUD/Evil`, player HUD helpers, and the Extra Stage HUD family back to readable hooks, source-path seeds, asset families, and translated seams.
-- [ ] Generate a machine-readable gameplay HUD core map.
-- [ ] Generate a human-readable gameplay HUD core recovery report.
-- [ ] Update the archaeology/state/correlation layer where the gameplay HUD evidence materially tightens host ownership or timing claims.
+- [x] Anchor the stage HUD family around `ui_playscreen`, `ui_playscreen_ev`, `ui_playscreen_ev_hit`, and `ui_playscreen_su`.
+- [x] Tie `HUD/Sonic`, `HUD/Evil`, player HUD helpers, and the Extra Stage HUD family back to readable hooks, source-path seeds, asset families, and translated seams.
+- [x] Generate a machine-readable gameplay HUD core map.
+- [x] Generate a human-readable gameplay HUD core recovery report.
+- [x] Update the archaeology/state/correlation layer where the gameplay HUD evidence materially tightens host ownership or timing claims.
 
 ## Phase 31 - CSD / UI Foundation Humanization
 

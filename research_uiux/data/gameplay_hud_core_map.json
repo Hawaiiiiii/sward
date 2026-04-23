@@ -1,0 +1,314 @@
+{
+  "generated_at_repo_root": "C:\\Users\\DavidErikGarciaArena\\Documents\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero",
+  "source_inputs": {
+    "source_path_dump": "C:\\Users\\DavidErikGarciaArena\\Documents\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\Match SU OG source code folders and locations.txt",
+    "ui_source_seed": "C:\\Users\\DavidErikGarciaArena\\Documents\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\source_path_seeds\\UI_SOURCE_PATHS_FROM_EXECUTABLE.txt",
+    "aspect_ratio_patches": "C:\\Users\\DavidErikGarciaArena\\Documents\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\UnleashedRecomp\\patches\\aspect_ratio_patches.cpp",
+    "swa_toml": "C:\\Users\\DavidErikGarciaArena\\Documents\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\UnleashedRecompLib\\config\\SWA.toml",
+    "extracted_assets_root": "C:\\Users\\DavidErikGarciaArena\\Documents\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\extracted_assets"
+  },
+  "summary": {
+    "system_count": 4,
+    "layout_family_count": 6,
+    "loose_layout_family_count": 2,
+    "hash_only_family_count": 4,
+    "evil_hud_guide_hook_count": 4
+  },
+  "systems": [
+    {
+      "system_id": "sonic_stage_hud",
+      "screen_name": "Sonic Stage HUD",
+      "confidence": "medium_high",
+      "ownership_summary": "Day-stage HUD shell with score/time/exp/ring/boost ownership plus guide-side prompt helpers.",
+      "host_paths": [
+        "HUD/Sonic/HudSonicStage.cpp",
+        "HUD/Sonic/SonicMainDisplay.cpp",
+        "Player/Character/Sonic/Hud/SonicHudGuide.cpp",
+        "Player/Character/Sonic/Hud/SonicHudHomingAttack.cpp"
+      ],
+      "source_path_hits": {
+        "HUD/Sonic/HudSonicStage.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\HUD\\Sonic\\HudSonicStage.cpp"
+        ],
+        "HUD/Sonic/SonicMainDisplay.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\HUD\\Sonic\\SonicMainDisplay.cpp"
+        ],
+        "Player/Character/Sonic/Hud/SonicHudGuide.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\Player\\Character\\Sonic\\Hud\\SonicHudGuide.cpp"
+        ],
+        "Player/Character/Sonic/Hud/SonicHudHomingAttack.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\Player\\Character\\Sonic\\Hud\\SonicHudHomingAttack.cpp"
+        ]
+      },
+      "layout_families": [
+        {
+          "layout_id": "ui_playscreen",
+          "hash_node_count": 35,
+          "hash_nodes": [
+            "ui_playscreen/add/medal_get_m",
+            "ui_playscreen/add/medal_get_m/position/bar",
+            "ui_playscreen/add/medal_get_m/position/bar/R",
+            "ui_playscreen/add/medal_get_s",
+            "ui_playscreen/add/medal_get_s/position/bar",
+            "ui_playscreen/add/medal_get_s/position/bar/R",
+            "ui_playscreen/add/speed_count",
+            "ui_playscreen/add/speed_count/position/bar",
+            "ui_playscreen/add/speed_count/position/bar/R",
+            "ui_playscreen/add/speed_count/position/bar_pale",
+            "ui_playscreen/add/speed_count/position/bar_pale/R",
+            "ui_playscreen/add/u_info",
+            "ui_playscreen/add/u_info/position/bar",
+            "ui_playscreen/add/u_info/position/bar/R",
+            "ui_playscreen/exp_count",
+            "ui_playscreen/exp_count/position/bg_1",
+            "ui_playscreen/exp_count/position/bg_1/C_h",
+            "ui_playscreen/exp_count/position/bg_2",
+            "ui_playscreen/exp_count/position/bg_2/C_h",
+            "ui_playscreen/gauge_frame",
+            "ui_playscreen/player_count",
+            "ui_playscreen/ring_count",
+            "ui_playscreen/ring_get",
+            "ui_playscreen/score_count",
+            "ui_playscreen/score_count/position/bg_1",
+            "ui_playscreen/score_count/position/bg_1/C_h",
+            "ui_playscreen/score_count/position/bg_2",
+            "ui_playscreen/score_count/position/bg_2/C_h",
+            "ui_playscreen/so_ringenagy_gauge",
+            "ui_playscreen/so_speed_gauge",
+            "ui_playscreen/time_count",
+            "ui_playscreen/time_count/position_s/bg_1"
+          ],
+          "loose_layout_present": false
+        }
+      ],
+      "loose_layout_files": [],
+      "texture_hits": [
+        "extracted_assets/phase16_support_archives/ActionCommon/mat_playscreen_001.dds",
+        "extracted_assets/phase16_support_archives/ExStageTails_Common/mat_playscreen_001.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ActionCommon/mat_playscreen_en_001.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ActionCommon/mat_playscreen_en_002.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ActionCommon/mat_playscreen_en_001.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ActionCommon/mat_playscreen_en_002.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds",
+        "extracted_assets/ui_extended_archives/SystemCommonCore/mat_playscreen_002.dds"
+      ]
+    },
+    {
+      "system_id": "werehog_stage_hud",
+      "screen_name": "Werehog Stage HUD",
+      "confidence": "high",
+      "ownership_summary": "Night-stage HUD shell with unleash/life/shield gauges, hit-counter overlay, and helper-guide ownership.",
+      "host_paths": [
+        "HUD/Evil/HudEvilStage.cpp",
+        "HUD/Evil/EvilMainDisplay.cpp",
+        "Player/Character/EvilSonic/Hud/EvilHudGuide.cpp",
+        "Player/Character/EvilSonic/Hud/EvilHudTarget.cpp"
+      ],
+      "source_path_hits": {
+        "HUD/Evil/HudEvilStage.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\HUD\\Evil\\HudEvilStage.cpp"
+        ],
+        "HUD/Evil/EvilMainDisplay.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\HUD\\Evil\\EvilMainDisplay.cpp"
+        ],
+        "Player/Character/EvilSonic/Hud/EvilHudGuide.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\Player\\Character\\EvilSonic\\Hud\\EvilHudGuide.cpp"
+        ],
+        "Player/Character/EvilSonic/Hud/EvilHudTarget.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\Player\\Character\\EvilSonic\\Hud\\EvilHudTarget.cpp"
+        ]
+      },
+      "layout_families": [
+        {
+          "layout_id": "ui_playscreen_ev",
+          "hash_node_count": 51,
+          "hash_nodes": [
+            "ui_playscreen_ev/add/medal_get_m",
+            "ui_playscreen_ev/add/medal_get_m/position/bar",
+            "ui_playscreen_ev/add/medal_get_m/position/bar/R",
+            "ui_playscreen_ev/add/medal_get_s",
+            "ui_playscreen_ev/add/medal_get_s/position/bar",
+            "ui_playscreen_ev/add/medal_get_s/position/bar/R",
+            "ui_playscreen_ev/add/u_info",
+            "ui_playscreen_ev/add/u_info/position/bar",
+            "ui_playscreen_ev/add/u_info/position/bar/R",
+            "ui_playscreen_ev/exp_count",
+            "ui_playscreen_ev/exp_count/position/bg_1",
+            "ui_playscreen_ev/exp_count/position/bg_1/C_h",
+            "ui_playscreen_ev/exp_count/position/bg_2",
+            "ui_playscreen_ev/exp_count/position/bg_2/C_h",
+            "ui_playscreen_ev/gauge/life",
+            "ui_playscreen_ev/gauge/life_bg",
+            "ui_playscreen_ev/gauge/shield/shield_01",
+            "ui_playscreen_ev/gauge/shield/shield_02",
+            "ui_playscreen_ev/gauge/shield/shield_03",
+            "ui_playscreen_ev/gauge/shield/shield_04",
+            "ui_playscreen_ev/gauge/shield/shield_05",
+            "ui_playscreen_ev/gauge/shield/shield_06",
+            "ui_playscreen_ev/gauge/shield/shield_07",
+            "ui_playscreen_ev/gauge/shield/shield_08",
+            "ui_playscreen_ev/gauge/shield/shield_09",
+            "ui_playscreen_ev/gauge/shield/shield_10",
+            "ui_playscreen_ev/gauge/shield/shield_11",
+            "ui_playscreen_ev/gauge/shield/shield_12",
+            "ui_playscreen_ev/gauge/shield/shield_13",
+            "ui_playscreen_ev/gauge/shield/shield_14",
+            "ui_playscreen_ev/gauge/shield/shield_15",
+            "ui_playscreen_ev/gauge/shield_position"
+          ],
+          "loose_layout_present": false
+        },
+        {
+          "layout_id": "ui_playscreen_ev_hit",
+          "hash_node_count": 8,
+          "hash_nodes": [
+            "ui_playscreen_ev_hit/chance_attack",
+            "ui_playscreen_ev_hit/hit_counter_bg",
+            "ui_playscreen_ev_hit/hit_counter_bg/C",
+            "ui_playscreen_ev_hit/hit_counter_bg/C/L",
+            "ui_playscreen_ev_hit/hit_counter_bg/C/R",
+            "ui_playscreen_ev_hit/hit_counter_num",
+            "ui_playscreen_ev_hit/hit_counter_txt_1",
+            "ui_playscreen_ev_hit/hit_counter_txt_2"
+          ],
+          "loose_layout_present": false
+        }
+      ],
+      "loose_layout_files": [],
+      "texture_hits": [
+        "extracted_assets/phase16_support_archives/ActionCommon/mat_playscreen_001.dds",
+        "extracted_assets/phase16_support_archives/ActionCommon/ui_ps1_e_gauge1.dds",
+        "extracted_assets/phase16_support_archives/ExStageTails_Common/mat_playscreen_001.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ActionCommon/mat_playscreen_en_001.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ActionCommon/mat_playscreen_en_002.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ActionCommon/mat_playscreen_en_001.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ActionCommon/mat_playscreen_en_002.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds",
+        "extracted_assets/ui_extended_archives/SystemCommonCore/mat_playscreen_002.dds"
+      ],
+      "readable_hooks": {
+        "config_hooks": [
+          "EvilHudGuideAllocMidAsmHook",
+          "EvilHudGuideUpdateMidAsmHook"
+        ],
+        "constructor_seams": [
+          "0x82448CF0"
+        ],
+        "update_seams": [
+          "0x82449088"
+        ]
+      }
+    },
+    {
+      "system_id": "extra_stage_hud",
+      "screen_name": "Extra Stage / Tornado Defense HUD",
+      "confidence": "high",
+      "ownership_summary": "ExStage battle HUD with play-screen counters, controller-specific QTE prompts, and dedicated extra-stage host ownership.",
+      "host_paths": [
+        "ExtraStage/Tails/Hud/HudExQte.cpp"
+      ],
+      "source_path_hits": {
+        "ExtraStage/Tails/Hud/HudExQte.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\ExtraStage\\Tails\\Hud\\HudExQte.cpp"
+        ]
+      },
+      "layout_families": [
+        {
+          "layout_id": "ui_prov_playscreen",
+          "hash_node_count": 14,
+          "hash_nodes": [
+            "ui_prov_playscreen/bg",
+            "ui_prov_playscreen/info_1",
+            "ui_prov_playscreen/info_1/position/bg_1",
+            "ui_prov_playscreen/info_1/position/bg_1/C_h",
+            "ui_prov_playscreen/info_1/position/bg_2",
+            "ui_prov_playscreen/info_1/position/bg_2/C_h",
+            "ui_prov_playscreen/info_2",
+            "ui_prov_playscreen/info_2/position/bg_1",
+            "ui_prov_playscreen/info_2/position/bg_1/C_h",
+            "ui_prov_playscreen/info_2/position/bg_2",
+            "ui_prov_playscreen/info_2/position/bg_2/C_h",
+            "ui_prov_playscreen/ring_get_effect",
+            "ui_prov_playscreen/so_ringenagy_gauge",
+            "ui_prov_playscreen/so_speed_gauge"
+          ],
+          "loose_layout_present": true
+        },
+        {
+          "layout_id": "ui_qte",
+          "hash_node_count": 0,
+          "hash_nodes": [],
+          "loose_layout_present": true
+        }
+      ],
+      "loose_layout_files": [
+        "extracted_assets/phase16_support_archives/ExStageTails_Common/ui_prov_playscreen.yncp",
+        "extracted_assets/phase16_support_archives/ExStageTails_Common/ui_qte.yncp"
+      ],
+      "texture_hits": [
+        "extracted_assets/phase16_support_archives/ActionCommon/mat_playscreen_001.dds",
+        "extracted_assets/phase16_support_archives/ExStageTails_Common/mat_playscreen_001.dds",
+        "extracted_assets/phase16_support_archives/ExStageTails_Common/mat_qte_001.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ActionCommon/mat_playscreen_en_001.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ActionCommon/mat_playscreen_en_002.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ExStageTails_Common/mat_qte_en_001.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ActionCommon/mat_playscreen_en_001.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ActionCommon/mat_playscreen_en_002.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ExStageTails_Common/mat_qte_en_001.dds",
+        "extracted_assets/ui_extended_archives/SystemCommonCore/mat_playscreen_002.dds"
+      ]
+    },
+    {
+      "system_id": "super_sonic_hud",
+      "screen_name": "Super Sonic / Final HUD Bridge",
+      "confidence": "medium",
+      "ownership_summary": "Super Sonic / boss-facing HUD bridge with dual gauges and footer ownership hints.",
+      "host_paths": [
+        "Boss/BossHudSuperSonic.cpp",
+        "Boss/BossHudVitality.cpp",
+        "Boss/BossNamePlate.cpp"
+      ],
+      "source_path_hits": {
+        "Boss/BossHudSuperSonic.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\Boss\\BossHudSuperSonic.cpp"
+        ],
+        "Boss/BossHudVitality.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\Boss\\BossHudVitality.cpp"
+        ],
+        "Boss/BossNamePlate.cpp": [
+          "D:\\SonicWorldAdventure\\SWA\\source\\Boss\\BossNamePlate.cpp"
+        ]
+      },
+      "layout_families": [
+        {
+          "layout_id": "ui_playscreen_su",
+          "hash_node_count": 5,
+          "hash_nodes": [
+            "ui_playscreen_su/footer",
+            "ui_playscreen_su/gaia_gauge",
+            "ui_playscreen_su/gaia_gauge/position/C/R",
+            "ui_playscreen_su/su_sonic_gauge",
+            "ui_playscreen_su/su_sonic_gauge/position/C/R"
+          ],
+          "loose_layout_present": false
+        }
+      ],
+      "loose_layout_files": [],
+      "texture_hits": [
+        "extracted_assets/phase16_support_archives/ActionCommon/mat_playscreen_001.dds",
+        "extracted_assets/phase16_support_archives/ExStageTails_Common/mat_playscreen_001.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ActionCommon/mat_playscreen_en_001.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ActionCommon/mat_playscreen_en_002.dds",
+        "extracted_assets/phase25_commonflow_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ActionCommon/mat_playscreen_en_001.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ActionCommon/mat_playscreen_en_002.dds",
+        "extracted_assets/ui_broader_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds",
+        "extracted_assets/ui_extended_archives/SystemCommonCore/mat_playscreen_002.dds"
+      ]
+    }
+  ]
+}

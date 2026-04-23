@@ -239,3 +239,19 @@ Follow-on translated seam labeling: [`research_uiux/PPC_LAYOUT_STATE_LABELS.md`]
 - Patch-derived generated seams: `0`
 - Timing highlights: `subtitle_windows::subtitle_max_duration=178.0f, playmovie_sequences::playmovie_project_duration=4862f`
 - Why this group matters: Subtitle XML plus PlayMovie sequence correlation lives outside the CSD layout layer but belongs in the same cross-reference database for cutscene UI archaeology.
+
+## Phase 30 Follow-On: Gameplay HUD Core
+
+The new gameplay-HUD-specific pass now groups the previously scattered in-stage HUD evidence into:
+
+- `sonic_stage_hud`
+- `werehog_stage_hud`
+- `extra_stage_hud`
+- `super_sonic_hud`
+
+That follow-on map resolves `6` gameplay HUD layout families:
+
+- loose-layout-backed: `ui_prov_playscreen`, `ui_qte`
+- hash/source-path-backed: `ui_playscreen`, `ui_playscreen_ev`, `ui_playscreen_ev_hit`, `ui_playscreen_su`
+
+The machine-readable payload lives in `research_uiux/data/gameplay_hud_core_map.json`, and the human-readable breakdown lives in `research_uiux/GAMEPLAY_HUD_CORE_RECOVERY.md`.

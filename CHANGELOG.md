@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 30 gameplay HUD core recovery
+
+- added [`research_uiux/tools/build_gameplay_hud_core_map.py`](./research_uiux/tools/build_gameplay_hud_core_map.py)
+- added [`research_uiux/GAMEPLAY_HUD_CORE_RECOVERY.md`](./research_uiux/GAMEPLAY_HUD_CORE_RECOVERY.md)
+- generated a new machine-readable HUD-core map under `research_uiux/data/gameplay_hud_core_map.json`
+- grouped the in-stage HUD evidence into `4` host-owned systems across `6` layout families
+- confirmed that `ui_prov_playscreen` and `ui_qte` are loose-layout-backed while `ui_playscreen`, `ui_playscreen_ev`, `ui_playscreen_ev_hit`, and `ui_playscreen_su` remain hash/source-path-backed
+- tied the strongest readable/translated bridge in this family to `CEvilHudGuide` via `EvilHudGuideAllocMidAsmHook`, `EvilHudGuideUpdateMidAsmHook`, `0x82448CF0`, and `0x82449088`
+
 ### Phase 29 standalone UI debug selector
 
 - added [`research_uiux/STANDALONE_UI_DEBUG_SELECTOR.md`](./research_uiux/STANDALONE_UI_DEBUG_SELECTOR.md)
@@ -181,6 +190,7 @@ The repo now contains:
 - a buildable generic runtime reference that turns the template pack into executable C++ code
 - a reusable multi-language port-kit layer across C++, C, and C#
 - a standalone contract-backed debug selector over the current reusable screen family set
+- a dedicated gameplay-HUD-core recovery layer for the day/night/extra-stage/super variants
 
 The repo still does not contain:
 
