@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 19 subtitle and cutscene presentation deep dive
+
+- added [`research_uiux/tools/analyze_subtitle_cutscene_presentation.py`](./research_uiux/tools/analyze_subtitle_cutscene_presentation.py)
+- added [`research_uiux/SUBTITLE_CUTSCENE_PRESENTATION_DEEP_DIVE.md`](./research_uiux/SUBTITLE_CUTSCENE_PRESENTATION_DEEP_DIVE.md)
+- extracted a focused English subtitle slice into `extracted_assets/phase19_subtitle_archives` without needing any new tool download
+- correlated `*.inspire_resource.xml` subtitle cue windows against `#Application` `PlayMovie` ownership, hide-layer flags, and loading/stage-handoff behavior
+- tied the extracted subtitle layer back to readable runtime controls for `Subtitles` and `CutsceneAspectRatio`
+
 ### Phase 18 transferable template pack for original projects
 
 - added [`research_uiux/TEMPLATE_PACK_FOR_ORIGINAL_PROJECTS.md`](./research_uiux/TEMPLATE_PACK_FOR_ORIGINAL_PROJECTS.md)
@@ -82,6 +90,7 @@ The repo now contains:
 - dedicated deep dives for pause/world-map and boss/result/save-load flow
 - a publishable atlas-builder that renders local-only contact sheets from the extracted DDS/UI layer
 - a reusable template pack for original screen-state, overlay, prompt, and transition work
+- a subtitle/cutscene presentation report that bridges subtitle timing resources, `PlayMovie` sequences, and readable runtime controls
 
 The repo still does not contain:
 
