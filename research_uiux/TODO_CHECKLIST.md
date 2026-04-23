@@ -244,10 +244,10 @@
 
 ## Phase 33 - Source-Path-Named Debug Selector
 
-- [ ] Expand the standalone debug selector from contract-name browsing to source-path/family-name browsing.
-- [ ] Add a tracked selector-family index or equivalent generated runtime metadata.
-- [ ] Verify the selector locally against source-family tokens rather than only contract stems.
-- [ ] Update runtime docs and the checklist audit for the new selector layer.
+- [x] Expand the standalone debug selector from contract-name browsing to source-path/family-name browsing.
+- [x] Add a tracked selector-family index or equivalent generated runtime metadata.
+- [x] Verify the selector locally against source-family tokens rather than only contract stems.
+- [x] Update runtime docs and the checklist audit for the new selector layer.
 
 ## Phase 34 - Broader UI-Adjacent Source-Path Manifest
 
@@ -337,3 +337,6 @@
 - [x] Follow-on phase audit on `2026-04-23 19:35:09 +02:00`: added `research_uiux\tools\materialize_source_family_notes.py` and generated the local-only `SONIC UNLEASHED\**\*.sward.md` note layer.
 - [x] Follow-on phase audit on `2026-04-23 19:35:09 +02:00`: materialized `108` local-only placement notes, split into `13` direct host anchors, `77` family-member anchors, `13` debug-host candidates, and `5` named-only placeholders.
 - [x] Follow-on phase audit on `2026-04-23 19:35:09 +02:00`: added `research_uiux\LOCAL_SOURCE_FAMILY_PLACEMENT.md` and refreshed the local-only mirror metadata under `SONIC UNLEASHED\_meta\`.
+- [x] Follow-on phase audit on `2026-04-23 20:01:00 +02:00`: added `research_uiux\tools\build_source_family_selector_data.py`, `research_uiux\SOURCE_PATH_NAMED_DEBUG_SELECTOR.md`, and the generated selector metadata header under `research_uiux\runtime_reference\include\sward\ui_runtime\source_family_selector_data.hpp`.
+- [x] Follow-on phase audit on `2026-04-23 20:01:00 +02:00`: upgraded `sward_ui_runtime_debug_selector` so it supports `--list-families`, `--family <token>`, and direct source-family inputs such as `TitleMenu.cpp`, `HudPause.cpp`, and `WorldMapSelect.cpp`.
+- [x] Follow-on phase audit on `2026-04-23 20:01:00 +02:00`: re-verified the selector locally from `b\rr33\Release\`, confirming source-family launches for title, pause, and world-map flows.

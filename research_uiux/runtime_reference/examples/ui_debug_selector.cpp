@@ -1,5 +1,6 @@
 #include <sward/ui_runtime/contract_loader.hpp>
 #include <sward/ui_runtime/runtime.hpp>
+#include <sward/ui_runtime/source_family_selector_data.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -22,6 +23,12 @@ struct ContractEntry
     ScreenContract contract;
 };
 
+struct ResolvedFamilyEntry
+{
+    const SourceFamilySelectorEntry* metadata = nullptr;
+    std::size_t contractIndex = 0;
+};
+
 [[nodiscard]] std::string normalizeToken(std::string_view value)
 {
     std::string normalized;
@@ -42,6 +49,23 @@ struct ContractEntry
     for (const auto& path : bundledContractPaths())
         result.push_back(ContractEntry{ path, loadContractFromJsonFile(path) });
     return result;
+}
+
+[[nodiscard]] std::vector<std::string_view> splitBlob(std::string_view blob)
+{
+    std::vector<std::string_view> tokens;
+    std::size_t start = 0;
+    while (start <= blob.size())
+    {
+        const std::size_t end = blob.find('|', start);
+        const std::size_t stop = end == std::string_view::npos ? blob.size() : end;
+        if (stop > start)
+            tokens.push_back(blob.substr(start, stop - start));
+        if (end == std::string_view::npos)
+            break;
+        start = end + 1;
+    }
+    return tokens;
 }
 
 void printVisiblePrompts(const ScreenRuntime& runtime)
@@ -88,6 +112,48 @@ void printEntryList(const std::vector<ContractEntry>& entries)
             << " overlays=" << entry.contract.overlayLayers.size()
             << " prompts=" << entry.contract.promptSlots.size()
             << '\n';
+    }
+}
+
+[[nodiscard]] std::vector<ResolvedFamilyEntry> resolveFamilyEntries(const std::vector<ContractEntry>& bundledEntries)
+{
+    std::vector<ResolvedFamilyEntry> result;
+    for (const auto& family : kSourceFamilySelectorEntries)
+    {
+        const auto found = std::find_if(
+            bundledEntries.begin(),
+            bundledEntries.end(),
+            [&family](const ContractEntry& entry)
+            {
+                return entry.path.filename() == family.contractFileName;
+            });
+        if (found == bundledEntries.end())
+            continue;
+
+        result.push_back(
+            ResolvedFamilyEntry{
+                .metadata = &family,
+                .contractIndex = static_cast<std::size_t>(std::distance(bundledEntries.begin(), found)),
+            });
+    }
+    return result;
+}
+
+void printFamilyList(const std::vector<ResolvedFamilyEntry>& families)
+{
+    std::cout << "Source-path launch families:\n";
+    for (std::size_t index = 0; index < families.size(); ++index)
+    {
+        const auto& family = *families[index].metadata;
+        const auto sourcePaths = splitBlob(family.sourcePathBlob);
+        std::cout
+            << "  " << (index + 1)
+            << ". " << family.displayName
+            << " [" << family.contractFileName << ']'
+            << " source_system=" << family.sourceSystemId;
+        if (!sourcePaths.empty())
+            std::cout << " anchor=" << sourcePaths.front();
+        std::cout << '\n';
     }
 }
 
@@ -221,6 +287,22 @@ void driveRuntime(const ContractEntry& entry)
     return value - 1;
 }
 
+[[nodiscard]] std::optional<std::size_t> selectInteractiveFamilyIndex(const std::vector<ResolvedFamilyEntry>& families)
+{
+    printFamilyList(families);
+    std::cout << "\nSelect family number: ";
+
+    std::string line;
+    if (!std::getline(std::cin, line))
+        return std::nullopt;
+
+    std::istringstream parser(line);
+    std::size_t value = 0;
+    if (!(parser >> value) || value == 0 || value > families.size())
+        return std::nullopt;
+    return value - 1;
+}
+
 [[nodiscard]] std::optional<std::size_t> findEntryIndex(const std::vector<ContractEntry>& entries, std::string_view token)
 {
     const std::string needle = normalizeToken(token);
@@ -234,6 +316,39 @@ void driveRuntime(const ContractEntry& entry)
             return index;
         if (normalizeToken(entry.path.stem().string()).find(needle) != std::string::npos)
             return index;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<std::size_t> findFamilyIndex(const std::vector<ResolvedFamilyEntry>& families, std::string_view token)
+{
+    const std::string needle = normalizeToken(token);
+    if (needle.empty())
+        return std::nullopt;
+
+    for (std::size_t index = 0; index < families.size(); ++index)
+    {
+        const auto& family = *families[index].metadata;
+        if (normalizeToken(family.displayName).find(needle) != std::string::npos)
+            return index;
+        if (normalizeToken(family.familyId).find(needle) != std::string::npos)
+            return index;
+        if (normalizeToken(family.sourceSystemId).find(needle) != std::string::npos)
+            return index;
+        if (normalizeToken(family.contractFileName).find(needle) != std::string::npos)
+            return index;
+
+        for (const auto alias : splitBlob(family.aliasBlob))
+        {
+            if (normalizeToken(alias).find(needle) != std::string::npos)
+                return index;
+        }
+        for (const auto sourcePath : splitBlob(family.sourcePathBlob))
+        {
+            if (normalizeToken(sourcePath).find(needle) != std::string::npos)
+                return index;
+        }
     }
 
     return std::nullopt;
@@ -259,12 +374,19 @@ int main(int argc, char** argv)
     try
     {
         const std::vector<ContractEntry> bundledEntries = loadBundledEntries();
+        const std::vector<ResolvedFamilyEntry> families = resolveFamilyEntries(bundledEntries);
         if (argc > 1)
         {
             const std::string command = argv[1];
             if (command == "--list")
             {
                 printEntryList(bundledEntries);
+                return 0;
+            }
+
+            if (command == "--list-families")
+            {
+                printFamilyList(families);
                 return 0;
             }
 
@@ -277,6 +399,25 @@ int main(int argc, char** argv)
                 }
 
                 driveRuntime(loadExplicitEntry(argv[2]));
+                return 0;
+            }
+
+            if (command == "--family")
+            {
+                if (argc < 3)
+                {
+                    std::cerr << "--family requires a family token.\n";
+                    return 1;
+                }
+
+                const auto familyIndex = findFamilyIndex(families, argv[2]);
+                if (!familyIndex.has_value())
+                {
+                    std::cerr << "Unknown family token. Use --list-families to inspect the available launch families.\n";
+                    return 1;
+                }
+
+                driveRuntime(bundledEntries[families[*familyIndex].contractIndex]);
                 return 0;
             }
 
@@ -299,25 +440,32 @@ int main(int argc, char** argv)
                 return 0;
             }
 
-            const auto index = findEntryIndex(bundledEntries, command);
-            if (!index.has_value())
+            const auto familyIndex = findFamilyIndex(families, command);
+            if (familyIndex.has_value())
             {
-                std::cerr << "Unknown screen token. Use --list to inspect the available contracts.\n";
+                driveRuntime(bundledEntries[families[*familyIndex].contractIndex]);
+                return 0;
+            }
+
+            const auto entryIndex = findEntryIndex(bundledEntries, command);
+            if (!entryIndex.has_value())
+            {
+                std::cerr << "Unknown screen or family token. Use --list or --list-families to inspect the available launches.\n";
                 return 1;
             }
 
-            driveRuntime(bundledEntries[*index]);
+            driveRuntime(bundledEntries[*entryIndex]);
             return 0;
         }
 
-        const auto index = selectInteractiveIndex(bundledEntries);
-        if (!index.has_value())
+        const auto familyIndex = selectInteractiveFamilyIndex(families);
+        if (!familyIndex.has_value())
         {
-            std::cerr << "No valid contract selection was provided.\n";
+            std::cerr << "No valid family selection was provided.\n";
             return 1;
         }
 
-        driveRuntime(bundledEntries[*index]);
+        driveRuntime(bundledEntries[families[*familyIndex].contractIndex]);
         return 0;
     }
     catch (const std::exception& exception)

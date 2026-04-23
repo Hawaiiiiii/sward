@@ -16,6 +16,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - portable reference profiles across C++, C, and C#
 - portable JSON contract files instead of hardcoded in-code builders
 - a standalone contract-backed debug selector for the first reusable screen-browser pass
+- a source-family alias layer so the selector can launch by recovered names such as `TitleMenu.cpp` and `HudPause.cpp`
 
 Contents:
 
@@ -62,7 +63,7 @@ b/rr27/Release/sward_ui_runtime_example.exe
 b/rr27/Release/sward_ui_runtime_title_menu_example.exe
 b/rr27/Release/sward_ui_runtime_toast_example.exe
 b/rr27/Release/sward_ui_runtime_c_example.exe
-b/rr29/Release/sward_ui_runtime_debug_selector.exe
+b/rr33/Release/sward_ui_runtime_debug_selector.exe
 ```
 
 Run against the bundled contracts:
@@ -72,10 +73,11 @@ b/rr27/Release/sward_ui_runtime_example.exe
 b/rr27/Release/sward_ui_runtime_title_menu_example.exe
 b/rr27/Release/sward_ui_runtime_toast_example.exe
 b/rr27/Release/sward_ui_runtime_c_example.exe
-b/rr29/Release/sward_ui_runtime_debug_selector.exe --list
-b/rr29/Release/sward_ui_runtime_debug_selector.exe title
-b/rr29/Release/sward_ui_runtime_debug_selector.exe loading
-b/rr29/Release/sward_ui_runtime_debug_selector.exe world
+b/rr33/Release/sward_ui_runtime_debug_selector.exe --list
+b/rr33/Release/sward_ui_runtime_debug_selector.exe --list-families
+b/rr33/Release/sward_ui_runtime_debug_selector.exe TitleMenu.cpp
+b/rr33/Release/sward_ui_runtime_debug_selector.exe HudPause.cpp
+b/rr33/Release/sward_ui_runtime_debug_selector.exe WorldMapSelect.cpp
 ```
 
 Run against an explicit portable contract path:
@@ -95,6 +97,8 @@ external_tools/dotnet8/dotnet.exe run --project research_uiux/runtime_reference/
 Selector notes:
 
 - `--list` prints all bundled contract-backed screens
+- `--list-families` prints the generated source-family launch groups
 - `--index <n>` selects by 1-based slot
-- `<token>` matches `screen_id` or filename stem, for example `title`, `loading`, `world`
+- `<token>` matches either a source-family alias or a bundled contract token
+- `--family <token>` forces a source-family lookup
 - `--path <contract.json>` loads an explicit portable contract file

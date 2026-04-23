@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 33 source-path-named debug selector
+
+- added [`research_uiux/tools/build_source_family_selector_data.py`](./research_uiux/tools/build_source_family_selector_data.py)
+- added [`research_uiux/SOURCE_PATH_NAMED_DEBUG_SELECTOR.md`](./research_uiux/SOURCE_PATH_NAMED_DEBUG_SELECTOR.md)
+- added generated runtime metadata under [`research_uiux/runtime_reference/include/sward/ui_runtime/source_family_selector_data.hpp`](./research_uiux/runtime_reference/include/sward/ui_runtime/source_family_selector_data.hpp)
+- upgraded [`research_uiux/runtime_reference/examples/ui_debug_selector.cpp`](./research_uiux/runtime_reference/examples/ui_debug_selector.cpp) from contract-stem browsing into source-family browsing
+- verified the selector locally against recovered source-family tokens such as `TitleMenu.cpp`, `HudPause.cpp`, and `WorldMapSelect.cpp`
+- added family-aware selector commands so the runtime layer now supports `--list-families`, `--family <token>`, and interactive source-family selection
+
 ### Phase 32 local source-family placement
 
 - added [`research_uiux/tools/materialize_source_family_notes.py`](./research_uiux/tools/materialize_source_family_notes.py)
