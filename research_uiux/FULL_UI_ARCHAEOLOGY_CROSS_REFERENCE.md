@@ -6,6 +6,8 @@
 
 Machine-readable inventory: `research_uiux/data/ui_archaeology_database.json`
 
+Follow-on translated seam labeling: [`research_uiux/PPC_LAYOUT_STATE_LABELS.md`](./PPC_LAYOUT_STATE_LABELS.md)
+
 ## Summary
 
 - Merged layout IDs cross-referenced: `26`

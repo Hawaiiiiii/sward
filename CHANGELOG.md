@@ -21,6 +21,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 - re-ran the asset scan to `6840` combined matched entries, with `5112` extracted-side matches and `89` indexed hits inside the Phase 25 extraction root
 - documented the growing emphasis on correlation/state labeling over blind archive hunting for the next beats
 
+### Phase 26 deeper PPC-to-layout and state labeling
+
+- added [`research_uiux/tools/label_ppc_ui_states.py`](./research_uiux/tools/label_ppc_ui_states.py)
+- added [`research_uiux/PPC_LAYOUT_STATE_LABELS.md`](./research_uiux/PPC_LAYOUT_STATE_LABELS.md)
+- generated a new local seam/state label inventory under `research_uiux/data/ppc_ui_state_labels.json`
+- labeled `180` translated PPC seams across `8` targeted systems, including loading/start, world map, town UI, mission/gate, result, save/ending, and Tornado Defense
+- sampled translated function windows for each resolved seam so the label layer carries call-shape and float/timing hints rather than only symbol names
+- confirmed that subtitle/cutscene presentation remains asset/readable-code driven in the current pass, with no resolved translated PPC seam yet
+
 ### Phase 23 full UI archaeology cross-reference
 
 - added [`research_uiux/tools/build_ui_archaeology_database.py`](./research_uiux/tools/build_ui_archaeology_database.py)
