@@ -1,0 +1,45 @@
+{
+  "screen_id": "SubtitleCutsceneReference",
+  "source_system": "subtitle_cutscene_presentation",
+  "notes": "Preview-hostable cutscene/subtitle contract derived from PlayMovie ownership, bottom-anchored subtitle cues, letterbox policy, and stage/loading handoff.",
+  "timeline_bands": [
+    { "id": "announce_prepare", "seconds": 0.5 },
+    { "id": "scene_cycle", "seconds": 0.333333 },
+    { "id": "subtitle_playback", "seconds": 2.516667 },
+    { "id": "handoff_gate", "seconds": 0.6 },
+    { "id": "route_return", "seconds": 0.4 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "MoviePrep", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "MovieAnnounce", "enter_scene": "movie_prepare", "timeline_band_id": "announce_prepare", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "PreviewIdle", "enter_scene": "preview_idle", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "SceneCycle", "enter_scene": "scene_cycle", "timeline_band_id": "scene_cycle", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "SubtitleCuePlayback", "enter_scene": "movie_takeover", "timeline_band_id": "subtitle_playback", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "LoadingOrStageHandoff", "enter_scene": "loading_handoff", "timeline_band_id": "handoff_gate", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "RouteReturn", "enter_scene": "route_return", "timeline_band_id": "route_return", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "backdrop", "role": "backdrop", "interactive": false },
+    { "id": "letterbox", "role": "letterbox", "interactive": false },
+    { "id": "movie_surface", "role": "content", "interactive": false },
+    { "id": "subtitle_plate", "role": "subtitle", "interactive": false },
+    { "id": "loading_gate", "role": "loading_gate", "interactive": false },
+    { "id": "prompts", "role": "prompt", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Intro": ["backdrop", "letterbox", "content", "loading_gate"],
+    "Idle": ["backdrop", "letterbox", "content", "subtitle", "prompt"],
+    "Navigate": ["backdrop", "letterbox", "content", "subtitle", "prompt"],
+    "Confirm": ["backdrop", "letterbox", "content", "subtitle"],
+    "Cancel": ["backdrop", "letterbox", "content", "subtitle", "loading_gate"],
+    "Outro": ["backdrop", "letterbox", "loading_gate"]
+  },
+  "prompt_slots": [
+    { "slot_id": "play_scene", "button": "A", "label": "Play", "visible_states": ["Idle"], "required_predicates": ["can_confirm"] },
+    { "slot_id": "leave_preview", "button": "B", "label": "Back", "visible_states": ["Idle"], "required_predicates": ["can_cancel"] },
+    { "slot_id": "scene_left", "button": "LB", "label": "Previous Scene", "visible_states": ["Idle"], "required_predicates": ["has_previous_scene"] },
+    { "slot_id": "scene_right", "button": "RB", "label": "Next Scene", "visible_states": ["Idle"], "required_predicates": ["has_next_scene"] },
+    { "slot_id": "subtitle_toggle", "button": "Start", "label": "Subtitles", "visible_states": ["Idle"], "required_predicates": ["subtitles_enabled"] }
+  ]
+}

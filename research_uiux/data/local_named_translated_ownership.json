@@ -1,0 +1,48 @@
+{
+  "inputs": {
+    "source_path_manifest": "C:\\Users\\DavidErikGarciaArena\\Documents\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\data\\ui_source_path_manifest.json",
+    "frontend_shell_recovery": "C:\\Users\\DavidErikGarciaArena\\Documents\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\data\\frontend_shell_recovery.json",
+    "subtitle_cutscene_presentation": "C:\\Users\\DavidErikGarciaArena\\Documents\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\data\\subtitle_cutscene_presentation.json"
+  },
+  "output_root": "C:\\Users\\DavidErikGarciaArena\\Documents\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\SONIC UNLEASHED",
+  "summary": {
+    "immediate_host_target_count": 15,
+    "humanized_source_file_count": 13,
+    "immediate_host_conversion_pct": 86.7,
+    "representative_subtitle_scene_count": 9
+  },
+  "groups": [
+    {
+      "group_id": "menu_debug_hosts",
+      "display_name": "Menu / Stage Debug Hosts",
+      "file_count": 3,
+      "purpose": "Readable local-only launch ownership for title/menu/stage debug entry points."
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "display_name": "Cutscene / Preview Hosts",
+      "file_count": 5,
+      "purpose": "Readable local-only preview browser and menu scaffolds around InspirePreview and InspirePreview2nd."
+    },
+    {
+      "group_id": "movie_route_hosts",
+      "display_name": "Movie / Sequence Route Hosts",
+      "file_count": 5,
+      "purpose": "Readable local-only descriptors for movie ownership, stage-movie handoff, and sequence wrappers."
+    }
+  ],
+  "sample_files": [
+    "SonicWorldAdventure/SWA/source/System/GameMode/GameModeMainMenu_Test.cpp",
+    "SonicWorldAdventure/SWA/source/System/GameMode/GameModeMenuSelectDebug.cpp",
+    "SonicWorldAdventure/SWA/source/System/GameMode/GameModeStageSelectDebug.cpp",
+    "SonicWorldAdventure/SWA/source/Tool/InspirePreview/InspirePreview.cpp",
+    "SonicWorldAdventure/SWA/source/Tool/InspirePreview/InspirePreviewMenu.cpp",
+    "SonicWorldAdventure/SWA/source/Tool/InspirePreview/InspireObject.cpp",
+    "SonicWorldAdventure/SWA/source/Tool/InspirePreview2nd/InspirePreview2nd.cpp",
+    "SonicWorldAdventure/SWA/source/Tool/InspirePreview2nd/InspirePreview2ndMenu.cpp",
+    "SonicWorldAdventure/SWA/source/System/GameMode/GameModeStageMovie.cpp",
+    "SonicWorldAdventure/SWA/source/Movie/MovieManager.cpp",
+    "SonicWorldAdventure/SWA/source/Sequence/Unit/SequenceUnitPlayMovie.cpp",
+    "SonicWorldAdventure/SWA/source/Sequence/Unit/SequenceUnitMicroSequence.cpp"
+  ]
+}

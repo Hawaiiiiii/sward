@@ -13,6 +13,7 @@ enum class ReferenceProfile
     AutosaveToast,
     LoadingTransition,
     MissionResult,
+    SubtitleCutscene,
     WorldMap,
 };
 
@@ -21,6 +22,7 @@ enum class ReferenceProfile
 [[nodiscard]] ScreenContract makeAutosaveToastContract();
 [[nodiscard]] ScreenContract makeLoadingTransitionContract();
 [[nodiscard]] ScreenContract makeMissionResultContract();
+[[nodiscard]] ScreenContract makeSubtitleCutsceneContract();
 [[nodiscard]] ScreenContract makeWorldMapContract();
 [[nodiscard]] ScreenContract makeContract(ReferenceProfile profile);
 [[nodiscard]] std::string_view toString(ReferenceProfile profile);

@@ -1,0 +1,536 @@
+{
+  "hosts": [
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "System/GameMode/GameModeStageMovie.cpp",
+      "host_display_name": "GameModeStageMovie.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Subtitle / Cutscene Presentation",
+        "subtitle_cutscene",
+        "System/GameMode/GameModeStageMovie.cpp",
+        "GameModeStageMovie.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "lift current contract/runtime examples into source-path-named debug screens"
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "Tool/InspirePreview/InspireObject.cpp",
+      "host_display_name": "InspireObject.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "Tool/InspirePreview/InspireObject.cpp",
+        "InspireObject.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "Tool/InspirePreview/InspirePreview.cpp",
+      "host_display_name": "InspirePreview.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "Tool/InspirePreview/InspirePreview.cpp",
+        "InspirePreview.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "Tool/InspirePreview2nd/InspirePreview2nd.cpp",
+      "host_display_name": "InspirePreview2nd.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "Tool/InspirePreview2nd/InspirePreview2nd.cpp",
+        "InspirePreview2nd.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "Tool/InspirePreview2nd/InspirePreview2ndMenu.cpp",
+      "host_display_name": "InspirePreview2ndMenu.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "Tool/InspirePreview2nd/InspirePreview2ndMenu.cpp",
+        "InspirePreview2ndMenu.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "Tool/InspirePreview/InspirePreviewMenu.cpp",
+      "host_display_name": "InspirePreviewMenu.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "Tool/InspirePreview/InspirePreviewMenu.cpp",
+        "InspirePreviewMenu.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "Tool/MotionCameraTool/MotionCameraMenu.cpp",
+      "host_display_name": "MotionCameraMenu.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "Tool/MotionCameraTool/MotionCameraMenu.cpp",
+        "MotionCameraMenu.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "Tool/MotionCameraTool/MotionCameraTool.cpp",
+      "host_display_name": "MotionCameraTool.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "Tool/MotionCameraTool/MotionCameraTool.cpp",
+        "MotionCameraTool.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "Movie/MovieManager.cpp",
+      "host_display_name": "MovieManager.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Subtitle / Cutscene Presentation",
+        "subtitle_cutscene",
+        "Movie/MovieManager.cpp",
+        "MovieManager.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "lift current contract/runtime examples into source-path-named debug screens"
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "Sequence/Utility/SequencePlayMovieWrapper.cpp",
+      "host_display_name": "SequencePlayMovieWrapper.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Subtitle / Cutscene Presentation",
+        "subtitle_cutscene",
+        "Sequence/Utility/SequencePlayMovieWrapper.cpp",
+        "SequencePlayMovieWrapper.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "lift current contract/runtime examples into source-path-named debug screens"
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "Sequence/Unit/SequenceUnitMicroSequence.cpp",
+      "host_display_name": "SequenceUnitMicroSequence.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Subtitle / Cutscene Presentation",
+        "subtitle_cutscene",
+        "Sequence/Unit/SequenceUnitMicroSequence.cpp",
+        "SequenceUnitMicroSequence.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "lift current contract/runtime examples into source-path-named debug screens"
+    },
+    {
+      "group_id": "cutscene_preview_hosts",
+      "group_display_name": "Cutscene / Preview Hosts",
+      "priority": "immediate",
+      "relative_source_path": "Sequence/Unit/SequenceUnitPlayMovie.cpp",
+      "host_display_name": "SequenceUnitPlayMovie.cpp",
+      "primary_contract_file_name": "subtitle_cutscene_reference.json",
+      "alias_tokens": [
+        "Cutscene / Preview Hosts",
+        "cutscene_preview_hosts",
+        "Subtitle / Cutscene Presentation",
+        "subtitle_cutscene",
+        "Sequence/Unit/SequenceUnitPlayMovie.cpp",
+        "SequenceUnitPlayMovie.cpp",
+        "subtitle_cutscene_reference.json",
+        "subtitle_cutscene_reference"
+      ],
+      "notes": "lift current contract/runtime examples into source-path-named debug screens"
+    },
+    {
+      "group_id": "menu_debug_hosts",
+      "group_display_name": "Menu / Stage Debug Hosts",
+      "priority": "immediate",
+      "relative_source_path": "System/GameMode/GameModeMainMenu_Test.cpp",
+      "host_display_name": "GameModeMainMenu_Test.cpp",
+      "primary_contract_file_name": "title_menu_reference.json",
+      "alias_tokens": [
+        "Menu / Stage Debug Hosts",
+        "menu_debug_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeMainMenu_Test.cpp",
+        "GameModeMainMenu_Test.cpp",
+        "title_menu_reference.json",
+        "title_menu_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "menu_debug_hosts",
+      "group_display_name": "Menu / Stage Debug Hosts",
+      "priority": "immediate",
+      "relative_source_path": "System/GameMode/GameModeMenuSelectDebug.cpp",
+      "host_display_name": "GameModeMenuSelectDebug.cpp",
+      "primary_contract_file_name": "title_menu_reference.json",
+      "alias_tokens": [
+        "Menu / Stage Debug Hosts",
+        "menu_debug_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeMenuSelectDebug.cpp",
+        "GameModeMenuSelectDebug.cpp",
+        "title_menu_reference.json",
+        "title_menu_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "menu_debug_hosts",
+      "group_display_name": "Menu / Stage Debug Hosts",
+      "priority": "immediate",
+      "relative_source_path": "System/GameMode/GameModeStageSelectDebug.cpp",
+      "host_display_name": "GameModeStageSelectDebug.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Menu / Stage Debug Hosts",
+        "menu_debug_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeStageSelectDebug.cpp",
+        "GameModeStageSelectDebug.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "pause_help_and_loading_dispatch",
+      "group_display_name": "Pause / Help / Loading Dispatch",
+      "priority": "high",
+      "relative_source_path": "Sequence/Utility/SequenceChangeStageUnit.cpp",
+      "host_display_name": "SequenceChangeStageUnit.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Pause / Help / Loading Dispatch",
+        "pause_help_and_loading_dispatch",
+        "Loading / Boot / Install",
+        "loading_and_boot",
+        "Sequence/Utility/SequenceChangeStageUnit.cpp",
+        "SequenceChangeStageUnit.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "lift current contract/runtime examples into source-path-named debug screens"
+    },
+    {
+      "group_id": "pause_help_and_loading_dispatch",
+      "group_display_name": "Pause / Help / Loading Dispatch",
+      "priority": "high",
+      "relative_source_path": "Sequence/Unit/SequenceUnitCallHelpWindow.cpp",
+      "host_display_name": "SequenceUnitCallHelpWindow.cpp",
+      "primary_contract_file_name": "pause_menu_reference.json",
+      "alias_tokens": [
+        "Pause / Help / Loading Dispatch",
+        "pause_help_and_loading_dispatch",
+        "Pause Stack",
+        "pause_stack",
+        "Sequence/Unit/SequenceUnitCallHelpWindow.cpp",
+        "SequenceUnitCallHelpWindow.cpp",
+        "pause_menu_reference.json",
+        "pause_menu_reference"
+      ],
+      "notes": "lift current contract/runtime examples into source-path-named debug screens"
+    },
+    {
+      "group_id": "pause_help_and_loading_dispatch",
+      "group_display_name": "Pause / Help / Loading Dispatch",
+      "priority": "high",
+      "relative_source_path": "Sequence/Unit/SequenceUnitChangeStage.cpp",
+      "host_display_name": "SequenceUnitChangeStage.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Pause / Help / Loading Dispatch",
+        "pause_help_and_loading_dispatch",
+        "Loading / Boot / Install",
+        "loading_and_boot",
+        "Sequence/Unit/SequenceUnitChangeStage.cpp",
+        "SequenceUnitChangeStage.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "lift current contract/runtime examples into source-path-named debug screens"
+    },
+    {
+      "group_id": "pause_help_and_loading_dispatch",
+      "group_display_name": "Pause / Help / Loading Dispatch",
+      "priority": "high",
+      "relative_source_path": "Sequence/Unit/SequenceUnitSwapDisk.cpp",
+      "host_display_name": "SequenceUnitSwapDisk.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Pause / Help / Loading Dispatch",
+        "pause_help_and_loading_dispatch",
+        "Loading / Boot / Install",
+        "loading_and_boot",
+        "Sequence/Unit/SequenceUnitSwapDisk.cpp",
+        "SequenceUnitSwapDisk.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "lift current contract/runtime examples into source-path-named debug screens"
+    },
+    {
+      "group_id": "stage_test_hosts",
+      "group_display_name": "Stage Test / Validation Hosts",
+      "priority": "high",
+      "relative_source_path": "System/GameMode/GameModeStageAchievementTest.cpp",
+      "host_display_name": "GameModeStageAchievementTest.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Stage Test / Validation Hosts",
+        "stage_test_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeStageAchievementTest.cpp",
+        "GameModeStageAchievementTest.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "stage_test_hosts",
+      "group_display_name": "Stage Test / Validation Hosts",
+      "priority": "high",
+      "relative_source_path": "System/GameMode/GameModeStageEvilTest.cpp",
+      "host_display_name": "GameModeStageEvilTest.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Stage Test / Validation Hosts",
+        "stage_test_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeStageEvilTest.cpp",
+        "GameModeStageEvilTest.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "stage_test_hosts",
+      "group_display_name": "Stage Test / Validation Hosts",
+      "priority": "high",
+      "relative_source_path": "System/GameMode/GameModeStageForwardTest.cpp",
+      "host_display_name": "GameModeStageForwardTest.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Stage Test / Validation Hosts",
+        "stage_test_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeStageForwardTest.cpp",
+        "GameModeStageForwardTest.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "stage_test_hosts",
+      "group_display_name": "Stage Test / Validation Hosts",
+      "priority": "high",
+      "relative_source_path": "System/GameMode/GameModeStageInstallTest.cpp",
+      "host_display_name": "GameModeStageInstallTest.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Stage Test / Validation Hosts",
+        "stage_test_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeStageInstallTest.cpp",
+        "GameModeStageInstallTest.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "stage_test_hosts",
+      "group_display_name": "Stage Test / Validation Hosts",
+      "priority": "high",
+      "relative_source_path": "System/GameMode/GameModeStageLoadXML.cpp",
+      "host_display_name": "GameModeStageLoadXML.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Stage Test / Validation Hosts",
+        "stage_test_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeStageLoadXML.cpp",
+        "GameModeStageLoadXML.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "stage_test_hosts",
+      "group_display_name": "Stage Test / Validation Hosts",
+      "priority": "high",
+      "relative_source_path": "System/GameMode/GameModeStageMotionTest.cpp",
+      "host_display_name": "GameModeStageMotionTest.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Stage Test / Validation Hosts",
+        "stage_test_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeStageMotionTest.cpp",
+        "GameModeStageMotionTest.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "stage_test_hosts",
+      "group_display_name": "Stage Test / Validation Hosts",
+      "priority": "high",
+      "relative_source_path": "System/GameMode/GameModeStageSaveTest.cpp",
+      "host_display_name": "GameModeStageSaveTest.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Stage Test / Validation Hosts",
+        "stage_test_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeStageSaveTest.cpp",
+        "GameModeStageSaveTest.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "stage_test_hosts",
+      "group_display_name": "Stage Test / Validation Hosts",
+      "priority": "high",
+      "relative_source_path": "System/GameMode/GameModeStageScreenshot.cpp",
+      "host_display_name": "GameModeStageScreenshot.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Stage Test / Validation Hosts",
+        "stage_test_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeStageScreenshot.cpp",
+        "GameModeStageScreenshot.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    },
+    {
+      "group_id": "stage_test_hosts",
+      "group_display_name": "Stage Test / Validation Hosts",
+      "priority": "high",
+      "relative_source_path": "System/GameMode/GameModeStageSwapDiskTest.cpp",
+      "host_display_name": "GameModeStageSwapDiskTest.cpp",
+      "primary_contract_file_name": "loading_transition_reference.json",
+      "alias_tokens": [
+        "Stage Test / Validation Hosts",
+        "stage_test_hosts",
+        "Tooling / Debug UI",
+        "tooling_debug_ui",
+        "System/GameMode/GameModeStageSwapDiskTest.cpp",
+        "GameModeStageSwapDiskTest.cpp",
+        "loading_transition_reference.json",
+        "loading_transition_reference"
+      ],
+      "notes": "use this as a host surface for the future UI capability sandbox"
+    }
+  ]
+}

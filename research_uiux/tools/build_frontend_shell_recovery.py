@@ -80,7 +80,7 @@ GROUPS = [
             "Sequence/Utility/SequencePlayMovieWrapper.cpp",
         ],
         "likely_target_system_ids": ["subtitle_cutscene_presentation"],
-        "likely_runtime_contracts": [],
+        "likely_runtime_contracts": ["subtitle_cutscene_reference.json"],
         "rationale": "These preview, movie, and sequence surfaces are the strongest current path toward a cutscene/subtitle-capable debug sandbox instead of a title-only selector.",
         "hint_ids": ["debug_operation_tool", "inspire_preview_hosts"],
     },

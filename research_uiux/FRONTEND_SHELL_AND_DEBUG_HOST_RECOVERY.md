@@ -13,7 +13,7 @@ Phase 35 tightens the newly widened shell/debug families instead of leaving them
 
 - Targeted shell/debug paths in this pass: `46`
 - Paths with current archaeology bridges: `13` (`28.3%`)
-- Paths already landing on current runtime contracts: `4` (`8.7%`)
+- Paths already landing on current runtime contracts: `9` (`19.6%`)
 - Paths still shell-only after this pass: `10` (`21.7%`)
 
 ## Local Hint Set Used
@@ -27,7 +27,7 @@ Phase 35 tightens the newly widened shell/debug families instead of leaving them
 
 | Group | Priority | Paths | Bridged | Contract-backed |
 |---|---|---:|---:|---:|
-| Cutscene / Preview Hosts | `immediate` | `12` | `5` | `0` |
+| Cutscene / Preview Hosts | `immediate` | `12` | `5` | `5` |
 | Menu / Stage Debug Hosts | `immediate` | `3` | `0` | `0` |
 | Stage Test / Validation Hosts | `high` | `9` | `0` | `0` |
 | Pause / Help / Loading Dispatch | `high` | `4` | `4` | `4` |
@@ -43,6 +43,9 @@ These preview, movie, and sequence surfaces are the strongest current path towar
 
 Likely target systems:
 - `subtitle_cutscene_presentation`
+
+Likely runtime contracts:
+- `subtitle_cutscene_reference.json`
 
 Representative paths:
 - `Tool/InspirePreview/InspirePreview.cpp`

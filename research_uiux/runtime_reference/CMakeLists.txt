@@ -81,3 +81,12 @@ target_link_libraries(sward_ui_runtime_debug_selector
     PRIVATE
         sward_ui_runtime
 )
+
+add_executable(sward_ui_runtime_debug_workbench
+    examples/ui_debug_workbench.cpp
+)
+
+target_link_libraries(sward_ui_runtime_debug_workbench
+    PRIVATE
+        sward_ui_runtime
+)

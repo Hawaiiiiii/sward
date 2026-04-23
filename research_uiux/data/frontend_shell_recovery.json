@@ -4,8 +4,8 @@
     "targeted_path_count": 46,
     "bridged_path_count": 13,
     "bridged_path_pct": 28.3,
-    "contract_backed_path_count": 4,
-    "contract_backed_path_pct": 8.7,
+    "contract_backed_path_count": 9,
+    "contract_backed_path_pct": 19.6,
     "unresolved_shell_path_count": 10,
     "unresolved_shell_path_pct": 21.7
   },
@@ -36,15 +36,17 @@
       "likely_target_system_ids": [
         "subtitle_cutscene_presentation"
       ],
-      "likely_runtime_contracts": [],
+      "likely_runtime_contracts": [
+        "subtitle_cutscene_reference.json"
+      ],
       "rationale": "These preview, movie, and sequence surfaces are the strongest current path toward a cutscene/subtitle-capable debug sandbox instead of a title-only selector.",
       "hint_ids": [
         "debug_operation_tool",
         "inspire_preview_hosts"
       ],
       "status_counts": {
-        "contract_backed": 0,
-        "archaeology_mapped": 5,
+        "contract_backed": 5,
+        "archaeology_mapped": 0,
         "debug_tool_candidate": 7,
         "named_seed_only": 0
       },
@@ -124,56 +126,66 @@
           "relative_source_path": "System/GameMode/GameModeStageMovie.cpp",
           "family_id": "subtitle_cutscene",
           "family_name": "Subtitle / Cutscene Presentation",
-          "status": "archaeology_mapped",
+          "status": "contract_backed",
           "matched_system_ids": [
             "subtitle_cutscene_presentation"
           ],
-          "runtime_contracts": [],
-          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+          "runtime_contracts": [
+            "subtitle_cutscene_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "Movie/MovieManager.cpp",
           "family_id": "subtitle_cutscene",
           "family_name": "Subtitle / Cutscene Presentation",
-          "status": "archaeology_mapped",
+          "status": "contract_backed",
           "matched_system_ids": [
             "subtitle_cutscene_presentation"
           ],
-          "runtime_contracts": [],
-          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+          "runtime_contracts": [
+            "subtitle_cutscene_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "Sequence/Unit/SequenceUnitPlayMovie.cpp",
           "family_id": "subtitle_cutscene",
           "family_name": "Subtitle / Cutscene Presentation",
-          "status": "archaeology_mapped",
+          "status": "contract_backed",
           "matched_system_ids": [
             "subtitle_cutscene_presentation"
           ],
-          "runtime_contracts": [],
-          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+          "runtime_contracts": [
+            "subtitle_cutscene_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "Sequence/Unit/SequenceUnitMicroSequence.cpp",
           "family_id": "subtitle_cutscene",
           "family_name": "Subtitle / Cutscene Presentation",
-          "status": "archaeology_mapped",
+          "status": "contract_backed",
           "matched_system_ids": [
             "subtitle_cutscene_presentation"
           ],
-          "runtime_contracts": [],
-          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+          "runtime_contracts": [
+            "subtitle_cutscene_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "Sequence/Utility/SequencePlayMovieWrapper.cpp",
           "family_id": "subtitle_cutscene",
           "family_name": "Subtitle / Cutscene Presentation",
-          "status": "archaeology_mapped",
+          "status": "contract_backed",
           "matched_system_ids": [
             "subtitle_cutscene_presentation"
           ],
-          "runtime_contracts": [],
-          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+          "runtime_contracts": [
+            "subtitle_cutscene_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         }
       ]
     },

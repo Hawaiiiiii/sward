@@ -11,6 +11,31 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 38 first richer UI debug workbench
+
+- added [`research_uiux/tools/build_debug_workbench_data.py`](./research_uiux/tools/build_debug_workbench_data.py)
+- added [`research_uiux/FIRST_UI_DEBUG_WORKBENCH.md`](./research_uiux/FIRST_UI_DEBUG_WORKBENCH.md)
+- added the generated workbench-host map under [`research_uiux/data/debug_workbench_host_map.json`](./research_uiux/data/debug_workbench_host_map.json)
+- added the generated host metadata header under [`research_uiux/runtime_reference/include/sward/ui_runtime/debug_workbench_data.hpp`](./research_uiux/runtime_reference/include/sward/ui_runtime/debug_workbench_data.hpp)
+- added the native `sward_ui_runtime_debug_workbench` executable around the recovered menu-debug, stage-debug, and cutscene-preview host buckets
+- verified the workbench locally against `GameModeMenuSelectDebug.cpp` and `InspirePreview.cpp` from `b/rr38/Release`
+
+### Phase 37 subtitle and cutscene runtime contract bridge
+
+- added [`research_uiux/runtime_reference/contracts/subtitle_cutscene_reference.json`](./research_uiux/runtime_reference/contracts/subtitle_cutscene_reference.json)
+- added [`research_uiux/SUBTITLE_CUTSCENE_RUNTIME_CONTRACTS.md`](./research_uiux/SUBTITLE_CUTSCENE_RUNTIME_CONTRACTS.md)
+- extended the bundled profile layers across native C++, the C ABI, and the C# managed reference port with `SubtitleCutscene`
+- refreshed the broader source-path manifest to `220` paths with `118` archaeology-mapped entries, `74` contract-backed entries, `60` debug-host candidates, and `42` named-only gaps
+- widened the source-family selector so `InspirePreview.cpp` now resolves through the seventh bundled contract-backed runtime family
+
+### Phase 36 local named translated ownership for debug and cutscene hosts
+
+- added [`research_uiux/tools/materialize_humanized_debug_hosts.py`](./research_uiux/tools/materialize_humanized_debug_hosts.py)
+- added [`research_uiux/LOCAL_NAMED_TRANSLATED_OWNERSHIP.md`](./research_uiux/LOCAL_NAMED_TRANSLATED_OWNERSHIP.md)
+- added the tracked summary under [`research_uiux/data/local_named_translated_ownership.json`](./research_uiux/data/local_named_translated_ownership.json)
+- materialized `13` local-only readable `.cpp` source-family scaffolds under `SONIC UNLEASHED/` for the immediate menu-debug and cutscene-preview host set
+- converted `86.7%` of the immediate host bucket from notes-only placement into readable translated ownership stubs without publishing that mirror itself
+
 ### Phase 35 frontend shell and debug host recovery
 
 - added [`research_uiux/tools/build_frontend_shell_recovery.py`](./research_uiux/tools/build_frontend_shell_recovery.py)

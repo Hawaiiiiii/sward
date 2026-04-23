@@ -43,6 +43,8 @@ ReferenceProfile fromCProfile(sward_ui_profile_id profileId)
         return ReferenceProfile::LoadingTransition;
     case SWARD_UI_PROFILE_MISSION_RESULT:
         return ReferenceProfile::MissionResult;
+    case SWARD_UI_PROFILE_SUBTITLE_CUTSCENE:
+        return ReferenceProfile::SubtitleCutscene;
     case SWARD_UI_PROFILE_WORLD_MAP:
         return ReferenceProfile::WorldMap;
     }
@@ -372,6 +374,14 @@ const char* sward_ui_to_string_profile(sward_ui_profile_id profile_id)
         return "TitleMenu";
     case SWARD_UI_PROFILE_AUTOSAVE_TOAST:
         return "AutosaveToast";
+    case SWARD_UI_PROFILE_LOADING_TRANSITION:
+        return "LoadingTransition";
+    case SWARD_UI_PROFILE_MISSION_RESULT:
+        return "MissionResult";
+    case SWARD_UI_PROFILE_SUBTITLE_CUTSCENE:
+        return "SubtitleCutscene";
+    case SWARD_UI_PROFILE_WORLD_MAP:
+        return "WorldMap";
     }
 
     return "Unknown";

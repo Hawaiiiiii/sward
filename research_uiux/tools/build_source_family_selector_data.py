@@ -19,8 +19,28 @@ PRIMARY_FAMILY_IDS = {
     "mission_result_family": "mission_result",
     "pause_stack": "pause_stack",
     "save_and_ending": "save_and_ending",
+    "subtitle_cutscene_presentation": "subtitle_cutscene",
     "title_menu": "title_menu",
     "world_map_stack": "world_map_stack",
+}
+
+EXTRA_SELECTOR_PATHS = {
+    "subtitle_cutscene_presentation": [
+        "Tool/InspirePreview/InspireObject.cpp",
+        "Tool/InspirePreview/InspirePreview.cpp",
+        "Tool/InspirePreview/InspirePreviewMenu.cpp",
+        "Tool/InspirePreview2nd/InspirePreview2nd.cpp",
+        "Tool/InspirePreview2nd/InspirePreview2ndMenu.cpp",
+        "Tool/MotionCameraTool/MotionCameraMenu.cpp",
+        "Tool/MotionCameraTool/MotionCameraTool.cpp",
+    ],
+    "title_menu": [
+        "System/GameMode/GameModeMainMenu_Test.cpp",
+        "System/GameMode/GameModeMenuSelectDebug.cpp",
+    ],
+    "loading_and_start": [
+        "System/GameMode/GameModeStageSelectDebug.cpp",
+    ],
 }
 
 
@@ -41,6 +61,7 @@ def cpp_string(value: str) -> str:
 
 def build_entries(payload: dict) -> list[dict]:
     systems_by_id = {system["system_id"]: system for system in payload.get("systems", [])}
+    entries_by_relative_path = {entry["relative_source_path"]: entry for entry in payload.get("entries", [])}
     entries = []
 
     for system in payload.get("systems", []):
@@ -75,6 +96,21 @@ def build_entries(payload: dict) -> list[dict]:
                     relative_source_path,
                     Path(relative_source_path).name,
                     source_path,
+                ]
+            )
+
+        for extra_path in EXTRA_SELECTOR_PATHS.get(system_id, []):
+            entry = entries_by_relative_path.get(extra_path)
+            if not entry:
+                continue
+            source_paths.append(extra_path)
+            alias_values.extend(
+                [
+                    entry["family_name"],
+                    entry["family_id"],
+                    extra_path,
+                    Path(extra_path).name,
+                    entry["source_path"],
                 ]
             )
 

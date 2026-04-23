@@ -11,7 +11,7 @@ Phase 33 upgrades the standalone selector from contract-stem browsing into sourc
 
 ## Launch Families
 
-- Source-path launch families: `6`
+- Source-path launch families: `7`
 
 | Family | Contract | Seed paths | Example anchors |
 |---|---|---:|---|
@@ -19,6 +19,7 @@ Phase 33 upgrades the standalone selector from contract-stem browsing into sourc
 | Mission Result Family | `mission_result_reference.json` | `4` | `HUD/Common/Result/HudResult.cpp`, `HUD/Mission/HudMissionFinish.cpp`, `HUD/Mission/HudSelectMissionFailed.cpp` |
 | Pause Stack | `pause_menu_reference.json` | `7` | `HUD/GeneralWindow/GeneralWindow.cpp`, `HUD/HelpWindow/HelpWindow.cpp`, `HUD/Pause/HudPause.cpp` |
 | Save And Ending | `autosave_toast_reference.json` | `7` | `Sequence/Unit/SequenceUnitAutoSave.cpp`, `Sequence/Unit/SequenceUnitRegisterClearFlag.cpp`, `System/GameMode/Ending/EndingImageList.cpp` |
+| Subtitle / Cutscene Presentation | `subtitle_cutscene_reference.json` | `32` | `Inspire/InspireAnimationCurve.cpp`, `Inspire/InspireDataLoader.cpp`, `Inspire/InspireLetterbox.cpp` |
 | Title Menu | `title_menu_reference.json` | `9` | `HUD/StageSelect/HudStageSelect.cpp`, `System/GameMode/GameModeMainMenu.cpp`, `System/GameMode/GameModeStageMainMenu.cpp` |
 | World Map Stack | `world_map_reference.json` | `7` | `System/GameMode/Title/TitleStateWorldMap.cpp`, `System/GameMode/WorldMap/WorldMapListBox.cpp`, `System/GameMode/WorldMap/WorldMapMission.cpp` |
 
@@ -28,6 +29,7 @@ Phase 33 upgrades the standalone selector from contract-stem browsing into sourc
 - `Mission Result Family`: `HudResult.cpp`, `HudMissionFinish.cpp`, `HudSelectMissionFailed.cpp`, `Mission Result Family`, `mission_result_family`
 - `Pause Stack`: `GeneralWindow.cpp`, `HelpWindow.cpp`, `HudPause.cpp`, `Pause Stack`, `pause_stack`
 - `Save And Ending`: `SequenceUnitAutoSave.cpp`, `SequenceUnitRegisterClearFlag.cpp`, `EndingImageList.cpp`, `Save And Ending`, `save_and_ending`
+- `Subtitle / Cutscene Presentation`: `InspireAnimationCurve.cpp`, `InspireDataLoader.cpp`, `InspireLetterbox.cpp`, `Subtitle / Cutscene Presentation`, `subtitle_cutscene_presentation`
 - `Title Menu`: `HudStageSelect.cpp`, `GameModeMainMenu.cpp`, `GameModeStageMainMenu.cpp`, `Title Menu`, `title_menu`
 - `World Map Stack`: `TitleStateWorldMap.cpp`, `WorldMapListBox.cpp`, `WorldMapMission.cpp`, `World Map Stack`, `world_map_stack`
 

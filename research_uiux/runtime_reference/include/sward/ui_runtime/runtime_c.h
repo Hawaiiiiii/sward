@@ -58,7 +58,8 @@ typedef enum sward_ui_profile_id
     SWARD_UI_PROFILE_AUTOSAVE_TOAST = 2,
     SWARD_UI_PROFILE_LOADING_TRANSITION = 3,
     SWARD_UI_PROFILE_MISSION_RESULT = 4,
-    SWARD_UI_PROFILE_WORLD_MAP = 5,
+    SWARD_UI_PROFILE_SUBTITLE_CUTSCENE = 5,
+    SWARD_UI_PROFILE_WORLD_MAP = 6,
 } sward_ui_profile_id;
 
 typedef struct sward_ui_prompt_view

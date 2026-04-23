@@ -30,6 +30,11 @@ ScreenContract makeMissionResultContract()
     return loadBundledContract(ReferenceProfile::MissionResult);
 }
 
+ScreenContract makeSubtitleCutsceneContract()
+{
+    return loadBundledContract(ReferenceProfile::SubtitleCutscene);
+}
+
 ScreenContract makeWorldMapContract()
 {
     return loadBundledContract(ReferenceProfile::WorldMap);
@@ -54,6 +59,8 @@ std::string_view toString(ReferenceProfile profile)
         return "LoadingTransition";
     case ReferenceProfile::MissionResult:
         return "MissionResult";
+    case ReferenceProfile::SubtitleCutscene:
+        return "SubtitleCutscene";
     case ReferenceProfile::WorldMap:
         return "WorldMap";
     }

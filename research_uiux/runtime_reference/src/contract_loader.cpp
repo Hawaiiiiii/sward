@@ -393,6 +393,8 @@ private:
         return "loading_transition_reference.json";
     case ReferenceProfile::MissionResult:
         return "mission_result_reference.json";
+    case ReferenceProfile::SubtitleCutscene:
+        return "subtitle_cutscene_reference.json";
     case ReferenceProfile::WorldMap:
         return "world_map_reference.json";
     }
@@ -498,6 +500,7 @@ std::vector<std::filesystem::path> bundledContractPaths()
     result.push_back(root / "autosave_toast_reference.json");
     result.push_back(root / "loading_transition_reference.json");
     result.push_back(root / "mission_result_reference.json");
+    result.push_back(root / "subtitle_cutscene_reference.json");
     result.push_back(root / "world_map_reference.json");
     return result;
 }

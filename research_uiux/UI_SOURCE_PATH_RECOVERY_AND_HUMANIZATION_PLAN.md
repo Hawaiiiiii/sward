@@ -13,7 +13,7 @@
 |---|---|---:|
 | Current source-path seed organized into families | Complete for this phase | `100.0%` |
 | Current source-path seed mapped into the current archaeology layer | Partial but strong | `53.6%` |
-| Current source-path seed already backed by portable runtime contracts | Partial | `19.1%` |
+| Current source-path seed already backed by portable runtime contracts | Partial | `33.6%` |
 | Current source-path seed still only named/debug-targeted and not semantically recovered | Open gap | `46.4%` |
 
 ## Exact Counts
@@ -21,7 +21,7 @@
 - Seeded source paths: `220`
 - Family groups: `19`
 - Paths mapped to current archaeology systems: `118`
-- Paths already backed by runtime contracts: `42`
+- Paths already backed by runtime contracts: `74`
 - Paths that are strong debug-tool host candidates: `60`
 - Paths that remain named-only after this phase: `42`
 
@@ -29,8 +29,8 @@
 
 | Bucket | Count | Meaning |
 |---|---:|---|
-| `contract_backed` | `42` | Path family already lands on a recovered archaeology system with a portable runtime contract. |
-| `archaeology_mapped` | `76` | Path family is tied to a recovered system, but not yet exercised by the runtime contract pack. |
+| `contract_backed` | `74` | Path family already lands on a recovered archaeology system with a portable runtime contract. |
+| `archaeology_mapped` | `44` | Path family is tied to a recovered system, but not yet exercised by the runtime contract pack. |
 | `debug_tool_candidate` | `60` | Debug/tool/game-mode surface that looks like a good host for the future UI capability sandbox. |
 | `named_seed_only` | `42` | We now have the source-path name organized, but the family still needs extraction/correlation/humanization work. |
 
@@ -40,7 +40,7 @@
 |---|---:|---|---|
 | Tooling / Debug UI | `60` | Not yet in archaeology | No |
 | Frontend System Shell | `33` | Not yet in archaeology | No |
-| Subtitle / Cutscene Presentation | `32` | `Subtitle / Cutscene Presentation` | No |
+| Subtitle / Cutscene Presentation | `32` | `Subtitle / Cutscene Presentation` | `subtitle_cutscene_reference.json` |
 | Town / Media Room UI | `21` | `Town UI` | No |
 | Stage HUD Core | `9` | `Werehog Stage HUD`, `Sonic Stage HUD` | No |
 | Title / Main Menu | `9` | `Title Menu`, `Loading And Start/Clear` | `title_menu_reference.json`, `loading_transition_reference.json` |
@@ -62,7 +62,7 @@
 
 | Archaeology system | Seed paths | Layout IDs | Runtime contract |
 |---|---:|---|---|
-| Subtitle / Cutscene Presentation | `32` | None | No |
+| Subtitle / Cutscene Presentation | `32` | None | `subtitle_cutscene_reference.json` |
 | Town UI | `21` | `ui_balloon`, `ui_shop`, `ui_townscreen`, `ui_mediaroom` | No |
 | Loading And Start/Clear | `17` | `ui_loading`, `ui_start` | `loading_transition_reference.json` |
 | Title Menu | `9` | `ui_mainmenu` | `title_menu_reference.json` |
@@ -84,16 +84,16 @@
 - The generated translated PPC layer is present, but the clean human-readable organization layer is still incomplete.
 - This phase gives the current source-path subset a stable naming scaffold, so future translated-code cleanup can follow original source-family names instead of raw `sub_XXXXXXXX` clusters alone.
 - The strongest already-recovered path families are title/menu, pause, loading/start, world map, mission-result, save/ending, gameplay HUD core, town/media-room, and the lower-level CSD foundation layer.
-- The clearest remaining UI/UX gaps are the debug/tool host surfaces, the subtitle/cutscene family still lacking a runtime-contract bridge, and the system-shell paths that are now named but still not semantically folded into recovered screen families.
+- The clearest remaining UI/UX gaps are the broader debug/tool host surface beyond the first local-only `.cpp` scaffolds and the system-shell paths that are now named but still not semantically folded into recovered screen families.
 
 ## Debug Tool Direction
 
 - The best current hosts for a local debug executable/menu build are the debug/test game modes plus the tool/preview surfaces grouped under `Tooling / Debug UI`.
 - The current contract-backed runtime layer is already strong enough to prototype a standalone screen selector for title, pause, loading, result, autosave, and world-map flows.
-- The missing bridge for a richer debug tool is no longer raw translation; it is turning the source-path-backed families into named local debug screens and widening contract coverage beyond the current reusable subset.
+- The missing bridge for a richer debug tool is no longer raw translation; it is widening the first workbench beyond the current frontend/menu/cutscene set and continuing to replace note-only placements with readable translated ownership.
 
 ## Next Local Work
 
 1. Keep widening the current source-path seed in defensible chunks instead of flooding the repo with raw whole-dump noise.
-2. Start placing humanized translated findings into the local-only `SONIC UNLEASHED/` mirror under source-family names instead of leaving them as report-only notes.
-3. Grow the standalone debug selector from contract-backed console runs into a source-path-named UI sandbox, then add gameplay-HUD and subtitle/cutscene contract coverage.
+2. Expand the local-only readable `.cpp` host layer beyond the current `13` menu-debug/cutscene files.
+3. Grow the new workbench from frontend/menu/cutscene coverage into gameplay-HUD and stage-test validation coverage.

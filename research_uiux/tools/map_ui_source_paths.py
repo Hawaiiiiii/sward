@@ -36,6 +36,7 @@ RUNTIME_CONTRACTS = {
     "mission_result_family": "mission_result_reference.json",
     "save_and_ending": "autosave_toast_reference.json",
     "world_map_stack": "world_map_reference.json",
+    "subtitle_cutscene_presentation": "subtitle_cutscene_reference.json",
 }
 
 STATUS_ORDER = {

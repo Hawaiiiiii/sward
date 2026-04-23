@@ -263,6 +263,28 @@
 - [x] Generate `research_uiux\FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`.
 - [x] Refresh the broader source-path manifest, local-only `SONIC UNLEASHED\**\*.sward.md` note layer, and selector metadata where the tighter ownership changes land.
 
+## Phase 36 - Local Named Translated Ownership For Debug / Cutscene Hosts
+
+- [x] Materialize local-only readable `.cpp` humanization scaffolds under `SONIC UNLEASHED\` for the first menu-debug and cutscene-preview host surfaces.
+- [x] Generate `research_uiux\data\local_named_translated_ownership.json`.
+- [x] Generate `research_uiux\LOCAL_NAMED_TRANSLATED_OWNERSHIP.md`.
+- [x] Refresh the local-only mirror metadata so the tree no longer reads as notes-only for the newly humanized hosts.
+
+## Phase 37 - Subtitle / Cutscene Runtime Contract Bridge
+
+- [x] Add a bundled subtitle/cutscene runtime contract and wire it through the native, C ABI, and C# reference profile layers.
+- [x] Refresh the broader source-path manifest and selector metadata so subtitle/cutscene becomes a seventh contract-backed family.
+- [x] Generate `research_uiux\SUBTITLE_CUTSCENE_RUNTIME_CONTRACTS.md`.
+- [x] Verify subtitle/cutscene launches through the native selector and explicit C/C# contract loading paths.
+
+## Phase 38 - First Richer UI Debug Workbench
+
+- [x] Add generated workbench-host metadata from the frontend shell/debug recovery layer.
+- [x] Add a richer native debug workbench executable around `GameModeMenuSelectDebug.cpp`, `GameModeStageSelectDebug.cpp`, and `InspirePreview*.cpp`.
+- [x] Generate `research_uiux\data\debug_workbench_host_map.json`.
+- [x] Generate `research_uiux\FIRST_UI_DEBUG_WORKBENCH.md`.
+- [x] Verify the workbench locally against menu-debug and cutscene-preview host tokens.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -354,3 +376,8 @@
 - [x] Follow-on phase audit on `2026-04-23`: added `research_uiux\tools\build_frontend_shell_recovery.py`, `research_uiux\data\frontend_shell_recovery.json`, and `research_uiux\FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`.
 - [x] Follow-on phase audit on `2026-04-23`: refreshed the broader `ui_source_path_manifest.json` to `220` source paths with `118` archaeology-mapped entries, `42` contract-backed entries, `60` debug-host candidates, and `42` named-only gaps.
 - [x] Follow-on phase audit on `2026-04-23`: narrowed the new shell/debug pass to `46` targeted host paths with `13` archaeology bridges, `4` contract-backed dispatch anchors, and `10` still shell-only paths after the tighter recovery sweep.
+- [x] Follow-on phase audit on `2026-04-23`: added `research_uiux\tools\materialize_humanized_debug_hosts.py`, generated `13` local-only readable `.cpp` host scaffolds under `SONIC UNLEASHED\`, and produced `research_uiux\data\local_named_translated_ownership.json` plus `research_uiux\LOCAL_NAMED_TRANSLATED_OWNERSHIP.md`.
+- [x] Follow-on phase audit on `2026-04-23`: added `research_uiux\runtime_reference\contracts\subtitle_cutscene_reference.json` and extended the bundled profile layers across native C++, the C ABI, and the C# managed reference port.
+- [x] Follow-on phase audit on `2026-04-23`: refreshed the broader source-path bridge to `74 / 220` contract-backed paths (`33.6%`) and widened selector-family coverage so `InspirePreview.cpp` now resolves through the bundled runtime layer.
+- [x] Follow-on phase audit on `2026-04-23`: added `research_uiux\tools\build_debug_workbench_data.py`, generated `research_uiux\data\debug_workbench_host_map.json`, and added the native `sward_ui_runtime_debug_workbench` executable.
+- [x] Follow-on phase audit on `2026-04-23`: verified the native workbench and selector under `b\rr38`, including `GameModeMenuSelectDebug.cpp` and `InspirePreview.cpp`, then re-verified the C# managed reference with the new subtitle/cutscene profile.
