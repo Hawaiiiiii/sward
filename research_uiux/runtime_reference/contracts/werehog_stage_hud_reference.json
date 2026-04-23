@@ -1,0 +1,45 @@
+{
+  "screen_id": "WerehogStageHudReference",
+  "source_system": "werehog_stage_hud",
+  "notes": "Werehog gameplay HUD with life, unleash, shield, target-guide, and hit-counter ownership.",
+  "timeline_bands": [
+    { "id": "hud_in", "seconds": 0.45 },
+    { "id": "target_shift", "seconds": 0.2 },
+    { "id": "claw_flash", "seconds": 0.4 },
+    { "id": "hud_out", "seconds": 0.25 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "werehog_hud_in", "timeline_band_id": "hud_in", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "werehog_hud_live", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "Navigate", "enter_scene": "werehog_target_shift", "timeline_band_id": "target_shift", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "Confirm", "enter_scene": "werehog_claw_flash", "timeline_band_id": "claw_flash", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "Cancel", "enter_scene": "werehog_hud_hide", "timeline_band_id": "hud_out", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "werehog_hud_out", "timeline_band_id": "hud_out", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "life_gauge", "role": "gauge", "interactive": false },
+    { "id": "unleash_gauge", "role": "gauge", "interactive": false },
+    { "id": "shield_stack", "role": "gauge", "interactive": false },
+    { "id": "exp_count", "role": "counter", "interactive": false },
+    { "id": "hit_counter", "role": "counter", "interactive": false },
+    { "id": "target_overlay", "role": "sidecar", "interactive": false },
+    { "id": "chance_attack", "role": "transient_fx", "interactive": false },
+    { "id": "prompt_strip", "role": "prompt", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Intro": ["gauge", "counter", "sidecar"],
+    "Idle": ["gauge", "counter", "sidecar", "prompt"],
+    "Navigate": ["gauge", "counter", "sidecar", "transient_fx"],
+    "Confirm": ["gauge", "counter", "sidecar", "transient_fx"],
+    "Cancel": ["gauge", "counter", "sidecar"],
+    "Outro": ["gauge", "counter", "sidecar"]
+  },
+  "prompt_slots": [
+    { "slot_id": "cycle_target", "button": "LB", "label": "Previous Target", "visible_states": ["Idle"], "required_predicates": ["can_cycle_target"] },
+    { "slot_id": "cycle_lane", "button": "RB", "label": "Next Target", "visible_states": ["Idle"], "required_predicates": ["can_cycle_lane"] },
+    { "slot_id": "trigger_claw", "button": "Y", "label": "Claw Flash", "visible_states": ["Idle"], "required_predicates": ["can_trigger_claw"] },
+    { "slot_id": "hide_hud", "button": "B", "label": "Hide HUD", "visible_states": ["Idle"], "required_predicates": ["can_hide"] }
+  ]
+}

@@ -47,6 +47,6 @@ Phase 36 starts replacing local-only `*.sward.md` anchors with real readable sou
 
 ## What Changed
 
-- `GameModeMenuSelectDebug.cpp` and `GameModeStageSelectDebug.cpp` now have readable local-only host tables that point at the current contract-backed screen families plus the new subtitle/cutscene contract.
+- `GameModeMenuSelectDebug.cpp` and `GameModeStageSelectDebug.cpp` now have readable local-only host tables that point at the then-current contract-backed screen families plus the new subtitle/cutscene contract.
 - `InspirePreview*.cpp`, `MovieManager.cpp`, `GameModeStageMovie.cpp`, and the `SequenceUnitPlayMovie` wrapper layer now carry readable local-only scene/route descriptors derived from the subtitle/cutscene presentation evidence.
 - The mirror is no longer only notes for these hosts; it now has real `.cpp` scaffolds that can be tightened further as translated seam naming improves.

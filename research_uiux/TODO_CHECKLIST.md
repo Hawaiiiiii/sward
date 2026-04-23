@@ -285,6 +285,25 @@
 - [x] Generate `research_uiux\FIRST_UI_DEBUG_WORKBENCH.md`.
 - [x] Verify the workbench locally against menu-debug and cutscene-preview host tokens.
 
+## Phase 39 - Gameplay HUD Runtime Contract Bridge
+
+- [x] Add bundled runtime contracts for the in-stage HUD families covering Sonic, Werehog, Extra Stage, and boss/final HUD ownership.
+- [x] Wire the new gameplay-HUD contracts through the native runtime, C ABI, and C# reference profile layers.
+- [x] Refresh the source-path manifest and selector metadata so gameplay-HUD host paths stop being archaeology-only where the contracts now exist.
+- [x] Generate a dedicated gameplay-HUD runtime-contract report.
+
+## Phase 40 - In-Stage HUD Workbench Expansion
+
+- [x] Extend the debug workbench metadata layer so it can launch gameplay-HUD and stage-test hosts in addition to the existing frontend/menu/cutscene buckets.
+- [x] Verify the richer workbench locally against Sonic-stage, Werehog-stage, Extra-Stage, and boss/final HUD host tokens.
+- [x] Generate a dedicated report for the in-stage HUD workbench expansion.
+
+## Phase 41 - Local Debug-Oriented Source Tree Expansion
+
+- [x] Expand the local-only readable `.cpp` source layer beyond the first debug/cutscene hosts into gameplay HUD, stage-test, town, camera, and application/world shell paths.
+- [x] Refresh the local-only `SONIC UNLEASHED\_meta\` manifests and counts for the widened readable source layer.
+- [x] Generate a tracked JSON summary plus a human-readable report for the widened local-only source-tree expansion.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -381,3 +400,8 @@
 - [x] Follow-on phase audit on `2026-04-23`: refreshed the broader source-path bridge to `74 / 220` contract-backed paths (`33.6%`) and widened selector-family coverage so `InspirePreview.cpp` now resolves through the bundled runtime layer.
 - [x] Follow-on phase audit on `2026-04-23`: added `research_uiux\tools\build_debug_workbench_data.py`, generated `research_uiux\data\debug_workbench_host_map.json`, and added the native `sward_ui_runtime_debug_workbench` executable.
 - [x] Follow-on phase audit on `2026-04-23`: verified the native workbench and selector under `b\rr38`, including `GameModeMenuSelectDebug.cpp` and `InspirePreview.cpp`, then re-verified the C# managed reference with the new subtitle/cutscene profile.
+- [x] Follow-on phase audit on `2026-04-23`: added bundled gameplay-HUD contracts for Sonic, Werehog, Extra Stage, Super Sonic, and boss/final HUD ownership across the native runtime, C ABI, and C# managed reference layers.
+- [x] Follow-on phase audit on `2026-04-23`: refreshed the broader source-path bridge to `88 / 220` contract-backed paths (`40.0%`) while keeping `118` archaeology-mapped paths, `60` debug-host candidates, and `42` named-only gaps.
+- [x] Follow-on phase audit on `2026-04-23`: widened the generated selector metadata to `12` launch families and the generated workbench map to `40` host entries, including gameplay-HUD and stage-test groups.
+- [x] Follow-on phase audit on `2026-04-23`: verified the selector and workbench locally under `b\rr41`, including `HudSonicStage.cpp`, `HudEvilStage.cpp`, `HudExQte.cpp`, `BossHudSuperSonic.cpp`, and `GameModeStageForwardTest.cpp`.
+- [x] Follow-on phase audit on `2026-04-23`: added `research_uiux\tools\materialize_local_debug_source_tree.py`, generated `research_uiux\data\local_debug_source_tree_expansion.json`, and widened the local-only readable source tree to `68` `.cpp` scaffolds under `SONIC UNLEASHED\`.

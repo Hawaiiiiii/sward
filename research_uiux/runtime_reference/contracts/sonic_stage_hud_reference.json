@@ -1,0 +1,47 @@
+{
+  "screen_id": "SonicStageHudReference",
+  "source_system": "sonic_stage_hud",
+  "notes": "Day-stage gameplay HUD with timer, score, EXP, ring, medal, and boost-energy ownership.",
+  "timeline_bands": [
+    { "id": "hud_in", "seconds": 0.35 },
+    { "id": "lane_shift", "seconds": 0.18 },
+    { "id": "medal_burst", "seconds": 0.45 },
+    { "id": "hud_out", "seconds": 0.25 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "sonic_hud_in", "timeline_band_id": "hud_in", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "sonic_hud_live", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "Navigate", "enter_scene": "sonic_hud_lane_shift", "timeline_band_id": "lane_shift", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "Confirm", "enter_scene": "sonic_hud_medal_burst", "timeline_band_id": "medal_burst", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "Cancel", "enter_scene": "sonic_hud_hide", "timeline_band_id": "hud_out", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "sonic_hud_out", "timeline_band_id": "hud_out", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "player_count", "role": "counter", "interactive": false },
+    { "id": "time_count", "role": "counter", "interactive": false },
+    { "id": "score_count", "role": "counter", "interactive": false },
+    { "id": "exp_count", "role": "counter", "interactive": false },
+    { "id": "ring_count", "role": "counter", "interactive": false },
+    { "id": "so_speed_gauge", "role": "gauge", "interactive": false },
+    { "id": "so_ringenagy_gauge", "role": "gauge", "interactive": false },
+    { "id": "u_info", "role": "sidecar", "interactive": false },
+    { "id": "medal_banner", "role": "transient_fx", "interactive": false },
+    { "id": "prompt_strip", "role": "prompt", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Intro": ["counter", "gauge", "sidecar"],
+    "Idle": ["counter", "gauge", "sidecar", "prompt"],
+    "Navigate": ["counter", "gauge", "sidecar", "transient_fx"],
+    "Confirm": ["counter", "gauge", "sidecar", "transient_fx"],
+    "Cancel": ["counter", "gauge", "sidecar"],
+    "Outro": ["counter", "gauge", "sidecar"]
+  },
+  "prompt_slots": [
+    { "slot_id": "cycle_left", "button": "LB", "label": "Previous Probe", "visible_states": ["Idle"], "required_predicates": ["can_cycle_left"] },
+    { "slot_id": "cycle_right", "button": "RB", "label": "Next Probe", "visible_states": ["Idle"], "required_predicates": ["can_cycle_right"] },
+    { "slot_id": "medal_burst", "button": "Y", "label": "Medal Burst", "visible_states": ["Idle"], "required_predicates": ["can_burst"] },
+    { "slot_id": "hide_hud", "button": "B", "label": "Hide HUD", "visible_states": ["Idle"], "required_predicates": ["can_hide"] }
+  ]
+}

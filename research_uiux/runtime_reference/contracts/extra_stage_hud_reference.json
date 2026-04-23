@@ -1,0 +1,43 @@
+{
+  "screen_id": "ExtraStageHudReference",
+  "source_system": "extra_stage_hud",
+  "notes": "Extra-stage / Tornado Defense HUD with play-screen counters, energy/speed gauges, and QTE prompt ownership.",
+  "timeline_bands": [
+    { "id": "hud_in", "seconds": 0.35 },
+    { "id": "prompt_shift", "seconds": 0.2 },
+    { "id": "qte_confirm", "seconds": 0.4 },
+    { "id": "hud_out", "seconds": 0.25 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "extra_hud_in", "timeline_band_id": "hud_in", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "extra_hud_live", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "Navigate", "enter_scene": "extra_qte_shift", "timeline_band_id": "prompt_shift", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "Confirm", "enter_scene": "extra_qte_confirm", "timeline_band_id": "qte_confirm", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "Cancel", "enter_scene": "extra_hud_hide", "timeline_band_id": "hud_out", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "extra_hud_out", "timeline_band_id": "hud_out", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "info_1", "role": "counter", "interactive": false },
+    { "id": "info_2", "role": "counter", "interactive": false },
+    { "id": "so_speed_gauge", "role": "gauge", "interactive": false },
+    { "id": "so_ringenagy_gauge", "role": "gauge", "interactive": false },
+    { "id": "qte_prompt", "role": "prompt", "interactive": false },
+    { "id": "ring_get_effect", "role": "transient_fx", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Intro": ["counter", "gauge"],
+    "Idle": ["counter", "gauge", "prompt"],
+    "Navigate": ["counter", "gauge", "prompt", "transient_fx"],
+    "Confirm": ["counter", "gauge", "prompt", "transient_fx"],
+    "Cancel": ["counter", "gauge"],
+    "Outro": ["counter", "gauge"]
+  },
+  "prompt_slots": [
+    { "slot_id": "previous_prompt", "button": "LB", "label": "Previous Prompt", "visible_states": ["Idle"], "required_predicates": ["can_cycle_prompt_left"] },
+    { "slot_id": "next_prompt", "button": "RB", "label": "Next Prompt", "visible_states": ["Idle"], "required_predicates": ["can_cycle_prompt_right"] },
+    { "slot_id": "qte_confirm", "button": "A", "label": "Confirm QTE", "visible_states": ["Idle"], "required_predicates": ["can_confirm_qte"] },
+    { "slot_id": "hide_hud", "button": "B", "label": "Hide HUD", "visible_states": ["Idle"], "required_predicates": ["can_hide"] }
+  ]
+}

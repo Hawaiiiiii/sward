@@ -1,6 +1,66 @@
 {
   "hosts": [
     {
+      "group_id": "boss_hud_hosts",
+      "group_display_name": "Boss / Final HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "Boss/BossHudSuperSonic.cpp",
+      "host_display_name": "BossHudSuperSonic.cpp",
+      "primary_contract_file_name": "super_sonic_hud_reference.json",
+      "alias_tokens": [
+        "Boss / Final HUD Hosts",
+        "boss_hud_hosts",
+        "Super Sonic / Final HUD Bridge",
+        "super_sonic_hud",
+        "Boss/BossHudSuperSonic.cpp",
+        "BossHudSuperSonic.cpp",
+        "super_sonic_hud_reference.json",
+        "super_sonic_hud_reference",
+        "ui_playscreen_su"
+      ],
+      "notes": "Super Sonic and final-phase HUD bridge with shared vitality and nameplate ownership."
+    },
+    {
+      "group_id": "boss_hud_hosts",
+      "group_display_name": "Boss / Final HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "Boss/BossHudVitality.cpp",
+      "host_display_name": "BossHudVitality.cpp",
+      "primary_contract_file_name": "super_sonic_hud_reference.json",
+      "alias_tokens": [
+        "Boss / Final HUD Hosts",
+        "boss_hud_hosts",
+        "Super Sonic / Final HUD Bridge",
+        "super_sonic_hud",
+        "Boss/BossHudVitality.cpp",
+        "BossHudVitality.cpp",
+        "super_sonic_hud_reference.json",
+        "super_sonic_hud_reference",
+        "ui_playscreen_su"
+      ],
+      "notes": "Super Sonic and final-phase HUD bridge with shared vitality and nameplate ownership."
+    },
+    {
+      "group_id": "boss_hud_hosts",
+      "group_display_name": "Boss / Final HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "Boss/BossNamePlate.cpp",
+      "host_display_name": "BossNamePlate.cpp",
+      "primary_contract_file_name": "super_sonic_hud_reference.json",
+      "alias_tokens": [
+        "Boss / Final HUD Hosts",
+        "boss_hud_hosts",
+        "Super Sonic / Final HUD Bridge",
+        "super_sonic_hud",
+        "Boss/BossNamePlate.cpp",
+        "BossNamePlate.cpp",
+        "super_sonic_hud_reference.json",
+        "super_sonic_hud_reference",
+        "ui_playscreen_su"
+      ],
+      "notes": "Super Sonic and final-phase HUD bridge with shared vitality and nameplate ownership."
+    },
+    {
       "group_id": "cutscene_preview_hosts",
       "group_display_name": "Cutscene / Preview Hosts",
       "priority": "immediate",
@@ -229,6 +289,200 @@
       "notes": "lift current contract/runtime examples into source-path-named debug screens"
     },
     {
+      "group_id": "gameplay_hud_hosts",
+      "group_display_name": "Gameplay HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "Player/Character/EvilSonic/Hud/EvilHudGuide.cpp",
+      "host_display_name": "EvilHudGuide.cpp",
+      "primary_contract_file_name": "werehog_stage_hud_reference.json",
+      "alias_tokens": [
+        "Gameplay HUD Hosts",
+        "gameplay_hud_hosts",
+        "Werehog Stage HUD",
+        "werehog_stage_hud",
+        "Player/Character/EvilSonic/Hud/EvilHudGuide.cpp",
+        "EvilHudGuide.cpp",
+        "werehog_stage_hud_reference.json",
+        "werehog_stage_hud_reference",
+        "ui_playscreen_ev",
+        "ui_playscreen_ev_hit",
+        "GameModeStageEvilTest.cpp"
+      ],
+      "notes": "Werehog-stage HUD ownership with life/unleash/shield gauges and hit-counter overlays."
+    },
+    {
+      "group_id": "gameplay_hud_hosts",
+      "group_display_name": "Gameplay HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "Player/Character/EvilSonic/Hud/EvilHudTarget.cpp",
+      "host_display_name": "EvilHudTarget.cpp",
+      "primary_contract_file_name": "werehog_stage_hud_reference.json",
+      "alias_tokens": [
+        "Gameplay HUD Hosts",
+        "gameplay_hud_hosts",
+        "Werehog Stage HUD",
+        "werehog_stage_hud",
+        "Player/Character/EvilSonic/Hud/EvilHudTarget.cpp",
+        "EvilHudTarget.cpp",
+        "werehog_stage_hud_reference.json",
+        "werehog_stage_hud_reference",
+        "ui_playscreen_ev",
+        "ui_playscreen_ev_hit",
+        "GameModeStageEvilTest.cpp"
+      ],
+      "notes": "Werehog-stage HUD ownership with life/unleash/shield gauges and hit-counter overlays."
+    },
+    {
+      "group_id": "gameplay_hud_hosts",
+      "group_display_name": "Gameplay HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "HUD/Evil/EvilMainDisplay.cpp",
+      "host_display_name": "EvilMainDisplay.cpp",
+      "primary_contract_file_name": "werehog_stage_hud_reference.json",
+      "alias_tokens": [
+        "Gameplay HUD Hosts",
+        "gameplay_hud_hosts",
+        "Werehog Stage HUD",
+        "werehog_stage_hud",
+        "HUD/Evil/EvilMainDisplay.cpp",
+        "EvilMainDisplay.cpp",
+        "werehog_stage_hud_reference.json",
+        "werehog_stage_hud_reference",
+        "ui_playscreen_ev",
+        "ui_playscreen_ev_hit",
+        "GameModeStageEvilTest.cpp"
+      ],
+      "notes": "Werehog-stage HUD ownership with life/unleash/shield gauges and hit-counter overlays."
+    },
+    {
+      "group_id": "gameplay_hud_hosts",
+      "group_display_name": "Gameplay HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "HUD/Evil/HudEvilStage.cpp",
+      "host_display_name": "HudEvilStage.cpp",
+      "primary_contract_file_name": "werehog_stage_hud_reference.json",
+      "alias_tokens": [
+        "Gameplay HUD Hosts",
+        "gameplay_hud_hosts",
+        "Werehog Stage HUD",
+        "werehog_stage_hud",
+        "HUD/Evil/HudEvilStage.cpp",
+        "HudEvilStage.cpp",
+        "werehog_stage_hud_reference.json",
+        "werehog_stage_hud_reference",
+        "ui_playscreen_ev",
+        "ui_playscreen_ev_hit",
+        "GameModeStageEvilTest.cpp"
+      ],
+      "notes": "Werehog-stage HUD ownership with life/unleash/shield gauges and hit-counter overlays."
+    },
+    {
+      "group_id": "gameplay_hud_hosts",
+      "group_display_name": "Gameplay HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "ExtraStage/Tails/Hud/HudExQte.cpp",
+      "host_display_name": "HudExQte.cpp",
+      "primary_contract_file_name": "extra_stage_hud_reference.json",
+      "alias_tokens": [
+        "Gameplay HUD Hosts",
+        "gameplay_hud_hosts",
+        "Extra Stage / Tornado Defense HUD",
+        "extra_stage_hud",
+        "ExtraStage/Tails/Hud/HudExQte.cpp",
+        "HudExQte.cpp",
+        "extra_stage_hud_reference.json",
+        "extra_stage_hud_reference",
+        "ui_prov_playscreen",
+        "ui_qte",
+        "GameModeStageMotionTest.cpp"
+      ],
+      "notes": "Extra-stage / Tornado Defense HUD ownership with counter shells and QTE prompt layers."
+    },
+    {
+      "group_id": "gameplay_hud_hosts",
+      "group_display_name": "Gameplay HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "HUD/Sonic/HudSonicStage.cpp",
+      "host_display_name": "HudSonicStage.cpp",
+      "primary_contract_file_name": "sonic_stage_hud_reference.json",
+      "alias_tokens": [
+        "Gameplay HUD Hosts",
+        "gameplay_hud_hosts",
+        "Sonic Stage HUD",
+        "sonic_stage_hud",
+        "HUD/Sonic/HudSonicStage.cpp",
+        "HudSonicStage.cpp",
+        "sonic_stage_hud_reference.json",
+        "sonic_stage_hud_reference",
+        "ui_playscreen",
+        "GameModeStageForwardTest.cpp"
+      ],
+      "notes": "Day-stage HUD ownership with counters, medal sidecars, and boost/ring gauge shells."
+    },
+    {
+      "group_id": "gameplay_hud_hosts",
+      "group_display_name": "Gameplay HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "Player/Character/Sonic/Hud/SonicHudGuide.cpp",
+      "host_display_name": "SonicHudGuide.cpp",
+      "primary_contract_file_name": "sonic_stage_hud_reference.json",
+      "alias_tokens": [
+        "Gameplay HUD Hosts",
+        "gameplay_hud_hosts",
+        "Sonic Stage HUD",
+        "sonic_stage_hud",
+        "Player/Character/Sonic/Hud/SonicHudGuide.cpp",
+        "SonicHudGuide.cpp",
+        "sonic_stage_hud_reference.json",
+        "sonic_stage_hud_reference",
+        "ui_playscreen",
+        "GameModeStageForwardTest.cpp"
+      ],
+      "notes": "Day-stage HUD ownership with counters, medal sidecars, and boost/ring gauge shells."
+    },
+    {
+      "group_id": "gameplay_hud_hosts",
+      "group_display_name": "Gameplay HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "Player/Character/Sonic/Hud/SonicHudHomingAttack.cpp",
+      "host_display_name": "SonicHudHomingAttack.cpp",
+      "primary_contract_file_name": "sonic_stage_hud_reference.json",
+      "alias_tokens": [
+        "Gameplay HUD Hosts",
+        "gameplay_hud_hosts",
+        "Sonic Stage HUD",
+        "sonic_stage_hud",
+        "Player/Character/Sonic/Hud/SonicHudHomingAttack.cpp",
+        "SonicHudHomingAttack.cpp",
+        "sonic_stage_hud_reference.json",
+        "sonic_stage_hud_reference",
+        "ui_playscreen",
+        "GameModeStageForwardTest.cpp"
+      ],
+      "notes": "Day-stage HUD ownership with counters, medal sidecars, and boost/ring gauge shells."
+    },
+    {
+      "group_id": "gameplay_hud_hosts",
+      "group_display_name": "Gameplay HUD Hosts",
+      "priority": "high",
+      "relative_source_path": "HUD/Sonic/SonicMainDisplay.cpp",
+      "host_display_name": "SonicMainDisplay.cpp",
+      "primary_contract_file_name": "sonic_stage_hud_reference.json",
+      "alias_tokens": [
+        "Gameplay HUD Hosts",
+        "gameplay_hud_hosts",
+        "Sonic Stage HUD",
+        "sonic_stage_hud",
+        "HUD/Sonic/SonicMainDisplay.cpp",
+        "SonicMainDisplay.cpp",
+        "sonic_stage_hud_reference.json",
+        "sonic_stage_hud_reference",
+        "ui_playscreen",
+        "GameModeStageForwardTest.cpp"
+      ],
+      "notes": "Day-stage HUD ownership with counters, medal sidecars, and boost/ring gauge shells."
+    },
+    {
       "group_id": "menu_debug_hosts",
       "group_display_name": "Menu / Stage Debug Hosts",
       "priority": "immediate",
@@ -367,7 +621,7 @@
       "priority": "high",
       "relative_source_path": "System/GameMode/GameModeStageAchievementTest.cpp",
       "host_display_name": "GameModeStageAchievementTest.cpp",
-      "primary_contract_file_name": "loading_transition_reference.json",
+      "primary_contract_file_name": "boss_hud_reference.json",
       "alias_tokens": [
         "Stage Test / Validation Hosts",
         "stage_test_hosts",
@@ -375,8 +629,8 @@
         "tooling_debug_ui",
         "System/GameMode/GameModeStageAchievementTest.cpp",
         "GameModeStageAchievementTest.cpp",
-        "loading_transition_reference.json",
-        "loading_transition_reference"
+        "boss_hud_reference.json",
+        "boss_hud_reference"
       ],
       "notes": "use this as a host surface for the future UI capability sandbox"
     },
@@ -386,7 +640,7 @@
       "priority": "high",
       "relative_source_path": "System/GameMode/GameModeStageEvilTest.cpp",
       "host_display_name": "GameModeStageEvilTest.cpp",
-      "primary_contract_file_name": "loading_transition_reference.json",
+      "primary_contract_file_name": "werehog_stage_hud_reference.json",
       "alias_tokens": [
         "Stage Test / Validation Hosts",
         "stage_test_hosts",
@@ -394,8 +648,8 @@
         "tooling_debug_ui",
         "System/GameMode/GameModeStageEvilTest.cpp",
         "GameModeStageEvilTest.cpp",
-        "loading_transition_reference.json",
-        "loading_transition_reference"
+        "werehog_stage_hud_reference.json",
+        "werehog_stage_hud_reference"
       ],
       "notes": "use this as a host surface for the future UI capability sandbox"
     },
@@ -405,7 +659,7 @@
       "priority": "high",
       "relative_source_path": "System/GameMode/GameModeStageForwardTest.cpp",
       "host_display_name": "GameModeStageForwardTest.cpp",
-      "primary_contract_file_name": "loading_transition_reference.json",
+      "primary_contract_file_name": "sonic_stage_hud_reference.json",
       "alias_tokens": [
         "Stage Test / Validation Hosts",
         "stage_test_hosts",
@@ -413,8 +667,8 @@
         "tooling_debug_ui",
         "System/GameMode/GameModeStageForwardTest.cpp",
         "GameModeStageForwardTest.cpp",
-        "loading_transition_reference.json",
-        "loading_transition_reference"
+        "sonic_stage_hud_reference.json",
+        "sonic_stage_hud_reference"
       ],
       "notes": "use this as a host surface for the future UI capability sandbox"
     },
@@ -462,7 +716,7 @@
       "priority": "high",
       "relative_source_path": "System/GameMode/GameModeStageMotionTest.cpp",
       "host_display_name": "GameModeStageMotionTest.cpp",
-      "primary_contract_file_name": "loading_transition_reference.json",
+      "primary_contract_file_name": "extra_stage_hud_reference.json",
       "alias_tokens": [
         "Stage Test / Validation Hosts",
         "stage_test_hosts",
@@ -470,8 +724,8 @@
         "tooling_debug_ui",
         "System/GameMode/GameModeStageMotionTest.cpp",
         "GameModeStageMotionTest.cpp",
-        "loading_transition_reference.json",
-        "loading_transition_reference"
+        "extra_stage_hud_reference.json",
+        "extra_stage_hud_reference"
       ],
       "notes": "use this as a host surface for the future UI capability sandbox"
     },

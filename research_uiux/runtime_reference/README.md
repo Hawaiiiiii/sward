@@ -4,7 +4,7 @@
 
 # <img src="../../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Runtime Reference
 
-This directory contains the Phase 21/24/27/37/38 reusable runtime and port-kit layer for the SWARD template-pack concepts.
+This directory contains the Phase 21/24/27/37/38/39/40 reusable runtime and port-kit layer for the SWARD template-pack concepts.
 
 It is intentionally decoupled from game assets and from the asset-backed Unleashed Recompiled runtime. The goal is to provide reusable implementation layers for original projects that need:
 
@@ -17,7 +17,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - portable JSON contract files instead of hardcoded in-code builders
 - a standalone contract-backed debug selector for the first reusable screen-browser pass
 - a source-family alias layer so the selector can launch by recovered names such as `TitleMenu.cpp`, `HudPause.cpp`, and `InspirePreview.cpp`
-- a richer host-bucket debug workbench around recovered debug/menu/cutscene source families
+- a richer host-bucket debug workbench around recovered debug/menu/cutscene/gameplay-HUD/stage-test source families
 
 Contents:
 
@@ -44,6 +44,11 @@ Bundled contract files:
 - `contracts/autosave_toast_reference.json`
 - `contracts/loading_transition_reference.json`
 - `contracts/mission_result_reference.json`
+- `contracts/sonic_stage_hud_reference.json`
+- `contracts/werehog_stage_hud_reference.json`
+- `contracts/extra_stage_hud_reference.json`
+- `contracts/super_sonic_hud_reference.json`
+- `contracts/boss_hud_reference.json`
 - `contracts/subtitle_cutscene_reference.json`
 - `contracts/world_map_reference.json`
 
@@ -54,45 +59,56 @@ Bundled reference profiles:
 - `AutosaveToast`
 - `LoadingTransition`
 - `MissionResult`
+- `SonicStageHud`
+- `WerehogStageHud`
+- `ExtraStageHud`
+- `SuperSonicHud`
+- `BossHud`
 - `SubtitleCutscene`
 - `WorldMap`
 
 Build the native layer locally:
 
 ```powershell
-C:\Program Files\CMake\bin\cmake.exe -S research_uiux/runtime_reference -B b/rr38 -G "Visual Studio 17 2022" -A x64
-C:\Program Files\CMake\bin\cmake.exe --build b/rr38 --config Release
-b/rr38/Release/sward_ui_runtime_example.exe
-b/rr38/Release/sward_ui_runtime_title_menu_example.exe
-b/rr38/Release/sward_ui_runtime_toast_example.exe
-b/rr38/Release/sward_ui_runtime_c_example.exe
-b/rr38/Release/sward_ui_runtime_debug_selector.exe
-b/rr38/Release/sward_ui_runtime_debug_workbench.exe
+C:\Program Files\CMake\bin\cmake.exe -S research_uiux/runtime_reference -B b/rr41 -G "Visual Studio 17 2022" -A x64
+C:\Program Files\CMake\bin\cmake.exe --build b/rr41 --config Release
+b/rr41/Release/sward_ui_runtime_example.exe
+b/rr41/Release/sward_ui_runtime_title_menu_example.exe
+b/rr41/Release/sward_ui_runtime_toast_example.exe
+b/rr41/Release/sward_ui_runtime_c_example.exe
+b/rr41/Release/sward_ui_runtime_debug_selector.exe
+b/rr41/Release/sward_ui_runtime_debug_workbench.exe
 ```
 
 Run against the bundled contracts:
 
 ```powershell
-b/rr38/Release/sward_ui_runtime_example.exe
-b/rr38/Release/sward_ui_runtime_title_menu_example.exe
-b/rr38/Release/sward_ui_runtime_toast_example.exe
-b/rr38/Release/sward_ui_runtime_c_example.exe
-b/rr38/Release/sward_ui_runtime_debug_selector.exe --list
-b/rr38/Release/sward_ui_runtime_debug_selector.exe --list-families
-b/rr38/Release/sward_ui_runtime_debug_selector.exe TitleMenu.cpp
-b/rr38/Release/sward_ui_runtime_debug_selector.exe HudPause.cpp
-b/rr38/Release/sward_ui_runtime_debug_selector.exe InspirePreview.cpp
-b/rr38/Release/sward_ui_runtime_debug_workbench.exe --list-groups
-b/rr38/Release/sward_ui_runtime_debug_workbench.exe --host GameModeMenuSelectDebug.cpp
-b/rr38/Release/sward_ui_runtime_debug_workbench.exe --host InspirePreview.cpp
+b/rr41/Release/sward_ui_runtime_example.exe
+b/rr41/Release/sward_ui_runtime_title_menu_example.exe
+b/rr41/Release/sward_ui_runtime_toast_example.exe
+b/rr41/Release/sward_ui_runtime_c_example.exe
+b/rr41/Release/sward_ui_runtime_debug_selector.exe --list
+b/rr41/Release/sward_ui_runtime_debug_selector.exe --list-families
+b/rr41/Release/sward_ui_runtime_debug_selector.exe TitleMenu.cpp
+b/rr41/Release/sward_ui_runtime_debug_selector.exe HudPause.cpp
+b/rr41/Release/sward_ui_runtime_debug_selector.exe HudSonicStage.cpp
+b/rr41/Release/sward_ui_runtime_debug_selector.exe HudEvilStage.cpp
+b/rr41/Release/sward_ui_runtime_debug_selector.exe HudExQte.cpp
+b/rr41/Release/sward_ui_runtime_debug_selector.exe BossHudSuperSonic.cpp
+b/rr41/Release/sward_ui_runtime_debug_workbench.exe --list-groups
+b/rr41/Release/sward_ui_runtime_debug_workbench.exe --host GameModeMenuSelectDebug.cpp
+b/rr41/Release/sward_ui_runtime_debug_workbench.exe --host InspirePreview.cpp
+b/rr41/Release/sward_ui_runtime_debug_workbench.exe --host GameModeStageForwardTest.cpp
+b/rr41/Release/sward_ui_runtime_debug_workbench.exe --host HudSonicStage.cpp
 ```
 
 Run against an explicit portable contract path:
 
 ```powershell
-b/rr38/Release/sward_ui_runtime_example.exe research_uiux/runtime_reference/contracts/world_map_reference.json
-b/rr38/Release/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/mission_result_reference.json
-b/rr38/Release/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/subtitle_cutscene_reference.json
+b/rr41/Release/sward_ui_runtime_example.exe research_uiux/runtime_reference/contracts/world_map_reference.json
+b/rr41/Release/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/mission_result_reference.json
+b/rr41/Release/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/subtitle_cutscene_reference.json
+b/rr41/Release/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/sonic_stage_hud_reference.json
 ```
 
 Build the managed port locally:
@@ -113,7 +129,7 @@ Selector notes:
 
 Workbench notes:
 
-- `--list-groups` prints the richer host-bucket groups derived from the frontend shell/debug recovery layer
+- `--list-groups` prints the richer host-bucket groups derived from the frontend shell/debug and gameplay-HUD recovery layers
 - `--group <token>` lists the launchable hosts inside one workbench group
 - `--host <token>` launches by recovered host name or source path such as `GameModeMenuSelectDebug.cpp` or `InspirePreview.cpp`
-- the current workbench is intentionally centered on menu-debug, stage-debug, and cutscene-preview ownership; gameplay HUD host buckets are the next expansion target
+- the current workbench now covers menu-debug, stage-debug, cutscene-preview, gameplay-HUD, boss/final HUD, and stage-test ownership

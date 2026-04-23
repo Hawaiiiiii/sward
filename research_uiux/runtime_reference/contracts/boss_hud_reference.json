@@ -1,0 +1,42 @@
+{
+  "screen_id": "BossHudReference",
+  "source_system": "boss_hud",
+  "notes": "Generic boss HUD shell with vitality gauge, nameplate ownership, and stage-facing boss overlay cadence.",
+  "timeline_bands": [
+    { "id": "hud_in", "seconds": 0.4 },
+    { "id": "target_shift", "seconds": 0.2 },
+    { "id": "weakpoint_flash", "seconds": 0.45 },
+    { "id": "hud_out", "seconds": 0.3 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "boss_hud_in", "timeline_band_id": "hud_in", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "boss_hud_live", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "Navigate", "enter_scene": "boss_target_shift", "timeline_band_id": "target_shift", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "Confirm", "enter_scene": "boss_weakpoint_flash", "timeline_band_id": "weakpoint_flash", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "Cancel", "enter_scene": "boss_hud_hide", "timeline_band_id": "hud_out", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "boss_hud_out", "timeline_band_id": "hud_out", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "boss_gauge", "role": "gauge", "interactive": false },
+    { "id": "boss_name", "role": "content", "interactive": false },
+    { "id": "phase_banner", "role": "footer", "interactive": false },
+    { "id": "weakpoint_flash", "role": "transient_fx", "interactive": false },
+    { "id": "prompt_strip", "role": "prompt", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Intro": ["gauge", "content", "footer"],
+    "Idle": ["gauge", "content", "footer", "prompt"],
+    "Navigate": ["gauge", "content", "footer", "transient_fx"],
+    "Confirm": ["gauge", "content", "footer", "transient_fx"],
+    "Cancel": ["gauge", "content", "footer"],
+    "Outro": ["gauge", "content", "footer"]
+  },
+  "prompt_slots": [
+    { "slot_id": "target_previous", "button": "LB", "label": "Previous Phase", "visible_states": ["Idle"], "required_predicates": ["can_target_previous"] },
+    { "slot_id": "target_next", "button": "RB", "label": "Next Phase", "visible_states": ["Idle"], "required_predicates": ["can_target_next"] },
+    { "slot_id": "weakpoint_flash", "button": "Y", "label": "Weakpoint Flash", "visible_states": ["Idle"], "required_predicates": ["can_flash_weakpoint"] },
+    { "slot_id": "hide_hud", "button": "B", "label": "Hide HUD", "visible_states": ["Idle"], "required_predicates": ["can_hide"] }
+  ]
+}

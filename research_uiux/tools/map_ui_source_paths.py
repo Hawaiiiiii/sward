@@ -37,6 +37,11 @@ RUNTIME_CONTRACTS = {
     "save_and_ending": "autosave_toast_reference.json",
     "world_map_stack": "world_map_reference.json",
     "subtitle_cutscene_presentation": "subtitle_cutscene_reference.json",
+    "sonic_stage_hud": "sonic_stage_hud_reference.json",
+    "werehog_stage_hud": "werehog_stage_hud_reference.json",
+    "extra_stage_hud": "extra_stage_hud_reference.json",
+    "super_sonic_hud": "super_sonic_hud_reference.json",
+    "boss_hud": "boss_hud_reference.json",
 }
 
 STATUS_ORDER = {
@@ -160,6 +165,19 @@ def classify_source_path(relative_path: str) -> dict:
             "candidate_system_ids": [],
             "debug_tool_candidate": True,
             "notes": "Debug-oriented game modes and test hosts that look like likely entry points for a future UI capability sandbox.",
+        }
+
+    if lowered in (
+        "boss/bosshudsupersonic.cpp",
+        "boss/bosshudvitality.cpp",
+        "boss/bossnameplate.cpp",
+    ):
+        return {
+            "family_id": "boss_ui",
+            "family_name": "Boss HUD",
+            "candidate_system_ids": ["super_sonic_hud"],
+            "debug_tool_candidate": False,
+            "notes": "Super Sonic and final-phase boss HUD bridge with shared vitality/nameplate ownership.",
         }
 
     if lowered.startswith("boss/") and ("hud" in lowered or "bosshud" in lowered or "nameplate" in lowered):
@@ -361,7 +379,7 @@ def classify_source_path(relative_path: str) -> dict:
         return {
             "family_id": "tornado_defense",
             "family_name": "Tornado Defense / EX HUD",
-            "candidate_system_ids": ["tornado_defense"],
+            "candidate_system_ids": ["tornado_defense", "extra_stage_hud"],
             "debug_tool_candidate": False,
             "notes": "EX-stage/Tornado Defense HUD and QTE surface.",
         }
@@ -653,19 +671,19 @@ def write_markdown(payload: dict, output_path: Path) -> None:
             "- The generated translated PPC layer is present, but the clean human-readable organization layer is still incomplete.",
             "- This phase gives the current source-path subset a stable naming scaffold, so future translated-code cleanup can follow original source-family names instead of raw `sub_XXXXXXXX` clusters alone.",
             "- The strongest already-recovered path families are title/menu, pause, loading/start, world map, mission-result, save/ending, gameplay HUD core, town/media-room, and the lower-level CSD foundation layer.",
-            "- The clearest remaining UI/UX gaps are the debug/tool host surfaces, the subtitle/cutscene family still lacking a runtime-contract bridge, and the system-shell paths that are now named but still not semantically folded into recovered screen families.",
+            "- The clearest remaining UI/UX gaps are the debug/tool host surfaces, the broader town/camera/application/world shell paths that are now named but still not semantically folded into recovered screen families, and the still note-heavy translated ownership layer inside the local mirror.",
             "",
             "## Debug Tool Direction",
             "",
             "- The best current hosts for a local debug executable/menu build are the debug/test game modes plus the tool/preview surfaces grouped under `Tooling / Debug UI`.",
-            "- The current contract-backed runtime layer is already strong enough to prototype a standalone screen selector for title, pause, loading, result, autosave, and world-map flows.",
-            "- The missing bridge for a richer debug tool is no longer raw translation; it is turning the source-path-backed families into named local debug screens and widening contract coverage beyond the current reusable subset.",
+            "- The current contract-backed runtime layer is already strong enough to drive the standalone selector and workbench across frontend, cutscene, gameplay-HUD, boss/final, and stage-test-adjacent host families.",
+            "- The missing bridge for a richer debug tool is no longer raw translation; it is turning more of the source-path-backed families into readable translated ownership and widening host coverage beyond the current reusable subset.",
             "",
             "## Next Local Work",
             "",
             "1. Keep widening the current source-path seed in defensible chunks instead of flooding the repo with raw whole-dump noise.",
-            "2. Start placing humanized translated findings into the local-only `SONIC UNLEASHED/` mirror under source-family names instead of leaving them as report-only notes.",
-            "3. Grow the standalone debug selector from contract-backed console runs into a source-path-named UI sandbox, then add gameplay-HUD and subtitle/cutscene contract coverage.",
+            "2. Keep replacing local-only `SONIC UNLEASHED/` note/scaffold files with cleaner translated ownership under the recovered source-family paths.",
+            "3. Expand the selector/workbench coverage further into town, camera, application/world shell, and other still named-only families.",
         ]
     )
 

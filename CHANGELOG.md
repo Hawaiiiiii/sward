@@ -11,6 +11,29 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 41 local debug-oriented source tree expansion
+
+- added [`research_uiux/tools/materialize_local_debug_source_tree.py`](./research_uiux/tools/materialize_local_debug_source_tree.py)
+- added [`research_uiux/LOCAL_DEBUG_SOURCE_TREE_EXPANSION.md`](./research_uiux/LOCAL_DEBUG_SOURCE_TREE_EXPANSION.md)
+- added the tracked summary under [`research_uiux/data/local_debug_source_tree_expansion.json`](./research_uiux/data/local_debug_source_tree_expansion.json)
+- widened the local-only readable source layer under `SONIC UNLEASHED/` from `13` to `68` `.cpp` scaffolds across gameplay HUD, stage-test, town, camera, and application/world shells
+- refreshed the local-only mirror metadata without publishing that mirror itself
+
+### Phase 40 in-stage HUD workbench expansion
+
+- added [`research_uiux/IN_STAGE_HUD_WORKBENCH_EXPANSION.md`](./research_uiux/IN_STAGE_HUD_WORKBENCH_EXPANSION.md)
+- widened the generated workbench-host map under [`research_uiux/data/debug_workbench_host_map.json`](./research_uiux/data/debug_workbench_host_map.json) to `40` hosts
+- expanded the native `sward_ui_runtime_debug_workbench` executable so it can launch gameplay-HUD and stage-test hosts in addition to frontend/menu/cutscene buckets
+- verified the widened workbench locally against `HudSonicStage.cpp`, `HudEvilStage.cpp`, `HudExQte.cpp`, `BossHudSuperSonic.cpp`, and `GameModeStageForwardTest.cpp` from `b/rr41/Release`
+
+### Phase 39 gameplay HUD runtime contract bridge
+
+- added [`research_uiux/GAMEPLAY_HUD_RUNTIME_CONTRACTS.md`](./research_uiux/GAMEPLAY_HUD_RUNTIME_CONTRACTS.md)
+- added bundled gameplay-HUD contract files for Sonic, Werehog, Extra Stage, Super Sonic, and boss/final HUD ownership under [`research_uiux/runtime_reference/contracts/`](./research_uiux/runtime_reference/contracts/)
+- extended the native runtime, C ABI, and C# managed reference port with the new gameplay-HUD profile set
+- refreshed the broader source-path manifest to `220` paths with `118` archaeology-mapped entries, `88` contract-backed entries, `60` debug-host candidates, and `42` named-only gaps
+- widened the selector-family metadata to `12` launch families, including Sonic-stage, Werehog-stage, Extra-stage, Super Sonic, and boss HUD bridges
+
 ### Phase 38 first richer UI debug workbench
 
 - added [`research_uiux/tools/build_debug_workbench_data.py`](./research_uiux/tools/build_debug_workbench_data.py)

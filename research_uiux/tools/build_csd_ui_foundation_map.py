@@ -553,8 +553,8 @@ def write_markdown(payload: dict, output_path: Path) -> None:
             "## Remaining Gap",
             "",
             "- None of this means the translated C++ is already humanized into those folders yet.",
-            "- The foundation is mapped and named, but it is not runtime-contract-backed like the current title/pause/loading/result/world-map selector set.",
-            "- The next value is to place renamed translated findings into the local-only `SONIC UNLEASHED/` scaffold and then grow the debug selector around those named families.",
+            "- The foundation is mapped and named, but most of it is still not runtime-contract-backed like the current selector/workbench families.",
+            "- The next value is to place renamed translated findings into the local-only `SONIC UNLEASHED/` scaffold and then widen host coverage around those named families.",
         ]
     )
 

@@ -397,6 +397,16 @@ private:
         return "subtitle_cutscene_reference.json";
     case ReferenceProfile::WorldMap:
         return "world_map_reference.json";
+    case ReferenceProfile::SonicStageHud:
+        return "sonic_stage_hud_reference.json";
+    case ReferenceProfile::WerehogStageHud:
+        return "werehog_stage_hud_reference.json";
+    case ReferenceProfile::ExtraStageHud:
+        return "extra_stage_hud_reference.json";
+    case ReferenceProfile::SuperSonicHud:
+        return "super_sonic_hud_reference.json";
+    case ReferenceProfile::BossHud:
+        return "boss_hud_reference.json";
     }
 
     throw std::runtime_error("Unknown reference profile.");
@@ -502,6 +512,11 @@ std::vector<std::filesystem::path> bundledContractPaths()
     result.push_back(root / "mission_result_reference.json");
     result.push_back(root / "subtitle_cutscene_reference.json");
     result.push_back(root / "world_map_reference.json");
+    result.push_back(root / "sonic_stage_hud_reference.json");
+    result.push_back(root / "werehog_stage_hud_reference.json");
+    result.push_back(root / "extra_stage_hud_reference.json");
+    result.push_back(root / "super_sonic_hud_reference.json");
+    result.push_back(root / "boss_hud_reference.json");
     return result;
 }
 } // namespace sward::ui_runtime

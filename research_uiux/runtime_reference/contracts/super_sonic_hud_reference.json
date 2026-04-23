@@ -1,0 +1,43 @@
+{
+  "screen_id": "SuperSonicHudReference",
+  "source_system": "super_sonic_hud",
+  "notes": "Super Sonic / final-phase HUD bridge with dual gauges, footer ownership, and shared boss nameplate presentation.",
+  "timeline_bands": [
+    { "id": "hud_in", "seconds": 0.45 },
+    { "id": "gauge_focus", "seconds": 0.22 },
+    { "id": "phase_flash", "seconds": 0.5 },
+    { "id": "hud_out", "seconds": 0.3 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "supersonic_hud_in", "timeline_band_id": "hud_in", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "supersonic_hud_live", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "Navigate", "enter_scene": "supersonic_gauge_focus", "timeline_band_id": "gauge_focus", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "Confirm", "enter_scene": "supersonic_phase_flash", "timeline_band_id": "phase_flash", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "Cancel", "enter_scene": "supersonic_hud_hide", "timeline_band_id": "hud_out", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "supersonic_hud_out", "timeline_band_id": "hud_out", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "su_sonic_gauge", "role": "gauge", "interactive": false },
+    { "id": "gaia_gauge", "role": "gauge", "interactive": false },
+    { "id": "boss_nameplate", "role": "content", "interactive": false },
+    { "id": "footer", "role": "footer", "interactive": false },
+    { "id": "phase_flash", "role": "transient_fx", "interactive": false },
+    { "id": "prompt_strip", "role": "prompt", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Intro": ["gauge", "content", "footer"],
+    "Idle": ["gauge", "content", "footer", "prompt"],
+    "Navigate": ["gauge", "content", "footer", "transient_fx"],
+    "Confirm": ["gauge", "content", "footer", "transient_fx"],
+    "Cancel": ["gauge", "content", "footer"],
+    "Outro": ["gauge", "content", "footer"]
+  },
+  "prompt_slots": [
+    { "slot_id": "focus_left", "button": "LB", "label": "Focus Sonic Gauge", "visible_states": ["Idle"], "required_predicates": ["can_focus_sonic"] },
+    { "slot_id": "focus_right", "button": "RB", "label": "Focus Gaia Gauge", "visible_states": ["Idle"], "required_predicates": ["can_focus_gaia"] },
+    { "slot_id": "phase_flash", "button": "Y", "label": "Phase Flash", "visible_states": ["Idle"], "required_predicates": ["can_flash_phase"] },
+    { "slot_id": "hide_hud", "button": "B", "label": "Hide HUD", "visible_states": ["Idle"], "required_predicates": ["can_hide"] }
+  ]
+}

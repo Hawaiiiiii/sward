@@ -9,6 +9,11 @@ public enum ReferenceProfile
     MissionResult,
     SubtitleCutscene,
     WorldMap,
+    SonicStageHud,
+    WerehogStageHud,
+    ExtraStageHud,
+    SuperSonicHud,
+    BossHud,
 }
 
 public static class ReferenceProfiles
@@ -23,6 +28,11 @@ public static class ReferenceProfiles
             ReferenceProfile.MissionResult => "mission_result_reference.json",
             ReferenceProfile.SubtitleCutscene => "subtitle_cutscene_reference.json",
             ReferenceProfile.WorldMap => "world_map_reference.json",
+            ReferenceProfile.SonicStageHud => "sonic_stage_hud_reference.json",
+            ReferenceProfile.WerehogStageHud => "werehog_stage_hud_reference.json",
+            ReferenceProfile.ExtraStageHud => "extra_stage_hud_reference.json",
+            ReferenceProfile.SuperSonicHud => "super_sonic_hud_reference.json",
+            ReferenceProfile.BossHud => "boss_hud_reference.json",
             _ => throw new InvalidOperationException("Unknown reference profile."),
         });
 

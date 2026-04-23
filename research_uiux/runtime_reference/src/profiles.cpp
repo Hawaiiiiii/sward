@@ -40,6 +40,31 @@ ScreenContract makeWorldMapContract()
     return loadBundledContract(ReferenceProfile::WorldMap);
 }
 
+ScreenContract makeSonicStageHudContract()
+{
+    return loadBundledContract(ReferenceProfile::SonicStageHud);
+}
+
+ScreenContract makeWerehogStageHudContract()
+{
+    return loadBundledContract(ReferenceProfile::WerehogStageHud);
+}
+
+ScreenContract makeExtraStageHudContract()
+{
+    return loadBundledContract(ReferenceProfile::ExtraStageHud);
+}
+
+ScreenContract makeSuperSonicHudContract()
+{
+    return loadBundledContract(ReferenceProfile::SuperSonicHud);
+}
+
+ScreenContract makeBossHudContract()
+{
+    return loadBundledContract(ReferenceProfile::BossHud);
+}
+
 ScreenContract makeContract(ReferenceProfile profile)
 {
     return loadBundledContract(profile);
@@ -63,6 +88,16 @@ std::string_view toString(ReferenceProfile profile)
         return "SubtitleCutscene";
     case ReferenceProfile::WorldMap:
         return "WorldMap";
+    case ReferenceProfile::SonicStageHud:
+        return "SonicStageHud";
+    case ReferenceProfile::WerehogStageHud:
+        return "WerehogStageHud";
+    case ReferenceProfile::ExtraStageHud:
+        return "ExtraStageHud";
+    case ReferenceProfile::SuperSonicHud:
+        return "SuperSonicHud";
+    case ReferenceProfile::BossHud:
+        return "BossHud";
     }
 
     return "Unknown";

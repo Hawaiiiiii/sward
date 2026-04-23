@@ -4,7 +4,7 @@
 
 # <img src="../../../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> C# Reference Port
 
-This directory contains the managed Phase 24/27/37 reference port for the SWARD runtime concepts.
+This directory contains the managed Phase 24/27/37/39 reference port for the SWARD runtime concepts.
 
 It is intentionally self-contained:
 
@@ -27,6 +27,11 @@ Included profiles:
 - `AutosaveToastReference`
 - `LoadingTransitionReference`
 - `MissionResultReference`
+- `SonicStageHudReference`
+- `WerehogStageHudReference`
+- `ExtraStageHudReference`
+- `SuperSonicHudReference`
+- `BossHudReference`
 - `SubtitleCutsceneReference`
 - `WorldMapReference`
 

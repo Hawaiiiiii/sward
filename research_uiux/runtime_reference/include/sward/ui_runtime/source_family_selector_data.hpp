@@ -15,7 +15,23 @@ struct SourceFamilySelectorEntry
     std::string_view sourcePathBlob;
 };
 
-inline constexpr std::array<SourceFamilySelectorEntry, 7> kSourceFamilySelectorEntries{{
+inline constexpr std::array<SourceFamilySelectorEntry, 12> kSourceFamilySelectorEntries{{
+    {
+        "boss_hud",
+        "Boss HUD",
+        "boss_hud",
+        "boss_hud_reference.json",
+        "Boss HUD|boss_hud|boss_hud_reference.json|boss_hud_reference|boss_ui|Boss/FinalDarkGaia/Object/FinalDarkGaiaHud.cpp|FinalDarkGaiaHud.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\Boss\\\\FinalDarkGaia\\\\Object\\\\FinalDarkGaiaHud.cpp|Boss/Phoenix/Hud/PhoenixHudVitality.cpp|PhoenixHudVitality.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\Boss\\\\Phoenix\\\\Hud\\\\PhoenixHudVitality.cpp",
+        "Boss/FinalDarkGaia/Object/FinalDarkGaiaHud.cpp|Boss/Phoenix/Hud/PhoenixHudVitality.cpp",
+    },
+    {
+        "extra_stage_hud",
+        "Extra Stage / Tornado Defense HUD",
+        "extra_stage_hud",
+        "extra_stage_hud_reference.json",
+        "Extra Stage / Tornado Defense HUD|extra_stage_hud|extra_stage_hud_reference.json|extra_stage_hud_reference|Tornado Defense / EX HUD|tornado_defense|ExtraStage/Tails/Hud/HudExQte.cpp|HudExQte.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\ExtraStage\\\\Tails\\\\Hud\\\\HudExQte.cpp|Tooling / Debug UI|tooling_debug_ui|System/GameMode/GameModeStageMotionTest.cpp|GameModeStageMotionTest.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\GameModeStageMotionTest.cpp",
+        "ExtraStage/Tails/Hud/HudExQte.cpp|System/GameMode/GameModeStageMotionTest.cpp",
+    },
     {
         "loading_and_start",
         "Loading And Start/Clear",
@@ -49,6 +65,14 @@ inline constexpr std::array<SourceFamilySelectorEntry, 7> kSourceFamilySelectorE
         "Sequence/Unit/SequenceUnitAutoSave.cpp|Sequence/Unit/SequenceUnitRegisterClearFlag.cpp|System/GameMode/Ending/EndingImageList.cpp|System/GameMode/Ending/EndingManager.cpp|System/GameMode/Ending/EndingText.cpp|System/GameMode/GameModeEnding.cpp|System/SaveLoadTest.cpp",
     },
     {
+        "sonic_stage_hud",
+        "Sonic Stage HUD",
+        "sonic_stage_hud",
+        "sonic_stage_hud_reference.json",
+        "Sonic Stage HUD|sonic_stage_hud|sonic_stage_hud_reference.json|sonic_stage_hud_reference|Stage HUD Core|stage_hud_core|HUD/Sonic/HudSonicStage.cpp|HudSonicStage.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\HUD\\\\Sonic\\\\HudSonicStage.cpp|HUD/Sonic/SonicMainDisplay.cpp|SonicMainDisplay.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\HUD\\\\Sonic\\\\SonicMainDisplay.cpp|Player/Character/Sonic/Hud/SonicHudGuide.cpp|SonicHudGuide.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\Player\\\\Character\\\\Sonic\\\\Hud\\\\SonicHudGuide.cpp|Player/Character/Sonic/Hud/SonicHudHomingAttack.cpp|SonicHudHomingAttack.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\Player\\\\Character\\\\Sonic\\\\Hud\\\\SonicHudHomingAttack.cpp|Tooling / Debug UI|tooling_debug_ui|System/GameMode/GameModeStageForwardTest.cpp|GameModeStageForwardTest.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\GameModeStageForwardTest.cpp",
+        "HUD/Sonic/HudSonicStage.cpp|HUD/Sonic/SonicMainDisplay.cpp|Player/Character/Sonic/Hud/SonicHudGuide.cpp|Player/Character/Sonic/Hud/SonicHudHomingAttack.cpp|System/GameMode/GameModeStageForwardTest.cpp",
+    },
+    {
         "subtitle_cutscene_presentation",
         "Subtitle / Cutscene Presentation",
         "subtitle_cutscene_presentation",
@@ -57,12 +81,28 @@ inline constexpr std::array<SourceFamilySelectorEntry, 7> kSourceFamilySelectorE
         "Inspire/InspireAnimationCurve.cpp|Inspire/InspireDataLoader.cpp|Inspire/InspireLetterbox.cpp|Inspire/InspireMovieOverlay.cpp|Inspire/InspireOpacityAnimation.cpp|Inspire/InspireResourceData_Audio.cpp|Inspire/InspireResourceData_CameraMotion.cpp|Inspire/InspireResourceData_CurveAnimation.cpp|Inspire/InspireResourceData_MaterialAnimation.cpp|Inspire/InspireResourceData_Model.cpp|Inspire/InspireResourceData_MorphAnimation.cpp|Inspire/InspireResourceData_NodeMotion.cpp|Inspire/InspireResourceData_None.cpp|Inspire/InspireResourceData_Particle.cpp|Inspire/InspireResourceData_Subtitle.cpp|Inspire/InspireResourceData_TexcoordAnimation.cpp|Inspire/InspireResourceEnv_Audio.cpp|Inspire/InspireResourceEnv_CameraMotion.cpp|Inspire/InspireResourceEnv_CurveAnimation.cpp|Inspire/InspireResourceEnv_Model.cpp|Inspire/InspireResourceEnv_Particle.cpp|Inspire/InspireResourceEnv_Subtitle.cpp|Inspire/InspireScene.cpp|Inspire/InspireSceneInfo.cpp|Inspire/InspireSceneSet.cpp|Inspire/InspireTextureAnimation.cpp|Inspire/InspireTextureOverlay.cpp|Movie/MovieManager.cpp|Sequence/Unit/SequenceUnitMicroSequence.cpp|Sequence/Unit/SequenceUnitPlayMovie.cpp|Sequence/Utility/SequencePlayMovieWrapper.cpp|System/GameMode/GameModeStageMovie.cpp|Tool/InspirePreview/InspireObject.cpp|Tool/InspirePreview/InspirePreview.cpp|Tool/InspirePreview/InspirePreviewMenu.cpp|Tool/InspirePreview2nd/InspirePreview2nd.cpp|Tool/InspirePreview2nd/InspirePreview2ndMenu.cpp|Tool/MotionCameraTool/MotionCameraMenu.cpp|Tool/MotionCameraTool/MotionCameraTool.cpp",
     },
     {
+        "super_sonic_hud",
+        "Super Sonic / Final HUD Bridge",
+        "super_sonic_hud",
+        "super_sonic_hud_reference.json",
+        "Super Sonic / Final HUD Bridge|super_sonic_hud|super_sonic_hud_reference.json|super_sonic_hud_reference|Boss HUD|boss_ui|Boss/BossHudSuperSonic.cpp|BossHudSuperSonic.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\Boss\\\\BossHudSuperSonic.cpp|Boss/BossHudVitality.cpp|BossHudVitality.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\Boss\\\\BossHudVitality.cpp|Boss/BossNamePlate.cpp|BossNamePlate.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\Boss\\\\BossNamePlate.cpp",
+        "Boss/BossHudSuperSonic.cpp|Boss/BossHudVitality.cpp|Boss/BossNamePlate.cpp",
+    },
+    {
         "title_menu",
         "Title Menu",
         "title_menu",
         "title_menu_reference.json",
         "Title Menu|title_menu|title_menu_reference.json|title_menu_reference|Title / Main Menu|HUD/StageSelect/HudStageSelect.cpp|HudStageSelect.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\HUD\\\\StageSelect\\\\HudStageSelect.cpp|System/GameMode/GameModeMainMenu.cpp|GameModeMainMenu.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\GameModeMainMenu.cpp|System/GameMode/GameModeStageMainMenu.cpp|GameModeStageMainMenu.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\GameModeStageMainMenu.cpp|System/GameMode/GameModeStageTitle.cpp|GameModeStageTitle.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\GameModeStageTitle.cpp|System/GameMode/GameModeTitleSelect.cpp|GameModeTitleSelect.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\GameModeTitleSelect.cpp|System/GameMode/MainMenu/MainMenuManager.cpp|MainMenuManager.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\MainMenu\\\\MainMenuManager.cpp|System/GameMode/Title/TitleManager.cpp|TitleManager.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\Title\\\\TitleManager.cpp|System/GameMode/Title/TitleMenu.cpp|TitleMenu.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\Title\\\\TitleMenu.cpp|System/GameMode/Title/TitleStateIntro.cpp|TitleStateIntro.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\Title\\\\TitleStateIntro.cpp|Tooling / Debug UI|tooling_debug_ui|System/GameMode/GameModeMainMenu_Test.cpp|GameModeMainMenu_Test.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\GameModeMainMenu_Test.cpp|System/GameMode/GameModeMenuSelectDebug.cpp|GameModeMenuSelectDebug.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\GameModeMenuSelectDebug.cpp",
         "HUD/StageSelect/HudStageSelect.cpp|System/GameMode/GameModeMainMenu.cpp|System/GameMode/GameModeStageMainMenu.cpp|System/GameMode/GameModeStageTitle.cpp|System/GameMode/GameModeTitleSelect.cpp|System/GameMode/MainMenu/MainMenuManager.cpp|System/GameMode/Title/TitleManager.cpp|System/GameMode/Title/TitleMenu.cpp|System/GameMode/Title/TitleStateIntro.cpp|System/GameMode/GameModeMainMenu_Test.cpp|System/GameMode/GameModeMenuSelectDebug.cpp",
+    },
+    {
+        "werehog_stage_hud",
+        "Werehog Stage HUD",
+        "werehog_stage_hud",
+        "werehog_stage_hud_reference.json",
+        "Werehog Stage HUD|werehog_stage_hud|werehog_stage_hud_reference.json|werehog_stage_hud_reference|Stage HUD Core|stage_hud_core|HUD/Evil/EvilMainDisplay.cpp|EvilMainDisplay.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\HUD\\\\Evil\\\\EvilMainDisplay.cpp|HUD/Evil/HudEvilStage.cpp|HudEvilStage.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\HUD\\\\Evil\\\\HudEvilStage.cpp|Player/Character/EvilSonic/Hud/EvilHudGuide.cpp|EvilHudGuide.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\Player\\\\Character\\\\EvilSonic\\\\Hud\\\\EvilHudGuide.cpp|Player/Character/EvilSonic/Hud/EvilHudTarget.cpp|EvilHudTarget.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\Player\\\\Character\\\\EvilSonic\\\\Hud\\\\EvilHudTarget.cpp|Tooling / Debug UI|tooling_debug_ui|System/GameMode/GameModeStageEvilTest.cpp|GameModeStageEvilTest.cpp|D:\\\\SonicWorldAdventure\\\\SWA\\\\source\\\\System\\\\GameMode\\\\GameModeStageEvilTest.cpp",
+        "HUD/Evil/EvilMainDisplay.cpp|HUD/Evil/HudEvilStage.cpp|Player/Character/EvilSonic/Hud/EvilHudGuide.cpp|Player/Character/EvilSonic/Hud/EvilHudTarget.cpp|System/GameMode/GameModeStageEvilTest.cpp",
     },
     {
         "world_map_stack",

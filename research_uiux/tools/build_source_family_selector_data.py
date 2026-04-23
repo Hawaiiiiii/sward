@@ -19,9 +19,14 @@ PRIMARY_FAMILY_IDS = {
     "mission_result_family": "mission_result",
     "pause_stack": "pause_stack",
     "save_and_ending": "save_and_ending",
+    "sonic_stage_hud": "stage_hud_core",
     "subtitle_cutscene_presentation": "subtitle_cutscene",
+    "super_sonic_hud": "boss_ui",
     "title_menu": "title_menu",
+    "extra_stage_hud": "tornado_defense",
+    "werehog_stage_hud": "stage_hud_core",
     "world_map_stack": "world_map_stack",
+    "boss_hud": "boss_ui",
 }
 
 EXTRA_SELECTOR_PATHS = {
@@ -40,6 +45,15 @@ EXTRA_SELECTOR_PATHS = {
     ],
     "loading_and_start": [
         "System/GameMode/GameModeStageSelectDebug.cpp",
+    ],
+    "sonic_stage_hud": [
+        "System/GameMode/GameModeStageForwardTest.cpp",
+    ],
+    "werehog_stage_hud": [
+        "System/GameMode/GameModeStageEvilTest.cpp",
+    ],
+    "extra_stage_hud": [
+        "System/GameMode/GameModeStageMotionTest.cpp",
     ],
 }
 
@@ -222,8 +236,8 @@ def write_markdown(entries: list[dict], output_path: Path) -> None:
             "## Selector Direction",
             "",
             "- The selector can now treat source-family aliases as first-class launch tokens.",
-            "- The current launch set is still bounded by the six contract-backed systems, but the tokens now line up with the mirrored source-family tree and the executable path dump.",
-            "- This is the bridge needed before the richer debug sandbox can be widened with gameplay HUD and subtitle/cutscene families.",
+            "- The current launch set now spans the bundled frontend, cutscene, gameplay-HUD, and boss/final runtime families, while keeping the tokens aligned with the mirrored source-family tree and the executable path dump.",
+            "- The next value is widening readable translated ownership and adding broader town/camera/application/world host coverage on top of this named selector layer.",
         ]
     )
 

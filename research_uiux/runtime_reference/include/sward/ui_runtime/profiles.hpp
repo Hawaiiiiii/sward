@@ -15,6 +15,11 @@ enum class ReferenceProfile
     MissionResult,
     SubtitleCutscene,
     WorldMap,
+    SonicStageHud,
+    WerehogStageHud,
+    ExtraStageHud,
+    SuperSonicHud,
+    BossHud,
 };
 
 [[nodiscard]] ScreenContract makePauseMenuContract();
@@ -24,6 +29,11 @@ enum class ReferenceProfile
 [[nodiscard]] ScreenContract makeMissionResultContract();
 [[nodiscard]] ScreenContract makeSubtitleCutsceneContract();
 [[nodiscard]] ScreenContract makeWorldMapContract();
+[[nodiscard]] ScreenContract makeSonicStageHudContract();
+[[nodiscard]] ScreenContract makeWerehogStageHudContract();
+[[nodiscard]] ScreenContract makeExtraStageHudContract();
+[[nodiscard]] ScreenContract makeSuperSonicHudContract();
+[[nodiscard]] ScreenContract makeBossHudContract();
 [[nodiscard]] ScreenContract makeContract(ReferenceProfile profile);
 [[nodiscard]] std::string_view toString(ReferenceProfile profile);
 } // namespace sward::ui_runtime

@@ -92,4 +92,4 @@ The mirror now behaves like a staging tree for:
 The next two beats stay the same:
 
 1. keep converting shell-level placements into named translated ownership under the same source-family paths
-2. keep widening the debug selector and runtime contracts beyond the current six contract-backed families
+2. keep widening the debug selector and runtime contracts beyond the then-current six contract-backed families from that placement pass

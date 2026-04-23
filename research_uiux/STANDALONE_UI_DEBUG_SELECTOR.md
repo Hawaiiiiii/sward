@@ -19,7 +19,7 @@ Build a first local executable that can:
 - drive the chosen contract through a representative state walk
 - print state, scene-request, overlay, and prompt visibility changes for inspection
 
-That covers the current contract-backed screen set:
+The original Phase 29 baseline covered this contract-backed screen set:
 
 - `PauseMenuReference`
 - `TitleMenuReference`
@@ -32,7 +32,7 @@ That covers the current contract-backed screen set:
 
 The combined Phase 29 and Phase 33 work expands the reusable runtime layer in four ways:
 
-1. `ReferenceProfile` now exposes all six bundled contracts instead of only pause/title/autosave.
+1. `ReferenceProfile` now exposes all six bundled Phase 29 baseline contracts instead of only pause/title/autosave.
 2. The native and managed helper layers can resolve those same bundled profiles consistently.
 3. A new console executable, `sward_ui_runtime_debug_selector`, acts as a first debug shell for browsing contract-backed screens.
 4. A generated source-family metadata layer lets the selector resolve inputs such as `TitleMenu.cpp`, `HudPause.cpp`, and `WorldMapSelect.cpp` without dropping down to raw contract filenames.
@@ -94,20 +94,20 @@ external_tools/dotnet8/dotnet.exe build research_uiux/runtime_reference/csharp_r
 external_tools/dotnet8/dotnet.exe run --project research_uiux/runtime_reference/csharp_reference/Sward.UiRuntime.Reference.csproj -c Release
 ```
 
-Observed successful checks:
+Observed successful checks for the Phase 29/33 baseline:
 
-- bundled selector list resolved all six contract-backed screens
+- bundled selector list resolved all six baseline contract-backed screens
 - family-aware selector listing resolved six source-family launch groups backed by those same contracts
 - title flow traversed `Intro -> Idle -> Navigate -> Confirm -> Outro -> Closed`
 - pause flow traversed `Intro -> Idle -> Navigate -> Confirm -> Outro -> Closed`
 - world-map flow traversed `Intro -> Idle -> Navigate -> Confirm -> Idle -> Outro -> Closed`
 - the managed C# reference still built and ran cleanly after the bundled-profile expansion
 
-## Current Limits
+## Current Limits In The Phase 29/33 Baseline
 
 - It is still a console debug shell, not the final asset-backed debug UI executable.
-- It only covers the current contract-backed families, not the gameplay HUD core or the broader UI-adjacent system shell.
+- It only covers the then-current contract-backed families, not the gameplay HUD core or the broader UI-adjacent system shell.
 - It does not yet browse extracted layouts or translated seams directly; it browses the source-family naming layer over the contract pack.
 - It does not yet load screens from extracted layouts directly.
 
-Those gaps are the direct handoff into Phase 30 and Phase 31.
+Those gaps were the direct handoff into Phase 30 and Phase 31. Later phases widened the selector to `12` launch families, including subtitle/cutscene, Sonic-stage, Werehog-stage, Extra-stage, and boss/final HUD bridges.

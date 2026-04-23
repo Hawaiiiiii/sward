@@ -4,7 +4,7 @@
 
 # <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> First UI Debug Workbench
 
-Phase 38 adds the first richer native debug executable/menu on top of the recovered host buckets.
+Phase 38 adds the first richer native debug executable/menu on top of the recovered host buckets. Later phases widened that same workbench into gameplay-HUD and stage-test ownership.
 
 > [!IMPORTANT]
 > This is the first host-bucket workbench, not the final whole-game debug build. It focuses on recovered menu-debug, stage-debug, and cutscene-preview ownership because those buckets are already measurable and defensible.
@@ -13,7 +13,7 @@ Phase 38 adds the first richer native debug executable/menu on top of the recove
 
 - generated host map: `research_uiux/data/debug_workbench_host_map.json`
 - generated metadata header: `research_uiux/runtime_reference/include/sward/ui_runtime/debug_workbench_data.hpp`
-- native executable: `b/rr38/Release/sward_ui_runtime_debug_workbench.exe`
+- native executable: `b/rr38/Release/sward_ui_runtime_debug_workbench.exe` (baseline) and later `b/rr41/Release/sward_ui_runtime_debug_workbench.exe`
 - source hosts centered around:
   - `GameModeMenuSelectDebug.cpp`
   - `GameModeStageSelectDebug.cpp`
@@ -42,6 +42,12 @@ Verified behavior:
 - menu-debug host launch works
 - cutscene-preview host launch works
 - the workbench resolves host names through the bundled runtime contracts instead of only raw contract tokens
+
+Later verified expansion:
+
+- gameplay-HUD host launch works
+- stage-test host launch works
+- the widened workbench now carries gameplay-HUD and stage-test groups in addition to the original frontend/cutscene buckets
 
 ## Why This Matters
 

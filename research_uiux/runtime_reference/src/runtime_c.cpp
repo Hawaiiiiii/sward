@@ -47,6 +47,16 @@ ReferenceProfile fromCProfile(sward_ui_profile_id profileId)
         return ReferenceProfile::SubtitleCutscene;
     case SWARD_UI_PROFILE_WORLD_MAP:
         return ReferenceProfile::WorldMap;
+    case SWARD_UI_PROFILE_SONIC_STAGE_HUD:
+        return ReferenceProfile::SonicStageHud;
+    case SWARD_UI_PROFILE_WEREHOG_STAGE_HUD:
+        return ReferenceProfile::WerehogStageHud;
+    case SWARD_UI_PROFILE_EXTRA_STAGE_HUD:
+        return ReferenceProfile::ExtraStageHud;
+    case SWARD_UI_PROFILE_SUPER_SONIC_HUD:
+        return ReferenceProfile::SuperSonicHud;
+    case SWARD_UI_PROFILE_BOSS_HUD:
+        return ReferenceProfile::BossHud;
     }
 
     return ReferenceProfile::PauseMenu;
@@ -382,6 +392,16 @@ const char* sward_ui_to_string_profile(sward_ui_profile_id profile_id)
         return "SubtitleCutscene";
     case SWARD_UI_PROFILE_WORLD_MAP:
         return "WorldMap";
+    case SWARD_UI_PROFILE_SONIC_STAGE_HUD:
+        return "SonicStageHud";
+    case SWARD_UI_PROFILE_WEREHOG_STAGE_HUD:
+        return "WerehogStageHud";
+    case SWARD_UI_PROFILE_EXTRA_STAGE_HUD:
+        return "ExtraStageHud";
+    case SWARD_UI_PROFILE_SUPER_SONIC_HUD:
+        return "SuperSonicHud";
+    case SWARD_UI_PROFILE_BOSS_HUD:
+        return "BossHud";
     }
 
     return "Unknown";
