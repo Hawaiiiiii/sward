@@ -2,10 +2,6 @@
     <img src="./docs/assets/branding/logo_sward.png" width="900"/>
 </p>
 
-<p align="center">
-    <img src="./docs/assets/branding/icon_sward.png" width="144" alt="SWARD icon"/>
-</p>
-
 # Project Sonic World Adventure R&D
 
 Also referred to in this workspace as **SWARD**.
