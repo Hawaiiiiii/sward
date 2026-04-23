@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 21 code-backed runtime reference implementation
+
+- added the standalone C++ runtime reference under [`research_uiux/runtime_reference/`](./research_uiux/runtime_reference/)
+- added [`research_uiux/CODE_BACKED_RUNTIME_IMPLEMENTATION.md`](./research_uiux/CODE_BACKED_RUNTIME_IMPLEMENTATION.md)
+- implemented generic state, overlay, prompt, and timing-band runtime types that mirror the Phase 18 template pack
+- verified the runtime locally with a standalone CMake build and the `pause_menu_example` executable
+
 ### Phase 20 boss HUD, result, and save visual taxonomy
 
 - added [`research_uiux/tools/derive_visual_taxonomy.py`](./research_uiux/tools/derive_visual_taxonomy.py)
@@ -99,6 +106,7 @@ The repo now contains:
 - a reusable template pack for original screen-state, overlay, prompt, and transition work
 - a subtitle/cutscene presentation report that bridges subtitle timing resources, `PlayMovie` sequences, and readable runtime controls
 - a visual taxonomy/style guide for boss HUD, result, and save systems grounded in the local atlas layer
+- a buildable generic runtime reference that turns the template pack into executable C++ code
 
 The repo still does not contain:
 

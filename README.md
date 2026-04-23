@@ -45,6 +45,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - Local repository branding assets under [`docs/assets/branding/`](./docs/assets/branding)
 - Research scripts under [`research_uiux/tools/`](./research_uiux/tools)
 - Reusable template pack assets under [`research_uiux/templates/`](./research_uiux/templates)
+- Reusable runtime reference code under [`research_uiux/runtime_reference/`](./research_uiux/runtime_reference)
 - Publishable research notes such as:
   - [`research_uiux/UI_CODE_INDEX.md`](./research_uiux/UI_CODE_INDEX.md)
   - [`research_uiux/PATCH_HOOK_INDEX.md`](./research_uiux/PATCH_HOOK_INDEX.md)
@@ -54,6 +55,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
   - [`research_uiux/BOSS_RESULT_SAVE_VISUAL_TAXONOMY.md`](./research_uiux/BOSS_RESULT_SAVE_VISUAL_TAXONOMY.md)
   - [`research_uiux/VISUAL_ATLAS_DOCS.md`](./research_uiux/VISUAL_ATLAS_DOCS.md)
   - [`research_uiux/SUBTITLE_CUTSCENE_PRESENTATION_DEEP_DIVE.md`](./research_uiux/SUBTITLE_CUTSCENE_PRESENTATION_DEEP_DIVE.md)
+  - [`research_uiux/CODE_BACKED_RUNTIME_IMPLEMENTATION.md`](./research_uiux/CODE_BACKED_RUNTIME_IMPLEMENTATION.md)
   - [`research_uiux/TEMPLATE_PACK_FOR_ORIGINAL_PROJECTS.md`](./research_uiux/TEMPLATE_PACK_FOR_ORIGINAL_PROJECTS.md)
   - [`research_uiux/UI_UX_INSPIRATION_NOTES.md`](./research_uiux/UI_UX_INSPIRATION_NOTES.md)
 - [`CHANGELOG.md`](./CHANGELOG.md) for the repo timeline from initial publication to the latest research beat
