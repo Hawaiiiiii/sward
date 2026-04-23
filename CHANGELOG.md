@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 20 boss HUD, result, and save visual taxonomy
+
+- added [`research_uiux/tools/derive_visual_taxonomy.py`](./research_uiux/tools/derive_visual_taxonomy.py)
+- added [`research_uiux/BOSS_RESULT_SAVE_VISUAL_TAXONOMY.md`](./research_uiux/BOSS_RESULT_SAVE_VISUAL_TAXONOMY.md)
+- derived a machine-readable local taxonomy from atlas/layout outputs for `ui_boss_gauge`, `ui_boss_name`, `ui_result`, `ui_result_ex`, `ui_itemresult`, and `ui_saveicon`
+- turned palette, texture-count, scene-family, and timing evidence into a screen-by-screen style guide for original projects
+
 ### Phase 19 subtitle and cutscene presentation deep dive
 
 - added [`research_uiux/tools/analyze_subtitle_cutscene_presentation.py`](./research_uiux/tools/analyze_subtitle_cutscene_presentation.py)
@@ -91,6 +98,7 @@ The repo now contains:
 - a publishable atlas-builder that renders local-only contact sheets from the extracted DDS/UI layer
 - a reusable template pack for original screen-state, overlay, prompt, and transition work
 - a subtitle/cutscene presentation report that bridges subtitle timing resources, `PlayMovie` sequences, and readable runtime controls
+- a visual taxonomy/style guide for boss HUD, result, and save systems grounded in the local atlas layer
 
 The repo still does not contain:
 
