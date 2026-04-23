@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 18 transferable template pack for original projects
+
+- added [`research_uiux/TEMPLATE_PACK_FOR_ORIGINAL_PROJECTS.md`](./research_uiux/TEMPLATE_PACK_FOR_ORIGINAL_PROJECTS.md)
+- added the reusable template bundle under [`research_uiux/templates/`](./research_uiux/templates)
+- distilled recovered screen-state, overlay, prompt-row, and timing patterns into generic YAML/JSON contracts
+- documented how to adapt the pack for original work without copying proprietary assets, strings, audio, or scene naming
+
 ### Phase 17 visual atlas docs from extracted textures and layouts
 
 - added [`research_uiux/tools/build_visual_atlas.py`](./research_uiux/tools/build_visual_atlas.py)
@@ -74,6 +81,7 @@ The repo now contains:
 - report-level correlation between extracted local layouts and readable code
 - dedicated deep dives for pause/world-map and boss/result/save-load flow
 - a publishable atlas-builder that renders local-only contact sheets from the extracted DDS/UI layer
+- a reusable template pack for original screen-state, overlay, prompt, and transition work
 
 The repo still does not contain:
 

@@ -1,0 +1,58 @@
+template_name: screen_contract
+version: 1
+
+screen_id: ReplaceMeScreen
+screen_family: ReplaceMeFamily
+host_owner: ReplaceMeHostController
+screen_purpose: Replace me with the player-facing purpose.
+
+layout_contract:
+  scene_namespace: replace_me_namespace
+  root_anchor: body_anchor
+  prompt_anchor: prompt_anchor
+  transient_anchor: transient_anchor
+
+state_machine:
+  source_template: screen_state_machine_template.yaml
+  first_state: Boot
+  terminal_state: Closed
+
+overlay_stack:
+  source_template: overlay_stack_template.yaml
+  backdrop_required: true
+  prompt_row_required: true
+  transient_fx_optional: true
+
+input_contract:
+  accepts_directional_input: true
+  accepts_confirm: true
+  accepts_cancel: true
+  hide_prompts_when_locked: true
+
+audio_contract:
+  on_open: replace_me_ui_open
+  on_move: replace_me_ui_move
+  on_confirm: replace_me_ui_confirm
+  on_cancel: replace_me_ui_cancel
+  on_close: replace_me_ui_close
+
+timing_contract:
+  source_template: transition_timeline_template.yaml
+  intro_band: intro_medium
+  navigate_band: select_travel
+  confirm_band: resize_accent
+  cancel_band: intro_short
+  outro_band: intro_medium
+
+telemetry_contract:
+  log_state_entries: true
+  log_state_exits: true
+  log_blocked_input: true
+  log_animation_completion: true
+
+adaptation_checklist:
+  - replace all scene names with project-local names
+  - replace all texture/audio/string identifiers
+  - confirm each state has an explicit input policy
+  - confirm each transition has either an animation-complete event or a fallback timeout
+  - confirm prompt visibility is host-driven, not hardcoded inside a single widget

@@ -1,0 +1,85 @@
+template_name: transition_timeline
+version: 1
+
+timing_bands:
+  flash_micro:
+    seconds: 0.083333
+    use_for:
+      - sparkle_hits
+      - quick highlights
+      - subimage swaps
+
+  intro_short:
+    seconds: 0.25
+    use_for:
+      - card pop-ins
+      - small title tags
+
+  intro_medium:
+    seconds: 0.333333
+    use_for:
+      - menu reveal
+      - list-shell entry
+      - compact result tag reveal
+
+  resize_accent:
+    seconds: 0.45
+    use_for:
+      - gauge resize
+      - focus pulse
+      - panel emphasis
+
+  select_travel:
+    seconds: 0.333333
+    use_for:
+      - cursor movement
+      - selection bar travel
+
+  scroll_short:
+    seconds: 0.983333
+    use_for:
+      - mission ticker
+      - list-page nudge
+      - short content carousel
+
+  loading_card:
+    seconds: 1.666667
+    use_for:
+      - loading info motion
+      - conditional cue dwell
+
+  toast_hold:
+    seconds: 3.0
+    use_for:
+      - autosave icon
+      - compact notification dwell
+
+  nameplate_hold:
+    seconds: 3.0
+    use_for:
+      - boss or stage name emphasis
+      - large card sustain
+
+  result_idle_hold:
+    seconds: 3.333333
+    use_for:
+      - grade sustain
+      - reward hold before dismissal
+
+  result_flourish:
+    seconds: 4.216667
+    use_for:
+      - long rank reveal
+      - high-attention summary moment
+
+recommended_rules:
+  - lock input during intro_medium, resize_accent, confirm_hold, cancel_hold, and outro_medium
+  - use the shortest band that still preserves readability under gameplay pressure
+  - keep idle loops visually alive without forcing player input lock
+
+state_defaults:
+  Intro: intro_medium
+  Navigate: select_travel
+  Confirm: resize_accent
+  Cancel: intro_short
+  Outro: intro_medium

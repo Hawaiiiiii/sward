@@ -1,0 +1,61 @@
+{
+  "template_name": "button_prompt_model",
+  "version": 1,
+  "screen_id": "ReplaceMeScreen",
+  "platform_icon_family": "replace_me_family",
+  "prompt_row": {
+    "anchor": "prompt_anchor",
+    "visible_states": [
+      "Idle"
+    ],
+    "hidden_states": [
+      "Boot",
+      "Intro",
+      "Outro"
+    ]
+  },
+  "slots": [
+    {
+      "slot_id": "confirm_primary",
+      "button": "A",
+      "action_id": "confirm",
+      "label": "Select",
+      "visible_when": [
+        "can_confirm"
+      ]
+    },
+    {
+      "slot_id": "cancel_secondary",
+      "button": "B",
+      "action_id": "cancel",
+      "label": "Back",
+      "visible_when": [
+        "can_cancel"
+      ]
+    },
+    {
+      "slot_id": "page_left",
+      "button": "LB",
+      "action_id": "page_left",
+      "label": "Previous Tab",
+      "visible_when": [
+        "has_previous_tab"
+      ]
+    },
+    {
+      "slot_id": "page_right",
+      "button": "RB",
+      "action_id": "page_right",
+      "label": "Next Tab",
+      "visible_when": [
+        "has_next_tab"
+      ]
+    }
+  ],
+  "rules": {
+    "hide_all_when_input_locked": true,
+    "allow_host_override": true,
+    "refresh_on_state_change": true,
+    "refresh_on_selection_change": true
+  }
+}

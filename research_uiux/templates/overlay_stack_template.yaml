@@ -1,0 +1,74 @@
+template_name: overlay_stack
+version: 1
+
+screen_id: ReplaceMeScreen
+safe_area_profile: widescreen_16_9
+scale_policy:
+  reference_aspect_ratio: 1.777778
+  horizontal_strategy: preserve_composition_then_expand
+  vertical_strategy: anchor_to_safe_area
+
+layers:
+  - id: backdrop_layer
+    purpose: Full-screen dim, veil, blur, or wash.
+    examples:
+      - black_fade
+      - colored_backplate
+      - static_or_noise_fx
+    interaction: never_interactive
+
+  - id: chrome_layer
+    purpose: Window frame, bars, title plates, separators, edge trims.
+    interaction: never_interactive
+
+  - id: content_layer
+    purpose: Lists, metrics, thumbnails, stat blocks, map panels, result cards.
+    interaction: interactive_when_idle
+
+  - id: prompt_layer
+    purpose: Button guide row and context hints.
+    interaction: host_driven
+
+  - id: transient_fx_layer
+    purpose: Sparkles, emphasis flashes, route arrows, selection bursts, toast accents.
+    interaction: never_interactive
+
+visibility_rules:
+  Intro:
+    show:
+      - backdrop_layer
+      - chrome_layer
+      - content_layer
+    hide:
+      - prompt_layer
+  Idle:
+    show:
+      - backdrop_layer
+      - chrome_layer
+      - content_layer
+      - prompt_layer
+  Confirm:
+    show:
+      - transient_fx_layer
+      - prompt_layer
+    lock_content_interaction: true
+  Outro:
+    hide:
+      - prompt_layer
+
+layout_tokens:
+  - name: title_anchor
+    purpose: Heading or plate anchor.
+  - name: body_anchor
+    purpose: Main content block anchor.
+  - name: focus_anchor
+    purpose: Selection highlight or moving cursor anchor.
+  - name: prompt_anchor
+    purpose: Footer prompt row anchor.
+  - name: transient_anchor
+    purpose: Toast or short-lived overlay anchor.
+
+practical_notes:
+  - keep chrome reusable across sibling screens
+  - reserve transient_fx_layer for short-lived motion and emphasis, not for core information
+  - let prompt_layer visibility follow state, not per-widget ad hoc logic

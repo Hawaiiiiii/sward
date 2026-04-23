@@ -1,0 +1,127 @@
+template_name: screen_state_machine
+version: 1
+
+screen_id: ReplaceMeScreen
+host_system: ReplaceMeHost
+
+states:
+  - id: Boot
+    purpose: Allocate host bindings and prepare default visual state.
+    input_enabled: false
+    enter_actions:
+      - reset_timers
+      - bind_overlay_scene
+      - seed_prompt_model
+    exit_conditions:
+      - resources_ready
+    next_state: Intro
+
+  - id: Intro
+    purpose: Reveal the screen and finish any entry choreography.
+    input_enabled: false
+    timer_band: intro_medium
+    enter_actions:
+      - play_scene: reveal
+      - fade_backdrop_in
+      - play_optional_audio: ui_open
+    exit_conditions:
+      - intro_animation_finished
+      - fallback_timeout
+    next_state: Idle
+
+  - id: Idle
+    purpose: Stable state with no selection movement pending.
+    input_enabled: true
+    enter_actions:
+      - publish_prompt_row
+      - begin_idle_loop
+    transitions:
+      - event: move_selection
+        target: Navigate
+      - event: confirm
+        target: Confirm
+      - event: cancel
+        target: Cancel
+      - event: host_forces_close
+        target: Outro
+
+  - id: Navigate
+    purpose: Consume directional input and run focus-change feedback.
+    input_enabled: false
+    timer_band: select_travel
+    enter_actions:
+      - move_focus
+      - play_scene: focus_pulse
+      - play_optional_audio: ui_move
+    exit_conditions:
+      - selection_animation_finished
+      - fallback_timeout
+    next_state: Idle
+
+  - id: Confirm
+    purpose: Lock the screen long enough to acknowledge the chosen action.
+    input_enabled: false
+    timer_band: confirm_hold
+    enter_actions:
+      - play_scene: confirm
+      - dispatch_selected_action
+      - play_optional_audio: ui_confirm
+    transitions:
+      - event: action_consumed_keep_screen
+        target: Idle
+      - event: action_consumed_close_screen
+        target: Outro
+
+  - id: Cancel
+    purpose: Run the back-out path without accepting further input.
+    input_enabled: false
+    timer_band: cancel_hold
+    enter_actions:
+      - play_scene: cancel
+      - play_optional_audio: ui_cancel
+    exit_conditions:
+      - cancel_animation_finished
+      - fallback_timeout
+    next_state: Outro
+
+  - id: Outro
+    purpose: Tear down the screen while preserving host state.
+    input_enabled: false
+    timer_band: outro_medium
+    enter_actions:
+      - hide_prompt_row
+      - play_scene: outro
+      - fade_backdrop_out
+    exit_conditions:
+      - outro_animation_finished
+      - fallback_timeout
+    next_state: Closed
+
+  - id: Closed
+    purpose: Final terminal state for host cleanup.
+    input_enabled: false
+    enter_actions:
+      - release_transient_bindings
+      - notify_host_closed
+
+input_lock_policy:
+  lock_during:
+    - Boot
+    - Intro
+    - Navigate
+    - Confirm
+    - Cancel
+    - Outro
+  allow_during:
+    - Idle
+
+recommended_events:
+  - move_selection
+  - confirm
+  - cancel
+  - host_forces_close
+  - intro_animation_finished
+  - selection_animation_finished
+  - action_consumed_keep_screen
+  - action_consumed_close_screen
+  - outro_animation_finished
