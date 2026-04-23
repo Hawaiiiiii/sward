@@ -5,7 +5,7 @@
 # <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Whole-Game Coverage And Gaps
 
 > [!IMPORTANT]
-> Short answer: no, this workspace does not contain the original human-authored Sonic Unleashed source code, and it does not yet contain a fully extracted/readable copy of every shipped asset.
+> Short answer: yes for the locally generated translated executable/shader layer from the owned build inputs; no for a clean human-readable whole-game source tree, and no for a fully extracted/readable copy of every shipped asset.
 
 ## Status Snapshot
 
@@ -15,7 +15,9 @@
 | Publishable repo layer | Complete | `100%` |
 | In-scope readable Unleashed Recompiled UI/runtime/patch layer | Indexed and documented | `100%` of the files we targeted and scanned |
 | Original SEGA human-authored game source | Not available locally | `0%` verified |
-| Generated translated PowerPC C++ from owned `default.xex` | Present locally | exact semantic-readability percentage is not meaningful |
+| Generated translated PowerPC C++ and shader layer from owned inputs | Present locally | `100%` of the current generation goal |
+| UI-centric source-path seed bridged into the archaeology layer | Partial but measured | `71.3%` |
+| UI-centric source-path seed already backed by runtime contracts | Partial | `34.3%` |
 | Whole-game asset corpus extracted into readable loose files | Not complete | no defensible exact percentage yet |
 | Template-grade UI/UX recovery for the studied screens | Strong | high confidence, but not a whole-game `1:1` portability claim |
 
@@ -33,6 +35,10 @@
   - native C++ reference profiles
   - a C ABI wrapper plus verified C example
   - a managed C# reference port
+- The source-path bridge layer now includes:
+  - a tracked UI-focused source-path seed at `research_uiux/source_path_seeds/UI_SOURCE_PATHS_FROM_EXECUTABLE.txt`
+  - a machine-readable manifest at `research_uiux/data/ui_source_path_manifest.json`
+  - a human-readable bridge report at `research_uiux/UI_SOURCE_PATH_RECOVERY_AND_HUMANIZATION_PLAN.md`
 - The UI asset workspace currently indexes:
   - `6840` UI-relevant asset entries across the installed build plus extracted roots
   - `17792` extracted files under `extracted_assets`
@@ -49,6 +55,7 @@
 
 - Original human-authored SEGA gameplay/UI engine source code.
 - A clean, architecture-level, whole-game C++ codebase equivalent to the shipped game.
+- A fully source-path-organized and humanized local tree that explains what every translated gameplay/UI unit does.
 - A fully loose-file-extracted copy of every archive in the game.
 - A verified `1:1` forward-port package for the entire game UI stack.
 
@@ -62,6 +69,7 @@ What it gives us:
 - callable/function-level seams for readable patch correlation
 - enough low-level visibility to recover timings, state branches, and host relationships
 - enough structure to drive portable JSON runtime contracts across the current C++, C, and C# reference kits
+- enough structure to start organizing translated findings under original source-family names for the UI/UX subset
 
 What it does not give us:
 
@@ -69,6 +77,7 @@ What it does not give us:
 - original file/module boundaries
 - clean naming
 - a production-quality source base you can directly treat as authored engine code
+- a finished source-path-backed debug executable that can browse every uncovered UI family
 
 ## What This Means For `1:1` Template Work
 
@@ -97,17 +106,18 @@ The current workspace is:
 - strong for UI/UX reverse-engineering and template extraction
 - strong for local executable-backed timing/state archaeology
 - strong for reusable runtime/template productization across C++, C, and C#
+- strong for measured UI source-path organization inside the seeded UI/UX subset
 - partial for whole-game loose-file asset extraction
-- not equivalent to the original full source code of Sonic Unleashed
+- not yet equivalent to a whole-game clean human-readable source tree
 
 ## Highest-Value Remaining Work
 
 If the goal is to move closer to a broader `1:1` UI portability basis, the next concrete work would be:
 
-1. Expand extraction coverage beyond the current UI-heavy archive slices into more remaining common/HUD/mission/cutscene families.
-2. Push the layout parser deeper into scene graphs, animation channels, and per-scene timeline naming across more extracted layouts.
+1. Expand the current UI-focused source-path seed into a broader manifest so the humanization pass can cover more than the current `108` UI-centric paths.
+2. Start a source-path-backed cleanup pass for the uncovered families, especially gameplay HUD core and the CSD/UI foundation layer.
 3. Continue correlating generated PPC seams against extracted layouts and readable patch hosts for the remaining UI families.
-4. Extend the generic runtime reference so more recovered screen contracts can be exercised in standalone examples.
+4. Build the first dedicated standalone UI debug selector over the current contract-backed runtime screens, then widen that selector as new families land.
 
 > [!NOTE]
-> The new Phase 25 common-flow slice improves the loose localized support layer, and Phase 26 now labels `180` translated seams across the highest-value common-flow systems. The next bottleneck is therefore even clearer: more value now comes from contract-building and runtime productization than from blindly expecting every high-scoring archive to hide another `.yncp`.
+> The new Phase 28 source-path bridge makes the next bottleneck clearer again: more value now comes from source-family naming, debug-screen productization, and targeted gameplay-HUD/CSD recovery than from blindly expecting every high-scoring archive to hide another `.yncp`.

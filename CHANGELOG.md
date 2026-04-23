@@ -11,6 +11,16 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 28 UI source-path recovery and humanization plan
+
+- added [`research_uiux/tools/map_ui_source_paths.py`](./research_uiux/tools/map_ui_source_paths.py)
+- added [`research_uiux/source_path_seeds/UI_SOURCE_PATHS_FROM_EXECUTABLE.txt`](./research_uiux/source_path_seeds/UI_SOURCE_PATHS_FROM_EXECUTABLE.txt)
+- added [`research_uiux/UI_SOURCE_PATH_RECOVERY_AND_HUMANIZATION_PLAN.md`](./research_uiux/UI_SOURCE_PATH_RECOVERY_AND_HUMANIZATION_PLAN.md)
+- generated a new local manifest under `research_uiux/data/ui_source_path_manifest.json`
+- organized `108` UI-centric source paths from the supplied Xbox 360 dump into `16` families
+- measured that `77` paths (`71.3%`) already land in the current archaeology layer, while `37` paths (`34.3%`) are already backed by the portable runtime contracts
+- isolated `13` strong debug-tool host candidates and `18` still named-only gaps, clarifying that the next bottleneck is source-family humanization and a standalone UI screen selector rather than raw PPC generation
+
 ### Phase 25 broader remaining UI and common-flow extraction
 
 - added [`research_uiux/tools/summarize_commonflow_extraction.py`](./research_uiux/tools/summarize_commonflow_extraction.py)
