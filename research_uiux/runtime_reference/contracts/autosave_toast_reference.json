@@ -1,0 +1,28 @@
+{
+  "screen_id": "AutosaveToastReference",
+  "source_system": "save_and_ending",
+  "notes": "Non-interactive save toast with short in/hold/out timing.",
+  "timeline_bands": [
+    { "id": "intro_short", "seconds": 0.25 },
+    { "id": "toast_hold", "seconds": 3.0 },
+    { "id": "outro_short", "seconds": 0.25 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "toast_in", "timeline_band_id": "intro_short", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "toast_hold", "timeline_band_id": "toast_hold", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "toast_out", "timeline_band_id": "outro_short", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "icon", "role": "icon", "interactive": false },
+    { "id": "panel", "role": "content", "interactive": false },
+    { "id": "shine", "role": "transient_fx", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Intro": ["icon", "content", "transient_fx"],
+    "Idle": ["icon", "content"],
+    "Outro": ["icon", "content", "transient_fx"]
+  },
+  "prompt_slots": []
+}

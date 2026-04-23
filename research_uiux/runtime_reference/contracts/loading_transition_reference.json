@@ -1,0 +1,30 @@
+{
+  "screen_id": "LoadingTransitionReference",
+  "source_system": "loading_and_start",
+  "notes": "Loading/start handoff shell with PDA framing, controller-variant text, and host-driven close.",
+  "timeline_bands": [
+    { "id": "pda_intro", "seconds": 4.5 },
+    { "id": "pda_idle_loop", "seconds": 4.0 },
+    { "id": "fade_out", "seconds": 4.0 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "pda_in", "timeline_band_id": "pda_intro", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "pda_loop", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "pda_out", "timeline_band_id": "fade_out", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "backdrop", "role": "backdrop", "interactive": false },
+    { "id": "black_bars", "role": "cinematic_frame", "interactive": false },
+    { "id": "pda_frame", "role": "content", "interactive": false },
+    { "id": "tip_text", "role": "tip_copy", "interactive": false },
+    { "id": "controller_hint", "role": "controller_variant", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Intro": ["backdrop", "cinematic_frame", "content", "tip_copy", "controller_variant"],
+    "Idle": ["backdrop", "cinematic_frame", "content", "tip_copy", "controller_variant"],
+    "Outro": ["backdrop", "cinematic_frame", "content"]
+  },
+  "prompt_slots": []
+}

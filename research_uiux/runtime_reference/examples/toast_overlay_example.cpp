@@ -1,7 +1,8 @@
-#include <sward/ui_runtime/profiles.hpp>
+#include <sward/ui_runtime/contract_loader.hpp>
 #include <sward/ui_runtime/runtime.hpp>
 
 #include <iostream>
+#include <utility>
 
 using namespace sward::ui_runtime;
 
@@ -23,15 +24,18 @@ void printVisibleLayers(const ScreenRuntime& runtime)
 }
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
+    ScreenContract contract = argc > 1 ? loadContractFromJsonFile(argv[1]) : loadBundledContract(ReferenceProfile::AutosaveToast);
     ScreenRuntime runtime(
-        makeAutosaveToastContract(),
+        std::move(contract),
         RuntimeCallbacks{
             .onStateEntered = [](ScreenState state) { std::cout << "Enter " << toString(state) << '\n'; },
             .onStateChanged = [](ScreenState from, ScreenState to) { std::cout << "Transition " << toString(from) << " -> " << toString(to) << '\n'; },
             .onSceneRequested = [](std::string_view scene) { std::cout << "Request scene: " << scene << '\n'; },
         });
+
+    std::cout << "Contract source: " << (argc > 1 ? argv[1] : bundledContractPath(ReferenceProfile::AutosaveToast).string()) << '\n';
 
     runtime.dispatch(RuntimeEventType::ResourcesReady);
     printVisibleLayers(runtime);

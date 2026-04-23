@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(sward_ui_runtime_reference LANGUAGES C CXX)
 
 add_library(sward_ui_runtime STATIC
+    src/contract_loader.cpp
     src/runtime.cpp
     src/profiles.cpp
 )
@@ -12,6 +13,11 @@ target_include_directories(sward_ui_runtime
 )
 
 target_compile_features(sward_ui_runtime PUBLIC cxx_std_20)
+
+target_compile_definitions(sward_ui_runtime
+    PUBLIC
+        SWARD_UI_RUNTIME_CONTRACT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/contracts"
+)
 
 add_library(sward_ui_runtime_c_api STATIC
     src/runtime_c.cpp

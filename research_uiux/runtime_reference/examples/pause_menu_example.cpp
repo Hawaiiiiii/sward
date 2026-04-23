@@ -1,7 +1,8 @@
-#include <sward/ui_runtime/profiles.hpp>
+#include <sward/ui_runtime/contract_loader.hpp>
 #include <sward/ui_runtime/runtime.hpp>
 
 #include <iostream>
+#include <utility>
 
 using namespace sward::ui_runtime;
 
@@ -23,16 +24,19 @@ void printVisiblePrompts(const ScreenRuntime& runtime)
 }
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
+    ScreenContract contract = argc > 1 ? loadContractFromJsonFile(argv[1]) : loadBundledContract(ReferenceProfile::PauseMenu);
     ScreenRuntime runtime(
-        makePauseMenuContract(),
+        std::move(contract),
         RuntimeCallbacks{
             .onStateEntered = [](ScreenState state) { std::cout << "Enter " << toString(state) << '\n'; },
             .onStateChanged = [](ScreenState from, ScreenState to) { std::cout << "Transition " << toString(from) << " -> " << toString(to) << '\n'; },
             .onInputBlocked = [](InputAction action) { std::cout << "Blocked input: " << toString(action) << '\n'; },
             .onSceneRequested = [](std::string_view scene) { std::cout << "Request scene: " << scene << '\n'; },
         });
+
+    std::cout << "Contract source: " << (argc > 1 ? argv[1] : bundledContractPath(ReferenceProfile::PauseMenu).string()) << '\n';
 
     runtime.setPredicate("can_confirm", true);
     runtime.setPredicate("can_cancel", true);

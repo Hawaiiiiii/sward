@@ -14,6 +14,9 @@ Port-kit root:
 
 - `research_uiux/runtime_reference/`
 
+> [!TIP]
+> The follow-on Phase 27 runtime work is documented in [`DATA_DRIVEN_RUNTIME_CONTRACTS.md`](./DATA_DRIVEN_RUNTIME_CONTRACTS.md). The runtime kits now load shared JSON contracts instead of relying only on hardcoded profile builders.
+
 ## What Landed
 
 - Expanded C++ runtime profile factories:

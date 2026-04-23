@@ -1,17 +1,18 @@
+#include <sward/ui_runtime/contract_loader.hpp>
 #include <sward/ui_runtime/profiles.hpp>
 #include <sward/ui_runtime/runtime_c.h>
 
-#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace sward::ui_runtime;
 
 struct sward_ui_runtime
 {
-    explicit sward_ui_runtime(ReferenceProfile profile)
+    explicit sward_ui_runtime(ScreenContract contract, ReferenceProfile profile)
         : runtime(
-            makeContract(profile),
+            std::move(contract),
             RuntimeCallbacks{
                 .onSceneRequested = [this](std::string_view scene) { lastScene = std::string(scene); },
             })
@@ -66,27 +67,6 @@ sward_ui_screen_state toCState(ScreenState state)
     }
 
     return SWARD_UI_STATE_BOOT;
-}
-
-ScreenState fromCStateAction(sward_ui_input_action action)
-{
-    switch (action)
-    {
-    case SWARD_UI_ACTION_MOVE_PREVIOUS:
-        return ScreenState::Navigate;
-    case SWARD_UI_ACTION_MOVE_NEXT:
-        return ScreenState::Navigate;
-    case SWARD_UI_ACTION_PAGE_LEFT:
-        return ScreenState::Navigate;
-    case SWARD_UI_ACTION_PAGE_RIGHT:
-        return ScreenState::Navigate;
-    case SWARD_UI_ACTION_CONFIRM:
-        return ScreenState::Confirm;
-    case SWARD_UI_ACTION_CANCEL:
-        return ScreenState::Cancel;
-    }
-
-    return ScreenState::Boot;
 }
 
 InputAction fromCAction(sward_ui_input_action action)
@@ -171,7 +151,30 @@ extern "C"
 {
 sward_ui_runtime* sward_ui_runtime_create_profile(sward_ui_profile_id profile_id)
 {
-    return new sward_ui_runtime(fromCProfile(profile_id));
+    try
+    {
+        ReferenceProfile profile = fromCProfile(profile_id);
+        return new sward_ui_runtime(loadBundledContract(profile), profile);
+    }
+    catch (...)
+    {
+        return nullptr;
+    }
+}
+
+sward_ui_runtime* sward_ui_runtime_create_contract_path(const char* contract_path)
+{
+    if (!contract_path)
+        return nullptr;
+
+    try
+    {
+        return new sward_ui_runtime(loadContractFromJsonFile(contract_path), ReferenceProfile::PauseMenu);
+    }
+    catch (...)
+    {
+        return nullptr;
+    }
 }
 
 void sward_ui_runtime_destroy(sward_ui_runtime* runtime)

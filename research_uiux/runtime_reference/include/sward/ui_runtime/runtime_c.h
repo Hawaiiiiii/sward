@@ -75,6 +75,7 @@ typedef struct sward_ui_overlay_view
 typedef struct sward_ui_runtime sward_ui_runtime;
 
 sward_ui_runtime* sward_ui_runtime_create_profile(sward_ui_profile_id profile_id);
+sward_ui_runtime* sward_ui_runtime_create_contract_path(const char* contract_path);
 void sward_ui_runtime_destroy(sward_ui_runtime* runtime);
 
 const char* sward_ui_runtime_screen_id(const sward_ui_runtime* runtime);

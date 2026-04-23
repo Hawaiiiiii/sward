@@ -61,6 +61,7 @@ What it gives us:
 - broad executable-level coverage from the owned `default.xex`
 - callable/function-level seams for readable patch correlation
 - enough low-level visibility to recover timings, state branches, and host relationships
+- enough structure to drive portable JSON runtime contracts across the current C++, C, and C# reference kits
 
 What it does not give us:
 

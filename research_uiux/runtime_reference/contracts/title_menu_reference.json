@@ -1,0 +1,44 @@
+{
+  "screen_id": "TitleMenuReference",
+  "source_system": "title_menu",
+  "notes": "Logo/card reveal plus carousel navigation and gated prompt row.",
+  "timeline_bands": [
+    { "id": "logo_hold", "seconds": 1.2 },
+    { "id": "select_travel", "seconds": 0.333333 },
+    { "id": "confirm_hold", "seconds": 0.45 },
+    { "id": "cancel_hold", "seconds": 0.25 },
+    { "id": "outro_medium", "seconds": 0.333333 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "logo_reveal", "timeline_band_id": "logo_hold", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "carousel_idle", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "Navigate", "enter_scene": "carousel_move", "timeline_band_id": "select_travel", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "Confirm", "enter_scene": "selection_commit", "timeline_band_id": "confirm_hold", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "Cancel", "enter_scene": "menu_back", "timeline_band_id": "cancel_hold", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "fade_out", "timeline_band_id": "outro_medium", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "backdrop", "role": "backdrop", "interactive": false },
+    { "id": "logo", "role": "logo", "interactive": false },
+    { "id": "carousel", "role": "content", "interactive": true },
+    { "id": "prompts", "role": "prompt", "interactive": false },
+    { "id": "flare", "role": "transient_fx", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Intro": ["backdrop", "logo", "content", "transient_fx"],
+    "Idle": ["backdrop", "logo", "content", "prompt"],
+    "Navigate": ["backdrop", "logo", "content", "prompt", "transient_fx"],
+    "Confirm": ["backdrop", "logo", "content", "transient_fx"],
+    "Cancel": ["backdrop", "logo", "content", "transient_fx"],
+    "Outro": ["backdrop", "logo", "transient_fx"]
+  },
+  "prompt_slots": [
+    { "slot_id": "confirm_primary", "button": "A", "label": "Start", "visible_states": ["Idle"], "required_predicates": ["can_confirm"] },
+    { "slot_id": "cancel_secondary", "button": "B", "label": "Quit", "visible_states": ["Idle"], "required_predicates": ["can_cancel"] },
+    { "slot_id": "page_left", "button": "LB", "label": "Previous", "visible_states": ["Idle"], "required_predicates": ["has_previous_tab"] },
+    { "slot_id": "page_right", "button": "RB", "label": "Next", "visible_states": ["Idle"], "required_predicates": ["has_next_tab"] },
+    { "slot_id": "press_start", "button": "Start", "label": "Open", "visible_states": ["Idle"], "required_predicates": ["show_start_prompt"] }
+  ]
+}

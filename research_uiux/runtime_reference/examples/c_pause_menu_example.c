@@ -42,9 +42,10 @@ static void print_layers(sward_ui_runtime* runtime)
     printf("\n");
 }
 
-int main(void)
+int main(int argc, char** argv)
 {
-    sward_ui_runtime* runtime = sward_ui_runtime_create_profile(SWARD_UI_PROFILE_PAUSE_MENU);
+    sward_ui_runtime* runtime =
+        argc > 1 ? sward_ui_runtime_create_contract_path(argv[1]) : sward_ui_runtime_create_profile(SWARD_UI_PROFILE_PAUSE_MENU);
     if (!runtime)
         return 1;
 
@@ -53,7 +54,11 @@ int main(void)
     sward_ui_runtime_set_predicate(runtime, "has_previous_tab", 1);
     sward_ui_runtime_set_predicate(runtime, "has_next_tab", 1);
 
-    printf("Profile: %s\n", sward_ui_to_string_profile(SWARD_UI_PROFILE_PAUSE_MENU));
+    if (argc > 1)
+        printf("Contract path: %s\n", argv[1]);
+    else
+        printf("Profile: %s\n", sward_ui_to_string_profile(SWARD_UI_PROFILE_PAUSE_MENU));
+    printf("Screen id: %s\n", sward_ui_runtime_screen_id(runtime));
     sward_ui_runtime_dispatch(runtime, SWARD_UI_EVENT_RESOURCES_READY);
     printf("Scene: %s\n", sward_ui_runtime_last_scene_request(runtime));
     sward_ui_runtime_tick(runtime, 0.4);

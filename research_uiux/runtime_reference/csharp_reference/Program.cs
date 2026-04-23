@@ -42,7 +42,8 @@ static ScreenRuntime BuildRuntime(ScreenContract contract) =>
             OnSceneRequested: scene => Console.WriteLine($"Request scene: {scene}")));
 
 Console.WriteLine("== PauseMenuReference ==");
-var pauseRuntime = BuildRuntime(ReferenceProfiles.BuildPauseMenu());
+var pauseRuntime = BuildRuntime(ReferenceProfiles.Load(ReferenceProfile.PauseMenu));
+Console.WriteLine($"Contract source: {ReferenceProfiles.BundledPath(ReferenceProfile.PauseMenu)}");
 pauseRuntime.SetPredicate("can_confirm", true);
 pauseRuntime.SetPredicate("can_cancel", true);
 pauseRuntime.SetPredicate("has_previous_tab", true);
@@ -56,7 +57,8 @@ PrintLayers(pauseRuntime);
 
 Console.WriteLine();
 Console.WriteLine("== AutosaveToastReference ==");
-var toastRuntime = BuildRuntime(ReferenceProfiles.BuildAutosaveToast());
+var toastRuntime = BuildRuntime(ReferenceProfiles.Load(ReferenceProfile.AutosaveToast));
+Console.WriteLine($"Contract source: {ReferenceProfiles.BundledPath(ReferenceProfile.AutosaveToast)}");
 toastRuntime.Dispatch(RuntimeEventType.ResourcesReady);
 PrintLayers(toastRuntime);
 toastRuntime.Tick(0.3);

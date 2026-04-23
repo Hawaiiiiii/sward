@@ -1,0 +1,36 @@
+{
+  "screen_id": "MissionResultReference",
+  "source_system": "mission_result_family",
+  "notes": "Result shell with rank burst, stats block, and explicit continue prompt.",
+  "timeline_bands": [
+    { "id": "rank_intro", "seconds": 4.216667 },
+    { "id": "settle_hold", "seconds": 2.0 },
+    { "id": "confirm_flash", "seconds": 0.5 },
+    { "id": "result_out", "seconds": 0.333333 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "Boot", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "Intro", "enter_scene": "result_in", "timeline_band_id": "rank_intro", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "Idle", "enter_scene": "result_hold", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Confirm", "debug_name": "Confirm", "enter_scene": "result_confirm", "timeline_band_id": "confirm_flash", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "Outro", "enter_scene": "result_out", "timeline_band_id": "result_out", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "backdrop", "role": "backdrop", "interactive": false },
+    { "id": "rank", "role": "rank", "interactive": false },
+    { "id": "stats", "role": "content", "interactive": false },
+    { "id": "footer", "role": "footer", "interactive": false },
+    { "id": "prompts", "role": "prompt", "interactive": false },
+    { "id": "flare", "role": "transient_fx", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Intro": ["backdrop", "rank", "content", "footer", "transient_fx"],
+    "Idle": ["backdrop", "rank", "content", "footer", "prompt"],
+    "Confirm": ["backdrop", "rank", "content", "footer", "transient_fx"],
+    "Outro": ["backdrop", "rank", "content", "footer", "transient_fx"]
+  },
+  "prompt_slots": [
+    { "slot_id": "continue_primary", "button": "A", "label": "Continue", "visible_states": ["Idle"], "required_predicates": ["can_confirm"] }
+  ]
+}

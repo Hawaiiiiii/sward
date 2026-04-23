@@ -30,6 +30,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 - sampled translated function windows for each resolved seam so the label layer carries call-shape and float/timing hints rather than only symbol names
 - confirmed that subtitle/cutscene presentation remains asset/readable-code driven in the current pass, with no resolved translated PPC seam yet
 
+### Phase 27 data-driven runtime contracts
+
+- added [`research_uiux/DATA_DRIVEN_RUNTIME_CONTRACTS.md`](./research_uiux/DATA_DRIVEN_RUNTIME_CONTRACTS.md)
+- added the shared runtime contract bundle under [`research_uiux/runtime_reference/contracts/`](./research_uiux/runtime_reference/contracts/)
+- added the native JSON contract loader under [`research_uiux/runtime_reference/include/sward/ui_runtime/contract_loader.hpp`](./research_uiux/runtime_reference/include/sward/ui_runtime/contract_loader.hpp) and [`research_uiux/runtime_reference/src/contract_loader.cpp`](./research_uiux/runtime_reference/src/contract_loader.cpp)
+- converted the existing native profile builders into compatibility wrappers over the bundled JSON contracts
+- added path-based contract loading to the C ABI and shared contract loading to the C# reference port
+- verified bundled and explicit path-based runtime loading in native C++ and C, then re-verified the managed build/run in the repo-local `.NET 8` environment
+
 ### Phase 23 full UI archaeology cross-reference
 
 - added [`research_uiux/tools/build_ui_archaeology_database.py`](./research_uiux/tools/build_ui_archaeology_database.py)
