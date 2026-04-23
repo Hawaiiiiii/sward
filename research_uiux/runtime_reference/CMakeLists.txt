@@ -72,3 +72,12 @@ target_link_libraries(sward_ui_runtime_c_example
 )
 
 set_target_properties(sward_ui_runtime_c_example PROPERTIES LINKER_LANGUAGE CXX)
+
+add_executable(sward_ui_runtime_debug_selector
+    examples/ui_debug_selector.cpp
+)
+
+target_link_libraries(sward_ui_runtime_debug_selector
+    PRIVATE
+        sward_ui_runtime
+)

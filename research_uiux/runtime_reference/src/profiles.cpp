@@ -20,6 +20,21 @@ ScreenContract makeAutosaveToastContract()
     return loadBundledContract(ReferenceProfile::AutosaveToast);
 }
 
+ScreenContract makeLoadingTransitionContract()
+{
+    return loadBundledContract(ReferenceProfile::LoadingTransition);
+}
+
+ScreenContract makeMissionResultContract()
+{
+    return loadBundledContract(ReferenceProfile::MissionResult);
+}
+
+ScreenContract makeWorldMapContract()
+{
+    return loadBundledContract(ReferenceProfile::WorldMap);
+}
+
 ScreenContract makeContract(ReferenceProfile profile)
 {
     return loadBundledContract(profile);
@@ -35,6 +50,12 @@ std::string_view toString(ReferenceProfile profile)
         return "TitleMenu";
     case ReferenceProfile::AutosaveToast:
         return "AutosaveToast";
+    case ReferenceProfile::LoadingTransition:
+        return "LoadingTransition";
+    case ReferenceProfile::MissionResult:
+        return "MissionResult";
+    case ReferenceProfile::WorldMap:
+        return "WorldMap";
     }
 
     return "Unknown";

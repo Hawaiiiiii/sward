@@ -389,6 +389,12 @@ private:
         return "title_menu_reference.json";
     case ReferenceProfile::AutosaveToast:
         return "autosave_toast_reference.json";
+    case ReferenceProfile::LoadingTransition:
+        return "loading_transition_reference.json";
+    case ReferenceProfile::MissionResult:
+        return "mission_result_reference.json";
+    case ReferenceProfile::WorldMap:
+        return "world_map_reference.json";
     }
 
     throw std::runtime_error("Unknown reference profile.");

@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 29 standalone UI debug selector
+
+- added [`research_uiux/STANDALONE_UI_DEBUG_SELECTOR.md`](./research_uiux/STANDALONE_UI_DEBUG_SELECTOR.md)
+- added [`research_uiux/runtime_reference/examples/ui_debug_selector.cpp`](./research_uiux/runtime_reference/examples/ui_debug_selector.cpp)
+- expanded the bundled runtime profile surface to include loading, mission-result, and world-map alongside pause, title, and autosave
+- added the native selector target `sward_ui_runtime_debug_selector` so the contract-backed screens can now be listed, selected, and stepped from one executable
+- verified the selector locally against bundled `title`, `loading`, and `world map` contracts, while re-verifying the managed C# reference after the bundled-profile expansion
+
 ### Phase 28 UI source-path recovery and humanization plan
 
 - added [`research_uiux/tools/map_ui_source_paths.py`](./research_uiux/tools/map_ui_source_paths.py)
@@ -172,6 +180,7 @@ The repo now contains:
 - a visual taxonomy/style guide for boss HUD, result, and save systems grounded in the local atlas layer
 - a buildable generic runtime reference that turns the template pack into executable C++ code
 - a reusable multi-language port-kit layer across C++, C, and C#
+- a standalone contract-backed debug selector over the current reusable screen family set
 
 The repo still does not contain:
 

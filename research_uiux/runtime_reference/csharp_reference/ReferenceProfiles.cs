@@ -5,6 +5,9 @@ public enum ReferenceProfile
     PauseMenu,
     TitleMenu,
     AutosaveToast,
+    LoadingTransition,
+    MissionResult,
+    WorldMap,
 }
 
 public static class ReferenceProfiles
@@ -15,6 +18,9 @@ public static class ReferenceProfiles
             ReferenceProfile.PauseMenu => "pause_menu_reference.json",
             ReferenceProfile.TitleMenu => "title_menu_reference.json",
             ReferenceProfile.AutosaveToast => "autosave_toast_reference.json",
+            ReferenceProfile.LoadingTransition => "loading_transition_reference.json",
+            ReferenceProfile.MissionResult => "mission_result_reference.json",
+            ReferenceProfile.WorldMap => "world_map_reference.json",
             _ => throw new InvalidOperationException("Unknown reference profile."),
         });
 

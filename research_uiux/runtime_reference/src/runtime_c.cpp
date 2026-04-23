@@ -39,6 +39,12 @@ ReferenceProfile fromCProfile(sward_ui_profile_id profileId)
         return ReferenceProfile::TitleMenu;
     case SWARD_UI_PROFILE_AUTOSAVE_TOAST:
         return ReferenceProfile::AutosaveToast;
+    case SWARD_UI_PROFILE_LOADING_TRANSITION:
+        return ReferenceProfile::LoadingTransition;
+    case SWARD_UI_PROFILE_MISSION_RESULT:
+        return ReferenceProfile::MissionResult;
+    case SWARD_UI_PROFILE_WORLD_MAP:
+        return ReferenceProfile::WorldMap;
     }
 
     return ReferenceProfile::PauseMenu;

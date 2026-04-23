@@ -25,9 +25,12 @@ Included profiles:
 - `PauseMenuReference`
 - `TitleMenuReference`
 - `AutosaveToastReference`
+- `LoadingTransitionReference`
+- `MissionResultReference`
+- `WorldMapReference`
 
 Portable contract notes:
 
 - bundled contract JSON files are copied to `bin/Release/net8.0/contracts/`
 - `ReferenceProfiles.Load(...)` uses those copied JSON files
-- `ContractLoader.LoadFromFile(...)` can load the broader `loading_transition_reference.json`, `mission_result_reference.json`, and `world_map_reference.json` contracts directly by path
+- `ContractLoader.LoadFromFile(...)` can still load any explicit contract path directly when you do not want to go through the bundled profile enum

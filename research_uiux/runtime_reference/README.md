@@ -15,6 +15,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - timer-banded transitions
 - portable reference profiles across C++, C, and C#
 - portable JSON contract files instead of hardcoded in-code builders
+- a standalone contract-backed debug selector for the first reusable screen-browser pass
 
 Contents:
 
@@ -43,6 +44,15 @@ Bundled contract files:
 - `contracts/mission_result_reference.json`
 - `contracts/world_map_reference.json`
 
+Bundled reference profiles:
+
+- `PauseMenu`
+- `TitleMenu`
+- `AutosaveToast`
+- `LoadingTransition`
+- `MissionResult`
+- `WorldMap`
+
 Build the native layer locally:
 
 ```powershell
@@ -52,6 +62,7 @@ b/rr27/Release/sward_ui_runtime_example.exe
 b/rr27/Release/sward_ui_runtime_title_menu_example.exe
 b/rr27/Release/sward_ui_runtime_toast_example.exe
 b/rr27/Release/sward_ui_runtime_c_example.exe
+b/rr29/Release/sward_ui_runtime_debug_selector.exe
 ```
 
 Run against the bundled contracts:
@@ -61,6 +72,10 @@ b/rr27/Release/sward_ui_runtime_example.exe
 b/rr27/Release/sward_ui_runtime_title_menu_example.exe
 b/rr27/Release/sward_ui_runtime_toast_example.exe
 b/rr27/Release/sward_ui_runtime_c_example.exe
+b/rr29/Release/sward_ui_runtime_debug_selector.exe --list
+b/rr29/Release/sward_ui_runtime_debug_selector.exe title
+b/rr29/Release/sward_ui_runtime_debug_selector.exe loading
+b/rr29/Release/sward_ui_runtime_debug_selector.exe world
 ```
 
 Run against an explicit portable contract path:
@@ -76,3 +91,10 @@ Build the managed port locally:
 external_tools/dotnet8/dotnet.exe build research_uiux/runtime_reference/csharp_reference/Sward.UiRuntime.Reference.csproj -c Release
 external_tools/dotnet8/dotnet.exe run --project research_uiux/runtime_reference/csharp_reference/Sward.UiRuntime.Reference.csproj -c Release
 ```
+
+Selector notes:
+
+- `--list` prints all bundled contract-backed screens
+- `--index <n>` selects by 1-based slot
+- `<token>` matches `screen_id` or filename stem, for example `title`, `loading`, `world`
+- `--path <contract.json>` loads an explicit portable contract file
