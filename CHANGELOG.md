@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-23
 
+### Phase 17 visual atlas docs from extracted textures and layouts
+
+- added [`research_uiux/tools/build_visual_atlas.py`](./research_uiux/tools/build_visual_atlas.py)
+- added [`research_uiux/VISUAL_ATLAS_DOCS.md`](./research_uiux/VISUAL_ATLAS_DOCS.md)
+- verified a repo-local DDS render path with `Pillow 12.2.0`, so no extra atlas tool download was needed
+- generated a local-only atlas root at `extracted_assets/visual_atlas`
+- produced `23` atlas sheets covering `144` rendered UI texture references across the current extracted layout set
+
 ### Phase 16 deep dive: boss HUD, result, and save-load flow
 
 - added [`research_uiux/BOSS_RESULT_SAVE_LOAD_DEEP_DIVE.md`](./research_uiux/BOSS_RESULT_SAVE_LOAD_DEEP_DIVE.md)
@@ -65,6 +73,7 @@ The repo now contains:
 - repo-safe branding and documentation
 - report-level correlation between extracted local layouts and readable code
 - dedicated deep dives for pause/world-map and boss/result/save-load flow
+- a publishable atlas-builder that renders local-only contact sheets from the extracted DDS/UI layer
 
 The repo still does not contain:
 
