@@ -91,6 +91,23 @@ struct LayoutEvidence
     int maxDepth = 0;
 };
 
+struct LayoutScenePrimitive
+{
+    std::string_view contractFileName;
+    std::string_view scenePath;
+    std::string_view sceneName;
+    std::string_view trackSummary;
+    int frameCount = 0;
+    int groupCount = 0;
+    int castReferenceCount = 0;
+    int maxCastCount = 0;
+    int keyframeCount = 0;
+    float x = 0.0F;
+    float y = 0.0F;
+    float width = 0.0F;
+    float height = 0.0F;
+};
+
 inline constexpr const char* kPreviewPanelClassName = "SwardUiRuntimePreviewPanel";
 inline constexpr UINT_PTR kPlaybackTimerId = 2001;
 inline constexpr UINT kPlaybackTimerMilliseconds = 33;
@@ -161,6 +178,29 @@ inline constexpr std::array<LayoutEvidence, 3> kLayoutEvidenceEntries{{
         2240,
         0,
     },
+}};
+
+inline constexpr std::array<LayoutScenePrimitive, 18> kLayoutScenePrimitiveEntries{{
+    { "title_menu_reference.json", "Root/mm_donut_move", "mm_donut_move", "Color, Rotation, X/Y position, X/Y scale", 220, 5, 175, 35, 462, 0.08F, 0.28F, 0.44F, 0.16F },
+    { "title_menu_reference.json", "Root/mm_base", "mm_base", "Rotation, SubImage, Y position, Y scale", 120, 12, 47, 11, 105, 0.06F, 0.18F, 0.52F, 0.09F },
+    { "title_menu_reference.json", "Root/mm_title_usual", "mm_title_usual", "Color, X/Y scale", 60, 6, 34, 16, 95, 0.10F, 0.07F, 0.48F, 0.09F },
+    { "title_menu_reference.json", "Root/mm_title_intro", "mm_title_intro", "Color, X/Y position, X scale", 120, 5, 26, 15, 68, 0.12F, 0.16F, 0.42F, 0.08F },
+    { "title_menu_reference.json", "Root/mm_contentsitem_select", "mm_contentsitem_select", "Color, X/Y position, X/Y scale", 15, 4, 19, 8, 45, 0.12F, 0.62F, 0.50F, 0.12F },
+    { "title_menu_reference.json", "Root/mm_donut_idle", "mm_donut_idle", "Color, Y position", 40, 2, 46, 45, 31, 0.52F, 0.32F, 0.28F, 0.14F },
+
+    { "pause_menu_reference.json", "Root/window_1/item/stick", "stick", "Color, HideFlag, Rotation, X/Y position, X/Y scale", 240, 6, 198, 33, 571, 0.34F, 0.26F, 0.46F, 0.14F },
+    { "pause_menu_reference.json", "Root/footer/arrow", "arrow", "Color, Gradient, HideFlag, X/Y position, X/Y scale", 20, 8, 136, 24, 161, 0.06F, 0.82F, 0.88F, 0.10F },
+    { "pause_menu_reference.json", "Root/window_2/status_title", "status_title", "Color, SubImage, X position", 69, 5, 10, 5, 24, 0.12F, 0.12F, 0.42F, 0.09F },
+    { "pause_menu_reference.json", "Root/explanatory/bg_1_select", "bg_1_select", "Color, X scale, Y position", 120, 3, 12, 4, 20, 0.17F, 0.56F, 0.60F, 0.12F },
+    { "pause_menu_reference.json", "Root/header/select", "select", "Color, Y position", 120, 2, 8, 4, 16, 0.08F, 0.06F, 0.50F, 0.08F },
+    { "pause_menu_reference.json", "Root/explanatory/bg_1", "bg_1", "Color, X/Y scale", 27, 2, 28, 14, 14, 0.18F, 0.44F, 0.54F, 0.10F },
+
+    { "loading_transition_reference.json", "Root/bg_2", "bg_2", "Color, X/Y position", 2, 52, 1378, 84, 1378, 0.05F, 0.14F, 0.90F, 0.16F },
+    { "loading_transition_reference.json", "Root/pda", "pda", "Color, X/Y position, X/Y scale", 240, 16, 152, 17, 465, 0.52F, 0.28F, 0.38F, 0.42F },
+    { "loading_transition_reference.json", "Root/n_2_d", "n_2_d", "Color, HideFlag, X/Y scale", 240, 24, 456, 44, 342, 0.08F, 0.24F, 0.36F, 0.32F },
+    { "loading_transition_reference.json", "Root/loadinfo", "loadinfo", "Color, Y position", 80, 3, 83, 79, 248, 0.14F, 0.70F, 0.72F, 0.12F },
+    { "loading_transition_reference.json", "Root/event_viewer", "event_viewer", "Gradient, SubImage, X/Y position, X/Y scale", 128, 9, 30, 5, 198, 0.06F, 0.05F, 0.88F, 0.10F },
+    { "loading_transition_reference.json", "Root/pda_txt", "pda_txt", "Color", 51, 2, 56, 28, 144, 0.54F, 0.62F, 0.34F, 0.13F },
 }};
 
 enum ControlId
@@ -238,6 +278,25 @@ enum ControlId
             return evidence.contractFileName == contractFileName;
         });
     return found == kLayoutEvidenceEntries.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] std::vector<const LayoutScenePrimitive*> layoutScenePrimitivesForContract(std::string_view contractFileName)
+{
+    std::vector<const LayoutScenePrimitive*> primitives;
+    for (const auto& primitive : kLayoutScenePrimitiveEntries)
+    {
+        if (primitive.contractFileName == contractFileName)
+            primitives.push_back(&primitive);
+    }
+    return primitives;
+}
+
+[[nodiscard]] int layoutScenePrimitiveKeyframeTotal(const std::vector<const LayoutScenePrimitive*>& primitives)
+{
+    int total = 0;
+    for (const auto* primitive : primitives)
+        total += primitive->keyframeCount;
+    return total;
 }
 
 [[nodiscard]] bool isProxyAtlasCandidate(const AtlasCandidate& candidate)
@@ -405,6 +464,67 @@ void drawLayoutTimelineBar(Gdiplus::Graphics& graphics, const Gdiplus::RectF& ba
     graphics.FillRectangle(&trackBrush, bar);
     graphics.FillRectangle(&fillBrush, bar.X, bar.Y, bar.Width * clampedProgress, bar.Height);
     graphics.DrawRectangle(&barPen, bar);
+}
+
+[[nodiscard]] Gdiplus::RectF clampRectToCanvas(Gdiplus::RectF rect, const Gdiplus::RectF& canvas);
+
+void drawLayoutScenePrimitives(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const std::vector<const LayoutScenePrimitive*>& primitives, float timelineProgress)
+{
+    if (primitives.empty())
+        return;
+
+    const int maxKeyframes = std::max(
+        1,
+        (*std::max_element(
+            primitives.begin(),
+            primitives.end(),
+            [](const LayoutScenePrimitive* left, const LayoutScenePrimitive* right)
+            {
+                return left->keyframeCount < right->keyframeCount;
+            }))->keyframeCount);
+
+    for (const auto* primitive : primitives)
+    {
+        Gdiplus::RectF primitiveRect(
+            canvas.X + (primitive->x * canvas.Width),
+            canvas.Y + (primitive->y * canvas.Height),
+            primitive->width * canvas.Width,
+            primitive->height * canvas.Height);
+        primitiveRect = clampRectToCanvas(primitiveRect, canvas);
+
+        const float density = std::clamp(static_cast<float>(primitive->keyframeCount) / static_cast<float>(maxKeyframes), 0.12F, 1.0F);
+        const BYTE fillAlpha = static_cast<BYTE>(std::round(40.0F + (95.0F * density)));
+        Gdiplus::SolidBrush primitiveBrush(Gdiplus::Color(fillAlpha, 93, 245, 189));
+        Gdiplus::Pen primitivePen(Gdiplus::Color(220, 151, 255, 223), 1.2F);
+        graphics.FillRectangle(&primitiveBrush, primitiveRect);
+        graphics.DrawRectangle(&primitivePen, primitiveRect);
+
+        const int frame = primitive->frameCount > 0
+            ? static_cast<int>(std::round(std::clamp(timelineProgress, 0.0F, 1.0F) * static_cast<float>(primitive->frameCount)))
+            : 0;
+        std::ostringstream label;
+        label
+            << primitive->sceneName
+            << " | kf=" << primitive->keyframeCount
+            << " | f=" << frame << "/" << primitive->frameCount;
+
+        RECT labelRect{
+            static_cast<LONG>(primitiveRect.X + 6.0F),
+            static_cast<LONG>(primitiveRect.Y + 2.0F),
+            static_cast<LONG>(primitiveRect.X + primitiveRect.Width - 6.0F),
+            static_cast<LONG>(primitiveRect.Y + std::min(24.0F, primitiveRect.Height)),
+        };
+        drawTextLine(dc, labelRect, label.str(), RGB(236, 255, 248));
+
+        const float barMargin = 6.0F;
+        const float barHeight = 4.0F;
+        Gdiplus::RectF primitiveBar(
+            primitiveRect.X + barMargin,
+            primitiveRect.Y + primitiveRect.Height - barMargin - barHeight,
+            std::max(1.0F, primitiveRect.Width - (barMargin * 2.0F)),
+            barHeight);
+        drawLayoutTimelineBar(graphics, primitiveBar, timelineProgress);
+    }
 }
 
 void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const LayoutEvidence& evidence, float timelineProgress)
@@ -956,6 +1076,32 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     return titleMatches && pauseMatches && loadingMatches && title->framesPerSecond == 60 ? 0 : 1;
 }
 
+[[nodiscard]] int runLayoutPrimitiveSmoke()
+{
+    const auto title = layoutScenePrimitivesForContract("title_menu_reference.json");
+    const auto pause = layoutScenePrimitivesForContract("pause_menu_reference.json");
+    const auto loading = layoutScenePrimitivesForContract("loading_transition_reference.json");
+
+    const int titleKeyframes = layoutScenePrimitiveKeyframeTotal(title);
+    const int pauseKeyframes = layoutScenePrimitiveKeyframeTotal(pause);
+    const int loadingKeyframes = layoutScenePrimitiveKeyframeTotal(loading);
+
+    std::cout
+        << "sward_ui_runtime_debug_gui layout primitive smoke ok "
+        << "title_primitives=" << title.size()
+        << " keyframes=" << titleKeyframes
+        << " pause_primitives=" << pause.size()
+        << " keyframes=" << pauseKeyframes
+        << " loading_primitives=" << loading.size()
+        << " keyframes=" << loadingKeyframes
+        << '\n';
+
+    const bool titleMatches = title.size() == 6 && titleKeyframes == 806;
+    const bool pauseMatches = pause.size() == 6 && pauseKeyframes == 806;
+    const bool loadingMatches = loading.size() == 6 && loadingKeyframes == 2775;
+    return titleMatches && pauseMatches && loadingMatches ? 0 : 1;
+}
+
 [[nodiscard]] int runLayerFillSmoke()
 {
     const float backdropAlpha = previewLayerFillAlpha("backdrop");
@@ -1315,10 +1461,12 @@ private:
         std::string atlasLabel = "Local atlas: none";
         PreviewFamily previewFamily = PreviewFamily::Generic;
         const LayoutEvidence* layoutEvidence = nullptr;
+        std::vector<const LayoutScenePrimitive*> layoutPrimitives;
         if (host)
         {
             previewFamily = previewFamilyForContract(host->primaryContractFileName);
             layoutEvidence = layoutEvidenceForContract(host->primaryContractFileName);
+            layoutPrimitives = layoutScenePrimitivesForContract(host->primaryContractFileName);
             if (const auto* candidate = atlasCandidateForContract(host->primaryContractFileName))
             {
                 const auto atlasPath = visualAtlasSheetRoot() / std::string(candidate->atlasFileName);
@@ -1366,6 +1514,8 @@ private:
                 : (m_runtime->state() == ScreenState::Idle ? 1.0F : 0.0F);
             stateProgress = easedTimelineProgress(m_runtime->stateElapsedSeconds(), stateDuration);
         }
+
+        drawLayoutScenePrimitives(dc, graphics, canvas, layoutPrimitives, stateLinearProgress);
 
         if (m_runtime)
         {
@@ -1733,6 +1883,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runLayoutEvidenceSmoke();
         if (command.find("--layout-timeline-smoke") != std::string::npos)
             return runLayoutTimelineSmoke();
+        if (command.find("--layout-primitive-smoke") != std::string::npos)
+            return runLayoutPrimitiveSmoke();
         if (command.find("--family-preview-smoke") != std::string::npos)
             return runFamilyPreviewSmoke();
         if (command.find("--motion-smoke") != std::string::npos)

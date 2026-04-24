@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 59 GUI layout scene primitive preview
+
+- added [`research_uiux/GUI_LAYOUT_SCENE_PRIMITIVE_PREVIEW.md`](./research_uiux/GUI_LAYOUT_SCENE_PRIMITIVE_PREVIEW.md)
+- added a compact `LayoutScenePrimitive` table for the highest keyframe-density Title, Pause, and Loading scenes
+- added a scene-primitive draw pass over the native GUI atlas preview, including scene names, keyframe counts, and per-primitive frame progress bars
+- added `--layout-primitive-smoke` regression coverage and verified `b/rr59/sward_ui_runtime_debug_gui.exe`
+- capture-checked `GameModeMainMenu_Test.cpp` through `PrintWindow` with `mm_donut_move` and `mm_contentsitem_select` primitive overlays visible over the title atlas
+
 ### Phase 58 GUI layout timeline frame preview
 
 - added [`research_uiux/GUI_LAYOUT_TIMELINE_FRAME_PREVIEW.md`](./research_uiux/GUI_LAYOUT_TIMELINE_FRAME_PREVIEW.md)

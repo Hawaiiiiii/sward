@@ -446,6 +446,14 @@
 - [x] Build, smoke, and capture-check `b\rr58\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for the first GUI layout timeline frame-preview beat.
 
+## Phase 59 - GUI Layout Scene Primitive Preview
+
+- [x] Add a compact scene-primitive table for the highest keyframe-density Title, Pause, and Loading scenes.
+- [x] Draw recovered scene names, keyframe counts, and per-scene frame progress over the GUI atlas preview.
+- [x] Add `--layout-primitive-smoke` regression coverage for primitive counts and keyframe totals.
+- [x] Build, smoke, and capture-check `b\rr59\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for the first GUI scene-primitive preview beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -566,3 +574,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added and verified exact-family GUI preview layouts under `b\rr56`, with Title, Pause, and Loading placement adapters plus a captured `GameModeMainMenu_Test.cpp` title Intro preview frame.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI layout evidence overlays under `b\rr57`, with `ui_mainmenu`, `ui_pause`, and `ui_loading` parsed layout facts visible in the native preview and a captured `GameModeMainMenu_Test.cpp` title evidence frame.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI layout timeline frame previews under `b\rr58`, with Title/Pause/Loading longest timeline frame domains and a captured `GameModeMainMenu_Test.cpp` title Intro frame readout.
+- [x] Follow-on phase audit on `2026-04-24`: added and verified GUI layout scene primitive previews under `b\rr59`, with keyframe-density primitives for Title/Pause/Loading and a captured `GameModeMainMenu_Test.cpp` title primitive overlay.

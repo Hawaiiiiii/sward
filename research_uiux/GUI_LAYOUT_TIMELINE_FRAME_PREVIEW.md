@@ -66,3 +66,5 @@ sward_ui_runtime_debug_gui smoke ok contracts=19 hosts=176 groups=11 support_hos
 ```
 
 The GUI was also launch/capture-checked through `PrintWindow` by selecting `Menu / Stage Debug Hosts -> GameModeMainMenu_Test.cpp`, pressing `Run Host`, pausing playback during `Intro`, and capturing the rr58 window with the `ui_mainmenu` evidence panel showing a live `Frame: 98/220 @ 60fps` timeline readout.
+
+Phase 59 builds directly on this in [`GUI_LAYOUT_SCENE_PRIMITIVE_PREVIEW.md`](./GUI_LAYOUT_SCENE_PRIMITIVE_PREVIEW.md), drawing keyframe-density scene primitives over the same atlas preview.

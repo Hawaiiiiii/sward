@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr58" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr59" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -103,6 +103,16 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("layoutTimelineFrame", source_text)
         self.assertIn("drawLayoutTimelineBar", source_text)
         self.assertIn("--layout-timeline-smoke", source_text)
+
+    def test_gui_source_exposes_layout_scene_primitive_preview(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("LayoutScenePrimitive", source_text)
+        self.assertIn("layoutScenePrimitivesForContract", source_text)
+        self.assertIn("drawLayoutScenePrimitives", source_text)
+        self.assertIn("mm_donut_move", source_text)
+        self.assertIn("Root/window_1/item/stick", source_text)
+        self.assertIn("Root/bg_2", source_text)
+        self.assertIn("--layout-primitive-smoke", source_text)
 
     def test_gui_source_preserves_atlas_under_structural_backdrop_layers(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -267,6 +277,24 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("pause_frame=120/240", completed.stdout)
         self.assertIn("loading_frame=180/240", completed.stdout)
         self.assertIn("fps=60", completed.stdout)
+
+    def test_layout_primitive_smoke_reports_scene_graph_metrics_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--layout-primitive-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui layout primitive smoke ok", completed.stdout)
+        self.assertIn("title_primitives=6 keyframes=806", completed.stdout)
+        self.assertIn("pause_primitives=6 keyframes=806", completed.stdout)
+        self.assertIn("loading_primitives=6 keyframes=2775", completed.stdout)
 
 
 if __name__ == "__main__":
