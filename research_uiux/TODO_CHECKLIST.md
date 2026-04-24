@@ -426,6 +426,17 @@
 - [x] Build, smoke, and capture-check `b\rr56\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for the first exact-family GUI preview-layout beat.
 
+## Phase 57 - GUI Layout Evidence Preview Overlay
+
+- [x] Add a compact layout-evidence table for Title, Pause, and Loading contracts.
+- [x] Draw recovered layout IDs, verdicts, scene/animation counts, cue summaries, and longest parsed timelines inside the visual preview.
+- [x] Extend the GUI preview footer with the active recovered layout ID.
+- [x] Preserve atlas readability under structural backdrop and cinematic-frame roles.
+- [x] Add `--layout-evidence-smoke` regression coverage for decoded layout facts without opening a window.
+- [x] Add `--layer-fill-smoke` regression coverage for backdrop/cinematic-frame fill policy.
+- [x] Build, smoke, and capture-check `b\rr57\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for the first GUI layout-evidence overlay beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -544,3 +555,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI timeline playback controls under `b\rr54`, with Play/Pause, Step, timer-driven contract ticks, and a captured `SonicMainDisplay.cpp` Intro playback frame.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI state-aware preview motion under `b\rr55`, with eased role/state offsets, prompt/layer alpha, a dark atlas backing fill, and a captured `SonicMainDisplay.cpp` Intro preview frame.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified exact-family GUI preview layouts under `b\rr56`, with Title, Pause, and Loading placement adapters plus a captured `GameModeMainMenu_Test.cpp` title Intro preview frame.
+- [x] Follow-on phase audit on `2026-04-24`: added and verified GUI layout evidence overlays under `b\rr57`, with `ui_mainmenu`, `ui_pause`, and `ui_loading` parsed layout facts visible in the native preview and a captured `GameModeMainMenu_Test.cpp` title evidence frame.

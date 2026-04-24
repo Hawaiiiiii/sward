@@ -62,3 +62,5 @@ b\rr56\sward_ui_runtime_debug_gui.exe --smoke
 ```
 
 The GUI was also launch/capture-checked by selecting `Menu / Stage Debug Hosts -> GameModeMainMenu_Test.cpp`, pressing `Run Host`, and capturing the rr56 window while the title contract was in the `Intro` band.
+
+Phase 57 builds directly on this by adding [`GUI_LAYOUT_EVIDENCE_PREVIEW_OVERLAY.md`](./GUI_LAYOUT_EVIDENCE_PREVIEW_OVERLAY.md), which puts the parsed `ui_mainmenu`, `ui_pause`, and `ui_loading` layout/timeline facts into the same native preview surface.

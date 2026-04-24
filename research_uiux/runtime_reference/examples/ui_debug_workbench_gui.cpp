@@ -72,6 +72,23 @@ enum class PreviewFamily
     LoadingTransition,
 };
 
+struct LayoutEvidence
+{
+    std::string_view contractFileName;
+    std::string_view layoutId;
+    std::string_view fileName;
+    std::string_view verdict;
+    std::string_view role;
+    std::string_view sceneCueSummary;
+    std::string_view animationCueSummary;
+    std::string_view longestTimeline;
+    int sceneCount = 0;
+    int animationCount = 0;
+    int castDictionaryCount = 0;
+    int subimageCount = 0;
+    int maxDepth = 0;
+};
+
 inline constexpr const char* kPreviewPanelClassName = "SwardUiRuntimePreviewPanel";
 inline constexpr UINT_PTR kPlaybackTimerId = 2001;
 inline constexpr UINT kPlaybackTimerMilliseconds = 33;
@@ -88,6 +105,54 @@ inline constexpr std::array<AtlasCandidate, 10> kPreviewAtlasCandidates{{
     { "extra_stage_hud_reference.json", "extra_stage", "exstagetails_common__ui_prov_playscreen.png", "exact" },
     { "sonic_stage_hud_reference.json", "sonic_stage", "exstagetails_common__ui_prov_playscreen.png", "proxy" },
     { "werehog_stage_hud_reference.json", "werehog_stage", "exstagetails_common__ui_prov_playscreen.png", "proxy" },
+}};
+
+inline constexpr std::array<LayoutEvidence, 3> kLayoutEvidenceEntries{{
+    {
+        "title_menu_reference.json",
+        "ui_mainmenu",
+        "ui_mainmenu.xncp/.yncp",
+        "strong",
+        "title_menu",
+        "mm_base, mm_bg_intro, mm_contentsitem_*, mm_donut_*, mm_title_*",
+        "DefaultAnim, intro, move, sel1, sel2, sel3",
+        "mm_donut_move/DefaultAnim: 220f @ 60fps",
+        16,
+        6,
+        0,
+        0,
+        0,
+    },
+    {
+        "pause_menu_reference.json",
+        "ui_pause",
+        "ui_pause.yncp",
+        "direct",
+        "pause_menu",
+        "bg plus direct bg/footer/header-title layout-path anchors",
+        "Intro_Anim plus 41 parsed authored animation banks",
+        "btn_effect/charge_3_Outro: 240f @ 60fps",
+        29,
+        41,
+        260,
+        2871,
+        4,
+    },
+    {
+        "loading_transition_reference.json",
+        "ui_loading",
+        "ui_loading.yncp",
+        "direct",
+        "loading_transition",
+        "bg_1, bg_2, event_viewer, loadinfo, n_2_d, pda, pda_txt",
+        "Intro_Anim, Outro_Anim, 360_* variants, extra, ps3_* variants",
+        "pda_txt/Usual_Anim_3: 240f @ 60fps",
+        7,
+        37,
+        331,
+        2240,
+        0,
+    },
 }};
 
 enum ControlId
@@ -153,6 +218,18 @@ enum ControlId
     }
 
     return "generic";
+}
+
+[[nodiscard]] const LayoutEvidence* layoutEvidenceForContract(std::string_view contractFileName)
+{
+    const auto found = std::find_if(
+        kLayoutEvidenceEntries.begin(),
+        kLayoutEvidenceEntries.end(),
+        [contractFileName](const LayoutEvidence& evidence)
+        {
+            return evidence.contractFileName == contractFileName;
+        });
+    return found == kLayoutEvidenceEntries.end() ? nullptr : &*found;
 }
 
 [[nodiscard]] bool isProxyAtlasCandidate(const AtlasCandidate& candidate)
@@ -302,6 +379,67 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     DrawTextA(dc, text.c_str(), static_cast<int>(text.size()), &bounds, format);
 }
 
+void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const LayoutEvidence& evidence)
+{
+    const float panelWidth = std::min(340.0F, canvas.Width * 0.46F);
+    const float panelHeight = 92.0F;
+    const Gdiplus::RectF panel(
+        canvas.X + canvas.Width - panelWidth - 14.0F,
+        canvas.Y + 14.0F,
+        panelWidth,
+        panelHeight);
+
+    Gdiplus::SolidBrush panelBrush(Gdiplus::Color(210, 8, 14, 20));
+    Gdiplus::Pen panelPen(Gdiplus::Color(235, 111, 196, 255), 1.2F);
+    graphics.FillRectangle(&panelBrush, panel);
+    graphics.DrawRectangle(&panelPen, panel);
+
+    std::ostringstream summary;
+    summary
+        << evidence.layoutId
+        << " | " << evidence.verdict
+        << " | scenes=" << evidence.sceneCount
+        << " anims=" << evidence.animationCount;
+    if (evidence.castDictionaryCount > 0 || evidence.subimageCount > 0)
+    {
+        summary
+            << " casts=" << evidence.castDictionaryCount
+            << " subimgs=" << evidence.subimageCount;
+    }
+
+    RECT titleRect{
+        static_cast<LONG>(panel.X + 8.0F),
+        static_cast<LONG>(panel.Y + 4.0F),
+        static_cast<LONG>(panel.X + panel.Width - 8.0F),
+        static_cast<LONG>(panel.Y + 22.0F),
+    };
+    drawTextLine(dc, titleRect, summary.str(), RGB(234, 247, 255));
+
+    RECT sceneRect{
+        static_cast<LONG>(panel.X + 8.0F),
+        static_cast<LONG>(panel.Y + 26.0F),
+        static_cast<LONG>(panel.X + panel.Width - 8.0F),
+        static_cast<LONG>(panel.Y + 48.0F),
+    };
+    drawTextLine(dc, sceneRect, "Scenes: " + std::string(evidence.sceneCueSummary), RGB(193, 223, 240), DT_LEFT | DT_WORDBREAK | DT_END_ELLIPSIS);
+
+    RECT animRect{
+        static_cast<LONG>(panel.X + 8.0F),
+        static_cast<LONG>(panel.Y + 50.0F),
+        static_cast<LONG>(panel.X + panel.Width - 8.0F),
+        static_cast<LONG>(panel.Y + 68.0F),
+    };
+    drawTextLine(dc, animRect, "Anim: " + std::string(evidence.animationCueSummary), RGB(247, 211, 72));
+
+    RECT timelineRect{
+        static_cast<LONG>(panel.X + 8.0F),
+        static_cast<LONG>(panel.Y + 70.0F),
+        static_cast<LONG>(panel.X + panel.Width - 8.0F),
+        static_cast<LONG>(panel.Y + panel.Height - 6.0F),
+    };
+    drawTextLine(dc, timelineRect, "Longest: " + std::string(evidence.longestTimeline), RGB(207, 232, 245));
+}
+
 [[nodiscard]] float clampUnit(float value)
 {
     return std::max(0.0F, std::min(1.0F, value));
@@ -406,6 +544,13 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
 {
     const float alpha = clampUnit(baseAlpha * clampUnit(motion.alpha));
     return static_cast<BYTE>(std::round(alpha * 255.0F));
+}
+
+[[nodiscard]] float previewLayerFillAlpha(std::string_view role)
+{
+    if (role == "backdrop" || role == "cinematic_frame")
+        return 0.0F;
+    return 0.58F;
 }
 
 [[nodiscard]] Gdiplus::RectF layoutLayerRect(const OverlayLayer& layer, std::size_t roleIndex, const Gdiplus::RectF& canvas)
@@ -703,6 +848,52 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     const bool pauseFramed = pauseFamily == PreviewFamily::PauseMenu && pauseChromeRect.Width > pauseContentRect.Width;
     const bool loadingCentered = loadingFamily == PreviewFamily::LoadingTransition && loadingFrameRect.Y > canvas.Y;
     return titleSeparated && pauseFramed && loadingCentered ? 0 : 1;
+}
+
+[[nodiscard]] int runLayoutEvidenceSmoke()
+{
+    const auto* title = layoutEvidenceForContract("title_menu_reference.json");
+    const auto* pause = layoutEvidenceForContract("pause_menu_reference.json");
+    const auto* loading = layoutEvidenceForContract("loading_transition_reference.json");
+    if (!title || !pause || !loading)
+    {
+        std::cerr << "sward_ui_runtime_debug_gui layout evidence smoke failed missing evidence entry\n";
+        return 1;
+    }
+
+    std::cout
+        << "sward_ui_runtime_debug_gui layout evidence smoke ok "
+        << "title=" << title->layoutId
+        << " scenes=" << title->sceneCount
+        << " animations=" << title->animationCount
+        << " pause=" << pause->layoutId
+        << " scenes=" << pause->sceneCount
+        << " animations=" << pause->animationCount
+        << " loading=" << loading->layoutId
+        << " scenes=" << loading->sceneCount
+        << " animations=" << loading->animationCount
+        << '\n';
+
+    const bool titleMatches = title->layoutId == "ui_mainmenu" && title->sceneCount == 16 && title->animationCount == 6;
+    const bool pauseMatches = pause->layoutId == "ui_pause" && pause->sceneCount == 29 && pause->animationCount == 41;
+    const bool loadingMatches = loading->layoutId == "ui_loading" && loading->sceneCount == 7 && loading->animationCount == 37;
+    return titleMatches && pauseMatches && loadingMatches ? 0 : 1;
+}
+
+[[nodiscard]] int runLayerFillSmoke()
+{
+    const float backdropAlpha = previewLayerFillAlpha("backdrop");
+    const float cinematicAlpha = previewLayerFillAlpha("cinematic_frame");
+    const float contentAlpha = previewLayerFillAlpha("content");
+
+    std::cout
+        << "sward_ui_runtime_debug_gui layer fill smoke ok "
+        << "backdrop_alpha=" << backdropAlpha
+        << " cinematic_alpha=" << cinematicAlpha
+        << " content_alpha=" << contentAlpha
+        << '\n';
+
+    return backdropAlpha == 0.0F && cinematicAlpha == 0.0F && contentAlpha > 0.0F ? 0 : 1;
 }
 
 class WorkbenchGui
@@ -1047,9 +1238,11 @@ private:
         bool drewAtlas = false;
         std::string atlasLabel = "Local atlas: none";
         PreviewFamily previewFamily = PreviewFamily::Generic;
+        const LayoutEvidence* layoutEvidence = nullptr;
         if (host)
         {
             previewFamily = previewFamilyForContract(host->primaryContractFileName);
+            layoutEvidence = layoutEvidenceForContract(host->primaryContractFileName);
             if (const auto* candidate = atlasCandidateForContract(host->primaryContractFileName))
             {
                 const auto atlasPath = visualAtlasSheetRoot() / std::string(candidate->atlasFileName);
@@ -1108,9 +1301,10 @@ private:
                 const PreviewMotion motion = previewMotionForState(m_runtime->state(), layers[index].role, stateProgress, canvas);
                 const Gdiplus::RectF layerRect = applyPreviewMotion(layoutFamilyLayerRect(previewFamily, layers[index], roleIndex, canvas), motion, canvas);
 
-                Gdiplus::SolidBrush layerBrush(Gdiplus::Color(motionAlphaByte(0.58F, motion), 57, 166, 218));
+                Gdiplus::SolidBrush layerBrush(Gdiplus::Color(motionAlphaByte(previewLayerFillAlpha(layers[index].role), motion), 57, 166, 218));
                 Gdiplus::Pen layerPen(Gdiplus::Color(motionAlphaByte(0.95F, motion), 245, 248, 250), 1.5F);
-                graphics.FillRectangle(&layerBrush, layerRect);
+                if (previewLayerFillAlpha(layers[index].role) > 0.0F)
+                    graphics.FillRectangle(&layerBrush, layerRect);
                 graphics.DrawRectangle(&layerPen, layerRect);
 
                 RECT layerText{
@@ -1149,6 +1343,9 @@ private:
             }
         }
 
+        if (layoutEvidence)
+            drawLayoutEvidenceOverlay(dc, graphics, canvas, *layoutEvidence);
+
         if (m_runtime && m_runningContractIndex.has_value())
         {
             const double progress = stateDuration > 0.0 ? std::min(1.0, m_runtime->stateElapsedSeconds() / stateDuration) : (m_runtime->state() == ScreenState::Idle ? 1.0 : 0.0);
@@ -1166,6 +1363,7 @@ private:
             footer
                 << atlasLabel
                 << " | Family " << previewFamilyName(previewFamily)
+                << " | Layout " << (layoutEvidence ? layoutEvidence->layoutId : "none")
                 << " | State " << toString(m_runtime->state())
                 << " | " << (m_playbackRunning ? "playing" : "paused")
                 << " | prompts=" << m_runtime->visiblePrompts().size();
@@ -1173,7 +1371,7 @@ private:
         }
         else
         {
-            drawTextLine(dc, footerRect, atlasLabel + " | Family " + std::string(previewFamilyName(previewFamily)) + " | Run Host to preview runtime layers and prompt rows.", RGB(68, 75, 82));
+            drawTextLine(dc, footerRect, atlasLabel + " | Family " + std::string(previewFamilyName(previewFamily)) + " | Layout " + std::string(layoutEvidence ? layoutEvidence->layoutId : "none") + " | Run Host to preview runtime layers and prompt rows.", RGB(68, 75, 82));
         }
     }
 
@@ -1449,6 +1647,10 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
     try
     {
         const std::string command = commandLine ? commandLine : "";
+        if (command.find("--layer-fill-smoke") != std::string::npos)
+            return runLayerFillSmoke();
+        if (command.find("--layout-evidence-smoke") != std::string::npos)
+            return runLayoutEvidenceSmoke();
         if (command.find("--family-preview-smoke") != std::string::npos)
             return runFamilyPreviewSmoke();
         if (command.find("--motion-smoke") != std::string::npos)

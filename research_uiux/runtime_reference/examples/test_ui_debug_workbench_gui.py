@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr56" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr57" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -86,6 +86,23 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("layoutLoadingLayerRect", source_text)
         self.assertIn("layoutFamilyLayerRect", source_text)
         self.assertIn("--family-preview-smoke", source_text)
+
+    def test_gui_source_exposes_layout_evidence_overlay(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("LayoutEvidence", source_text)
+        self.assertIn("layoutEvidenceForContract", source_text)
+        self.assertIn("drawLayoutEvidenceOverlay", source_text)
+        self.assertIn("ui_mainmenu", source_text)
+        self.assertIn("ui_pause", source_text)
+        self.assertIn("ui_loading", source_text)
+        self.assertIn("--layout-evidence-smoke", source_text)
+
+    def test_gui_source_preserves_atlas_under_structural_backdrop_layers(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("previewLayerFillAlpha", source_text)
+        self.assertIn('role == "backdrop"', source_text)
+        self.assertIn('role == "cinematic_frame"', source_text)
+        self.assertIn("--layer-fill-smoke", source_text)
 
     def test_gui_initial_window_uses_desktop_work_area(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -188,6 +205,42 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("pause=pause_menu", completed.stdout)
         self.assertIn("loading=loading_transition", completed.stdout)
         self.assertIn("title_logo_y=", completed.stdout)
+
+    def test_layout_evidence_smoke_reports_decoded_layout_facts_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--layout-evidence-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui layout evidence smoke ok", completed.stdout)
+        self.assertIn("title=ui_mainmenu scenes=16 animations=6", completed.stdout)
+        self.assertIn("pause=ui_pause scenes=29 animations=41", completed.stdout)
+        self.assertIn("loading=ui_loading scenes=7 animations=37", completed.stdout)
+
+    def test_layer_fill_smoke_preserves_atlas_under_backdrops_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--layer-fill-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui layer fill smoke ok", completed.stdout)
+        self.assertIn("backdrop_alpha=0", completed.stdout)
+        self.assertIn("cinematic_alpha=0", completed.stdout)
+        self.assertIn("content_alpha=0.58", completed.stdout)
 
 
 if __name__ == "__main__":

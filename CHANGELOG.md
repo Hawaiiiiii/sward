@@ -11,6 +11,16 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 57 GUI layout evidence preview overlay
+
+- added [`research_uiux/GUI_LAYOUT_EVIDENCE_PREVIEW_OVERLAY.md`](./research_uiux/GUI_LAYOUT_EVIDENCE_PREVIEW_OVERLAY.md)
+- added a compact `LayoutEvidence` overlay to `sward_ui_runtime_debug_gui` for Title, Pause, and Loading preview families
+- surfaced recovered layout IDs, correlation verdicts, scene/animation counts, cast/subimage counts, cue summaries, and longest parsed timelines directly inside the visual preview
+- extended the preview footer with the active recovered layout ID so atlas, family, state, playback, prompt, and layout evidence can be read together
+- added `--layout-evidence-smoke` regression coverage and verified `b/rr57/sward_ui_runtime_debug_gui.exe`
+- added `--layer-fill-smoke` regression coverage and fixed structural backdrop/cinematic-frame overlays so they preserve the atlas image underneath
+- capture-checked `GameModeMainMenu_Test.cpp` in the GUI with the title atlas, runtime layer projection, timeline footer, and `ui_mainmenu` evidence overlay visible
+
 ### Phase 56 GUI exact-family preview layouts
 
 - added [`research_uiux/GUI_EXACT_FAMILY_PREVIEW_LAYOUTS.md`](./research_uiux/GUI_EXACT_FAMILY_PREVIEW_LAYOUTS.md)

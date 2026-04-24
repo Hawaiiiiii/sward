@@ -59,6 +59,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the first exact-family Title/Pause/Loading preview layouts in the GUI workbench, start with [`research_uiux/GUI_EXACT_FAMILY_PREVIEW_LAYOUTS.md`](./research_uiux/GUI_EXACT_FAMILY_PREVIEW_LAYOUTS.md).
 
+> [!TIP]
+> For the first decoded layout-evidence overlay inside the GUI visual preview, start with [`research_uiux/GUI_LAYOUT_EVIDENCE_PREVIEW_OVERLAY.md`](./research_uiux/GUI_LAYOUT_EVIDENCE_PREVIEW_OVERLAY.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
@@ -93,6 +96,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - Timer-driven GUI playback controls via [`research_uiux/GUI_TIMELINE_PLAYBACK_CONTROLS.md`](./research_uiux/GUI_TIMELINE_PLAYBACK_CONTROLS.md)
 - State-aware GUI preview motion via [`research_uiux/GUI_STATE_AWARE_PREVIEW_MOTION.md`](./research_uiux/GUI_STATE_AWARE_PREVIEW_MOTION.md)
 - Exact-family Title/Pause/Loading preview layouts via [`research_uiux/GUI_EXACT_FAMILY_PREVIEW_LAYOUTS.md`](./research_uiux/GUI_EXACT_FAMILY_PREVIEW_LAYOUTS.md)
+- GUI layout-evidence preview overlays via [`research_uiux/GUI_LAYOUT_EVIDENCE_PREVIEW_OVERLAY.md`](./research_uiux/GUI_LAYOUT_EVIDENCE_PREVIEW_OVERLAY.md)
 - A local-only support-substrate humanization pass via [`research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`](./research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md)
 - Runtime-backed support-substrate contracts via [`research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`](./research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md)
 - A source-tree mirror helper for the local-only `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py)
