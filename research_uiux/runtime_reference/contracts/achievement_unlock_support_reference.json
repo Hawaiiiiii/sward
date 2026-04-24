@@ -1,0 +1,45 @@
+{
+  "screen_id": "AchievementUnlockSupportReference",
+  "source_system": "achievement_unlock_support",
+  "notes": "Diagnostic support contract for AchievementManager and SequenceUnitUnlockAchievement ownership. This models unlock queue preparation, burst/toast dispatch, profile reward commit, and return-to-shell timing without shipping extracted assets.",
+  "timeline_bands": [
+    { "id": "unlock_prepare", "seconds": 0.2 },
+    { "id": "queue_step", "seconds": 0.18 },
+    { "id": "toast_commit", "seconds": 0.46 },
+    { "id": "cancel_flush", "seconds": 0.24 },
+    { "id": "support_return", "seconds": 0.28 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "SupportBoot", "enter_scene": "achievement_support_boot", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "UnlockQueuePrepare", "enter_scene": "achievement_unlock_prepare", "timeline_band_id": "unlock_prepare", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "UnlockQueueIdle", "enter_scene": "achievement_unlock_idle", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "UnlockQueueStep", "enter_scene": "achievement_unlock_queue_step", "timeline_band_id": "queue_step", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "CommitUnlockToast", "enter_scene": "achievement_unlock_commit", "timeline_band_id": "toast_commit", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "FlushUnlockQueue", "enter_scene": "achievement_unlock_flush", "timeline_band_id": "cancel_flush", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "SupportReturn", "enter_scene": "achievement_support_return", "timeline_band_id": "support_return", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "achievement_support_closed", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "unlock_queue", "role": "content", "interactive": true },
+    { "id": "achievement_badge", "role": "sidecar", "interactive": false },
+    { "id": "toast_burst", "role": "transient_fx", "interactive": false },
+    { "id": "profile_commit_gate", "role": "loading_gate", "interactive": false },
+    { "id": "support_prompt_strip", "role": "prompt", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Boot": [],
+    "Intro": ["content", "sidecar"],
+    "Idle": ["content", "sidecar", "prompt"],
+    "Navigate": ["content", "sidecar", "prompt"],
+    "Confirm": ["content", "sidecar", "transient_fx", "loading_gate"],
+    "Cancel": ["content", "loading_gate"],
+    "Outro": ["loading_gate"],
+    "Closed": []
+  },
+  "prompt_slots": [
+    { "slot_id": "previous_unlock", "button": "LB", "label": "Previous Unlock", "visible_states": ["Idle"], "required_predicates": ["has_previous_unlock"] },
+    { "slot_id": "next_unlock", "button": "RB", "label": "Next Unlock", "visible_states": ["Idle"], "required_predicates": ["has_next_unlock"] },
+    { "slot_id": "dispatch_unlock", "button": "A", "label": "Dispatch Unlock", "visible_states": ["Idle"], "required_predicates": ["can_dispatch_unlock"] },
+    { "slot_id": "flush_queue", "button": "B", "label": "Flush Queue", "visible_states": ["Idle"], "required_predicates": ["can_cancel"] }
+  ]
+}

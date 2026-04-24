@@ -52,6 +52,9 @@ RUNTIME_CONTRACTS = {
     "frontend_sequence_shell": "frontend_sequence_shell_reference.json",
     "camera_shell": "camera_shell_reference.json",
     "application_world_shell": "application_world_shell_reference.json",
+    "achievement_unlock_support": "achievement_unlock_support_reference.json",
+    "audio_cue_support": "audio_cue_support_reference.json",
+    "xml_data_loading_support": "xml_data_loading_support_reference.json",
 }
 
 STATUS_ORDER = {

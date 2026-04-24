@@ -4,7 +4,7 @@
 
 # <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Debug Workbench Catalog View
 
-Phase 48 adds a compact catalog mode to the native debug workbench so the widened host map is inspectable as a menu surface, not only as raw group and host lists.
+Phase 48 added a compact catalog mode to the native debug workbench so the widened host map is inspectable as a menu surface, not only as raw group and host lists. Phase 50 keeps that catalog current with the new support-substrate runtime contracts.
 
 ## What Changed
 
@@ -19,12 +19,13 @@ Phase 48 adds a compact catalog mode to the native debug workbench so the widene
 
 ## Current Catalog Surface
 
-- Total hosts: `159`
-- Groups: `10`
+- Total hosts: `176`
+- Groups: `11`
 - Largest groups:
   - `Application / World Shell Hosts`: `64`
   - `Camera / Replay Hosts`: `30`
   - `Town / Media Room Hosts`: `21`
+  - `Support Substrate Hosts`: `17`
   - `Cutscene / Preview Hosts`: `12`
 
 ## Why It Matters
@@ -42,11 +43,14 @@ The workbench is now easier to inspect from a console launch before diving into 
 - `b/rr48/sward_ui_runtime_debug_workbench.exe --catalog`
 - `SWARD_UI_DEBUG_WORKBENCH_EXE=b\rr48\sward_ui_runtime_debug_workbench.exe python research_uiux/runtime_reference/examples/test_ui_debug_workbench_catalog.py`
 - `b/rr48/sward_ui_runtime_debug_workbench.exe --host Player3DBossCamera.cpp`
+- `b/rr50/sward_ui_runtime_debug_workbench.exe --catalog`
+- `SWARD_UI_DEBUG_WORKBENCH_EXE=b\rr50\sward_ui_runtime_debug_workbench.exe python research_uiux/runtime_reference/examples/test_ui_debug_workbench_catalog.py`
+- `b/rr50/sward_ui_runtime_debug_workbench.exe --host SoundController.cpp`
 
 ## Example
 
 ```powershell
-b/rr48/sward_ui_runtime_debug_workbench.exe --catalog
+b/rr50/sward_ui_runtime_debug_workbench.exe --catalog
 ```
 
 The catalog includes the widened camera/presentation sample:
@@ -55,4 +59,10 @@ The catalog includes the widened camera/presentation sample:
 Camera / Replay Hosts [medium] hosts=30
   contract: camera_shell_reference.json
   sample: Player3DBossCamera.cpp
+
+Support Substrate Hosts [medium] hosts=17
+  contract: achievement_unlock_support_reference.json
+  contract: audio_cue_support_reference.json
+  contract: xml_data_loading_support_reference.json
+  sample: SoundController.cpp
 ```

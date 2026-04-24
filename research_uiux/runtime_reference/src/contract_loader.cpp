@@ -415,6 +415,12 @@ private:
         return "application_world_shell_reference.json";
     case ReferenceProfile::FrontendSequenceShell:
         return "frontend_sequence_shell_reference.json";
+    case ReferenceProfile::AchievementUnlockSupport:
+        return "achievement_unlock_support_reference.json";
+    case ReferenceProfile::AudioCueSupport:
+        return "audio_cue_support_reference.json";
+    case ReferenceProfile::XmlDataLoadingSupport:
+        return "xml_data_loading_support_reference.json";
     }
 
     throw std::runtime_error("Unknown reference profile.");
@@ -529,6 +535,9 @@ std::vector<std::filesystem::path> bundledContractPaths()
     result.push_back(root / "camera_shell_reference.json");
     result.push_back(root / "application_world_shell_reference.json");
     result.push_back(root / "frontend_sequence_shell_reference.json");
+    result.push_back(root / "achievement_unlock_support_reference.json");
+    result.push_back(root / "audio_cue_support_reference.json");
+    result.push_back(root / "xml_data_loading_support_reference.json");
     return result;
 }
 } // namespace sward::ui_runtime

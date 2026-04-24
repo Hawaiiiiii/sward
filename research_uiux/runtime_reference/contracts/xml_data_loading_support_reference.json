@@ -1,0 +1,45 @@
+{
+  "screen_id": "XmlDataLoadingSupportReference",
+  "source_system": "xml_data_loading_support",
+  "notes": "Diagnostic support contract for XMLBinData, XMLDocument, XMLManager, XMLNode, and SL XML type loaders. This models document bind, node traversal, binary/text payload commit, failure/cancel, and stage-loader return timing.",
+  "timeline_bands": [
+    { "id": "document_bind", "seconds": 0.28 },
+    { "id": "node_cycle", "seconds": 0.2 },
+    { "id": "payload_commit", "seconds": 0.34 },
+    { "id": "loader_cancel", "seconds": 0.22 },
+    { "id": "loader_return", "seconds": 0.26 }
+  ],
+  "states": [
+    { "state": "Boot", "debug_name": "XmlSupportBoot", "enter_scene": "xml_support_boot", "timeline_band_id": null, "timeout_target": null, "input_enabled": false },
+    { "state": "Intro", "debug_name": "DocumentBind", "enter_scene": "xml_document_bind", "timeline_band_id": "document_bind", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Idle", "debug_name": "DocumentIdle", "enter_scene": "xml_document_idle", "timeline_band_id": null, "timeout_target": null, "input_enabled": true },
+    { "state": "Navigate", "debug_name": "NodeCycle", "enter_scene": "xml_node_cycle", "timeline_band_id": "node_cycle", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Confirm", "debug_name": "PayloadCommit", "enter_scene": "xml_payload_commit", "timeline_band_id": "payload_commit", "timeout_target": "Idle", "input_enabled": false },
+    { "state": "Cancel", "debug_name": "LoaderCancel", "enter_scene": "xml_loader_cancel", "timeline_band_id": "loader_cancel", "timeout_target": "Outro", "input_enabled": false },
+    { "state": "Outro", "debug_name": "LoaderReturn", "enter_scene": "xml_loader_return", "timeline_band_id": "loader_return", "timeout_target": "Closed", "input_enabled": false },
+    { "state": "Closed", "debug_name": "Closed", "enter_scene": "xml_support_closed", "timeline_band_id": null, "timeout_target": null, "input_enabled": false }
+  ],
+  "overlay_layers": [
+    { "id": "document_tree", "role": "content", "interactive": true },
+    { "id": "node_detail", "role": "sidecar", "interactive": false },
+    { "id": "payload_gate", "role": "loading_gate", "interactive": false },
+    { "id": "parse_flash", "role": "transient_fx", "interactive": false },
+    { "id": "support_prompt_strip", "role": "prompt", "interactive": false }
+  ],
+  "visible_overlay_roles": {
+    "Boot": [],
+    "Intro": ["content", "loading_gate"],
+    "Idle": ["content", "sidecar", "prompt"],
+    "Navigate": ["content", "sidecar", "prompt"],
+    "Confirm": ["content", "sidecar", "loading_gate", "transient_fx"],
+    "Cancel": ["content", "loading_gate"],
+    "Outro": ["loading_gate"],
+    "Closed": []
+  },
+  "prompt_slots": [
+    { "slot_id": "previous_node", "button": "LB", "label": "Previous Node", "visible_states": ["Idle"], "required_predicates": ["has_previous_node"] },
+    { "slot_id": "next_node", "button": "RB", "label": "Next Node", "visible_states": ["Idle"], "required_predicates": ["has_next_node"] },
+    { "slot_id": "commit_payload", "button": "A", "label": "Commit Payload", "visible_states": ["Idle"], "required_predicates": ["can_commit_payload"] },
+    { "slot_id": "cancel_loader", "button": "B", "label": "Cancel Loader", "visible_states": ["Idle"], "required_predicates": ["can_cancel"] }
+  ]
+}

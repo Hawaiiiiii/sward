@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 50 support-substrate runtime contracts
+
+- added [`research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`](./research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md)
+- added bundled runtime contracts for achievement unlock support, audio/BGM cue support, and XML/data-loading support
+- exposed `AchievementUnlockSupport`, `AudioCueSupport`, and `XmlDataLoadingSupport` through the native C++ profile layer, C ABI profile IDs, and C# reference profile mapper
+- promoted the current `269`-path source manifest to `203` contract-backed paths (`75.5%`) while preserving `0` `named_seed_only` entries
+- regenerated the source-family selector to `19` launch families and the debug workbench to `176` hosts across `11` groups, including `17` support-substrate hosts
+
 ### Phase 49 local support-substrate humanization sweep
 
 - added [`research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`](./research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md)

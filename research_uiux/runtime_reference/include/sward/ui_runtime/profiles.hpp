@@ -24,6 +24,9 @@ enum class ReferenceProfile
     CameraShell,
     ApplicationWorldShell,
     FrontendSequenceShell,
+    AchievementUnlockSupport,
+    AudioCueSupport,
+    XmlDataLoadingSupport,
 };
 
 [[nodiscard]] ScreenContract makePauseMenuContract();
@@ -42,6 +45,9 @@ enum class ReferenceProfile
 [[nodiscard]] ScreenContract makeCameraShellContract();
 [[nodiscard]] ScreenContract makeApplicationWorldShellContract();
 [[nodiscard]] ScreenContract makeFrontendSequenceShellContract();
+[[nodiscard]] ScreenContract makeAchievementUnlockSupportContract();
+[[nodiscard]] ScreenContract makeAudioCueSupportContract();
+[[nodiscard]] ScreenContract makeXmlDataLoadingSupportContract();
 [[nodiscard]] ScreenContract makeContract(ReferenceProfile profile);
 [[nodiscard]] std::string_view toString(ReferenceProfile profile);
 } // namespace sward::ui_runtime

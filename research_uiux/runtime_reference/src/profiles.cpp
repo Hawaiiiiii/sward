@@ -85,6 +85,21 @@ ScreenContract makeFrontendSequenceShellContract()
     return loadBundledContract(ReferenceProfile::FrontendSequenceShell);
 }
 
+ScreenContract makeAchievementUnlockSupportContract()
+{
+    return loadBundledContract(ReferenceProfile::AchievementUnlockSupport);
+}
+
+ScreenContract makeAudioCueSupportContract()
+{
+    return loadBundledContract(ReferenceProfile::AudioCueSupport);
+}
+
+ScreenContract makeXmlDataLoadingSupportContract()
+{
+    return loadBundledContract(ReferenceProfile::XmlDataLoadingSupport);
+}
+
 ScreenContract makeContract(ReferenceProfile profile)
 {
     return loadBundledContract(profile);
@@ -126,6 +141,12 @@ std::string_view toString(ReferenceProfile profile)
         return "ApplicationWorldShell";
     case ReferenceProfile::FrontendSequenceShell:
         return "FrontendSequenceShell";
+    case ReferenceProfile::AchievementUnlockSupport:
+        return "AchievementUnlockSupport";
+    case ReferenceProfile::AudioCueSupport:
+        return "AudioCueSupport";
+    case ReferenceProfile::XmlDataLoadingSupport:
+        return "XmlDataLoadingSupport";
     }
 
     return "Unknown";

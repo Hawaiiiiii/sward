@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_EXE = REPO_ROOT / "b" / "rr47" / "sward_ui_runtime_debug_workbench.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr50" / "sward_ui_runtime_debug_workbench.exe"
 
 
 class UiDebugWorkbenchCatalogTests(unittest.TestCase):
@@ -26,11 +26,15 @@ class UiDebugWorkbenchCatalogTests(unittest.TestCase):
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("Debug workbench catalog", completed.stdout)
-        self.assertIn("Total hosts: 159", completed.stdout)
+        self.assertIn("Total hosts: 176", completed.stdout)
+        self.assertIn("Groups: 11", completed.stdout)
         self.assertIn("Application / World Shell Hosts [high] hosts=64", completed.stdout)
         self.assertIn("Camera / Replay Hosts [medium] hosts=30", completed.stdout)
+        self.assertIn("Support Substrate Hosts [medium] hosts=17", completed.stdout)
         self.assertIn("contract: camera_shell_reference.json", completed.stdout)
+        self.assertIn("contract: audio_cue_support_reference.json", completed.stdout)
         self.assertIn("sample: Player3DBossCamera.cpp", completed.stdout)
+        self.assertIn("sample: SoundController.cpp", completed.stdout)
 
 
 if __name__ == "__main__":

@@ -406,6 +406,10 @@ void printGroupList(const std::vector<GroupEntry>& groups)
         const auto hostName = hosts[hostIndex].metadata->hostDisplayName;
         if (hostName == "Player3DBossCamera.cpp")
             appendUnique(samples, hostName);
+        if (hostName == "SoundController.cpp")
+            appendUnique(samples, hostName);
+        if (hostName == "XMLManager.cpp")
+            appendUnique(samples, hostName);
     }
 
     return samples;

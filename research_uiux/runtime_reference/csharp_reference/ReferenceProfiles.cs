@@ -18,6 +18,9 @@ public enum ReferenceProfile
     CameraShell,
     ApplicationWorldShell,
     FrontendSequenceShell,
+    AchievementUnlockSupport,
+    AudioCueSupport,
+    XmlDataLoadingSupport,
 }
 
 public static class ReferenceProfiles
@@ -41,6 +44,9 @@ public static class ReferenceProfiles
             ReferenceProfile.CameraShell => "camera_shell_reference.json",
             ReferenceProfile.ApplicationWorldShell => "application_world_shell_reference.json",
             ReferenceProfile.FrontendSequenceShell => "frontend_sequence_shell_reference.json",
+            ReferenceProfile.AchievementUnlockSupport => "achievement_unlock_support_reference.json",
+            ReferenceProfile.AudioCueSupport => "audio_cue_support_reference.json",
+            ReferenceProfile.XmlDataLoadingSupport => "xml_data_loading_support_reference.json",
             _ => throw new InvalidOperationException("Unknown reference profile."),
         });
 

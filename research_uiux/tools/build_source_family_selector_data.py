@@ -31,6 +31,9 @@ PRIMARY_FAMILY_IDS = {
     "world_map_stack": "world_map_stack",
     "boss_hud": "boss_ui",
     "town_ui": "town_ui",
+    "achievement_unlock_support": "achievement_unlock_support",
+    "audio_cue_support": "audio_cue_support",
+    "xml_data_loading_support": "xml_data_loading_support",
 }
 
 EXTRA_SELECTOR_PATHS = {

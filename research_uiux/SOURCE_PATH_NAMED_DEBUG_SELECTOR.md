@@ -11,11 +11,13 @@ This generated layer upgrades the standalone selector from contract-stem browsin
 
 ## Launch Families
 
-- Source-path launch families: `16`
+- Source-path launch families: `19`
 
 | Family | Contract | Seed paths | Example anchors |
 |---|---|---:|---|
+| Achievement / Unlock Support | `achievement_unlock_support_reference.json` | `1` | `Achievement/AchievementManager.cpp` |
 | Application / World Shell | `application_world_shell_reference.json` | `33` | `System/Application.cpp`, `System/ApplicationDocument.cpp`, `System/ApplicationSetting.cpp` |
+| Audio Cue / BGM Support | `audio_cue_support_reference.json` | `10` | `Sound/Sound.cpp`, `Sound/SoundBGMActEggman.cpp`, `Sound/SoundBGMActEvil.cpp` |
 | Boss HUD | `boss_hud_reference.json` | `2` | `Boss/FinalDarkGaia/Object/FinalDarkGaiaHud.cpp`, `Boss/Phoenix/Hud/PhoenixHudVitality.cpp` |
 | Camera / Replay Shell | `camera_shell_reference.json` | `27` | `Camera/Camera.cpp`, `Camera/Controller/BlendCameraController.cpp`, `Camera/Controller/BobsleighCamera.cpp` |
 | Extra Stage / Tornado Defense HUD | `extra_stage_hud_reference.json` | `1` | `ExtraStage/Tails/Hud/HudExQte.cpp`, `System/GameMode/GameModeStageMotionTest.cpp` |
@@ -31,10 +33,13 @@ This generated layer upgrades the standalone selector from contract-stem browsin
 | Town UI | `town_ui_reference.json` | `21` | `Camera/Controller/TownShopCamera.cpp`, `Camera/Controller/TownTalkCamera.cpp`, `HUD/MediaRoom/MediaRoom.cpp` |
 | Werehog Stage HUD | `werehog_stage_hud_reference.json` | `5` | `HUD/Evil/EvilMainDisplay.cpp`, `HUD/Evil/HudEvilStage.cpp`, `HUD/Item/HudItemGet.cpp` |
 | World Map Stack | `world_map_reference.json` | `7` | `System/GameMode/Title/TitleStateWorldMap.cpp`, `System/GameMode/WorldMap/WorldMapListBox.cpp`, `System/GameMode/WorldMap/WorldMapMission.cpp` |
+| XML / Data Loading Support | `xml_data_loading_support_reference.json` | `6` | `XML/XMLBinData.cpp`, `XML/XMLDocument.cpp`, `XML/XMLManager.cpp` |
 
 ## Example Family Tokens
 
+- `Achievement / Unlock Support`: `AchievementManager.cpp`, `Achievement / Unlock Support`, `achievement_unlock_support`
 - `Application / World Shell`: `Application.cpp`, `ApplicationDocument.cpp`, `ApplicationSetting.cpp`, `Application / World Shell`, `application_world_shell`
+- `Audio Cue / BGM Support`: `Sound.cpp`, `SoundBGMActEggman.cpp`, `SoundBGMActEvil.cpp`, `Audio Cue / BGM Support`, `audio_cue_support`
 - `Boss HUD`: `FinalDarkGaiaHud.cpp`, `PhoenixHudVitality.cpp`, `Boss HUD`, `boss_hud`
 - `Camera / Replay Shell`: `Camera.cpp`, `BlendCameraController.cpp`, `BobsleighCamera.cpp`, `Camera / Replay Shell`, `camera_shell`
 - `Extra Stage / Tornado Defense HUD`: `HudExQte.cpp`, `GameModeStageMotionTest.cpp`, `Extra Stage / Tornado Defense HUD`, `extra_stage_hud`
@@ -50,9 +55,10 @@ This generated layer upgrades the standalone selector from contract-stem browsin
 - `Town UI`: `TownShopCamera.cpp`, `TownTalkCamera.cpp`, `MediaRoom.cpp`, `Town UI`, `town_ui`
 - `Werehog Stage HUD`: `EvilMainDisplay.cpp`, `HudEvilStage.cpp`, `HudItemGet.cpp`, `Werehog Stage HUD`, `werehog_stage_hud`
 - `World Map Stack`: `TitleStateWorldMap.cpp`, `WorldMapListBox.cpp`, `WorldMapMission.cpp`, `World Map Stack`, `world_map_stack`
+- `XML / Data Loading Support`: `XMLBinData.cpp`, `XMLDocument.cpp`, `XMLManager.cpp`, `XML / Data Loading Support`, `xml_data_loading_support`
 
 ## Selector Direction
 
 - The selector can now treat source-family aliases as first-class launch tokens.
-- The current launch set now spans the bundled frontend, town, camera, application/world, cutscene, gameplay-HUD, and boss/final runtime families, while keeping the tokens aligned with the mirrored source-family tree and the executable path dump.
+- The current launch set now spans the bundled frontend, town, camera, application/world, support-substrate, cutscene, gameplay-HUD, and boss/final runtime families, while keeping the tokens aligned with the mirrored source-family tree and the executable path dump.
 - The next value is widening readable translated ownership and pushing more host families through the same source-path-named launch flow.

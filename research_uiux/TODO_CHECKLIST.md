@@ -359,6 +359,15 @@
 - [x] Cover the new group with a regression test.
 - [x] Generate a dedicated report for the support-substrate humanization beat.
 
+## Phase 50 - Support-Substrate Runtime Contracts
+
+- [x] Add portable runtime contracts for achievement unlock, audio/BGM cue, and XML/data-loading support systems.
+- [x] Expose the new support contracts through native C++ profiles, the C ABI profile enum, and the C# reference profile mapper.
+- [x] Promote achievement, sound/BGM, and XML/data-loading source paths from archaeology-only support into contract-backed manifest entries.
+- [x] Regenerate source-family selector and debug workbench metadata so `AchievementManager.cpp`, `SoundController.cpp`, and `XMLManager.cpp` are launchable support probes.
+- [x] Cover the support contracts, manifest promotion, selector families, and workbench host group with a regression test.
+- [x] Generate a dedicated report for the support-substrate runtime-contract beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -469,4 +478,5 @@
 - [x] Follow-on phase audit on `2026-04-24`: materialized `269` local-only placement notes under `SONIC UNLEASHED\` while keeping the mirror out of git.
 - [x] Follow-on phase audit on `2026-04-24`: widened the debug workbench host map to `159` hosts across `10` groups, with the camera/replay group expanded to `30` presentation-controller hosts.
 - [x] Follow-on phase audit on `2026-04-24`: added `--catalog` to `sward_ui_runtime_debug_workbench.exe` so the `159`-host map can be inspected by group, contract, and sample host before launching a specific source-family probe.
+- [x] Follow-on phase audit on `2026-04-24`: added achievement, audio/BGM, and XML/data-loading runtime contracts, raising contract-backed source-path coverage to `203 / 269` (`75.5%`) and the debug workbench to `176` hosts across `11` groups.
 - [x] Follow-on phase audit on `2026-04-24`: verified the catalog view under `b\rr48`, including the widened `Player3DBossCamera.cpp` camera/presentation host.

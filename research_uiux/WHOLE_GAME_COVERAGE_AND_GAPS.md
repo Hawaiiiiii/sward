@@ -17,7 +17,7 @@
 | Original SEGA human-authored game source | Not available locally | `0%` verified |
 | Generated translated PowerPC C++ and shader layer from owned inputs | Present locally | `100%` of the current generation goal |
 | Broader UI-adjacent source-path seed bridged into the archaeology/support layer | Partial but measured | `78.8%` |
-| Broader UI-adjacent source-path seed already backed by runtime contracts | Partial but strong | `69.1%` |
+| Broader UI-adjacent source-path seed already backed by runtime contracts | Partial but strong | `75.5%` |
 | Local-only readable source layer inside the mirrored `SONIC UNLEASHED/` tree | Partial but accelerating | `125` humanized `.cpp` scaffolds |
 | Whole-game asset corpus extracted into readable loose files | Not complete | no defensible exact percentage yet |
 | Template-grade UI/UX recovery for the studied screens | Strong | high confidence, but not a whole-game `1:1` portability claim |
@@ -43,11 +43,12 @@
   - a human-readable bridge report at `research_uiux/UI_SOURCE_PATH_RECOVERY_AND_HUMANIZATION_PLAN.md`
   - a Phase 47 wider-source report at `research_uiux/BROADER_SOURCE_PATH_EXPANSION_PHASE47.md`
   - a Phase 49 local support-substrate humanization report at `research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`
+  - a Phase 50 support-substrate runtime contract report at `research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`
   - a shell/debug host recovery map at `research_uiux/data/frontend_shell_recovery.json`
   - a human-readable shell/debug host report at `research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`
   - a dedicated frontend-sequence bridge report at `research_uiux/FRONTEND_SEQUENCE_SHELL_RUNTIME_BRIDGE.md`
-  - a richer native host-bucket debug executable at `b/rr48/sward_ui_runtime_debug_workbench.exe`
-  - a verified native selector with persistent interactive/stay-open behavior at `b/rr48/sward_ui_runtime_debug_selector.exe`
+  - a richer native host-bucket debug executable at `b/rr50/sward_ui_runtime_debug_workbench.exe`
+  - a verified native selector with persistent interactive/stay-open behavior at `b/rr50/sward_ui_runtime_debug_selector.exe`
   - a compact workbench catalog report at `research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md`
   - a dedicated CSD/UI foundation map at `research_uiux/data/csd_ui_foundation_map.json`
   - a human-readable foundation report at `research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md`
@@ -129,12 +130,12 @@ The current workspace is:
 - now materially stronger for local-only source-family placement inside the mirrored `SONIC UNLEASHED/` tree
 - now materially stronger for frontend shell/debug host recovery, especially pause/help dispatch, stage-change sequencing, town dispatch, and cutscene preview host triage
 - now materially stronger for local-only readable source-family ownership, with `125` debug-oriented `.cpp` scaffolds living under the mirrored `SONIC UNLEASHED/` tree instead of only `*.sward.md` notes
-- now materially stronger for runtime productization, with `186 / 269` broader source-path seeds (`69.1%`) backed by bundled contracts across frontend, frontend-sequence, town, camera, application/world, cutscene, gameplay-HUD, boss/final, and save/loading/title/world-map shell variants
+- now materially stronger for runtime productization, with `203 / 269` broader source-path seeds (`75.5%`) backed by bundled contracts across frontend, frontend-sequence, town, camera, application/world, support-substrate, cutscene, gameplay-HUD, boss/final, and save/loading/title/world-map shell variants
 - now materially stronger for source-path cleanup inside the current tracked seed, with `0` remaining `named_seed_only` paths in the present `269`-path subset
 - now materially stronger for support-substrate coverage, with achievement, animation-event, player-status, sound, XML/data-loading, and wider camera-controller paths classified instead of left outside the curated seed
 - now materially stronger for local-only support-substrate humanization, with `23` new achievement, animation-event, player-status, sound, and XML/data-loading scaffolds tied into the ignored mirror
 - now materially stronger for native debug-tool usability, with a verified selector/workbench that now loop in interactive mode and a workbench `--catalog` view for inspecting the widened host topology
-- now materially stronger for host coverage, with a verified `159`-host workbench map across `10` groups
+- now materially stronger for host coverage, with a verified `176`-host workbench map across `11` groups
 - partial for whole-game loose-file asset extraction
 - not yet equivalent to a whole-game clean human-readable source tree
 

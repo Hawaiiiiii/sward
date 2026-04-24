@@ -65,6 +65,12 @@ ReferenceProfile fromCProfile(sward_ui_profile_id profileId)
         return ReferenceProfile::ApplicationWorldShell;
     case SWARD_UI_PROFILE_FRONTEND_SEQUENCE_SHELL:
         return ReferenceProfile::FrontendSequenceShell;
+    case SWARD_UI_PROFILE_ACHIEVEMENT_UNLOCK_SUPPORT:
+        return ReferenceProfile::AchievementUnlockSupport;
+    case SWARD_UI_PROFILE_AUDIO_CUE_SUPPORT:
+        return ReferenceProfile::AudioCueSupport;
+    case SWARD_UI_PROFILE_XML_DATA_LOADING_SUPPORT:
+        return ReferenceProfile::XmlDataLoadingSupport;
     }
 
     return ReferenceProfile::PauseMenu;
@@ -418,6 +424,12 @@ const char* sward_ui_to_string_profile(sward_ui_profile_id profile_id)
         return "ApplicationWorldShell";
     case SWARD_UI_PROFILE_FRONTEND_SEQUENCE_SHELL:
         return "FrontendSequenceShell";
+    case SWARD_UI_PROFILE_ACHIEVEMENT_UNLOCK_SUPPORT:
+        return "AchievementUnlockSupport";
+    case SWARD_UI_PROFILE_AUDIO_CUE_SUPPORT:
+        return "AudioCueSupport";
+    case SWARD_UI_PROFILE_XML_DATA_LOADING_SUPPORT:
+        return "XmlDataLoadingSupport";
     }
 
     return "Unknown";

@@ -90,6 +90,33 @@ SHELL_GROUPS = {
     },
 }
 
+SUPPORT_GROUPS = {
+    "achievement_unlock_support": {
+        "group_id": "support_substrate_hosts",
+        "display_name": "Support Substrate Hosts",
+        "priority": "medium",
+        "primary_contract_file_name": "achievement_unlock_support_reference.json",
+        "extra_alias_tokens": ["AchievementManager.cpp", "SequenceUnitUnlockAchievement.cpp"],
+        "note": "Achievement unlock queue, toast dispatch, and profile reward support contract.",
+    },
+    "audio_cue_support": {
+        "group_id": "support_substrate_hosts",
+        "display_name": "Support Substrate Hosts",
+        "priority": "medium",
+        "primary_contract_file_name": "audio_cue_support_reference.json",
+        "extra_alias_tokens": ["SoundController.cpp", "SoundPlayer.cpp", "SoundBGMActSonic.cpp"],
+        "note": "Audio cue, BGM route, and sound-player support contract for UI feedback timing.",
+    },
+    "xml_data_loading_support": {
+        "group_id": "support_substrate_hosts",
+        "display_name": "Support Substrate Hosts",
+        "priority": "medium",
+        "primary_contract_file_name": "xml_data_loading_support_reference.json",
+        "extra_alias_tokens": ["XMLManager.cpp", "XMLDocument.cpp", "StageLoaderXML.cpp"],
+        "note": "XML document/bin-data loading support contract for stage loader and resource binding probes.",
+    },
+}
+
 
 def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8-sig"))
@@ -270,11 +297,64 @@ def build_shell_host_entries(manifest_payload: dict) -> list[dict]:
     return entries
 
 
+def build_support_host_entries(manifest_payload: dict) -> list[dict]:
+    entries: list[dict] = []
+
+    systems_by_id = {
+        system["system_id"]: system
+        for system in manifest_payload.get("systems", [])
+    }
+
+    for entry in manifest_payload.get("entries", []):
+        for system_id in entry.get("matched_system_ids", []):
+            config = SUPPORT_GROUPS.get(system_id)
+            if not config:
+                continue
+
+            system = systems_by_id.get(system_id, {})
+            runtime_contracts = entry.get("runtime_contracts", [])
+            primary_contract = runtime_contracts[0] if runtime_contracts else config["primary_contract_file_name"]
+            relative_source_path = entry["relative_source_path"]
+            alias_tokens = unique_ordered(
+                [
+                    config["display_name"],
+                    config["group_id"],
+                    system.get("screen_name", config["display_name"]),
+                    system_id,
+                    entry["family_name"],
+                    entry["family_id"],
+                    relative_source_path,
+                    Path(relative_source_path).name,
+                    primary_contract,
+                    Path(primary_contract).stem,
+                    *system.get("state_tags", []),
+                    *config["extra_alias_tokens"],
+                ]
+            )
+
+            entries.append(
+                {
+                    "group_id": config["group_id"],
+                    "group_display_name": config["display_name"],
+                    "priority": config["priority"],
+                    "relative_source_path": relative_source_path,
+                    "host_display_name": Path(relative_source_path).name,
+                    "primary_contract_file_name": primary_contract,
+                    "alias_tokens": alias_tokens,
+                    "notes": config["note"],
+                }
+            )
+
+    entries.sort(key=lambda item: (item["group_display_name"], item["host_display_name"]))
+    return entries
+
+
 def build_host_entries(frontend_payload: dict, hud_payload: dict, manifest_payload: dict) -> list[dict]:
     entries = (
         build_frontend_host_entries(frontend_payload)
         + build_gameplay_hud_host_entries(hud_payload)
         + build_shell_host_entries(manifest_payload)
+        + build_support_host_entries(manifest_payload)
     )
     deduped: list[dict] = []
     seen_paths: set[str] = set()

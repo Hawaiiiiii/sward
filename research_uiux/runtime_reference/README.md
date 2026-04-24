@@ -4,7 +4,7 @@
 
 # <img src="../../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Runtime Reference
 
-This directory contains the Phase 21/24/27/37/38/39/40/42/43/45/47/48 reusable runtime and port-kit layer for the SWARD template-pack concepts.
+This directory contains the Phase 21/24/27/37/38/39/40/42/43/45/47/48/50 reusable runtime and port-kit layer for the SWARD template-pack concepts.
 
 It is intentionally decoupled from game assets and from the asset-backed Unleashed Recompiled runtime. The goal is to provide reusable implementation layers for original projects that need:
 
@@ -21,6 +21,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - a dedicated frontend-sequence shell family for sequence-core, unit-factory, and unlock/dispatch probing
 - a Phase 47 wider source-path support layer with `159` generated workbench hosts, including `30` camera/replay presentation hosts
 - a compact `--catalog` workbench view that summarizes groups, contracts, and sample launch hosts before running a specific probe
+- Phase 50 support-substrate contracts for achievement unlock, audio/BGM cue, and XML/data-loading probes
 - interactive selector/workbench loops plus a `--stay-open` mode so the native tools no longer look like GUI crashes when launched directly
 
 Contents:
@@ -58,6 +59,9 @@ Bundled contract files:
 - `contracts/camera_shell_reference.json`
 - `contracts/application_world_shell_reference.json`
 - `contracts/frontend_sequence_shell_reference.json`
+- `contracts/achievement_unlock_support_reference.json`
+- `contracts/audio_cue_support_reference.json`
+- `contracts/xml_data_loading_support_reference.json`
 - `contracts/world_map_reference.json`
 
 Bundled reference profiles:
@@ -77,57 +81,67 @@ Bundled reference profiles:
 - `CameraShell`
 - `ApplicationWorldShell`
 - `FrontendSequenceShell`
+- `AchievementUnlockSupport`
+- `AudioCueSupport`
+- `XmlDataLoadingSupport`
 - `WorldMap`
 
 Build the native layer locally:
 
 ```powershell
-cmd /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" && "C:\Program Files\CMake\bin\cmake.exe" -S research_uiux/runtime_reference -B b/rr48 -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release && "C:\Program Files\CMake\bin\cmake.exe" --build b/rr48 --config Release'
-b/rr48/sward_ui_runtime_example.exe
-b/rr48/sward_ui_runtime_title_menu_example.exe
-b/rr48/sward_ui_runtime_toast_example.exe
-b/rr48/sward_ui_runtime_c_example.exe
-b/rr48/sward_ui_runtime_debug_selector.exe
-b/rr48/sward_ui_runtime_debug_workbench.exe
+cmd /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" && "C:\Program Files\CMake\bin\cmake.exe" -S research_uiux/runtime_reference -B b/rr50 -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release && "C:\Program Files\CMake\bin\cmake.exe" --build b/rr50 --config Release'
+b/rr50/sward_ui_runtime_example.exe
+b/rr50/sward_ui_runtime_title_menu_example.exe
+b/rr50/sward_ui_runtime_toast_example.exe
+b/rr50/sward_ui_runtime_c_example.exe
+b/rr50/sward_ui_runtime_debug_selector.exe
+b/rr50/sward_ui_runtime_debug_workbench.exe
 ```
 
 Run against the bundled contracts:
 
 ```powershell
-b/rr48/sward_ui_runtime_example.exe
-b/rr48/sward_ui_runtime_title_menu_example.exe
-b/rr48/sward_ui_runtime_toast_example.exe
-b/rr48/sward_ui_runtime_c_example.exe
-b/rr48/sward_ui_runtime_debug_selector.exe --list
-b/rr48/sward_ui_runtime_debug_selector.exe --list-families
-b/rr48/sward_ui_runtime_debug_selector.exe TitleMenu.cpp
-b/rr48/sward_ui_runtime_debug_selector.exe TownManager.cpp
-b/rr48/sward_ui_runtime_debug_selector.exe FreeCamera.cpp
-b/rr48/sward_ui_runtime_debug_selector.exe Player3DBossCamera.cpp
-b/rr48/sward_ui_runtime_debug_selector.exe Application.cpp
-b/rr48/sward_ui_runtime_debug_selector.exe SequenceManagerImpl.cpp
-b/rr48/sward_ui_runtime_debug_selector.exe --stay-open TitleManager.cpp
-b/rr48/sward_ui_runtime_debug_workbench.exe --list-groups
-b/rr48/sward_ui_runtime_debug_workbench.exe --catalog
-b/rr48/sward_ui_runtime_debug_workbench.exe --host GameModeMenuSelectDebug.cpp
-b/rr48/sward_ui_runtime_debug_workbench.exe --host InspirePreview.cpp
-b/rr48/sward_ui_runtime_debug_workbench.exe --host HudSonicStage.cpp
-b/rr48/sward_ui_runtime_debug_workbench.exe --host TownManager.cpp
-b/rr48/sward_ui_runtime_debug_workbench.exe --host Player3DBossCamera.cpp
-b/rr48/sward_ui_runtime_debug_workbench.exe --host TitleManager.cpp
-b/rr48/sward_ui_runtime_debug_workbench.exe --host WorldMapSelect.cpp
-b/rr48/sward_ui_runtime_debug_workbench.exe --host SequenceManagerImpl.cpp
+b/rr50/sward_ui_runtime_example.exe
+b/rr50/sward_ui_runtime_title_menu_example.exe
+b/rr50/sward_ui_runtime_toast_example.exe
+b/rr50/sward_ui_runtime_c_example.exe
+b/rr50/sward_ui_runtime_debug_selector.exe --list
+b/rr50/sward_ui_runtime_debug_selector.exe --list-families
+b/rr50/sward_ui_runtime_debug_selector.exe TitleMenu.cpp
+b/rr50/sward_ui_runtime_debug_selector.exe TownManager.cpp
+b/rr50/sward_ui_runtime_debug_selector.exe FreeCamera.cpp
+b/rr50/sward_ui_runtime_debug_selector.exe Player3DBossCamera.cpp
+b/rr50/sward_ui_runtime_debug_selector.exe Application.cpp
+b/rr50/sward_ui_runtime_debug_selector.exe SequenceManagerImpl.cpp
+b/rr50/sward_ui_runtime_debug_selector.exe AchievementManager.cpp
+b/rr50/sward_ui_runtime_debug_selector.exe SoundController.cpp
+b/rr50/sward_ui_runtime_debug_selector.exe XMLManager.cpp
+b/rr50/sward_ui_runtime_debug_selector.exe --stay-open TitleManager.cpp
+b/rr50/sward_ui_runtime_debug_workbench.exe --list-groups
+b/rr50/sward_ui_runtime_debug_workbench.exe --catalog
+b/rr50/sward_ui_runtime_debug_workbench.exe --host GameModeMenuSelectDebug.cpp
+b/rr50/sward_ui_runtime_debug_workbench.exe --host InspirePreview.cpp
+b/rr50/sward_ui_runtime_debug_workbench.exe --host HudSonicStage.cpp
+b/rr50/sward_ui_runtime_debug_workbench.exe --host TownManager.cpp
+b/rr50/sward_ui_runtime_debug_workbench.exe --host Player3DBossCamera.cpp
+b/rr50/sward_ui_runtime_debug_workbench.exe --host TitleManager.cpp
+b/rr50/sward_ui_runtime_debug_workbench.exe --host WorldMapSelect.cpp
+b/rr50/sward_ui_runtime_debug_workbench.exe --host SequenceManagerImpl.cpp
+b/rr50/sward_ui_runtime_debug_workbench.exe --host AchievementManager.cpp
+b/rr50/sward_ui_runtime_debug_workbench.exe --host SoundController.cpp
+b/rr50/sward_ui_runtime_debug_workbench.exe --host XMLManager.cpp
 ```
 
 Run against an explicit portable contract path:
 
 ```powershell
-b/rr48/sward_ui_runtime_example.exe research_uiux/runtime_reference/contracts/world_map_reference.json
-b/rr48/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/mission_result_reference.json
-b/rr48/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/subtitle_cutscene_reference.json
-b/rr48/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/sonic_stage_hud_reference.json
-b/rr48/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/application_world_shell_reference.json
-b/rr48/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/frontend_sequence_shell_reference.json
+b/rr50/sward_ui_runtime_example.exe research_uiux/runtime_reference/contracts/world_map_reference.json
+b/rr50/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/mission_result_reference.json
+b/rr50/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/subtitle_cutscene_reference.json
+b/rr50/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/sonic_stage_hud_reference.json
+b/rr50/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/application_world_shell_reference.json
+b/rr50/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/frontend_sequence_shell_reference.json
+b/rr50/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/audio_cue_support_reference.json
 ```
 
 Build the managed port locally:
@@ -155,6 +169,6 @@ Workbench notes:
 - `--group <token>` lists the launchable hosts inside one workbench group
 - `--host <token>` launches by recovered host name or source path such as `GameModeMenuSelectDebug.cpp` or `InspirePreview.cpp`
 - `--stay-open` waits for Enter before exit when you launch a direct host/command
-- the current workbench now covers menu-debug, stage-debug, cutscene-preview, gameplay-HUD, boss/final HUD, town/media-room, camera/replay, frontend-sequence, application/world shell, and stage-test ownership
-- the Phase 47 workbench map contains `159` host entries across `10` groups
+- the current workbench now covers menu-debug, stage-debug, cutscene-preview, gameplay-HUD, boss/final HUD, town/media-room, camera/replay, frontend-sequence, application/world shell, support-substrate, and stage-test ownership
+- the Phase 50 workbench map contains `176` host entries across `11` groups
 - no-argument interactive mode now returns to the group menu after each launch instead of exiting immediately
