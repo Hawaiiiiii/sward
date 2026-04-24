@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr57" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr58" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -96,6 +96,13 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("ui_pause", source_text)
         self.assertIn("ui_loading", source_text)
         self.assertIn("--layout-evidence-smoke", source_text)
+
+    def test_gui_source_exposes_layout_timeline_frame_overlay(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("longestTimelineFrames", source_text)
+        self.assertIn("layoutTimelineFrame", source_text)
+        self.assertIn("drawLayoutTimelineBar", source_text)
+        self.assertIn("--layout-timeline-smoke", source_text)
 
     def test_gui_source_preserves_atlas_under_structural_backdrop_layers(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -241,6 +248,25 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("backdrop_alpha=0", completed.stdout)
         self.assertIn("cinematic_alpha=0", completed.stdout)
         self.assertIn("content_alpha=0.58", completed.stdout)
+
+    def test_layout_timeline_smoke_reports_frame_domain_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--layout-timeline-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui layout timeline smoke ok", completed.stdout)
+        self.assertIn("title_frame=110/220", completed.stdout)
+        self.assertIn("pause_frame=120/240", completed.stdout)
+        self.assertIn("loading_frame=180/240", completed.stdout)
+        self.assertIn("fps=60", completed.stdout)
 
 
 if __name__ == "__main__":

@@ -437,6 +437,15 @@
 - [x] Build, smoke, and capture-check `b\rr57\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for the first GUI layout-evidence overlay beat.
 
+## Phase 58 - GUI Layout Timeline Frame Preview
+
+- [x] Add recovered longest-timeline frame counts and FPS to the compact layout evidence table.
+- [x] Map active runtime progress into parsed layout timeline frame space for Title, Pause, and Loading.
+- [x] Draw a frame-domain timeline bar and `Frame: current/total @ fps` readout in the GUI evidence overlay.
+- [x] Add `--layout-timeline-smoke` regression coverage for frame-domain mapping without opening a window.
+- [x] Build, smoke, and capture-check `b\rr58\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for the first GUI layout timeline frame-preview beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -556,3 +565,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI state-aware preview motion under `b\rr55`, with eased role/state offsets, prompt/layer alpha, a dark atlas backing fill, and a captured `SonicMainDisplay.cpp` Intro preview frame.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified exact-family GUI preview layouts under `b\rr56`, with Title, Pause, and Loading placement adapters plus a captured `GameModeMainMenu_Test.cpp` title Intro preview frame.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI layout evidence overlays under `b\rr57`, with `ui_mainmenu`, `ui_pause`, and `ui_loading` parsed layout facts visible in the native preview and a captured `GameModeMainMenu_Test.cpp` title evidence frame.
+- [x] Follow-on phase audit on `2026-04-24`: added and verified GUI layout timeline frame previews under `b\rr58`, with Title/Pause/Loading longest timeline frame domains and a captured `GameModeMainMenu_Test.cpp` title Intro frame readout.

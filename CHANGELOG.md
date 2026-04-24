@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 58 GUI layout timeline frame preview
+
+- added [`research_uiux/GUI_LAYOUT_TIMELINE_FRAME_PREVIEW.md`](./research_uiux/GUI_LAYOUT_TIMELINE_FRAME_PREVIEW.md)
+- extended `LayoutEvidence` with recovered longest-timeline frame counts and FPS for Title, Pause, and Loading previews
+- added frame-domain mapping from active runtime progress into parsed layout timeline space
+- added a visual timeline bar and `Frame: current/total @ fps` readout to the native GUI evidence overlay
+- added `--layout-timeline-smoke` regression coverage and verified `b/rr58/sward_ui_runtime_debug_gui.exe`
+- capture-checked `GameModeMainMenu_Test.cpp` through `PrintWindow` with the `ui_mainmenu` evidence overlay showing a live `98/220 @ 60fps` frame readout
+
 ### Phase 57 GUI layout evidence preview overlay
 
 - added [`research_uiux/GUI_LAYOUT_EVIDENCE_PREVIEW_OVERLAY.md`](./research_uiux/GUI_LAYOUT_EVIDENCE_PREVIEW_OVERLAY.md)

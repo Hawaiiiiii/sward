@@ -82,6 +82,8 @@ struct LayoutEvidence
     std::string_view sceneCueSummary;
     std::string_view animationCueSummary;
     std::string_view longestTimeline;
+    int longestTimelineFrames = 0;
+    int framesPerSecond = 60;
     int sceneCount = 0;
     int animationCount = 0;
     int castDictionaryCount = 0;
@@ -117,6 +119,8 @@ inline constexpr std::array<LayoutEvidence, 3> kLayoutEvidenceEntries{{
         "mm_base, mm_bg_intro, mm_contentsitem_*, mm_donut_*, mm_title_*",
         "DefaultAnim, intro, move, sel1, sel2, sel3",
         "mm_donut_move/DefaultAnim: 220f @ 60fps",
+        220,
+        60,
         16,
         6,
         0,
@@ -132,6 +136,8 @@ inline constexpr std::array<LayoutEvidence, 3> kLayoutEvidenceEntries{{
         "bg plus direct bg/footer/header-title layout-path anchors",
         "Intro_Anim plus 41 parsed authored animation banks",
         "btn_effect/charge_3_Outro: 240f @ 60fps",
+        240,
+        60,
         29,
         41,
         260,
@@ -147,6 +153,8 @@ inline constexpr std::array<LayoutEvidence, 3> kLayoutEvidenceEntries{{
         "bg_1, bg_2, event_viewer, loadinfo, n_2_d, pda, pda_txt",
         "Intro_Anim, Outro_Anim, 360_* variants, extra, ps3_* variants",
         "pda_txt/Usual_Anim_3: 240f @ 60fps",
+        240,
+        60,
         7,
         37,
         331,
@@ -379,10 +387,30 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     DrawTextA(dc, text.c_str(), static_cast<int>(text.size()), &bounds, format);
 }
 
-void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const LayoutEvidence& evidence)
+[[nodiscard]] int layoutTimelineFrame(const LayoutEvidence& evidence, float progress)
+{
+    if (evidence.longestTimelineFrames <= 0)
+        return 0;
+
+    const float clampedProgress = std::clamp(progress, 0.0F, 1.0F);
+    return static_cast<int>(std::round(clampedProgress * static_cast<float>(evidence.longestTimelineFrames)));
+}
+
+void drawLayoutTimelineBar(Gdiplus::Graphics& graphics, const Gdiplus::RectF& bar, float progress)
+{
+    const float clampedProgress = std::clamp(progress, 0.0F, 1.0F);
+    Gdiplus::SolidBrush trackBrush(Gdiplus::Color(235, 24, 34, 44));
+    Gdiplus::SolidBrush fillBrush(Gdiplus::Color(245, 247, 211, 72));
+    Gdiplus::Pen barPen(Gdiplus::Color(235, 135, 205, 255), 1.0F);
+    graphics.FillRectangle(&trackBrush, bar);
+    graphics.FillRectangle(&fillBrush, bar.X, bar.Y, bar.Width * clampedProgress, bar.Height);
+    graphics.DrawRectangle(&barPen, bar);
+}
+
+void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const LayoutEvidence& evidence, float timelineProgress)
 {
     const float panelWidth = std::min(340.0F, canvas.Width * 0.46F);
-    const float panelHeight = 92.0F;
+    const float panelHeight = 118.0F;
     const Gdiplus::RectF panel(
         canvas.X + canvas.Width - panelWidth - 14.0F,
         canvas.Y + 14.0F,
@@ -435,9 +463,28 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         static_cast<LONG>(panel.X + 8.0F),
         static_cast<LONG>(panel.Y + 70.0F),
         static_cast<LONG>(panel.X + panel.Width - 8.0F),
-        static_cast<LONG>(panel.Y + panel.Height - 6.0F),
+        static_cast<LONG>(panel.Y + 86.0F),
     };
     drawTextLine(dc, timelineRect, "Longest: " + std::string(evidence.longestTimeline), RGB(207, 232, 245));
+
+    const int frame = layoutTimelineFrame(evidence, timelineProgress);
+    std::ostringstream frameSummary;
+    frameSummary
+        << "Frame: " << frame
+        << "/" << evidence.longestTimelineFrames
+        << " @ " << evidence.framesPerSecond
+        << "fps";
+
+    RECT frameRect{
+        static_cast<LONG>(panel.X + 8.0F),
+        static_cast<LONG>(panel.Y + 90.0F),
+        static_cast<LONG>(panel.X + panel.Width - 8.0F),
+        static_cast<LONG>(panel.Y + 106.0F),
+    };
+    drawTextLine(dc, frameRect, frameSummary.str(), RGB(247, 211, 72));
+
+    Gdiplus::RectF timelineBar(panel.X + 8.0F, panel.Y + 108.0F, panel.Width - 16.0F, 5.0F);
+    drawLayoutTimelineBar(graphics, timelineBar, timelineProgress);
 }
 
 [[nodiscard]] float clampUnit(float value)
@@ -880,6 +927,35 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     return titleMatches && pauseMatches && loadingMatches ? 0 : 1;
 }
 
+[[nodiscard]] int runLayoutTimelineSmoke()
+{
+    const auto* title = layoutEvidenceForContract("title_menu_reference.json");
+    const auto* pause = layoutEvidenceForContract("pause_menu_reference.json");
+    const auto* loading = layoutEvidenceForContract("loading_transition_reference.json");
+    if (!title || !pause || !loading)
+    {
+        std::cerr << "sward_ui_runtime_debug_gui layout timeline smoke failed missing evidence entry\n";
+        return 1;
+    }
+
+    const int titleFrame = layoutTimelineFrame(*title, 0.5F);
+    const int pauseFrame = layoutTimelineFrame(*pause, 0.5F);
+    const int loadingFrame = layoutTimelineFrame(*loading, 0.75F);
+
+    std::cout
+        << "sward_ui_runtime_debug_gui layout timeline smoke ok "
+        << "title_frame=" << titleFrame << "/" << title->longestTimelineFrames
+        << " pause_frame=" << pauseFrame << "/" << pause->longestTimelineFrames
+        << " loading_frame=" << loadingFrame << "/" << loading->longestTimelineFrames
+        << " fps=" << title->framesPerSecond
+        << '\n';
+
+    const bool titleMatches = titleFrame == 110 && title->longestTimelineFrames == 220;
+    const bool pauseMatches = pauseFrame == 120 && pause->longestTimelineFrames == 240;
+    const bool loadingMatches = loadingFrame == 180 && loading->longestTimelineFrames == 240;
+    return titleMatches && pauseMatches && loadingMatches && title->framesPerSecond == 60 ? 0 : 1;
+}
+
 [[nodiscard]] int runLayerFillSmoke()
 {
     const float backdropAlpha = previewLayerFillAlpha("backdrop");
@@ -1279,11 +1355,15 @@ private:
         graphics.DrawRectangle(&canvasPen, canvas);
 
         double stateDuration = 0.0;
+        float stateLinearProgress = 0.0F;
         float stateProgress = 1.0F;
         if (m_runtime && m_runningContractIndex.has_value())
         {
             const auto& contract = m_contracts[*m_runningContractIndex].contract;
             stateDuration = timelineDuration(contract, m_runtime->state());
+            stateLinearProgress = stateDuration > 0.0
+                ? static_cast<float>(std::min(1.0, m_runtime->stateElapsedSeconds() / stateDuration))
+                : (m_runtime->state() == ScreenState::Idle ? 1.0F : 0.0F);
             stateProgress = easedTimelineProgress(m_runtime->stateElapsedSeconds(), stateDuration);
         }
 
@@ -1344,7 +1424,7 @@ private:
         }
 
         if (layoutEvidence)
-            drawLayoutEvidenceOverlay(dc, graphics, canvas, *layoutEvidence);
+            drawLayoutEvidenceOverlay(dc, graphics, canvas, *layoutEvidence, stateLinearProgress);
 
         if (m_runtime && m_runningContractIndex.has_value())
         {
@@ -1651,6 +1731,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runLayerFillSmoke();
         if (command.find("--layout-evidence-smoke") != std::string::npos)
             return runLayoutEvidenceSmoke();
+        if (command.find("--layout-timeline-smoke") != std::string::npos)
+            return runLayoutTimelineSmoke();
         if (command.find("--family-preview-smoke") != std::string::npos)
             return runFamilyPreviewSmoke();
         if (command.find("--motion-smoke") != std::string::npos)

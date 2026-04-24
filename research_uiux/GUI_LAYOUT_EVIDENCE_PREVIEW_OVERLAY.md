@@ -70,3 +70,5 @@ sward_ui_runtime_debug_gui smoke ok contracts=19 hosts=176 groups=11 support_hos
 ```
 
 The GUI was also launch/capture-checked by selecting `Menu / Stage Debug Hosts -> GameModeMainMenu_Test.cpp`, pressing `Run Host`, pausing playback, and capturing the rr57 window with the title-menu atlas, layer projection, timeline footer, and `ui_mainmenu` evidence overlay visible.
+
+Phase 58 builds directly on this in [`GUI_LAYOUT_TIMELINE_FRAME_PREVIEW.md`](./GUI_LAYOUT_TIMELINE_FRAME_PREVIEW.md), adding frame-domain readouts over the same recovered layout-evidence panel.
