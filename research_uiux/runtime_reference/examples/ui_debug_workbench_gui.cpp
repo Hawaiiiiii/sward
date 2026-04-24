@@ -7,8 +7,12 @@
 #endif
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <objidl.h>
+#include <propidl.h>
+#include <gdiplus.h>
 
 #include <algorithm>
+#include <array>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -44,6 +48,26 @@ struct GroupEntry
     std::vector<std::size_t> hostIndices;
 };
 
+struct AtlasCandidate
+{
+    std::string_view contractFileName;
+    std::string_view shortName;
+    std::string_view atlasFileName;
+};
+
+inline constexpr const char* kPreviewPanelClassName = "SwardUiRuntimePreviewPanel";
+
+inline constexpr std::array<AtlasCandidate, 8> kPreviewAtlasCandidates{{
+    { "title_menu_reference.json", "title", "mainmenu__ui_mainmenu.png" },
+    { "pause_menu_reference.json", "pause", "systemcommoncore__ui_pause.png" },
+    { "autosave_toast_reference.json", "autosave", "autosave__ui_saveicon.png" },
+    { "loading_transition_reference.json", "loading", "loading__ui_loading.png" },
+    { "mission_result_reference.json", "mission_result", "actioncommon__ui_result.png" },
+    { "world_map_reference.json", "world_map", "worldmap__ui_worldmap.png" },
+    { "boss_hud_reference.json", "boss_hud", "bosscommon__ui_boss_gauge.png" },
+    { "extra_stage_hud_reference.json", "extra_stage", "exstagetails_common__ui_exstage.png" },
+}};
+
 enum ControlId
 {
     kGroupListId = 1001,
@@ -54,6 +78,43 @@ enum ControlId
     kCancelButtonId = 1006,
     kResetButtonId = 1007,
 };
+
+[[nodiscard]] const AtlasCandidate* atlasCandidateForContract(std::string_view contractFileName)
+{
+    const auto found = std::find_if(
+        kPreviewAtlasCandidates.begin(),
+        kPreviewAtlasCandidates.end(),
+        [contractFileName](const AtlasCandidate& candidate)
+        {
+            return candidate.contractFileName == contractFileName;
+        });
+    return found == kPreviewAtlasCandidates.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] const AtlasCandidate* atlasCandidateByShortName(std::string_view shortName)
+{
+    const auto found = std::find_if(
+        kPreviewAtlasCandidates.begin(),
+        kPreviewAtlasCandidates.end(),
+        [shortName](const AtlasCandidate& candidate)
+        {
+            return candidate.shortName == shortName;
+        });
+    return found == kPreviewAtlasCandidates.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] std::filesystem::path visualAtlasSheetRoot()
+{
+    return std::filesystem::current_path() / "extracted_assets/visual_atlas/sheets";
+}
+
+[[nodiscard]] std::optional<std::filesystem::path> visualAtlasSheetForContract(std::string_view contractFileName)
+{
+    const auto* candidate = atlasCandidateForContract(contractFileName);
+    if (!candidate)
+        return std::nullopt;
+    return visualAtlasSheetRoot() / std::string(candidate->atlasFileName);
+}
 
 [[nodiscard]] std::vector<ContractEntry> loadBundledEntries()
 {
@@ -146,6 +207,36 @@ void enableAllPromptPredicates(ScreenRuntime& runtime, const ScreenContract& con
         runtime.setPredicate(predicate, true);
 }
 
+class GdiPlusSession
+{
+public:
+    GdiPlusSession()
+    {
+        Gdiplus::GdiplusStartupInput input;
+        if (Gdiplus::GdiplusStartup(&m_token, &input, nullptr) != Gdiplus::Ok)
+            m_token = 0;
+    }
+
+    ~GdiPlusSession()
+    {
+        if (m_token != 0)
+            Gdiplus::GdiplusShutdown(m_token);
+    }
+
+    GdiPlusSession(const GdiPlusSession&) = delete;
+    GdiPlusSession& operator=(const GdiPlusSession&) = delete;
+
+private:
+    ULONG_PTR m_token = 0;
+};
+
+void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, UINT format = DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_VCENTER)
+{
+    SetBkMode(dc, TRANSPARENT);
+    SetTextColor(dc, color);
+    DrawTextA(dc, text.c_str(), static_cast<int>(text.size()), &bounds, format);
+}
+
 [[nodiscard]] std::string snapshotText(const ScreenRuntime& runtime, const ContractEntry& entry, const DebugWorkbenchHostEntry& host)
 {
     std::ostringstream text;
@@ -155,6 +246,15 @@ void enableAllPromptPredicates(ScreenRuntime& runtime, const ScreenContract& con
         << "Primary contract: " << host.primaryContractFileName << "\r\n"
         << "Contract source: " << entry.path.string() << "\r\n"
         << "Screen id: " << entry.contract.screenId << "\r\n"
+        << "Local atlas candidate: ";
+
+    if (const auto* candidate = atlasCandidateForContract(host.primaryContractFileName))
+        text << candidate->atlasFileName;
+    else
+        text << "none";
+
+    text
+        << "\r\n"
         << "State: " << toString(runtime.state()) << "\r\n"
         << "Input locked: " << (runtime.isInputLocked() ? "yes" : "no") << "\r\n\r\n"
         << "Visible layers:\r\n";
@@ -199,6 +299,27 @@ void enableAllPromptPredicates(ScreenRuntime& runtime, const ScreenContract& con
     return 0;
 }
 
+[[nodiscard]] int runPreviewSmoke()
+{
+    std::size_t existingAtlasSheets = 0;
+    for (const auto& candidate : kPreviewAtlasCandidates)
+    {
+        if (std::filesystem::exists(visualAtlasSheetRoot() / std::string(candidate.atlasFileName)))
+            ++existingAtlasSheets;
+    }
+
+    const auto* title = atlasCandidateByShortName("title");
+    const auto* pause = atlasCandidateByShortName("pause");
+    std::cout
+        << "sward_ui_runtime_debug_gui preview smoke ok "
+        << "atlas_candidates=" << kPreviewAtlasCandidates.size()
+        << " existing_local_atlas=" << existingAtlasSheets
+        << " title=" << (title ? title->atlasFileName : "none")
+        << " pause=" << (pause ? pause->atlasFileName : "none")
+        << '\n';
+    return 0;
+}
+
 class WorkbenchGui
 {
 public:
@@ -219,17 +340,27 @@ public:
         windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
         windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
 
+        registerPreviewClass();
         RegisterClassA(&windowClass);
+
+        RECT workArea{ 0, 0, 1240, 760 };
+        SystemParametersInfoA(SPI_GETWORKAREA, 0, &workArea, 0);
+        const int workAreaWidth = std::max(900, static_cast<int>(workArea.right - workArea.left));
+        const int workAreaHeight = std::max(640, static_cast<int>(workArea.bottom - workArea.top));
+        const int windowWidth = std::min(1240, std::max(900, workAreaWidth - 40));
+        const int windowHeight = std::min(760, std::max(640, workAreaHeight - 40));
+        const int windowX = workArea.left + std::max(0, (workAreaWidth - windowWidth) / 2);
+        const int windowY = workArea.top + std::max(0, (workAreaHeight - windowHeight) / 2);
 
         m_window = CreateWindowExA(
             0,
             windowClass.lpszClassName,
             "SWARD UI Runtime Debug Workbench",
             WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            1240,
-            760,
+            windowX,
+            windowY,
+            windowWidth,
+            windowHeight,
             nullptr,
             nullptr,
             m_instance,
@@ -252,6 +383,17 @@ public:
     }
 
 private:
+    void registerPreviewClass()
+    {
+        WNDCLASSA previewClass{};
+        previewClass.lpfnWndProc = &WorkbenchGui::previewWindowProc;
+        previewClass.hInstance = m_instance;
+        previewClass.lpszClassName = kPreviewPanelClassName;
+        previewClass.hCursor = LoadCursor(nullptr, IDC_ARROW);
+        previewClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+        RegisterClassA(&previewClass);
+    }
+
     static LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
     {
         auto* app = reinterpret_cast<WorkbenchGui*>(GetWindowLongPtrA(window, GWLP_USERDATA));
@@ -266,6 +408,32 @@ private:
         if (!app)
             return DefWindowProcA(window, message, wParam, lParam);
         return app->handleMessage(message, wParam, lParam);
+    }
+
+    static LRESULT CALLBACK previewWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+    {
+        auto* app = reinterpret_cast<WorkbenchGui*>(GetWindowLongPtrA(window, GWLP_USERDATA));
+        if (message == WM_NCCREATE)
+        {
+            const auto* create = reinterpret_cast<CREATESTRUCTA*>(lParam);
+            app = reinterpret_cast<WorkbenchGui*>(create->lpCreateParams);
+            SetWindowLongPtrA(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(app));
+        }
+
+        if (message == WM_ERASEBKGND)
+            return 1;
+
+        if (message == WM_PAINT)
+        {
+            PAINTSTRUCT paint{};
+            const HDC dc = BeginPaint(window, &paint);
+            if (app)
+                app->paintPreview(dc);
+            EndPaint(window, &paint);
+            return 0;
+        }
+
+        return DefWindowProcA(window, message, wParam, lParam);
     }
 
     LRESULT handleMessage(UINT message, WPARAM wParam, LPARAM lParam)
@@ -301,6 +469,7 @@ private:
         m_confirmButton = createButton("Confirm", kConfirmButtonId);
         m_cancelButton = createButton("Cancel", kCancelButtonId);
         m_resetButton = createButton("Reset", kResetButtonId);
+        m_previewPanel = createPreviewPanel();
         m_detailText = createEdit();
         m_logText = createEdit();
     }
@@ -318,6 +487,7 @@ private:
             m_confirmButton,
             m_cancelButton,
             m_resetButton,
+            m_previewPanel,
             m_detailText,
             m_logText,
         };
@@ -354,6 +524,23 @@ private:
             reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
             m_instance,
             nullptr);
+    }
+
+    HWND createPreviewPanel()
+    {
+        return CreateWindowExA(
+            WS_EX_CLIENTEDGE,
+            kPreviewPanelClassName,
+            "",
+            WS_CHILD | WS_VISIBLE,
+            0,
+            0,
+            0,
+            0,
+            m_window,
+            nullptr,
+            m_instance,
+            this);
     }
 
     HWND createEdit()
@@ -398,10 +585,174 @@ private:
         MoveWindow(m_cancelButton, rightX + 300, buttonY, buttonWidth, buttonHeight, TRUE);
         MoveWindow(m_resetButton, rightX + 400, buttonY, buttonWidth, buttonHeight, TRUE);
 
-        const int detailsTop = buttonY + buttonHeight + margin;
-        const int detailsHeight = std::max(220, (height - detailsTop - (margin * 3)) / 2);
+        const int previewTop = buttonY + buttonHeight + margin;
+        const int previewWantedHeight = (rightWidth * 9 / 16) + 46;
+        const int previewHeight = std::min(std::max(180, previewWantedHeight), std::max(180, height / 3));
+        MoveWindow(m_previewPanel, rightX, previewTop, rightWidth, previewHeight, TRUE);
+
+        const int detailsTop = previewTop + previewHeight + margin;
+        const int remainingHeight = std::max(160, height - detailsTop - margin);
+        const int detailsHeight = std::max(110, (remainingHeight - margin) / 2);
         MoveWindow(m_detailText, rightX, detailsTop, rightWidth, detailsHeight, TRUE);
-        MoveWindow(m_logText, rightX, detailsTop + detailsHeight + margin, rightWidth, height - detailsTop - detailsHeight - (margin * 2), TRUE);
+        MoveWindow(m_logText, rightX, detailsTop + detailsHeight + margin, rightWidth, std::max(80, remainingHeight - detailsHeight - margin), TRUE);
+    }
+
+    [[nodiscard]] const ResolvedHostEntry* selectedHostEntry() const
+    {
+        if (!m_selectedHostIndex.has_value() || *m_selectedHostIndex >= m_hosts.size())
+            return nullptr;
+        return &m_hosts[*m_selectedHostIndex];
+    }
+
+    void paintPreview(HDC dc)
+    {
+        RECT client{};
+        GetClientRect(m_previewPanel, &client);
+        const int width = client.right - client.left;
+        const int height = client.bottom - client.top;
+        if (width <= 0 || height <= 0)
+            return;
+
+        Gdiplus::Graphics graphics(dc);
+        graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+        graphics.Clear(Gdiplus::Color(255, 246, 247, 244));
+
+        const auto* selected = selectedHostEntry();
+        const auto* host = selected ? selected->metadata : nullptr;
+
+        RECT titleRect{ 12, 8, width - 12, 30 };
+        std::string title = "Visual Preview";
+        if (host)
+            title += " - " + std::string(host->hostDisplayName);
+        drawTextLine(dc, titleRect, title, RGB(34, 40, 46));
+
+        Gdiplus::RectF bounds(14.0F, 38.0F, static_cast<float>(std::max(1, width - 28)), static_cast<float>(std::max(1, height - 78)));
+        const float targetAspect = 16.0F / 9.0F;
+        float canvasWidth = bounds.Width;
+        float canvasHeight = canvasWidth / targetAspect;
+        if (canvasHeight > bounds.Height)
+        {
+            canvasHeight = bounds.Height;
+            canvasWidth = canvasHeight * targetAspect;
+        }
+
+        Gdiplus::RectF canvas(
+            bounds.X + ((bounds.Width - canvasWidth) / 2.0F),
+            bounds.Y + ((bounds.Height - canvasHeight) / 2.0F),
+            canvasWidth,
+            canvasHeight);
+
+        bool drewAtlas = false;
+        std::string atlasLabel = "Local atlas: none";
+        if (host)
+        {
+            if (const auto atlasPath = visualAtlasSheetForContract(host->primaryContractFileName))
+            {
+                atlasLabel = "Local atlas: " + atlasPath->filename().string();
+                if (std::filesystem::exists(*atlasPath))
+                {
+                    Gdiplus::Image image(atlasPath->wstring().c_str());
+                    if (image.GetLastStatus() == Gdiplus::Ok)
+                    {
+                        graphics.DrawImage(&image, canvas.X, canvas.Y, canvas.Width, canvas.Height);
+                        drewAtlas = true;
+                    }
+                }
+            }
+        }
+
+        if (!drewAtlas)
+        {
+            Gdiplus::SolidBrush canvasBrush(Gdiplus::Color(255, 30, 34, 38));
+            graphics.FillRectangle(&canvasBrush, canvas);
+
+            RECT fallbackText{
+                static_cast<LONG>(canvas.X + 16.0F),
+                static_cast<LONG>(canvas.Y + 16.0F),
+                static_cast<LONG>(canvas.X + canvas.Width - 16.0F),
+                static_cast<LONG>(canvas.Y + canvas.Height - 16.0F),
+            };
+            drawTextLine(dc, fallbackText, "No local atlas sheet matched. Rendering contract layers only.", RGB(230, 235, 238), DT_LEFT | DT_WORDBREAK);
+        }
+
+        Gdiplus::Pen canvasPen(Gdiplus::Color(255, 38, 45, 52), 2.0F);
+        graphics.DrawRectangle(&canvasPen, canvas);
+
+        if (m_runtime)
+        {
+            const auto layers = m_runtime->visibleLayers();
+            for (std::size_t index = 0; index < layers.size(); ++index)
+            {
+                const float inset = 18.0F + (static_cast<float>(index) * 8.0F);
+                const float layerHeight = std::min(46.0F, std::max(24.0F, canvas.Height / static_cast<float>(layers.size() + 3)));
+                Gdiplus::RectF layerRect(
+                    canvas.X + inset,
+                    canvas.Y + 18.0F + (static_cast<float>(index) * (layerHeight + 8.0F)),
+                    std::max(48.0F, canvas.Width - (inset * 2.0F)),
+                    layerHeight);
+
+                Gdiplus::SolidBrush layerBrush(Gdiplus::Color(96, 57, 166, 218));
+                Gdiplus::Pen layerPen(Gdiplus::Color(220, 245, 248, 250), 1.5F);
+                graphics.FillRectangle(&layerBrush, layerRect);
+                graphics.DrawRectangle(&layerPen, layerRect);
+
+                RECT layerText{
+                    static_cast<LONG>(layerRect.X + 8.0F),
+                    static_cast<LONG>(layerRect.Y),
+                    static_cast<LONG>(layerRect.X + layerRect.Width - 8.0F),
+                    static_cast<LONG>(layerRect.Y + layerRect.Height),
+                };
+                drawTextLine(dc, layerText, layers[index].id + " : " + layers[index].role, RGB(255, 255, 255));
+            }
+
+            const auto prompts = m_runtime->visiblePrompts();
+            const float promptTop = canvas.Y + canvas.Height - 38.0F;
+            const float promptWidth = prompts.empty() ? 0.0F : std::min(150.0F, (canvas.Width - 32.0F) / static_cast<float>(prompts.size()));
+            for (std::size_t index = 0; index < prompts.size(); ++index)
+            {
+                Gdiplus::RectF promptRect(
+                    canvas.X + 16.0F + (static_cast<float>(index) * promptWidth),
+                    promptTop,
+                    std::max(56.0F, promptWidth - 8.0F),
+                    26.0F);
+                Gdiplus::SolidBrush promptBrush(Gdiplus::Color(228, 247, 211, 72));
+                Gdiplus::Pen promptPen(Gdiplus::Color(255, 35, 41, 47), 1.2F);
+                graphics.FillRectangle(&promptBrush, promptRect);
+                graphics.DrawRectangle(&promptPen, promptRect);
+
+                RECT promptText{
+                    static_cast<LONG>(promptRect.X + 6.0F),
+                    static_cast<LONG>(promptRect.Y),
+                    static_cast<LONG>(promptRect.X + promptRect.Width - 6.0F),
+                    static_cast<LONG>(promptRect.Y + promptRect.Height),
+                };
+                drawTextLine(dc, promptText, std::string(toString(prompts[index].button)) + " " + prompts[index].label, RGB(24, 29, 34));
+            }
+        }
+
+        if (m_runtime && m_runningContractIndex.has_value())
+        {
+            const auto& contract = m_contracts[*m_runningContractIndex].contract;
+            const double duration = timelineDuration(contract, m_runtime->state());
+            const double progress = duration > 0.0 ? std::min(1.0, m_runtime->stateElapsedSeconds() / duration) : (m_runtime->state() == ScreenState::Idle ? 1.0 : 0.0);
+            Gdiplus::RectF track(canvas.X, canvas.Y + canvas.Height + 10.0F, canvas.Width, 8.0F);
+            Gdiplus::SolidBrush trackBrush(Gdiplus::Color(255, 203, 209, 213));
+            Gdiplus::SolidBrush fillBrush(Gdiplus::Color(255, 45, 130, 216));
+            graphics.FillRectangle(&trackBrush, track);
+            graphics.FillRectangle(&fillBrush, track.X, track.Y, static_cast<float>(track.Width * progress), track.Height);
+        }
+
+        RECT footerRect{ 12, height - 30, width - 12, height - 8 };
+        if (m_runtime)
+        {
+            std::ostringstream footer;
+            footer << atlasLabel << " | State " << toString(m_runtime->state()) << " | prompts=" << m_runtime->visiblePrompts().size();
+            drawTextLine(dc, footerRect, footer.str(), RGB(68, 75, 82));
+        }
+        else
+        {
+            drawTextLine(dc, footerRect, atlasLabel + " | Run Host to preview runtime layers and prompt rows.", RGB(68, 75, 82));
+        }
     }
 
     void populateGroups()
@@ -486,10 +837,19 @@ private:
             << host.hostDisplayName << "\r\n\r\n"
             << "Group: " << host.groupDisplayName << "\r\n"
             << "Path: " << host.relativeSourcePath << "\r\n"
-            << "Contract: " << host.primaryContractFileName << "\r\n\r\n"
+            << "Contract: " << host.primaryContractFileName << "\r\n";
+
+        if (const auto* candidate = atlasCandidateForContract(host.primaryContractFileName))
+            text << "Atlas candidate: " << candidate->atlasFileName << "\r\n\r\n";
+        else
+            text << "Atlas candidate: none\r\n\r\n";
+
+        text
             << host.notes << "\r\n\r\n"
             << "Click Run Host to drive this contract through the runtime.";
         SetWindowTextA(m_detailText, text.str().c_str());
+        if (m_previewPanel)
+            InvalidateRect(m_previewPanel, nullptr, TRUE);
     }
 
     void runSelectedHost()
@@ -577,6 +937,8 @@ private:
         const auto& host = *m_hosts[*m_selectedHostIndex].metadata;
         SetWindowTextA(m_detailText, snapshotText(*m_runtime, entry, host).c_str());
         SetWindowTextA(m_logText, m_log.c_str());
+        if (m_previewPanel)
+            InvalidateRect(m_previewPanel, nullptr, TRUE);
     }
 
     void appendLogLine(const std::string& line)
@@ -598,6 +960,7 @@ private:
     HWND m_confirmButton = nullptr;
     HWND m_cancelButton = nullptr;
     HWND m_resetButton = nullptr;
+    HWND m_previewPanel = nullptr;
     HWND m_detailText = nullptr;
     HWND m_logText = nullptr;
 
@@ -617,9 +980,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
     try
     {
         const std::string command = commandLine ? commandLine : "";
+        if (command.find("--preview-smoke") != std::string::npos)
+            return runPreviewSmoke();
         if (command.find("--smoke") != std::string::npos)
             return runSmoke();
 
+        GdiPlusSession gdiPlus;
         WorkbenchGui app(instance);
         return app.run(showCommand);
     }

@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr51" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr52" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -20,6 +20,7 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("examples/ui_debug_workbench_gui.cpp", cmake_text)
         self.assertIn("user32", cmake_text)
         self.assertIn("gdi32", cmake_text)
+        self.assertIn("gdiplus", cmake_text)
 
     def test_gui_source_uses_workbench_data_and_runtime_contracts(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -30,6 +31,24 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("LISTBOX", source_text)
         self.assertIn("Run Host", source_text)
         self.assertIn("--smoke", source_text)
+
+    def test_gui_source_declares_visual_preview_surface(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("SwardUiRuntimePreviewPanel", source_text)
+        self.assertIn("WM_PAINT", source_text)
+        self.assertIn("paintPreview", source_text)
+        self.assertIn("Gdiplus::Image", source_text)
+        self.assertIn("extracted_assets/visual_atlas/sheets", source_text)
+        self.assertIn("visibleLayers", source_text)
+        self.assertIn("visiblePrompts", source_text)
+        self.assertIn("--preview-smoke", source_text)
+
+    def test_gui_initial_window_uses_desktop_work_area(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("SPI_GETWORKAREA", source_text)
+        self.assertIn("SystemParametersInfoA", source_text)
+        self.assertIn("windowWidth", source_text)
+        self.assertIn("windowHeight", source_text)
 
     def test_gui_smoke_command_resolves_hosts_without_opening_window(self) -> None:
         exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
@@ -48,6 +67,24 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("hosts=176", completed.stdout)
         self.assertIn("groups=11", completed.stdout)
         self.assertIn("support_hosts=17", completed.stdout)
+
+    def test_preview_smoke_command_reports_atlas_bindings_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--preview-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui preview smoke ok", completed.stdout)
+        self.assertIn("atlas_candidates=8", completed.stdout)
+        self.assertIn("title=mainmenu__ui_mainmenu.png", completed.stdout)
+        self.assertIn("pause=systemcommoncore__ui_pause.png", completed.stdout)
 
 
 if __name__ == "__main__":

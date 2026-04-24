@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 52 GUI visual preview and atlas binding
+
+- added [`research_uiux/GUI_VISUAL_PREVIEW_AND_ATLAS_BINDING.md`](./research_uiux/GUI_VISUAL_PREVIEW_AND_ATLAS_BINDING.md)
+- added a native preview panel to `sward_ui_runtime_debug_gui` so selected hosts now have a 16:9 visual surface instead of only detail/log text
+- added GDI+ atlas loading hooks for `8` high-confidence contract families while keeping the extracted PNG atlas sheets local-only under `extracted_assets/`
+- overlaid runtime visible layers, prompt rows, and a timeline/progress strip on top of the preview canvas
+- added `--preview-smoke` regression coverage and verified `b/rr52/sward_ui_runtime_debug_gui.exe`
+
 ### Phase 51 native GUI debug workbench
 
 - added [`research_uiux/NATIVE_GUI_DEBUG_WORKBENCH.md`](./research_uiux/NATIVE_GUI_DEBUG_WORKBENCH.md)

@@ -377,6 +377,15 @@
 - [x] Build and launch-check `b\rr51\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for the first non-CLI workbench beat.
 
+## Phase 52 - GUI Visual Preview And Atlas Binding
+
+- [x] Add a native preview panel to the GUI workbench.
+- [x] Bind high-confidence runtime contracts to local visual atlas sheet candidates without committing extracted PNGs.
+- [x] Draw runtime visible layers, prompt rows, and timeline/progress state on the preview canvas.
+- [x] Add a `--preview-smoke` regression path for validating atlas bindings without opening a window.
+- [x] Build and launch-check `b\rr52\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for the first GUI visual-preview beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -490,3 +499,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added achievement, audio/BGM, and XML/data-loading runtime contracts, raising contract-backed source-path coverage to `203 / 269` (`75.5%`) and the debug workbench to `176` hosts across `11` groups.
 - [x] Follow-on phase audit on `2026-04-24`: verified the catalog view under `b\rr48`, including the widened `Player3DBossCamera.cpp` camera/presentation host.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified the native Win32 `sward_ui_runtime_debug_gui.exe` under `b\rr51`, giving the current workbench its first proper non-CLI operator shell.
+- [x] Follow-on phase audit on `2026-04-24`: added and verified the GUI preview panel under `b\rr52`, with `8` local atlas candidates plus runtime layer/prompt/timeline overlay drawing.

@@ -100,4 +100,5 @@ target_link_libraries(sward_ui_runtime_debug_gui
         sward_ui_runtime
         user32
         gdi32
+        gdiplus
 )
