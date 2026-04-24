@@ -30,21 +30,21 @@ Verified preview smoke:
 sward_ui_runtime_debug_gui preview smoke ok atlas_candidates=10 proxy_candidates=2 existing_local_atlas=10 title=mainmenu__ui_mainmenu.png pause=systemcommoncore__ui_pause.png sonic_stage=exstagetails_common__ui_prov_playscreen.png
 ```
 
-## Phase 60 Follow-On
+## Phase 60/61 Follow-On
 
-Phase 60 keeps the same proxy boundary, but the GUI no longer treats the gameplay HUD atlas as only a backdrop. Sonic, Werehog, and Extra Stage HUD previews now draw six recovered `ui_prov_playscreen` scene primitives each:
+Phase 60 keeps the same proxy boundary, but the GUI no longer treats the gameplay HUD atlas as only a backdrop. Phase 61 audits the scene ownership labels against parsed `ui_prov_playscreen` facts. Sonic, Werehog, and Extra Stage HUD previews now draw six recovered scene primitives each:
 
-- `Root/bg`
-- `Root/info_1`
-- `Root/ring_get_effect`
 - `Root/so_speed_gauge`
 - `Root/so_ringenagy_gauge`
+- `Root/info_1`
 - `Root/info_2`
+- `Root/ring_get_effect`
+- `Root/bg`
 
 The primitive pass represents `680` parsed keyframes per gameplay HUD contract and is verified by:
 
 ```text
-sward_ui_runtime_debug_gui layout primitive smoke ok title_primitives=6 keyframes=806 pause_primitives=6 keyframes=806 loading_primitives=6 keyframes=2775 sonic_stage_primitives=6 keyframes=680 werehog_stage_primitives=6 keyframes=680 extra_stage_primitives=6 keyframes=680
+sward_ui_runtime_debug_gui layout primitive smoke ok title_primitives=6 keyframes=806 pause_primitives=6 keyframes=806 loading_primitives=6 keyframes=2775 sonic_stage_primitives=6 keyframes=680 werehog_stage_primitives=6 keyframes=680 extra_stage_primitives=6 keyframes=680 sonic_speed_gauge_kf=360 sonic_ring_energy_gauge_kf=240 sonic_ring_get_effect_kf=14 sonic_bg_kf=0
 ```
 
 ## Evidence Boundary

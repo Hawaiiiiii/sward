@@ -202,26 +202,26 @@ inline constexpr std::array<LayoutScenePrimitive, 36> kLayoutScenePrimitiveEntri
     { "loading_transition_reference.json", "Root/event_viewer", "event_viewer", "Gradient, SubImage, X/Y position, X/Y scale", 128, 9, 30, 5, 198, 0.06F, 0.05F, 0.88F, 0.10F },
     { "loading_transition_reference.json", "Root/pda_txt", "pda_txt", "Color", 51, 2, 56, 28, 144, 0.54F, 0.62F, 0.34F, 0.13F },
 
-    { "sonic_stage_hud_reference.json", "Root/bg", "bg", "Gradient, X/Y scale", 100, 1, 47, 47, 360, 0.08F, 0.08F, 0.50F, 0.18F },
-    { "sonic_stage_hud_reference.json", "Root/info_1", "info_1", "Gradient, X scale", 100, 1, 43, 43, 240, 0.07F, 0.29F, 0.42F, 0.14F },
-    { "sonic_stage_hud_reference.json", "Root/ring_get_effect", "ring_get_effect", "Gradient, HideFlag", 100, 3, 72, 24, 57, 0.64F, 0.26F, 0.28F, 0.14F },
-    { "sonic_stage_hud_reference.json", "Root/so_speed_gauge", "so_speed_gauge", "Gradient, Rotation", 5, 1, 2, 2, 14, 0.55F, 0.58F, 0.36F, 0.12F },
-    { "sonic_stage_hud_reference.json", "Root/so_ringenagy_gauge", "so_ringenagy_gauge", "HideFlag", 100, 3, 72, 24, 9, 0.55F, 0.72F, 0.36F, 0.10F },
-    { "sonic_stage_hud_reference.json", "Root/info_2", "info_2", "DefaultAnim", 100, 6, 29, 21, 0, 0.07F, 0.66F, 0.38F, 0.12F },
+    { "sonic_stage_hud_reference.json", "Root/so_speed_gauge", "so_speed_gauge", "Gradient, X/Y scale", 100, 1, 47, 47, 360, 0.55F, 0.58F, 0.36F, 0.12F },
+    { "sonic_stage_hud_reference.json", "Root/so_ringenagy_gauge", "so_ringenagy_gauge", "Gradient, X scale", 100, 1, 43, 43, 240, 0.55F, 0.72F, 0.36F, 0.10F },
+    { "sonic_stage_hud_reference.json", "Root/info_1", "info_1", "Gradient, HideFlag", 100, 3, 72, 24, 57, 0.07F, 0.29F, 0.42F, 0.14F },
+    { "sonic_stage_hud_reference.json", "Root/info_2", "info_2", "HideFlag", 100, 3, 72, 24, 9, 0.07F, 0.66F, 0.38F, 0.12F },
+    { "sonic_stage_hud_reference.json", "Root/ring_get_effect", "ring_get_effect", "Gradient, Rotation", 5, 1, 2, 2, 14, 0.64F, 0.26F, 0.28F, 0.14F },
+    { "sonic_stage_hud_reference.json", "Root/bg", "bg", "DefaultAnim", 100, 6, 29, 21, 0, 0.08F, 0.08F, 0.50F, 0.18F },
 
-    { "werehog_stage_hud_reference.json", "Root/bg", "bg", "Gradient, X/Y scale", 100, 1, 47, 47, 360, 0.08F, 0.08F, 0.50F, 0.18F },
-    { "werehog_stage_hud_reference.json", "Root/info_1", "info_1", "Gradient, X scale", 100, 1, 43, 43, 240, 0.07F, 0.29F, 0.42F, 0.14F },
-    { "werehog_stage_hud_reference.json", "Root/ring_get_effect", "ring_get_effect", "Gradient, HideFlag", 100, 3, 72, 24, 57, 0.64F, 0.26F, 0.28F, 0.14F },
-    { "werehog_stage_hud_reference.json", "Root/so_speed_gauge", "so_speed_gauge", "Gradient, Rotation", 5, 1, 2, 2, 14, 0.55F, 0.58F, 0.36F, 0.12F },
-    { "werehog_stage_hud_reference.json", "Root/so_ringenagy_gauge", "so_ringenagy_gauge", "HideFlag", 100, 3, 72, 24, 9, 0.55F, 0.72F, 0.36F, 0.10F },
-    { "werehog_stage_hud_reference.json", "Root/info_2", "info_2", "DefaultAnim", 100, 6, 29, 21, 0, 0.07F, 0.66F, 0.38F, 0.12F },
+    { "werehog_stage_hud_reference.json", "Root/so_speed_gauge", "so_speed_gauge", "Gradient, X/Y scale", 100, 1, 47, 47, 360, 0.55F, 0.58F, 0.36F, 0.12F },
+    { "werehog_stage_hud_reference.json", "Root/so_ringenagy_gauge", "so_ringenagy_gauge", "Gradient, X scale", 100, 1, 43, 43, 240, 0.55F, 0.72F, 0.36F, 0.10F },
+    { "werehog_stage_hud_reference.json", "Root/info_1", "info_1", "Gradient, HideFlag", 100, 3, 72, 24, 57, 0.07F, 0.29F, 0.42F, 0.14F },
+    { "werehog_stage_hud_reference.json", "Root/info_2", "info_2", "HideFlag", 100, 3, 72, 24, 9, 0.07F, 0.66F, 0.38F, 0.12F },
+    { "werehog_stage_hud_reference.json", "Root/ring_get_effect", "ring_get_effect", "Gradient, Rotation", 5, 1, 2, 2, 14, 0.64F, 0.26F, 0.28F, 0.14F },
+    { "werehog_stage_hud_reference.json", "Root/bg", "bg", "DefaultAnim", 100, 6, 29, 21, 0, 0.08F, 0.08F, 0.50F, 0.18F },
 
-    { "extra_stage_hud_reference.json", "Root/bg", "bg", "Gradient, X/Y scale", 100, 1, 47, 47, 360, 0.08F, 0.08F, 0.50F, 0.18F },
-    { "extra_stage_hud_reference.json", "Root/info_1", "info_1", "Gradient, X scale", 100, 1, 43, 43, 240, 0.07F, 0.29F, 0.42F, 0.14F },
-    { "extra_stage_hud_reference.json", "Root/ring_get_effect", "ring_get_effect", "Gradient, HideFlag", 100, 3, 72, 24, 57, 0.64F, 0.26F, 0.28F, 0.14F },
-    { "extra_stage_hud_reference.json", "Root/so_speed_gauge", "so_speed_gauge", "Gradient, Rotation", 5, 1, 2, 2, 14, 0.55F, 0.58F, 0.36F, 0.12F },
-    { "extra_stage_hud_reference.json", "Root/so_ringenagy_gauge", "so_ringenagy_gauge", "HideFlag", 100, 3, 72, 24, 9, 0.55F, 0.72F, 0.36F, 0.10F },
-    { "extra_stage_hud_reference.json", "Root/info_2", "info_2", "DefaultAnim", 100, 6, 29, 21, 0, 0.07F, 0.66F, 0.38F, 0.12F },
+    { "extra_stage_hud_reference.json", "Root/so_speed_gauge", "so_speed_gauge", "Gradient, X/Y scale", 100, 1, 47, 47, 360, 0.55F, 0.58F, 0.36F, 0.12F },
+    { "extra_stage_hud_reference.json", "Root/so_ringenagy_gauge", "so_ringenagy_gauge", "Gradient, X scale", 100, 1, 43, 43, 240, 0.55F, 0.72F, 0.36F, 0.10F },
+    { "extra_stage_hud_reference.json", "Root/info_1", "info_1", "Gradient, HideFlag", 100, 3, 72, 24, 57, 0.07F, 0.29F, 0.42F, 0.14F },
+    { "extra_stage_hud_reference.json", "Root/info_2", "info_2", "HideFlag", 100, 3, 72, 24, 9, 0.07F, 0.66F, 0.38F, 0.12F },
+    { "extra_stage_hud_reference.json", "Root/ring_get_effect", "ring_get_effect", "Gradient, Rotation", 5, 1, 2, 2, 14, 0.64F, 0.26F, 0.28F, 0.14F },
+    { "extra_stage_hud_reference.json", "Root/bg", "bg", "DefaultAnim", 100, 6, 29, 21, 0, 0.08F, 0.08F, 0.50F, 0.18F },
 }};
 
 enum ControlId
@@ -318,6 +318,18 @@ enum ControlId
     for (const auto* primitive : primitives)
         total += primitive->keyframeCount;
     return total;
+}
+
+[[nodiscard]] int layoutScenePrimitiveKeyframesForScene(const std::vector<const LayoutScenePrimitive*>& primitives, std::string_view sceneName)
+{
+    const auto found = std::find_if(
+        primitives.begin(),
+        primitives.end(),
+        [sceneName](const LayoutScenePrimitive* primitive)
+        {
+            return primitive->sceneName == sceneName;
+        });
+    return found == primitives.end() ? -1 : (*found)->keyframeCount;
 }
 
 [[nodiscard]] bool isProxyAtlasCandidate(const AtlasCandidate& candidate)
@@ -1127,6 +1139,10 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         << " keyframes=" << werehogStageKeyframes
         << " extra_stage_primitives=" << extraStage.size()
         << " keyframes=" << extraStageKeyframes
+        << " sonic_speed_gauge_kf=" << layoutScenePrimitiveKeyframesForScene(sonicStage, "so_speed_gauge")
+        << " sonic_ring_energy_gauge_kf=" << layoutScenePrimitiveKeyframesForScene(sonicStage, "so_ringenagy_gauge")
+        << " sonic_ring_get_effect_kf=" << layoutScenePrimitiveKeyframesForScene(sonicStage, "ring_get_effect")
+        << " sonic_bg_kf=" << layoutScenePrimitiveKeyframesForScene(sonicStage, "bg")
         << '\n';
 
     const bool titleMatches = title.size() == 6 && titleKeyframes == 806;
@@ -1135,7 +1151,12 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     const bool sonicStageMatches = sonicStage.size() == 6 && sonicStageKeyframes == 680;
     const bool werehogStageMatches = werehogStage.size() == 6 && werehogStageKeyframes == 680;
     const bool extraStageMatches = extraStage.size() == 6 && extraStageKeyframes == 680;
-    return titleMatches && pauseMatches && loadingMatches && sonicStageMatches && werehogStageMatches && extraStageMatches ? 0 : 1;
+    const bool sonicOwnershipMatches =
+        layoutScenePrimitiveKeyframesForScene(sonicStage, "so_speed_gauge") == 360
+        && layoutScenePrimitiveKeyframesForScene(sonicStage, "so_ringenagy_gauge") == 240
+        && layoutScenePrimitiveKeyframesForScene(sonicStage, "ring_get_effect") == 14
+        && layoutScenePrimitiveKeyframesForScene(sonicStage, "bg") == 0;
+    return titleMatches && pauseMatches && loadingMatches && sonicStageMatches && werehogStageMatches && extraStageMatches && sonicOwnershipMatches ? 0 : 1;
 }
 
 [[nodiscard]] int runLayerFillSmoke()

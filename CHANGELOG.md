@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 61 gameplay HUD primitive ownership audit
+
+- added [`research_uiux/GUI_GAMEPLAY_HUD_PRIMITIVE_OWNERSHIP_AUDIT.md`](./research_uiux/GUI_GAMEPLAY_HUD_PRIMITIVE_OWNERSHIP_AUDIT.md)
+- corrected the gameplay HUD primitive table against `layout_deep_analysis.json` so `so_speed_gauge`, `so_ringenagy_gauge`, `info_1`, `info_2`, `ring_get_effect`, and `bg` carry their parsed scene ownership/keyframe weights
+- extended `--layout-primitive-smoke` with Sonic HUD scene ownership metrics for the highest-risk proxy primitives
+- verified `b/rr61/sward_ui_runtime_debug_gui.exe`
+
 ### Phase 60 GUI gameplay HUD primitive preview
 
 - added [`research_uiux/GUI_GAMEPLAY_HUD_PRIMITIVE_PREVIEW.md`](./research_uiux/GUI_GAMEPLAY_HUD_PRIMITIVE_PREVIEW.md)

@@ -4,10 +4,10 @@
 
 # <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Native GUI Debug Workbench
 
-Phase 51 added the first native, windowed SWARD UI runtime workbench. Phase 52 added the first visual preview surface, Phase 53 added gameplay-HUD proxy atlas binding, Phase 54 added timer-driven playback controls, Phase 55 added state-aware preview motion, Phase 56 added exact-family preview layouts, Phase 57 added decoded layout-evidence overlays, Phase 58 added frame-domain layout timeline readouts, Phase 59 added the first scene-primitive draw pass, and Phase 60 widens primitives into gameplay HUD proxy previews:
+Phase 51 added the first native, windowed SWARD UI runtime workbench. Phase 52 added the first visual preview surface, Phase 53 added gameplay-HUD proxy atlas binding, Phase 54 added timer-driven playback controls, Phase 55 added state-aware preview motion, Phase 56 added exact-family preview layouts, Phase 57 added decoded layout-evidence overlays, Phase 58 added frame-domain layout timeline readouts, Phase 59 added the first scene-primitive draw pass, Phase 60 widened primitives into gameplay HUD proxy previews, and Phase 61 audits gameplay HUD primitive scene ownership:
 
 ```text
-b/rr60/sward_ui_runtime_debug_gui.exe
+b/rr61/sward_ui_runtime_debug_gui.exe
 ```
 
 This is the first proper non-CLI executable surface around the recovered runtime contracts and workbench host catalog. It now draws local atlas previews and schematic runtime overlays, but it is still not yet a 1:1 Sonic Unleashed UI renderer.
@@ -29,7 +29,7 @@ This is the first proper non-CLI executable surface around the recovered runtime
 - overlays decoded layout evidence for Title, Pause, and Loading previews, including layout IDs, verdicts, scene/animation counts, cue summaries, and longest parsed timelines
 - maps active runtime progress into recovered longest-timeline frame domains and draws `Frame: current/total @ fps` readouts in the evidence panel
 - draws recovered scene primitives for the highest keyframe-density Title, Pause, and Loading layout scenes over the atlas preview
-- draws recovered `ui_prov_playscreen` scene primitives for Sonic, Werehog, and Extra Stage HUD preview hosts
+- draws recovered `ui_prov_playscreen` scene primitives for Sonic, Werehog, and Extra Stage HUD preview hosts with smoke-guarded scene/keyframe ownership
 - fills atlas-backed preview canvases with a dark backing brush before drawing local PNGs, keeping transparent proxy sheets readable
 - preserves atlas readability under structural backdrop and cinematic-frame roles by outline-drawing those overlays instead of tint-filling over them
 - supports `--smoke` so automation can verify the GUI target without opening a window
@@ -52,7 +52,7 @@ sward_ui_runtime_debug_gui motion smoke ok intro_alpha=0.28 intro_offset_x=-204.
 sward_ui_runtime_debug_gui family preview smoke ok title=title_menu pause=pause_menu loading=loading_transition title_logo_y=64.8 title_content_y=331.2 pause_chrome_w=844.8 loading_frame_y=187.2
 sward_ui_runtime_debug_gui layout evidence smoke ok title=ui_mainmenu scenes=16 animations=6 pause=ui_pause scenes=29 animations=41 loading=ui_loading scenes=7 animations=37
 sward_ui_runtime_debug_gui layout timeline smoke ok title_frame=110/220 pause_frame=120/240 loading_frame=180/240 fps=60
-sward_ui_runtime_debug_gui layout primitive smoke ok title_primitives=6 keyframes=806 pause_primitives=6 keyframes=806 loading_primitives=6 keyframes=2775 sonic_stage_primitives=6 keyframes=680 werehog_stage_primitives=6 keyframes=680 extra_stage_primitives=6 keyframes=680
+sward_ui_runtime_debug_gui layout primitive smoke ok title_primitives=6 keyframes=806 pause_primitives=6 keyframes=806 loading_primitives=6 keyframes=2775 sonic_stage_primitives=6 keyframes=680 werehog_stage_primitives=6 keyframes=680 extra_stage_primitives=6 keyframes=680 sonic_speed_gauge_kf=360 sonic_ring_energy_gauge_kf=240 sonic_ring_get_effect_kf=14 sonic_bg_kf=0
 sward_ui_runtime_debug_gui layer fill smoke ok backdrop_alpha=0 cinematic_alpha=0 content_alpha=0.58
 ```
 
@@ -74,13 +74,13 @@ That is the correct foundation for the larger goal: a visual SWARD UI workbench 
 - It now surfaces parsed layout/timeline evidence in the preview, but that evidence is still a diagnostic overlay rather than the renderer source of truth.
 - It now projects runtime progress into recovered layout frame domains, but it still does not sample original animation channels.
 - It now draws evidence-backed scene primitives, but those primitives are diagnostic scene boxes rather than exact authored node transforms.
-- Gameplay HUD primitives for Sonic/Werehog remain tied to the explicit `ui_prov_playscreen` proxy boundary.
+- Gameplay HUD primitives for Sonic/Werehog remain tied to the explicit `ui_prov_playscreen` proxy boundary, now with audited scene/keyframe ownership for the current proxy primitive set.
 - It does not yet bind every translated PPC seam into executable host-specific behavior.
 - It currently exercises contract-backed behavior: states, transitions, timing bands, prompts, overlay roles, and host metadata.
 
 ## Practical Runway
 
-The first non-CLI executable is present, Phase 52 added the first visual preview panel, Phase 53 made the gameplay-HUD host preview useful enough to inspect in the window, Phase 54 keeps intro/action bands visible through timer-driven playback, Phase 55 gives those bands visible preview motion, Phase 56 splits exact Title/Pause/Loading placement away from the generic role stack, Phase 57 puts parsed layout/timeline evidence into the same visual surface, Phase 58 adds frame-domain progress over those recovered timelines, Phase 59 starts drawing recovered scene primitives, and Phase 60 widens that primitive layer to gameplay HUD proxy previews.
+The first non-CLI executable is present, Phase 52 added the first visual preview panel, Phase 53 made the gameplay-HUD host preview useful enough to inspect in the window, Phase 54 keeps intro/action bands visible through timer-driven playback, Phase 55 gives those bands visible preview motion, Phase 56 splits exact Title/Pause/Loading placement away from the generic role stack, Phase 57 puts parsed layout/timeline evidence into the same visual surface, Phase 58 adds frame-domain progress over those recovered timelines, Phase 59 starts drawing recovered scene primitives, Phase 60 widens that primitive layer to gameplay HUD proxy previews, and Phase 61 guards the gameplay HUD proxy primitive ownership against the parsed deep-analysis scene facts.
 
 The next useful windowed milestones are:
 
@@ -90,4 +90,4 @@ The next useful windowed milestones are:
 4. Replace more local-only scaffold ownership with translated PPC-backed host behavior.
 5. Expand from diagnostic contracts into family-specific visual playback.
 
-Full 1:1-style UI/UX parity for all relevant Sonic Unleashed UI families is still a long-range target, not a single remaining build step. The honest state is: the proper `.exe` shell exists now; visual timing/motion scaffolding exists; first exact-family placement adapters exist; parsed layout evidence, frame-domain timeline readouts, diagnostic scene primitives, and gameplay HUD proxy primitives are visible in the window; the full asset/layout/animation renderer is the next major productization track.
+Full 1:1-style UI/UX parity for all relevant Sonic Unleashed UI families is still a long-range target, not a single remaining build step. The honest state is: the proper `.exe` shell exists now; visual timing/motion scaffolding exists; first exact-family placement adapters exist; parsed layout evidence, frame-domain timeline readouts, diagnostic scene primitives, and audited gameplay HUD proxy primitives are visible in the window; the full asset/layout/animation renderer is the next major productization track.
