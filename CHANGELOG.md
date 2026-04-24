@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 60 GUI gameplay HUD primitive preview
+
+- added [`research_uiux/GUI_GAMEPLAY_HUD_PRIMITIVE_PREVIEW.md`](./research_uiux/GUI_GAMEPLAY_HUD_PRIMITIVE_PREVIEW.md)
+- bound Sonic, Werehog, and Extra Stage HUD preview contracts to the recovered `ui_prov_playscreen` scene primitive set
+- extended `--layout-primitive-smoke` to verify gameplay HUD proxy primitive counts and keyframe totals
+- verified `b/rr60/sward_ui_runtime_debug_gui.exe`
+- capture-checked `Gameplay HUD Hosts -> SonicMainDisplay.cpp` through `PrintWindow`, with `bg`, `ring_get_effect`, `so_speed_gauge`, and `so_ringenagy_gauge` primitives visible over the proxy HUD atlas
+
 ### Phase 59 GUI layout scene primitive preview
 
 - added [`research_uiux/GUI_LAYOUT_SCENE_PRIMITIVE_PREVIEW.md`](./research_uiux/GUI_LAYOUT_SCENE_PRIMITIVE_PREVIEW.md)

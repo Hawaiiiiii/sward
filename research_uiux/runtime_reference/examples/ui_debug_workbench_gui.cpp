@@ -180,7 +180,7 @@ inline constexpr std::array<LayoutEvidence, 3> kLayoutEvidenceEntries{{
     },
 }};
 
-inline constexpr std::array<LayoutScenePrimitive, 18> kLayoutScenePrimitiveEntries{{
+inline constexpr std::array<LayoutScenePrimitive, 36> kLayoutScenePrimitiveEntries{{
     { "title_menu_reference.json", "Root/mm_donut_move", "mm_donut_move", "Color, Rotation, X/Y position, X/Y scale", 220, 5, 175, 35, 462, 0.08F, 0.28F, 0.44F, 0.16F },
     { "title_menu_reference.json", "Root/mm_base", "mm_base", "Rotation, SubImage, Y position, Y scale", 120, 12, 47, 11, 105, 0.06F, 0.18F, 0.52F, 0.09F },
     { "title_menu_reference.json", "Root/mm_title_usual", "mm_title_usual", "Color, X/Y scale", 60, 6, 34, 16, 95, 0.10F, 0.07F, 0.48F, 0.09F },
@@ -201,6 +201,27 @@ inline constexpr std::array<LayoutScenePrimitive, 18> kLayoutScenePrimitiveEntri
     { "loading_transition_reference.json", "Root/loadinfo", "loadinfo", "Color, Y position", 80, 3, 83, 79, 248, 0.14F, 0.70F, 0.72F, 0.12F },
     { "loading_transition_reference.json", "Root/event_viewer", "event_viewer", "Gradient, SubImage, X/Y position, X/Y scale", 128, 9, 30, 5, 198, 0.06F, 0.05F, 0.88F, 0.10F },
     { "loading_transition_reference.json", "Root/pda_txt", "pda_txt", "Color", 51, 2, 56, 28, 144, 0.54F, 0.62F, 0.34F, 0.13F },
+
+    { "sonic_stage_hud_reference.json", "Root/bg", "bg", "Gradient, X/Y scale", 100, 1, 47, 47, 360, 0.08F, 0.08F, 0.50F, 0.18F },
+    { "sonic_stage_hud_reference.json", "Root/info_1", "info_1", "Gradient, X scale", 100, 1, 43, 43, 240, 0.07F, 0.29F, 0.42F, 0.14F },
+    { "sonic_stage_hud_reference.json", "Root/ring_get_effect", "ring_get_effect", "Gradient, HideFlag", 100, 3, 72, 24, 57, 0.64F, 0.26F, 0.28F, 0.14F },
+    { "sonic_stage_hud_reference.json", "Root/so_speed_gauge", "so_speed_gauge", "Gradient, Rotation", 5, 1, 2, 2, 14, 0.55F, 0.58F, 0.36F, 0.12F },
+    { "sonic_stage_hud_reference.json", "Root/so_ringenagy_gauge", "so_ringenagy_gauge", "HideFlag", 100, 3, 72, 24, 9, 0.55F, 0.72F, 0.36F, 0.10F },
+    { "sonic_stage_hud_reference.json", "Root/info_2", "info_2", "DefaultAnim", 100, 6, 29, 21, 0, 0.07F, 0.66F, 0.38F, 0.12F },
+
+    { "werehog_stage_hud_reference.json", "Root/bg", "bg", "Gradient, X/Y scale", 100, 1, 47, 47, 360, 0.08F, 0.08F, 0.50F, 0.18F },
+    { "werehog_stage_hud_reference.json", "Root/info_1", "info_1", "Gradient, X scale", 100, 1, 43, 43, 240, 0.07F, 0.29F, 0.42F, 0.14F },
+    { "werehog_stage_hud_reference.json", "Root/ring_get_effect", "ring_get_effect", "Gradient, HideFlag", 100, 3, 72, 24, 57, 0.64F, 0.26F, 0.28F, 0.14F },
+    { "werehog_stage_hud_reference.json", "Root/so_speed_gauge", "so_speed_gauge", "Gradient, Rotation", 5, 1, 2, 2, 14, 0.55F, 0.58F, 0.36F, 0.12F },
+    { "werehog_stage_hud_reference.json", "Root/so_ringenagy_gauge", "so_ringenagy_gauge", "HideFlag", 100, 3, 72, 24, 9, 0.55F, 0.72F, 0.36F, 0.10F },
+    { "werehog_stage_hud_reference.json", "Root/info_2", "info_2", "DefaultAnim", 100, 6, 29, 21, 0, 0.07F, 0.66F, 0.38F, 0.12F },
+
+    { "extra_stage_hud_reference.json", "Root/bg", "bg", "Gradient, X/Y scale", 100, 1, 47, 47, 360, 0.08F, 0.08F, 0.50F, 0.18F },
+    { "extra_stage_hud_reference.json", "Root/info_1", "info_1", "Gradient, X scale", 100, 1, 43, 43, 240, 0.07F, 0.29F, 0.42F, 0.14F },
+    { "extra_stage_hud_reference.json", "Root/ring_get_effect", "ring_get_effect", "Gradient, HideFlag", 100, 3, 72, 24, 57, 0.64F, 0.26F, 0.28F, 0.14F },
+    { "extra_stage_hud_reference.json", "Root/so_speed_gauge", "so_speed_gauge", "Gradient, Rotation", 5, 1, 2, 2, 14, 0.55F, 0.58F, 0.36F, 0.12F },
+    { "extra_stage_hud_reference.json", "Root/so_ringenagy_gauge", "so_ringenagy_gauge", "HideFlag", 100, 3, 72, 24, 9, 0.55F, 0.72F, 0.36F, 0.10F },
+    { "extra_stage_hud_reference.json", "Root/info_2", "info_2", "DefaultAnim", 100, 6, 29, 21, 0, 0.07F, 0.66F, 0.38F, 0.12F },
 }};
 
 enum ControlId
@@ -1081,10 +1102,16 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     const auto title = layoutScenePrimitivesForContract("title_menu_reference.json");
     const auto pause = layoutScenePrimitivesForContract("pause_menu_reference.json");
     const auto loading = layoutScenePrimitivesForContract("loading_transition_reference.json");
+    const auto sonicStage = layoutScenePrimitivesForContract("sonic_stage_hud_reference.json");
+    const auto werehogStage = layoutScenePrimitivesForContract("werehog_stage_hud_reference.json");
+    const auto extraStage = layoutScenePrimitivesForContract("extra_stage_hud_reference.json");
 
     const int titleKeyframes = layoutScenePrimitiveKeyframeTotal(title);
     const int pauseKeyframes = layoutScenePrimitiveKeyframeTotal(pause);
     const int loadingKeyframes = layoutScenePrimitiveKeyframeTotal(loading);
+    const int sonicStageKeyframes = layoutScenePrimitiveKeyframeTotal(sonicStage);
+    const int werehogStageKeyframes = layoutScenePrimitiveKeyframeTotal(werehogStage);
+    const int extraStageKeyframes = layoutScenePrimitiveKeyframeTotal(extraStage);
 
     std::cout
         << "sward_ui_runtime_debug_gui layout primitive smoke ok "
@@ -1094,12 +1121,21 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         << " keyframes=" << pauseKeyframes
         << " loading_primitives=" << loading.size()
         << " keyframes=" << loadingKeyframes
+        << " sonic_stage_primitives=" << sonicStage.size()
+        << " keyframes=" << sonicStageKeyframes
+        << " werehog_stage_primitives=" << werehogStage.size()
+        << " keyframes=" << werehogStageKeyframes
+        << " extra_stage_primitives=" << extraStage.size()
+        << " keyframes=" << extraStageKeyframes
         << '\n';
 
     const bool titleMatches = title.size() == 6 && titleKeyframes == 806;
     const bool pauseMatches = pause.size() == 6 && pauseKeyframes == 806;
     const bool loadingMatches = loading.size() == 6 && loadingKeyframes == 2775;
-    return titleMatches && pauseMatches && loadingMatches ? 0 : 1;
+    const bool sonicStageMatches = sonicStage.size() == 6 && sonicStageKeyframes == 680;
+    const bool werehogStageMatches = werehogStage.size() == 6 && werehogStageKeyframes == 680;
+    const bool extraStageMatches = extraStage.size() == 6 && extraStageKeyframes == 680;
+    return titleMatches && pauseMatches && loadingMatches && sonicStageMatches && werehogStageMatches && extraStageMatches ? 0 : 1;
 }
 
 [[nodiscard]] int runLayerFillSmoke()

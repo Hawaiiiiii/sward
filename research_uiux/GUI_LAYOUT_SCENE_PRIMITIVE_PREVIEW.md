@@ -49,7 +49,11 @@ What remains:
 - decode exact node transforms and authored coordinates into draw commands
 - sample animation channels instead of projecting one runtime progress value across all primitives
 - bind exact subimage regions rather than drawing scene boxes over the full atlas
-- expand beyond Title/Pause/Loading once the next families have enough decoded scene evidence
+- expand beyond diagnostic boxes into exact node/subimage playback as more families gain decoded scene evidence
+
+## Phase 60 Follow-On
+
+Phase 60 expands this primitive renderer beyond Title/Pause/Loading by binding Sonic, Werehog, and Extra Stage HUD previews to the recovered `ui_prov_playscreen` primitive set. The follow-on report lives at [`research_uiux/GUI_GAMEPLAY_HUD_PRIMITIVE_PREVIEW.md`](./GUI_GAMEPLAY_HUD_PRIMITIVE_PREVIEW.md).
 
 ## Verification
 

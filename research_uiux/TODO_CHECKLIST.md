@@ -454,6 +454,13 @@
 - [x] Build, smoke, and capture-check `b\rr59\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for the first GUI scene-primitive preview beat.
 
+## Phase 60 - GUI Gameplay HUD Primitive Preview
+
+- [x] Bind Sonic, Werehog, and Extra Stage HUD previews to the recovered `ui_prov_playscreen` scene primitive set.
+- [x] Extend `--layout-primitive-smoke` with gameplay HUD proxy primitive counts and keyframe totals.
+- [x] Build, smoke, and capture-check `b\rr60\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for the first gameplay HUD primitive preview beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -575,3 +582,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI layout evidence overlays under `b\rr57`, with `ui_mainmenu`, `ui_pause`, and `ui_loading` parsed layout facts visible in the native preview and a captured `GameModeMainMenu_Test.cpp` title evidence frame.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI layout timeline frame previews under `b\rr58`, with Title/Pause/Loading longest timeline frame domains and a captured `GameModeMainMenu_Test.cpp` title Intro frame readout.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI layout scene primitive previews under `b\rr59`, with keyframe-density primitives for Title/Pause/Loading and a captured `GameModeMainMenu_Test.cpp` title primitive overlay.
+- [x] Follow-on phase audit on `2026-04-24`: added and verified gameplay HUD primitive previews under `b\rr60`, with Sonic/Werehog/Extra Stage bindings to the recovered `ui_prov_playscreen` primitive set and a captured `SonicMainDisplay.cpp` proxy HUD primitive overlay.
