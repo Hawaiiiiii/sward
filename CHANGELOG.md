@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 49 local support-substrate humanization sweep
+
+- added [`research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`](./research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md)
+- added a dedicated `support_substrate_sources` group to [`research_uiux/tools/materialize_local_debug_source_tree.py`](./research_uiux/tools/materialize_local_debug_source_tree.py)
+- generated `23` local-only support-substrate scaffolds for achievement unlocks, animation event triggers, player-status feeds, audio/BGM routing, and XML/data loading without publishing `SONIC UNLEASHED/`
+- refreshed [`research_uiux/LOCAL_DEBUG_SOURCE_TREE_EXPANSION.md`](./research_uiux/LOCAL_DEBUG_SOURCE_TREE_EXPANSION.md) to `7` groups, `116` materialized local-only source files, and `125` total readable `.cpp` scaffolds under the ignored mirror
+- added a regression test for the new materializer group
+
 ### Phase 48 debug workbench catalog view
 
 - added [`research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md`](./research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md)

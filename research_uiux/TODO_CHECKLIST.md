@@ -351,6 +351,14 @@
 - [x] Verify the catalog against the widened `159`-host workbench map.
 - [x] Generate a dedicated report for the catalog-view beat.
 
+## Phase 49 - Local Support-Substrate Humanization Sweep
+
+- [x] Add a dedicated local-only source-tree materializer group for Phase 47 support-substrate paths.
+- [x] Generate `23` support-substrate `.cpp` scaffolds under the ignored `SONIC UNLEASHED\` mirror.
+- [x] Refresh the tracked local debug source-tree expansion summary to `7` groups and `125` total local-only readable `.cpp` files.
+- [x] Cover the new group with a regression test.
+- [x] Generate a dedicated report for the support-substrate humanization beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -457,6 +465,7 @@
 - [x] Follow-on phase audit on `2026-04-24`: widened the selector to `16` launch families and the workbench to `133` hosts across `10` groups, including the new frontend-sequence host bucket.
 - [x] Follow-on phase audit on `2026-04-24`: deepened the local-only readable source mirror to `102` `.cpp` scaffolds under `SONIC UNLEASHED\`, including `12` sequence-shell scaffolds and `HUD\Item\HudItemGet.cpp`.
 - [x] Follow-on phase audit on `2026-04-24`: widened the curated source-path manifest to `269` paths across `24` families, with `212` archaeology/support-mapped entries, `186` contract-backed entries, `57` debug-host candidates, and `0` named-only gaps.
+- [x] Follow-on phase audit on `2026-04-24`: added the `23`-path local-only support-substrate humanization group and raised the local mirror to `125` readable `.cpp` scaffolds without publishing `SONIC UNLEASHED\`.
 - [x] Follow-on phase audit on `2026-04-24`: materialized `269` local-only placement notes under `SONIC UNLEASHED\` while keeping the mirror out of git.
 - [x] Follow-on phase audit on `2026-04-24`: widened the debug workbench host map to `159` hosts across `10` groups, with the camera/replay group expanded to `30` presentation-controller hosts.
 - [x] Follow-on phase audit on `2026-04-24`: added `--catalog` to `sward_ui_runtime_debug_workbench.exe` so the `159`-host map can be inspected by group, contract, and sample host before launching a specific source-family probe.

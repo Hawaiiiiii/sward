@@ -303,6 +303,83 @@ SYSTEM_BINDINGS = {
     ],
 }
 
+SUPPORT_SUBSTRATE_BINDINGS = {
+    "Achievement/AchievementManager.cpp": [
+        ("Achievement / Unlock Support", "Sequence/Unit/SequenceUnitUnlockAchievement.cpp", "frontend_sequence_shell_reference.json", "Achievement ownership that pairs with sequence unlock dispatch and future toast/profile validation."),
+    ],
+    "Animation/EventTrigger/AnimationEventTriggerContainer.cpp": [
+        ("Timeline Event Trigger Support", "Sequence/Unit/SequenceUnitPlayMovie.cpp", "subtitle_cutscene_reference.json", "Timeline-trigger container for cutscene/movie cue routing."),
+    ],
+    "Animation/EventTrigger/Event/AnimationEventTriggerAudio.cpp": [
+        ("Timeline Event Trigger Support", "Tool/InspirePreview/InspirePreview.cpp", "subtitle_cutscene_reference.json", "Audio cue trigger adjacent to cutscene and preview playback."),
+        ("Audio Cue / BGM Support", "Sound/SoundController.cpp", "none", "Sound controller handoff point for triggered presentation audio."),
+    ],
+    "Animation/EventTrigger/Event/AnimationEventTriggerSparkle.cpp": [
+        ("Timeline Event Trigger Support", "Tool/InspirePreview/InspirePreview.cpp", "subtitle_cutscene_reference.json", "Sparkle/event feedback trigger adjacent to timeline presentation."),
+    ],
+    "Animation/EventTrigger/Event/AnimationEventTriggerVibration.cpp": [
+        ("Timeline Event Trigger Support", "Tool/InspirePreview/InspirePreview.cpp", "subtitle_cutscene_reference.json", "Controller-feedback trigger adjacent to timeline presentation."),
+    ],
+    "Player/Parameter/PlayerParameter.cpp": [
+        ("Sonic Stage HUD", "HUD/Sonic/HudSonicStage.cpp", "sonic_stage_hud_reference.json", "Player parameters feeding day-stage counters, gauges, and overlay state."),
+        ("Werehog Stage HUD", "HUD/Evil/HudEvilStage.cpp", "werehog_stage_hud_reference.json", "Player parameters feeding night-stage vitality, shield, and hit-counter state."),
+        ("Super Sonic / Final HUD Bridge", "Boss/BossHudSuperSonic.cpp", "super_sonic_hud_reference.json", "Player parameters feeding final-boss gauge and super-state presentation."),
+    ],
+    "Player/Switch/PlayerSwitchManager.cpp": [
+        ("Sonic Stage HUD", "HUD/Sonic/HudSonicStage.cpp", "sonic_stage_hud_reference.json", "Mode switch state feeding day-stage overlay visibility and status routing."),
+        ("Werehog Stage HUD", "HUD/Evil/HudEvilStage.cpp", "werehog_stage_hud_reference.json", "Mode switch state feeding night-stage overlay visibility and status routing."),
+        ("Super Sonic / Final HUD Bridge", "Boss/BossHudSuperSonic.cpp", "super_sonic_hud_reference.json", "Mode switch state feeding final-boss presentation routing."),
+    ],
+    "Sound/Sound.cpp": [
+        ("Audio Cue / BGM Support", "System/Game.cpp", "none", "Shared sound substrate for UI feedback and presentation-state timing."),
+    ],
+    "Sound/SoundBGMActEggman.cpp": [
+        ("Audio Cue / BGM Support", "Sound/SoundController.cpp", "none", "Eggman-act BGM route shell for stage presentation state."),
+    ],
+    "Sound/SoundBGMActEvil.cpp": [
+        ("Audio Cue / BGM Support", "HUD/Evil/HudEvilStage.cpp", "werehog_stage_hud_reference.json", "Werehog/night-stage BGM route adjacent to night HUD state."),
+    ],
+    "Sound/SoundBGMActSonic.cpp": [
+        ("Audio Cue / BGM Support", "HUD/Sonic/HudSonicStage.cpp", "sonic_stage_hud_reference.json", "Sonic/day-stage BGM route adjacent to day HUD state."),
+    ],
+    "Sound/SoundBGMDispel.cpp": [
+        ("Audio Cue / BGM Support", "System/GameMode/GameModeStageMovie.cpp", "subtitle_cutscene_reference.json", "Dispel/presentation BGM route adjacent to movie-stage handoff."),
+    ],
+    "Sound/SoundBGMExtra.cpp": [
+        ("Audio Cue / BGM Support", "ExtraStage/Tails/Hud/HudExQte.cpp", "extra_stage_hud_reference.json", "Extra-stage BGM route adjacent to EX-stage prompt timing."),
+    ],
+    "Sound/SoundBGMStandard.cpp": [
+        ("Audio Cue / BGM Support", "System/StageManager.cpp", "none", "Standard stage BGM route adjacent to stage-manager presentation state."),
+    ],
+    "Sound/SoundBGMTown.cpp": [
+        ("Audio Cue / BGM Support", "Town/TownManager.cpp", "town_ui_reference.json", "Town BGM route adjacent to town UI, talk, and media-room state."),
+    ],
+    "Sound/SoundController.cpp": [
+        ("Audio Cue / BGM Support", "Sound/SoundPlayer.cpp", "none", "Sound routing controller for UI feedback, BGM, and timeline-triggered cues."),
+    ],
+    "Sound/SoundPlayer.cpp": [
+        ("Audio Cue / BGM Support", "Sound/SoundController.cpp", "none", "Playback substrate for UI feedback, BGM, and presentation-state cues."),
+    ],
+    "XML/XMLBinData.cpp": [
+        ("XML / Data Loading Support", "System/GameMode/Loader/StageLoaderXML.cpp", "extra_stage_hud_reference.json", "Binary XML payload support for stage loader and future UI/resource binding probes."),
+    ],
+    "XML/XMLDocument.cpp": [
+        ("XML / Data Loading Support", "System/GameMode/Loader/StageLoaderXML.cpp", "extra_stage_hud_reference.json", "XML document ownership for stage loader and future UI/resource binding probes."),
+    ],
+    "XML/XMLManager.cpp": [
+        ("XML / Data Loading Support", "System/GameMode/Loader/StageLoaderXML.cpp", "extra_stage_hud_reference.json", "XML manager shell for stage loader and future UI/resource binding probes."),
+    ],
+    "XML/XMLNode.cpp": [
+        ("XML / Data Loading Support", "System/GameMode/Loader/StageLoaderXML.cpp", "extra_stage_hud_reference.json", "XML node traversal shell for stage loader and future UI/resource binding probes."),
+    ],
+    "XML/XMLTypeSLBin.cpp": [
+        ("XML / Data Loading Support", "System/GameMode/Loader/StageLoaderXML.cpp", "extra_stage_hud_reference.json", "SL binary XML type shell for stage loader and future UI/resource binding probes."),
+    ],
+    "XML/XMLTypeSLTxt.cpp": [
+        ("XML / Data Loading Support", "System/GameMode/Loader/StageLoaderXML.cpp", "extra_stage_hud_reference.json", "SL text XML type shell for stage loader and future UI/resource binding probes."),
+    ],
+}
+
 
 def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8-sig"))
@@ -676,6 +753,54 @@ def render_system_source(relative_source_path: str, entry: dict[str, Any]) -> st
     return "\n".join(lines)
 
 
+def render_support_substrate_source(relative_source_path: str, entry: dict[str, Any]) -> str:
+    bindings = SUPPORT_SUBSTRATE_BINDINGS[relative_source_path]
+    lines = make_header(
+        relative_source_path,
+        entry,
+        [
+            "research_uiux/data/ui_source_path_manifest.json",
+            "research_uiux/BROADER_SOURCE_PATH_EXPANSION_PHASE47.md",
+            "research_uiux/runtime_reference/contracts/*.json",
+            "Match SU OG source code folders and locations.txt",
+        ],
+    )
+    stem = Path(relative_source_path).stem
+    lines.extend(
+        [
+            "struct SupportSubstrateBinding",
+            "{",
+            "    std::string_view ownerFamily;",
+            "    std::string_view runtimeSurface;",
+            "    std::string_view contractHint;",
+            "    std::string_view notes;",
+            "};",
+            "",
+            f"struct {stem}Support",
+            "{",
+            "    [[nodiscard]] static constexpr auto BuildSupportBindings()",
+            "    {",
+            f"        return std::array<SupportSubstrateBinding, {len(bindings)}>{{",
+        ]
+    )
+    for index, (owner_family, runtime_surface, contract_hint, notes) in enumerate(bindings):
+        lines.append("            SupportSubstrateBinding{")
+        lines.append(f'                "{cpp_string(owner_family)}",')
+        lines.append(f'                "{cpp_string(runtime_surface)}",')
+        lines.append(f'                "{cpp_string(contract_hint)}",')
+        lines.append(f'                "{cpp_string(notes)}",')
+        lines.append("            }" + ("," if index + 1 != len(bindings) else ""))
+    lines.extend(
+        [
+            "        };",
+            "    }",
+            "};",
+        ]
+    )
+    lines.extend(make_footer())
+    return "\n".join(lines)
+
+
 def build_target_groups(entries_by_path: dict[str, dict[str, Any]], gameplay_payload: dict[str, Any]) -> list[dict[str, Any]]:
     systems_by_id = {system["system_id"]: system for system in gameplay_payload.get("systems", [])}
     groups = []
@@ -785,6 +910,22 @@ def build_target_groups(entries_by_path: dict[str, dict[str, Any]], gameplay_pay
         }
     )
 
+    groups.append(
+        {
+            "group_id": "support_substrate_sources",
+            "display_name": "Support Substrate Sources",
+            "purpose": "Readable local-only support-substrate scaffolds for achievement unlocks, animation event triggers, player-status feeds, audio routing, and XML/data loading.",
+            "targets": [
+                {
+                    "relative_source_path": relative_source_path,
+                    "entry": lookup_entry(entries_by_path, relative_source_path),
+                    "renderer": "support_substrate",
+                }
+                for relative_source_path in SUPPORT_SUBSTRATE_BINDINGS
+            ],
+        }
+    )
+
     return groups
 
 
@@ -802,6 +943,8 @@ def render_target(target: dict[str, Any]) -> str:
         return render_camera_source(relative_source_path, entry)
     if renderer == "sequence":
         return render_sequence_source(relative_source_path, entry)
+    if renderer == "support_substrate":
+        return render_support_substrate_source(relative_source_path, entry)
     return render_system_source(relative_source_path, entry)
 
 
@@ -814,14 +957,14 @@ def write_tracked_markdown(summary_payload: dict[str, Any], output_path: Path) -
         "",
         '# <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Local Debug-Oriented Source Tree Expansion',
         "",
-        "This pass widens the local-only readable source layer from the first menu/cutscene hosts into gameplay HUD, stage-test, town, camera, sequence, and application/world shell paths.",
+        "This pass widens the local-only readable source layer from the first menu/cutscene hosts into gameplay HUD, stage-test, town, camera, sequence, application/world, and support-substrate shell paths.",
         "",
         "> [!IMPORTANT]",
         "> These files stay local-only under `SONIC UNLEASHED/`. The tracked repo carries the materializer plus the summary, not the mirrored files themselves.",
         "",
         "## Snapshot",
         "",
-        f"- New local-only readable `.cpp` files added in this phase: `{summary['new_humanized_source_file_count']}`",
+        f"- Materialized local-only readable `.cpp` files in this pass: `{summary['new_humanized_source_file_count']}`",
         f"- Total local-only readable `.cpp` files under `SONIC UNLEASHED/`: `{summary['total_humanized_source_file_count']}`",
         f"- Expansion groups added: `{summary['group_count']}`",
         "",
@@ -841,6 +984,7 @@ def write_tracked_markdown(summary_payload: dict[str, Any], output_path: Path) -
             "- Gameplay HUD hosts now have local-only readable ownership scaffolds tied to the new runtime contracts.",
             "- Stage-test game modes now read like probe hosts instead of only path-dump notes.",
             "- Town/media-room, camera, sequence, and application/world shells now carry readable ownership bindings instead of remaining note-only placeholders.",
+            "- Phase 47 support-substrate paths now have local-only readable bindings for achievement unlocks, animation event triggers, player-status feeds, audio routing, and XML/data loading.",
             "- The mirrored local source tree is materially closer to a debug-oriented source layout instead of a note staging area.",
         ]
     )
