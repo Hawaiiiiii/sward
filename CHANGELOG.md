@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 54 GUI timeline playback controls
+
+- added [`research_uiux/GUI_TIMELINE_PLAYBACK_CONTROLS.md`](./research_uiux/GUI_TIMELINE_PLAYBACK_CONTROLS.md)
+- added Play/Pause and Step controls to `sward_ui_runtime_debug_gui`
+- added a Win32 timer loop around `ScreenRuntime::tick(...)` so `Run Host` now shows intro/action timing bands instead of immediately settling to Idle
+- changed action buttons to start playback when they trigger Navigate, Confirm, or Cancel transitions
+- added `--playback-smoke` regression coverage, verifying Intro -> Idle and Navigate -> Idle timeline advancement under `b/rr54`
+- capture-checked `SonicMainDisplay.cpp` in the GUI while it was still in Intro playback state
+
 ### Phase 53 gameplay HUD proxy preview binding
 
 - added [`research_uiux/GAMEPLAY_HUD_PROXY_PREVIEW_BINDING.md`](./research_uiux/GAMEPLAY_HUD_PROXY_PREVIEW_BINDING.md)

@@ -4,10 +4,10 @@
 
 # <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Native GUI Debug Workbench
 
-Phase 51 added the first native, windowed SWARD UI runtime workbench. Phase 52 added the first visual preview surface, and Phase 53 adds gameplay-HUD proxy atlas binding:
+Phase 51 added the first native, windowed SWARD UI runtime workbench. Phase 52 added the first visual preview surface, Phase 53 added gameplay-HUD proxy atlas binding, and Phase 54 adds timer-driven playback controls:
 
 ```text
-b/rr53/sward_ui_runtime_debug_gui.exe
+b/rr54/sward_ui_runtime_debug_gui.exe
 ```
 
 This is the first proper non-CLI executable surface around the recovered runtime contracts and workbench host catalog. It now draws local atlas previews and schematic runtime overlays, but it is still not yet a 1:1 Sonic Unleashed UI renderer.
@@ -20,6 +20,7 @@ This is the first proper non-CLI executable surface around the recovered runtime
 - presents native Win32 group and host listboxes
 - runs a selected host through `ScreenRuntime`
 - exposes `Run Host`, `Move Next`, `Confirm`, `Cancel`, and `Reset` controls
+- exposes Play/Pause and Step controls for timer-driven contract playback
 - shows state, input-lock, visible layer, visible prompt, contract, source-path, and callback log details
 - draws a 16:9 preview panel with local atlas PNGs when available
 - overlays runtime visible layers, prompt rows, and a timeline/progress strip
@@ -31,6 +32,7 @@ Verified smoke output:
 ```text
 sward_ui_runtime_debug_gui smoke ok contracts=19 hosts=176 groups=11 support_hosts=17
 sward_ui_runtime_debug_gui preview smoke ok atlas_candidates=10 proxy_candidates=2 existing_local_atlas=10 title=mainmenu__ui_mainmenu.png pause=systemcommoncore__ui_pause.png sonic_stage=exstagetails_common__ui_prov_playscreen.png
+sward_ui_runtime_debug_gui playback smoke ok intro=Intro after_intro=Idle action=Navigate after_action=Idle
 ```
 
 ## Why This Matters
@@ -45,12 +47,13 @@ That is the correct foundation for the larger goal: a visual SWARD UI workbench 
 - It draws ignored local atlas sheets when present, but those sheets are still local-only and not committed.
 - Sonic/Werehog gameplay HUD previews currently use the recovered `ui_prov_playscreen` sheet as a marked proxy until exact loose `ui_playscreen*` assets are recovered.
 - It does not yet play original CSD animation tracks.
+- It now plays portable runtime contract timing bands, which is a step toward visual playback but not original CSD keyframe parity.
 - It does not yet bind every translated PPC seam into executable host-specific behavior.
 - It currently exercises contract-backed behavior: states, transitions, timing bands, prompts, overlay roles, and host metadata.
 
 ## Practical Runway
 
-The first non-CLI executable is present, Phase 52 added the first visual preview panel, and Phase 53 makes the gameplay-HUD host preview useful enough to inspect in the window.
+The first non-CLI executable is present, Phase 52 added the first visual preview panel, Phase 53 made the gameplay-HUD host preview useful enough to inspect in the window, and Phase 54 keeps intro/action bands visible through timer-driven playback.
 
 The next useful windowed milestones are:
 

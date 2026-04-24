@@ -57,6 +57,9 @@ struct AtlasCandidate
 };
 
 inline constexpr const char* kPreviewPanelClassName = "SwardUiRuntimePreviewPanel";
+inline constexpr UINT_PTR kPlaybackTimerId = 2001;
+inline constexpr UINT kPlaybackTimerMilliseconds = 33;
+inline constexpr double kPlaybackTickSeconds = 1.0 / 30.0;
 
 inline constexpr std::array<AtlasCandidate, 10> kPreviewAtlasCandidates{{
     { "title_menu_reference.json", "title", "mainmenu__ui_mainmenu.png", "exact" },
@@ -80,6 +83,8 @@ enum ControlId
     kConfirmButtonId = 1005,
     kCancelButtonId = 1006,
     kResetButtonId = 1007,
+    kPlayPauseButtonId = 1008,
+    kStepButtonId = 1009,
 };
 
 [[nodiscard]] const AtlasCandidate* atlasCandidateForContract(std::string_view contractFileName)
@@ -406,6 +411,44 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return 0;
 }
 
+[[nodiscard]] int runPlaybackSmoke()
+{
+    const auto contracts = loadBundledEntries();
+    const auto found = std::find_if(
+        contracts.begin(),
+        contracts.end(),
+        [](const ContractEntry& entry)
+        {
+            return entry.path.filename() == "sonic_stage_hud_reference.json";
+        });
+    if (found == contracts.end())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui playback smoke failed missing sonic_stage_hud_reference.json\n";
+        return 1;
+    }
+
+    ScreenRuntime runtime(found->contract);
+    enableAllPromptPredicates(runtime, found->contract);
+    runtime.dispatch(RuntimeEventType::ResourcesReady);
+    const std::string intro(toString(runtime.state()));
+    runtime.tick(0.12);
+    runtime.tick(1.0);
+    const std::string afterIntro(toString(runtime.state()));
+    runtime.requestAction(InputAction::MoveNext);
+    const std::string action(toString(runtime.state()));
+    runtime.tick(1.0);
+    const std::string afterAction(toString(runtime.state()));
+
+    std::cout
+        << "sward_ui_runtime_debug_gui playback smoke ok "
+        << "intro=" << intro
+        << " after_intro=" << afterIntro
+        << " action=" << action
+        << " after_action=" << afterAction
+        << '\n';
+    return afterIntro == "Idle" && action == "Navigate" && afterAction == "Idle" ? 0 : 1;
+}
+
 class WorkbenchGui
 {
 public:
@@ -536,7 +579,15 @@ private:
         case WM_COMMAND:
             handleCommand(LOWORD(wParam), HIWORD(wParam));
             return 0;
+        case WM_TIMER:
+            if (wParam == kPlaybackTimerId)
+            {
+                tickPlaybackFrame(kPlaybackTickSeconds);
+                return 0;
+            }
+            return DefWindowProcA(m_window, message, wParam, lParam);
         case WM_DESTROY:
+            stopPlayback();
             PostQuitMessage(0);
             return 0;
         default:
@@ -555,6 +606,8 @@ private:
         m_confirmButton = createButton("Confirm", kConfirmButtonId);
         m_cancelButton = createButton("Cancel", kCancelButtonId);
         m_resetButton = createButton("Reset", kResetButtonId);
+        m_playPauseButton = createButton("Play", kPlayPauseButtonId);
+        m_stepButton = createButton("Step", kStepButtonId);
         m_previewPanel = createPreviewPanel();
         m_detailText = createEdit();
         m_logText = createEdit();
@@ -573,6 +626,8 @@ private:
             m_confirmButton,
             m_cancelButton,
             m_resetButton,
+            m_playPauseButton,
+            m_stepButton,
             m_previewPanel,
             m_detailText,
             m_logText,
@@ -666,12 +721,16 @@ private:
         const int buttonY = margin;
         const int buttonWidth = 92;
         MoveWindow(m_runButton, rightX, buttonY, buttonWidth, buttonHeight, TRUE);
-        MoveWindow(m_moveNextButton, rightX + 100, buttonY, buttonWidth, buttonHeight, TRUE);
-        MoveWindow(m_confirmButton, rightX + 200, buttonY, buttonWidth, buttonHeight, TRUE);
-        MoveWindow(m_cancelButton, rightX + 300, buttonY, buttonWidth, buttonHeight, TRUE);
-        MoveWindow(m_resetButton, rightX + 400, buttonY, buttonWidth, buttonHeight, TRUE);
+        MoveWindow(m_playPauseButton, rightX + 100, buttonY, buttonWidth, buttonHeight, TRUE);
+        MoveWindow(m_stepButton, rightX + 200, buttonY, buttonWidth, buttonHeight, TRUE);
+        MoveWindow(m_resetButton, rightX + 300, buttonY, buttonWidth, buttonHeight, TRUE);
 
-        const int previewTop = buttonY + buttonHeight + margin;
+        const int actionButtonY = buttonY + buttonHeight + 8;
+        MoveWindow(m_moveNextButton, rightX, actionButtonY, buttonWidth, buttonHeight, TRUE);
+        MoveWindow(m_confirmButton, rightX + 100, actionButtonY, buttonWidth, buttonHeight, TRUE);
+        MoveWindow(m_cancelButton, rightX + 200, actionButtonY, buttonWidth, buttonHeight, TRUE);
+
+        const int previewTop = actionButtonY + buttonHeight + margin;
         const int previewWantedHeight = (rightWidth * 9 / 16) + 46;
         const int previewMaxHeight = std::max(220, height * 45 / 100);
         const int previewHeight = std::min(std::max(220, previewWantedHeight), previewMaxHeight);
@@ -835,7 +894,11 @@ private:
         if (m_runtime)
         {
             std::ostringstream footer;
-            footer << atlasLabel << " | State " << toString(m_runtime->state()) << " | prompts=" << m_runtime->visiblePrompts().size();
+            footer
+                << atlasLabel
+                << " | State " << toString(m_runtime->state())
+                << " | " << (m_playbackRunning ? "playing" : "paused")
+                << " | prompts=" << m_runtime->visiblePrompts().size();
             drawTextLine(dc, footerRect, footer.str(), RGB(68, 75, 82));
         }
         else
@@ -906,6 +969,10 @@ private:
 
         if (id == kRunButtonId || id == kResetButtonId)
             runSelectedHost();
+        else if (id == kPlayPauseButtonId)
+            togglePlayback();
+        else if (id == kStepButtonId)
+            stepPlaybackFrame();
         else if (id == kMoveNextButtonId)
             requestAction(InputAction::MoveNext);
         else if (id == kConfirmButtonId)
@@ -946,6 +1013,7 @@ private:
         if (!m_selectedHostIndex.has_value())
             return;
 
+        stopPlayback();
         const auto& resolved = m_hosts[*m_selectedHostIndex];
         const auto& entry = m_contracts[resolved.contractIndex];
         const auto* host = resolved.metadata;
@@ -968,7 +1036,7 @@ private:
         m_runningContractIndex = resolved.contractIndex;
         enableAllPromptPredicates(*m_runtime, entry.contract);
         m_runtime->dispatch(RuntimeEventType::ResourcesReady);
-        settleRuntime();
+        startPlayback();
         updateRuntimeDetails();
     }
 
@@ -979,42 +1047,81 @@ private:
 
         appendLogLine("Action: " + std::string(toString(action)));
         if (m_runtime->requestAction(action))
-            settleRuntime();
+            startPlayback();
         updateRuntimeDetails();
     }
 
-    void settleRuntime(std::size_t maxSteps = 12)
+    void togglePlayback()
     {
-        if (!m_runtime || !m_runningContractIndex.has_value())
-            return;
+        if (m_playbackRunning)
+            stopPlayback();
+        else
+            startPlayback();
+    }
 
-        const auto& contract = m_contracts[*m_runningContractIndex].contract;
-        for (std::size_t step = 0; step < maxSteps; ++step)
+    void stepPlaybackFrame()
+    {
+        stopPlayback();
+        tickPlaybackFrame(kPlaybackTickSeconds);
+    }
+
+    void startPlayback()
+    {
+        if (!m_runtime || !m_window || m_runtime->state() == ScreenState::Closed)
         {
-            if (m_runtime->state() == ScreenState::Closed)
-                return;
-
-            const auto stateIt = contract.states.find(m_runtime->state());
-            if (stateIt == contract.states.end())
-                return;
-
-            const double duration = timelineDuration(contract, m_runtime->state());
-            if (duration > 0.0)
-            {
-                m_runtime->tick(duration + 0.05);
-                continue;
-            }
-
-            if (!stateIt->second.inputEnabled)
-            {
-                if (m_runtime->dispatch(RuntimeEventType::Timeout))
-                    continue;
-                if (m_runtime->dispatch(RuntimeEventType::AnimationFinished))
-                    continue;
-            }
-
+            updatePlaybackButton();
             return;
         }
+
+        if (!m_playbackRunning)
+        {
+            SetTimer(m_window, kPlaybackTimerId, kPlaybackTimerMilliseconds, nullptr);
+            m_playbackRunning = true;
+            appendLogLine("Playback: start");
+        }
+        updatePlaybackButton();
+    }
+
+    void stopPlayback()
+    {
+        if (m_playbackRunning && m_window)
+            KillTimer(m_window, kPlaybackTimerId);
+
+        if (m_playbackRunning)
+            appendLogLine("Playback: pause");
+
+        m_playbackRunning = false;
+        updatePlaybackButton();
+    }
+
+    void updatePlaybackButton()
+    {
+        if (m_playPauseButton)
+            SetWindowTextA(m_playPauseButton, m_playbackRunning ? "Pause" : "Play");
+    }
+
+    [[nodiscard]] double activeTimelineDuration() const
+    {
+        if (!m_runtime || !m_runningContractIndex.has_value())
+            return 0.0;
+
+        const auto& contract = m_contracts[*m_runningContractIndex].contract;
+        return timelineDuration(contract, m_runtime->state());
+    }
+
+    void tickPlaybackFrame(double deltaSeconds)
+    {
+        if (!m_runtime || !m_runningContractIndex.has_value())
+        {
+            stopPlayback();
+            return;
+        }
+
+        m_runtime->tick(deltaSeconds);
+        if (m_runtime->state() == ScreenState::Closed || activeTimelineDuration() <= 0.0)
+            stopPlayback();
+
+        updateRuntimeDetails();
     }
 
     void updateRuntimeDetails()
@@ -1049,6 +1156,8 @@ private:
     HWND m_confirmButton = nullptr;
     HWND m_cancelButton = nullptr;
     HWND m_resetButton = nullptr;
+    HWND m_playPauseButton = nullptr;
+    HWND m_stepButton = nullptr;
     HWND m_previewPanel = nullptr;
     HWND m_detailText = nullptr;
     HWND m_logText = nullptr;
@@ -1060,6 +1169,7 @@ private:
     std::optional<std::size_t> m_selectedHostIndex;
     std::optional<std::size_t> m_runningContractIndex;
     std::unique_ptr<ScreenRuntime> m_runtime;
+    bool m_playbackRunning = false;
     std::string m_log;
 };
 } // namespace
@@ -1069,6 +1179,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
     try
     {
         const std::string command = commandLine ? commandLine : "";
+        if (command.find("--playback-smoke") != std::string::npos)
+            return runPlaybackSmoke();
         if (command.find("--preview-smoke") != std::string::npos)
             return runPreviewSmoke();
         if (command.find("--smoke") != std::string::npos)

@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr53" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr54" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -52,6 +52,20 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("layoutLayerRect", source_text)
         self.assertIn("clampRectToCanvas", source_text)
         self.assertIn("previewMaxHeight", source_text)
+
+    def test_gui_source_exposes_timeline_playback_controls(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("kPlayPauseButtonId", source_text)
+        self.assertIn("kStepButtonId", source_text)
+        self.assertIn("kPlaybackTimerId", source_text)
+        self.assertIn("kPlaybackTickSeconds", source_text)
+        self.assertIn("WM_TIMER", source_text)
+        self.assertIn("SetTimer", source_text)
+        self.assertIn("KillTimer", source_text)
+        self.assertIn("startPlayback", source_text)
+        self.assertIn("stopPlayback", source_text)
+        self.assertIn("tickPlaybackFrame", source_text)
+        self.assertIn("--playback-smoke", source_text)
 
     def test_gui_initial_window_uses_desktop_work_area(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -97,6 +111,25 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("title=mainmenu__ui_mainmenu.png", completed.stdout)
         self.assertIn("pause=systemcommoncore__ui_pause.png", completed.stdout)
         self.assertIn("sonic_stage=exstagetails_common__ui_prov_playscreen.png", completed.stdout)
+
+    def test_playback_smoke_command_advances_timeline_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--playback-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui playback smoke ok", completed.stdout)
+        self.assertIn("intro=Intro", completed.stdout)
+        self.assertIn("after_intro=Idle", completed.stdout)
+        self.assertIn("action=Navigate", completed.stdout)
+        self.assertIn("after_action=Idle", completed.stdout)
 
 
 if __name__ == "__main__":

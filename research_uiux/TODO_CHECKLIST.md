@@ -396,6 +396,15 @@
 - [x] Build, smoke, and capture-check `b\rr53\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for the gameplay-HUD proxy-preview beat.
 
+## Phase 54 - GUI Timeline Playback Controls
+
+- [x] Add Play/Pause and Step controls to the native GUI workbench.
+- [x] Replace immediate GUI transition settling with timer-driven `ScreenRuntime::tick(...)` playback.
+- [x] Keep input-locked intro/action bands visible in the preview instead of snapping straight to Idle.
+- [x] Add a `--playback-smoke` regression path for timeline advancement without opening a window.
+- [x] Build, smoke, and capture-check `b\rr54\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for the first GUI timeline-playback beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -511,3 +520,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added and verified the native Win32 `sward_ui_runtime_debug_gui.exe` under `b\rr51`, giving the current workbench its first proper non-CLI operator shell.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified the GUI preview panel under `b\rr52`, with `8` local atlas candidates plus runtime layer/prompt/timeline overlay drawing.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified the gameplay-HUD proxy atlas binding under `b\rr53`, with `10` atlas candidates, `2` marked proxy candidates, and a captured `SonicMainDisplay.cpp` preview using `exstagetails_common__ui_prov_playscreen.png`.
+- [x] Follow-on phase audit on `2026-04-24`: added and verified GUI timeline playback controls under `b\rr54`, with Play/Pause, Step, timer-driven contract ticks, and a captured `SonicMainDisplay.cpp` Intro playback frame.

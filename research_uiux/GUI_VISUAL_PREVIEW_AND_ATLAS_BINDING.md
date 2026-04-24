@@ -4,10 +4,10 @@
 
 # <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> GUI Visual Preview And Atlas Binding
 
-Phase 52 turned the native GUI workbench from a metadata/action shell into the first visual preview surface. Phase 53 adds the first gameplay-HUD proxy atlas bindings.
+Phase 52 turned the native GUI workbench from a metadata/action shell into the first visual preview surface. Phase 53 added the first gameplay-HUD proxy atlas bindings, and Phase 54 adds timer-driven playback controls over the same preview.
 
 ```text
-b/rr53/sward_ui_runtime_debug_gui.exe
+b/rr54/sward_ui_runtime_debug_gui.exe
 ```
 
 The preview remains publishable because the repo only commits renderer code and atlas lookup logic. The extracted atlas PNGs still live under ignored local-only `extracted_assets/`.
@@ -22,6 +22,7 @@ The preview remains publishable because the repo only commits renderer code and 
 - draws visible prompt rows on the preview canvas
 - draws a small timeline/progress strip for the active runtime state
 - adds `--preview-smoke` so automation can validate atlas bindings without opening a window
+- adds Play/Pause and Step controls so the timeline/progress strip can be inspected during intro/action bands
 
 Verified preview smoke:
 
@@ -49,6 +50,7 @@ sward_ui_runtime_debug_gui preview smoke ok atlas_candidates=10 proxy_candidates
 - The atlas image is a local visual reference sheet, not an interactive layout renderer.
 - The overlay rectangles are schematic runtime-layer projections, not decoded CSD node transforms.
 - The timeline strip reflects the portable contract state band, not original CSD keyframe playback.
+- Phase 54 can play those portable bands over time, but decoded original CSD timeline playback is still future work.
 - Sonic/Werehog gameplay HUD atlas binding is intentionally marked as a proxy until exact loose `ui_playscreen*` payloads are recovered.
 - Proprietary atlas PNGs remain local-only and ignored.
 
