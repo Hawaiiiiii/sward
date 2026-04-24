@@ -469,6 +469,14 @@
 - [x] Build and smoke-check `b\rr61\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated ownership-audit report.
 
+## Phase 62 - GUI Layout Primitive Playback Cues
+
+- [x] Attach recovered animation-bank names to layout scene primitives.
+- [x] Draw scene/animation labels and per-primitive sampled frame cursors in the native GUI.
+- [x] Add `--layout-primitive-playback-smoke` for gameplay HUD proxy animation/frame cursor checks.
+- [x] Build, smoke, and capture-check `b\rr62\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for primitive playback cues.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -592,3 +600,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI layout scene primitive previews under `b\rr59`, with keyframe-density primitives for Title/Pause/Loading and a captured `GameModeMainMenu_Test.cpp` title primitive overlay.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified gameplay HUD primitive previews under `b\rr60`, with Sonic/Werehog/Extra Stage bindings to the recovered `ui_prov_playscreen` primitive set and a captured `SonicMainDisplay.cpp` proxy HUD primitive overlay.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified gameplay HUD primitive ownership auditing under `b\rr61`, with `so_speed_gauge`, `so_ringenagy_gauge`, `ring_get_effect`, and `bg` scene/keyframe metrics smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive playback cues under `b\rr62`, with recovered gameplay HUD animation-bank labels and sampled frame cursors smoke-guarded.

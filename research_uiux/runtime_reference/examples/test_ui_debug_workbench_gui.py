@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr61" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr62" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -114,6 +114,13 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("Root/bg_2", source_text)
         self.assertIn("--layout-primitive-smoke", source_text)
 
+    def test_gui_source_exposes_layout_scene_primitive_playback_cues(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("animationName", source_text)
+        self.assertIn("layoutScenePrimitiveFrame", source_text)
+        self.assertIn("--layout-primitive-playback-smoke", source_text)
+        self.assertIn("WM_PRINTCLIENT", source_text)
+
     def test_gui_source_exposes_gameplay_hud_proxy_primitives(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
         self.assertIn("ui_prov_playscreen", source_text)
@@ -127,12 +134,27 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
 
         expected_fragments = [
-            '"Root/so_speed_gauge", "so_speed_gauge", "Gradient, X/Y scale", 100, 1, 47, 47, 360',
-            '"Root/so_ringenagy_gauge", "so_ringenagy_gauge", "Gradient, X scale", 100, 1, 43, 43, 240',
-            '"Root/info_1", "info_1", "Gradient, HideFlag", 100, 3, 72, 24, 57',
-            '"Root/info_2", "info_2", "HideFlag", 100, 3, 72, 24, 9',
-            '"Root/ring_get_effect", "ring_get_effect", "Gradient, Rotation", 5, 1, 2, 2, 14',
-            '"Root/bg", "bg", "DefaultAnim", 100, 6, 29, 21, 0',
+            '"Root/so_speed_gauge", "so_speed_gauge", "Size_Anim", "Gradient, X/Y scale", 100, 1, 47, 47, 360',
+            '"Root/so_ringenagy_gauge", "so_ringenagy_gauge", "Size_Anim", "Gradient, X scale", 100, 1, 43, 43, 240',
+            '"Root/info_1", "info_1", "Count_Anim", "Gradient, HideFlag", 100, 3, 72, 24, 57',
+            '"Root/info_2", "info_2", "Count_Anim", "HideFlag", 100, 3, 72, 24, 9',
+            '"Root/ring_get_effect", "ring_get_effect", "Intro_Anim", "Gradient, Rotation", 5, 1, 2, 2, 14',
+            '"Root/bg", "bg", "DefaultAnim", "DefaultAnim", 100, 6, 29, 21, 0',
+        ]
+
+        for fragment in expected_fragments:
+            self.assertIn(fragment, source_text)
+
+    def test_gui_source_maps_gameplay_hud_primitives_to_animation_banks(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+
+        expected_fragments = [
+            '"Root/so_speed_gauge", "so_speed_gauge", "Size_Anim", "Gradient, X/Y scale"',
+            '"Root/so_ringenagy_gauge", "so_ringenagy_gauge", "Size_Anim", "Gradient, X scale"',
+            '"Root/info_1", "info_1", "Count_Anim", "Gradient, HideFlag"',
+            '"Root/info_2", "info_2", "Count_Anim", "HideFlag"',
+            '"Root/ring_get_effect", "ring_get_effect", "Intro_Anim", "Gradient, Rotation"',
+            '"Root/bg", "bg", "DefaultAnim", "DefaultAnim"',
         ]
 
         for fragment in expected_fragments:
@@ -354,6 +376,26 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("sonic_ring_energy_gauge_kf=240", completed.stdout)
         self.assertIn("sonic_ring_get_effect_kf=14", completed.stdout)
         self.assertIn("sonic_bg_kf=0", completed.stdout)
+
+    def test_layout_primitive_playback_smoke_reports_gameplay_hud_animation_cursors_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--layout-primitive-playback-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui layout primitive playback smoke ok", completed.stdout)
+        self.assertIn("speed_anim=Size_Anim speed_frame=50/100", completed.stdout)
+        self.assertIn("energy_anim=Size_Anim energy_frame=50/100", completed.stdout)
+        self.assertIn("info_anim=Count_Anim info_frame=50/100", completed.stdout)
+        self.assertIn("ring_fx_anim=Intro_Anim ring_fx_frame=3/5", completed.stdout)
+        self.assertIn("bg_anim=DefaultAnim bg_frame=50/100", completed.stdout)
 
 
 if __name__ == "__main__":

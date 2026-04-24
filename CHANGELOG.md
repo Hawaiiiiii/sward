@@ -9,6 +9,17 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 > [!NOTE]
 > This changelog tracks the publishable repo layer. Local-only extracted assets, generated PPC output, staged tools, and private inputs stay outside git history by design.
 
+## 2026-04-25
+
+### Phase 62 GUI layout primitive playback cues
+
+- added [`research_uiux/GUI_LAYOUT_PRIMITIVE_PLAYBACK_CUES.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_PLAYBACK_CUES.md)
+- attached recovered animation-bank names to the layout scene primitive table, including the Sonic/Werehog/Extra Stage HUD proxy primitive set
+- added per-primitive sampled frame cursors to the native GUI primitive overlay so scene/keyframe boxes now expose the active diagnostic playback frame
+- made the custom preview panel respond to `WM_PRINTCLIENT` / `WM_PRINT` so visual automation can capture the same paint path used on screen
+- added `--layout-primitive-playback-smoke` to verify gameplay-HUD proxy animation names and sampled frame cursors without opening the window
+- verified `b/rr62/sward_ui_runtime_debug_gui.exe`
+
 ## 2026-04-24
 
 ### Phase 61 gameplay HUD primitive ownership audit
