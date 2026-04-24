@@ -4,10 +4,10 @@
 
 # <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> GUI Visual Preview And Atlas Binding
 
-Phase 52 turns the native GUI workbench from a metadata/action shell into the first visual preview surface.
+Phase 52 turned the native GUI workbench from a metadata/action shell into the first visual preview surface. Phase 53 adds the first gameplay-HUD proxy atlas bindings.
 
 ```text
-b/rr52/sward_ui_runtime_debug_gui.exe
+b/rr53/sward_ui_runtime_debug_gui.exe
 ```
 
 The preview remains publishable because the repo only commits renderer code and atlas lookup logic. The extracted atlas PNGs still live under ignored local-only `extracted_assets/`.
@@ -16,7 +16,7 @@ The preview remains publishable because the repo only commits renderer code and 
 
 - added a dedicated `SwardUiRuntimePreviewPanel` Win32 child window
 - added GDI+ rendering for local atlas PNGs when the ignored visual atlas exists
-- added a contract-to-atlas candidate table for `8` high-confidence screen families
+- added a contract-to-atlas candidate table for `10` screen families, including `2` explicit proxy bindings for gameplay HUD previews
 - draws a 16:9 preview surface inside the GUI workbench
 - overlays current `ScreenRuntime` visible layers as translucent rectangles
 - draws visible prompt rows on the preview canvas
@@ -26,7 +26,7 @@ The preview remains publishable because the repo only commits renderer code and 
 Verified preview smoke:
 
 ```text
-sward_ui_runtime_debug_gui preview smoke ok atlas_candidates=8 existing_local_atlas=8 title=mainmenu__ui_mainmenu.png pause=systemcommoncore__ui_pause.png
+sward_ui_runtime_debug_gui preview smoke ok atlas_candidates=10 proxy_candidates=2 existing_local_atlas=10 title=mainmenu__ui_mainmenu.png pause=systemcommoncore__ui_pause.png sonic_stage=exstagetails_common__ui_prov_playscreen.png
 ```
 
 ## Current Atlas Candidates
@@ -40,13 +40,16 @@ sward_ui_runtime_debug_gui preview smoke ok atlas_candidates=8 existing_local_at
 | `mission_result_reference.json` | `actioncommon__ui_result.png` |
 | `world_map_reference.json` | `worldmap__ui_worldmap.png` |
 | `boss_hud_reference.json` | `bosscommon__ui_boss_gauge.png` |
-| `extra_stage_hud_reference.json` | `exstagetails_common__ui_exstage.png` |
+| `extra_stage_hud_reference.json` | `exstagetails_common__ui_prov_playscreen.png` |
+| `sonic_stage_hud_reference.json` | `exstagetails_common__ui_prov_playscreen.png` (`proxy`) |
+| `werehog_stage_hud_reference.json` | `exstagetails_common__ui_prov_playscreen.png` (`proxy`) |
 
 ## Current Limits
 
 - The atlas image is a local visual reference sheet, not an interactive layout renderer.
 - The overlay rectangles are schematic runtime-layer projections, not decoded CSD node transforms.
 - The timeline strip reflects the portable contract state band, not original CSD keyframe playback.
+- Sonic/Werehog gameplay HUD atlas binding is intentionally marked as a proxy until exact loose `ui_playscreen*` payloads are recovered.
 - Proprietary atlas PNGs remain local-only and ignored.
 
 ## Next Product Step

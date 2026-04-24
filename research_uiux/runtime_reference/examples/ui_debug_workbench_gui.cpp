@@ -53,19 +53,22 @@ struct AtlasCandidate
     std::string_view contractFileName;
     std::string_view shortName;
     std::string_view atlasFileName;
+    std::string_view matchKind;
 };
 
 inline constexpr const char* kPreviewPanelClassName = "SwardUiRuntimePreviewPanel";
 
-inline constexpr std::array<AtlasCandidate, 8> kPreviewAtlasCandidates{{
-    { "title_menu_reference.json", "title", "mainmenu__ui_mainmenu.png" },
-    { "pause_menu_reference.json", "pause", "systemcommoncore__ui_pause.png" },
-    { "autosave_toast_reference.json", "autosave", "autosave__ui_saveicon.png" },
-    { "loading_transition_reference.json", "loading", "loading__ui_loading.png" },
-    { "mission_result_reference.json", "mission_result", "actioncommon__ui_result.png" },
-    { "world_map_reference.json", "world_map", "worldmap__ui_worldmap.png" },
-    { "boss_hud_reference.json", "boss_hud", "bosscommon__ui_boss_gauge.png" },
-    { "extra_stage_hud_reference.json", "extra_stage", "exstagetails_common__ui_exstage.png" },
+inline constexpr std::array<AtlasCandidate, 10> kPreviewAtlasCandidates{{
+    { "title_menu_reference.json", "title", "mainmenu__ui_mainmenu.png", "exact" },
+    { "pause_menu_reference.json", "pause", "systemcommoncore__ui_pause.png", "exact" },
+    { "autosave_toast_reference.json", "autosave", "autosave__ui_saveicon.png", "exact" },
+    { "loading_transition_reference.json", "loading", "loading__ui_loading.png", "exact" },
+    { "mission_result_reference.json", "mission_result", "actioncommon__ui_result.png", "exact" },
+    { "world_map_reference.json", "world_map", "worldmap__ui_worldmap.png", "exact" },
+    { "boss_hud_reference.json", "boss_hud", "bosscommon__ui_boss_gauge.png", "exact" },
+    { "extra_stage_hud_reference.json", "extra_stage", "exstagetails_common__ui_prov_playscreen.png", "exact" },
+    { "sonic_stage_hud_reference.json", "sonic_stage", "exstagetails_common__ui_prov_playscreen.png", "proxy" },
+    { "werehog_stage_hud_reference.json", "werehog_stage", "exstagetails_common__ui_prov_playscreen.png", "proxy" },
 }};
 
 enum ControlId
@@ -101,6 +104,19 @@ enum ControlId
             return candidate.shortName == shortName;
         });
     return found == kPreviewAtlasCandidates.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] bool isProxyAtlasCandidate(const AtlasCandidate& candidate)
+{
+    return candidate.matchKind == std::string_view("proxy");
+}
+
+[[nodiscard]] std::string atlasCandidateDisplayName(const AtlasCandidate& candidate)
+{
+    std::string label(candidate.atlasFileName);
+    if (isProxyAtlasCandidate(candidate))
+        label += " (proxy)";
+    return label;
 }
 
 [[nodiscard]] std::filesystem::path visualAtlasSheetRoot()
@@ -237,6 +253,70 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     DrawTextA(dc, text.c_str(), static_cast<int>(text.size()), &bounds, format);
 }
 
+[[nodiscard]] Gdiplus::RectF clampRectToCanvas(Gdiplus::RectF rect, const Gdiplus::RectF& canvas)
+{
+    const float maxWidth = std::max(1.0F, canvas.Width - 8.0F);
+    const float maxHeight = std::max(1.0F, canvas.Height - 8.0F);
+    rect.Width = std::min(rect.Width, maxWidth);
+    rect.Height = std::min(rect.Height, maxHeight);
+
+    const float minX = canvas.X + 4.0F;
+    const float minY = canvas.Y + 4.0F;
+    const float maxX = std::max(minX, canvas.X + canvas.Width - rect.Width - 4.0F);
+    const float maxY = std::max(minY, canvas.Y + canvas.Height - rect.Height - 4.0F);
+    rect.X = std::max(minX, std::min(rect.X, maxX));
+    rect.Y = std::max(minY, std::min(rect.Y, maxY));
+    return rect;
+}
+
+[[nodiscard]] Gdiplus::RectF layoutLayerRect(const OverlayLayer& layer, std::size_t roleIndex, const Gdiplus::RectF& canvas)
+{
+    if (layer.role == "counter")
+    {
+        const float width = std::min(250.0F, canvas.Width * 0.38F);
+        return clampRectToCanvas(
+            Gdiplus::RectF(canvas.X + 18.0F, canvas.Y + 16.0F + (static_cast<float>(roleIndex) * 22.0F), width, 17.0F),
+            canvas);
+    }
+
+    if (layer.role == "gauge")
+    {
+        const float width = std::min(300.0F, canvas.Width * 0.48F);
+        return clampRectToCanvas(
+            Gdiplus::RectF(canvas.X + 18.0F, canvas.Y + canvas.Height - 88.0F + (static_cast<float>(roleIndex) * 22.0F), width, 17.0F),
+            canvas);
+    }
+
+    if (layer.role == "sidecar")
+    {
+        const float width = std::min(210.0F, canvas.Width * 0.30F);
+        return clampRectToCanvas(
+            Gdiplus::RectF(canvas.X + canvas.Width - width - 18.0F, canvas.Y + 22.0F + (static_cast<float>(roleIndex) * 34.0F), width, 26.0F),
+            canvas);
+    }
+
+    if (layer.role == "transient_fx")
+    {
+        const float width = std::min(260.0F, canvas.Width * 0.42F);
+        return clampRectToCanvas(
+            Gdiplus::RectF(canvas.X + ((canvas.Width - width) / 2.0F), canvas.Y + 22.0F + (static_cast<float>(roleIndex) * 30.0F), width, 24.0F),
+            canvas);
+    }
+
+    if (layer.role == "prompt")
+    {
+        const float width = std::min(360.0F, canvas.Width - 32.0F);
+        return clampRectToCanvas(
+            Gdiplus::RectF(canvas.X + 16.0F, canvas.Y + canvas.Height - 38.0F - (static_cast<float>(roleIndex) * 28.0F), width, 22.0F),
+            canvas);
+    }
+
+    const float width = std::min(280.0F, canvas.Width * 0.44F);
+    return clampRectToCanvas(
+        Gdiplus::RectF(canvas.X + 20.0F, canvas.Y + 20.0F + (static_cast<float>(roleIndex) * 24.0F), width, 20.0F),
+        canvas);
+}
+
 [[nodiscard]] std::string snapshotText(const ScreenRuntime& runtime, const ContractEntry& entry, const DebugWorkbenchHostEntry& host)
 {
     std::ostringstream text;
@@ -249,7 +329,7 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
         << "Local atlas candidate: ";
 
     if (const auto* candidate = atlasCandidateForContract(host.primaryContractFileName))
-        text << candidate->atlasFileName;
+        text << atlasCandidateDisplayName(*candidate);
     else
         text << "none";
 
@@ -302,20 +382,26 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
 [[nodiscard]] int runPreviewSmoke()
 {
     std::size_t existingAtlasSheets = 0;
+    std::size_t proxyCandidates = 0;
     for (const auto& candidate : kPreviewAtlasCandidates)
     {
+        if (isProxyAtlasCandidate(candidate))
+            ++proxyCandidates;
         if (std::filesystem::exists(visualAtlasSheetRoot() / std::string(candidate.atlasFileName)))
             ++existingAtlasSheets;
     }
 
     const auto* title = atlasCandidateByShortName("title");
     const auto* pause = atlasCandidateByShortName("pause");
+    const auto* sonicStage = atlasCandidateByShortName("sonic_stage");
     std::cout
         << "sward_ui_runtime_debug_gui preview smoke ok "
         << "atlas_candidates=" << kPreviewAtlasCandidates.size()
+        << " proxy_candidates=" << proxyCandidates
         << " existing_local_atlas=" << existingAtlasSheets
         << " title=" << (title ? title->atlasFileName : "none")
         << " pause=" << (pause ? pause->atlasFileName : "none")
+        << " sonic_stage=" << (sonicStage ? sonicStage->atlasFileName : "none")
         << '\n';
     return 0;
 }
@@ -587,7 +673,8 @@ private:
 
         const int previewTop = buttonY + buttonHeight + margin;
         const int previewWantedHeight = (rightWidth * 9 / 16) + 46;
-        const int previewHeight = std::min(std::max(180, previewWantedHeight), std::max(180, height / 3));
+        const int previewMaxHeight = std::max(220, height * 45 / 100);
+        const int previewHeight = std::min(std::max(220, previewWantedHeight), previewMaxHeight);
         MoveWindow(m_previewPanel, rightX, previewTop, rightWidth, previewHeight, TRUE);
 
         const int detailsTop = previewTop + previewHeight + margin;
@@ -646,12 +733,13 @@ private:
         std::string atlasLabel = "Local atlas: none";
         if (host)
         {
-            if (const auto atlasPath = visualAtlasSheetForContract(host->primaryContractFileName))
+            if (const auto* candidate = atlasCandidateForContract(host->primaryContractFileName))
             {
-                atlasLabel = "Local atlas: " + atlasPath->filename().string();
-                if (std::filesystem::exists(*atlasPath))
+                const auto atlasPath = visualAtlasSheetRoot() / std::string(candidate->atlasFileName);
+                atlasLabel = "Local atlas: " + atlasCandidateDisplayName(*candidate);
+                if (std::filesystem::exists(atlasPath))
                 {
-                    Gdiplus::Image image(atlasPath->wstring().c_str());
+                    Gdiplus::Image image(atlasPath.wstring().c_str());
                     if (image.GetLastStatus() == Gdiplus::Ok)
                     {
                         graphics.DrawImage(&image, canvas.X, canvas.Y, canvas.Width, canvas.Height);
@@ -683,13 +771,13 @@ private:
             const auto layers = m_runtime->visibleLayers();
             for (std::size_t index = 0; index < layers.size(); ++index)
             {
-                const float inset = 18.0F + (static_cast<float>(index) * 8.0F);
-                const float layerHeight = std::min(46.0F, std::max(24.0F, canvas.Height / static_cast<float>(layers.size() + 3)));
-                Gdiplus::RectF layerRect(
-                    canvas.X + inset,
-                    canvas.Y + 18.0F + (static_cast<float>(index) * (layerHeight + 8.0F)),
-                    std::max(48.0F, canvas.Width - (inset * 2.0F)),
-                    layerHeight);
+                std::size_t roleIndex = 0;
+                for (std::size_t previous = 0; previous < index; ++previous)
+                {
+                    if (layers[previous].role == layers[index].role)
+                        ++roleIndex;
+                }
+                const Gdiplus::RectF layerRect = layoutLayerRect(layers[index], roleIndex, canvas);
 
                 Gdiplus::SolidBrush layerBrush(Gdiplus::Color(96, 57, 166, 218));
                 Gdiplus::Pen layerPen(Gdiplus::Color(220, 245, 248, 250), 1.5F);
@@ -707,14 +795,15 @@ private:
 
             const auto prompts = m_runtime->visiblePrompts();
             const float promptTop = canvas.Y + canvas.Height - 38.0F;
-            const float promptWidth = prompts.empty() ? 0.0F : std::min(150.0F, (canvas.Width - 32.0F) / static_cast<float>(prompts.size()));
+            const float promptWidth = prompts.empty() ? 0.0F : std::min(132.0F, (canvas.Width - 32.0F) / static_cast<float>(prompts.size()));
             for (std::size_t index = 0; index < prompts.size(); ++index)
             {
                 Gdiplus::RectF promptRect(
                     canvas.X + 16.0F + (static_cast<float>(index) * promptWidth),
                     promptTop,
-                    std::max(56.0F, promptWidth - 8.0F),
+                    std::max(44.0F, promptWidth - 8.0F),
                     26.0F);
+                promptRect = clampRectToCanvas(promptRect, canvas);
                 Gdiplus::SolidBrush promptBrush(Gdiplus::Color(228, 247, 211, 72));
                 Gdiplus::Pen promptPen(Gdiplus::Color(255, 35, 41, 47), 1.2F);
                 graphics.FillRectangle(&promptBrush, promptRect);
@@ -840,7 +929,7 @@ private:
             << "Contract: " << host.primaryContractFileName << "\r\n";
 
         if (const auto* candidate = atlasCandidateForContract(host.primaryContractFileName))
-            text << "Atlas candidate: " << candidate->atlasFileName << "\r\n\r\n";
+            text << "Atlas candidate: " << atlasCandidateDisplayName(*candidate) << "\r\n\r\n";
         else
             text << "Atlas candidate: none\r\n\r\n";
 

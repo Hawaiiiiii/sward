@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 53 gameplay HUD proxy preview binding
+
+- added [`research_uiux/GAMEPLAY_HUD_PROXY_PREVIEW_BINDING.md`](./research_uiux/GAMEPLAY_HUD_PROXY_PREVIEW_BINDING.md)
+- bound Sonic and Werehog gameplay-HUD GUI previews to the recovered `ui_prov_playscreen` atlas as explicit proxy evidence while the exact loose `ui_playscreen*` packages remain unrecovered
+- moved the Extra Stage HUD atlas candidate onto the recovered play-screen sheet used by the runtime contract vocabulary
+- replaced the GUI preview's diagonal layer stack with bounded role-aware placement for counters, gauges, sidecars, transient effects, and prompt strips
+- increased the preview panel height budget so atlas-backed HUD surfaces are readable in normal desktop workbench windows
+- extended `--preview-smoke` to verify `10` atlas candidates and `2` proxy candidates, then verified `b/rr53/sward_ui_runtime_debug_gui.exe`
+
 ### Phase 52 GUI visual preview and atlas binding
 
 - added [`research_uiux/GUI_VISUAL_PREVIEW_AND_ATLAS_BINDING.md`](./research_uiux/GUI_VISUAL_PREVIEW_AND_ATLAS_BINDING.md)

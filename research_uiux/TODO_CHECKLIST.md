@@ -386,6 +386,16 @@
 - [x] Build and launch-check `b\rr52\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for the first GUI visual-preview beat.
 
+## Phase 53 - Gameplay HUD Proxy Preview Binding
+
+- [x] Bind Sonic and Werehog gameplay-HUD previews to the recovered `ui_prov_playscreen` atlas as explicit proxy evidence.
+- [x] Keep exact `ui_playscreen*` parity marked as unrecovered rather than overclaiming atlas/layout coverage.
+- [x] Add bounded role-aware preview placement for counters, gauges, sidecars, transient effects, and prompt strips.
+- [x] Increase the GUI preview height budget so atlas-backed HUD previews stay readable in normal desktop windows.
+- [x] Extend GUI preview smoke coverage to `10` atlas candidates and `2` proxy candidates.
+- [x] Build, smoke, and capture-check `b\rr53\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for the gameplay-HUD proxy-preview beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -500,3 +510,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: verified the catalog view under `b\rr48`, including the widened `Player3DBossCamera.cpp` camera/presentation host.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified the native Win32 `sward_ui_runtime_debug_gui.exe` under `b\rr51`, giving the current workbench its first proper non-CLI operator shell.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified the GUI preview panel under `b\rr52`, with `8` local atlas candidates plus runtime layer/prompt/timeline overlay drawing.
+- [x] Follow-on phase audit on `2026-04-24`: added and verified the gameplay-HUD proxy atlas binding under `b\rr53`, with `10` atlas candidates, `2` marked proxy candidates, and a captured `SonicMainDisplay.cpp` preview using `exstagetails_common__ui_prov_playscreen.png`.

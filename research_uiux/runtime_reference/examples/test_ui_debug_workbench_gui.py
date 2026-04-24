@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr52" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr53" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -42,6 +42,16 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("visibleLayers", source_text)
         self.assertIn("visiblePrompts", source_text)
         self.assertIn("--preview-smoke", source_text)
+
+    def test_gui_preview_binds_gameplay_hud_proxy_atlas_and_bounded_layout(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("sonic_stage_hud_reference.json", source_text)
+        self.assertIn("werehog_stage_hud_reference.json", source_text)
+        self.assertIn("exstagetails_common__ui_prov_playscreen.png", source_text)
+        self.assertIn("proxy", source_text)
+        self.assertIn("layoutLayerRect", source_text)
+        self.assertIn("clampRectToCanvas", source_text)
+        self.assertIn("previewMaxHeight", source_text)
 
     def test_gui_initial_window_uses_desktop_work_area(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -82,9 +92,11 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("sward_ui_runtime_debug_gui preview smoke ok", completed.stdout)
-        self.assertIn("atlas_candidates=8", completed.stdout)
+        self.assertIn("atlas_candidates=10", completed.stdout)
+        self.assertIn("proxy_candidates=2", completed.stdout)
         self.assertIn("title=mainmenu__ui_mainmenu.png", completed.stdout)
         self.assertIn("pause=systemcommoncore__ui_pause.png", completed.stdout)
+        self.assertIn("sonic_stage=exstagetails_common__ui_prov_playscreen.png", completed.stdout)
 
 
 if __name__ == "__main__":
