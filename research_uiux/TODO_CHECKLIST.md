@@ -477,6 +477,14 @@
 - [x] Build, smoke, and capture-check `b\rr62\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for primitive playback cues.
 
+## Phase 63 - GUI Layout Primitive Detail Cues
+
+- [x] Add a readable layout primitive cue summary to the GUI detail pane.
+- [x] Include primitive count, total keyframes, animation-bank names, sampled frames, and track summaries.
+- [x] Add `--layout-primitive-detail-smoke` for headless Sonic HUD proxy parity checks.
+- [x] Build, smoke, and GUI-control-check `b\rr63\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for primitive detail cues.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -601,3 +609,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added and verified gameplay HUD primitive previews under `b\rr60`, with Sonic/Werehog/Extra Stage bindings to the recovered `ui_prov_playscreen` primitive set and a captured `SonicMainDisplay.cpp` proxy HUD primitive overlay.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified gameplay HUD primitive ownership auditing under `b\rr61`, with `so_speed_gauge`, `so_ringenagy_gauge`, `ring_get_effect`, and `bg` scene/keyframe metrics smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive playback cues under `b\rr62`, with recovered gameplay HUD animation-bank labels and sampled frame cursors smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive detail cues under `b\rr63`, with the Sonic HUD primitive parity summary visible through the native detail pane.

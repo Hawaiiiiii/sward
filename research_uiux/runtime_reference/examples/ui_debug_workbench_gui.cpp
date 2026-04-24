@@ -504,6 +504,37 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return static_cast<int>(std::round(clampedProgress * static_cast<float>(primitive.frameCount)));
 }
 
+[[nodiscard]] std::string layoutPrimitiveCueSummary(std::string_view contractFileName, float progress)
+{
+    const auto primitives = layoutScenePrimitivesForContract(contractFileName);
+    std::ostringstream text;
+    text << "Layout primitive cues:\r\n";
+
+    if (primitives.empty())
+    {
+        text << "  none\r\n";
+        return text.str();
+    }
+
+    text
+        << "  primitives=" << primitives.size()
+        << " keyframes=" << layoutScenePrimitiveKeyframeTotal(primitives)
+        << "\r\n";
+
+    for (const auto* primitive : primitives)
+    {
+        text
+            << "  " << primitive->sceneName
+            << " / " << primitive->animationName
+            << " : frame " << layoutScenePrimitiveFrame(*primitive, progress) << "/" << primitive->frameCount
+            << ", keyframes=" << primitive->keyframeCount
+            << ", tracks=" << primitive->trackSummary
+            << "\r\n";
+    }
+
+    return text.str();
+}
+
 void drawLayoutTimelineBar(Gdiplus::Graphics& graphics, const Gdiplus::RectF& bar, float progress)
 {
     const float clampedProgress = std::clamp(progress, 0.0F, 1.0F);
@@ -913,6 +944,12 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     for (const auto& prompt : prompts)
         text << "  [" << toString(prompt.button) << "] " << prompt.label << "\r\n";
 
+    const double stateDuration = timelineDuration(entry.contract, runtime.state());
+    const float primitiveProgress = stateDuration > 0.0
+        ? static_cast<float>(std::min(1.0, runtime.stateElapsedSeconds() / stateDuration))
+        : (runtime.state() == ScreenState::Idle ? 1.0F : 0.0F);
+    text << "\r\n" << layoutPrimitiveCueSummary(host.primaryContractFileName, primitiveProgress);
+
     text << "\r\nNotes:\r\n" << host.notes << "\r\n";
     return text.str();
 }
@@ -1222,6 +1259,26 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         && ringGetFrame == 3
         && backgroundFrame == 50;
     return animationsMatch && framesMatch ? 0 : 1;
+}
+
+[[nodiscard]] int runLayoutPrimitiveDetailSmoke()
+{
+    constexpr float kSampleProgress = 0.5F;
+    const std::string summary = layoutPrimitiveCueSummary("sonic_stage_hud_reference.json", kSampleProgress);
+
+    const bool hasHeader = summary.find("Layout primitive cues:") != std::string::npos;
+    const bool hasAggregate = summary.find("primitives=6 keyframes=680") != std::string::npos;
+    const bool hasSpeedGauge = summary.find("so_speed_gauge / Size_Anim : frame 50/100") != std::string::npos;
+    const bool hasRingEffect = summary.find("ring_get_effect / Intro_Anim : frame 3/5") != std::string::npos;
+
+    std::cout
+        << "sward_ui_runtime_debug_gui layout primitive detail smoke ok "
+        << "primitives=6 keyframes=680 "
+        << "speed=so_speed_gauge/Size_Anim frame=50/100 "
+        << "ring_fx=ring_get_effect/Intro_Anim frame=3/5"
+        << '\n';
+
+    return hasHeader && hasAggregate && hasSpeedGauge && hasRingEffect ? 0 : 1;
 }
 
 [[nodiscard]] int runLayerFillSmoke()
@@ -2014,6 +2071,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runLayoutTimelineSmoke();
         if (command.find("--layout-primitive-playback-smoke") != std::string::npos)
             return runLayoutPrimitivePlaybackSmoke();
+        if (command.find("--layout-primitive-detail-smoke") != std::string::npos)
+            return runLayoutPrimitiveDetailSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)
             return runLayoutPrimitiveSmoke();
         if (command.find("--family-preview-smoke") != std::string::npos)

@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 63 GUI layout primitive detail cues
+
+- added [`research_uiux/GUI_LAYOUT_PRIMITIVE_DETAIL_CUES.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_DETAIL_CUES.md)
+- surfaced layout primitive parity data in the native GUI detail pane, including primitive count, total keyframes, animation bank, sampled frame cursor, and track summary
+- added `--layout-primitive-detail-smoke` for headless Sonic HUD primitive parity checks
+- verified `b/rr63/sward_ui_runtime_debug_gui.exe`
+
 ### Phase 62 GUI layout primitive playback cues
 
 - added [`research_uiux/GUI_LAYOUT_PRIMITIVE_PLAYBACK_CUES.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_PLAYBACK_CUES.md)
