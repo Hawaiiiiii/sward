@@ -2,12 +2,12 @@
   "summary": {
     "group_count": 7,
     "targeted_path_count": 46,
-    "bridged_path_count": 13,
-    "bridged_path_pct": 28.3,
-    "contract_backed_path_count": 9,
-    "contract_backed_path_pct": 19.6,
-    "unresolved_shell_path_count": 10,
-    "unresolved_shell_path_pct": 21.7
+    "bridged_path_count": 26,
+    "bridged_path_pct": 56.5,
+    "contract_backed_path_count": 26,
+    "contract_backed_path_pct": 56.5,
+    "unresolved_shell_path_count": 0,
+    "unresolved_shell_path_pct": 0.0
   },
   "local_hints": [
     {
@@ -459,8 +459,8 @@
       "rationale": "These camera and sequence dispatch surfaces now form a tighter bridge into the town/media-room frontend family.",
       "hint_ids": [],
       "status_counts": {
-        "contract_backed": 0,
-        "archaeology_mapped": 4,
+        "contract_backed": 4,
+        "archaeology_mapped": 0,
         "debug_tool_candidate": 0,
         "named_seed_only": 0
       },
@@ -475,45 +475,53 @@
           "relative_source_path": "Camera/Controller/TownShopCamera.cpp",
           "family_id": "town_ui",
           "family_name": "Town / Media Room UI",
-          "status": "archaeology_mapped",
+          "status": "contract_backed",
           "matched_system_ids": [
             "town_ui"
           ],
-          "runtime_contracts": [],
-          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+          "runtime_contracts": [
+            "town_ui_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "Camera/Controller/TownTalkCamera.cpp",
           "family_id": "town_ui",
           "family_name": "Town / Media Room UI",
-          "status": "archaeology_mapped",
+          "status": "contract_backed",
           "matched_system_ids": [
             "town_ui"
           ],
-          "runtime_contracts": [],
-          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+          "runtime_contracts": [
+            "town_ui_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "Sequence/Unit/SequenceUnitSendMediaRoomMessage.cpp",
           "family_id": "town_ui",
           "family_name": "Town / Media Room UI",
-          "status": "archaeology_mapped",
+          "status": "contract_backed",
           "matched_system_ids": [
             "town_ui"
           ],
-          "runtime_contracts": [],
-          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+          "runtime_contracts": [
+            "town_ui_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "Sequence/Unit/SequenceUnitSendTownMessage.cpp",
           "family_id": "town_ui",
           "family_name": "Town / Media Room UI",
-          "status": "archaeology_mapped",
+          "status": "contract_backed",
           "matched_system_ids": [
             "town_ui"
           ],
-          "runtime_contracts": [],
-          "humanization_priority": "add cleaner translated seam labels and source-path-backed notes"
+          "runtime_contracts": [
+            "town_ui_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         }
       ]
     },
@@ -527,10 +535,10 @@
       "rationale": "These files look like app/world ownership shells rather than screen implementations, but they are the layer that will eventually need named translated ownership once the debug executable stops being purely menu-bound.",
       "hint_ids": [],
       "status_counts": {
-        "contract_backed": 0,
+        "contract_backed": 9,
         "archaeology_mapped": 0,
         "debug_tool_candidate": 0,
-        "named_seed_only": 9
+        "named_seed_only": 0
       },
       "sample_paths": [
         "System/Application.cpp",
@@ -545,82 +553,118 @@
           "relative_source_path": "System/Application.cpp",
           "family_id": "frontend_system_shell",
           "family_name": "Frontend System Shell",
-          "status": "named_seed_only",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "application_world_shell"
+          ],
+          "runtime_contracts": [
+            "application_world_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "System/ApplicationDocument.cpp",
           "family_id": "frontend_system_shell",
           "family_name": "Frontend System Shell",
-          "status": "named_seed_only",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "application_world_shell"
+          ],
+          "runtime_contracts": [
+            "application_world_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "System/ApplicationSetting.cpp",
           "family_id": "frontend_system_shell",
           "family_name": "Frontend System Shell",
-          "status": "named_seed_only",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "application_world_shell"
+          ],
+          "runtime_contracts": [
+            "application_world_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "System/Game.cpp",
           "family_id": "frontend_system_shell",
           "family_name": "Frontend System Shell",
-          "status": "named_seed_only",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "application_world_shell"
+          ],
+          "runtime_contracts": [
+            "application_world_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "System/GameDocument.cpp",
           "family_id": "frontend_system_shell",
           "family_name": "Frontend System Shell",
-          "status": "named_seed_only",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "application_world_shell"
+          ],
+          "runtime_contracts": [
+            "application_world_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "System/NextStagePreloadingManager.cpp",
           "family_id": "frontend_system_shell",
           "family_name": "Frontend System Shell",
-          "status": "named_seed_only",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "application_world_shell"
+          ],
+          "runtime_contracts": [
+            "application_world_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "System/StageListManager.cpp",
           "family_id": "frontend_system_shell",
           "family_name": "Frontend System Shell",
-          "status": "named_seed_only",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "application_world_shell"
+          ],
+          "runtime_contracts": [
+            "application_world_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "System/StageManager.cpp",
           "family_id": "frontend_system_shell",
           "family_name": "Frontend System Shell",
-          "status": "named_seed_only",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "application_world_shell"
+          ],
+          "runtime_contracts": [
+            "application_world_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "System/World.cpp",
           "family_id": "frontend_system_shell",
           "family_name": "Frontend System Shell",
-          "status": "named_seed_only",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "application_world_shell"
+          ],
+          "runtime_contracts": [
+            "application_world_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         }
       ]
     },
@@ -636,10 +680,10 @@
         "debug_operation_tool"
       ],
       "status_counts": {
-        "contract_backed": 0,
+        "contract_backed": 4,
         "archaeology_mapped": 0,
-        "debug_tool_candidate": 4,
-        "named_seed_only": 1
+        "debug_tool_candidate": 1,
+        "named_seed_only": 0
       },
       "sample_paths": [
         "Tool/FreeCameraTool/FreeCameraTool.cpp",
@@ -662,37 +706,53 @@
           "relative_source_path": "Camera/Controller/FreeCamera.cpp",
           "family_id": "tooling_debug_ui",
           "family_name": "Tooling / Debug UI",
-          "status": "debug_tool_candidate",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "camera_shell"
+          ],
+          "runtime_contracts": [
+            "camera_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "Camera/Controller/GoalCamera.cpp",
           "family_id": "frontend_camera_shell",
           "family_name": "Frontend Camera Shell",
-          "status": "named_seed_only",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "expand extraction and correlation before pretending this path is understood"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "camera_shell"
+          ],
+          "runtime_contracts": [
+            "camera_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "Replay/Camera/ReplayFreeCamera.cpp",
           "family_id": "tooling_debug_ui",
           "family_name": "Tooling / Debug UI",
-          "status": "debug_tool_candidate",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "camera_shell"
+          ],
+          "runtime_contracts": [
+            "camera_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         },
         {
           "relative_source_path": "Replay/Camera/ReplayRelativeCamera.cpp",
           "family_id": "tooling_debug_ui",
           "family_name": "Tooling / Debug UI",
-          "status": "debug_tool_candidate",
-          "matched_system_ids": [],
-          "runtime_contracts": [],
-          "humanization_priority": "use this as a host surface for the future UI capability sandbox"
+          "status": "contract_backed",
+          "matched_system_ids": [
+            "camera_shell"
+          ],
+          "runtime_contracts": [
+            "camera_shell_reference.json"
+          ],
+          "humanization_priority": "lift current contract/runtime examples into source-path-named debug screens"
         }
       ]
     }

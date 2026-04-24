@@ -17,7 +17,7 @@ This generated layer upgrades the standalone selector from contract-stem browsin
 |---|---|---:|---|
 | Application / World Shell | `application_world_shell_reference.json` | `33` | `System/Application.cpp`, `System/ApplicationDocument.cpp`, `System/ApplicationSetting.cpp` |
 | Boss HUD | `boss_hud_reference.json` | `2` | `Boss/FinalDarkGaia/Object/FinalDarkGaiaHud.cpp`, `Boss/Phoenix/Hud/PhoenixHudVitality.cpp` |
-| Camera / Replay Shell | `camera_shell_reference.json` | `1` | `Camera/Controller/GoalCamera.cpp`, `Camera/Controller/FreeCamera.cpp`, `Camera/Controller/TownShopCamera.cpp` |
+| Camera / Replay Shell | `camera_shell_reference.json` | `27` | `Camera/Camera.cpp`, `Camera/Controller/BlendCameraController.cpp`, `Camera/Controller/BobsleighCamera.cpp` |
 | Extra Stage / Tornado Defense HUD | `extra_stage_hud_reference.json` | `1` | `ExtraStage/Tails/Hud/HudExQte.cpp`, `System/GameMode/GameModeStageMotionTest.cpp` |
 | Frontend Sequence Shell | `frontend_sequence_shell_reference.json` | `4` | `Sequence/Core/SequenceHandleUnit.cpp`, `Sequence/Core/SequenceManagerImpl.cpp`, `Sequence/Unit/SequenceUnitFactory.cpp` |
 | Loading And Start/Clear | `loading_transition_reference.json` | `8` | `HUD/Install/InstallDisplay.cpp`, `HUD/Loading/Loading.cpp`, `Sequence/Unit/SequenceUnitChangeStage.cpp` |
@@ -36,7 +36,7 @@ This generated layer upgrades the standalone selector from contract-stem browsin
 
 - `Application / World Shell`: `Application.cpp`, `ApplicationDocument.cpp`, `ApplicationSetting.cpp`, `Application / World Shell`, `application_world_shell`
 - `Boss HUD`: `FinalDarkGaiaHud.cpp`, `PhoenixHudVitality.cpp`, `Boss HUD`, `boss_hud`
-- `Camera / Replay Shell`: `GoalCamera.cpp`, `FreeCamera.cpp`, `TownShopCamera.cpp`, `Camera / Replay Shell`, `camera_shell`
+- `Camera / Replay Shell`: `Camera.cpp`, `BlendCameraController.cpp`, `BobsleighCamera.cpp`, `Camera / Replay Shell`, `camera_shell`
 - `Extra Stage / Tornado Defense HUD`: `HudExQte.cpp`, `GameModeStageMotionTest.cpp`, `Extra Stage / Tornado Defense HUD`, `extra_stage_hud`
 - `Frontend Sequence Shell`: `SequenceHandleUnit.cpp`, `SequenceManagerImpl.cpp`, `SequenceUnitFactory.cpp`, `Frontend Sequence Shell`, `frontend_sequence_shell`
 - `Loading And Start/Clear`: `InstallDisplay.cpp`, `Loading.cpp`, `SequenceUnitChangeStage.cpp`, `Loading And Start/Clear`, `loading_and_start`

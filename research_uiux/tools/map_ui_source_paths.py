@@ -30,6 +30,9 @@ SYSTEM_DISPLAY = {
     "frontend_sequence_shell": "Frontend Sequence Shell",
     "camera_shell": "Camera / Replay Shell",
     "application_world_shell": "Application / World Shell",
+    "achievement_unlock_support": "Achievement / Unlock Support",
+    "audio_cue_support": "Audio Cue / BGM Support",
+    "xml_data_loading_support": "XML / Data Loading Support",
 }
 
 RUNTIME_CONTRACTS = {
@@ -158,6 +161,53 @@ def load_system_index(repo_root: Path, archaeology_json: Path) -> dict[str, dict
             "generated_seams": [],
             "state_tags": ["application_shell", "world_shell", "gamemode_shell", "frontend_dispatch"],
         },
+        "achievement_unlock_support": {
+            "system_id": "achievement_unlock_support",
+            "screen_name": SYSTEM_DISPLAY["achievement_unlock_support"],
+            "layout_ids": [],
+            "host_code_files": [
+                "Achievement/AchievementManager.cpp",
+                "Sequence/Unit/SequenceUnitUnlockAchievement.cpp",
+            ],
+            "generated_seams": [],
+            "state_tags": ["achievement_unlock", "toast_dispatch", "profile_reward"],
+        },
+        "audio_cue_support": {
+            "system_id": "audio_cue_support",
+            "screen_name": SYSTEM_DISPLAY["audio_cue_support"],
+            "layout_ids": [],
+            "host_code_files": [
+                "Sound/Sound.cpp",
+                "Sound/SoundBGMActEggman.cpp",
+                "Sound/SoundBGMActEvil.cpp",
+                "Sound/SoundBGMActSonic.cpp",
+                "Sound/SoundBGMDispel.cpp",
+                "Sound/SoundBGMExtra.cpp",
+                "Sound/SoundBGMStandard.cpp",
+                "Sound/SoundBGMTown.cpp",
+                "Sound/SoundController.cpp",
+                "Sound/SoundPlayer.cpp",
+            ],
+            "generated_seams": [],
+            "state_tags": ["audio_cue", "bgm_route", "ui_feedback"],
+        },
+        "xml_data_loading_support": {
+            "system_id": "xml_data_loading_support",
+            "screen_name": SYSTEM_DISPLAY["xml_data_loading_support"],
+            "layout_ids": [],
+            "host_code_files": [
+                "System/GameMode/Loader/DatabaseTree.cpp",
+                "System/GameMode/Loader/StageLoaderXML.cpp",
+                "XML/XMLBinData.cpp",
+                "XML/XMLDocument.cpp",
+                "XML/XMLManager.cpp",
+                "XML/XMLNode.cpp",
+                "XML/XMLTypeSLBin.cpp",
+                "XML/XMLTypeSLTxt.cpp",
+            ],
+            "generated_seams": [],
+            "state_tags": ["xml_resource", "stage_loader", "data_binding"],
+        },
     }
     for system_id, system in synthetic_systems.items():
         systems.setdefault(system_id, system)
@@ -221,6 +271,51 @@ def classify_source_path(relative_path: str) -> dict:
             "candidate_system_ids": [],
             "debug_tool_candidate": True,
             "notes": "Editor, preview, debug, and profiling surfaces that can host a standalone UI sandbox.",
+        }
+
+    if lowered.startswith("achievement/"):
+        return {
+            "family_id": "achievement_unlock_support",
+            "family_name": "Achievement / Unlock Support",
+            "candidate_system_ids": ["achievement_unlock_support"],
+            "debug_tool_candidate": False,
+            "notes": "Achievement ownership that pairs with sequence unlock dispatch and future toast/profile validation.",
+        }
+
+    if lowered.startswith("animation/eventtrigger/"):
+        return {
+            "family_id": "timeline_event_trigger_support",
+            "family_name": "Timeline Event Trigger Support",
+            "candidate_system_ids": ["subtitle_cutscene_presentation"],
+            "debug_tool_candidate": False,
+            "notes": "Animation event trigger support for audio, sparkle, and vibration cues around cutscene/timeline presentation.",
+        }
+
+    if lowered.startswith("sound/"):
+        return {
+            "family_id": "audio_cue_support",
+            "family_name": "Audio Cue / BGM Support",
+            "candidate_system_ids": ["audio_cue_support"],
+            "debug_tool_candidate": False,
+            "notes": "Audio cue, BGM route, and sound-player support layer for UI feedback and presentation-state timing.",
+        }
+
+    if lowered.startswith("xml/"):
+        return {
+            "family_id": "xml_data_loading_support",
+            "family_name": "XML / Data Loading Support",
+            "candidate_system_ids": ["xml_data_loading_support"],
+            "debug_tool_candidate": False,
+            "notes": "XML document/bin-data manager layer that backs stage loader data and future UI/resource binding probes.",
+        }
+
+    if lowered.startswith("player/parameter/") or lowered.startswith("player/switch/"):
+        return {
+            "family_id": "player_status_support",
+            "family_name": "Player Status / Switch Support",
+            "candidate_system_ids": ["sonic_stage_hud", "werehog_stage_hud", "super_sonic_hud"],
+            "debug_tool_candidate": False,
+            "notes": "Player parameter and switch state support that feeds gameplay HUD status, gauges, and mode-sensitive overlays.",
         }
 
     if any(lowered.endswith(suffix) for suffix in DEBUG_GAMEMODE_SUFFIXES):
@@ -342,6 +437,28 @@ def classify_source_path(relative_path: str) -> dict:
             "candidate_system_ids": ["town_ui"],
             "debug_tool_candidate": False,
             "notes": "Town conversation/shop camera controllers that sit beside the town UI shell.",
+        }
+
+    if lowered.startswith("camera/controller/") and any(
+        token in lowered for token in ("boss", "finaldarkgaia", "supersonic", "eggdragoon")
+    ):
+        return {
+            "family_id": "frontend_camera_shell",
+            "family_name": "Frontend Camera Shell",
+            "candidate_system_ids": ["camera_shell", "boss_hud"],
+            "debug_tool_candidate": False,
+            "notes": "Boss and final-phase presentation camera controllers that pair camera-shell routing with boss HUD timing.",
+        }
+
+    if lowered.startswith("camera/controller/") and any(
+        token in lowered for token in ("exstage", "explayer", "tails", "temple")
+    ):
+        return {
+            "family_id": "frontend_camera_shell",
+            "family_name": "Frontend Camera Shell",
+            "candidate_system_ids": ["camera_shell", "extra_stage_hud"],
+            "debug_tool_candidate": False,
+            "notes": "Extra-stage and special-player presentation camera controllers adjacent to EX-stage HUD validation.",
         }
 
     if lowered.startswith("hud/mission/") or lowered.startswith("system/mission/"):
@@ -535,6 +652,16 @@ def humanization_priority(status: str, family_id: str) -> str:
         return "create a new gameplay HUD archaeology family before deep code cleanup"
     if family_id == "csd_ui_foundation":
         return "document the CSD foundation and recover reusable scene/widget abstractions"
+    if family_id == "achievement_unlock_support":
+        return "tie achievement manager ownership to sequence unlock dispatch and toast/profile behavior"
+    if family_id == "audio_cue_support":
+        return "correlate sound cue ownership with menu, cutscene, and HUD transition events"
+    if family_id == "xml_data_loading_support":
+        return "recover XML/resource loader boundaries before treating data-backed screens as understood"
+    if family_id == "timeline_event_trigger_support":
+        return "map animation event triggers onto cutscene, feedback, and transition timing seams"
+    if family_id == "player_status_support":
+        return "connect player parameter/switch state to HUD gauge and overlay ownership"
     if status == "debug_tool_candidate":
         return "use this as a host surface for the future UI capability sandbox"
     return "expand extraction and correlation before pretending this path is understood"

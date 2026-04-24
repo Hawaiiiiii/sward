@@ -70,7 +70,7 @@ SHELL_GROUPS = {
         "priority": "medium",
         "primary_contract_file_name": "camera_shell_reference.json",
         "extra_alias_tokens": ["FreeCamera.cpp", "ReplayFreeCamera.cpp", "GoalCamera.cpp"],
-        "note": "Free, replay, goal, and town-support camera hosts driven through the camera/replay shell contract.",
+        "note": "Free, replay, goal, town, boss, and special-stage presentation camera hosts driven through the camera/replay shell contract.",
     },
     "frontend_sequence_shell": {
         "group_id": "frontend_sequence_hosts",

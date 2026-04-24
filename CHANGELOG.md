@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 47 broader source-path expansion beyond the current seed
+
+- added [`research_uiux/BROADER_SOURCE_PATH_EXPANSION_PHASE47.md`](./research_uiux/BROADER_SOURCE_PATH_EXPANSION_PHASE47.md)
+- widened the curated source-path seed from `220` to `269` entries while keeping the full raw path dump out of the tracked layer
+- added support-substrate classification for achievement unlocks, animation event triggers, the wider camera/presentation family, player status/switch support, sound cue routing, and XML/data loading
+- refreshed the source-path manifest to `24` families with `212` archaeology/support-mapped entries, `186` runtime-contract-backed entries, `57` debug-host candidates, and `0` named-only gaps
+- widened the workbench host map to `159` entries across `10` groups, with `Camera / Replay Hosts` expanded to `30` launchable presentation-controller hosts
+
 ### Phase 46 sequence and item source deepening
 
 - added [`research_uiux/SEQUENCE_AND_ITEM_SOURCE_DEEPENING.md`](./research_uiux/SEQUENCE_AND_ITEM_SOURCE_DEEPENING.md)

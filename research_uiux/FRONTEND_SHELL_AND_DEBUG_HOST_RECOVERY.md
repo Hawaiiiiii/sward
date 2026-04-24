@@ -12,9 +12,9 @@ Phase 35 tightens the newly widened shell/debug families instead of leaving them
 ## Snapshot
 
 - Targeted shell/debug paths in this pass: `46`
-- Paths with current archaeology bridges: `13` (`28.3%`)
-- Paths already landing on current runtime contracts: `9` (`19.6%`)
-- Paths still shell-only after this pass: `10` (`21.7%`)
+- Paths with current archaeology bridges: `26` (`56.5%`)
+- Paths already landing on current runtime contracts: `26` (`56.5%`)
+- Paths still shell-only after this pass: `0` (`0.0%`)
 
 ## Local Hint Set Used
 
@@ -31,9 +31,9 @@ Phase 35 tightens the newly widened shell/debug families instead of leaving them
 | Menu / Stage Debug Hosts | `immediate` | `3` | `0` | `0` |
 | Stage Test / Validation Hosts | `high` | `9` | `0` | `0` |
 | Pause / Help / Loading Dispatch | `high` | `4` | `4` | `4` |
-| Town / Media-Room Dispatch Hosts | `high` | `4` | `4` | `0` |
-| Application / World Shell | `medium` | `9` | `0` | `0` |
-| Free Camera / Replay Hosts | `medium` | `5` | `0` | `0` |
+| Town / Media-Room Dispatch Hosts | `high` | `4` | `4` | `4` |
+| Application / World Shell | `medium` | `9` | `9` | `9` |
+| Free Camera / Replay Hosts | `medium` | `5` | `4` | `4` |
 
 ## Group Notes
 

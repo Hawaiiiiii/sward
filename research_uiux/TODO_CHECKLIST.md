@@ -337,6 +337,13 @@
 - [x] Refresh the local-only `SONIC UNLEASHED\_meta\` manifests and tracked source-tree summary counts after the sequence/item pass.
 - [x] Generate a dedicated report for the widened sequence/item debug-oriented source layer.
 
+## Phase 47 - Broader Source-Path Expansion Beyond The Current Seed
+
+- [x] Widen the curated source-path seed beyond `220` entries without admitting the full raw path dump.
+- [x] Add the next support-substrate tranche for achievement, animation-event, camera, player-status, sound, and XML/data-loading paths.
+- [x] Refresh the source-path manifest, selector metadata, workbench metadata, and local-only source-family notes.
+- [x] Generate a dedicated report for the widened Phase 47 source-path layer.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -442,3 +449,6 @@
 - [x] Follow-on phase audit on `2026-04-24`: refreshed the broader source-path manifest to `220` paths with `163` archaeology-mapped entries, `154` contract-backed entries, `57` debug-host candidates, and `0` named-only gaps.
 - [x] Follow-on phase audit on `2026-04-24`: widened the selector to `16` launch families and the workbench to `133` hosts across `10` groups, including the new frontend-sequence host bucket.
 - [x] Follow-on phase audit on `2026-04-24`: deepened the local-only readable source mirror to `102` `.cpp` scaffolds under `SONIC UNLEASHED\`, including `12` sequence-shell scaffolds and `HUD\Item\HudItemGet.cpp`.
+- [x] Follow-on phase audit on `2026-04-24`: widened the curated source-path manifest to `269` paths across `24` families, with `212` archaeology/support-mapped entries, `186` contract-backed entries, `57` debug-host candidates, and `0` named-only gaps.
+- [x] Follow-on phase audit on `2026-04-24`: materialized `269` local-only placement notes under `SONIC UNLEASHED\` while keeping the mirror out of git.
+- [x] Follow-on phase audit on `2026-04-24`: widened the debug workbench host map to `159` hosts across `10` groups, with the camera/replay group expanded to `30` presentation-controller hosts.
