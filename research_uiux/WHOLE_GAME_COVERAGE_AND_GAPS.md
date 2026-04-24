@@ -45,8 +45,9 @@
   - a shell/debug host recovery map at `research_uiux/data/frontend_shell_recovery.json`
   - a human-readable shell/debug host report at `research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`
   - a dedicated frontend-sequence bridge report at `research_uiux/FRONTEND_SEQUENCE_SHELL_RUNTIME_BRIDGE.md`
-  - a richer native host-bucket debug executable at `b/rr47/sward_ui_runtime_debug_workbench.exe`
-  - a verified native selector with persistent interactive/stay-open behavior at `b/rr47/sward_ui_runtime_debug_selector.exe`
+  - a richer native host-bucket debug executable at `b/rr48/sward_ui_runtime_debug_workbench.exe`
+  - a verified native selector with persistent interactive/stay-open behavior at `b/rr48/sward_ui_runtime_debug_selector.exe`
+  - a compact workbench catalog report at `research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md`
   - a dedicated CSD/UI foundation map at `research_uiux/data/csd_ui_foundation_map.json`
   - a human-readable foundation report at `research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md`
   - a local-only mirrored note layer now widened to `269` `*.sward.md` placement notes under `SONIC UNLEASHED/`
@@ -130,7 +131,7 @@ The current workspace is:
 - now materially stronger for runtime productization, with `186 / 269` broader source-path seeds (`69.1%`) backed by bundled contracts across frontend, frontend-sequence, town, camera, application/world, cutscene, gameplay-HUD, boss/final, and save/loading/title/world-map shell variants
 - now materially stronger for source-path cleanup inside the current tracked seed, with `0` remaining `named_seed_only` paths in the present `269`-path subset
 - now materially stronger for support-substrate coverage, with achievement, animation-event, player-status, sound, XML/data-loading, and wider camera-controller paths classified instead of left outside the curated seed
-- now materially stronger for native debug-tool usability, with a verified selector/workbench that now loop in interactive mode instead of behaving like one-shot console probes
+- now materially stronger for native debug-tool usability, with a verified selector/workbench that now loop in interactive mode and a workbench `--catalog` view for inspecting the widened host topology
 - now materially stronger for host coverage, with a verified `159`-host workbench map across `10` groups
 - partial for whole-game loose-file asset extraction
 - not yet equivalent to a whole-game clean human-readable source tree

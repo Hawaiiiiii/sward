@@ -68,6 +68,13 @@ struct GroupEntry
     return tokens;
 }
 
+template <typename T>
+void appendUnique(std::vector<T>& values, T value)
+{
+    if (std::find(values.begin(), values.end(), value) == values.end())
+        values.push_back(value);
+}
+
 [[nodiscard]] std::vector<ContractEntry> loadBundledEntries()
 {
     std::vector<ContractEntry> result;
@@ -376,6 +383,58 @@ void printGroupList(const std::vector<GroupEntry>& groups)
     }
 }
 
+[[nodiscard]] std::vector<std::string_view> contractsForGroup(const std::vector<ResolvedHostEntry>& hosts, const GroupEntry& group)
+{
+    std::vector<std::string_view> contracts;
+    for (const std::size_t hostIndex : group.hostIndices)
+        appendUnique(contracts, hosts[hostIndex].metadata->primaryContractFileName);
+    return contracts;
+}
+
+[[nodiscard]] std::vector<std::string_view> sampleHostsForGroup(const std::vector<ResolvedHostEntry>& hosts, const GroupEntry& group)
+{
+    std::vector<std::string_view> samples;
+    for (const std::size_t hostIndex : group.hostIndices)
+    {
+        appendUnique(samples, hosts[hostIndex].metadata->hostDisplayName);
+        if (samples.size() == 3)
+            break;
+    }
+
+    for (const std::size_t hostIndex : group.hostIndices)
+    {
+        const auto hostName = hosts[hostIndex].metadata->hostDisplayName;
+        if (hostName == "Player3DBossCamera.cpp")
+            appendUnique(samples, hostName);
+    }
+
+    return samples;
+}
+
+void printCatalog(const std::vector<ResolvedHostEntry>& hosts, const std::vector<GroupEntry>& groups)
+{
+    std::cout << "Debug workbench catalog\n";
+    std::cout << "Total hosts: " << hosts.size() << '\n';
+    std::cout << "Groups: " << groups.size() << "\n\n";
+
+    for (const auto& group : groups)
+    {
+        std::cout
+            << group.groupDisplayName
+            << " [" << group.priority << "]"
+            << " hosts=" << group.hostIndices.size()
+            << '\n';
+
+        for (const auto contract : contractsForGroup(hosts, group))
+            std::cout << "  contract: " << contract << '\n';
+
+        for (const auto sample : sampleHostsForGroup(hosts, group))
+            std::cout << "  sample: " << sample << '\n';
+
+        std::cout << '\n';
+    }
+}
+
 void printHostList(const std::vector<ResolvedHostEntry>& hosts, const std::optional<GroupEntry>& group = std::nullopt)
 {
     std::cout << "Debug workbench hosts:\n";
@@ -449,6 +508,14 @@ int main(int argc, char** argv)
             if (command == "--list-groups")
             {
                 printGroupList(groups);
+                if (stayOpen)
+                    waitForEnter("\nPress Enter to exit...");
+                return 0;
+            }
+
+            if (command == "--catalog")
+            {
+                printCatalog(hosts, groups);
                 if (stayOpen)
                     waitForEnter("\nPress Enter to exit...");
                 return 0;

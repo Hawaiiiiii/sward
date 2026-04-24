@@ -38,6 +38,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the newest widened seed beyond the `220`-path subset, start with [`research_uiux/BROADER_SOURCE_PATH_EXPANSION_PHASE47.md`](./research_uiux/BROADER_SOURCE_PATH_EXPANSION_PHASE47.md).
 
+> [!TIP]
+> For the newest workbench operator view, start with [`research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md`](./research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
@@ -65,6 +68,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - A source-path-named launch layer for that browser via [`research_uiux/SOURCE_PATH_NAMED_DEBUG_SELECTOR.md`](./research_uiux/SOURCE_PATH_NAMED_DEBUG_SELECTOR.md)
 - A broader UI-adjacent source-path seed via [`research_uiux/source_path_seeds/UI_ADJACENT_SOURCE_PATHS_FROM_MATCH_DUMP.txt`](./research_uiux/source_path_seeds/UI_ADJACENT_SOURCE_PATHS_FROM_MATCH_DUMP.txt)
 - A Phase 47 widened source-path support layer via [`research_uiux/BROADER_SOURCE_PATH_EXPANSION_PHASE47.md`](./research_uiux/BROADER_SOURCE_PATH_EXPANSION_PHASE47.md)
+- A compact debug workbench catalog view via [`research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md`](./research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md)
 - A source-tree mirror helper for the local-only `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py)
 - A local source-family note materializer for the `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_family_notes.py`](./research_uiux/tools/materialize_source_family_notes.py)
 - A tracked shell/debug host recovery layer via [`research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`](./research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md)

@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 48 debug workbench catalog view
+
+- added [`research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md`](./research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md)
+- added `--catalog` to [`research_uiux/runtime_reference/examples/ui_debug_workbench.cpp`](./research_uiux/runtime_reference/examples/ui_debug_workbench.cpp)
+- added a subprocess regression test for the native workbench catalog command
+- verified the catalog view against the widened `159`-host workbench map under `b/rr48`
+
 ### Phase 47 broader source-path expansion beyond the current seed
 
 - added [`research_uiux/BROADER_SOURCE_PATH_EXPANSION_PHASE47.md`](./research_uiux/BROADER_SOURCE_PATH_EXPANSION_PHASE47.md)
