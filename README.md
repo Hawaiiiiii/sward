@@ -53,6 +53,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the first timer-driven GUI playback controls in the native workbench, start with [`research_uiux/GUI_TIMELINE_PLAYBACK_CONTROLS.md`](./research_uiux/GUI_TIMELINE_PLAYBACK_CONTROLS.md).
 
+> [!TIP]
+> For the first state-aware preview motion adapter in the GUI workbench, start with [`research_uiux/GUI_STATE_AWARE_PREVIEW_MOTION.md`](./research_uiux/GUI_STATE_AWARE_PREVIEW_MOTION.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
@@ -85,6 +88,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - The first GUI visual preview and local atlas binding layer via [`research_uiux/GUI_VISUAL_PREVIEW_AND_ATLAS_BINDING.md`](./research_uiux/GUI_VISUAL_PREVIEW_AND_ATLAS_BINDING.md)
 - A gameplay-HUD proxy preview binding report via [`research_uiux/GAMEPLAY_HUD_PROXY_PREVIEW_BINDING.md`](./research_uiux/GAMEPLAY_HUD_PROXY_PREVIEW_BINDING.md)
 - Timer-driven GUI playback controls via [`research_uiux/GUI_TIMELINE_PLAYBACK_CONTROLS.md`](./research_uiux/GUI_TIMELINE_PLAYBACK_CONTROLS.md)
+- State-aware GUI preview motion via [`research_uiux/GUI_STATE_AWARE_PREVIEW_MOTION.md`](./research_uiux/GUI_STATE_AWARE_PREVIEW_MOTION.md)
 - A local-only support-substrate humanization pass via [`research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`](./research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md)
 - Runtime-backed support-substrate contracts via [`research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`](./research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md)
 - A source-tree mirror helper for the local-only `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py)

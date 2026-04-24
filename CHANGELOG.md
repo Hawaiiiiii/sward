@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 55 GUI state-aware preview motion
+
+- added [`research_uiux/GUI_STATE_AWARE_PREVIEW_MOTION.md`](./research_uiux/GUI_STATE_AWARE_PREVIEW_MOTION.md)
+- added a state-aware `PreviewMotion` adapter to `sward_ui_runtime_debug_gui` so contract preview layers now slide/fade through Intro, Navigate, Confirm, Cancel, and Outro bands instead of staying fully static
+- added eased progress from the active runtime state's elapsed time and contract timeline duration
+- applied motion to overlay roles and prompt buttons while keeping preview rectangles bounded to the 16:9 workbench canvas
+- filled atlas-backed preview canvases with a dark backing brush before drawing local PNG atlas sheets, fixing transparent HUD proxy regions that previously exposed the white panel background
+- added `--motion-smoke` regression coverage and verified `b/rr55/sward_ui_runtime_debug_gui.exe`
+
 ### Phase 54 GUI timeline playback controls
 
 - added [`research_uiux/GUI_TIMELINE_PLAYBACK_CONTROLS.md`](./research_uiux/GUI_TIMELINE_PLAYBACK_CONTROLS.md)

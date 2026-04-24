@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr54" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr55" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -66,6 +66,16 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("stopPlayback", source_text)
         self.assertIn("tickPlaybackFrame", source_text)
         self.assertIn("--playback-smoke", source_text)
+
+    def test_gui_source_exposes_state_aware_preview_motion(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("PreviewMotion", source_text)
+        self.assertIn("easedTimelineProgress", source_text)
+        self.assertIn("previewMotionForState", source_text)
+        self.assertIn("applyPreviewMotion", source_text)
+        self.assertIn("motionAlphaByte", source_text)
+        self.assertIn("atlasBackingBrush", source_text)
+        self.assertIn("--motion-smoke", source_text)
 
     def test_gui_initial_window_uses_desktop_work_area(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -130,6 +140,25 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("after_intro=Idle", completed.stdout)
         self.assertIn("action=Navigate", completed.stdout)
         self.assertIn("after_action=Idle", completed.stdout)
+
+    def test_motion_smoke_command_reports_eased_preview_motion_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--motion-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui motion smoke ok", completed.stdout)
+        self.assertIn("intro_alpha=", completed.stdout)
+        self.assertIn("intro_offset_x=", completed.stdout)
+        self.assertIn("idle_alpha=1", completed.stdout)
+        self.assertIn("outro_alpha=", completed.stdout)
 
 
 if __name__ == "__main__":

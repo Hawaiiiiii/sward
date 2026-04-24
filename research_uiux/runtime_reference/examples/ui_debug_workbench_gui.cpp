@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -54,6 +55,13 @@ struct AtlasCandidate
     std::string_view shortName;
     std::string_view atlasFileName;
     std::string_view matchKind;
+};
+
+struct PreviewMotion
+{
+    float offsetX = 0.0F;
+    float offsetY = 0.0F;
+    float alpha = 1.0F;
 };
 
 inline constexpr const char* kPreviewPanelClassName = "SwardUiRuntimePreviewPanel";
@@ -258,6 +266,21 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     DrawTextA(dc, text.c_str(), static_cast<int>(text.size()), &bounds, format);
 }
 
+[[nodiscard]] float clampUnit(float value)
+{
+    return std::max(0.0F, std::min(1.0F, value));
+}
+
+[[nodiscard]] float easedTimelineProgress(double elapsedSeconds, double durationSeconds)
+{
+    if (durationSeconds <= 0.0)
+        return 1.0F;
+
+    const float linear = clampUnit(static_cast<float>(elapsedSeconds / durationSeconds));
+    const float inverse = 1.0F - linear;
+    return 1.0F - (inverse * inverse * inverse);
+}
+
 [[nodiscard]] Gdiplus::RectF clampRectToCanvas(Gdiplus::RectF rect, const Gdiplus::RectF& canvas)
 {
     const float maxWidth = std::max(1.0F, canvas.Width - 8.0F);
@@ -272,6 +295,61 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     rect.X = std::max(minX, std::min(rect.X, maxX));
     rect.Y = std::max(minY, std::min(rect.Y, maxY));
     return rect;
+}
+
+[[nodiscard]] PreviewMotion previewMotionForState(ScreenState state, std::string_view role, float progress, const Gdiplus::RectF& canvas)
+{
+    const float eased = clampUnit(progress);
+    const float inverse = 1.0F - eased;
+
+    switch (state)
+    {
+    case ScreenState::Intro:
+        if (role == "counter")
+            return PreviewMotion{ -canvas.Width * 0.16F * inverse, 0.0F, 0.28F + (0.72F * eased) };
+        if (role == "gauge")
+            return PreviewMotion{ 0.0F, canvas.Height * 0.12F * inverse, 0.32F + (0.68F * eased) };
+        if (role == "sidecar")
+            return PreviewMotion{ canvas.Width * 0.12F * inverse, 0.0F, 0.3F + (0.7F * eased) };
+        return PreviewMotion{ 0.0F, 0.0F, 0.35F + (0.65F * eased) };
+    case ScreenState::Navigate:
+        if (role == "sidecar")
+            return PreviewMotion{ canvas.Width * 0.04F * inverse, 0.0F, 1.0F };
+        return PreviewMotion{ canvas.Width * 0.025F * inverse, 0.0F, 0.88F + (0.12F * eased) };
+    case ScreenState::Confirm:
+        if (role == "transient_fx")
+            return PreviewMotion{ 0.0F, -canvas.Height * 0.06F * inverse, 0.45F + (0.55F * eased) };
+        return PreviewMotion{ 0.0F, 0.0F, 0.78F + (0.22F * eased) };
+    case ScreenState::Cancel:
+    case ScreenState::Outro:
+        if (role == "counter")
+            return PreviewMotion{ -canvas.Width * 0.18F * eased, 0.0F, 1.0F - (0.72F * eased) };
+        if (role == "gauge")
+            return PreviewMotion{ 0.0F, canvas.Height * 0.14F * eased, 1.0F - (0.68F * eased) };
+        if (role == "sidecar")
+            return PreviewMotion{ canvas.Width * 0.14F * eased, 0.0F, 1.0F - (0.7F * eased) };
+        return PreviewMotion{ 0.0F, 0.0F, 1.0F - (0.65F * eased) };
+    case ScreenState::Boot:
+        return PreviewMotion{ 0.0F, 0.0F, 0.25F };
+    case ScreenState::Idle:
+    case ScreenState::Closed:
+        return PreviewMotion{};
+    }
+
+    return PreviewMotion{};
+}
+
+[[nodiscard]] Gdiplus::RectF applyPreviewMotion(Gdiplus::RectF rect, const PreviewMotion& motion, const Gdiplus::RectF& canvas)
+{
+    rect.X += motion.offsetX;
+    rect.Y += motion.offsetY;
+    return clampRectToCanvas(rect, canvas);
+}
+
+[[nodiscard]] BYTE motionAlphaByte(float baseAlpha, const PreviewMotion& motion)
+{
+    const float alpha = clampUnit(baseAlpha * clampUnit(motion.alpha));
+    return static_cast<BYTE>(std::round(alpha * 255.0F));
 }
 
 [[nodiscard]] Gdiplus::RectF layoutLayerRect(const OverlayLayer& layer, std::size_t roleIndex, const Gdiplus::RectF& canvas)
@@ -447,6 +525,31 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
         << " after_action=" << afterAction
         << '\n';
     return afterIntro == "Idle" && action == "Navigate" && afterAction == "Idle" ? 0 : 1;
+}
+
+[[nodiscard]] int runMotionSmoke()
+{
+    const Gdiplus::RectF canvas(0.0F, 0.0F, 1280.0F, 720.0F);
+    const float introStartProgress = easedTimelineProgress(0.0, 0.35);
+    const float introEndProgress = easedTimelineProgress(0.35, 0.35);
+    const PreviewMotion introStart = previewMotionForState(ScreenState::Intro, "counter", introStartProgress, canvas);
+    const PreviewMotion introEnd = previewMotionForState(ScreenState::Intro, "counter", introEndProgress, canvas);
+    const PreviewMotion idle = previewMotionForState(ScreenState::Idle, "counter", 1.0F, canvas);
+    const PreviewMotion outro = previewMotionForState(ScreenState::Outro, "gauge", 1.0F, canvas);
+
+    std::cout
+        << "sward_ui_runtime_debug_gui motion smoke ok "
+        << "intro_alpha=" << introStart.alpha
+        << " intro_offset_x=" << introStart.offsetX
+        << " intro_end_alpha=" << introEnd.alpha
+        << " idle_alpha=" << idle.alpha
+        << " outro_alpha=" << outro.alpha
+        << '\n';
+
+    const bool introMovesIn = introStart.offsetX < introEnd.offsetX && introStart.alpha < introEnd.alpha;
+    const bool idleStable = idle.alpha == 1.0F && idle.offsetX == 0.0F && idle.offsetY == 0.0F;
+    const bool outroFades = outro.alpha < 1.0F && outro.offsetY > 0.0F;
+    return introMovesIn && idleStable && outroFades ? 0 : 1;
 }
 
 class WorkbenchGui
@@ -801,6 +904,8 @@ private:
                     Gdiplus::Image image(atlasPath.wstring().c_str());
                     if (image.GetLastStatus() == Gdiplus::Ok)
                     {
+                        Gdiplus::SolidBrush atlasBackingBrush(Gdiplus::Color(255, 12, 18, 23));
+                        graphics.FillRectangle(&atlasBackingBrush, canvas);
                         graphics.DrawImage(&image, canvas.X, canvas.Y, canvas.Width, canvas.Height);
                         drewAtlas = true;
                     }
@@ -825,6 +930,15 @@ private:
         Gdiplus::Pen canvasPen(Gdiplus::Color(255, 38, 45, 52), 2.0F);
         graphics.DrawRectangle(&canvasPen, canvas);
 
+        double stateDuration = 0.0;
+        float stateProgress = 1.0F;
+        if (m_runtime && m_runningContractIndex.has_value())
+        {
+            const auto& contract = m_contracts[*m_runningContractIndex].contract;
+            stateDuration = timelineDuration(contract, m_runtime->state());
+            stateProgress = easedTimelineProgress(m_runtime->stateElapsedSeconds(), stateDuration);
+        }
+
         if (m_runtime)
         {
             const auto layers = m_runtime->visibleLayers();
@@ -836,10 +950,11 @@ private:
                     if (layers[previous].role == layers[index].role)
                         ++roleIndex;
                 }
-                const Gdiplus::RectF layerRect = layoutLayerRect(layers[index], roleIndex, canvas);
+                const PreviewMotion motion = previewMotionForState(m_runtime->state(), layers[index].role, stateProgress, canvas);
+                const Gdiplus::RectF layerRect = applyPreviewMotion(layoutLayerRect(layers[index], roleIndex, canvas), motion, canvas);
 
-                Gdiplus::SolidBrush layerBrush(Gdiplus::Color(96, 57, 166, 218));
-                Gdiplus::Pen layerPen(Gdiplus::Color(220, 245, 248, 250), 1.5F);
+                Gdiplus::SolidBrush layerBrush(Gdiplus::Color(motionAlphaByte(0.58F, motion), 57, 166, 218));
+                Gdiplus::Pen layerPen(Gdiplus::Color(motionAlphaByte(0.95F, motion), 245, 248, 250), 1.5F);
                 graphics.FillRectangle(&layerBrush, layerRect);
                 graphics.DrawRectangle(&layerPen, layerRect);
 
@@ -857,14 +972,15 @@ private:
             const float promptWidth = prompts.empty() ? 0.0F : std::min(132.0F, (canvas.Width - 32.0F) / static_cast<float>(prompts.size()));
             for (std::size_t index = 0; index < prompts.size(); ++index)
             {
+                const PreviewMotion promptMotion = previewMotionForState(m_runtime->state(), "prompt", stateProgress, canvas);
                 Gdiplus::RectF promptRect(
                     canvas.X + 16.0F + (static_cast<float>(index) * promptWidth),
                     promptTop,
                     std::max(44.0F, promptWidth - 8.0F),
                     26.0F);
-                promptRect = clampRectToCanvas(promptRect, canvas);
-                Gdiplus::SolidBrush promptBrush(Gdiplus::Color(228, 247, 211, 72));
-                Gdiplus::Pen promptPen(Gdiplus::Color(255, 35, 41, 47), 1.2F);
+                promptRect = applyPreviewMotion(promptRect, promptMotion, canvas);
+                Gdiplus::SolidBrush promptBrush(Gdiplus::Color(motionAlphaByte(0.9F, promptMotion), 247, 211, 72));
+                Gdiplus::Pen promptPen(Gdiplus::Color(motionAlphaByte(1.0F, promptMotion), 35, 41, 47), 1.2F);
                 graphics.FillRectangle(&promptBrush, promptRect);
                 graphics.DrawRectangle(&promptPen, promptRect);
 
@@ -880,9 +996,7 @@ private:
 
         if (m_runtime && m_runningContractIndex.has_value())
         {
-            const auto& contract = m_contracts[*m_runningContractIndex].contract;
-            const double duration = timelineDuration(contract, m_runtime->state());
-            const double progress = duration > 0.0 ? std::min(1.0, m_runtime->stateElapsedSeconds() / duration) : (m_runtime->state() == ScreenState::Idle ? 1.0 : 0.0);
+            const double progress = stateDuration > 0.0 ? std::min(1.0, m_runtime->stateElapsedSeconds() / stateDuration) : (m_runtime->state() == ScreenState::Idle ? 1.0 : 0.0);
             Gdiplus::RectF track(canvas.X, canvas.Y + canvas.Height + 10.0F, canvas.Width, 8.0F);
             Gdiplus::SolidBrush trackBrush(Gdiplus::Color(255, 203, 209, 213));
             Gdiplus::SolidBrush fillBrush(Gdiplus::Color(255, 45, 130, 216));
@@ -1179,6 +1293,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
     try
     {
         const std::string command = commandLine ? commandLine : "";
+        if (command.find("--motion-smoke") != std::string::npos)
+            return runMotionSmoke();
         if (command.find("--playback-smoke") != std::string::npos)
             return runPlaybackSmoke();
         if (command.find("--preview-smoke") != std::string::npos)

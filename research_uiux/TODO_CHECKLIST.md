@@ -405,6 +405,16 @@
 - [x] Build, smoke, and capture-check `b\rr54\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for the first GUI timeline-playback beat.
 
+## Phase 55 - GUI State-Aware Preview Motion
+
+- [x] Add a state-aware preview-motion adapter over runtime overlay roles.
+- [x] Drive preview motion from eased contract state progress instead of static settled rectangles.
+- [x] Apply motion and alpha to overlay layers and prompt buttons while keeping canvas bounds stable.
+- [x] Add a dark atlas backing fill so transparent local PNG regions do not read as blank Win32 panel background.
+- [x] Add a `--motion-smoke` regression path for motion semantics without opening a window.
+- [x] Build, smoke, and capture-check `b\rr55\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for the first state-aware GUI preview-motion beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -521,3 +531,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added and verified the GUI preview panel under `b\rr52`, with `8` local atlas candidates plus runtime layer/prompt/timeline overlay drawing.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified the gameplay-HUD proxy atlas binding under `b\rr53`, with `10` atlas candidates, `2` marked proxy candidates, and a captured `SonicMainDisplay.cpp` preview using `exstagetails_common__ui_prov_playscreen.png`.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI timeline playback controls under `b\rr54`, with Play/Pause, Step, timer-driven contract ticks, and a captured `SonicMainDisplay.cpp` Intro playback frame.
+- [x] Follow-on phase audit on `2026-04-24`: added and verified GUI state-aware preview motion under `b\rr55`, with eased role/state offsets, prompt/layer alpha, a dark atlas backing fill, and a captured `SonicMainDisplay.cpp` Intro preview frame.

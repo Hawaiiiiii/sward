@@ -49,7 +49,7 @@ For SGFX-style reuse, this is the first version that behaves like an operator-fa
 
 ## Next Product Step
 
-The next useful beat is to give one family a stronger visual playback adapter. A good target is Title, Pause, or Sonic HUD:
+Phase 55 added the first generic visual playback adapter by applying state-aware motion and alpha to preview layers and prompt buttons. The next useful beat after that is family-specific visual playback for one high-confidence target. A good target is Title, Pause, or Sonic HUD:
 
 - Title/Pause are better for exact atlas/layout confidence.
 - Sonic HUD is better for the SGFX/HUD framework direction, but it still needs exact `ui_playscreen*` payload recovery or a carefully labeled proxy adapter.
