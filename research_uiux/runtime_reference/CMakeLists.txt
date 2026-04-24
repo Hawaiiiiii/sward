@@ -90,3 +90,14 @@ target_link_libraries(sward_ui_runtime_debug_workbench
     PRIVATE
         sward_ui_runtime
 )
+
+add_executable(sward_ui_runtime_debug_gui WIN32
+    examples/ui_debug_workbench_gui.cpp
+)
+
+target_link_libraries(sward_ui_runtime_debug_gui
+    PRIVATE
+        sward_ui_runtime
+        user32
+        gdi32
+)

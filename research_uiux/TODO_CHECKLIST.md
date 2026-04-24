@@ -368,6 +368,15 @@
 - [x] Cover the support contracts, manifest promotion, selector families, and workbench host group with a regression test.
 - [x] Generate a dedicated report for the support-substrate runtime-contract beat.
 
+## Phase 51 - Native GUI Debug Workbench
+
+- [x] Add a native Win32 GUI debug workbench target around the existing runtime contracts and generated host catalog.
+- [x] Expose group and host browsing for the current `176` workbench hosts across `11` groups.
+- [x] Add windowed controls for `Run Host`, `Move Next`, `Confirm`, `Cancel`, and `Reset` over `ScreenRuntime`.
+- [x] Add a `--smoke` regression path for validating the GUI executable without opening a window.
+- [x] Build and launch-check `b\rr51\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for the first non-CLI workbench beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -480,3 +489,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added `--catalog` to `sward_ui_runtime_debug_workbench.exe` so the `159`-host map can be inspected by group, contract, and sample host before launching a specific source-family probe.
 - [x] Follow-on phase audit on `2026-04-24`: added achievement, audio/BGM, and XML/data-loading runtime contracts, raising contract-backed source-path coverage to `203 / 269` (`75.5%`) and the debug workbench to `176` hosts across `11` groups.
 - [x] Follow-on phase audit on `2026-04-24`: verified the catalog view under `b\rr48`, including the widened `Player3DBossCamera.cpp` camera/presentation host.
+- [x] Follow-on phase audit on `2026-04-24`: added and verified the native Win32 `sward_ui_runtime_debug_gui.exe` under `b\rr51`, giving the current workbench its first proper non-CLI operator shell.

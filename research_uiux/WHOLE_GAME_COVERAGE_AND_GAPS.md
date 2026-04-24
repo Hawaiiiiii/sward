@@ -19,6 +19,7 @@
 | Broader UI-adjacent source-path seed bridged into the archaeology/support layer | Partial but measured | `78.8%` |
 | Broader UI-adjacent source-path seed already backed by runtime contracts | Partial but strong | `75.5%` |
 | Local-only readable source layer inside the mirrored `SONIC UNLEASHED/` tree | Partial but accelerating | `125` humanized `.cpp` scaffolds |
+| Native non-CLI UI runtime workbench | First operator shell present | `b/rr51/sward_ui_runtime_debug_gui.exe` |
 | Whole-game asset corpus extracted into readable loose files | Not complete | no defensible exact percentage yet |
 | Template-grade UI/UX recovery for the studied screens | Strong | high confidence, but not a whole-game `1:1` portability claim |
 
@@ -44,11 +45,13 @@
   - a Phase 47 wider-source report at `research_uiux/BROADER_SOURCE_PATH_EXPANSION_PHASE47.md`
   - a Phase 49 local support-substrate humanization report at `research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`
   - a Phase 50 support-substrate runtime contract report at `research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`
+  - a Phase 51 native GUI workbench report at `research_uiux/NATIVE_GUI_DEBUG_WORKBENCH.md`
   - a shell/debug host recovery map at `research_uiux/data/frontend_shell_recovery.json`
   - a human-readable shell/debug host report at `research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`
   - a dedicated frontend-sequence bridge report at `research_uiux/FRONTEND_SEQUENCE_SHELL_RUNTIME_BRIDGE.md`
-  - a richer native host-bucket debug executable at `b/rr50/sward_ui_runtime_debug_workbench.exe`
-  - a verified native selector with persistent interactive/stay-open behavior at `b/rr50/sward_ui_runtime_debug_selector.exe`
+  - a richer native host-bucket debug executable at `b/rr51/sward_ui_runtime_debug_workbench.exe`
+  - a verified native selector with persistent interactive/stay-open behavior at `b/rr51/sward_ui_runtime_debug_selector.exe`
+  - a first proper native GUI operator shell at `b/rr51/sward_ui_runtime_debug_gui.exe`
   - a compact workbench catalog report at `research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md`
   - a dedicated CSD/UI foundation map at `research_uiux/data/csd_ui_foundation_map.json`
   - a human-readable foundation report at `research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md`
@@ -86,6 +89,7 @@ What it gives us:
 - enough structure to drive portable JSON runtime contracts across the current C++, C, and C# reference kits
 - enough structure to start organizing translated findings under original source-family names for a broader UI-adjacent/debug/system subset
 - enough structure to drive a native selector/workbench for frontend, frontend-sequence, town, camera, application/world, cutscene, gameplay-HUD, and stage-test host families
+- enough structure to drive the first native GUI operator shell over the current contract-backed host catalog
 
 What it does not give us:
 
@@ -109,6 +113,7 @@ That includes:
 - gameplay HUD core families across Sonic, Werehog, Extra Stage, and Super Sonic variants
 - reusable runtime contracts and template-pack structures
 - a first debug-oriented workbench that can exercise recovered menu, town, camera, application/world, cutscene, gameplay-HUD, and stage-test host families
+- a first non-CLI operator shell for browsing hosts and driving contract-backed runtime actions
 
 What it still does not justify:
 
@@ -120,7 +125,7 @@ What it still does not justify:
 
 The current workspace is:
 
-- `100%` complete against the tracked research plan through Phase `49`
+- `100%` complete against the tracked research plan through Phase `51`
 - strong for UI/UX reverse-engineering and template extraction
 - strong for local executable-backed timing/state archaeology
 - strong for reusable runtime/template productization across C++, C, and C#
@@ -135,6 +140,7 @@ The current workspace is:
 - now materially stronger for support-substrate coverage, with achievement, animation-event, player-status, sound, XML/data-loading, and wider camera-controller paths classified instead of left outside the curated seed
 - now materially stronger for local-only support-substrate humanization, with `23` new achievement, animation-event, player-status, sound, and XML/data-loading scaffolds tied into the ignored mirror
 - now materially stronger for native debug-tool usability, with a verified selector/workbench that now loop in interactive mode and a workbench `--catalog` view for inspecting the widened host topology
+- now materially stronger for non-CLI debug-tool usability, with `b/rr51/sward_ui_runtime_debug_gui.exe` providing a native Windows group/host browser and runtime action controls over the same evidence-backed catalog
 - now materially stronger for host coverage, with a verified `176`-host workbench map across `11` groups
 - partial for whole-game loose-file asset extraction
 - not yet equivalent to a whole-game clean human-readable source tree
@@ -144,9 +150,10 @@ The current workspace is:
 If the goal is to move closer to a broader `1:1` UI portability basis, the next concrete work would be:
 
 1. Keep replacing the widened local-only debug-oriented source tree with cleaner translated ownership so the mirrored `SONIC UNLEASHED/` paths stop reading like scaffolds and start reading like readable source.
-2. Keep widening the current contract-backed shell layer beyond the present `269`-path seed instead of treating the current subset as the whole game.
-3. Continue correlating generated PPC seams against extracted layouts, source-path seeds, and readable patch hosts for the still-unmapped or still debug/tool-only families.
-4. Keep tightening the local-only `SONIC UNLEASHED/` tree until the recovered source-family paths carry readable translated ownership at a much broader whole-game shell level.
+2. Add visual layout/asset inspection and then rendering inside the new native GUI workbench, starting with a small high-confidence family before widening.
+3. Keep widening the current contract-backed shell layer beyond the present `269`-path seed instead of treating the current subset as the whole game.
+4. Continue correlating generated PPC seams against extracted layouts, source-path seeds, and readable patch hosts for the still-unmapped or still debug/tool-only families.
+5. Keep tightening the local-only `SONIC UNLEASHED/` tree until the recovered source-family paths carry readable translated ownership at a much broader whole-game shell level.
 
 > [!NOTE]
-> After the Phase 49 local support-substrate pass, the current bottleneck is no longer leftover named-only entries inside the tracked seed. The remaining value is in picking the next defensible source tranche and continuing to replace local-only scaffolds with readable translated ownership.
+> After Phase 51, the current bottleneck is no longer just "make an executable." The first non-CLI executable exists. The remaining product gap is turning the diagnostic GUI into a visual renderer backed by parsed layouts, local assets, animation timelines, and translated host behavior.

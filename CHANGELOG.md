@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 51 native GUI debug workbench
+
+- added [`research_uiux/NATIVE_GUI_DEBUG_WORKBENCH.md`](./research_uiux/NATIVE_GUI_DEBUG_WORKBENCH.md)
+- added the native Win32 `sward_ui_runtime_debug_gui` target around the existing contract runtime and generated workbench host catalog
+- exposed a windowed group/host browser with `Run Host`, `Move Next`, `Confirm`, `Cancel`, and `Reset` controls over `176` workbench hosts across `11` groups
+- added a `--smoke` verification path for the GUI executable so automation can validate host/group resolution without opening a window
+- built and launch-checked `b/rr51/sward_ui_runtime_debug_gui.exe`, confirming the first proper non-CLI operator shell while keeping the existing selector/workbench console probes intact
+
 ### Phase 50 support-substrate runtime contracts
 
 - added [`research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`](./research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md)
