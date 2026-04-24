@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr55" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr56" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -76,6 +76,16 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("motionAlphaByte", source_text)
         self.assertIn("atlasBackingBrush", source_text)
         self.assertIn("--motion-smoke", source_text)
+
+    def test_gui_source_exposes_family_specific_preview_layouts(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("PreviewFamily", source_text)
+        self.assertIn("previewFamilyForContract", source_text)
+        self.assertIn("layoutTitleMenuLayerRect", source_text)
+        self.assertIn("layoutPauseMenuLayerRect", source_text)
+        self.assertIn("layoutLoadingLayerRect", source_text)
+        self.assertIn("layoutFamilyLayerRect", source_text)
+        self.assertIn("--family-preview-smoke", source_text)
 
     def test_gui_initial_window_uses_desktop_work_area(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -159,6 +169,25 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("intro_offset_x=", completed.stdout)
         self.assertIn("idle_alpha=1", completed.stdout)
         self.assertIn("outro_alpha=", completed.stdout)
+
+    def test_family_preview_smoke_command_reports_exact_family_layouts(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--family-preview-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui family preview smoke ok", completed.stdout)
+        self.assertIn("title=title_menu", completed.stdout)
+        self.assertIn("pause=pause_menu", completed.stdout)
+        self.assertIn("loading=loading_transition", completed.stdout)
+        self.assertIn("title_logo_y=", completed.stdout)
 
 
 if __name__ == "__main__":

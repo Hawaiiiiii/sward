@@ -64,6 +64,14 @@ struct PreviewMotion
     float alpha = 1.0F;
 };
 
+enum class PreviewFamily
+{
+    Generic,
+    TitleMenu,
+    PauseMenu,
+    LoadingTransition,
+};
+
 inline constexpr const char* kPreviewPanelClassName = "SwardUiRuntimePreviewPanel";
 inline constexpr UINT_PTR kPlaybackTimerId = 2001;
 inline constexpr UINT kPlaybackTimerMilliseconds = 33;
@@ -117,6 +125,34 @@ enum ControlId
             return candidate.shortName == shortName;
         });
     return found == kPreviewAtlasCandidates.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] PreviewFamily previewFamilyForContract(std::string_view contractFileName)
+{
+    if (contractFileName == "title_menu_reference.json")
+        return PreviewFamily::TitleMenu;
+    if (contractFileName == "pause_menu_reference.json")
+        return PreviewFamily::PauseMenu;
+    if (contractFileName == "loading_transition_reference.json")
+        return PreviewFamily::LoadingTransition;
+    return PreviewFamily::Generic;
+}
+
+[[nodiscard]] std::string_view previewFamilyName(PreviewFamily family)
+{
+    switch (family)
+    {
+    case PreviewFamily::TitleMenu:
+        return "title_menu";
+    case PreviewFamily::PauseMenu:
+        return "pause_menu";
+    case PreviewFamily::LoadingTransition:
+        return "loading_transition";
+    case PreviewFamily::Generic:
+        return "generic";
+    }
+
+    return "generic";
 }
 
 [[nodiscard]] bool isProxyAtlasCandidate(const AtlasCandidate& candidate)
@@ -305,6 +341,14 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     switch (state)
     {
     case ScreenState::Intro:
+        if (role == "logo")
+            return PreviewMotion{ 0.0F, -canvas.Height * 0.1F * inverse, 0.2F + (0.8F * eased) };
+        if (role == "content")
+            return PreviewMotion{ 0.0F, canvas.Height * 0.08F * inverse, 0.28F + (0.72F * eased) };
+        if (role == "chrome")
+            return PreviewMotion{ 0.0F, -canvas.Height * 0.05F * inverse, 0.34F + (0.66F * eased) };
+        if (role == "cinematic_frame")
+            return PreviewMotion{ 0.0F, 0.0F, 0.45F + (0.55F * eased) };
         if (role == "counter")
             return PreviewMotion{ -canvas.Width * 0.16F * inverse, 0.0F, 0.28F + (0.72F * eased) };
         if (role == "gauge")
@@ -313,15 +357,27 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
             return PreviewMotion{ canvas.Width * 0.12F * inverse, 0.0F, 0.3F + (0.7F * eased) };
         return PreviewMotion{ 0.0F, 0.0F, 0.35F + (0.65F * eased) };
     case ScreenState::Navigate:
+        if (role == "logo")
+            return PreviewMotion{ 0.0F, -canvas.Height * 0.015F * inverse, 0.95F + (0.05F * eased) };
+        if (role == "content" || role == "chrome")
+            return PreviewMotion{ canvas.Width * 0.035F * inverse, 0.0F, 0.92F + (0.08F * eased) };
         if (role == "sidecar")
             return PreviewMotion{ canvas.Width * 0.04F * inverse, 0.0F, 1.0F };
         return PreviewMotion{ canvas.Width * 0.025F * inverse, 0.0F, 0.88F + (0.12F * eased) };
     case ScreenState::Confirm:
+        if (role == "logo")
+            return PreviewMotion{ 0.0F, -canvas.Height * 0.025F * inverse, 0.82F + (0.18F * eased) };
+        if (role == "content" || role == "chrome")
+            return PreviewMotion{ 0.0F, 0.0F, 0.76F + (0.24F * eased) };
         if (role == "transient_fx")
             return PreviewMotion{ 0.0F, -canvas.Height * 0.06F * inverse, 0.45F + (0.55F * eased) };
         return PreviewMotion{ 0.0F, 0.0F, 0.78F + (0.22F * eased) };
     case ScreenState::Cancel:
     case ScreenState::Outro:
+        if (role == "logo")
+            return PreviewMotion{ 0.0F, -canvas.Height * 0.08F * eased, 1.0F - (0.75F * eased) };
+        if (role == "content" || role == "chrome")
+            return PreviewMotion{ 0.0F, canvas.Height * 0.08F * eased, 1.0F - (0.7F * eased) };
         if (role == "counter")
             return PreviewMotion{ -canvas.Width * 0.18F * eased, 0.0F, 1.0F - (0.72F * eased) };
         if (role == "gauge")
@@ -398,6 +454,68 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return clampRectToCanvas(
         Gdiplus::RectF(canvas.X + 20.0F, canvas.Y + 20.0F + (static_cast<float>(roleIndex) * 24.0F), width, 20.0F),
         canvas);
+}
+
+[[nodiscard]] Gdiplus::RectF layoutTitleMenuLayerRect(const OverlayLayer& layer, std::size_t roleIndex, const Gdiplus::RectF& canvas)
+{
+    if (layer.role == "backdrop")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + 6.0F, canvas.Y + 6.0F, canvas.Width - 12.0F, canvas.Height - 12.0F), canvas);
+    if (layer.role == "logo")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + (canvas.Width * 0.1F), canvas.Y + (canvas.Height * 0.09F), canvas.Width * 0.5F, canvas.Height * 0.19F), canvas);
+    if (layer.role == "content")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + (canvas.Width * 0.2F), canvas.Y + (canvas.Height * 0.46F), canvas.Width * 0.6F, canvas.Height * 0.24F), canvas);
+    if (layer.role == "transient_fx")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + (canvas.Width * 0.08F), canvas.Y + (canvas.Height * 0.06F), canvas.Width * 0.56F, canvas.Height * 0.27F), canvas);
+    if (layer.role == "prompt")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + (canvas.Width * 0.18F), canvas.Y + (canvas.Height * 0.78F), canvas.Width * 0.64F, 24.0F + (static_cast<float>(roleIndex) * 2.0F)), canvas);
+    return layoutLayerRect(layer, roleIndex, canvas);
+}
+
+[[nodiscard]] Gdiplus::RectF layoutPauseMenuLayerRect(const OverlayLayer& layer, std::size_t roleIndex, const Gdiplus::RectF& canvas)
+{
+    if (layer.role == "backdrop")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + 8.0F, canvas.Y + 8.0F, canvas.Width - 16.0F, canvas.Height - 16.0F), canvas);
+    if (layer.role == "chrome")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + (canvas.Width * 0.17F), canvas.Y + (canvas.Height * 0.16F), canvas.Width * 0.66F, canvas.Height * 0.58F), canvas);
+    if (layer.role == "content")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + (canvas.Width * 0.25F), canvas.Y + (canvas.Height * 0.28F), canvas.Width * 0.5F, canvas.Height * 0.34F), canvas);
+    if (layer.role == "transient_fx")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + (canvas.Width * 0.2F), canvas.Y + (canvas.Height * 0.18F), canvas.Width * 0.6F, canvas.Height * 0.12F), canvas);
+    if (layer.role == "prompt")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + (canvas.Width * 0.22F), canvas.Y + (canvas.Height * 0.78F), canvas.Width * 0.56F, 24.0F + (static_cast<float>(roleIndex) * 2.0F)), canvas);
+    return layoutLayerRect(layer, roleIndex, canvas);
+}
+
+[[nodiscard]] Gdiplus::RectF layoutLoadingLayerRect(const OverlayLayer& layer, std::size_t roleIndex, const Gdiplus::RectF& canvas)
+{
+    if (layer.role == "backdrop")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + 4.0F, canvas.Y + 4.0F, canvas.Width - 8.0F, canvas.Height - 8.0F), canvas);
+    if (layer.role == "cinematic_frame")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + 6.0F, canvas.Y + (canvas.Height * 0.09F), canvas.Width - 12.0F, canvas.Height * 0.82F), canvas);
+    if (layer.role == "content")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + (canvas.Width * 0.21F), canvas.Y + (canvas.Height * 0.26F), canvas.Width * 0.58F, canvas.Height * 0.3F), canvas);
+    if (layer.role == "tip_copy")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + (canvas.Width * 0.24F), canvas.Y + (canvas.Height * 0.62F), canvas.Width * 0.52F, canvas.Height * 0.12F), canvas);
+    if (layer.role == "controller_variant")
+        return clampRectToCanvas(Gdiplus::RectF(canvas.X + (canvas.Width * 0.32F), canvas.Y + (canvas.Height * 0.77F), canvas.Width * 0.36F, canvas.Height * 0.08F), canvas);
+    return layoutLayerRect(layer, roleIndex, canvas);
+}
+
+[[nodiscard]] Gdiplus::RectF layoutFamilyLayerRect(PreviewFamily family, const OverlayLayer& layer, std::size_t roleIndex, const Gdiplus::RectF& canvas)
+{
+    switch (family)
+    {
+    case PreviewFamily::TitleMenu:
+        return layoutTitleMenuLayerRect(layer, roleIndex, canvas);
+    case PreviewFamily::PauseMenu:
+        return layoutPauseMenuLayerRect(layer, roleIndex, canvas);
+    case PreviewFamily::LoadingTransition:
+        return layoutLoadingLayerRect(layer, roleIndex, canvas);
+    case PreviewFamily::Generic:
+        return layoutLayerRect(layer, roleIndex, canvas);
+    }
+
+    return layoutLayerRect(layer, roleIndex, canvas);
 }
 
 [[nodiscard]] std::string snapshotText(const ScreenRuntime& runtime, const ContractEntry& entry, const DebugWorkbenchHostEntry& host)
@@ -550,6 +668,41 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     const bool idleStable = idle.alpha == 1.0F && idle.offsetX == 0.0F && idle.offsetY == 0.0F;
     const bool outroFades = outro.alpha < 1.0F && outro.offsetY > 0.0F;
     return introMovesIn && idleStable && outroFades ? 0 : 1;
+}
+
+[[nodiscard]] int runFamilyPreviewSmoke()
+{
+    const Gdiplus::RectF canvas(0.0F, 0.0F, 1280.0F, 720.0F);
+    const OverlayLayer titleLogo{ "logo", "logo", false };
+    const OverlayLayer titleContent{ "carousel", "content", true };
+    const OverlayLayer pauseChrome{ "chrome", "chrome", false };
+    const OverlayLayer pauseContent{ "content", "content", true };
+    const OverlayLayer loadingFrame{ "pda_frame", "content", false };
+
+    const PreviewFamily titleFamily = previewFamilyForContract("title_menu_reference.json");
+    const PreviewFamily pauseFamily = previewFamilyForContract("pause_menu_reference.json");
+    const PreviewFamily loadingFamily = previewFamilyForContract("loading_transition_reference.json");
+    const Gdiplus::RectF titleLogoRect = layoutFamilyLayerRect(titleFamily, titleLogo, 0, canvas);
+    const Gdiplus::RectF titleContentRect = layoutFamilyLayerRect(titleFamily, titleContent, 0, canvas);
+    const Gdiplus::RectF pauseChromeRect = layoutFamilyLayerRect(pauseFamily, pauseChrome, 0, canvas);
+    const Gdiplus::RectF pauseContentRect = layoutFamilyLayerRect(pauseFamily, pauseContent, 0, canvas);
+    const Gdiplus::RectF loadingFrameRect = layoutFamilyLayerRect(loadingFamily, loadingFrame, 0, canvas);
+
+    std::cout
+        << "sward_ui_runtime_debug_gui family preview smoke ok "
+        << "title=" << previewFamilyName(titleFamily)
+        << " pause=" << previewFamilyName(pauseFamily)
+        << " loading=" << previewFamilyName(loadingFamily)
+        << " title_logo_y=" << titleLogoRect.Y
+        << " title_content_y=" << titleContentRect.Y
+        << " pause_chrome_w=" << pauseChromeRect.Width
+        << " loading_frame_y=" << loadingFrameRect.Y
+        << '\n';
+
+    const bool titleSeparated = titleFamily == PreviewFamily::TitleMenu && titleLogoRect.Y < titleContentRect.Y;
+    const bool pauseFramed = pauseFamily == PreviewFamily::PauseMenu && pauseChromeRect.Width > pauseContentRect.Width;
+    const bool loadingCentered = loadingFamily == PreviewFamily::LoadingTransition && loadingFrameRect.Y > canvas.Y;
+    return titleSeparated && pauseFramed && loadingCentered ? 0 : 1;
 }
 
 class WorkbenchGui
@@ -893,8 +1046,10 @@ private:
 
         bool drewAtlas = false;
         std::string atlasLabel = "Local atlas: none";
+        PreviewFamily previewFamily = PreviewFamily::Generic;
         if (host)
         {
+            previewFamily = previewFamilyForContract(host->primaryContractFileName);
             if (const auto* candidate = atlasCandidateForContract(host->primaryContractFileName))
             {
                 const auto atlasPath = visualAtlasSheetRoot() / std::string(candidate->atlasFileName);
@@ -951,7 +1106,7 @@ private:
                         ++roleIndex;
                 }
                 const PreviewMotion motion = previewMotionForState(m_runtime->state(), layers[index].role, stateProgress, canvas);
-                const Gdiplus::RectF layerRect = applyPreviewMotion(layoutLayerRect(layers[index], roleIndex, canvas), motion, canvas);
+                const Gdiplus::RectF layerRect = applyPreviewMotion(layoutFamilyLayerRect(previewFamily, layers[index], roleIndex, canvas), motion, canvas);
 
                 Gdiplus::SolidBrush layerBrush(Gdiplus::Color(motionAlphaByte(0.58F, motion), 57, 166, 218));
                 Gdiplus::Pen layerPen(Gdiplus::Color(motionAlphaByte(0.95F, motion), 245, 248, 250), 1.5F);
@@ -1010,6 +1165,7 @@ private:
             std::ostringstream footer;
             footer
                 << atlasLabel
+                << " | Family " << previewFamilyName(previewFamily)
                 << " | State " << toString(m_runtime->state())
                 << " | " << (m_playbackRunning ? "playing" : "paused")
                 << " | prompts=" << m_runtime->visiblePrompts().size();
@@ -1017,7 +1173,7 @@ private:
         }
         else
         {
-            drawTextLine(dc, footerRect, atlasLabel + " | Run Host to preview runtime layers and prompt rows.", RGB(68, 75, 82));
+            drawTextLine(dc, footerRect, atlasLabel + " | Family " + std::string(previewFamilyName(previewFamily)) + " | Run Host to preview runtime layers and prompt rows.", RGB(68, 75, 82));
         }
     }
 
@@ -1293,6 +1449,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
     try
     {
         const std::string command = commandLine ? commandLine : "";
+        if (command.find("--family-preview-smoke") != std::string::npos)
+            return runFamilyPreviewSmoke();
         if (command.find("--motion-smoke") != std::string::npos)
             return runMotionSmoke();
         if (command.find("--playback-smoke") != std::string::npos)

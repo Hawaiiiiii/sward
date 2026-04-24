@@ -4,7 +4,7 @@
 
 # <img src="../../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Runtime Reference
 
-This directory contains the Phase 21/24/27/37/38/39/40/42/43/45/47/48/50/51/52/53/54/55 reusable runtime and port-kit layer for the SWARD template-pack concepts.
+This directory contains the Phase 21/24/27/37/38/39/40/42/43/45/47/48/50/51/52/53/54/55/56 reusable runtime and port-kit layer for the SWARD template-pack concepts.
 
 It is intentionally decoupled from game assets and from the asset-backed Unleashed Recompiled runtime. The goal is to provide reusable implementation layers for original projects that need:
 
@@ -27,6 +27,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - a GUI preview panel that can draw ignored local atlas PNGs plus runtime layer/prompt/timeline overlays, including explicit proxy atlas bindings for gameplay HUD families
 - timer-driven GUI playback controls for inspecting contract intro/action/outro bands without snapping straight to the settled state
 - state-aware GUI preview motion for layer/prompt offsets and alpha during contract Intro, Navigate, Confirm, Cancel, and Outro bands
+- exact-family preview layout adapters for Title, Pause, and Loading contracts before decoded layout nodes are ready
 
 Contents:
 
@@ -94,65 +95,66 @@ Bundled reference profiles:
 Build the native layer locally:
 
 ```powershell
-cmd /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" && "C:\Program Files\CMake\bin\cmake.exe" -S research_uiux/runtime_reference -B b/rr55 -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release && "C:\Program Files\CMake\bin\cmake.exe" --build b/rr55 --config Release'
-b/rr55/sward_ui_runtime_example.exe
-b/rr55/sward_ui_runtime_title_menu_example.exe
-b/rr55/sward_ui_runtime_toast_example.exe
-b/rr55/sward_ui_runtime_c_example.exe
-b/rr55/sward_ui_runtime_debug_selector.exe
-b/rr55/sward_ui_runtime_debug_workbench.exe
-b/rr55/sward_ui_runtime_debug_gui.exe
+cmd /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" && "C:\Program Files\CMake\bin\cmake.exe" -S research_uiux/runtime_reference -B b/rr56 -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release && "C:\Program Files\CMake\bin\cmake.exe" --build b/rr56 --config Release'
+b/rr56/sward_ui_runtime_example.exe
+b/rr56/sward_ui_runtime_title_menu_example.exe
+b/rr56/sward_ui_runtime_toast_example.exe
+b/rr56/sward_ui_runtime_c_example.exe
+b/rr56/sward_ui_runtime_debug_selector.exe
+b/rr56/sward_ui_runtime_debug_workbench.exe
+b/rr56/sward_ui_runtime_debug_gui.exe
 ```
 
 Run against the bundled contracts:
 
 ```powershell
-b/rr55/sward_ui_runtime_example.exe
-b/rr55/sward_ui_runtime_title_menu_example.exe
-b/rr55/sward_ui_runtime_toast_example.exe
-b/rr55/sward_ui_runtime_c_example.exe
-b/rr55/sward_ui_runtime_debug_selector.exe --list
-b/rr55/sward_ui_runtime_debug_selector.exe --list-families
-b/rr55/sward_ui_runtime_debug_selector.exe TitleMenu.cpp
-b/rr55/sward_ui_runtime_debug_selector.exe TownManager.cpp
-b/rr55/sward_ui_runtime_debug_selector.exe FreeCamera.cpp
-b/rr55/sward_ui_runtime_debug_selector.exe Player3DBossCamera.cpp
-b/rr55/sward_ui_runtime_debug_selector.exe Application.cpp
-b/rr55/sward_ui_runtime_debug_selector.exe SequenceManagerImpl.cpp
-b/rr55/sward_ui_runtime_debug_selector.exe AchievementManager.cpp
-b/rr55/sward_ui_runtime_debug_selector.exe SoundController.cpp
-b/rr55/sward_ui_runtime_debug_selector.exe XMLManager.cpp
-b/rr55/sward_ui_runtime_debug_selector.exe --stay-open TitleManager.cpp
-b/rr55/sward_ui_runtime_debug_workbench.exe --list-groups
-b/rr55/sward_ui_runtime_debug_workbench.exe --catalog
-b/rr55/sward_ui_runtime_debug_workbench.exe --host GameModeMenuSelectDebug.cpp
-b/rr55/sward_ui_runtime_debug_workbench.exe --host InspirePreview.cpp
-b/rr55/sward_ui_runtime_debug_workbench.exe --host HudSonicStage.cpp
-b/rr55/sward_ui_runtime_debug_workbench.exe --host TownManager.cpp
-b/rr55/sward_ui_runtime_debug_workbench.exe --host Player3DBossCamera.cpp
-b/rr55/sward_ui_runtime_debug_workbench.exe --host TitleManager.cpp
-b/rr55/sward_ui_runtime_debug_workbench.exe --host WorldMapSelect.cpp
-b/rr55/sward_ui_runtime_debug_workbench.exe --host SequenceManagerImpl.cpp
-b/rr55/sward_ui_runtime_debug_workbench.exe --host AchievementManager.cpp
-b/rr55/sward_ui_runtime_debug_workbench.exe --host SoundController.cpp
-b/rr55/sward_ui_runtime_debug_workbench.exe --host XMLManager.cpp
-b/rr55/sward_ui_runtime_debug_gui.exe
-b/rr55/sward_ui_runtime_debug_gui.exe --smoke
-b/rr55/sward_ui_runtime_debug_gui.exe --preview-smoke
-b/rr55/sward_ui_runtime_debug_gui.exe --playback-smoke
-b/rr55/sward_ui_runtime_debug_gui.exe --motion-smoke
+b/rr56/sward_ui_runtime_example.exe
+b/rr56/sward_ui_runtime_title_menu_example.exe
+b/rr56/sward_ui_runtime_toast_example.exe
+b/rr56/sward_ui_runtime_c_example.exe
+b/rr56/sward_ui_runtime_debug_selector.exe --list
+b/rr56/sward_ui_runtime_debug_selector.exe --list-families
+b/rr56/sward_ui_runtime_debug_selector.exe TitleMenu.cpp
+b/rr56/sward_ui_runtime_debug_selector.exe TownManager.cpp
+b/rr56/sward_ui_runtime_debug_selector.exe FreeCamera.cpp
+b/rr56/sward_ui_runtime_debug_selector.exe Player3DBossCamera.cpp
+b/rr56/sward_ui_runtime_debug_selector.exe Application.cpp
+b/rr56/sward_ui_runtime_debug_selector.exe SequenceManagerImpl.cpp
+b/rr56/sward_ui_runtime_debug_selector.exe AchievementManager.cpp
+b/rr56/sward_ui_runtime_debug_selector.exe SoundController.cpp
+b/rr56/sward_ui_runtime_debug_selector.exe XMLManager.cpp
+b/rr56/sward_ui_runtime_debug_selector.exe --stay-open TitleManager.cpp
+b/rr56/sward_ui_runtime_debug_workbench.exe --list-groups
+b/rr56/sward_ui_runtime_debug_workbench.exe --catalog
+b/rr56/sward_ui_runtime_debug_workbench.exe --host GameModeMenuSelectDebug.cpp
+b/rr56/sward_ui_runtime_debug_workbench.exe --host InspirePreview.cpp
+b/rr56/sward_ui_runtime_debug_workbench.exe --host HudSonicStage.cpp
+b/rr56/sward_ui_runtime_debug_workbench.exe --host TownManager.cpp
+b/rr56/sward_ui_runtime_debug_workbench.exe --host Player3DBossCamera.cpp
+b/rr56/sward_ui_runtime_debug_workbench.exe --host TitleManager.cpp
+b/rr56/sward_ui_runtime_debug_workbench.exe --host WorldMapSelect.cpp
+b/rr56/sward_ui_runtime_debug_workbench.exe --host SequenceManagerImpl.cpp
+b/rr56/sward_ui_runtime_debug_workbench.exe --host AchievementManager.cpp
+b/rr56/sward_ui_runtime_debug_workbench.exe --host SoundController.cpp
+b/rr56/sward_ui_runtime_debug_workbench.exe --host XMLManager.cpp
+b/rr56/sward_ui_runtime_debug_gui.exe
+b/rr56/sward_ui_runtime_debug_gui.exe --smoke
+b/rr56/sward_ui_runtime_debug_gui.exe --preview-smoke
+b/rr56/sward_ui_runtime_debug_gui.exe --playback-smoke
+b/rr56/sward_ui_runtime_debug_gui.exe --motion-smoke
+b/rr56/sward_ui_runtime_debug_gui.exe --family-preview-smoke
 ```
 
 Run against an explicit portable contract path:
 
 ```powershell
-b/rr55/sward_ui_runtime_example.exe research_uiux/runtime_reference/contracts/world_map_reference.json
-b/rr55/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/mission_result_reference.json
-b/rr55/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/subtitle_cutscene_reference.json
-b/rr55/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/sonic_stage_hud_reference.json
-b/rr55/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/application_world_shell_reference.json
-b/rr55/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/frontend_sequence_shell_reference.json
-b/rr55/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/audio_cue_support_reference.json
+b/rr56/sward_ui_runtime_example.exe research_uiux/runtime_reference/contracts/world_map_reference.json
+b/rr56/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/mission_result_reference.json
+b/rr56/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/subtitle_cutscene_reference.json
+b/rr56/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/sonic_stage_hud_reference.json
+b/rr56/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/application_world_shell_reference.json
+b/rr56/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/frontend_sequence_shell_reference.json
+b/rr56/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/audio_cue_support_reference.json
 ```
 
 Build the managed port locally:
@@ -197,3 +199,5 @@ GUI workbench notes:
 - `--playback-smoke` verifies that the same tick path advances Intro -> Idle and Navigate -> Idle without opening the GUI window
 - preview layers and prompt buttons now apply state-aware motion/alpha during active contract bands
 - `--motion-smoke` verifies the eased preview-motion adapter without opening the GUI window
+- Title, Pause, and Loading contracts now use exact-family preview layout adapters before falling back to the generic role projection
+- `--family-preview-smoke` verifies those exact-family layout adapters without opening the GUI window

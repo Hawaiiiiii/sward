@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-24
 
+### Phase 56 GUI exact-family preview layouts
+
+- added [`research_uiux/GUI_EXACT_FAMILY_PREVIEW_LAYOUTS.md`](./research_uiux/GUI_EXACT_FAMILY_PREVIEW_LAYOUTS.md)
+- added `PreviewFamily` classification for exact Title, Pause, and Loading preview families
+- added family-specific projection functions for title-logo/carousel, pause chrome/content, and loading PDA/tip/controller roles instead of forcing those exact-atlas screens through the generic HUD-like stack
+- preserved the existing generic role layout for gameplay HUD, town, camera, application/world, support-substrate, and other still-broader families
+- added `--family-preview-smoke` regression coverage and verified `b/rr56/sward_ui_runtime_debug_gui.exe`
+- capture-checked `GameModeMainMenu_Test.cpp` in the GUI while it was in the title-menu Intro band
+
 ### Phase 55 GUI state-aware preview motion
 
 - added [`research_uiux/GUI_STATE_AWARE_PREVIEW_MOTION.md`](./research_uiux/GUI_STATE_AWARE_PREVIEW_MOTION.md)

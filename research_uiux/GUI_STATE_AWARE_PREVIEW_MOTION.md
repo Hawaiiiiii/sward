@@ -45,6 +45,10 @@ For the SGFX-style framework direction, this is the first reusable visual-motion
 - Sonic/Werehog gameplay HUD previews still use the recovered `ui_prov_playscreen` sheet as marked proxy evidence.
 - Exact UI parity still needs decoded `.xncp` / `.yncp` node transforms, CSD timeline playback, and more PPC-backed host behavior.
 
+## Follow-On
+
+Phase 56 adds exact-family preview placement for Title, Pause, and Loading on top of this motion layer, so those exact-atlas families no longer share the same generic role stack as gameplay HUD and support probes.
+
 ## Verification
 
 Fresh verification on `2026-04-24`:

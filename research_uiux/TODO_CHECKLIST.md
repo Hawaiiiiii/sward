@@ -415,6 +415,17 @@
 - [x] Build, smoke, and capture-check `b\rr55\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for the first state-aware GUI preview-motion beat.
 
+## Phase 56 - GUI Exact-Family Preview Layouts
+
+- [x] Add exact-family preview classification for Title, Pause, and Loading contracts.
+- [x] Add Title-specific visual placement for logo/content/prompt/transient roles.
+- [x] Add Pause-specific visual placement for chrome/content/prompt/transient roles.
+- [x] Add Loading-specific visual placement for cinematic-frame/content/tip/controller roles.
+- [x] Keep generic role projection available for gameplay HUD, support, town, camera, and other broader families.
+- [x] Add a `--family-preview-smoke` regression path for exact-family placement semantics without opening a window.
+- [x] Build, smoke, and capture-check `b\rr56\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for the first exact-family GUI preview-layout beat.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -532,3 +543,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added and verified the gameplay-HUD proxy atlas binding under `b\rr53`, with `10` atlas candidates, `2` marked proxy candidates, and a captured `SonicMainDisplay.cpp` preview using `exstagetails_common__ui_prov_playscreen.png`.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI timeline playback controls under `b\rr54`, with Play/Pause, Step, timer-driven contract ticks, and a captured `SonicMainDisplay.cpp` Intro playback frame.
 - [x] Follow-on phase audit on `2026-04-24`: added and verified GUI state-aware preview motion under `b\rr55`, with eased role/state offsets, prompt/layer alpha, a dark atlas backing fill, and a captured `SonicMainDisplay.cpp` Intro preview frame.
+- [x] Follow-on phase audit on `2026-04-24`: added and verified exact-family GUI preview layouts under `b\rr56`, with Title, Pause, and Loading placement adapters plus a captured `GameModeMainMenu_Test.cpp` title Intro preview frame.
