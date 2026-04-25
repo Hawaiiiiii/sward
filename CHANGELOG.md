@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-26
 
+### Phase 91 SU UI renderer atlas gallery
+
+- added [`research_uiux/SU_UI_RENDERER_ATLAS_GALLERY.md`](./research_uiux/SU_UI_RENDERER_ATLAS_GALLERY.md)
+- added a `VisualAtlasGallery` renderer screen that discovers local ignored `extracted_assets/visual_atlas/sheets/*.png` files at runtime
+- added visible `Atlas Prev` / `Atlas Next` controls to browse the local atlas inventory from the clean renderer
+- added `--renderer-atlas-gallery-smoke`, verifying `22` local atlas sheets plus Loading, Main Menu, and Status gallery coverage under `b/rr91`
+- kept the DDS-backed composition samples available behind the new atlas-gallery start page
+
 ### Phase 90 SU UI renderer navigation shell
 
 - added [`research_uiux/SU_UI_RENDERER_NAVIGATION_SHELL.md`](./research_uiux/SU_UI_RENDERER_NAVIGATION_SHELL.md)

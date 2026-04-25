@@ -680,6 +680,16 @@
 - [x] Build, smoke-check, and launch-check `b\rr90\sward_su_ui_asset_renderer.exe`.
 - [x] Generate a dedicated report for the renderer navigation shell.
 
+## Phase 91 - SU UI Renderer Atlas Gallery
+
+- [x] Add a `VisualAtlasGallery` page to the clean renderer.
+- [x] Discover local ignored `extracted_assets\visual_atlas\sheets\*.png` files at runtime.
+- [x] Add visible `Atlas Prev` / `Atlas Next` controls.
+- [x] Render selected atlas PNG sheets inside the clean renderer canvas.
+- [x] Add `--renderer-atlas-gallery-smoke` for local sheet inventory verification.
+- [x] Build, smoke-check, launch-check, and screenshot-check `b\rr91\sward_su_ui_asset_renderer.exe`.
+- [x] Generate a dedicated report for the renderer atlas gallery.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.

@@ -30,6 +30,8 @@ inline constexpr int kRendererChromeHeight = 44;
 inline constexpr int kPrevButtonId = 1001;
 inline constexpr int kNextButtonId = 1002;
 inline constexpr int kScreenLabelId = 1003;
+inline constexpr int kAtlasPrevButtonId = 1004;
+inline constexpr int kAtlasNextButtonId = 1005;
 
 struct TextureSourceCandidate
 {
@@ -62,6 +64,12 @@ struct SuUiRenderCast
     int destinationHeight = 0;
 };
 
+enum class RendererScreenKind
+{
+    CastCatalog,
+    AtlasGallery,
+};
+
 struct SuUiRendererScreen
 {
     std::string_view id;
@@ -70,6 +78,7 @@ struct SuUiRendererScreen
     const SuUiRenderCast* casts = nullptr;
     std::size_t castCount = 0;
     Gdiplus::Color background = Gdiplus::Color(255, 0, 0, 0);
+    RendererScreenKind kind = RendererScreenKind::CastCatalog;
 };
 
 inline constexpr std::array<TextureSourceCandidate, 7> kTextureSourceCandidates{{
@@ -105,7 +114,16 @@ inline constexpr std::array<SuUiRenderCast, 1> kSonicStageHudCasts{{
     { "so_speed_gauge", "position_hd", "ui_ps1_gauge1.dds", 4, 64, 16, 20, 752, 357, 16, 20 },
 }};
 
-inline const std::array<SuUiRendererScreen, 5> kRendererScreens{{
+inline const std::array<SuUiRendererScreen, 6> kRendererScreens{{
+    {
+        "VisualAtlasGallery",
+        "Visual Atlas Gallery",
+        "visual_atlas/atlas_index.json",
+        nullptr,
+        0,
+        Gdiplus::Color(255, 0, 0, 0),
+        RendererScreenKind::AtlasGallery,
+    },
     {
         "LoadingComposite",
         "LoadingTransition Composite",
@@ -186,6 +204,48 @@ void appendAncestorAssetRoots(std::vector<std::filesystem::path>& candidates, st
     appendAncestorAssetRoots(candidates, std::filesystem::current_path());
     appendAncestorAssetRoots(candidates, executableDirectory());
     return candidates;
+}
+
+[[nodiscard]] std::vector<std::filesystem::path> discoverAtlasSheetPaths()
+{
+    std::vector<std::filesystem::path> paths;
+    for (const auto& root : extractedAssetRootCandidates())
+    {
+        std::error_code error;
+        const auto sheetRoot = root / "visual_atlas" / "sheets";
+        if (!std::filesystem::is_directory(sheetRoot, error))
+            continue;
+
+        for (const auto& entry : std::filesystem::directory_iterator(sheetRoot, error))
+        {
+            if (error)
+                break;
+            if (!entry.is_regular_file(error))
+                continue;
+
+            const auto extension = entry.path().extension().string();
+            if (extension == ".png" || extension == ".PNG")
+                paths.push_back(entry.path());
+        }
+    }
+
+    std::sort(
+        paths.begin(),
+        paths.end(),
+        [](const auto& left, const auto& right)
+        {
+            return left.filename().string() < right.filename().string();
+        });
+    paths.erase(
+        std::unique(
+            paths.begin(),
+            paths.end(),
+            [](const auto& left, const auto& right)
+            {
+                return left.filename() == right.filename();
+            }),
+        paths.end());
+    return paths;
 }
 
 [[nodiscard]] const TextureSourceCandidate* textureSourceCandidateForFileName(std::string_view textureFileName)
@@ -402,6 +462,11 @@ struct CachedTexture
 class SwardSuUiAssetRenderer
 {
 public:
+    SwardSuUiAssetRenderer()
+        : atlasSheets_(discoverAtlasSheetPaths())
+    {
+    }
+
     [[nodiscard]] std::size_t selectedScreenIndex() const
     {
         return selectedScreenIndex_ % kRendererScreens.size();
@@ -427,6 +492,36 @@ public:
         selectedScreenIndex_ = (selectedScreenIndex_ + kRendererScreens.size() - 1) % kRendererScreens.size();
     }
 
+    void selectNextAtlas()
+    {
+        if (atlasSheets_.empty())
+            return;
+        selectedScreenIndex_ = 0;
+        selectedAtlasIndex_ = (selectedAtlasIndex_ + 1) % atlasSheets_.size();
+        atlasBitmap_.reset();
+    }
+
+    void selectPreviousAtlas()
+    {
+        if (atlasSheets_.empty())
+            return;
+        selectedScreenIndex_ = 0;
+        selectedAtlasIndex_ = (selectedAtlasIndex_ + atlasSheets_.size() - 1) % atlasSheets_.size();
+        atlasBitmap_.reset();
+    }
+
+    [[nodiscard]] std::size_t atlasSheetCount() const
+    {
+        return atlasSheets_.size();
+    }
+
+    [[nodiscard]] std::string selectedAtlasFileName() const
+    {
+        if (atlasSheets_.empty())
+            return "none";
+        return atlasSheets_[selectedAtlasIndex_ % atlasSheets_.size()].filename().string();
+    }
+
     [[nodiscard]] std::string selectedScreenIndexText() const
     {
         const auto& screen = selectedScreen();
@@ -439,6 +534,23 @@ public:
             << screen.id
             << " - "
             << screen.displayName;
+        if (screen.kind == RendererScreenKind::AtlasGallery)
+        {
+            text << " | atlas ";
+            if (atlasSheets_.empty())
+            {
+                text << "0/0 missing visual_atlas/sheets";
+            }
+            else
+            {
+                text
+                    << ((selectedAtlasIndex_ % atlasSheets_.size()) + 1)
+                    << "/"
+                    << atlasSheets_.size()
+                    << " "
+                    << selectedAtlasFileName();
+            }
+        }
         return text.str();
     }
 
@@ -464,8 +576,34 @@ public:
         return textureCache_.back().get();
     }
 
+    [[nodiscard]] Gdiplus::Bitmap* currentAtlasBitmap()
+    {
+        if (atlasSheets_.empty())
+            return nullptr;
+
+        const auto& path = atlasSheets_[selectedAtlasIndex_ % atlasSheets_.size()];
+        if (atlasBitmap_ && atlasBitmapPath_ == path)
+            return atlasBitmap_.get();
+
+        auto bitmap = std::unique_ptr<Gdiplus::Bitmap>(Gdiplus::Bitmap::FromFile(path.wstring().c_str(), FALSE));
+        if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok)
+        {
+            atlasBitmap_.reset();
+            atlasBitmapPath_.clear();
+            return nullptr;
+        }
+
+        atlasBitmapPath_ = path;
+        atlasBitmap_ = std::move(bitmap);
+        return atlasBitmap_.get();
+    }
+
 private:
     std::size_t selectedScreenIndex_ = 0;
+    std::size_t selectedAtlasIndex_ = 0;
+    std::vector<std::filesystem::path> atlasSheets_;
+    std::filesystem::path atlasBitmapPath_;
+    std::unique_ptr<Gdiplus::Bitmap> atlasBitmap_;
     std::vector<std::unique_ptr<CachedTexture>> textureCache_;
 };
 
@@ -492,6 +630,21 @@ private:
         height);
 }
 
+[[nodiscard]] Gdiplus::RectF fitBitmapRectToCanvas(const Gdiplus::RectF& canvas, UINT width, UINT height)
+{
+    if (width == 0 || height == 0)
+        return canvas;
+
+    const float scale = std::min(canvas.Width / static_cast<float>(width), canvas.Height / static_cast<float>(height));
+    const float fittedWidth = static_cast<float>(width) * scale;
+    const float fittedHeight = static_cast<float>(height) * scale;
+    return Gdiplus::RectF(
+        canvas.X + ((canvas.Width - fittedWidth) * 0.5F),
+        canvas.Y + ((canvas.Height - fittedHeight) * 0.5F),
+        fittedWidth,
+        fittedHeight);
+}
+
 [[nodiscard]] std::wstring widenAscii(std::string_view text)
 {
     return std::wstring(text.begin(), text.end());
@@ -515,16 +668,23 @@ void layoutRendererControls(HWND hwnd)
 
     const int margin = 10;
     const int buttonWidth = 88;
+    const int atlasButtonWidth = 112;
     const int buttonHeight = 28;
     const int top = 8;
     const int nextLeft = margin + buttonWidth + 8;
-    const int labelLeft = nextLeft + buttonWidth + 14;
+    const int atlasPrevLeft = nextLeft + buttonWidth + 8;
+    const int atlasNextLeft = atlasPrevLeft + atlasButtonWidth + 8;
+    const int labelLeft = atlasNextLeft + atlasButtonWidth + 14;
     const int labelWidth = std::max(160L, client.right - labelLeft - margin);
 
     if (HWND previous = GetDlgItem(hwnd, kPrevButtonId))
         MoveWindow(previous, margin, top, buttonWidth, buttonHeight, TRUE);
     if (HWND next = GetDlgItem(hwnd, kNextButtonId))
         MoveWindow(next, nextLeft, top, buttonWidth, buttonHeight, TRUE);
+    if (HWND atlasPrevious = GetDlgItem(hwnd, kAtlasPrevButtonId))
+        MoveWindow(atlasPrevious, atlasPrevLeft, top, atlasButtonWidth, buttonHeight, TRUE);
+    if (HWND atlasNext = GetDlgItem(hwnd, kAtlasNextButtonId))
+        MoveWindow(atlasNext, atlasNextLeft, top, atlasButtonWidth, buttonHeight, TRUE);
     if (HWND label = GetDlgItem(hwnd, kScreenLabelId))
         MoveWindow(label, labelLeft, top, labelWidth, buttonHeight, TRUE);
 }
@@ -549,6 +709,22 @@ void createRendererControls(HWND hwnd)
         instance,
         nullptr);
 
+    CreateWindowExW(0, L"BUTTON", L"Atlas Prev",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+        0, 0, 0, 0,
+        hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kAtlasPrevButtonId)),
+        instance,
+        nullptr);
+
+    CreateWindowExW(0, L"BUTTON", L"Atlas Next",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+        0, 0, 0, 0,
+        hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kAtlasNextButtonId)),
+        instance,
+        nullptr);
+
     CreateWindowExW(0, L"STATIC", L"",
         WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,
         0, 0, 0, 0,
@@ -566,6 +742,26 @@ void drawMissingCast(Gdiplus::Graphics& graphics, const Gdiplus::RectF& destinat
     Gdiplus::Pen outline(Gdiplus::Color(220, 98, 205, 98), 1.0F);
     graphics.FillRectangle(&fill, destination);
     graphics.DrawRectangle(&outline, destination);
+}
+
+void renderAtlasGalleryScreen(Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, SwardSuUiAssetRenderer& renderer)
+{
+    auto* bitmap = renderer.currentAtlasBitmap();
+    if (!bitmap)
+    {
+        drawMissingCast(graphics, canvas);
+        return;
+    }
+
+    const auto destination = fitBitmapRectToCanvas(canvas, bitmap->GetWidth(), bitmap->GetHeight());
+    graphics.DrawImage(
+        bitmap,
+        destination,
+        0.0F,
+        0.0F,
+        static_cast<float>(bitmap->GetWidth()),
+        static_cast<float>(bitmap->GetHeight()),
+        Gdiplus::UnitPixel);
 }
 
 void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
@@ -589,6 +785,12 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     const auto& screen = renderer.selectedScreen();
     Gdiplus::SolidBrush canvasBrush(screen.background);
     graphics.FillRectangle(&canvasBrush, canvas);
+
+    if (screen.kind == RendererScreenKind::AtlasGallery)
+    {
+        renderAtlasGalleryScreen(graphics, canvas, renderer);
+        return;
+    }
 
     for (std::size_t index = 0; index < screen.castCount; ++index)
     {
@@ -645,6 +847,20 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
         if (LOWORD(wParam) == kNextButtonId)
         {
             renderer->selectNext();
+            updateRendererStatus(hwnd, *renderer);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        if (LOWORD(wParam) == kAtlasPrevButtonId)
+        {
+            renderer->selectPreviousAtlas();
+            updateRendererStatus(hwnd, *renderer);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        if (LOWORD(wParam) == kAtlasNextButtonId)
+        {
+            renderer->selectNextAtlas();
             updateRendererStatus(hwnd, *renderer);
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
@@ -761,7 +977,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     std::cout
         << "sward_su_ui_asset_renderer navigation smoke ok "
         << "screens=" << renderer.screenCount()
-        << " controls=3"
+        << " controls=5"
         << " first=" << kRendererScreens.front().id
         << " last=" << kRendererScreens.back().id
         << " label=" << renderer.selectedScreenIndexText()
@@ -777,6 +993,38 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     }
 
     return 0;
+}
+
+[[nodiscard]] std::string findAtlasSheetFileName(const std::vector<std::filesystem::path>& sheets, std::string_view fileName)
+{
+    const auto found = std::find_if(
+        sheets.begin(),
+        sheets.end(),
+        [fileName](const auto& path)
+        {
+            return path.filename().string() == fileName;
+        });
+    return found == sheets.end() ? "missing" : found->filename().string();
+}
+
+[[nodiscard]] int runRendererAtlasGallerySmoke()
+{
+    const auto sheets = discoverAtlasSheetPaths();
+    const auto first = sheets.empty() ? std::string("none") : sheets.front().filename().string();
+    const auto loading = findAtlasSheetFileName(sheets, "loading__ui_loading.png");
+    const auto mainMenu = findAtlasSheetFileName(sheets, "mainmenu__ui_mainmenu.png");
+    const auto status = findAtlasSheetFileName(sheets, "systemcommoncore__ui_status.png");
+
+    std::cout
+        << "sward_su_ui_asset_renderer atlas gallery smoke ok "
+        << "sheets=" << sheets.size()
+        << " first=" << first
+        << " loading=" << loading
+        << " mainmenu=" << mainMenu
+        << " status=" << status
+        << '\n';
+
+    return sheets.empty() || loading == "missing" || mainMenu == "missing" || status == "missing" ? 1 : 0;
 }
 
 [[nodiscard]] bool commandLineHasFlag(std::string_view flag)
@@ -843,6 +1091,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererSmoke();
     if (commandLineHasFlag("--renderer-navigation-smoke"))
         return runRendererNavigationSmoke();
+    if (commandLineHasFlag("--renderer-atlas-gallery-smoke"))
+        return runRendererAtlasGallerySmoke();
 
     return runRendererWindow(instance, showCommand);
 }
