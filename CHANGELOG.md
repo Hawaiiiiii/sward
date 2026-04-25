@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 89 SU UI asset renderer composite sheets
+
+- added [`research_uiux/SU_UI_ASSET_RENDERER_COMPOSITE_SHEETS.md`](./research_uiux/SU_UI_ASSET_RENDERER_COMPOSITE_SHEETS.md)
+- changed `sward_su_ui_asset_renderer.exe` to open on a full-screen `mat_load_comon_001.dds` loading composition instead of the isolated `bg_1/arrow` crop
+- widened the renderer catalog to `5` screen samples and `8` DDS-backed blits across Loading, Main Menu, Title, and Sonic HUD evidence
+- extended `--renderer-smoke` with destination rects and `full_screen_casts=1`, preventing the clean renderer from regressing to a single-crop proof
+
 ### Phase 88 SU UI asset renderer vertical slice
 
 - added [`research_uiux/SU_UI_ASSET_RENDERER_VERTICAL_SLICE.md`](./research_uiux/SU_UI_ASSET_RENDERER_VERTICAL_SLICE.md)

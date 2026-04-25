@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RENDERER_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "su_ui_asset_renderer.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr88" / "sward_su_ui_asset_renderer.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr89" / "sward_su_ui_asset_renderer.exe"
 
 
 class SuUiAssetRendererTests(unittest.TestCase):
@@ -29,7 +29,8 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("SuUiRenderCast", source_text)
         self.assertIn("renderCleanScreen", source_text)
         self.assertIn("SonicTitleMenu", source_text)
-        self.assertIn("LoadingTransition", source_text)
+        self.assertIn("LoadingTransition Composite", source_text)
+        self.assertIn("LoadingComposite", source_text)
         self.assertIn("SonicStageHud", source_text)
         self.assertNotIn("kDebugWorkbenchHostEntries", source_text)
 
@@ -39,9 +40,20 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("decodeDxt5Block", source_text)
         self.assertIn("loadDdsTextureImage", source_text)
         self.assertIn("mat_load_comon_001.dds", source_text)
+        self.assertIn("ui_mm_base.dds", source_text)
         self.assertIn("ui_mm_parts1.dds", source_text)
+        self.assertIn("ui_mm_contentstext.dds", source_text)
+        self.assertIn("mat_title_en_001.dds", source_text)
         self.assertIn("ui_ps1_gauge1.dds", source_text)
         self.assertIn("--renderer-smoke", source_text)
+
+    def test_renderer_catalog_starts_with_full_screen_composition_not_single_arrow(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn('screen.id == "LoadingComposite"', source_text)
+        self.assertIn('full_screen_casts=', source_text)
+        self.assertIn('{ "load_composite", "full_screen", "mat_load_comon_001.dds", 0, 0, 1280, 720, 0, 0, 1280, 720 }', source_text)
+        self.assertIn('kMainMenuCompositeCasts', source_text)
+        self.assertIn('kTitleLogoSheetCasts', source_text)
 
     def test_renderer_smoke_reports_clean_screen_texture_inventory(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
@@ -57,11 +69,15 @@ class SuUiAssetRendererTests(unittest.TestCase):
         )
 
         self.assertIn("sward_su_ui_asset_renderer smoke ok", completed.stdout)
-        self.assertIn("screens=3", completed.stdout)
-        self.assertIn("casts=3", completed.stdout)
-        self.assertIn("textures=3", completed.stdout)
-        self.assertIn("LoadingTransition:bg_1/arrow:mat_load_comon_001.dds:DXT5:1280x720", completed.stdout)
+        self.assertIn("screens=5", completed.stdout)
+        self.assertIn("casts=8", completed.stdout)
+        self.assertIn("textures=8", completed.stdout)
+        self.assertIn("full_screen_casts=1", completed.stdout)
+        self.assertIn("LoadingComposite:load_composite/full_screen:mat_load_comon_001.dds:DXT5:1280x720:dst=0,0,1280x720", completed.stdout)
+        self.assertNotIn("LoadingTransition:bg_1/arrow", completed.stdout)
+        self.assertIn("MainMenuComposite:mm_bg/base_sheet:ui_mm_base.dds:DXT5:1280x720:dst=0,0,1280x720", completed.stdout)
         self.assertIn("SonicTitleMenu:mm_bg_usual/black3:ui_mm_parts1.dds:DXT5:1280x640", completed.stdout)
+        self.assertIn("TitleLogoSheet:title/logo_en_001:mat_title_en_001.dds:DXT5:256x512", completed.stdout)
         self.assertIn("SonicStageHud:so_speed_gauge/position_hd:ui_ps1_gauge1.dds:DXT5:256x128", completed.stdout)
 
 

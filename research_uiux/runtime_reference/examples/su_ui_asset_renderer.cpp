@@ -68,31 +68,54 @@ struct SuUiRendererScreen
     Gdiplus::Color background = Gdiplus::Color(255, 0, 0, 0);
 };
 
-inline constexpr std::array<TextureSourceCandidate, 3> kTextureSourceCandidates{{
+inline constexpr std::array<TextureSourceCandidate, 7> kTextureSourceCandidates{{
     { "mat_load_comon_001.dds", "ui_extended_archives/Loading/mat_load_comon_001.dds" },
+    { "ui_mm_base.dds", "ui_frontend_archives/MainMenu/ui_mm_base.dds" },
     { "ui_mm_parts1.dds", "ui_frontend_archives/MainMenu/ui_mm_parts1.dds" },
+    { "ui_mm_contentstext.dds", "ui_frontend_archives/MainMenu/ui_mm_contentstext.dds" },
+    { "mat_title_en_001.dds", "ui_broader_archives/Languages/English/Title/mat_title_en_001.dds" },
+    { "mat_title_en_002.dds", "ui_broader_archives/Languages/English/Title/mat_title_en_002.dds" },
     { "ui_ps1_gauge1.dds", "phase16_support_archives/ExStageTails_Common/ui_ps1_gauge1.dds" },
 }};
 
-inline constexpr std::array<SuUiRenderCast, 1> kLoadingTransitionCasts{{
-    { "bg_1", "arrow", "mat_load_comon_001.dds", 595, 121, 300, 240, 350, 360, 300, 240 },
+inline constexpr std::array<SuUiRenderCast, 1> kLoadingCompositeCasts{{
+    { "load_composite", "full_screen", "mat_load_comon_001.dds", 0, 0, 1280, 720, 0, 0, 1280, 720 },
+}};
+
+inline constexpr std::array<SuUiRenderCast, 3> kMainMenuCompositeCasts{{
+    { "mm_bg", "base_sheet", "ui_mm_base.dds", 0, 0, 1280, 720, 0, 0, 1280, 720 },
+    { "mm_bg", "parts_sheet", "ui_mm_parts1.dds", 0, 0, 1280, 640, 0, 40, 1280, 640 },
+    { "mm_contents", "text_sheet", "ui_mm_contentstext.dds", 0, 0, 640, 640, 248, 40, 640, 640 },
 }};
 
 inline constexpr std::array<SuUiRenderCast, 1> kSonicTitleMenuCasts{{
     { "mm_bg_usual", "black3", "ui_mm_parts1.dds", 896, 336, 16, 16, 655, 435, 368, 464 },
 }};
 
+inline constexpr std::array<SuUiRenderCast, 2> kTitleLogoSheetCasts{{
+    { "title", "logo_en_001", "mat_title_en_001.dds", 0, 0, 256, 512, 320, 104, 256, 512 },
+    { "title", "logo_en_002", "mat_title_en_002.dds", 0, 0, 128, 256, 704, 232, 128, 256 },
+}};
+
 inline constexpr std::array<SuUiRenderCast, 1> kSonicStageHudCasts{{
     { "so_speed_gauge", "position_hd", "ui_ps1_gauge1.dds", 4, 64, 16, 20, 752, 357, 16, 20 },
 }};
 
-inline const std::array<SuUiRendererScreen, 3> kRendererScreens{{
+inline const std::array<SuUiRendererScreen, 5> kRendererScreens{{
     {
-        "LoadingTransition",
-        "Loading Transition",
+        "LoadingComposite",
+        "LoadingTransition Composite",
         "loading_transition_reference.json",
-        kLoadingTransitionCasts.data(),
-        kLoadingTransitionCasts.size(),
+        kLoadingCompositeCasts.data(),
+        kLoadingCompositeCasts.size(),
+        Gdiplus::Color(255, 0, 0, 0),
+    },
+    {
+        "MainMenuComposite",
+        "Main Menu Composite Sheets",
+        "title_menu_reference.json",
+        kMainMenuCompositeCasts.data(),
+        kMainMenuCompositeCasts.size(),
         Gdiplus::Color(255, 0, 0, 0),
     },
     {
@@ -101,6 +124,14 @@ inline const std::array<SuUiRendererScreen, 3> kRendererScreens{{
         "title_menu_reference.json",
         kSonicTitleMenuCasts.data(),
         kSonicTitleMenuCasts.size(),
+        Gdiplus::Color(255, 0, 0, 0),
+    },
+    {
+        "TitleLogoSheet",
+        "Title Logo Sheets",
+        "title_menu_reference.json",
+        kTitleLogoSheetCasts.data(),
+        kTitleLogoSheetCasts.size(),
         Gdiplus::Color(255, 0, 0, 0),
     },
     {
@@ -442,7 +473,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     GetClientRect(hwnd, &client);
 
     Gdiplus::Graphics graphics(dc);
-    graphics.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+    graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
 
     Gdiplus::SolidBrush windowBrush(Gdiplus::Color(255, 0, 0, 0));
@@ -531,6 +562,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 {
     std::size_t castCount = 0;
     std::size_t resolvedTextureCount = 0;
+    std::size_t fullScreenCastCount = 0;
     std::vector<std::string> descriptors;
 
     for (const auto& screen : kRendererScreens)
@@ -540,6 +572,15 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
         {
             const auto& cast = screen.casts[index];
             const auto image = loadDdsTextureImage(cast.textureName);
+            if (screen.id == "LoadingComposite"
+                && cast.destinationX == 0
+                && cast.destinationY == 0
+                && cast.destinationWidth == kDesignWidth
+                && cast.destinationHeight == kDesignHeight)
+            {
+                ++fullScreenCastCount;
+            }
+
             std::ostringstream descriptor;
             descriptor
                 << screen.id
@@ -558,6 +599,9 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
             {
                 descriptor << ":missing";
             }
+            descriptor
+                << ":dst=" << cast.destinationX << "," << cast.destinationY << ","
+                << cast.destinationWidth << "x" << cast.destinationHeight;
             descriptors.push_back(descriptor.str());
         }
     }
@@ -567,6 +611,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
         << "screens=" << kRendererScreens.size()
         << " casts=" << castCount
         << " textures=" << resolvedTextureCount
+        << " full_screen_casts=" << fullScreenCastCount
         << '\n';
 
     for (const auto& descriptor : descriptors)

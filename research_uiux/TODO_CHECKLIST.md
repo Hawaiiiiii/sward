@@ -660,6 +660,16 @@
 - [x] Keep `sward_ui_runtime_debug_gui.exe` intact as the evidence/debug workbench.
 - [x] Generate a dedicated report for the clean asset renderer vertical slice.
 
+## Phase 89 - SU UI Asset Renderer Composite Sheets
+
+- [x] Replace the clean renderer's first screen from an isolated arrow crop to a full-screen Loading composition.
+- [x] Add Main Menu and Title sheet surfaces to the renderer catalog.
+- [x] Keep the old crop samples only as regression contrast, not as the first product-facing screen.
+- [x] Extend `--renderer-smoke` with destination rects and full-screen cast counts.
+- [x] Build and smoke-check `b\rr89\sward_su_ui_asset_renderer.exe`.
+- [x] Capture-check the renderer window and verify it opens on the full Loading composition.
+- [x] Generate a dedicated report for renderer composite sheets.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -810,3 +820,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD render plans under `b\rr86`, with Sonic HUD, Loading, Title, and Pause virtual `1280x720` target-space rectangles smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD DDS blit previews under `b\rr87`, with local DXT5 source texture decode for Sonic HUD, Loading, and Title smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified the separate clean SU UI asset renderer under `b\rr88`, with Loading, Title, and Sonic HUD local DDS blits smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-26`: corrected the clean renderer under `b\rr89` to open on a full-screen Loading composition and widened it to `5` screen samples / `8` local DDS blits.
