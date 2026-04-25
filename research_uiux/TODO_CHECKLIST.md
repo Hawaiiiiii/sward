@@ -609,6 +609,16 @@
 - [x] Build and smoke-check `b\rr83\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for Asset View CSD crop previews.
 
+## Phase 84 - GUI Asset CSD Subimage Draw Descriptors
+
+- [x] Add selected CSD cast/subimage descriptors from parsed layout evidence.
+- [x] Bind Sonic HUD, Extra Stage HUD, Werehog HUD, Loading, Title, and Pause selected elements to drawable cast/subimage or no-subimage evidence.
+- [x] Surface `CSD cast/subimage:` in the detail pane and runtime snapshot text.
+- [x] Draw a selected cast/subimage cue in Asset View.
+- [x] Add `--asset-csd-subimage-smoke`.
+- [x] Build and smoke-check `b\rr84\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for Asset View CSD subimage draw descriptors.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -754,3 +764,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD element bindings under `b\rr81`, tying Title, Pause, Loading, and gameplay-HUD proxy atlas candidates to package/scene/cast/subimage evidence.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD element navigation under `b\rr82`, widening the binding set to `41` package/scene/cast entries with selected-element highlighting and `Element Prev` / `Element Next` controls.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD crop previews under `b\rr83`, with selected-element `1280x720` crop rectangles for Sonic HUD, Loading, Title, and Pause smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD subimage draw descriptors under `b\rr84`, with Sonic HUD, Loading, Title, and Pause selected cast/subimage evidence smoke-guarded.

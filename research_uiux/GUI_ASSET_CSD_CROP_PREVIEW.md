@@ -35,3 +35,5 @@ sward_ui_runtime_debug_gui asset csd crop smoke ok sonic=so_speed_gauge:691,418,
 ```
 
 This is still a footprint/crop bridge, not final subimage reconstruction. The next useful renderer step is resolving decoded subimage rectangles and cast-local transforms so the crop panel can move from atlas-footprint inspection to exact subimage/cast draw commands.
+
+Phase 84 follows that runway with the first selected cast/subimage descriptors in [`GUI_ASSET_CSD_SUBIMAGE_DRAW_DESCRIPTORS.md`](./GUI_ASSET_CSD_SUBIMAGE_DRAW_DESCRIPTORS.md).

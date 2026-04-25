@@ -143,6 +143,28 @@ struct LayoutCsdElementCrop
     int height = 0;
 };
 
+struct LayoutCsdCastSubimageBinding
+{
+    std::string_view contractFileName;
+    std::string_view packageFileName;
+    std::string_view sceneName;
+    std::string_view selectedCastName;
+    std::string_view drawableCastName;
+    std::string_view textureName;
+    int subimageIndex = -1;
+    float subimageLeft = 0.0F;
+    float subimageTop = 0.0F;
+    float subimageRight = 0.0F;
+    float subimageBottom = 0.0F;
+    int castWidth = 0;
+    int castHeight = 0;
+    float translateX = 0.0F;
+    float translateY = 0.0F;
+    float scaleX = 1.0F;
+    float scaleY = 1.0F;
+    bool hasSubimage = true;
+};
+
 struct LayoutPrimitiveDrawCommand
 {
     std::string_view sceneName;
@@ -422,6 +444,18 @@ inline constexpr std::array<LayoutCsdElementBinding, 41> kLayoutCsdElementBindin
     { "werehog_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "ring_get_effect", "position_hd", "flash", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 2, 109, 654, 0.64F, 0.26F, 0.28F, 0.14F },
 }};
 
+inline constexpr std::array<LayoutCsdCastSubimageBinding, 9> kLayoutCsdCastSubimageBindings{{
+    { "sonic_stage_hud_reference.json", "ui_prov_playscreen.yncp", "so_speed_gauge", "position_hd", "Cast_0506_bg", "ui_ps1_gauge1.dds", 1, 0.015625F, 0.500000F, 0.078125F, 0.656250F, 16, 20, 0.093750F, 0.009722F, 1.0F, 1.0F, true },
+    { "sonic_stage_hud_reference.json", "ui_prov_playscreen.yncp", "ring_get_effect", "position_hd", "flash", "ui_ps1_gauge1.dds", 52, 0.281250F, 0.640625F, 0.371094F, 0.812500F, 23, 22, 0.011719F, -0.008333F, 2.2F, 2.2F, true },
+    { "extra_stage_hud_reference.json", "ui_prov_playscreen.yncp", "so_speed_gauge", "position_hd", "Cast_0506_bg", "ui_ps1_gauge1.dds", 1, 0.015625F, 0.500000F, 0.078125F, 0.656250F, 16, 20, 0.093750F, 0.009722F, 1.0F, 1.0F, true },
+    { "extra_stage_hud_reference.json", "ui_prov_playscreen.yncp", "ring_get_effect", "position_hd", "flash", "ui_ps1_gauge1.dds", 52, 0.281250F, 0.640625F, 0.371094F, 0.812500F, 23, 22, 0.011719F, -0.008333F, 2.2F, 2.2F, true },
+    { "werehog_stage_hud_reference.json", "ui_prov_playscreen.yncp", "so_speed_gauge", "position_hd", "Cast_0506_bg", "ui_ps1_gauge1.dds", 1, 0.015625F, 0.500000F, 0.078125F, 0.656250F, 16, 20, 0.093750F, 0.009722F, 1.0F, 1.0F, true },
+    { "werehog_stage_hud_reference.json", "ui_prov_playscreen.yncp", "ring_get_effect", "position_hd", "flash", "ui_ps1_gauge1.dds", 52, 0.281250F, 0.640625F, 0.371094F, 0.812500F, 23, 22, 0.011719F, -0.008333F, 2.2F, 2.2F, true },
+    { "loading_transition_reference.json", "ui_loading.yncp", "bg_1", "arrow", "img_1", "mat_load_comon_001.dds", 198, 0.464844F, 0.168056F, 0.699219F, 0.501389F, 300, 240, -0.109375F, 0.166667F, 1.0F, 1.0F, true },
+    { "title_menu_reference.json", "ui_mainmenu.xncp", "mm_bg_usual", "black3", "black3", "ui_mm_parts1.dds", 14, 0.700000F, 0.525000F, 0.712500F, 0.550000F, 16, 16, 0.155469F, 0.426389F, 23.0F, 29.0F, true },
+    { "pause_menu_reference.json", "ui_pause.yncp", "bg", "img", "img", "none", -1, 0.0F, 0.0F, 0.0F, 0.0F, 1280, 720, 0.0F, 0.0F, 1.0F, 1.0F, false },
+}};
+
 inline constexpr std::array<LayoutAuthoredCastTransform, 3> kLayoutAuthoredCastTransforms{{
     { "title_menu_reference.json", "ui_mainmenu.xncp", "mm_donut_move", "index_text_pos", 408, 296, 16, 16, 0.0F, 1.0F, 1.0F, "0xFFFFFFFF" },
     { "pause_menu_reference.json", "ui_pause.yncp", "bg", "img", 0, 0, 1280, 720, 0.0F, 1.0F, 1.0F, "0x00000000" },
@@ -646,6 +680,76 @@ enum ControlId
             << " | anchor=" << binding->anchorCastName
             << "\r\n";
         return text.str();
+    }
+
+    text << "  none\r\n";
+    return text.str();
+}
+
+[[nodiscard]] const LayoutCsdCastSubimageBinding* layoutCsdCastSubimageForBinding(const LayoutCsdElementBinding& binding)
+{
+    const auto found = std::find_if(
+        kLayoutCsdCastSubimageBindings.begin(),
+        kLayoutCsdCastSubimageBindings.end(),
+        [&binding](const LayoutCsdCastSubimageBinding& subimage)
+        {
+            return subimage.contractFileName == binding.contractFileName
+                && subimage.packageFileName == binding.packageFileName
+                && subimage.sceneName == binding.sceneName
+                && subimage.selectedCastName == binding.castName;
+        });
+    return found == kLayoutCsdCastSubimageBindings.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] std::string layoutCsdCastSubimageDescriptor(const LayoutCsdCastSubimageBinding& binding)
+{
+    std::ostringstream text;
+    text
+        << binding.sceneName
+        << "/" << binding.selectedCastName
+        << "->" << binding.drawableCastName;
+
+    if (binding.hasSubimage)
+    {
+        text
+            << ":sub=" << binding.subimageIndex
+            << ":tex=" << binding.textureName
+            << ":uv="
+            << std::fixed << std::setprecision(6)
+            << binding.subimageLeft << "," << binding.subimageTop
+            << "-" << binding.subimageRight << "," << binding.subimageBottom;
+    }
+    else
+    {
+        text
+            << ":sub=none"
+            << ":tex=none";
+    }
+
+    text
+        << ":cast=" << binding.castWidth << "x" << binding.castHeight
+        << ":pos=" << std::fixed << std::setprecision(6)
+        << binding.translateX << "," << binding.translateY
+        << ":scale=" << std::fixed << std::setprecision(2)
+        << binding.scaleX << "," << binding.scaleY;
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutCsdCastSubimageSummary(std::string_view contractFileName, std::size_t requestedIndex)
+{
+    std::ostringstream text;
+    text << "CSD cast/subimage:\r\n";
+
+    if (const auto* element = layoutCsdElementBindingAt(contractFileName, requestedIndex))
+    {
+        if (const auto* subimage = layoutCsdCastSubimageForBinding(*element))
+        {
+            text
+                << "  " << layoutCsdCastSubimageDescriptor(*subimage)
+                << " | package=" << subimage->packageFileName
+                << "\r\n";
+            return text.str();
+        }
     }
 
     text << "  none\r\n";
@@ -1992,6 +2096,45 @@ void drawAssetCsdElementCropPreview(HDC dc, Gdiplus::Graphics& graphics, Gdiplus
     drawTextLine(dc, detailRect, std::string("anchor=") + std::string(binding.anchorCastName) + " textures=" + std::string(binding.textureSummary), RGB(164, 214, 154));
 }
 
+void drawAssetCsdCastSubimageCue(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const LayoutCsdCastSubimageBinding& binding)
+{
+    const float panelWidth = std::min(460.0F, std::max(300.0F, canvas.Width * 0.46F));
+    Gdiplus::RectF panel(
+        canvas.X + 14.0F,
+        canvas.Y + canvas.Height - 86.0F,
+        panelWidth,
+        72.0F);
+
+    Gdiplus::SolidBrush panelBrush(Gdiplus::Color(224, 3, 18, 16));
+    Gdiplus::Pen panelPen(Gdiplus::Color(220, 151, 255, 223), 1.2F);
+    graphics.FillRectangle(&panelBrush, panel);
+    graphics.DrawRectangle(&panelPen, panel);
+
+    RECT titleRect{
+        static_cast<LONG>(panel.X + 10.0F),
+        static_cast<LONG>(panel.Y + 6.0F),
+        static_cast<LONG>(panel.X + panel.Width - 10.0F),
+        static_cast<LONG>(panel.Y + 28.0F),
+    };
+    drawTextLine(dc, titleRect, "CSD cast/subimage " + layoutCsdCastSubimageDescriptor(binding), RGB(236, 255, 248));
+
+    std::ostringstream detail;
+    detail
+        << "package=" << binding.packageFileName
+        << " texture=" << binding.textureName
+        << " cast=" << binding.castWidth << "x" << binding.castHeight;
+    if (!binding.hasSubimage)
+        detail << " no decoded subimage; render as cast/local fill";
+
+    RECT detailRect{
+        static_cast<LONG>(panel.X + 10.0F),
+        static_cast<LONG>(panel.Y + 32.0F),
+        static_cast<LONG>(panel.X + panel.Width - 10.0F),
+        static_cast<LONG>(panel.Y + panel.Height - 6.0F),
+    };
+    drawTextLine(dc, detailRect, detail.str(), RGB(164, 214, 154));
+}
+
 void drawLayoutScenePrimitives(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const std::vector<const LayoutScenePrimitive*>& primitives, float timelineProgress)
 {
     if (primitives.empty())
@@ -2408,6 +2551,8 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         << "\r\n"
         << layoutCsdElementCropSummary(host.primaryContractFileName, 0)
         << "\r\n"
+        << layoutCsdCastSubimageSummary(host.primaryContractFileName, 0)
+        << "\r\n"
         << layoutCsdElementBindingSummary(host.primaryContractFileName)
         << "\r\n"
         << "State: " << toString(runtime.state()) << "\r\n"
@@ -2677,6 +2822,44 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         && pauseCrop.y == 58
         && pauseCrop.width == 1178
         && pauseCrop.height == 590
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAssetCsdSubimageSmoke()
+{
+    const auto* sonicElement = layoutCsdElementBindingAt("sonic_stage_hud_reference.json", 0);
+    const auto* loadingElement = layoutCsdElementBindingAt("loading_transition_reference.json", 0);
+    const auto* titleElement = layoutCsdElementBindingAt("title_menu_reference.json", 0);
+    const auto* pauseElement = layoutCsdElementBindingAt("pause_menu_reference.json", 0);
+
+    const auto* sonic = sonicElement ? layoutCsdCastSubimageForBinding(*sonicElement) : nullptr;
+    const auto* loading = loadingElement ? layoutCsdCastSubimageForBinding(*loadingElement) : nullptr;
+    const auto* title = titleElement ? layoutCsdCastSubimageForBinding(*titleElement) : nullptr;
+    const auto* pause = pauseElement ? layoutCsdCastSubimageForBinding(*pauseElement) : nullptr;
+
+    if (!sonic || !loading || !title || !pause)
+    {
+        std::cerr << "sward_ui_runtime_debug_gui asset csd subimage smoke failed missing descriptor\n";
+        return 1;
+    }
+
+    std::cout
+        << "sward_ui_runtime_debug_gui asset csd subimage smoke ok "
+        << "descriptors=" << kLayoutCsdCastSubimageBindings.size()
+        << " sonic=" << layoutCsdCastSubimageDescriptor(*sonic)
+        << " loading=" << layoutCsdCastSubimageDescriptor(*loading)
+        << " title=" << layoutCsdCastSubimageDescriptor(*title)
+        << " pause=" << layoutCsdCastSubimageDescriptor(*pause)
+        << '\n';
+
+    return sonic->subimageIndex == 1
+        && sonic->drawableCastName == "Cast_0506_bg"
+        && loading->subimageIndex == 198
+        && title->subimageIndex == 14
+        && !pause->hasSubimage
+        && pause->castWidth == 1280
+        && pause->castHeight == 720
         ? 0
         : 1;
 }
@@ -3937,6 +4120,8 @@ private:
                         {
                             const auto* selectedBinding = bindings[currentCsdElementIndex(*host)];
                             drawAssetCsdElementCropPreview(dc, graphics, image, canvas, *selectedBinding);
+                            if (const auto* subimage = layoutCsdCastSubimageForBinding(*selectedBinding))
+                                drawAssetCsdCastSubimageCue(dc, graphics, canvas, *subimage);
                         }
                         drewCsdElementOverlay = true;
                     }
@@ -3996,6 +4181,8 @@ private:
                 const auto* selected = bindings[elementIndex];
                 detail << " | csd=" << (elementIndex + 1) << "/" << bindings.size() << " " << selected->packageFileName << "/" << selected->sceneName << "/" << selected->castName;
                 detail << " | crop=" << layoutCsdElementCropDescriptor(*selected);
+                if (const auto* subimage = layoutCsdCastSubimageForBinding(*selected))
+                    detail << " | draw=" << layoutCsdCastSubimageDescriptor(*subimage);
             }
         }
         drawTextLine(dc, subText, detail.str(), RGB(164, 214, 154));
@@ -4321,6 +4508,7 @@ private:
             << assetViewerSummaryText(host.primaryContractFileName) << "\r\n"
             << layoutCsdElementBindingNavigationSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdElementCropSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
+            << layoutCsdCastSubimageSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdElementBindingSummary(host.primaryContractFileName) << "\r\n"
             << assetGallerySummaryText(host) << "\r\n"
             << csdElementGallerySummaryText(host) << "\r\n"
@@ -4564,6 +4752,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runMotionSmoke();
         if (command.find("--playback-smoke") != std::string::npos)
             return runPlaybackSmoke();
+        if (command.find("--asset-csd-subimage-smoke") != std::string::npos)
+            return runAssetCsdSubimageSmoke();
         if (command.find("--asset-csd-crop-smoke") != std::string::npos)
             return runAssetCsdCropSmoke();
         if (command.find("--asset-csd-navigation-smoke") != std::string::npos)

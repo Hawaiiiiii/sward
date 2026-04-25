@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr83" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr84" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -88,6 +88,15 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("drawAssetCsdElementCropPreview", source_text)
         self.assertIn("CSD element crop:", source_text)
         self.assertIn("--asset-csd-crop-smoke", source_text)
+
+    def test_gui_source_exposes_csd_cast_subimage_draw_descriptors_for_asset_viewer(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("LayoutCsdCastSubimageBinding", source_text)
+        self.assertIn("layoutCsdCastSubimageDescriptor", source_text)
+        self.assertIn("layoutCsdCastSubimageSummary", source_text)
+        self.assertIn("drawAssetCsdCastSubimageCue", source_text)
+        self.assertIn("CSD cast/subimage:", source_text)
+        self.assertIn("--asset-csd-subimage-smoke", source_text)
 
     def test_gui_preview_binds_gameplay_hud_proxy_atlas_and_bounded_layout(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -481,6 +490,28 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("loading=bg_1:77,58,1126x86:normalized=0.06,0.08,0.88x0.12", completed.stdout)
         self.assertIn("title=mm_bg_usual:102,86,1050x130:normalized=0.08,0.12,0.82x0.18", completed.stdout)
         self.assertIn("pause=bg:51,58,1178x590:normalized=0.04,0.08,0.92x0.82", completed.stdout)
+
+    def test_asset_csd_subimage_smoke_reports_cast_local_draw_descriptors(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE)).resolve()
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--asset-csd-subimage-smoke"],
+            cwd=exe.parent,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui asset csd subimage smoke ok", completed.stdout)
+        self.assertIn("sonic=so_speed_gauge/position_hd->Cast_0506_bg:sub=1:tex=ui_ps1_gauge1.dds", completed.stdout)
+        self.assertIn("uv=0.015625,0.500000-0.078125,0.656250", completed.stdout)
+        self.assertIn("loading=bg_1/arrow->img_1:sub=198:tex=mat_load_comon_001.dds", completed.stdout)
+        self.assertIn("uv=0.464844,0.168056-0.699219,0.501389", completed.stdout)
+        self.assertIn("title=mm_bg_usual/black3->black3:sub=14:tex=ui_mm_parts1.dds", completed.stdout)
+        self.assertIn("uv=0.700000,0.525000-0.712500,0.550000", completed.stdout)
+        self.assertIn("pause=bg/img->img:sub=none:tex=none", completed.stdout)
 
     def test_playback_smoke_command_advances_timeline_without_opening_window(self) -> None:
         exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))

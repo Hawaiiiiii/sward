@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 84 GUI asset CSD subimage draw descriptors
+
+- added [`research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_DESCRIPTORS.md`](./research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_DESCRIPTORS.md)
+- added selected CSD cast/subimage descriptors for Sonic HUD, Extra Stage HUD, Werehog HUD, Loading, Title, and the Pause no-subimage backing case
+- surfaced `CSD cast/subimage:` in the detail/runtime panes plus an Asset View cue for the selected drawable evidence
+- added `--asset-csd-subimage-smoke`, verifying Sonic HUD, Loading, Title, and Pause cast/subimage descriptors under `b/rr84`
+
 ### Phase 83 GUI asset CSD crop preview
 
 - added [`research_uiux/GUI_ASSET_CSD_CROP_PREVIEW.md`](./research_uiux/GUI_ASSET_CSD_CROP_PREVIEW.md)
