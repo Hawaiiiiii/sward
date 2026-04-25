@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 80 GUI asset root discovery and gallery controls
+
+- added [`research_uiux/GUI_ASSET_GALLERY_ROOT_DISCOVERY.md`](./research_uiux/GUI_ASSET_GALLERY_ROOT_DISCOVERY.md)
+- fixed Asset View local atlas discovery when the GUI is launched from `b/rrXX` instead of the repo root
+- added `Asset Prev` / `Asset Next` atlas-sheet gallery controls over the sorted local `visual_atlas/sheets` inventory
+- added `--asset-gallery-smoke`, verifying deterministic atlas navigation under `b/rr80`
+
 ### Phase 79 GUI asset viewer mode
 
 - added [`research_uiux/GUI_ASSET_VIEWER_MODE.md`](./research_uiux/GUI_ASSET_VIEWER_MODE.md)

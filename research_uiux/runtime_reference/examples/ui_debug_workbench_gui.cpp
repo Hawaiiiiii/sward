@@ -23,6 +23,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -413,6 +414,8 @@ enum ControlId
     kPlayPauseButtonId = 1008,
     kStepButtonId = 1009,
     kPreviewModeButtonId = 1010,
+    kAssetPrevButtonId = 1011,
+    kAssetNextButtonId = 1012,
 };
 
 [[nodiscard]] const AtlasCandidate* atlasCandidateForContract(std::string_view contractFileName)
@@ -589,8 +592,75 @@ enum ControlId
     return label;
 }
 
+[[nodiscard]] std::filesystem::path executableDirectory()
+{
+    std::array<char, MAX_PATH> buffer{};
+    const DWORD length = GetModuleFileNameA(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+    if (length == 0 || length >= buffer.size())
+        return std::filesystem::current_path();
+
+    return std::filesystem::path(std::string(buffer.data(), length)).parent_path();
+}
+
+void appendAssetRootCandidate(std::vector<std::filesystem::path>& candidates, const std::filesystem::path& path)
+{
+    if (path.empty())
+        return;
+
+    candidates.push_back(path);
+    candidates.push_back(path / "visual_atlas/sheets");
+    candidates.push_back(path / "extracted_assets/visual_atlas/sheets");
+}
+
+void appendAncestorAssetRootCandidates(std::vector<std::filesystem::path>& candidates, std::filesystem::path path)
+{
+    if (path.empty())
+        return;
+
+    if (std::filesystem::is_regular_file(path))
+        path = path.parent_path();
+
+    for (auto current = path; !current.empty(); current = current.parent_path())
+    {
+        candidates.push_back(current / "extracted_assets/visual_atlas/sheets");
+        if (current == current.root_path())
+            break;
+    }
+}
+
+[[nodiscard]] std::optional<std::filesystem::path> environmentAssetRoot()
+{
+    const DWORD required = GetEnvironmentVariableA("SWARD_UI_ASSET_ROOT", nullptr, 0);
+    if (required == 0)
+        return std::nullopt;
+
+    std::vector<char> value(required);
+    const DWORD written = GetEnvironmentVariableA("SWARD_UI_ASSET_ROOT", value.data(), required);
+    if (written == 0)
+        return std::nullopt;
+
+    return std::filesystem::path(std::string(value.data(), written));
+}
+
+[[nodiscard]] std::vector<std::filesystem::path> visualAtlasSheetRootCandidates()
+{
+    std::vector<std::filesystem::path> candidates;
+    if (const auto root = environmentAssetRoot())
+        appendAssetRootCandidate(candidates, *root);
+
+    appendAncestorAssetRootCandidates(candidates, std::filesystem::current_path());
+    appendAncestorAssetRootCandidates(candidates, executableDirectory());
+    return candidates;
+}
+
 [[nodiscard]] std::filesystem::path visualAtlasSheetRoot()
 {
+    for (const auto& candidate : visualAtlasSheetRootCandidates())
+    {
+        std::error_code error;
+        if (std::filesystem::is_directory(candidate, error))
+            return candidate;
+    }
     return std::filesystem::current_path() / "extracted_assets/visual_atlas/sheets";
 }
 
@@ -602,21 +672,48 @@ enum ControlId
     return visualAtlasSheetRoot() / std::string(candidate->atlasFileName);
 }
 
-[[nodiscard]] int visualAtlasSheetFileCount()
+[[nodiscard]] std::vector<std::filesystem::path> visualAtlasSheetFiles()
 {
+    std::vector<std::filesystem::path> files;
     const auto root = visualAtlasSheetRoot();
-    if (!std::filesystem::exists(root))
-        return 0;
+    std::error_code error;
+    if (!std::filesystem::is_directory(root, error))
+        return files;
 
-    int count = 0;
-    for (const auto& entry : std::filesystem::directory_iterator(root))
+    for (const auto& entry : std::filesystem::directory_iterator(root, error))
     {
-        if (!entry.is_regular_file())
+        if (error)
+            break;
+        if (!entry.is_regular_file(error))
             continue;
         if (entry.path().extension() == ".png")
-            ++count;
+            files.push_back(entry.path());
     }
-    return count;
+
+    std::sort(
+        files.begin(),
+        files.end(),
+        [](const std::filesystem::path& left, const std::filesystem::path& right)
+        {
+            return left.filename().string() < right.filename().string();
+        });
+    return files;
+}
+
+[[nodiscard]] int visualAtlasSheetFileCount()
+{
+    return static_cast<int>(visualAtlasSheetFiles().size());
+}
+
+[[nodiscard]] std::optional<std::size_t> visualAtlasSheetIndexByFileName(std::string_view fileName)
+{
+    const auto files = visualAtlasSheetFiles();
+    for (std::size_t index = 0; index < files.size(); ++index)
+    {
+        if (files[index].filename().string() == fileName)
+            return index;
+    }
+    return std::nullopt;
 }
 
 [[nodiscard]] std::string assetViewerAtlasDescriptor(const AtlasCandidate& candidate)
@@ -2073,6 +2170,38 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         : 1;
 }
 
+[[nodiscard]] int runAssetGallerySmoke()
+{
+    const auto files = visualAtlasSheetFiles();
+    const auto* sonic = atlasCandidateByShortName("sonic_stage");
+    const auto selected = sonic ? visualAtlasSheetIndexByFileName(sonic->atlasFileName) : std::nullopt;
+    const std::size_t selectedIndex = selected.value_or(0);
+    const std::size_t previousIndex = files.empty() ? 0 : (selectedIndex + files.size() - 1) % files.size();
+    const std::size_t nextIndex = files.empty() ? 0 : (selectedIndex + 1) % files.size();
+
+    const std::string firstName = files.empty() ? "none" : files.front().filename().string();
+    const std::string selectedName = files.empty() ? "none" : files[selectedIndex].filename().string();
+    const std::string previousName = files.empty() ? "none" : files[previousIndex].filename().string();
+    const std::string nextName = files.empty() ? "none" : files[nextIndex].filename().string();
+
+    std::cout
+        << "sward_ui_runtime_debug_gui asset gallery smoke ok "
+        << "sheet_files=" << files.size()
+        << " first=" << firstName
+        << " selected=" << selectedName
+        << " previous=" << previousName
+        << " next=" << nextName
+        << '\n';
+
+    return files.size() == 22
+        && firstName == "actioncommon__ui_gate.png"
+        && selectedName == "exstagetails_common__ui_prov_playscreen.png"
+        && previousName == "exstagetails_common__ui_exstage.png"
+        && nextName == "exstagetails_common__ui_qte.png"
+        ? 0
+        : 1;
+}
+
 [[nodiscard]] int runPlaybackSmoke()
 {
     const auto contracts = loadBundledEntries();
@@ -2991,6 +3120,8 @@ private:
         m_playPauseButton = createButton("Play", kPlayPauseButtonId);
         m_stepButton = createButton("Step", kStepButtonId);
         m_previewModeButton = createButton("Asset View", kPreviewModeButtonId);
+        m_assetPrevButton = createButton("Asset Prev", kAssetPrevButtonId);
+        m_assetNextButton = createButton("Asset Next", kAssetNextButtonId);
         m_previewPanel = createPreviewPanel();
         m_detailText = createEdit();
         m_logText = createEdit();
@@ -3012,6 +3143,8 @@ private:
             m_playPauseButton,
             m_stepButton,
             m_previewModeButton,
+            m_assetPrevButton,
+            m_assetNextButton,
             m_previewPanel,
             m_detailText,
             m_logText,
@@ -3114,6 +3247,8 @@ private:
         MoveWindow(m_confirmButton, rightX + 100, actionButtonY, buttonWidth, buttonHeight, TRUE);
         MoveWindow(m_cancelButton, rightX + 200, actionButtonY, buttonWidth, buttonHeight, TRUE);
         MoveWindow(m_previewModeButton, rightX + 300, actionButtonY, buttonWidth, buttonHeight, TRUE);
+        MoveWindow(m_assetPrevButton, rightX + 400, actionButtonY, buttonWidth, buttonHeight, TRUE);
+        MoveWindow(m_assetNextButton, rightX + 500, actionButtonY, buttonWidth, buttonHeight, TRUE);
 
         const int previewTop = actionButtonY + buttonHeight + margin;
         const int previewWantedHeight = (rightWidth * 9 / 16) + 46;
@@ -3135,6 +3270,77 @@ private:
         return &m_hosts[*m_selectedHostIndex];
     }
 
+    [[nodiscard]] std::optional<std::size_t> selectedAssetGalleryIndex(const DebugWorkbenchHostEntry* host, const std::vector<std::filesystem::path>& files) const
+    {
+        if (files.empty())
+            return std::nullopt;
+
+        if (m_assetGalleryIndex.has_value() && *m_assetGalleryIndex < files.size())
+            return *m_assetGalleryIndex;
+
+        if (host)
+        {
+            if (const auto* candidate = atlasCandidateForContract(host->primaryContractFileName))
+            {
+                const auto found = std::find_if(
+                    files.begin(),
+                    files.end(),
+                    [candidate](const std::filesystem::path& path)
+                    {
+                        return path.filename().string() == candidate->atlasFileName;
+                    });
+                if (found != files.end())
+                    return static_cast<std::size_t>(std::distance(files.begin(), found));
+            }
+        }
+
+        return 0;
+    }
+
+    void syncAssetGalleryToSelectedHost()
+    {
+        const auto* selected = selectedHostEntry();
+        const auto* host = selected ? selected->metadata : nullptr;
+        const auto files = visualAtlasSheetFiles();
+        m_assetGalleryIndex.reset();
+        m_assetGalleryIndex = selectedAssetGalleryIndex(host, files);
+    }
+
+    void shiftAssetGallery(int delta)
+    {
+        const auto files = visualAtlasSheetFiles();
+        if (files.empty())
+            return;
+
+        const auto* selected = selectedHostEntry();
+        const auto* host = selected ? selected->metadata : nullptr;
+        const std::size_t current = selectedAssetGalleryIndex(host, files).value_or(0);
+        const int count = static_cast<int>(files.size());
+        int next = static_cast<int>(current) + delta;
+        while (next < 0)
+            next += count;
+        next %= count;
+        m_assetGalleryIndex = static_cast<std::size_t>(next);
+
+        showHostSummary();
+        if (m_previewPanel)
+            InvalidateRect(m_previewPanel, nullptr, TRUE);
+    }
+
+    [[nodiscard]] std::string assetGallerySummaryText(const DebugWorkbenchHostEntry& host) const
+    {
+        const auto files = visualAtlasSheetFiles();
+        const auto index = selectedAssetGalleryIndex(&host, files);
+        if (!index.has_value())
+            return "Gallery asset: none";
+
+        std::ostringstream text;
+        text
+            << "Gallery asset: " << (*index + 1) << "/" << files.size()
+            << " " << files[*index].filename().string();
+        return text.str();
+    }
+
     void drawAssetViewerPreview(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const DebugWorkbenchHostEntry* host, const LayoutEvidence* layoutEvidence)
     {
         Gdiplus::SolidBrush backingBrush(Gdiplus::Color(255, 6, 10, 12));
@@ -3142,40 +3348,48 @@ private:
 
         std::string label = "Asset View: select a host with a local atlas";
         bool drewAtlas = false;
-        if (host)
+        const auto files = visualAtlasSheetFiles();
+        const auto selectedAssetIndex = selectedAssetGalleryIndex(host, files);
+        if (selectedAssetIndex.has_value())
         {
-            if (const auto* candidate = atlasCandidateForContract(host->primaryContractFileName))
+            const auto& atlasPath = files[*selectedAssetIndex];
+            label = "Asset View: " + atlasPath.filename().string();
+            if (host)
             {
-                const auto atlasPath = visualAtlasSheetRoot() / std::string(candidate->atlasFileName);
-                label = "Asset View: " + assetViewerAtlasDescriptor(*candidate);
-                if (std::filesystem::exists(atlasPath))
+                if (const auto* candidate = atlasCandidateForContract(host->primaryContractFileName);
+                    candidate && atlasPath.filename().string() == candidate->atlasFileName)
                 {
-                    Gdiplus::Image image(atlasPath.wstring().c_str());
-                    if (image.GetLastStatus() == Gdiplus::Ok && image.GetWidth() > 0 && image.GetHeight() > 0)
+                    label = "Asset View: " + assetViewerAtlasDescriptor(*candidate);
+                }
+            }
+
+            if (std::filesystem::exists(atlasPath))
+            {
+                Gdiplus::Image image(atlasPath.wstring().c_str());
+                if (image.GetLastStatus() == Gdiplus::Ok && image.GetWidth() > 0 && image.GetHeight() > 0)
+                {
+                    const float padding = 18.0F;
+                    const float availableWidth = std::max(1.0F, canvas.Width - (padding * 2.0F));
+                    const float availableHeight = std::max(1.0F, canvas.Height - (padding * 2.0F));
+                    const float imageAspect = static_cast<float>(image.GetWidth()) / static_cast<float>(image.GetHeight());
+                    float drawWidth = availableWidth;
+                    float drawHeight = drawWidth / imageAspect;
+                    if (drawHeight > availableHeight)
                     {
-                        const float padding = 18.0F;
-                        const float availableWidth = std::max(1.0F, canvas.Width - (padding * 2.0F));
-                        const float availableHeight = std::max(1.0F, canvas.Height - (padding * 2.0F));
-                        const float imageAspect = static_cast<float>(image.GetWidth()) / static_cast<float>(image.GetHeight());
-                        float drawWidth = availableWidth;
-                        float drawHeight = drawWidth / imageAspect;
-                        if (drawHeight > availableHeight)
-                        {
-                            drawHeight = availableHeight;
-                            drawWidth = drawHeight * imageAspect;
-                        }
-
-                        Gdiplus::RectF imageRect(
-                            canvas.X + ((canvas.Width - drawWidth) / 2.0F),
-                            canvas.Y + ((canvas.Height - drawHeight) / 2.0F),
-                            drawWidth,
-                            drawHeight);
-
-                        graphics.DrawImage(&image, imageRect.X, imageRect.Y, imageRect.Width, imageRect.Height);
-                        Gdiplus::Pen imagePen(Gdiplus::Color(180, 134, 218, 126), 1.0F);
-                        graphics.DrawRectangle(&imagePen, imageRect);
-                        drewAtlas = true;
+                        drawHeight = availableHeight;
+                        drawWidth = drawHeight * imageAspect;
                     }
+
+                    Gdiplus::RectF imageRect(
+                        canvas.X + ((canvas.Width - drawWidth) / 2.0F),
+                        canvas.Y + ((canvas.Height - drawHeight) / 2.0F),
+                        drawWidth,
+                        drawHeight);
+
+                    graphics.DrawImage(&image, imageRect.X, imageRect.Y, imageRect.Width, imageRect.Height);
+                    Gdiplus::Pen imagePen(Gdiplus::Color(180, 134, 218, 126), 1.0F);
+                    graphics.DrawRectangle(&imagePen, imageRect);
+                    drewAtlas = true;
                 }
             }
         }
@@ -3215,7 +3429,9 @@ private:
             static_cast<LONG>(labelPanel.Y + labelPanel.Height),
         };
         std::ostringstream detail;
-        detail << "sheets=" << visualAtlasSheetFileCount();
+        detail << "sheets=" << files.size();
+        if (selectedAssetIndex.has_value())
+            detail << " | asset=" << (*selectedAssetIndex + 1) << "/" << files.size();
         if (layoutEvidence)
             detail << " | layout=" << layoutEvidence->layoutId << " scenes=" << layoutEvidence->sceneCount << " anims=" << layoutEvidence->animationCount;
         drawTextLine(dc, subText, detail.str(), RGB(164, 214, 154));
@@ -3453,6 +3669,7 @@ private:
         {
             SendMessageA(m_hostList, LB_SETCURSEL, 0, 0);
             m_selectedHostIndex = m_visibleHostIndices.front();
+            syncAssetGalleryToSelectedHost();
             showHostSummary();
         }
     }
@@ -3473,6 +3690,7 @@ private:
             if (selected >= 0 && static_cast<std::size_t>(selected) < m_visibleHostIndices.size())
             {
                 m_selectedHostIndex = m_visibleHostIndices[static_cast<std::size_t>(selected)];
+                syncAssetGalleryToSelectedHost();
                 showHostSummary();
             }
             return;
@@ -3489,6 +3707,10 @@ private:
             stepPlaybackFrame();
         else if (id == kPreviewModeButtonId)
             togglePreviewMode();
+        else if (id == kAssetPrevButtonId)
+            shiftAssetGallery(-1);
+        else if (id == kAssetNextButtonId)
+            shiftAssetGallery(1);
         else if (id == kMoveNextButtonId)
             requestAction(InputAction::MoveNext);
         else if (id == kConfirmButtonId)
@@ -3527,6 +3749,7 @@ private:
 
         text
             << assetViewerSummaryText(host.primaryContractFileName) << "\r\n"
+            << assetGallerySummaryText(host) << "\r\n"
             << host.notes << "\r\n\r\n"
             << "Click Run Host to drive this contract through the runtime.";
         SetWindowTextA(m_detailText, text.str().c_str());
@@ -3691,6 +3914,8 @@ private:
     HWND m_playPauseButton = nullptr;
     HWND m_stepButton = nullptr;
     HWND m_previewModeButton = nullptr;
+    HWND m_assetPrevButton = nullptr;
+    HWND m_assetNextButton = nullptr;
     HWND m_previewPanel = nullptr;
     HWND m_detailText = nullptr;
     HWND m_logText = nullptr;
@@ -3700,6 +3925,7 @@ private:
     std::vector<GroupEntry> m_groups;
     std::vector<std::size_t> m_visibleHostIndices;
     std::optional<std::size_t> m_selectedHostIndex;
+    std::optional<std::size_t> m_assetGalleryIndex;
     std::optional<std::size_t> m_runningContractIndex;
     std::unique_ptr<ScreenRuntime> m_runtime;
     PreviewMode m_previewMode = PreviewMode::Runtime;
@@ -3761,6 +3987,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runMotionSmoke();
         if (command.find("--playback-smoke") != std::string::npos)
             return runPlaybackSmoke();
+        if (command.find("--asset-gallery-smoke") != std::string::npos)
+            return runAssetGallerySmoke();
         if (command.find("--asset-view-smoke") != std::string::npos)
             return runAssetViewSmoke();
         if (command.find("--preview-smoke") != std::string::npos)

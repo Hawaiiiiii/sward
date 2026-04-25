@@ -128,6 +128,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the first actual asset-viewer mode in the native GUI, with unobstructed local atlas inspection, use [`research_uiux/GUI_ASSET_VIEWER_MODE.md`](./research_uiux/GUI_ASSET_VIEWER_MODE.md).
 
+> [!TIP]
+> For the first hardened asset-root discovery and atlas gallery navigation pass, use [`research_uiux/GUI_ASSET_GALLERY_ROOT_DISCOVERY.md`](./research_uiux/GUI_ASSET_GALLERY_ROOT_DISCOVERY.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
@@ -180,6 +183,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - GUI authored keyframe curve descriptors via [`research_uiux/GUI_AUTHORED_KEYFRAME_CURVE_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_KEYFRAME_CURVE_DESCRIPTORS.md)
 - GUI authored keyframe sample descriptors via [`research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md)
 - GUI authored sampled transform descriptors via [`research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_DESCRIPTORS.md)
+- GUI asset-viewer and atlas-gallery reports via [`research_uiux/GUI_ASSET_VIEWER_MODE.md`](./research_uiux/GUI_ASSET_VIEWER_MODE.md) and [`research_uiux/GUI_ASSET_GALLERY_ROOT_DISCOVERY.md`](./research_uiux/GUI_ASSET_GALLERY_ROOT_DISCOVERY.md)
 - A local-only support-substrate humanization pass via [`research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`](./research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md)
 - Runtime-backed support-substrate contracts via [`research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`](./research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md)
 - A source-tree mirror helper for the local-only `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py)
