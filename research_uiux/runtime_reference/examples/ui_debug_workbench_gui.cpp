@@ -145,11 +145,15 @@ struct LayoutAuthoredKeyframeCurve
     std::string_view castName;
     std::string_view trackType;
     int keyframeCount = 0;
-    int firstFrame = 0;
-    float firstValue = 0.0F;
-    int lastFrame = 0;
-    float lastValue = 0.0F;
-    std::string_view interpolationType;
+    std::array<int, 5> frames{};
+    std::array<float, 5> values{};
+    std::array<std::string_view, 5> interpolationTypes{};
+};
+
+struct LayoutAuthoredKeyframeSample
+{
+    std::size_t curveIndex = 0;
+    int frame = 0;
 };
 
 struct PrimitiveChannelMask
@@ -301,9 +305,48 @@ inline constexpr std::array<LayoutAuthoredCastTransform, 3> kLayoutAuthoredCastT
 }};
 
 inline constexpr std::array<LayoutAuthoredKeyframeCurve, 3> kLayoutAuthoredKeyframeCurves{{
-    { "title_menu_reference.json", "ui_mainmenu.xncp", "mm_donut_move", "intro", "index_text_pos", "YPosition", 5, 0, 0.411111F, 40, 0.188889F, "Linear" },
-    { "pause_menu_reference.json", "ui_pause.yncp", "bg", "Intro_Anim", "img", "Color", 2, 0, 0.0F, 15, 0.0F, "Linear" },
-    { "loading_transition_reference.json", "ui_loading.yncp", "bg_2", "360_sonic1", "pos_text_sonic", "XPosition", 1, 0, 0.5F, 0, 0.5F, "Linear" },
+    {
+        "title_menu_reference.json",
+        "ui_mainmenu.xncp",
+        "mm_donut_move",
+        "intro",
+        "index_text_pos",
+        "YPosition",
+        5,
+        { 0, 15, 20, 35, 40 },
+        { 0.411111F, 0.300000F, 0.300000F, 0.188889F, 0.188889F },
+        { "Linear", "Linear", "Linear", "Linear", "Linear" },
+    },
+    {
+        "pause_menu_reference.json",
+        "ui_pause.yncp",
+        "bg",
+        "Intro_Anim",
+        "img",
+        "Color",
+        2,
+        { 0, 15, 0, 0, 0 },
+        { 0.0F, 0.0F, 0.0F, 0.0F, 0.0F },
+        { "Linear", "Linear", "", "", "" },
+    },
+    {
+        "loading_transition_reference.json",
+        "ui_loading.yncp",
+        "bg_2",
+        "360_sonic1",
+        "pos_text_sonic",
+        "XPosition",
+        1,
+        { 0, 0, 0, 0, 0 },
+        { 0.5F, 0.0F, 0.0F, 0.0F, 0.0F },
+        { "Linear", "", "", "", "" },
+    },
+}};
+
+inline constexpr std::array<LayoutAuthoredKeyframeSample, 3> kLayoutAuthoredKeyframeSamples{{
+    { 0, 30 },
+    { 1, 7 },
+    { 2, 1 },
 }};
 
 enum ControlId
@@ -414,6 +457,20 @@ enum ControlId
             curves.push_back(&curve);
     }
     return curves;
+}
+
+[[nodiscard]] std::vector<const LayoutAuthoredKeyframeSample*> layoutAuthoredKeyframeSamplesForContract(std::string_view contractFileName)
+{
+    std::vector<const LayoutAuthoredKeyframeSample*> samples;
+    for (const auto& sample : kLayoutAuthoredKeyframeSamples)
+    {
+        if (sample.curveIndex >= kLayoutAuthoredKeyframeCurves.size())
+            continue;
+
+        if (kLayoutAuthoredKeyframeCurves[sample.curveIndex].contractFileName == contractFileName)
+            samples.push_back(&sample);
+    }
+    return samples;
 }
 
 [[nodiscard]] int layoutScenePrimitiveKeyframeTotal(const std::vector<const LayoutScenePrimitive*>& primitives)
@@ -815,6 +872,7 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
 
 [[nodiscard]] std::string layoutAuthoredKeyframeCurveDescriptor(const LayoutAuthoredKeyframeCurve& curve)
 {
+    const int lastKeyframeIndex = std::max(0, curve.keyframeCount - 1);
     std::ostringstream text;
     text << std::fixed << std::setprecision(6);
     text
@@ -823,11 +881,52 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
         << "/" << curve.castName
         << "/" << curve.trackType
         << ":kf" << curve.keyframeCount
-        << ":" << curve.firstFrame
-        << "=" << curve.firstValue
-        << "->" << curve.lastFrame
-        << "=" << curve.lastValue
-        << ":" << curve.interpolationType;
+        << ":" << curve.frames[0]
+        << "=" << curve.values[0]
+        << "->" << curve.frames[static_cast<std::size_t>(lastKeyframeIndex)]
+        << "=" << curve.values[static_cast<std::size_t>(lastKeyframeIndex)]
+        << ":" << curve.interpolationTypes[0];
+    return text.str();
+}
+
+[[nodiscard]] float layoutAuthoredKeyframeCurveValueAtFrame(const LayoutAuthoredKeyframeCurve& curve, int frame)
+{
+    if (curve.keyframeCount <= 0)
+        return 0.0F;
+
+    if (frame <= curve.frames[0])
+        return curve.values[0];
+
+    for (int index = 1; index < curve.keyframeCount; ++index)
+    {
+        const auto current = static_cast<std::size_t>(index);
+        const auto previous = static_cast<std::size_t>(index - 1);
+        if (frame > curve.frames[current])
+            continue;
+
+        const int frameDelta = curve.frames[current] - curve.frames[previous];
+        if (frameDelta <= 0)
+            return curve.values[current];
+
+        const float t = static_cast<float>(frame - curve.frames[previous]) / static_cast<float>(frameDelta);
+        return curve.values[previous] + ((curve.values[current] - curve.values[previous]) * t);
+    }
+
+    return curve.values[static_cast<std::size_t>(curve.keyframeCount - 1)];
+}
+
+[[nodiscard]] std::string layoutAuthoredKeyframeSampleDescriptor(const LayoutAuthoredKeyframeSample& sample)
+{
+    const auto& curve = kLayoutAuthoredKeyframeCurves[sample.curveIndex];
+    std::ostringstream text;
+    text << std::fixed << std::setprecision(6);
+    text
+        << curve.sceneName
+        << "/" << curve.animationName
+        << "/" << curve.castName
+        << "/" << curve.trackType
+        << "@" << sample.frame
+        << "=" << layoutAuthoredKeyframeCurveValueAtFrame(curve, sample.frame);
     return text.str();
 }
 
@@ -848,6 +947,30 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
         text
             << "  " << curve->packageFileName
             << " :: " << layoutAuthoredKeyframeCurveDescriptor(*curve)
+            << "\r\n";
+    }
+
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutAuthoredKeyframeSampleSummary(std::string_view contractFileName)
+{
+    const auto samples = layoutAuthoredKeyframeSamplesForContract(contractFileName);
+    std::ostringstream text;
+    text << "Authored keyframe samples:\r\n";
+
+    if (samples.empty())
+    {
+        text << "  none\r\n";
+        return text.str();
+    }
+
+    for (const auto* sample : samples)
+    {
+        const auto& curve = kLayoutAuthoredKeyframeCurves[sample->curveIndex];
+        text
+            << "  " << curve.packageFileName
+            << " :: " << layoutAuthoredKeyframeSampleDescriptor(*sample)
             << "\r\n";
     }
 
@@ -1440,6 +1563,7 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     text << "\r\n" << layoutPrimitiveDrawCommandSummary(host.primaryContractFileName, primitiveProgress, 1280, 720);
     text << "\r\n" << layoutAuthoredCastTransformSummary(host.primaryContractFileName);
     text << "\r\n" << layoutAuthoredKeyframeCurveSummary(host.primaryContractFileName);
+    text << "\r\n" << layoutAuthoredKeyframeSampleSummary(host.primaryContractFileName);
 
     text << "\r\nNotes:\r\n" << host.notes << "\r\n";
     return text.str();
@@ -2039,6 +2163,35 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     return titleCurve == "mm_donut_move/intro/index_text_pos/YPosition:kf5:0=0.411111->40=0.188889:Linear"
         && pauseCurve == "bg/Intro_Anim/img/Color:kf2:0=0.000000->15=0.000000:Linear"
         && loadingCurve == "bg_2/360_sonic1/pos_text_sonic/XPosition:kf1:0=0.500000->0=0.500000:Linear"
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAuthoredKeyframeSampleSmoke()
+{
+    const auto title = layoutAuthoredKeyframeSamplesForContract("title_menu_reference.json");
+    const auto pause = layoutAuthoredKeyframeSamplesForContract("pause_menu_reference.json");
+    const auto loading = layoutAuthoredKeyframeSamplesForContract("loading_transition_reference.json");
+    if (title.empty() || pause.empty() || loading.empty())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui authored keyframe sample smoke failed missing exact-family sample\n";
+        return 1;
+    }
+
+    const std::string titleSample = layoutAuthoredKeyframeSampleDescriptor(*title.front());
+    const std::string pauseSample = layoutAuthoredKeyframeSampleDescriptor(*pause.front());
+    const std::string loadingSample = layoutAuthoredKeyframeSampleDescriptor(*loading.front());
+
+    std::cout
+        << "sward_ui_runtime_debug_gui authored keyframe sample smoke ok "
+        << "title_sample=" << titleSample
+        << " pause_sample=" << pauseSample
+        << " loading_sample=" << loadingSample
+        << '\n';
+
+    return titleSample == "mm_donut_move/intro/index_text_pos/YPosition@30=0.225926"
+        && pauseSample == "bg/Intro_Anim/img/Color@7=0.000000"
+        && loadingSample == "bg_2/360_sonic1/pos_text_sonic/XPosition@1=0.500000"
         ? 0
         : 1;
 }
@@ -2886,6 +3039,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runAuthoredCastTransformSmoke();
         if (command.find("--authored-keyframe-curve-smoke") != std::string::npos)
             return runAuthoredKeyframeCurveSmoke();
+        if (command.find("--authored-keyframe-sample-smoke") != std::string::npos)
+            return runAuthoredKeyframeSampleSmoke();
         if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
             return runLayoutPrimitiveChannelSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)

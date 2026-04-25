@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 73 GUI authored keyframe sample descriptors
+
+- added [`research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md)
+- added exact-family authored CSD keyframe sample descriptors to the GUI detail path
+- stored bounded keyframe points for the Title, Pause, and Loading samples and added a deterministic linear sampler
+- added `--authored-keyframe-sample-smoke`, verifying sampled Title, Pause, and Loading authored keyframe values under `b/rr73`
+
 ### Phase 72 GUI authored keyframe curve descriptors
 
 - added [`research_uiux/GUI_AUTHORED_KEYFRAME_CURVE_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_KEYFRAME_CURVE_DESCRIPTORS.md)

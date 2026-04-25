@@ -10,7 +10,7 @@ Phase 72 adds the first authored CSD keyframe curve descriptor layer to the nati
 b/rr72/sward_ui_runtime_debug_gui.exe
 ```
 
-Phase 71 surfaced parsed authored cast transforms. This beat binds the next evidence layer into the same detail path: representative exact-family animation tracks from `research_uiux/data/layout_deep_analysis.json`, expressed as deterministic first/last keyframe descriptors.
+Phase 71 surfaced parsed authored cast transforms. This beat binds the next evidence layer into the same detail path: representative exact-family animation tracks from `research_uiux/data/layout_deep_analysis.json`, expressed as deterministic first/last keyframe descriptors. Phase 73 extends this path with sampled authored keyframe values.
 
 ## What Changed
 

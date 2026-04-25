@@ -107,6 +107,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the first exact-family authored CSD keyframe curve descriptors, use [`research_uiux/GUI_AUTHORED_KEYFRAME_CURVE_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_KEYFRAME_CURVE_DESCRIPTORS.md).
 
+> [!TIP]
+> For the first exact-family authored CSD keyframe sample descriptors, use [`research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
@@ -157,6 +160,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - GUI layout draw command descriptors via [`research_uiux/GUI_LAYOUT_DRAW_COMMAND_DESCRIPTORS.md`](./research_uiux/GUI_LAYOUT_DRAW_COMMAND_DESCRIPTORS.md)
 - GUI authored cast transform descriptors via [`research_uiux/GUI_AUTHORED_CAST_TRANSFORM_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_CAST_TRANSFORM_DESCRIPTORS.md)
 - GUI authored keyframe curve descriptors via [`research_uiux/GUI_AUTHORED_KEYFRAME_CURVE_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_KEYFRAME_CURVE_DESCRIPTORS.md)
+- GUI authored keyframe sample descriptors via [`research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md)
 - A local-only support-substrate humanization pass via [`research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`](./research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md)
 - Runtime-backed support-substrate contracts via [`research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`](./research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md)
 - A source-tree mirror helper for the local-only `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py)

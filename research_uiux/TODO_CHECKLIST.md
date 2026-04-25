@@ -560,6 +560,16 @@
 - [x] Build and smoke-check `b\rr72\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for authored keyframe curve descriptors.
 
+## Phase 73 - GUI Authored Keyframe Sample Descriptors
+
+- [x] Add exact-family authored CSD keyframe sample descriptors to the GUI detail path.
+- [x] Store bounded keyframe points for Title, Pause, and Loading sample curves.
+- [x] Add deterministic linear sampling for authored keyframe curves.
+- [x] Surface `scene/animation/cast/track@frame=value` descriptors in the GUI detail pane.
+- [x] Add `--authored-keyframe-sample-smoke` for Title, Pause, and Loading sampled keyframe values.
+- [x] Build and smoke-check `b\rr73\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for authored keyframe sample descriptors.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -694,3 +704,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout draw command descriptors under `b\rr70`, with Title, Pause, and Loading exact-family geometry descriptors smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored cast transform descriptors under `b\rr71`, with Title, Pause, and Loading parsed CSD cast descriptors smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored keyframe curve descriptors under `b\rr72`, with Title, Pause, and Loading parsed CSD keyframe descriptors smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored keyframe sample descriptors under `b\rr73`, with Title, Pause, and Loading sampled CSD keyframe values smoke-guarded.
