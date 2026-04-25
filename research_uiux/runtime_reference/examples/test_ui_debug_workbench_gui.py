@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr78" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr79" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -42,6 +42,14 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("visibleLayers", source_text)
         self.assertIn("visiblePrompts", source_text)
         self.assertIn("--preview-smoke", source_text)
+
+    def test_gui_source_exposes_asset_view_mode_for_unobstructed_atlas_inspection(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("enum class PreviewMode", source_text)
+        self.assertIn("Asset View", source_text)
+        self.assertIn("drawAssetViewerPreview", source_text)
+        self.assertIn("assetViewerSummaryText", source_text)
+        self.assertIn("--asset-view-smoke", source_text)
 
     def test_gui_preview_binds_gameplay_hud_proxy_atlas_and_bounded_layout(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -317,6 +325,26 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("title=mainmenu__ui_mainmenu.png", completed.stdout)
         self.assertIn("pause=systemcommoncore__ui_pause.png", completed.stdout)
         self.assertIn("sonic_stage=exstagetails_common__ui_prov_playscreen.png", completed.stdout)
+
+    def test_asset_view_smoke_command_reports_local_atlas_viewer_inventory(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--asset-view-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui asset view smoke ok", completed.stdout)
+        self.assertIn("atlas_candidates=10", completed.stdout)
+        self.assertIn("sheet_files=22", completed.stdout)
+        self.assertIn("title_asset=mainmenu__ui_mainmenu.png:exact:exists=1", completed.stdout)
+        self.assertIn("loading_asset=loading__ui_loading.png:exact:exists=1", completed.stdout)
+        self.assertIn("sonic_asset=exstagetails_common__ui_prov_playscreen.png:proxy:exists=1", completed.stdout)
 
     def test_playback_smoke_command_advances_timeline_without_opening_window(self) -> None:
         exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))

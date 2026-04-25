@@ -719,3 +719,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored sampled draw commands under `b\rr76`, with Title and Loading renderer-facing command geometry smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored sampled channel commands under `b\rr77`, with Pause `Color` alpha state smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored sampled channel evaluation under `b\rr78`, with Title/Pause/Loading sampled alpha, visibility, and cast-space deltas smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset viewer mode under `b\rr79`, with `22` local atlas sheet PNGs and the first unobstructed atlas inspection path smoke-guarded.

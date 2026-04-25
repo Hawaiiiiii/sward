@@ -125,6 +125,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the first reusable sampled-channel evaluator carrying alpha, visibility, and cast-space deltas, use [`research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_EVALUATION.md`](./research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_EVALUATION.md).
 
+> [!TIP]
+> For the first actual asset-viewer mode in the native GUI, with unobstructed local atlas inspection, use [`research_uiux/GUI_ASSET_VIEWER_MODE.md`](./research_uiux/GUI_ASSET_VIEWER_MODE.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:

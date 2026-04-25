@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 79 GUI asset viewer mode
+
+- added [`research_uiux/GUI_ASSET_VIEWER_MODE.md`](./research_uiux/GUI_ASSET_VIEWER_MODE.md)
+- added an `Asset View` / `Runtime View` toggle to the native GUI preview panel
+- added an unobstructed local atlas-sheet inspection path that preserves asset aspect ratio and suppresses runtime/debug overlays
+- added `--asset-view-smoke`, verifying the curated atlas viewer inventory under `b/rr79`
+
 ### Phase 78 GUI authored sampled channel evaluation
 
 - added [`research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_EVALUATION.md`](./research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_EVALUATION.md)
