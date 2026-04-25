@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 86 GUI asset CSD render plan preview
+
+- added [`research_uiux/GUI_ASSET_CSD_RENDER_PLAN_PREVIEW.md`](./research_uiux/GUI_ASSET_CSD_RENDER_PLAN_PREVIEW.md)
+- projected selected CSD source/destination draw commands into virtual `1280x720` render-target rectangles
+- surfaced `CSD render plan:` in the detail/runtime panes plus a mini Asset View render-target preview
+- added `--asset-csd-render-plan-smoke`, verifying Sonic HUD, Loading, Title, and Pause target-space rects under `b/rr86`
+
 ### Phase 85 GUI asset CSD subimage draw commands
 
 - added [`research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_COMMANDS.md`](./research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_COMMANDS.md)

@@ -38,4 +38,5 @@ Evidence basis:
 Current limit:
 
 - these are draw-command descriptors, not yet an executed renderer command stream.
-- the next step is to feed these descriptors into a family-specific render pass, then bind timeline/channel sampling into those commands.
+- Phase 86 now projects these descriptors into virtual `1280x720` render-target rectangles in [`GUI_ASSET_CSD_RENDER_PLAN_PREVIEW.md`](./GUI_ASSET_CSD_RENDER_PLAN_PREVIEW.md).
+- the next step is to bind those render plans to actual decoded subimage blits, then feed timeline/channel sampling into those commands.

@@ -184,6 +184,23 @@ struct LayoutCsdSubimageDrawCommand
     bool hasSourceTexture = true;
 };
 
+struct LayoutCsdSubimageRenderPlan
+{
+    std::string_view sceneName;
+    std::string_view selectedCastName;
+    std::string_view drawableCastName;
+    std::string_view textureName;
+    int sourceX = 0;
+    int sourceY = 0;
+    int sourceWidth = 0;
+    int sourceHeight = 0;
+    int destinationX = 0;
+    int destinationY = 0;
+    int destinationWidth = 0;
+    int destinationHeight = 0;
+    bool hasSourceTexture = true;
+};
+
 struct LayoutPrimitiveDrawCommand
 {
     std::string_view sceneName;
@@ -851,6 +868,82 @@ enum ControlId
             if (command.hasSourceTexture)
                 text << " | texture_size=" << command.sourceTextureWidth << "x" << command.sourceTextureHeight;
             text << "\r\n";
+            return text.str();
+        }
+    }
+
+    text << "  none\r\n";
+    return text.str();
+}
+
+[[nodiscard]] LayoutCsdSubimageRenderPlan layoutCsdSubimageRenderPlanForCommand(const LayoutCsdSubimageDrawCommand& command)
+{
+    LayoutCsdSubimageRenderPlan plan{
+        command.sceneName,
+        command.selectedCastName,
+        command.drawableCastName,
+        command.textureName,
+        command.sourceX,
+        command.sourceY,
+        command.sourceWidth,
+        command.sourceHeight,
+        0,
+        0,
+        command.destinationWidth,
+        command.destinationHeight,
+        command.hasSourceTexture,
+    };
+
+    if (!command.hasSourceTexture)
+        return plan;
+
+    const int centerX = static_cast<int>(std::lround((0.5F + command.translateX) * static_cast<float>(kRecoveredAtlasCanvasWidth)));
+    const int centerY = static_cast<int>(std::lround((0.5F + command.translateY) * static_cast<float>(kRecoveredAtlasCanvasHeight)));
+    plan.destinationX = centerX - (plan.destinationWidth / 2);
+    plan.destinationY = centerY - (plan.destinationHeight / 2);
+    return plan;
+}
+
+[[nodiscard]] std::string layoutCsdSubimageRenderPlanDescriptor(const LayoutCsdSubimageRenderPlan& plan)
+{
+    std::ostringstream text;
+    text
+        << plan.sceneName
+        << "/" << plan.selectedCastName
+        << "->" << plan.drawableCastName;
+
+    if (plan.hasSourceTexture)
+    {
+        text
+            << ":texture"
+            << ":src=" << plan.sourceX << "," << plan.sourceY << "," << plan.sourceWidth << "x" << plan.sourceHeight
+            << ":dst=" << plan.destinationX << "," << plan.destinationY << "," << plan.destinationWidth << "x" << plan.destinationHeight;
+    }
+    else
+    {
+        text
+            << ":fill"
+            << ":dst=" << plan.destinationX << "," << plan.destinationY << "," << plan.destinationWidth << "x" << plan.destinationHeight;
+    }
+
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutCsdSubimageRenderPlanSummary(std::string_view contractFileName, std::size_t requestedIndex)
+{
+    std::ostringstream text;
+    text << "CSD render plan:\r\n";
+
+    if (const auto* element = layoutCsdElementBindingAt(contractFileName, requestedIndex))
+    {
+        if (const auto* subimage = layoutCsdCastSubimageForBinding(*element))
+        {
+            const auto command = layoutCsdSubimageDrawCommandForBinding(*subimage);
+            const auto plan = layoutCsdSubimageRenderPlanForCommand(command);
+            text
+                << "  " << layoutCsdSubimageRenderPlanDescriptor(plan)
+                << " | target=" << kRecoveredAtlasCanvasWidth << "x" << kRecoveredAtlasCanvasHeight
+                << "\r\n";
             return text.str();
         }
     }
@@ -2282,6 +2375,79 @@ void drawAssetCsdSubimageDrawCommandCue(HDC dc, Gdiplus::Graphics& graphics, con
     drawTextLine(dc, detailRect, detail.str(), RGB(164, 214, 154));
 }
 
+void drawAssetCsdSubimageRenderPlanPreview(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const LayoutCsdSubimageRenderPlan& plan)
+{
+    const float panelWidth = std::min(440.0F, std::max(300.0F, canvas.Width * 0.42F));
+    const float panelHeight = 138.0F;
+    Gdiplus::RectF panel(
+        canvas.X + canvas.Width - panelWidth - 14.0F,
+        canvas.Y + 72.0F,
+        panelWidth,
+        panelHeight);
+
+    Gdiplus::SolidBrush panelBrush(Gdiplus::Color(230, 4, 12, 9));
+    Gdiplus::Pen panelPen(Gdiplus::Color(220, 247, 211, 72), 1.2F);
+    graphics.FillRectangle(&panelBrush, panel);
+    graphics.DrawRectangle(&panelPen, panel);
+
+    RECT titleRect{
+        static_cast<LONG>(panel.X + 10.0F),
+        static_cast<LONG>(panel.Y + 6.0F),
+        static_cast<LONG>(panel.X + panel.Width - 10.0F),
+        static_cast<LONG>(panel.Y + 28.0F),
+    };
+    drawTextLine(dc, titleRect, "CSD render " + layoutCsdSubimageRenderPlanDescriptor(plan), RGB(255, 247, 177));
+
+    const float targetWidth = panel.Width - 28.0F;
+    const float targetHeight = targetWidth * (static_cast<float>(kRecoveredAtlasCanvasHeight) / static_cast<float>(kRecoveredAtlasCanvasWidth));
+    Gdiplus::RectF target(
+        panel.X + 14.0F,
+        panel.Y + 36.0F,
+        targetWidth,
+        std::min(70.0F, targetHeight));
+    if (target.Width / target.Height > static_cast<float>(kRecoveredAtlasCanvasWidth) / static_cast<float>(kRecoveredAtlasCanvasHeight))
+        target.Width = target.Height * (static_cast<float>(kRecoveredAtlasCanvasWidth) / static_cast<float>(kRecoveredAtlasCanvasHeight));
+
+    Gdiplus::SolidBrush targetBrush(Gdiplus::Color(210, 0, 6, 8));
+    Gdiplus::Pen targetPen(Gdiplus::Color(210, 134, 218, 126), 1.0F);
+    graphics.FillRectangle(&targetBrush, target);
+    graphics.DrawRectangle(&targetPen, target);
+
+    const float scaleX = target.Width / static_cast<float>(kRecoveredAtlasCanvasWidth);
+    const float scaleY = target.Height / static_cast<float>(kRecoveredAtlasCanvasHeight);
+    Gdiplus::RectF destination(
+        target.X + (static_cast<float>(plan.destinationX) * scaleX),
+        target.Y + (static_cast<float>(plan.destinationY) * scaleY),
+        std::max(2.0F, static_cast<float>(plan.destinationWidth) * scaleX),
+        std::max(2.0F, static_cast<float>(plan.destinationHeight) * scaleY));
+    destination = clampRectToCanvas(destination, target);
+
+    Gdiplus::SolidBrush destinationBrush(plan.hasSourceTexture
+        ? Gdiplus::Color(150, 30, 154, 194)
+        : Gdiplus::Color(130, 89, 211, 97));
+    Gdiplus::Pen destinationPen(plan.hasSourceTexture
+        ? Gdiplus::Color(240, 151, 255, 223)
+        : Gdiplus::Color(240, 247, 211, 72),
+        1.4F);
+    graphics.FillRectangle(&destinationBrush, destination);
+    graphics.DrawRectangle(&destinationPen, destination);
+
+    std::ostringstream detail;
+    detail
+        << "target=" << kRecoveredAtlasCanvasWidth << "x" << kRecoveredAtlasCanvasHeight
+        << " dst=" << plan.destinationX << "," << plan.destinationY << "," << plan.destinationWidth << "x" << plan.destinationHeight;
+    if (plan.hasSourceTexture)
+        detail << " src=" << plan.sourceX << "," << plan.sourceY << "," << plan.sourceWidth << "x" << plan.sourceHeight;
+
+    RECT detailRect{
+        static_cast<LONG>(panel.X + 10.0F),
+        static_cast<LONG>(panel.Y + panel.Height - 28.0F),
+        static_cast<LONG>(panel.X + panel.Width - 10.0F),
+        static_cast<LONG>(panel.Y + panel.Height - 6.0F),
+    };
+    drawTextLine(dc, detailRect, detail.str(), RGB(164, 214, 154));
+}
+
 void drawLayoutScenePrimitives(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const std::vector<const LayoutScenePrimitive*>& primitives, float timelineProgress)
 {
     if (primitives.empty())
@@ -2702,6 +2868,8 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         << "\r\n"
         << layoutCsdSubimageDrawCommandSummary(host.primaryContractFileName, 0)
         << "\r\n"
+        << layoutCsdSubimageRenderPlanSummary(host.primaryContractFileName, 0)
+        << "\r\n"
         << layoutCsdElementBindingSummary(host.primaryContractFileName)
         << "\r\n"
         << "State: " << toString(runtime.state()) << "\r\n"
@@ -3059,6 +3227,58 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         && title.destinationWidth == 368
         && title.destinationHeight == 464
         && !pause.hasSourceTexture
+        && pause.destinationWidth == 1280
+        && pause.destinationHeight == 720
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAssetCsdRenderPlanSmoke()
+{
+    const auto* sonicElement = layoutCsdElementBindingAt("sonic_stage_hud_reference.json", 0);
+    const auto* loadingElement = layoutCsdElementBindingAt("loading_transition_reference.json", 0);
+    const auto* titleElement = layoutCsdElementBindingAt("title_menu_reference.json", 0);
+    const auto* pauseElement = layoutCsdElementBindingAt("pause_menu_reference.json", 0);
+
+    const auto* sonicBinding = sonicElement ? layoutCsdCastSubimageForBinding(*sonicElement) : nullptr;
+    const auto* loadingBinding = loadingElement ? layoutCsdCastSubimageForBinding(*loadingElement) : nullptr;
+    const auto* titleBinding = titleElement ? layoutCsdCastSubimageForBinding(*titleElement) : nullptr;
+    const auto* pauseBinding = pauseElement ? layoutCsdCastSubimageForBinding(*pauseElement) : nullptr;
+
+    if (!sonicBinding || !loadingBinding || !titleBinding || !pauseBinding)
+    {
+        std::cerr << "sward_ui_runtime_debug_gui asset csd render plan smoke failed missing descriptor\n";
+        return 1;
+    }
+
+    const auto sonic = layoutCsdSubimageRenderPlanForCommand(layoutCsdSubimageDrawCommandForBinding(*sonicBinding));
+    const auto loading = layoutCsdSubimageRenderPlanForCommand(layoutCsdSubimageDrawCommandForBinding(*loadingBinding));
+    const auto title = layoutCsdSubimageRenderPlanForCommand(layoutCsdSubimageDrawCommandForBinding(*titleBinding));
+    const auto pause = layoutCsdSubimageRenderPlanForCommand(layoutCsdSubimageDrawCommandForBinding(*pauseBinding));
+
+    std::cout
+        << "sward_ui_runtime_debug_gui asset csd render plan smoke ok "
+        << "sonic=" << layoutCsdSubimageRenderPlanDescriptor(sonic)
+        << " loading=" << layoutCsdSubimageRenderPlanDescriptor(loading)
+        << " title=" << layoutCsdSubimageRenderPlanDescriptor(title)
+        << " pause=" << layoutCsdSubimageRenderPlanDescriptor(pause)
+        << '\n';
+
+    return sonic.destinationX == 752
+        && sonic.destinationY == 357
+        && sonic.destinationWidth == 16
+        && sonic.destinationHeight == 20
+        && loading.destinationX == 350
+        && loading.destinationY == 360
+        && loading.destinationWidth == 300
+        && loading.destinationHeight == 240
+        && title.destinationX == 655
+        && title.destinationY == 435
+        && title.destinationWidth == 368
+        && title.destinationHeight == 464
+        && !pause.hasSourceTexture
+        && pause.destinationX == 0
+        && pause.destinationY == 0
         && pause.destinationWidth == 1280
         && pause.destinationHeight == 720
         ? 0
@@ -4323,7 +4543,10 @@ private:
                             drawAssetCsdElementCropPreview(dc, graphics, image, canvas, *selectedBinding);
                             if (const auto* subimage = layoutCsdCastSubimageForBinding(*selectedBinding))
                             {
-                                drawAssetCsdSubimageDrawCommandCue(dc, graphics, canvas, layoutCsdSubimageDrawCommandForBinding(*subimage));
+                                const auto command = layoutCsdSubimageDrawCommandForBinding(*subimage);
+                                const auto plan = layoutCsdSubimageRenderPlanForCommand(command);
+                                drawAssetCsdSubimageRenderPlanPreview(dc, graphics, canvas, plan);
+                                drawAssetCsdSubimageDrawCommandCue(dc, graphics, canvas, command);
                                 drawAssetCsdCastSubimageCue(dc, graphics, canvas, *subimage);
                             }
                         }
@@ -4387,8 +4610,11 @@ private:
                 detail << " | crop=" << layoutCsdElementCropDescriptor(*selected);
                 if (const auto* subimage = layoutCsdCastSubimageForBinding(*selected))
                 {
+                    const auto command = layoutCsdSubimageDrawCommandForBinding(*subimage);
+                    const auto plan = layoutCsdSubimageRenderPlanForCommand(command);
                     detail << " | draw=" << layoutCsdCastSubimageDescriptor(*subimage);
-                    detail << " | cmd=" << layoutCsdSubimageDrawCommandDescriptor(layoutCsdSubimageDrawCommandForBinding(*subimage));
+                    detail << " | cmd=" << layoutCsdSubimageDrawCommandDescriptor(command);
+                    detail << " | plan=" << layoutCsdSubimageRenderPlanDescriptor(plan);
                 }
             }
         }
@@ -4717,6 +4943,7 @@ private:
             << layoutCsdElementCropSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdCastSubimageSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdSubimageDrawCommandSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
+            << layoutCsdSubimageRenderPlanSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdElementBindingSummary(host.primaryContractFileName) << "\r\n"
             << assetGallerySummaryText(host) << "\r\n"
             << csdElementGallerySummaryText(host) << "\r\n"
@@ -4960,6 +5187,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runMotionSmoke();
         if (command.find("--playback-smoke") != std::string::npos)
             return runPlaybackSmoke();
+        if (command.find("--asset-csd-render-plan-smoke") != std::string::npos)
+            return runAssetCsdRenderPlanSmoke();
         if (command.find("--asset-csd-draw-command-smoke") != std::string::npos)
             return runAssetCsdDrawCommandSmoke();
         if (command.find("--asset-csd-subimage-smoke") != std::string::npos)

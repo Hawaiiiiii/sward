@@ -630,6 +630,16 @@
 - [x] Build and smoke-check `b\rr85\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for Asset View CSD subimage draw commands.
 
+## Phase 86 - GUI Asset CSD Render Plan Preview
+
+- [x] Add selected CSD render-plan descriptors in virtual `1280x720` target space.
+- [x] Project source/destination draw commands into render-target rectangles.
+- [x] Surface `CSD render plan:` in the detail pane and runtime snapshot text.
+- [x] Draw a mini render-target preview in Asset View.
+- [x] Add `--asset-csd-render-plan-smoke`.
+- [x] Build and smoke-check `b\rr86\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for Asset View CSD render plan previews.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -777,3 +787,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD crop previews under `b\rr83`, with selected-element `1280x720` crop rectangles for Sonic HUD, Loading, Title, and Pause smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD subimage draw descriptors under `b\rr84`, with Sonic HUD, Loading, Title, and Pause selected cast/subimage evidence smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD subimage draw commands under `b\rr85`, with Sonic HUD, Loading, Title, and Pause source/destination draw descriptors smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD render plans under `b\rr86`, with Sonic HUD, Loading, Title, and Pause virtual `1280x720` target-space rectangles smoke-guarded.
