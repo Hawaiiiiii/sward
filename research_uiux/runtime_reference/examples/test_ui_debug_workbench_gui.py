@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr76" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr77" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -211,6 +211,13 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("layoutAuthoredSampledDrawCommandsForContract", source_text)
         self.assertIn("Authored sampled draw commands:", source_text)
         self.assertIn("--authored-sampled-draw-command-smoke", source_text)
+
+    def test_gui_source_exposes_authored_sampled_channel_draw_state(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("layoutAuthoredSampledDrawCommandChannelAlpha", source_text)
+        self.assertIn("layoutAuthoredSampledDrawCommandChannelStateDescriptor", source_text)
+        self.assertIn("--authored-sampled-channel-command-smoke", source_text)
+        self.assertIn("Color@7=0.000000:alpha=0.000000", source_text)
 
     def test_gui_source_exposes_gameplay_hud_proxy_primitives(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -743,7 +750,24 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("sward_ui_runtime_debug_gui authored sampled draw command smoke ok", completed.stdout)
         self.assertIn("title_draw=mm_donut_move/index_text_pos:408,163,16x16:YPosition@30=0.225926", completed.stdout)
+        self.assertIn("pause_draw=bg/img:0,0,1280x720:Color@7=0.000000", completed.stdout)
         self.assertIn("loading_draw=bg_2/pos_text_sonic:640,360,16x16:XPosition@1=0.500000", completed.stdout)
+
+    def test_authored_sampled_channel_command_smoke_reports_color_alpha_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--authored-sampled-channel-command-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui authored sampled channel command smoke ok", completed.stdout)
+        self.assertIn("pause_channel=bg/img:0,0,1280x720:Color@7=0.000000:alpha=0.000000", completed.stdout)
 
 
 if __name__ == "__main__":

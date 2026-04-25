@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 77 GUI authored sampled channel commands
+
+- added [`research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_COMMANDS.md`](./research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_COMMANDS.md)
+- extended authored sampled draw commands beyond X/Y transforms with the first Pause `Color` channel sample
+- added sampled-channel alpha state descriptors for renderer-facing command inspection
+- added `--authored-sampled-channel-command-smoke`, verifying Pause sampled `Color` alpha under `b/rr77`
+
 ### Phase 76 GUI authored sampled draw commands
 
 - added [`research_uiux/GUI_AUTHORED_SAMPLED_DRAW_COMMANDS.md`](./research_uiux/GUI_AUTHORED_SAMPLED_DRAW_COMMANDS.md)

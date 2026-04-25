@@ -178,6 +178,9 @@ struct LayoutAuthoredSampledDrawCommand
     int y = 0;
     int width = 0;
     int height = 0;
+    std::string trackType;
+    int sampleFrame = 0;
+    float sampledValue = 0.0F;
     std::string sampledTrack;
 };
 
@@ -374,8 +377,9 @@ inline constexpr std::array<LayoutAuthoredKeyframeSample, 3> kLayoutAuthoredKeyf
     { 2, 1 },
 }};
 
-inline constexpr std::array<LayoutAuthoredSampledTransform, 2> kLayoutAuthoredSampledTransforms{{
+inline constexpr std::array<LayoutAuthoredSampledTransform, 3> kLayoutAuthoredSampledTransforms{{
     { 0, 0 },
+    { 1, 1 },
     { 2, 2 },
 }};
 
@@ -1033,6 +1037,8 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
 [[nodiscard]] LayoutAuthoredSampledDrawCommand layoutAuthoredSampledDrawCommand(const LayoutAuthoredSampledTransform& sampledTransform)
 {
     const auto& transform = kLayoutAuthoredCastTransforms[sampledTransform.transformIndex];
+    const auto& sample = kLayoutAuthoredKeyframeSamples[sampledTransform.sampleIndex];
+    const auto& curve = kLayoutAuthoredKeyframeCurves[sample.curveIndex];
     const LayoutAuthoredSampledTransformPixels pixels = layoutAuthoredSampledTransformPixels(sampledTransform);
     return LayoutAuthoredSampledDrawCommand{
         std::string(transform.sceneName),
@@ -1041,6 +1047,9 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
         pixels.y,
         pixels.width,
         pixels.height,
+        std::string(curve.trackType),
+        sample.frame,
+        layoutAuthoredKeyframeCurveValueAtFrame(curve, sample.frame),
         layoutAuthoredSampledTrackDescriptor(sampledTransform),
     };
 }
@@ -1064,6 +1073,23 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
         << "," << command.width
         << "x" << command.height
         << ":" << command.sampledTrack;
+    return text.str();
+}
+
+[[nodiscard]] float layoutAuthoredSampledDrawCommandChannelAlpha(const LayoutAuthoredSampledDrawCommand& command)
+{
+    if (command.trackType == "Color")
+        return std::clamp(command.sampledValue, 0.0F, 1.0F);
+    return 1.0F;
+}
+
+[[nodiscard]] std::string layoutAuthoredSampledDrawCommandChannelStateDescriptor(const LayoutAuthoredSampledDrawCommand& command)
+{
+    std::ostringstream text;
+    text << std::fixed << std::setprecision(6);
+    text
+        << layoutAuthoredSampledDrawCommandDescriptor(command)
+        << ":alpha=" << layoutAuthoredSampledDrawCommandChannelAlpha(command);
     return text.str();
 }
 
@@ -1361,8 +1387,11 @@ void drawAuthoredSampledTransforms(HDC dc, Gdiplus::Graphics& graphics, const Gd
     for (const auto& command : commands)
     {
         const Gdiplus::RectF markerRect = layoutAuthoredSampledDrawCommandRect(command, canvas);
-        Gdiplus::SolidBrush markerBrush(Gdiplus::Color(110, 247, 211, 72));
-        Gdiplus::Pen markerPen(Gdiplus::Color(245, 255, 247, 177), 1.6F);
+        const float channelAlpha = layoutAuthoredSampledDrawCommandChannelAlpha(command);
+        const BYTE diagnosticFillAlpha = static_cast<BYTE>(std::round(42.0F + (92.0F * channelAlpha)));
+        const BYTE diagnosticPenAlpha = static_cast<BYTE>(std::round(150.0F + (95.0F * channelAlpha)));
+        Gdiplus::SolidBrush markerBrush(Gdiplus::Color(diagnosticFillAlpha, 247, 211, 72));
+        Gdiplus::Pen markerPen(Gdiplus::Color(diagnosticPenAlpha, 255, 247, 177), 1.6F);
         graphics.FillRectangle(&markerBrush, markerRect);
         graphics.DrawRectangle(&markerPen, markerRect);
 
@@ -1386,7 +1415,7 @@ void drawAuthoredSampledTransforms(HDC dc, Gdiplus::Graphics& graphics, const Gd
             static_cast<LONG>(labelRect.X + labelRect.Width - 6.0F),
             static_cast<LONG>(labelRect.Y + labelRect.Height),
         };
-        drawTextLine(dc, textRect, "authored sampled " + layoutAuthoredSampledDrawCommandDescriptor(command), RGB(255, 247, 177));
+        drawTextLine(dc, textRect, "authored sampled " + layoutAuthoredSampledDrawCommandChannelStateDescriptor(command), RGB(255, 247, 177));
     }
 }
 
@@ -2514,24 +2543,49 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
 [[nodiscard]] int runAuthoredSampledDrawCommandSmoke()
 {
     const auto title = layoutAuthoredSampledDrawCommandsForContract("title_menu_reference.json");
+    const auto pause = layoutAuthoredSampledDrawCommandsForContract("pause_menu_reference.json");
     const auto loading = layoutAuthoredSampledDrawCommandsForContract("loading_transition_reference.json");
-    if (title.empty() || loading.empty())
+    if (title.empty() || pause.empty() || loading.empty())
     {
         std::cerr << "sward_ui_runtime_debug_gui authored sampled draw command smoke failed missing exact-family draw command\n";
         return 1;
     }
 
     const std::string titleDraw = layoutAuthoredSampledDrawCommandDescriptor(title.front());
+    const std::string pauseDraw = layoutAuthoredSampledDrawCommandDescriptor(pause.front());
     const std::string loadingDraw = layoutAuthoredSampledDrawCommandDescriptor(loading.front());
 
     std::cout
         << "sward_ui_runtime_debug_gui authored sampled draw command smoke ok "
         << "title_draw=" << titleDraw
+        << " pause_draw=" << pauseDraw
         << " loading_draw=" << loadingDraw
         << '\n';
 
     return titleDraw == "mm_donut_move/index_text_pos:408,163,16x16:YPosition@30=0.225926"
+        && pauseDraw == "bg/img:0,0,1280x720:Color@7=0.000000"
         && loadingDraw == "bg_2/pos_text_sonic:640,360,16x16:XPosition@1=0.500000"
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAuthoredSampledChannelCommandSmoke()
+{
+    const auto pause = layoutAuthoredSampledDrawCommandsForContract("pause_menu_reference.json");
+    if (pause.empty())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui authored sampled channel command smoke failed missing Pause color draw command\n";
+        return 1;
+    }
+
+    const std::string pauseChannel = layoutAuthoredSampledDrawCommandChannelStateDescriptor(pause.front());
+
+    std::cout
+        << "sward_ui_runtime_debug_gui authored sampled channel command smoke ok "
+        << "pause_channel=" << pauseChannel
+        << '\n';
+
+    return pauseChannel == "bg/img:0,0,1280x720:Color@7=0.000000:alpha=0.000000"
         ? 0
         : 1;
 }
@@ -3383,6 +3437,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runAuthoredKeyframeCurveSmoke();
         if (command.find("--authored-keyframe-sample-smoke") != std::string::npos)
             return runAuthoredKeyframeSampleSmoke();
+        if (command.find("--authored-sampled-channel-command-smoke") != std::string::npos)
+            return runAuthoredSampledChannelCommandSmoke();
         if (command.find("--authored-sampled-draw-command-smoke") != std::string::npos)
             return runAuthoredSampledDrawCommandSmoke();
         if (command.find("--authored-sampled-transform-preview-smoke") != std::string::npos)

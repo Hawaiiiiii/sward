@@ -26,6 +26,7 @@ Phase 75 proved the preview can draw sampled authored transform evidence. This b
 
 ```text
 title:   ui_mainmenu.xncp / mm_donut_move / index_text_pos / YPosition @ frame 30
+pause:   ui_pause.yncp / bg / img / Color @ frame 7
 loading: ui_loading.yncp / bg_2 / pos_text_sonic / XPosition @ frame 1
 ```
 
@@ -39,6 +40,7 @@ Verified descriptors:
 
 ```text
 mm_donut_move/index_text_pos:408,163,16x16:YPosition@30=0.225926
+bg/img:0,0,1280x720:Color@7=0.000000
 bg_2/pos_text_sonic:640,360,16x16:XPosition@1=0.500000
 ```
 
@@ -55,9 +57,11 @@ b\rr76\sward_ui_runtime_debug_gui.exe --authored-sampled-draw-command-smoke
 Verified smoke output:
 
 ```text
-sward_ui_runtime_debug_gui authored sampled draw command smoke ok title_draw=mm_donut_move/index_text_pos:408,163,16x16:YPosition@30=0.225926 loading_draw=bg_2/pos_text_sonic:640,360,16x16:XPosition@1=0.500000
+sward_ui_runtime_debug_gui authored sampled draw command smoke ok title_draw=mm_donut_move/index_text_pos:408,163,16x16:YPosition@30=0.225926 pause_draw=bg/img:0,0,1280x720:Color@7=0.000000 loading_draw=bg_2/pos_text_sonic:640,360,16x16:XPosition@1=0.500000
 ```
 
 ## Boundary
 
 These draw commands are still a first narrow bridge, not the full renderer. They make the preview path command-driven for the first authored sampled rectangles, but broad UI/UX parity still needs more decoded node transforms, CSD channel sampling, exact HUD payloads, and PPC-backed host behavior.
+
+Phase 77 adds the first sampled channel-state descriptor on top of this command surface, using Pause `Color@7` as the first non-position channel sample.

@@ -119,6 +119,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the first renderer-facing draw-command bridge from authored sampled transforms, use [`research_uiux/GUI_AUTHORED_SAMPLED_DRAW_COMMANDS.md`](./research_uiux/GUI_AUTHORED_SAMPLED_DRAW_COMMANDS.md).
 
+> [!TIP]
+> For the first sampled non-position channel state in that draw-command bridge, use [`research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_COMMANDS.md`](./research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_COMMANDS.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
