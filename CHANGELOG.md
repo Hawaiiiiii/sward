@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 85 GUI asset CSD subimage draw commands
+
+- added [`research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_COMMANDS.md`](./research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_COMMANDS.md)
+- added selected CSD source texture pixel rect and scaled destination draw-command descriptors
+- surfaced `CSD subimage draw command:` in the detail/runtime panes plus an Asset View draw-command cue
+- added `--asset-csd-draw-command-smoke`, verifying Sonic HUD, Loading, Title, and Pause fill draw commands under `b/rr85`
+
 ### Phase 84 GUI asset CSD subimage draw descriptors
 
 - added [`research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_DESCRIPTORS.md`](./research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_DESCRIPTORS.md)

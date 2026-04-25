@@ -165,6 +165,25 @@ struct LayoutCsdCastSubimageBinding
     bool hasSubimage = true;
 };
 
+struct LayoutCsdSubimageDrawCommand
+{
+    std::string_view sceneName;
+    std::string_view selectedCastName;
+    std::string_view drawableCastName;
+    std::string_view textureName;
+    int sourceTextureWidth = 0;
+    int sourceTextureHeight = 0;
+    int sourceX = 0;
+    int sourceY = 0;
+    int sourceWidth = 0;
+    int sourceHeight = 0;
+    int destinationWidth = 0;
+    int destinationHeight = 0;
+    float translateX = 0.0F;
+    float translateY = 0.0F;
+    bool hasSourceTexture = true;
+};
+
 struct LayoutPrimitiveDrawCommand
 {
     std::string_view sceneName;
@@ -748,6 +767,90 @@ enum ControlId
                 << "  " << layoutCsdCastSubimageDescriptor(*subimage)
                 << " | package=" << subimage->packageFileName
                 << "\r\n";
+            return text.str();
+        }
+    }
+
+    text << "  none\r\n";
+    return text.str();
+}
+
+[[nodiscard]] LayoutCsdSubimageDrawCommand layoutCsdSubimageDrawCommandForBinding(const LayoutCsdCastSubimageBinding& binding)
+{
+    LayoutCsdSubimageDrawCommand command{
+        binding.sceneName,
+        binding.selectedCastName,
+        binding.drawableCastName,
+        binding.textureName,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        std::max(1, static_cast<int>(std::lround(static_cast<float>(binding.castWidth) * binding.scaleX))),
+        std::max(1, static_cast<int>(std::lround(static_cast<float>(binding.castHeight) * binding.scaleY))),
+        binding.translateX,
+        binding.translateY,
+        binding.hasSubimage,
+    };
+
+    if (!binding.hasSubimage)
+        return command;
+
+    const float uvWidth = std::max(0.000001F, binding.subimageRight - binding.subimageLeft);
+    const float uvHeight = std::max(0.000001F, binding.subimageBottom - binding.subimageTop);
+    command.sourceTextureWidth = std::max(1, static_cast<int>(std::lround(static_cast<float>(binding.castWidth) / uvWidth)));
+    command.sourceTextureHeight = std::max(1, static_cast<int>(std::lround(static_cast<float>(binding.castHeight) / uvHeight)));
+    command.sourceX = std::max(0, static_cast<int>(std::lround(binding.subimageLeft * static_cast<float>(command.sourceTextureWidth))));
+    command.sourceY = std::max(0, static_cast<int>(std::lround(binding.subimageTop * static_cast<float>(command.sourceTextureHeight))));
+    command.sourceWidth = std::max(1, static_cast<int>(std::lround(uvWidth * static_cast<float>(command.sourceTextureWidth))));
+    command.sourceHeight = std::max(1, static_cast<int>(std::lround(uvHeight * static_cast<float>(command.sourceTextureHeight))));
+    return command;
+}
+
+[[nodiscard]] std::string layoutCsdSubimageDrawCommandDescriptor(const LayoutCsdSubimageDrawCommand& command)
+{
+    std::ostringstream text;
+    text
+        << command.sceneName
+        << "/" << command.selectedCastName
+        << "->" << command.drawableCastName;
+
+    if (command.hasSourceTexture)
+    {
+        text
+            << ":tex=" << command.textureName
+            << ":src=" << command.sourceX << "," << command.sourceY << "," << command.sourceWidth << "x" << command.sourceHeight
+            << ":dst=" << command.destinationWidth << "x" << command.destinationHeight;
+    }
+    else
+    {
+        text
+            << ":fill=cast"
+            << ":dst=" << command.destinationWidth << "x" << command.destinationHeight;
+    }
+
+    text
+        << ":pos=" << std::fixed << std::setprecision(6)
+        << command.translateX << "," << command.translateY;
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutCsdSubimageDrawCommandSummary(std::string_view contractFileName, std::size_t requestedIndex)
+{
+    std::ostringstream text;
+    text << "CSD subimage draw command:\r\n";
+
+    if (const auto* element = layoutCsdElementBindingAt(contractFileName, requestedIndex))
+    {
+        if (const auto* subimage = layoutCsdCastSubimageForBinding(*element))
+        {
+            const auto command = layoutCsdSubimageDrawCommandForBinding(*subimage);
+            text << "  " << layoutCsdSubimageDrawCommandDescriptor(command);
+            if (command.hasSourceTexture)
+                text << " | texture_size=" << command.sourceTextureWidth << "x" << command.sourceTextureHeight;
+            text << "\r\n";
             return text.str();
         }
     }
@@ -2135,6 +2238,50 @@ void drawAssetCsdCastSubimageCue(HDC dc, Gdiplus::Graphics& graphics, const Gdip
     drawTextLine(dc, detailRect, detail.str(), RGB(164, 214, 154));
 }
 
+void drawAssetCsdSubimageDrawCommandCue(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const LayoutCsdSubimageDrawCommand& command)
+{
+    const float panelWidth = std::min(460.0F, std::max(300.0F, canvas.Width * 0.46F));
+    Gdiplus::RectF panel(
+        canvas.X + 14.0F,
+        canvas.Y + canvas.Height - 164.0F,
+        panelWidth,
+        68.0F);
+
+    Gdiplus::SolidBrush panelBrush(Gdiplus::Color(224, 5, 12, 22));
+    Gdiplus::Pen panelPen(Gdiplus::Color(220, 247, 211, 72), 1.2F);
+    graphics.FillRectangle(&panelBrush, panel);
+    graphics.DrawRectangle(&panelPen, panel);
+
+    RECT titleRect{
+        static_cast<LONG>(panel.X + 10.0F),
+        static_cast<LONG>(panel.Y + 6.0F),
+        static_cast<LONG>(panel.X + panel.Width - 10.0F),
+        static_cast<LONG>(panel.Y + 28.0F),
+    };
+    drawTextLine(dc, titleRect, "CSD draw " + layoutCsdSubimageDrawCommandDescriptor(command), RGB(255, 247, 177));
+
+    std::ostringstream detail;
+    if (command.hasSourceTexture)
+    {
+        detail
+            << "texture_size=" << command.sourceTextureWidth << "x" << command.sourceTextureHeight
+            << " src=" << command.sourceX << "," << command.sourceY << "," << command.sourceWidth << "x" << command.sourceHeight
+            << " dst=" << command.destinationWidth << "x" << command.destinationHeight;
+    }
+    else
+    {
+        detail << "no source texture; fill destination cast " << command.destinationWidth << "x" << command.destinationHeight;
+    }
+
+    RECT detailRect{
+        static_cast<LONG>(panel.X + 10.0F),
+        static_cast<LONG>(panel.Y + 32.0F),
+        static_cast<LONG>(panel.X + panel.Width - 10.0F),
+        static_cast<LONG>(panel.Y + panel.Height - 6.0F),
+    };
+    drawTextLine(dc, detailRect, detail.str(), RGB(164, 214, 154));
+}
+
 void drawLayoutScenePrimitives(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const std::vector<const LayoutScenePrimitive*>& primitives, float timelineProgress)
 {
     if (primitives.empty())
@@ -2553,6 +2700,8 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         << "\r\n"
         << layoutCsdCastSubimageSummary(host.primaryContractFileName, 0)
         << "\r\n"
+        << layoutCsdSubimageDrawCommandSummary(host.primaryContractFileName, 0)
+        << "\r\n"
         << layoutCsdElementBindingSummary(host.primaryContractFileName)
         << "\r\n"
         << "State: " << toString(runtime.state()) << "\r\n"
@@ -2860,6 +3009,58 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         && !pause->hasSubimage
         && pause->castWidth == 1280
         && pause->castHeight == 720
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAssetCsdDrawCommandSmoke()
+{
+    const auto* sonicElement = layoutCsdElementBindingAt("sonic_stage_hud_reference.json", 0);
+    const auto* loadingElement = layoutCsdElementBindingAt("loading_transition_reference.json", 0);
+    const auto* titleElement = layoutCsdElementBindingAt("title_menu_reference.json", 0);
+    const auto* pauseElement = layoutCsdElementBindingAt("pause_menu_reference.json", 0);
+
+    const auto* sonicBinding = sonicElement ? layoutCsdCastSubimageForBinding(*sonicElement) : nullptr;
+    const auto* loadingBinding = loadingElement ? layoutCsdCastSubimageForBinding(*loadingElement) : nullptr;
+    const auto* titleBinding = titleElement ? layoutCsdCastSubimageForBinding(*titleElement) : nullptr;
+    const auto* pauseBinding = pauseElement ? layoutCsdCastSubimageForBinding(*pauseElement) : nullptr;
+
+    if (!sonicBinding || !loadingBinding || !titleBinding || !pauseBinding)
+    {
+        std::cerr << "sward_ui_runtime_debug_gui asset csd draw command smoke failed missing descriptor\n";
+        return 1;
+    }
+
+    const auto sonic = layoutCsdSubimageDrawCommandForBinding(*sonicBinding);
+    const auto loading = layoutCsdSubimageDrawCommandForBinding(*loadingBinding);
+    const auto title = layoutCsdSubimageDrawCommandForBinding(*titleBinding);
+    const auto pause = layoutCsdSubimageDrawCommandForBinding(*pauseBinding);
+
+    std::cout
+        << "sward_ui_runtime_debug_gui asset csd draw command smoke ok "
+        << "sonic=" << layoutCsdSubimageDrawCommandDescriptor(sonic)
+        << " loading=" << layoutCsdSubimageDrawCommandDescriptor(loading)
+        << " title=" << layoutCsdSubimageDrawCommandDescriptor(title)
+        << " pause=" << layoutCsdSubimageDrawCommandDescriptor(pause)
+        << '\n';
+
+    return sonic.sourceTextureWidth == 256
+        && sonic.sourceTextureHeight == 128
+        && sonic.sourceX == 4
+        && sonic.sourceY == 64
+        && sonic.sourceWidth == 16
+        && sonic.sourceHeight == 20
+        && loading.sourceX == 595
+        && loading.sourceY == 121
+        && loading.sourceWidth == 300
+        && loading.sourceHeight == 240
+        && title.sourceX == 896
+        && title.sourceY == 336
+        && title.destinationWidth == 368
+        && title.destinationHeight == 464
+        && !pause.hasSourceTexture
+        && pause.destinationWidth == 1280
+        && pause.destinationHeight == 720
         ? 0
         : 1;
 }
@@ -4121,7 +4322,10 @@ private:
                             const auto* selectedBinding = bindings[currentCsdElementIndex(*host)];
                             drawAssetCsdElementCropPreview(dc, graphics, image, canvas, *selectedBinding);
                             if (const auto* subimage = layoutCsdCastSubimageForBinding(*selectedBinding))
+                            {
+                                drawAssetCsdSubimageDrawCommandCue(dc, graphics, canvas, layoutCsdSubimageDrawCommandForBinding(*subimage));
                                 drawAssetCsdCastSubimageCue(dc, graphics, canvas, *subimage);
+                            }
                         }
                         drewCsdElementOverlay = true;
                     }
@@ -4182,7 +4386,10 @@ private:
                 detail << " | csd=" << (elementIndex + 1) << "/" << bindings.size() << " " << selected->packageFileName << "/" << selected->sceneName << "/" << selected->castName;
                 detail << " | crop=" << layoutCsdElementCropDescriptor(*selected);
                 if (const auto* subimage = layoutCsdCastSubimageForBinding(*selected))
+                {
                     detail << " | draw=" << layoutCsdCastSubimageDescriptor(*subimage);
+                    detail << " | cmd=" << layoutCsdSubimageDrawCommandDescriptor(layoutCsdSubimageDrawCommandForBinding(*subimage));
+                }
             }
         }
         drawTextLine(dc, subText, detail.str(), RGB(164, 214, 154));
@@ -4509,6 +4716,7 @@ private:
             << layoutCsdElementBindingNavigationSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdElementCropSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdCastSubimageSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
+            << layoutCsdSubimageDrawCommandSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdElementBindingSummary(host.primaryContractFileName) << "\r\n"
             << assetGallerySummaryText(host) << "\r\n"
             << csdElementGallerySummaryText(host) << "\r\n"
@@ -4752,6 +4960,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runMotionSmoke();
         if (command.find("--playback-smoke") != std::string::npos)
             return runPlaybackSmoke();
+        if (command.find("--asset-csd-draw-command-smoke") != std::string::npos)
+            return runAssetCsdDrawCommandSmoke();
         if (command.find("--asset-csd-subimage-smoke") != std::string::npos)
             return runAssetCsdSubimageSmoke();
         if (command.find("--asset-csd-crop-smoke") != std::string::npos)

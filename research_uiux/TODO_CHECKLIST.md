@@ -619,6 +619,17 @@
 - [x] Build and smoke-check `b\rr84\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for Asset View CSD subimage draw descriptors.
 
+## Phase 85 - GUI Asset CSD Subimage Draw Commands
+
+- [x] Add selected CSD source/destination draw-command descriptors.
+- [x] Derive source texture pixel rects from parsed UV bounds and cast dimensions.
+- [x] Derive scaled destination sizes from cast dimensions and scale values.
+- [x] Surface `CSD subimage draw command:` in the detail pane and runtime snapshot text.
+- [x] Draw a selected draw-command cue in Asset View.
+- [x] Add `--asset-csd-draw-command-smoke`.
+- [x] Build and smoke-check `b\rr85\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for Asset View CSD subimage draw commands.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -765,3 +776,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD element navigation under `b\rr82`, widening the binding set to `41` package/scene/cast entries with selected-element highlighting and `Element Prev` / `Element Next` controls.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD crop previews under `b\rr83`, with selected-element `1280x720` crop rectangles for Sonic HUD, Loading, Title, and Pause smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD subimage draw descriptors under `b\rr84`, with Sonic HUD, Loading, Title, and Pause selected cast/subimage evidence smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD subimage draw commands under `b\rr85`, with Sonic HUD, Loading, Title, and Pause source/destination draw descriptors smoke-guarded.

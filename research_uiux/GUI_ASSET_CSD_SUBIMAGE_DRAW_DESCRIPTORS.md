@@ -39,3 +39,7 @@ Current limit:
 
 - the descriptor is not yet a full renderer command stream; atlas-packing and CSD texture-page placement are still represented as evidence descriptors/cues.
 - the next step is to turn these descriptors into family-specific subimage/cast draw commands, then bind sampled CSD channels and timeline playback to the same draw path.
+
+Follow-on:
+
+- Phase 85 derives the first selected source/destination draw-command descriptors in [`GUI_ASSET_CSD_SUBIMAGE_DRAW_COMMANDS.md`](./GUI_ASSET_CSD_SUBIMAGE_DRAW_COMMANDS.md).
