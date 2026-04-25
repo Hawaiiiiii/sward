@@ -19,7 +19,7 @@
 | Broader UI-adjacent source-path seed bridged into the archaeology/support layer | Partial but measured | `78.8%` |
 | Broader UI-adjacent source-path seed already backed by runtime contracts | Partial but strong | `75.5%` |
 | Local-only readable source layer inside the mirrored `SONIC UNLEASHED/` tree | Partial but accelerating | `125` humanized `.cpp` scaffolds |
-| Native non-CLI UI runtime workbench | Gameplay-HUD proxy preview plus timer playback/motion, first exact-family layouts, decoded layout-evidence overlay, frame-domain timeline readouts, exact-family scene primitives, audited gameplay-HUD proxy primitives, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, compact channel legends, visual parity summaries, and host readiness badges present | `b/rr67/sward_ui_runtime_debug_gui.exe` |
+| Native non-CLI UI runtime workbench | Gameplay-HUD proxy preview plus timer playback/motion, first exact-family layouts, decoded layout-evidence overlay, frame-domain timeline readouts, exact-family scene primitives, audited gameplay-HUD proxy primitives, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, compact channel legends, visual parity summaries, host readiness badges, and next-renderer blocker cues present | `b/rr68/sward_ui_runtime_debug_gui.exe` |
 | GUI visual atlas bindings | First curated set plus HUD proxies present | `10` contract-to-atlas candidates, including `2` proxy candidates |
 | Whole-game asset corpus extracted into readable loose files | Not complete | no defensible exact percentage yet |
 | Template-grade UI/UX recovery for the studied screens | Strong | high confidence, but not a whole-game `1:1` portability claim |
@@ -63,12 +63,13 @@
   - a Phase 65 GUI layout primitive channel-legend report at `research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_LEGEND.md`
   - a Phase 66 GUI visual parity summary report at `research_uiux/GUI_VISUAL_PARITY_SUMMARY.md`
   - a Phase 67 GUI host readiness badge report at `research_uiux/GUI_HOST_READINESS_BADGES.md`
+  - a Phase 68 GUI renderer blocker cue report at `research_uiux/GUI_RENDERER_BLOCKER_CUES.md`
   - a shell/debug host recovery map at `research_uiux/data/frontend_shell_recovery.json`
   - a human-readable shell/debug host report at `research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`
   - a dedicated frontend-sequence bridge report at `research_uiux/FRONTEND_SEQUENCE_SHELL_RUNTIME_BRIDGE.md`
-  - a richer native host-bucket debug executable at `b/rr67/sward_ui_runtime_debug_workbench.exe`
-  - a verified native selector with persistent interactive/stay-open behavior at `b/rr67/sward_ui_runtime_debug_selector.exe`
-  - a first proper native GUI operator shell with visual gameplay-HUD proxy preview, state-aware motion, exact-family Title/Pause/Loading placement, `ui_mainmenu` / `ui_pause` / `ui_loading` layout-evidence overlays, recovered frame-domain timeline readouts, keyframe-density scene primitives, audited `ui_prov_playscreen` gameplay HUD proxy primitives, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, compact channel legends, visual parity summaries, and host readiness badges at `b/rr67/sward_ui_runtime_debug_gui.exe`
+  - a richer native host-bucket debug executable at `b/rr68/sward_ui_runtime_debug_workbench.exe`
+  - a verified native selector with persistent interactive/stay-open behavior at `b/rr68/sward_ui_runtime_debug_selector.exe`
+  - a first proper native GUI operator shell with visual gameplay-HUD proxy preview, state-aware motion, exact-family Title/Pause/Loading placement, `ui_mainmenu` / `ui_pause` / `ui_loading` layout-evidence overlays, recovered frame-domain timeline readouts, keyframe-density scene primitives, audited `ui_prov_playscreen` gameplay HUD proxy primitives, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, compact channel legends, visual parity summaries, host readiness badges, and next-renderer blocker cues at `b/rr68/sward_ui_runtime_debug_gui.exe`
   - a compact workbench catalog report at `research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md`
   - a dedicated CSD/UI foundation map at `research_uiux/data/csd_ui_foundation_map.json`
   - a human-readable foundation report at `research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md`
@@ -144,7 +145,7 @@ What it still does not justify:
 
 The current workspace is:
 
-- `100%` complete against the tracked research plan through Phase `67`
+- `100%` complete against the tracked research plan through Phase `68`
 - strong for UI/UX reverse-engineering and template extraction
 - strong for local executable-backed timing/state archaeology
 - strong for reusable runtime/template productization across C++, C, and C#
@@ -159,8 +160,8 @@ The current workspace is:
 - now materially stronger for support-substrate coverage, with achievement, animation-event, player-status, sound, XML/data-loading, and wider camera-controller paths classified instead of left outside the curated seed
 - now materially stronger for local-only support-substrate humanization, with `23` new achievement, animation-event, player-status, sound, and XML/data-loading scaffolds tied into the ignored mirror
 - now materially stronger for native debug-tool usability, with a verified selector/workbench that now loop in interactive mode and a workbench `--catalog` view for inspecting the widened host topology
-- now materially stronger for non-CLI debug-tool usability, with `b/rr67/sward_ui_runtime_debug_gui.exe` providing a native Windows group/host browser, host readiness badges, and runtime action controls over the same evidence-backed catalog
-- now materially stronger for visual debug-tool usability, with `b/rr67/sward_ui_runtime_debug_gui.exe` drawing local atlas previews, runtime visible layers, prompt rows, state timeline strips, marked Sonic/Werehog gameplay-HUD proxy previews, timer-driven intro/action playback, eased state-aware preview motion, exact-family Title/Pause/Loading placement adapters, compact decoded layout-evidence panels, frame-domain timeline readouts, exact-family scene-primitive overlays, audited gameplay HUD proxy primitives, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, compact channel legends, visual parity summaries, and host-list readiness badges for exact/proxy/readiness triage
+- now materially stronger for non-CLI debug-tool usability, with `b/rr68/sward_ui_runtime_debug_gui.exe` providing a native Windows group/host browser, host readiness badges, and runtime action controls over the same evidence-backed catalog
+- now materially stronger for visual debug-tool usability, with `b/rr68/sward_ui_runtime_debug_gui.exe` drawing local atlas previews, runtime visible layers, prompt rows, state timeline strips, marked Sonic/Werehog gameplay-HUD proxy previews, timer-driven intro/action playback, eased state-aware preview motion, exact-family Title/Pause/Loading placement adapters, compact decoded layout-evidence panels, frame-domain timeline readouts, exact-family scene-primitive overlays, audited gameplay HUD proxy primitives, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, compact channel legends, visual parity summaries, host-list readiness badges, and next-renderer blocker cues for exact/proxy/readiness triage
 - now materially stronger for host coverage, with a verified `176`-host workbench map across `11` groups
 - partial for whole-game loose-file asset extraction
 - not yet equivalent to a whole-game clean human-readable source tree
@@ -176,4 +177,4 @@ If the goal is to move closer to a broader `1:1` UI portability basis, the next 
 5. Keep tightening the local-only `SONIC UNLEASHED/` tree until the recovered source-family paths carry readable translated ownership at a much broader whole-game shell level.
 
 > [!NOTE]
-> After Phase 67, the current bottleneck is no longer just "make an executable" or "show a visual panel." The first non-CLI executable, local-atlas preview path, gameplay-HUD proxy preview, timer-driven contract playback, state-aware preview-motion adapter, exact-family Title/Pause/Loading placement layer, parsed layout-evidence overlay, frame-domain timeline readout, scene-primitive draw pass, gameplay HUD proxy primitive pass, audited gameplay HUD primitive ownership, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, compact primitive channel legends, host-level visual parity summaries, and host-list readiness badges now exist. The remaining product gap is turning those diagnostic primitives into family-specific visual playback backed by decoded node transforms, original animation channels, exact HUD payloads, and translated host behavior.
+> After Phase 68, the current bottleneck is no longer just "make an executable" or "show a visual panel." The first non-CLI executable, local-atlas preview path, gameplay-HUD proxy preview, timer-driven contract playback, state-aware preview-motion adapter, exact-family Title/Pause/Loading placement layer, parsed layout-evidence overlay, frame-domain timeline readout, scene-primitive draw pass, gameplay HUD proxy primitive pass, audited gameplay HUD primitive ownership, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, compact primitive channel legends, host-level visual parity summaries, host-list readiness badges, and next-renderer blocker cues now exist. The remaining product gap is turning those diagnostic primitives into family-specific visual playback backed by decoded node transforms, original animation channels, exact HUD payloads, and translated host behavior.

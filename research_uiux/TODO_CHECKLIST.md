@@ -517,6 +517,14 @@
 - [x] Build, smoke, and GUI-listbox-check `b\rr67\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for host readiness badges.
 
+## Phase 68 - GUI Renderer Blocker Cues
+
+- [x] Add next-renderer blocker cues to the GUI visual parity summary.
+- [x] Classify proxy HUD, exact layout/channel, primitive-only, layout-only, and contract-only blocker classes.
+- [x] Add `--renderer-blocker-smoke` for Sonic HUD, Title, and support-substrate readiness blockers.
+- [x] Build and smoke-check `b\rr68\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for renderer blocker cues.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -646,3 +654,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive channel legends under `b\rr65`, with Sonic HUD transform/color/visibility/sprite/static counts visible in the preview.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI visual parity summaries under `b\rr66`, with exact Title and proxy Sonic HUD readiness smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI host readiness badges under `b\rr67`, with native host listbox labels smoke- and control-checked.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI renderer blocker cues under `b\rr68`, with Sonic HUD, Title, and support-substrate next-renderer blockers smoke-guarded.

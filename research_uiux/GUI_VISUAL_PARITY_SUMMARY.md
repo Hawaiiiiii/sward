@@ -4,7 +4,7 @@
 
 # <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> GUI Visual Parity Summary
 
-Phase 66 adds a compact host-level parity readout to the native GUI detail pane:
+Phase 66 adds a compact host-level parity readout to the native GUI detail pane. Phase 68 extends the same readout with `next_renderer=...` blocker cues for the next reconstruction step per host:
 
 ```text
 b/rr66/sward_ui_runtime_debug_gui.exe
@@ -30,6 +30,7 @@ Representative smoke-guarded comparison:
 | Title menu / `ui_mainmenu` | `exact` | `ui_mainmenu` | `6` | covered by the same primitive channel aggregation path |
 
 This keeps the Sonic HUD boundary honest: it has useful proxy primitive/channel evidence, but not exact loose HUD payload binding yet.
+Phase 68 makes that boundary visible in the same block as `next_renderer=exact loose HUD payload`, while exact-layout families with channel evidence point toward decoded CSD channel sampling.
 
 ## Verification
 

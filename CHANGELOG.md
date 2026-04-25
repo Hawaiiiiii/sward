@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 68 GUI renderer blocker cues
+
+- added [`research_uiux/GUI_RENDERER_BLOCKER_CUES.md`](./research_uiux/GUI_RENDERER_BLOCKER_CUES.md)
+- added `next_renderer=` cues to the GUI `Visual parity` detail section
+- classified the next blocker as exact loose HUD payload, decoded CSD channel sampling, primitive transform sampling, layout-node transform decoding, or visual evidence binding
+- added `--renderer-blocker-smoke`, verifying Sonic HUD, Title, and support-substrate next-renderer blockers under `b/rr68`
+
 ### Phase 67 GUI host readiness badges
 
 - added [`research_uiux/GUI_HOST_READINESS_BADGES.md`](./research_uiux/GUI_HOST_READINESS_BADGES.md)

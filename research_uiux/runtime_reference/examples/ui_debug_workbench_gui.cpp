@@ -642,6 +642,26 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return summary;
 }
 
+[[nodiscard]] bool visualParityHasChannels(const PrimitiveChannelCounts& counts)
+{
+    return counts.color > 0 || counts.sprite > 0 || counts.transform > 0 || counts.visibility > 0;
+}
+
+[[nodiscard]] std::string_view visualParityRendererBlocker(const VisualParitySummary& summary)
+{
+    if (summary.atlasBinding == "proxy")
+        return "exact loose HUD payload";
+    if (summary.atlasBinding == "none" && summary.layoutId == "none" && summary.primitiveCount == 0)
+        return "visual evidence binding";
+    if (visualParityHasChannels(summary.channels))
+        return "decoded CSD channel sampling";
+    if (summary.primitiveCount > 0)
+        return "primitive transform sampling";
+    if (summary.layoutId != "none")
+        return "layout node transform decoding";
+    return "visual evidence binding";
+}
+
 [[nodiscard]] std::string visualParitySummaryText(std::string_view contractFileName)
 {
     const VisualParitySummary summary = visualParitySummaryForContract(contractFileName);
@@ -654,6 +674,7 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
         << " keyframes=" << summary.keyframeCount
         << " channels=" << visualParityChannelToken(summary.channels)
         << "\r\n";
+    text << "  next_renderer=" << visualParityRendererBlocker(summary) << "\r\n";
 
     if (summary.atlasBinding == "proxy")
         text << "  boundary=proxy atlas; exact loose HUD payload still unrecovered\r\n";
@@ -663,11 +684,6 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
         text << "  boundary=contract-only; atlas/layout primitive evidence not yet bound\r\n";
 
     return text.str();
-}
-
-[[nodiscard]] bool visualParityHasChannels(const PrimitiveChannelCounts& counts)
-{
-    return counts.color > 0 || counts.sprite > 0 || counts.transform > 0 || counts.visibility > 0;
 }
 
 [[nodiscard]] std::string hostVisualReadinessBadge(const DebugWorkbenchHostEntry& host)
@@ -1660,6 +1676,30 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         : 1;
 }
 
+[[nodiscard]] int runRendererBlockerSmoke()
+{
+    const VisualParitySummary sonic = visualParitySummaryForContract("sonic_stage_hud_reference.json");
+    const VisualParitySummary title = visualParitySummaryForContract("title_menu_reference.json");
+    const VisualParitySummary support = visualParitySummaryForContract("achievement_unlock_support_reference.json");
+
+    const std::string_view sonicBlocker = visualParityRendererBlocker(sonic);
+    const std::string_view titleBlocker = visualParityRendererBlocker(title);
+    const std::string_view supportBlocker = visualParityRendererBlocker(support);
+
+    std::cout
+        << "sward_ui_runtime_debug_gui renderer blocker smoke ok "
+        << "sonic_blocker=" << sonicBlocker
+        << " title_blocker=" << titleBlocker
+        << " support_blocker=" << supportBlocker
+        << '\n';
+
+    return sonicBlocker == "exact loose HUD payload"
+        && titleBlocker == "decoded CSD channel sampling"
+        && supportBlocker == "visual evidence binding"
+        ? 0
+        : 1;
+}
+
 [[nodiscard]] int runLayerFillSmoke()
 {
     const float backdropAlpha = previewLayerFillAlpha("backdrop");
@@ -2464,6 +2504,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runVisualParitySmoke();
         if (command.find("--host-readiness-smoke") != std::string::npos)
             return runHostReadinessSmoke();
+        if (command.find("--renderer-blocker-smoke") != std::string::npos)
+            return runRendererBlockerSmoke();
         if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
             return runLayoutPrimitiveChannelSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)
