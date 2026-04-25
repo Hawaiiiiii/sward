@@ -102,3 +102,15 @@ target_link_libraries(sward_ui_runtime_debug_gui
         gdi32
         gdiplus
 )
+
+add_executable(sward_su_ui_asset_renderer WIN32
+    examples/su_ui_asset_renderer.cpp
+)
+
+target_link_libraries(sward_su_ui_asset_renderer
+    PRIVATE
+        sward_ui_runtime
+        user32
+        gdi32
+        gdiplus
+)

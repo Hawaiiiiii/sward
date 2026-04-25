@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 88 SU UI asset renderer vertical slice
+
+- added [`research_uiux/SU_UI_ASSET_RENDERER_VERTICAL_SLICE.md`](./research_uiux/SU_UI_ASSET_RENDERER_VERTICAL_SLICE.md)
+- added `sward_su_ui_asset_renderer.exe` as a separate clean asset-backed renderer path beside the debug reconstruction workbench
+- added local DDS-backed screen samples for Loading, Title, and Sonic HUD CSD/cast evidence using the existing DXT5 source-texture decode path
+- added `--renderer-smoke`, verifying `3` screens, `3` casts, and `3` resolved local DDS textures under `b/rr88`
+
 ### Phase 87 GUI asset CSD DDS blit preview
 
 - added [`research_uiux/GUI_ASSET_CSD_DDS_BLIT_PREVIEW.md`](./research_uiux/GUI_ASSET_CSD_DDS_BLIT_PREVIEW.md)

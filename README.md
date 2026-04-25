@@ -152,6 +152,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the first Asset View local DDS-backed CSD blit preview, use [`research_uiux/GUI_ASSET_CSD_DDS_BLIT_PREVIEW.md`](./research_uiux/GUI_ASSET_CSD_DDS_BLIT_PREVIEW.md).
 
+> [!TIP]
+> For the first separate clean asset-backed SU UI renderer executable, use [`research_uiux/SU_UI_ASSET_RENDERER_VERTICAL_SLICE.md`](./research_uiux/SU_UI_ASSET_RENDERER_VERTICAL_SLICE.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
@@ -205,6 +208,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - GUI authored keyframe sample descriptors via [`research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md)
 - GUI authored sampled transform descriptors via [`research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_DESCRIPTORS.md)
 - GUI asset-viewer, atlas-gallery, and CSD element inspector reports via [`research_uiux/GUI_ASSET_VIEWER_MODE.md`](./research_uiux/GUI_ASSET_VIEWER_MODE.md), [`research_uiux/GUI_ASSET_GALLERY_ROOT_DISCOVERY.md`](./research_uiux/GUI_ASSET_GALLERY_ROOT_DISCOVERY.md), [`research_uiux/GUI_ASSET_CSD_ELEMENT_BINDINGS.md`](./research_uiux/GUI_ASSET_CSD_ELEMENT_BINDINGS.md), [`research_uiux/GUI_ASSET_CSD_ELEMENT_NAVIGATION.md`](./research_uiux/GUI_ASSET_CSD_ELEMENT_NAVIGATION.md), [`research_uiux/GUI_ASSET_CSD_CROP_PREVIEW.md`](./research_uiux/GUI_ASSET_CSD_CROP_PREVIEW.md), [`research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_DESCRIPTORS.md`](./research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_DESCRIPTORS.md), [`research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_COMMANDS.md`](./research_uiux/GUI_ASSET_CSD_SUBIMAGE_DRAW_COMMANDS.md), [`research_uiux/GUI_ASSET_CSD_RENDER_PLAN_PREVIEW.md`](./research_uiux/GUI_ASSET_CSD_RENDER_PLAN_PREVIEW.md), and [`research_uiux/GUI_ASSET_CSD_DDS_BLIT_PREVIEW.md`](./research_uiux/GUI_ASSET_CSD_DDS_BLIT_PREVIEW.md)
+- A separate clean SU UI asset renderer vertical slice via [`research_uiux/SU_UI_ASSET_RENDERER_VERTICAL_SLICE.md`](./research_uiux/SU_UI_ASSET_RENDERER_VERTICAL_SLICE.md)
 - A local-only support-substrate humanization pass via [`research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`](./research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md)
 - Runtime-backed support-substrate contracts via [`research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`](./research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md)
 - A source-tree mirror helper for the local-only `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py)

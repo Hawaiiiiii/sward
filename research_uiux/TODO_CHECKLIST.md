@@ -650,6 +650,16 @@
 - [x] Build and smoke-check `b\rr87\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for Asset View CSD DDS blit previews.
 
+## Phase 88 - SU UI Asset Renderer Vertical Slice
+
+- [x] Add a separate clean native `sward_su_ui_asset_renderer.exe` product target beside the reconstruction workbench.
+- [x] Add a renderer-owned screen/cast catalog for Loading, Title, and Sonic HUD seed samples.
+- [x] Reuse local DDS source binding and DXT5 decode for real asset-backed blits.
+- [x] Add `--renderer-smoke` for screen/cast/texture inventory verification.
+- [x] Build and smoke-check `b\rr88\sward_su_ui_asset_renderer.exe`.
+- [x] Keep `sward_ui_runtime_debug_gui.exe` intact as the evidence/debug workbench.
+- [x] Generate a dedicated report for the clean asset renderer vertical slice.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -799,3 +809,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD subimage draw commands under `b\rr85`, with Sonic HUD, Loading, Title, and Pause source/destination draw descriptors smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD render plans under `b\rr86`, with Sonic HUD, Loading, Title, and Pause virtual `1280x720` target-space rectangles smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD DDS blit previews under `b\rr87`, with local DXT5 source texture decode for Sonic HUD, Loading, and Title smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified the separate clean SU UI asset renderer under `b\rr88`, with Loading, Title, and Sonic HUD local DDS blits smoke-guarded.
