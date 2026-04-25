@@ -36,5 +36,6 @@ Evidence basis:
 
 Current limit:
 
-- this is a deterministic render plan preview, not final composited texture rendering.
-- the next step is to bind these render plans to actual decoded subimage blits, then feed sampled CSD channels/timeline playback into the same command path.
+- this is a deterministic render plan preview, not full scene composition.
+- Phase 87 now binds the first selected render plans to local decoded DXT5 DDS source blits in [`GUI_ASSET_CSD_DDS_BLIT_PREVIEW.md`](./GUI_ASSET_CSD_DDS_BLIT_PREVIEW.md).
+- the next step is to feed multiple blits through sampled CSD channels/timeline playback in one family-specific render pass.

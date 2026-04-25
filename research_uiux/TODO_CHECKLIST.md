@@ -640,6 +640,16 @@
 - [x] Build and smoke-check `b\rr86\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for Asset View CSD render plan previews.
 
+## Phase 87 - GUI Asset CSD DDS Blit Preview
+
+- [x] Add curated DDS source binding for the current selected CSD samples.
+- [x] Add local DXT5 decode for DDS-backed source textures.
+- [x] Surface `CSD DDS blit:` in the detail pane and runtime snapshot text.
+- [x] Draw decoded selected source rects into the mini render-target preview when the DDS source is available.
+- [x] Add `--asset-csd-dds-blit-smoke`.
+- [x] Build and smoke-check `b\rr87\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for Asset View CSD DDS blit previews.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -788,3 +798,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD subimage draw descriptors under `b\rr84`, with Sonic HUD, Loading, Title, and Pause selected cast/subimage evidence smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD subimage draw commands under `b\rr85`, with Sonic HUD, Loading, Title, and Pause source/destination draw descriptors smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD render plans under `b\rr86`, with Sonic HUD, Loading, Title, and Pause virtual `1280x720` target-space rectangles smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD DDS blit previews under `b\rr87`, with local DXT5 source texture decode for Sonic HUD, Loading, and Title smoke-guarded.

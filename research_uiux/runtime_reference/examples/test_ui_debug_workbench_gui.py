@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr86" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr87" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -117,6 +117,17 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("drawAssetCsdSubimageRenderPlanPreview", source_text)
         self.assertIn("CSD render plan:", source_text)
         self.assertIn("--asset-csd-render-plan-smoke", source_text)
+
+    def test_gui_source_exposes_csd_dds_blit_preview_for_asset_viewer(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("DdsTextureImage", source_text)
+        self.assertIn("TextureSourceCandidate", source_text)
+        self.assertIn("decodeDxt5Block", source_text)
+        self.assertIn("loadDdsTextureImage", source_text)
+        self.assertIn("layoutCsdDdsBlitDescriptor", source_text)
+        self.assertIn("drawAssetCsdDdsBlitPreview", source_text)
+        self.assertIn("CSD DDS blit:", source_text)
+        self.assertIn("--asset-csd-dds-blit-smoke", source_text)
 
     def test_gui_preview_binds_gameplay_hud_proxy_atlas_and_bounded_layout(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -570,6 +581,25 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("loading=bg_1/arrow->img_1:texture:src=595,121,300x240:dst=350,360,300x240", completed.stdout)
         self.assertIn("title=mm_bg_usual/black3->black3:texture:src=896,336,16x16:dst=655,435,368x464", completed.stdout)
         self.assertIn("pause=bg/img->img:fill:dst=0,0,1280x720", completed.stdout)
+
+    def test_asset_csd_dds_blit_smoke_reports_decoded_source_textures(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE)).resolve()
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--asset-csd-dds-blit-smoke"],
+            cwd=exe.parent,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui asset csd dds blit smoke ok", completed.stdout)
+        self.assertIn("sonic=ui_ps1_gauge1.dds:DXT5:256x128:src=4,64,16x20:dst=752,357,16x20", completed.stdout)
+        self.assertIn("loading=mat_load_comon_001.dds:DXT5:1280x720:src=595,121,300x240:dst=350,360,300x240", completed.stdout)
+        self.assertIn("title=ui_mm_parts1.dds:DXT5:1280x640:src=896,336,16x16:dst=655,435,368x464", completed.stdout)
+        self.assertIn("pause=fill:dst=0,0,1280x720", completed.stdout)
 
     def test_playback_smoke_command_advances_timeline_without_opening_window(self) -> None:
         exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))

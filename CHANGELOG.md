@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 87 GUI asset CSD DDS blit preview
+
+- added [`research_uiux/GUI_ASSET_CSD_DDS_BLIT_PREVIEW.md`](./research_uiux/GUI_ASSET_CSD_DDS_BLIT_PREVIEW.md)
+- added curated local DDS source binding and DXT5 decode for the current Sonic HUD, Loading, and Title samples
+- surfaced `CSD DDS blit:` in the detail/runtime panes plus a decoded Asset View blit preview
+- added `--asset-csd-dds-blit-smoke`, verifying decoded source textures and render-plan rects under `b/rr87`
+
 ### Phase 86 GUI asset CSD render plan preview
 
 - added [`research_uiux/GUI_ASSET_CSD_RENDER_PLAN_PREVIEW.md`](./research_uiux/GUI_ASSET_CSD_RENDER_PLAN_PREVIEW.md)

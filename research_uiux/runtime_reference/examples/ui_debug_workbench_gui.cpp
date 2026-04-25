@@ -14,7 +14,10 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <exception>
+#include <fstream>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -57,6 +60,22 @@ struct AtlasCandidate
     std::string_view shortName;
     std::string_view atlasFileName;
     std::string_view matchKind;
+};
+
+struct TextureSourceCandidate
+{
+    std::string_view textureFileName;
+    std::string_view relativePath;
+};
+
+struct DdsTextureImage
+{
+    std::filesystem::path path;
+    std::string fileName;
+    std::string format;
+    int width = 0;
+    int height = 0;
+    std::vector<std::uint32_t> argbPixels;
 };
 
 struct PreviewMotion
@@ -331,6 +350,12 @@ inline constexpr std::array<AtlasCandidate, 10> kPreviewAtlasCandidates{{
     { "extra_stage_hud_reference.json", "extra_stage", "exstagetails_common__ui_prov_playscreen.png", "exact" },
     { "sonic_stage_hud_reference.json", "sonic_stage", "exstagetails_common__ui_prov_playscreen.png", "proxy" },
     { "werehog_stage_hud_reference.json", "werehog_stage", "exstagetails_common__ui_prov_playscreen.png", "proxy" },
+}};
+
+inline constexpr std::array<TextureSourceCandidate, 3> kTextureSourceCandidates{{
+    { "ui_ps1_gauge1.dds", "phase16_support_archives/ExStageTails_Common/ui_ps1_gauge1.dds" },
+    { "mat_load_comon_001.dds", "ui_extended_archives/Loading/mat_load_comon_001.dds" },
+    { "ui_mm_parts1.dds", "ui_frontend_archives/MainMenu/ui_mm_parts1.dds" },
 }};
 
 inline constexpr std::array<LayoutEvidence, 3> kLayoutEvidenceEntries{{
@@ -952,6 +977,32 @@ enum ControlId
     return text.str();
 }
 
+[[nodiscard]] const DdsTextureImage* cachedDdsTextureImage(std::string_view textureFileName);
+[[nodiscard]] std::string layoutCsdDdsBlitDescriptor(const LayoutCsdSubimageRenderPlan& plan, const DdsTextureImage* image);
+
+[[nodiscard]] std::string layoutCsdDdsBlitSummary(std::string_view contractFileName, std::size_t requestedIndex)
+{
+    std::ostringstream text;
+    text << "CSD DDS blit:\r\n";
+
+    if (const auto* element = layoutCsdElementBindingAt(contractFileName, requestedIndex))
+    {
+        if (const auto* subimage = layoutCsdCastSubimageForBinding(*element))
+        {
+            const auto command = layoutCsdSubimageDrawCommandForBinding(*subimage);
+            const auto plan = layoutCsdSubimageRenderPlanForCommand(command);
+            const auto* image = plan.hasSourceTexture ? cachedDdsTextureImage(plan.textureName) : nullptr;
+            text
+                << "  " << layoutCsdDdsBlitDescriptor(plan, image)
+                << "\r\n";
+            return text.str();
+        }
+    }
+
+    text << "  none\r\n";
+    return text.str();
+}
+
 [[nodiscard]] std::string layoutCsdElementBindingNavigationSummary(std::string_view contractFileName, std::size_t requestedIndex)
 {
     const auto bindings = layoutCsdElementBindingsForContract(contractFileName);
@@ -1229,6 +1280,298 @@ void appendAncestorAssetRootCandidates(std::vector<std::filesystem::path>& candi
         << candidate.atlasFileName
         << ":" << candidate.matchKind
         << ":exists=" << (exists ? 1 : 0);
+    return text.str();
+}
+
+void appendExtractedAssetRootCandidate(std::vector<std::filesystem::path>& candidates, const std::filesystem::path& path)
+{
+    if (path.empty())
+        return;
+
+    candidates.push_back(path);
+    candidates.push_back(path / "extracted_assets");
+    candidates.push_back(path.parent_path());
+}
+
+[[nodiscard]] std::vector<std::filesystem::path> extractedAssetRootCandidates()
+{
+    std::vector<std::filesystem::path> candidates;
+    if (const auto root = environmentAssetRoot())
+        appendExtractedAssetRootCandidate(candidates, *root);
+
+    for (auto current = std::filesystem::current_path(); !current.empty(); current = current.parent_path())
+    {
+        candidates.push_back(current / "extracted_assets");
+        if (current == current.root_path())
+            break;
+    }
+
+    for (auto current = executableDirectory(); !current.empty(); current = current.parent_path())
+    {
+        candidates.push_back(current / "extracted_assets");
+        if (current == current.root_path())
+            break;
+    }
+
+    const auto visualRoot = visualAtlasSheetRoot();
+    candidates.push_back(visualRoot.parent_path().parent_path());
+    return candidates;
+}
+
+[[nodiscard]] const TextureSourceCandidate* textureSourceCandidateForFileName(std::string_view textureFileName)
+{
+    const auto found = std::find_if(
+        kTextureSourceCandidates.begin(),
+        kTextureSourceCandidates.end(),
+        [textureFileName](const TextureSourceCandidate& candidate)
+        {
+            return candidate.textureFileName == textureFileName;
+        });
+    return found == kTextureSourceCandidates.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] std::optional<std::filesystem::path> textureSourcePathForFileName(std::string_view textureFileName)
+{
+    const auto* candidate = textureSourceCandidateForFileName(textureFileName);
+    if (!candidate)
+        return std::nullopt;
+
+    for (const auto& root : extractedAssetRootCandidates())
+    {
+        std::error_code error;
+        const auto path = root / std::filesystem::path(candidate->relativePath);
+        if (std::filesystem::is_regular_file(path, error))
+            return path;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::uint16_t readLe16(const std::uint8_t* data)
+{
+    return static_cast<std::uint16_t>(data[0] | (data[1] << 8));
+}
+
+[[nodiscard]] std::uint32_t readLe32(const std::uint8_t* data)
+{
+    return static_cast<std::uint32_t>(data[0])
+        | (static_cast<std::uint32_t>(data[1]) << 8)
+        | (static_cast<std::uint32_t>(data[2]) << 16)
+        | (static_cast<std::uint32_t>(data[3]) << 24);
+}
+
+void decodeDxt5Block(const std::uint8_t* block, int blockX, int blockY, int width, int height, std::vector<std::uint32_t>& pixels)
+{
+    std::array<std::uint8_t, 8> alpha{};
+    alpha[0] = block[0];
+    alpha[1] = block[1];
+    if (alpha[0] > alpha[1])
+    {
+        alpha[2] = static_cast<std::uint8_t>((6 * alpha[0] + alpha[1]) / 7);
+        alpha[3] = static_cast<std::uint8_t>((5 * alpha[0] + 2 * alpha[1]) / 7);
+        alpha[4] = static_cast<std::uint8_t>((4 * alpha[0] + 3 * alpha[1]) / 7);
+        alpha[5] = static_cast<std::uint8_t>((3 * alpha[0] + 4 * alpha[1]) / 7);
+        alpha[6] = static_cast<std::uint8_t>((2 * alpha[0] + 5 * alpha[1]) / 7);
+        alpha[7] = static_cast<std::uint8_t>((alpha[0] + 6 * alpha[1]) / 7);
+    }
+    else
+    {
+        alpha[2] = static_cast<std::uint8_t>((4 * alpha[0] + alpha[1]) / 5);
+        alpha[3] = static_cast<std::uint8_t>((3 * alpha[0] + 2 * alpha[1]) / 5);
+        alpha[4] = static_cast<std::uint8_t>((2 * alpha[0] + 3 * alpha[1]) / 5);
+        alpha[5] = static_cast<std::uint8_t>((alpha[0] + 4 * alpha[1]) / 5);
+        alpha[6] = 0;
+        alpha[7] = 255;
+    }
+
+    std::uint64_t alphaBits = 0;
+    for (int index = 0; index < 6; ++index)
+        alphaBits |= static_cast<std::uint64_t>(block[2 + index]) << (index * 8);
+
+    const std::uint16_t color0 = readLe16(block + 8);
+    const std::uint16_t color1 = readLe16(block + 10);
+    std::array<std::array<std::uint8_t, 3>, 4> colors{};
+    auto unpackColor = [](std::uint16_t color)
+    {
+        const std::uint8_t r5 = static_cast<std::uint8_t>((color >> 11) & 0x1F);
+        const std::uint8_t g6 = static_cast<std::uint8_t>((color >> 5) & 0x3F);
+        const std::uint8_t b5 = static_cast<std::uint8_t>(color & 0x1F);
+        return std::array<std::uint8_t, 3>{
+            static_cast<std::uint8_t>((r5 << 3) | (r5 >> 2)),
+            static_cast<std::uint8_t>((g6 << 2) | (g6 >> 4)),
+            static_cast<std::uint8_t>((b5 << 3) | (b5 >> 2)),
+        };
+    };
+    colors[0] = unpackColor(color0);
+    colors[1] = unpackColor(color1);
+    colors[2] = {
+        static_cast<std::uint8_t>((2 * colors[0][0] + colors[1][0]) / 3),
+        static_cast<std::uint8_t>((2 * colors[0][1] + colors[1][1]) / 3),
+        static_cast<std::uint8_t>((2 * colors[0][2] + colors[1][2]) / 3),
+    };
+    colors[3] = {
+        static_cast<std::uint8_t>((colors[0][0] + 2 * colors[1][0]) / 3),
+        static_cast<std::uint8_t>((colors[0][1] + 2 * colors[1][1]) / 3),
+        static_cast<std::uint8_t>((colors[0][2] + 2 * colors[1][2]) / 3),
+    };
+
+    const std::uint32_t colorBits = readLe32(block + 12);
+    for (int y = 0; y < 4; ++y)
+    {
+        for (int x = 0; x < 4; ++x)
+        {
+            const int pixelIndex = (y * 4) + x;
+            const int targetX = (blockX * 4) + x;
+            const int targetY = (blockY * 4) + y;
+            if (targetX >= width || targetY >= height)
+                continue;
+
+            const std::uint8_t alphaValue = alpha[(alphaBits >> (3 * pixelIndex)) & 0x7];
+            const auto& color = colors[(colorBits >> (2 * pixelIndex)) & 0x3];
+            pixels[static_cast<std::size_t>(targetY * width + targetX)] =
+                (static_cast<std::uint32_t>(alphaValue) << 24)
+                | (static_cast<std::uint32_t>(color[0]) << 16)
+                | (static_cast<std::uint32_t>(color[1]) << 8)
+                | static_cast<std::uint32_t>(color[2]);
+        }
+    }
+}
+
+[[nodiscard]] std::optional<DdsTextureImage> loadDdsTextureImage(std::string_view textureFileName)
+{
+    const auto path = textureSourcePathForFileName(textureFileName);
+    if (!path)
+        return std::nullopt;
+
+    std::ifstream file(*path, std::ios::binary | std::ios::ate);
+    if (!file)
+        return std::nullopt;
+
+    const auto fileSize = file.tellg();
+    if (fileSize < 128)
+        return std::nullopt;
+
+    std::vector<std::uint8_t> data(static_cast<std::size_t>(fileSize));
+    file.seekg(0, std::ios::beg);
+    file.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(data.size()));
+    if (!file || std::memcmp(data.data(), "DDS ", 4) != 0)
+        return std::nullopt;
+
+    const std::uint32_t headerSize = readLe32(data.data() + 4);
+    const int height = static_cast<int>(readLe32(data.data() + 12));
+    const int width = static_cast<int>(readLe32(data.data() + 16));
+    const std::uint32_t pixelFormatSize = readLe32(data.data() + 76);
+    const std::string fourCc(reinterpret_cast<const char*>(data.data() + 84), 4);
+    if (headerSize != 124 || pixelFormatSize != 32 || fourCc != "DXT5" || width <= 0 || height <= 0)
+        return std::nullopt;
+
+    const int blockCountX = (width + 3) / 4;
+    const int blockCountY = (height + 3) / 4;
+    const std::size_t requiredBytes = 128 + (static_cast<std::size_t>(blockCountX) * static_cast<std::size_t>(blockCountY) * 16);
+    if (data.size() < requiredBytes)
+        return std::nullopt;
+
+    DdsTextureImage image;
+    image.path = *path;
+    image.fileName = path->filename().string();
+    image.format = fourCc;
+    image.width = width;
+    image.height = height;
+    image.argbPixels.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), 0);
+
+    const std::uint8_t* block = data.data() + 128;
+    for (int blockY = 0; blockY < blockCountY; ++blockY)
+    {
+        for (int blockX = 0; blockX < blockCountX; ++blockX)
+        {
+            decodeDxt5Block(block, blockX, blockY, width, height, image.argbPixels);
+            block += 16;
+        }
+    }
+
+    return image;
+}
+
+[[nodiscard]] const DdsTextureImage* cachedDdsTextureImage(std::string_view textureFileName)
+{
+    struct CachedImage
+    {
+        std::string textureFileName;
+        std::optional<DdsTextureImage> image;
+    };
+
+    static std::vector<std::unique_ptr<CachedImage>> cache;
+    for (const auto& cached : cache)
+    {
+        if (cached->textureFileName == textureFileName)
+            return cached->image ? &*cached->image : nullptr;
+    }
+
+    auto cached = std::make_unique<CachedImage>();
+    cached->textureFileName = std::string(textureFileName);
+    cached->image = loadDdsTextureImage(textureFileName);
+    cache.push_back(std::move(cached));
+    return cache.back()->image ? &*cache.back()->image : nullptr;
+}
+
+[[nodiscard]] std::unique_ptr<Gdiplus::Bitmap> bitmapFromDdsTextureImage(const DdsTextureImage& image)
+{
+    auto bitmap = std::make_unique<Gdiplus::Bitmap>(image.width, image.height, PixelFormat32bppARGB);
+    Gdiplus::BitmapData bitmapData{};
+    Gdiplus::Rect lockRect(0, 0, image.width, image.height);
+    if (bitmap->LockBits(&lockRect, Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bitmapData) != Gdiplus::Ok)
+        return nullptr;
+
+    for (int y = 0; y < image.height; ++y)
+    {
+        auto* destination = static_cast<std::uint8_t*>(bitmapData.Scan0) + (static_cast<std::ptrdiff_t>(bitmapData.Stride) * y);
+        const auto* source = image.argbPixels.data() + (static_cast<std::size_t>(y) * static_cast<std::size_t>(image.width));
+        std::memcpy(destination, source, static_cast<std::size_t>(image.width) * sizeof(std::uint32_t));
+    }
+
+    bitmap->UnlockBits(&bitmapData);
+    return bitmap;
+}
+
+[[nodiscard]] bool layoutCsdDdsBlitSourceFits(const LayoutCsdSubimageRenderPlan& plan, const DdsTextureImage& image)
+{
+    return plan.hasSourceTexture
+        && plan.sourceX >= 0
+        && plan.sourceY >= 0
+        && plan.sourceWidth > 0
+        && plan.sourceHeight > 0
+        && plan.sourceX + plan.sourceWidth <= image.width
+        && plan.sourceY + plan.sourceHeight <= image.height;
+}
+
+[[nodiscard]] std::string layoutCsdDdsBlitDescriptor(const LayoutCsdSubimageRenderPlan& plan, const DdsTextureImage* image)
+{
+    std::ostringstream text;
+    if (!plan.hasSourceTexture)
+    {
+        text
+            << "fill"
+            << ":dst=" << plan.destinationX << "," << plan.destinationY << "," << plan.destinationWidth << "x" << plan.destinationHeight;
+        return text.str();
+    }
+
+    text << plan.textureName;
+    if (!image)
+    {
+        text << ":missing";
+    }
+    else
+    {
+        text
+            << ":" << image->format
+            << ":" << image->width << "x" << image->height;
+        if (!layoutCsdDdsBlitSourceFits(plan, *image))
+            text << ":source-out-of-bounds";
+    }
+
+    text
+        << ":src=" << plan.sourceX << "," << plan.sourceY << "," << plan.sourceWidth << "x" << plan.sourceHeight
+        << ":dst=" << plan.destinationX << "," << plan.destinationY << "," << plan.destinationWidth << "x" << plan.destinationHeight;
     return text.str();
 }
 
@@ -2448,6 +2791,102 @@ void drawAssetCsdSubimageRenderPlanPreview(HDC dc, Gdiplus::Graphics& graphics, 
     drawTextLine(dc, detailRect, detail.str(), RGB(164, 214, 154));
 }
 
+[[nodiscard]] bool drawAssetCsdDdsBlitPreview(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const LayoutCsdSubimageRenderPlan& plan)
+{
+    const DdsTextureImage* image = plan.hasSourceTexture ? cachedDdsTextureImage(plan.textureName) : nullptr;
+    if (plan.hasSourceTexture && (!image || !layoutCsdDdsBlitSourceFits(plan, *image)))
+        return false;
+
+    std::unique_ptr<Gdiplus::Bitmap> bitmap;
+    if (image)
+    {
+        bitmap = bitmapFromDdsTextureImage(*image);
+        if (!bitmap)
+            return false;
+    }
+
+    const float panelWidth = std::min(470.0F, std::max(320.0F, canvas.Width * 0.45F));
+    const float panelHeight = 154.0F;
+    Gdiplus::RectF panel(
+        canvas.X + canvas.Width - panelWidth - 14.0F,
+        canvas.Y + 72.0F,
+        panelWidth,
+        panelHeight);
+
+    Gdiplus::SolidBrush panelBrush(Gdiplus::Color(232, 4, 10, 10));
+    Gdiplus::Pen panelPen(Gdiplus::Color(230, 151, 255, 223), 1.2F);
+    graphics.FillRectangle(&panelBrush, panel);
+    graphics.DrawRectangle(&panelPen, panel);
+
+    RECT titleRect{
+        static_cast<LONG>(panel.X + 10.0F),
+        static_cast<LONG>(panel.Y + 6.0F),
+        static_cast<LONG>(panel.X + panel.Width - 10.0F),
+        static_cast<LONG>(panel.Y + 28.0F),
+    };
+    drawTextLine(dc, titleRect, "CSD DDS blit " + layoutCsdDdsBlitDescriptor(plan, image), RGB(236, 255, 248));
+
+    const float targetWidth = panel.Width - 28.0F;
+    const float targetHeight = targetWidth * (static_cast<float>(kRecoveredAtlasCanvasHeight) / static_cast<float>(kRecoveredAtlasCanvasWidth));
+    Gdiplus::RectF target(
+        panel.X + 14.0F,
+        panel.Y + 36.0F,
+        targetWidth,
+        std::min(78.0F, targetHeight));
+    if (target.Width / target.Height > static_cast<float>(kRecoveredAtlasCanvasWidth) / static_cast<float>(kRecoveredAtlasCanvasHeight))
+        target.Width = target.Height * (static_cast<float>(kRecoveredAtlasCanvasWidth) / static_cast<float>(kRecoveredAtlasCanvasHeight));
+
+    Gdiplus::SolidBrush targetBrush(Gdiplus::Color(255, 0, 6, 8));
+    Gdiplus::Pen targetPen(Gdiplus::Color(210, 134, 218, 126), 1.0F);
+    graphics.FillRectangle(&targetBrush, target);
+    graphics.DrawRectangle(&targetPen, target);
+
+    const float scaleX = target.Width / static_cast<float>(kRecoveredAtlasCanvasWidth);
+    const float scaleY = target.Height / static_cast<float>(kRecoveredAtlasCanvasHeight);
+    Gdiplus::RectF destination(
+        target.X + (static_cast<float>(plan.destinationX) * scaleX),
+        target.Y + (static_cast<float>(plan.destinationY) * scaleY),
+        std::max(2.0F, static_cast<float>(plan.destinationWidth) * scaleX),
+        std::max(2.0F, static_cast<float>(plan.destinationHeight) * scaleY));
+    destination = clampRectToCanvas(destination, target);
+
+    if (bitmap)
+    {
+        graphics.DrawImage(
+            bitmap.get(),
+            destination,
+            static_cast<Gdiplus::REAL>(plan.sourceX),
+            static_cast<Gdiplus::REAL>(plan.sourceY),
+            static_cast<Gdiplus::REAL>(plan.sourceWidth),
+            static_cast<Gdiplus::REAL>(plan.sourceHeight),
+            Gdiplus::UnitPixel);
+    }
+    else
+    {
+        Gdiplus::SolidBrush fillBrush(Gdiplus::Color(170, 89, 211, 97));
+        graphics.FillRectangle(&fillBrush, destination);
+    }
+
+    Gdiplus::Pen destinationPen(Gdiplus::Color(245, 247, 211, 72), 1.4F);
+    graphics.DrawRectangle(&destinationPen, destination);
+
+    std::ostringstream detail;
+    detail
+        << "decoded=" << (image ? image->fileName : "fill")
+        << " target=" << kRecoveredAtlasCanvasWidth << "x" << kRecoveredAtlasCanvasHeight;
+    if (image)
+        detail << " dds=" << image->width << "x" << image->height << " " << image->format;
+
+    RECT detailRect{
+        static_cast<LONG>(panel.X + 10.0F),
+        static_cast<LONG>(panel.Y + panel.Height - 30.0F),
+        static_cast<LONG>(panel.X + panel.Width - 10.0F),
+        static_cast<LONG>(panel.Y + panel.Height - 8.0F),
+    };
+    drawTextLine(dc, detailRect, detail.str(), RGB(164, 214, 154));
+    return true;
+}
+
 void drawLayoutScenePrimitives(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const std::vector<const LayoutScenePrimitive*>& primitives, float timelineProgress)
 {
     if (primitives.empty())
@@ -2870,6 +3309,8 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         << "\r\n"
         << layoutCsdSubimageRenderPlanSummary(host.primaryContractFileName, 0)
         << "\r\n"
+        << layoutCsdDdsBlitSummary(host.primaryContractFileName, 0)
+        << "\r\n"
         << layoutCsdElementBindingSummary(host.primaryContractFileName)
         << "\r\n"
         << "State: " << toString(runtime.state()) << "\r\n"
@@ -3281,6 +3722,64 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         && pause.destinationY == 0
         && pause.destinationWidth == 1280
         && pause.destinationHeight == 720
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAssetCsdDdsBlitSmoke()
+{
+    const auto* sonicElement = layoutCsdElementBindingAt("sonic_stage_hud_reference.json", 0);
+    const auto* loadingElement = layoutCsdElementBindingAt("loading_transition_reference.json", 0);
+    const auto* titleElement = layoutCsdElementBindingAt("title_menu_reference.json", 0);
+    const auto* pauseElement = layoutCsdElementBindingAt("pause_menu_reference.json", 0);
+
+    const auto* sonicBinding = sonicElement ? layoutCsdCastSubimageForBinding(*sonicElement) : nullptr;
+    const auto* loadingBinding = loadingElement ? layoutCsdCastSubimageForBinding(*loadingElement) : nullptr;
+    const auto* titleBinding = titleElement ? layoutCsdCastSubimageForBinding(*titleElement) : nullptr;
+    const auto* pauseBinding = pauseElement ? layoutCsdCastSubimageForBinding(*pauseElement) : nullptr;
+
+    if (!sonicBinding || !loadingBinding || !titleBinding || !pauseBinding)
+    {
+        std::cerr << "sward_ui_runtime_debug_gui asset csd dds blit smoke failed missing descriptor\n";
+        return 1;
+    }
+
+    const auto sonic = layoutCsdSubimageRenderPlanForCommand(layoutCsdSubimageDrawCommandForBinding(*sonicBinding));
+    const auto loading = layoutCsdSubimageRenderPlanForCommand(layoutCsdSubimageDrawCommandForBinding(*loadingBinding));
+    const auto title = layoutCsdSubimageRenderPlanForCommand(layoutCsdSubimageDrawCommandForBinding(*titleBinding));
+    const auto pause = layoutCsdSubimageRenderPlanForCommand(layoutCsdSubimageDrawCommandForBinding(*pauseBinding));
+
+    const auto* sonicImage = cachedDdsTextureImage(sonic.textureName);
+    const auto* loadingImage = cachedDdsTextureImage(loading.textureName);
+    const auto* titleImage = cachedDdsTextureImage(title.textureName);
+
+    std::cout
+        << "sward_ui_runtime_debug_gui asset csd dds blit smoke ok "
+        << "sonic=" << layoutCsdDdsBlitDescriptor(sonic, sonicImage)
+        << " loading=" << layoutCsdDdsBlitDescriptor(loading, loadingImage)
+        << " title=" << layoutCsdDdsBlitDescriptor(title, titleImage)
+        << " pause=" << layoutCsdDdsBlitDescriptor(pause, nullptr)
+        << '\n';
+
+    return sonicImage
+        && loadingImage
+        && titleImage
+        && sonicImage->format == "DXT5"
+        && loadingImage->format == "DXT5"
+        && titleImage->format == "DXT5"
+        && sonicImage->width == 256
+        && sonicImage->height == 128
+        && loadingImage->width == 1280
+        && loadingImage->height == 720
+        && titleImage->width == 1280
+        && titleImage->height == 640
+        && layoutCsdDdsBlitSourceFits(sonic, *sonicImage)
+        && layoutCsdDdsBlitSourceFits(loading, *loadingImage)
+        && layoutCsdDdsBlitSourceFits(title, *titleImage)
+        && !sonicImage->argbPixels.empty()
+        && !loadingImage->argbPixels.empty()
+        && !titleImage->argbPixels.empty()
+        && !pause.hasSourceTexture
         ? 0
         : 1;
 }
@@ -4545,7 +5044,8 @@ private:
                             {
                                 const auto command = layoutCsdSubimageDrawCommandForBinding(*subimage);
                                 const auto plan = layoutCsdSubimageRenderPlanForCommand(command);
-                                drawAssetCsdSubimageRenderPlanPreview(dc, graphics, canvas, plan);
+                                if (!drawAssetCsdDdsBlitPreview(dc, graphics, canvas, plan))
+                                    drawAssetCsdSubimageRenderPlanPreview(dc, graphics, canvas, plan);
                                 drawAssetCsdSubimageDrawCommandCue(dc, graphics, canvas, command);
                                 drawAssetCsdCastSubimageCue(dc, graphics, canvas, *subimage);
                             }
@@ -4615,6 +5115,7 @@ private:
                     detail << " | draw=" << layoutCsdCastSubimageDescriptor(*subimage);
                     detail << " | cmd=" << layoutCsdSubimageDrawCommandDescriptor(command);
                     detail << " | plan=" << layoutCsdSubimageRenderPlanDescriptor(plan);
+                    detail << " | dds=" << layoutCsdDdsBlitDescriptor(plan, plan.hasSourceTexture ? cachedDdsTextureImage(plan.textureName) : nullptr);
                 }
             }
         }
@@ -4944,6 +5445,7 @@ private:
             << layoutCsdCastSubimageSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdSubimageDrawCommandSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdSubimageRenderPlanSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
+            << layoutCsdDdsBlitSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdElementBindingSummary(host.primaryContractFileName) << "\r\n"
             << assetGallerySummaryText(host) << "\r\n"
             << csdElementGallerySummaryText(host) << "\r\n"
@@ -5187,6 +5689,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runMotionSmoke();
         if (command.find("--playback-smoke") != std::string::npos)
             return runPlaybackSmoke();
+        if (command.find("--asset-csd-dds-blit-smoke") != std::string::npos)
+            return runAssetCsdDdsBlitSmoke();
         if (command.find("--asset-csd-render-plan-smoke") != std::string::npos)
             return runAssetCsdRenderPlanSmoke();
         if (command.find("--asset-csd-draw-command-smoke") != std::string::npos)
