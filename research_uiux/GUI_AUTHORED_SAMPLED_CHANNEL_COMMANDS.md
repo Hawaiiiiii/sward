@@ -57,4 +57,4 @@ sward_ui_runtime_debug_gui authored sampled channel command smoke ok pause_chann
 
 ## Boundary
 
-This is still a one-sample renderer bridge, not full CSD channel playback. It proves the command path can carry and expose sampled non-position channel state. The next renderer step is to broaden this from one Pause color sample into actual channel evaluation across more casts, frames, and families.
+This is still a one-sample renderer bridge, not full CSD channel playback. It proves the command path can carry and expose sampled non-position channel state. Phase 78 builds directly on this by adding `LayoutAuthoredSampledChannelState` evaluation for sampled alpha, visibility, and cast-space deltas across the first Title/Pause/Loading authored command set.

@@ -174,6 +174,8 @@ struct LayoutAuthoredSampledDrawCommand
 {
     std::string sceneName;
     std::string castName;
+    int baseX = 0;
+    int baseY = 0;
     int x = 0;
     int y = 0;
     int width = 0;
@@ -182,6 +184,16 @@ struct LayoutAuthoredSampledDrawCommand
     int sampleFrame = 0;
     float sampledValue = 0.0F;
     std::string sampledTrack;
+};
+
+struct LayoutAuthoredSampledChannelState
+{
+    std::string trackType;
+    float sampledValue = 0.0F;
+    float alpha = 1.0F;
+    bool visible = true;
+    int deltaX = 0;
+    int deltaY = 0;
 };
 
 struct PrimitiveChannelMask
@@ -1043,6 +1055,8 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return LayoutAuthoredSampledDrawCommand{
         std::string(transform.sceneName),
         std::string(transform.castName),
+        transform.x,
+        transform.y,
         pixels.x,
         pixels.y,
         pixels.width,
@@ -1076,11 +1090,36 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return text.str();
 }
 
+[[nodiscard]] LayoutAuthoredSampledChannelState layoutAuthoredSampledDrawCommandChannelState(const LayoutAuthoredSampledDrawCommand& command)
+{
+    LayoutAuthoredSampledChannelState state{
+        command.trackType,
+        command.sampledValue,
+        1.0F,
+        true,
+        command.x - command.baseX,
+        command.y - command.baseY,
+    };
+
+    if (command.trackType == "Color"
+        || command.trackType == "GradientTL"
+        || command.trackType == "GradientBL"
+        || command.trackType == "GradientTR"
+        || command.trackType == "GradientBR")
+    {
+        state.alpha = std::clamp(command.sampledValue, 0.0F, 1.0F);
+    }
+    else if (command.trackType == "HideFlag")
+    {
+        state.visible = command.sampledValue < 0.5F;
+    }
+
+    return state;
+}
+
 [[nodiscard]] float layoutAuthoredSampledDrawCommandChannelAlpha(const LayoutAuthoredSampledDrawCommand& command)
 {
-    if (command.trackType == "Color")
-        return std::clamp(command.sampledValue, 0.0F, 1.0F);
-    return 1.0F;
+    return layoutAuthoredSampledDrawCommandChannelState(command).alpha;
 }
 
 [[nodiscard]] std::string layoutAuthoredSampledDrawCommandChannelStateDescriptor(const LayoutAuthoredSampledDrawCommand& command)
@@ -1090,6 +1129,19 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     text
         << layoutAuthoredSampledDrawCommandDescriptor(command)
         << ":alpha=" << layoutAuthoredSampledDrawCommandChannelAlpha(command);
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutAuthoredSampledDrawCommandEvaluatedStateDescriptor(const LayoutAuthoredSampledDrawCommand& command)
+{
+    const LayoutAuthoredSampledChannelState state = layoutAuthoredSampledDrawCommandChannelState(command);
+    std::ostringstream text;
+    text << std::fixed << std::setprecision(6);
+    text
+        << layoutAuthoredSampledDrawCommandDescriptor(command)
+        << ":alpha=" << state.alpha
+        << ":visible=" << (state.visible ? 1 : 0)
+        << ":delta=" << state.deltaX << "," << state.deltaY;
     return text.str();
 }
 
@@ -1387,9 +1439,9 @@ void drawAuthoredSampledTransforms(HDC dc, Gdiplus::Graphics& graphics, const Gd
     for (const auto& command : commands)
     {
         const Gdiplus::RectF markerRect = layoutAuthoredSampledDrawCommandRect(command, canvas);
-        const float channelAlpha = layoutAuthoredSampledDrawCommandChannelAlpha(command);
-        const BYTE diagnosticFillAlpha = static_cast<BYTE>(std::round(42.0F + (92.0F * channelAlpha)));
-        const BYTE diagnosticPenAlpha = static_cast<BYTE>(std::round(150.0F + (95.0F * channelAlpha)));
+        const LayoutAuthoredSampledChannelState channelState = layoutAuthoredSampledDrawCommandChannelState(command);
+        const BYTE diagnosticFillAlpha = static_cast<BYTE>(std::round(42.0F + (92.0F * channelState.alpha)));
+        const BYTE diagnosticPenAlpha = static_cast<BYTE>(std::round(150.0F + (95.0F * channelState.alpha)));
         Gdiplus::SolidBrush markerBrush(Gdiplus::Color(diagnosticFillAlpha, 247, 211, 72));
         Gdiplus::Pen markerPen(Gdiplus::Color(diagnosticPenAlpha, 255, 247, 177), 1.6F);
         graphics.FillRectangle(&markerBrush, markerRect);
@@ -1415,7 +1467,7 @@ void drawAuthoredSampledTransforms(HDC dc, Gdiplus::Graphics& graphics, const Gd
             static_cast<LONG>(labelRect.X + labelRect.Width - 6.0F),
             static_cast<LONG>(labelRect.Y + labelRect.Height),
         };
-        drawTextLine(dc, textRect, "authored sampled " + layoutAuthoredSampledDrawCommandChannelStateDescriptor(command), RGB(255, 247, 177));
+        drawTextLine(dc, textRect, "authored sampled " + layoutAuthoredSampledDrawCommandEvaluatedStateDescriptor(command), RGB(255, 247, 177));
     }
 }
 
@@ -2590,6 +2642,35 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         : 1;
 }
 
+[[nodiscard]] int runAuthoredSampledChannelEvalSmoke()
+{
+    const auto title = layoutAuthoredSampledDrawCommandsForContract("title_menu_reference.json");
+    const auto pause = layoutAuthoredSampledDrawCommandsForContract("pause_menu_reference.json");
+    const auto loading = layoutAuthoredSampledDrawCommandsForContract("loading_transition_reference.json");
+    if (title.empty() || pause.empty() || loading.empty())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui authored sampled channel eval smoke failed missing exact-family draw command\n";
+        return 1;
+    }
+
+    const std::string titleEval = layoutAuthoredSampledDrawCommandEvaluatedStateDescriptor(title.front());
+    const std::string pauseEval = layoutAuthoredSampledDrawCommandEvaluatedStateDescriptor(pause.front());
+    const std::string loadingEval = layoutAuthoredSampledDrawCommandEvaluatedStateDescriptor(loading.front());
+
+    std::cout
+        << "sward_ui_runtime_debug_gui authored sampled channel eval smoke ok "
+        << "title_eval=" << titleEval
+        << " pause_eval=" << pauseEval
+        << " loading_eval=" << loadingEval
+        << '\n';
+
+    return titleEval == "mm_donut_move/index_text_pos:408,163,16x16:YPosition@30=0.225926:alpha=1.000000:visible=1:delta=0,-133"
+        && pauseEval == "bg/img:0,0,1280x720:Color@7=0.000000:alpha=0.000000:visible=1:delta=0,0"
+        && loadingEval == "bg_2/pos_text_sonic:640,360,16x16:XPosition@1=0.500000:alpha=1.000000:visible=1:delta=0,0"
+        ? 0
+        : 1;
+}
+
 [[nodiscard]] int runAuthoredCastTransformSmoke()
 {
     const auto title = layoutAuthoredCastTransformsForContract("title_menu_reference.json");
@@ -3437,6 +3518,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runAuthoredKeyframeCurveSmoke();
         if (command.find("--authored-keyframe-sample-smoke") != std::string::npos)
             return runAuthoredKeyframeSampleSmoke();
+        if (command.find("--authored-sampled-channel-eval-smoke") != std::string::npos)
+            return runAuthoredSampledChannelEvalSmoke();
         if (command.find("--authored-sampled-channel-command-smoke") != std::string::npos)
             return runAuthoredSampledChannelCommandSmoke();
         if (command.find("--authored-sampled-draw-command-smoke") != std::string::npos)

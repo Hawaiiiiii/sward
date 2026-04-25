@@ -122,6 +122,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the first sampled non-position channel state in that draw-command bridge, use [`research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_COMMANDS.md`](./research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_COMMANDS.md).
 
+> [!TIP]
+> For the first reusable sampled-channel evaluator carrying alpha, visibility, and cast-space deltas, use [`research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_EVALUATION.md`](./research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_EVALUATION.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:

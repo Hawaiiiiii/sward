@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr77" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr78" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -218,6 +218,14 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("layoutAuthoredSampledDrawCommandChannelStateDescriptor", source_text)
         self.assertIn("--authored-sampled-channel-command-smoke", source_text)
         self.assertIn("Color@7=0.000000:alpha=0.000000", source_text)
+
+    def test_gui_source_exposes_authored_sampled_channel_state_evaluator(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("LayoutAuthoredSampledChannelState", source_text)
+        self.assertIn("layoutAuthoredSampledDrawCommandChannelState", source_text)
+        self.assertIn("layoutAuthoredSampledDrawCommandEvaluatedStateDescriptor", source_text)
+        self.assertIn("--authored-sampled-channel-eval-smoke", source_text)
+        self.assertIn("YPosition@30=0.225926:alpha=1.000000:visible=1:delta=0,-133", source_text)
 
     def test_gui_source_exposes_gameplay_hud_proxy_primitives(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -768,6 +776,24 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("sward_ui_runtime_debug_gui authored sampled channel command smoke ok", completed.stdout)
         self.assertIn("pause_channel=bg/img:0,0,1280x720:Color@7=0.000000:alpha=0.000000", completed.stdout)
+
+    def test_authored_sampled_channel_eval_smoke_reports_evaluated_transform_and_alpha_state(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--authored-sampled-channel-eval-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui authored sampled channel eval smoke ok", completed.stdout)
+        self.assertIn("title_eval=mm_donut_move/index_text_pos:408,163,16x16:YPosition@30=0.225926:alpha=1.000000:visible=1:delta=0,-133", completed.stdout)
+        self.assertIn("pause_eval=bg/img:0,0,1280x720:Color@7=0.000000:alpha=0.000000:visible=1:delta=0,0", completed.stdout)
+        self.assertIn("loading_eval=bg_2/pos_text_sonic:640,360,16x16:XPosition@1=0.500000:alpha=1.000000:visible=1:delta=0,0", completed.stdout)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 78 GUI authored sampled channel evaluation
+
+- added [`research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_EVALUATION.md`](./research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_EVALUATION.md)
+- added a reusable `LayoutAuthoredSampledChannelState` evaluator for sampled authored draw commands
+- carries sampled alpha, visibility, and cast-space delta diagnostics for Title, Pause, and Loading samples
+- added `--authored-sampled-channel-eval-smoke`, verifying evaluated transform/alpha state under `b/rr78`
+
 ### Phase 77 GUI authored sampled channel commands
 
 - added [`research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_COMMANDS.md`](./research_uiux/GUI_AUTHORED_SAMPLED_CHANNEL_COMMANDS.md)
