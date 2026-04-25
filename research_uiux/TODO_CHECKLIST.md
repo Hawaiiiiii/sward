@@ -579,6 +579,16 @@
 - [x] Build and smoke-check `b\rr74\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for authored sampled transform descriptors.
 
+## Phase 81 - GUI Asset CSD Element Bindings
+
+- [x] Add a CSD element-binding table for selected Asset View atlas candidates.
+- [x] Bind Title, Pause, Loading, and gameplay-HUD proxy hosts to package/scene/cast/subimage evidence from `layout_deep_analysis.json`.
+- [x] Draw first-pass CSD element cues over Asset View atlas images.
+- [x] Surface `CSD element bindings:` summaries in the GUI detail pane.
+- [x] Add `--asset-csd-binding-smoke` for package/scene/cast/subimage counts.
+- [x] Build and smoke-check `b\rr81\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for Asset View CSD element bindings.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -721,3 +731,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored sampled channel evaluation under `b\rr78`, with Title/Pause/Loading sampled alpha, visibility, and cast-space deltas smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset viewer mode under `b\rr79`, with `22` local atlas sheet PNGs and the first unobstructed atlas inspection path smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset root discovery plus atlas gallery navigation under `b\rr80`, keeping Asset View populated from both repo-root and build-dir launches.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD element bindings under `b\rr81`, tying Title, Pause, Loading, and gameplay-HUD proxy atlas candidates to package/scene/cast/subimage evidence.

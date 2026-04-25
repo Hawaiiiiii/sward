@@ -117,6 +117,24 @@ struct LayoutScenePrimitive
     float height = 0.0F;
 };
 
+struct LayoutCsdElementBinding
+{
+    std::string_view contractFileName;
+    std::string_view packageFileName;
+    std::string_view atlasFileName;
+    std::string_view sceneName;
+    std::string_view castName;
+    std::string_view anchorCastName;
+    std::string_view textureSummary;
+    int sceneCastCount = 0;
+    int sceneSubimageCount = 0;
+    int packageSubimageCount = 0;
+    float x = 0.0F;
+    float y = 0.0F;
+    float width = 0.0F;
+    float height = 0.0F;
+};
+
 struct LayoutPrimitiveDrawCommand
 {
     std::string_view sceneName;
@@ -345,6 +363,105 @@ inline constexpr std::array<LayoutScenePrimitive, 36> kLayoutScenePrimitiveEntri
     { "extra_stage_hud_reference.json", "Root/bg", "bg", "DefaultAnim", "DefaultAnim", 100, 6, 29, 21, 0, 0.08F, 0.08F, 0.50F, 0.18F },
 }};
 
+inline constexpr std::array<LayoutCsdElementBinding, 6> kLayoutCsdElementBindings{{
+    {
+        "title_menu_reference.json",
+        "ui_mainmenu.xncp",
+        "mainmenu__ui_mainmenu.png",
+        "mm_bg_usual",
+        "black3",
+        "circle",
+        "ui_mm_base.dds, ui_mm_parts1.dds, ui_mm_contentstext.dds",
+        47,
+        46,
+        736,
+        0.08F,
+        0.12F,
+        0.82F,
+        0.18F,
+    },
+    {
+        "pause_menu_reference.json",
+        "ui_pause.yncp",
+        "systemcommoncore__ui_pause.png",
+        "bg",
+        "img",
+        "img",
+        "mat_pause_en_*.dds, mat_comon_*.dds, mat_ex_common_002.dds",
+        1,
+        99,
+        2871,
+        0.04F,
+        0.08F,
+        0.92F,
+        0.82F,
+    },
+    {
+        "loading_transition_reference.json",
+        "ui_loading.yncp",
+        "loading__ui_loading.png",
+        "bg_1",
+        "arrow",
+        "img_1",
+        "mat_load_*.dds, mat_loadinfo_*.dds, mat_comon_txt_001.dds",
+        28,
+        320,
+        2240,
+        0.54F,
+        0.66F,
+        0.36F,
+        0.12F,
+    },
+    {
+        "extra_stage_hud_reference.json",
+        "ui_prov_playscreen.yncp",
+        "exstagetails_common__ui_prov_playscreen.png",
+        "so_speed_gauge",
+        "position_hd",
+        "speed_bg",
+        "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds",
+        47,
+        109,
+        654,
+        0.54F,
+        0.58F,
+        0.38F,
+        0.12F,
+    },
+    {
+        "sonic_stage_hud_reference.json",
+        "ui_prov_playscreen.yncp",
+        "exstagetails_common__ui_prov_playscreen.png",
+        "so_speed_gauge",
+        "position_hd",
+        "speed_bg",
+        "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds",
+        47,
+        109,
+        654,
+        0.54F,
+        0.58F,
+        0.38F,
+        0.12F,
+    },
+    {
+        "werehog_stage_hud_reference.json",
+        "ui_prov_playscreen.yncp",
+        "exstagetails_common__ui_prov_playscreen.png",
+        "so_speed_gauge",
+        "position_hd",
+        "speed_bg",
+        "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds",
+        47,
+        109,
+        654,
+        0.54F,
+        0.58F,
+        0.38F,
+        0.12F,
+    },
+}};
+
 inline constexpr std::array<LayoutAuthoredCastTransform, 3> kLayoutAuthoredCastTransforms{{
     { "title_menu_reference.json", "ui_mainmenu.xncp", "mm_donut_move", "index_text_pos", 408, 296, 16, 16, 0.0F, 1.0F, 1.0F, "0xFFFFFFFF" },
     { "pause_menu_reference.json", "ui_pause.yncp", "bg", "img", 0, 0, 1280, 720, 0.0F, 1.0F, 1.0F, "0x00000000" },
@@ -493,6 +610,54 @@ enum ControlId
             primitives.push_back(&primitive);
     }
     return primitives;
+}
+
+[[nodiscard]] std::vector<const LayoutCsdElementBinding*> layoutCsdElementBindingsForContract(std::string_view contractFileName)
+{
+    std::vector<const LayoutCsdElementBinding*> bindings;
+    for (const auto& binding : kLayoutCsdElementBindings)
+    {
+        if (binding.contractFileName == contractFileName)
+            bindings.push_back(&binding);
+    }
+    return bindings;
+}
+
+[[nodiscard]] std::string layoutCsdElementBindingDescriptor(const LayoutCsdElementBinding& binding)
+{
+    std::ostringstream text;
+    text
+        << binding.packageFileName
+        << "/" << binding.sceneName
+        << "/" << binding.castName
+        << ":casts=" << binding.sceneCastCount
+        << ":subimages=" << binding.sceneSubimageCount;
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutCsdElementBindingSummary(std::string_view contractFileName)
+{
+    const auto bindings = layoutCsdElementBindingsForContract(contractFileName);
+    std::ostringstream text;
+    text << "CSD element bindings:\r\n";
+
+    if (bindings.empty())
+    {
+        text << "  none\r\n";
+        return text.str();
+    }
+
+    for (const auto* binding : bindings)
+    {
+        text
+            << "  " << layoutCsdElementBindingDescriptor(*binding)
+            << " | atlas=" << binding->atlasFileName
+            << " | anchor=" << binding->anchorCastName
+            << " | package_subimages=" << binding->packageSubimageCount
+            << "\r\n";
+    }
+
+    return text.str();
 }
 
 [[nodiscard]] std::vector<const LayoutAuthoredCastTransform*> layoutAuthoredCastTransformsForContract(std::string_view contractFileName)
@@ -756,6 +921,22 @@ void appendAncestorAssetRootCandidates(std::vector<std::filesystem::path>& candi
     else
     {
         text << "  layout=none\r\n";
+    }
+
+    const auto bindings = layoutCsdElementBindingsForContract(contractFileName);
+    if (!bindings.empty())
+    {
+        text << "  csd_bindings=" << bindings.size();
+        for (const auto* binding : bindings)
+        {
+            text
+                << " | " << binding->packageFileName
+                << "/" << binding->sceneName
+                << "/" << binding->castName
+                << " casts=" << binding->sceneCastCount
+                << " subimages=" << binding->sceneSubimageCount;
+        }
+        text << "\r\n";
     }
 
     text
@@ -1641,6 +1822,67 @@ void drawAuthoredSampledTransforms(HDC dc, Gdiplus::Graphics& graphics, const Gd
     }
 }
 
+void drawAssetCsdElementBindings(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& atlasRect, std::string_view contractFileName)
+{
+    const auto bindings = layoutCsdElementBindingsForContract(contractFileName);
+    if (bindings.empty())
+        return;
+
+    for (const auto* binding : bindings)
+    {
+        Gdiplus::RectF markerRect(
+            atlasRect.X + (binding->x * atlasRect.Width),
+            atlasRect.Y + (binding->y * atlasRect.Height),
+            binding->width * atlasRect.Width,
+            binding->height * atlasRect.Height);
+        markerRect = clampRectToCanvas(markerRect, atlasRect);
+
+        Gdiplus::SolidBrush markerBrush(Gdiplus::Color(64, 93, 245, 189));
+        Gdiplus::Pen markerPen(Gdiplus::Color(230, 151, 255, 223), 1.4F);
+        graphics.FillRectangle(&markerBrush, markerRect);
+        graphics.DrawRectangle(&markerPen, markerRect);
+
+        const float labelWidth = std::min(430.0F, std::max(230.0F, atlasRect.Width * 0.50F));
+        const float labelHeight = 42.0F;
+        float labelX = markerRect.X + 8.0F;
+        if (labelX + labelWidth > atlasRect.X + atlasRect.Width - 8.0F)
+            labelX = atlasRect.X + atlasRect.Width - labelWidth - 8.0F;
+        labelX = std::max(atlasRect.X + 8.0F, labelX);
+
+        float labelY = markerRect.Y - labelHeight - 8.0F;
+        if (labelY < atlasRect.Y + 8.0F)
+            labelY = markerRect.Y + markerRect.Height + 8.0F;
+        if (labelY + labelHeight > atlasRect.Y + atlasRect.Height - 8.0F)
+            labelY = atlasRect.Y + atlasRect.Height - labelHeight - 8.0F;
+
+        Gdiplus::RectF labelRect(labelX, labelY, labelWidth, labelHeight);
+        Gdiplus::SolidBrush labelBrush(Gdiplus::Color(230, 8, 14, 20));
+        Gdiplus::Pen labelPen(Gdiplus::Color(230, 151, 255, 223), 1.0F);
+        graphics.FillRectangle(&labelBrush, labelRect);
+        graphics.DrawRectangle(&labelPen, labelRect);
+
+        RECT titleRect{
+            static_cast<LONG>(labelRect.X + 8.0F),
+            static_cast<LONG>(labelRect.Y + 2.0F),
+            static_cast<LONG>(labelRect.X + labelRect.Width - 8.0F),
+            static_cast<LONG>(labelRect.Y + 22.0F),
+        };
+        drawTextLine(dc, titleRect, "CSD " + layoutCsdElementBindingDescriptor(*binding), RGB(236, 255, 248));
+
+        std::ostringstream detail;
+        detail
+            << "anchor=" << binding->anchorCastName
+            << " package_subimages=" << binding->packageSubimageCount;
+        RECT detailRect{
+            static_cast<LONG>(labelRect.X + 8.0F),
+            static_cast<LONG>(labelRect.Y + 20.0F),
+            static_cast<LONG>(labelRect.X + labelRect.Width - 8.0F),
+            static_cast<LONG>(labelRect.Y + labelRect.Height - 2.0F),
+        };
+        drawTextLine(dc, detailRect, detail.str(), RGB(164, 214, 154));
+    }
+}
+
 void drawLayoutScenePrimitives(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const std::vector<const LayoutScenePrimitive*>& primitives, float timelineProgress)
 {
     if (primitives.empty())
@@ -2053,6 +2295,8 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         << "\r\n"
         << assetViewerSummaryText(host.primaryContractFileName)
         << "\r\n"
+        << layoutCsdElementBindingSummary(host.primaryContractFileName)
+        << "\r\n"
         << "State: " << toString(runtime.state()) << "\r\n"
         << "Input locked: " << (runtime.isInputLocked() ? "yes" : "no") << "\r\n\r\n"
         << "Visible layers:\r\n";
@@ -2198,6 +2442,45 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         && selectedName == "exstagetails_common__ui_prov_playscreen.png"
         && previousName == "exstagetails_common__ui_exstage.png"
         && nextName == "exstagetails_common__ui_qte.png"
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAssetCsdBindingSmoke()
+{
+    const auto sonicBindings = layoutCsdElementBindingsForContract("sonic_stage_hud_reference.json");
+    const auto loadingBindings = layoutCsdElementBindingsForContract("loading_transition_reference.json");
+    const auto pauseBindings = layoutCsdElementBindingsForContract("pause_menu_reference.json");
+    const auto titleBindings = layoutCsdElementBindingsForContract("title_menu_reference.json");
+
+    if (sonicBindings.empty() || loadingBindings.empty() || pauseBindings.empty() || titleBindings.empty())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui asset csd binding smoke failed missing binding\n";
+        return 1;
+    }
+
+    const auto* sonic = sonicBindings.front();
+    const auto* loading = loadingBindings.front();
+    const auto* pause = pauseBindings.front();
+    const auto* title = titleBindings.front();
+
+    std::cout
+        << "sward_ui_runtime_debug_gui asset csd binding smoke ok "
+        << "bindings=" << kLayoutCsdElementBindings.size()
+        << " sonic=" << layoutCsdElementBindingDescriptor(*sonic)
+        << " loading=" << layoutCsdElementBindingDescriptor(*loading)
+        << " pause=" << layoutCsdElementBindingDescriptor(*pause)
+        << " title=" << layoutCsdElementBindingDescriptor(*title)
+        << '\n';
+
+    return sonic->sceneCastCount == 47
+        && sonic->sceneSubimageCount == 109
+        && loading->sceneCastCount == 28
+        && loading->sceneSubimageCount == 320
+        && pause->sceneCastCount == 1
+        && pause->sceneSubimageCount == 99
+        && title->sceneCastCount == 47
+        && title->sceneSubimageCount == 46
         ? 0
         : 1;
 }
@@ -3348,6 +3631,7 @@ private:
 
         std::string label = "Asset View: select a host with a local atlas";
         bool drewAtlas = false;
+        std::optional<Gdiplus::RectF> drawnAtlasRect;
         const auto files = visualAtlasSheetFiles();
         const auto selectedAssetIndex = selectedAssetGalleryIndex(host, files);
         if (selectedAssetIndex.has_value())
@@ -3389,6 +3673,7 @@ private:
                     graphics.DrawImage(&image, imageRect.X, imageRect.Y, imageRect.Width, imageRect.Height);
                     Gdiplus::Pen imagePen(Gdiplus::Color(180, 134, 218, 126), 1.0F);
                     graphics.DrawRectangle(&imagePen, imageRect);
+                    drawnAtlasRect = imageRect;
                     drewAtlas = true;
                 }
             }
@@ -3404,6 +3689,9 @@ private:
             };
             drawTextLine(dc, missingText, "No local atlas sheet is available for this host yet.", RGB(230, 235, 238), DT_LEFT | DT_WORDBREAK);
         }
+
+        if (host && drawnAtlasRect.has_value())
+            drawAssetCsdElementBindings(dc, graphics, *drawnAtlasRect, host->primaryContractFileName);
 
         Gdiplus::Pen canvasPen(Gdiplus::Color(255, 70, 88, 70), 2.0F);
         graphics.DrawRectangle(&canvasPen, canvas);
@@ -3434,6 +3722,15 @@ private:
             detail << " | asset=" << (*selectedAssetIndex + 1) << "/" << files.size();
         if (layoutEvidence)
             detail << " | layout=" << layoutEvidence->layoutId << " scenes=" << layoutEvidence->sceneCount << " anims=" << layoutEvidence->animationCount;
+        if (host)
+        {
+            const auto bindings = layoutCsdElementBindingsForContract(host->primaryContractFileName);
+            if (!bindings.empty())
+            {
+                const auto* first = bindings.front();
+                detail << " | csd=" << first->packageFileName << "/" << first->sceneName << "/" << first->castName;
+            }
+        }
         drawTextLine(dc, subText, detail.str(), RGB(164, 214, 154));
     }
 
@@ -3749,6 +4046,7 @@ private:
 
         text
             << assetViewerSummaryText(host.primaryContractFileName) << "\r\n"
+            << layoutCsdElementBindingSummary(host.primaryContractFileName) << "\r\n"
             << assetGallerySummaryText(host) << "\r\n"
             << host.notes << "\r\n\r\n"
             << "Click Run Host to drive this contract through the runtime.";
@@ -3987,6 +4285,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runMotionSmoke();
         if (command.find("--playback-smoke") != std::string::npos)
             return runPlaybackSmoke();
+        if (command.find("--asset-csd-binding-smoke") != std::string::npos)
+            return runAssetCsdBindingSmoke();
         if (command.find("--asset-gallery-smoke") != std::string::npos)
             return runAssetGallerySmoke();
         if (command.find("--asset-view-smoke") != std::string::npos)

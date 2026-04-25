@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 81 GUI asset CSD element bindings
+
+- added [`research_uiux/GUI_ASSET_CSD_ELEMENT_BINDINGS.md`](./research_uiux/GUI_ASSET_CSD_ELEMENT_BINDINGS.md)
+- bound Asset View atlas candidates to curated CSD package, scene, cast, and subimage evidence
+- added asset-viewer CSD cue markers plus `CSD element bindings:` detail-pane summaries for selected hosts
+- added `--asset-csd-binding-smoke`, verifying Title, Pause, Loading, and Sonic gameplay-HUD package/scene/cast counts under `b/rr81`
+
 ### Phase 80 GUI asset root discovery and gallery controls
 
 - added [`research_uiux/GUI_ASSET_GALLERY_ROOT_DISCOVERY.md`](./research_uiux/GUI_ASSET_GALLERY_ROOT_DISCOVERY.md)

@@ -48,4 +48,6 @@ sward_ui_runtime_debug_gui asset gallery smoke ok sheet_files=22 first=actioncom
 
 ## Boundary
 
-This is still atlas-sheet browsing, not a decoded DDS/subimage/CSD scene browser. The important product shift is that the native GUI now has stable local asset discovery and the first operator controls for walking the recovered sheet inventory. The next step is binding CSD subimage/cast records so a selected atlas sheet can expose individual UI elements instead of only the full composed sheet.
+This is still atlas-sheet browsing, not a decoded DDS/subimage/CSD scene browser. The important product shift is that the native GUI now has stable local asset discovery and the first operator controls for walking the recovered sheet inventory.
+
+Phase 81 continues that lane in [`GUI_ASSET_CSD_ELEMENT_BINDINGS.md`](./GUI_ASSET_CSD_ELEMENT_BINDINGS.md), binding selected atlas sheets to recovered CSD package/scene/cast/subimage evidence so Asset View can start behaving like an element inspector.
