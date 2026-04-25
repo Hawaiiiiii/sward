@@ -135,6 +135,14 @@ struct LayoutCsdElementBinding
     float height = 0.0F;
 };
 
+struct LayoutCsdElementCrop
+{
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+};
+
 struct LayoutPrimitiveDrawCommand
 {
     std::string_view sceneName;
@@ -251,6 +259,8 @@ inline constexpr const char* kPreviewPanelClassName = "SwardUiRuntimePreviewPane
 inline constexpr UINT_PTR kPlaybackTimerId = 2001;
 inline constexpr UINT kPlaybackTimerMilliseconds = 33;
 inline constexpr double kPlaybackTickSeconds = 1.0 / 30.0;
+inline constexpr int kRecoveredAtlasCanvasWidth = 1280;
+inline constexpr int kRecoveredAtlasCanvasHeight = 720;
 
 inline constexpr std::array<AtlasCandidate, 10> kPreviewAtlasCandidates{{
     { "title_menu_reference.json", "title", "mainmenu__ui_mainmenu.png", "exact" },
@@ -597,6 +607,48 @@ enum ControlId
         << "/" << binding.castName
         << ":casts=" << binding.sceneCastCount
         << ":subimages=" << binding.sceneSubimageCount;
+    return text.str();
+}
+
+[[nodiscard]] LayoutCsdElementCrop layoutCsdElementCropForBinding(const LayoutCsdElementBinding& binding)
+{
+    return {
+        static_cast<int>(std::lround(binding.x * static_cast<float>(kRecoveredAtlasCanvasWidth))),
+        static_cast<int>(std::lround(binding.y * static_cast<float>(kRecoveredAtlasCanvasHeight))),
+        std::max(1, static_cast<int>(std::lround(binding.width * static_cast<float>(kRecoveredAtlasCanvasWidth)))),
+        std::max(1, static_cast<int>(std::lround(binding.height * static_cast<float>(kRecoveredAtlasCanvasHeight)))),
+    };
+}
+
+[[nodiscard]] std::string layoutCsdElementCropDescriptor(const LayoutCsdElementBinding& binding)
+{
+    const auto crop = layoutCsdElementCropForBinding(binding);
+    std::ostringstream text;
+    text
+        << binding.sceneName
+        << ":" << crop.x << "," << crop.y << "," << crop.width << "x" << crop.height
+        << ":normalized="
+        << std::fixed << std::setprecision(2)
+        << binding.x << "," << binding.y << "," << binding.width << "x" << binding.height;
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutCsdElementCropSummary(std::string_view contractFileName, std::size_t requestedIndex)
+{
+    std::ostringstream text;
+    text << "CSD element crop:\r\n";
+
+    if (const auto* binding = layoutCsdElementBindingAt(contractFileName, requestedIndex))
+    {
+        text
+            << "  " << layoutCsdElementCropDescriptor(*binding)
+            << " | atlas=" << binding->atlasFileName
+            << " | anchor=" << binding->anchorCastName
+            << "\r\n";
+        return text.str();
+    }
+
+    text << "  none\r\n";
     return text.str();
 }
 
@@ -1879,6 +1931,67 @@ void drawAssetCsdElementBindings(HDC dc, Gdiplus::Graphics& graphics, const Gdip
     }
 }
 
+void drawAssetCsdElementCropPreview(HDC dc, Gdiplus::Graphics& graphics, Gdiplus::Image& atlasImage, const Gdiplus::RectF& canvas, const LayoutCsdElementBinding& binding)
+{
+    if (atlasImage.GetWidth() == 0 || atlasImage.GetHeight() == 0)
+        return;
+
+    const float panelWidth = std::min(330.0F, std::max(230.0F, canvas.Width * 0.34F));
+    const float panelHeight = std::min(180.0F, std::max(126.0F, canvas.Height * 0.28F));
+    Gdiplus::RectF panel(
+        canvas.X + canvas.Width - panelWidth - 14.0F,
+        canvas.Y + canvas.Height - panelHeight - 14.0F,
+        panelWidth,
+        panelHeight);
+
+    Gdiplus::SolidBrush panelBrush(Gdiplus::Color(232, 4, 10, 10));
+    Gdiplus::Pen panelPen(Gdiplus::Color(220, 247, 211, 72), 1.2F);
+    graphics.FillRectangle(&panelBrush, panel);
+    graphics.DrawRectangle(&panelPen, panel);
+
+    RECT titleRect{
+        static_cast<LONG>(panel.X + 10.0F),
+        static_cast<LONG>(panel.Y + 6.0F),
+        static_cast<LONG>(panel.X + panel.Width - 10.0F),
+        static_cast<LONG>(panel.Y + 28.0F),
+    };
+    drawTextLine(dc, titleRect, "CSD crop " + layoutCsdElementCropDescriptor(binding), RGB(255, 247, 177));
+
+    const float sourceX = std::clamp(binding.x * static_cast<float>(atlasImage.GetWidth()), 0.0F, static_cast<float>(atlasImage.GetWidth()));
+    const float sourceY = std::clamp(binding.y * static_cast<float>(atlasImage.GetHeight()), 0.0F, static_cast<float>(atlasImage.GetHeight()));
+    const float sourceWidth = std::max(1.0F, std::min(binding.width * static_cast<float>(atlasImage.GetWidth()), static_cast<float>(atlasImage.GetWidth()) - sourceX));
+    const float sourceHeight = std::max(1.0F, std::min(binding.height * static_cast<float>(atlasImage.GetHeight()), static_cast<float>(atlasImage.GetHeight()) - sourceY));
+
+    const Gdiplus::RectF previewBounds(panel.X + 10.0F, panel.Y + 34.0F, panel.Width - 20.0F, panel.Height - 62.0F);
+    const float cropAspect = sourceWidth / sourceHeight;
+    float previewWidth = previewBounds.Width;
+    float previewHeight = previewWidth / cropAspect;
+    if (previewHeight > previewBounds.Height)
+    {
+        previewHeight = previewBounds.Height;
+        previewWidth = previewHeight * cropAspect;
+    }
+    Gdiplus::RectF previewRect(
+        previewBounds.X + ((previewBounds.Width - previewWidth) / 2.0F),
+        previewBounds.Y + ((previewBounds.Height - previewHeight) / 2.0F),
+        previewWidth,
+        previewHeight);
+
+    Gdiplus::SolidBrush cropBacking(Gdiplus::Color(255, 12, 18, 23));
+    graphics.FillRectangle(&cropBacking, previewRect);
+    graphics.DrawImage(&atlasImage, previewRect, sourceX, sourceY, sourceWidth, sourceHeight, Gdiplus::UnitPixel);
+    Gdiplus::Pen cropPen(Gdiplus::Color(255, 151, 255, 223), 1.2F);
+    graphics.DrawRectangle(&cropPen, previewRect);
+
+    RECT detailRect{
+        static_cast<LONG>(panel.X + 10.0F),
+        static_cast<LONG>(panel.Y + panel.Height - 26.0F),
+        static_cast<LONG>(panel.X + panel.Width - 10.0F),
+        static_cast<LONG>(panel.Y + panel.Height - 4.0F),
+    };
+    drawTextLine(dc, detailRect, std::string("anchor=") + std::string(binding.anchorCastName) + " textures=" + std::string(binding.textureSummary), RGB(164, 214, 154));
+}
+
 void drawLayoutScenePrimitives(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const std::vector<const LayoutScenePrimitive*>& primitives, float timelineProgress)
 {
     if (primitives.empty())
@@ -2293,6 +2406,8 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         << "\r\n"
         << layoutCsdElementBindingNavigationSummary(host.primaryContractFileName, 0)
         << "\r\n"
+        << layoutCsdElementCropSummary(host.primaryContractFileName, 0)
+        << "\r\n"
         << layoutCsdElementBindingSummary(host.primaryContractFileName)
         << "\r\n"
         << "State: " << toString(runtime.state()) << "\r\n"
@@ -2517,6 +2632,51 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         && selected->sceneName == "so_speed_gauge"
         && next->sceneName == "so_ringenagy_gauge"
         && previous->sceneName == "ring_get_effect"
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAssetCsdCropSmoke()
+{
+    const auto* sonic = layoutCsdElementBindingAt("sonic_stage_hud_reference.json", 0);
+    const auto* loading = layoutCsdElementBindingAt("loading_transition_reference.json", 0);
+    const auto* title = layoutCsdElementBindingAt("title_menu_reference.json", 0);
+    const auto* pause = layoutCsdElementBindingAt("pause_menu_reference.json", 0);
+
+    if (!sonic || !loading || !title || !pause)
+    {
+        std::cerr << "sward_ui_runtime_debug_gui asset csd crop smoke failed missing binding set\n";
+        return 1;
+    }
+
+    std::cout
+        << "sward_ui_runtime_debug_gui asset csd crop smoke ok "
+        << "sonic=" << layoutCsdElementCropDescriptor(*sonic)
+        << " loading=" << layoutCsdElementCropDescriptor(*loading)
+        << " title=" << layoutCsdElementCropDescriptor(*title)
+        << " pause=" << layoutCsdElementCropDescriptor(*pause)
+        << '\n';
+
+    const auto sonicCrop = layoutCsdElementCropForBinding(*sonic);
+    const auto loadingCrop = layoutCsdElementCropForBinding(*loading);
+    const auto titleCrop = layoutCsdElementCropForBinding(*title);
+    const auto pauseCrop = layoutCsdElementCropForBinding(*pause);
+    return sonicCrop.x == 691
+        && sonicCrop.y == 418
+        && sonicCrop.width == 486
+        && sonicCrop.height == 86
+        && loadingCrop.x == 77
+        && loadingCrop.y == 58
+        && loadingCrop.width == 1126
+        && loadingCrop.height == 86
+        && titleCrop.x == 102
+        && titleCrop.y == 86
+        && titleCrop.width == 1050
+        && titleCrop.height == 130
+        && pauseCrop.x == 51
+        && pauseCrop.y == 58
+        && pauseCrop.width == 1178
+        && pauseCrop.height == 590
         ? 0
         : 1;
 }
@@ -3723,6 +3883,7 @@ private:
 
         std::string label = "Asset View: select a host with a local atlas";
         bool drewAtlas = false;
+        bool drewCsdElementOverlay = false;
         std::optional<Gdiplus::RectF> drawnAtlasRect;
         const auto files = visualAtlasSheetFiles();
         const auto selectedAssetIndex = selectedAssetGalleryIndex(host, files);
@@ -3767,6 +3928,18 @@ private:
                     graphics.DrawRectangle(&imagePen, imageRect);
                     drawnAtlasRect = imageRect;
                     drewAtlas = true;
+
+                    if (host)
+                    {
+                        drawAssetCsdElementBindings(dc, graphics, imageRect, host->primaryContractFileName, currentCsdElementIndex(*host));
+                        const auto bindings = layoutCsdElementBindingsForContract(host->primaryContractFileName);
+                        if (!bindings.empty())
+                        {
+                            const auto* selectedBinding = bindings[currentCsdElementIndex(*host)];
+                            drawAssetCsdElementCropPreview(dc, graphics, image, canvas, *selectedBinding);
+                        }
+                        drewCsdElementOverlay = true;
+                    }
                 }
             }
         }
@@ -3782,7 +3955,7 @@ private:
             drawTextLine(dc, missingText, "No local atlas sheet is available for this host yet.", RGB(230, 235, 238), DT_LEFT | DT_WORDBREAK);
         }
 
-        if (host && drawnAtlasRect.has_value())
+        if (host && drawnAtlasRect.has_value() && !drewCsdElementOverlay)
             drawAssetCsdElementBindings(dc, graphics, *drawnAtlasRect, host->primaryContractFileName, currentCsdElementIndex(*host));
 
         Gdiplus::Pen canvasPen(Gdiplus::Color(255, 70, 88, 70), 2.0F);
@@ -3822,6 +3995,7 @@ private:
                 const std::size_t elementIndex = currentCsdElementIndex(*host);
                 const auto* selected = bindings[elementIndex];
                 detail << " | csd=" << (elementIndex + 1) << "/" << bindings.size() << " " << selected->packageFileName << "/" << selected->sceneName << "/" << selected->castName;
+                detail << " | crop=" << layoutCsdElementCropDescriptor(*selected);
             }
         }
         drawTextLine(dc, subText, detail.str(), RGB(164, 214, 154));
@@ -4146,6 +4320,7 @@ private:
         text
             << assetViewerSummaryText(host.primaryContractFileName) << "\r\n"
             << layoutCsdElementBindingNavigationSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
+            << layoutCsdElementCropSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdElementBindingSummary(host.primaryContractFileName) << "\r\n"
             << assetGallerySummaryText(host) << "\r\n"
             << csdElementGallerySummaryText(host) << "\r\n"
@@ -4389,6 +4564,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runMotionSmoke();
         if (command.find("--playback-smoke") != std::string::npos)
             return runPlaybackSmoke();
+        if (command.find("--asset-csd-crop-smoke") != std::string::npos)
+            return runAssetCsdCropSmoke();
         if (command.find("--asset-csd-navigation-smoke") != std::string::npos)
             return runAssetCsdNavigationSmoke();
         if (command.find("--asset-csd-binding-smoke") != std::string::npos)

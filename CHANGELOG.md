@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 83 GUI asset CSD crop preview
+
+- added [`research_uiux/GUI_ASSET_CSD_CROP_PREVIEW.md`](./research_uiux/GUI_ASSET_CSD_CROP_PREVIEW.md)
+- added selected-element crop descriptors that convert CSD binding footprints into stable `1280x720` pixel rects
+- added a selected CSD crop inset in Asset View plus `CSD element crop:` detail-pane text
+- added `--asset-csd-crop-smoke`, verifying Sonic HUD, Loading, Title, and Pause selected crop rects under `b/rr83`
+
 ### Phase 82 GUI asset CSD element navigation
 
 - added [`research_uiux/GUI_ASSET_CSD_ELEMENT_NAVIGATION.md`](./research_uiux/GUI_ASSET_CSD_ELEMENT_NAVIGATION.md)

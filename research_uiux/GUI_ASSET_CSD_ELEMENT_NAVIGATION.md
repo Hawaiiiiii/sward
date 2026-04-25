@@ -10,6 +10,8 @@ Phase 82 turns the first Asset View CSD binding pass into a small element inspec
 b/rr82/sward_ui_runtime_debug_gui.exe
 ```
 
+Phase 83 continues this navigation layer with selected-element crop previews in [`GUI_ASSET_CSD_CROP_PREVIEW.md`](./GUI_ASSET_CSD_CROP_PREVIEW.md).
+
 ## What Changed
 
 - widened `LayoutCsdElementBinding` from `6` seed bindings to `41` package/scene/cast bindings
@@ -36,4 +38,4 @@ Current navigable sets:
 sward_ui_runtime_debug_gui asset csd navigation smoke ok sonic_count=6 selected=ui_prov_playscreen.yncp/so_speed_gauge/position_hd:casts=47:subimages=109 next=ui_prov_playscreen.yncp/so_ringenagy_gauge/position_hd:casts=43:subimages=109 previous=ui_prov_playscreen.yncp/ring_get_effect/position_hd:casts=2:subimages=109 loading_count=7 title_count=8 pause_count=8
 ```
 
-This is still not final CSD rendering. It is the bridge between atlas browsing and a real element viewer: each highlighted item now has evidence-backed package/scene/cast ownership, and the next useful step is deriving crop/rect previews and per-scene lists from decoded subimage/cast geometry.
+This is still not final CSD rendering. It is the bridge between atlas browsing and a real element viewer: each highlighted item now has evidence-backed package/scene/cast ownership. Phase 83 adds the first crop/footprint preview bridge; the next useful step is resolving exact subimage rectangles and cast-local transforms from decoded CSD geometry.

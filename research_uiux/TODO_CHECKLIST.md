@@ -599,6 +599,16 @@
 - [x] Build and smoke-check `b\rr82\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for Asset View CSD element navigation.
 
+## Phase 83 - GUI Asset CSD Crop Preview
+
+- [x] Add selected-element crop descriptors derived from CSD binding footprints.
+- [x] Convert selected CSD bindings into stable `1280x720` pixel rects.
+- [x] Surface `CSD element crop:` in the detail pane and runtime snapshot text.
+- [x] Draw a selected-element crop inset in Asset View when a local atlas image is available.
+- [x] Add `--asset-csd-crop-smoke`.
+- [x] Build and smoke-check `b\rr83\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for Asset View CSD crop previews.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -743,3 +753,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset root discovery plus atlas gallery navigation under `b\rr80`, keeping Asset View populated from both repo-root and build-dir launches.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD element bindings under `b\rr81`, tying Title, Pause, Loading, and gameplay-HUD proxy atlas candidates to package/scene/cast/subimage evidence.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD element navigation under `b\rr82`, widening the binding set to `41` package/scene/cast entries with selected-element highlighting and `Element Prev` / `Element Next` controls.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD crop previews under `b\rr83`, with selected-element `1280x720` crop rectangles for Sonic HUD, Loading, Title, and Pause smoke-guarded.
