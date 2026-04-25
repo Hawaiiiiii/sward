@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 67 GUI host readiness badges
+
+- added [`research_uiux/GUI_HOST_READINESS_BADGES.md`](./research_uiux/GUI_HOST_READINESS_BADGES.md)
+- added compact exact/proxy/layout/primitive/channel readiness badges to GUI host-list labels
+- added `--host-readiness-smoke`, verifying Sonic HUD proxy, Title exact-layout, and support contract-only labels under `b/rr67`
+- GUI-control-checked the native host listbox labels for `SonicMainDisplay.cpp` and `GameModeMainMenu_Test.cpp`
+
 ### Phase 66 GUI visual parity summary
 
 - added [`research_uiux/GUI_VISUAL_PARITY_SUMMARY.md`](./research_uiux/GUI_VISUAL_PARITY_SUMMARY.md)

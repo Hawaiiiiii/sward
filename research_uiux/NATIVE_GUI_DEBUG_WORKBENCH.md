@@ -4,10 +4,10 @@
 
 # <img src="../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Native GUI Debug Workbench
 
-Phase 51 added the first native, windowed SWARD UI runtime workbench. Phase 52 added the first visual preview surface, Phase 53 added gameplay-HUD proxy atlas binding, Phase 54 added timer-driven playback controls, Phase 55 added state-aware preview motion, Phase 56 added exact-family preview layouts, Phase 57 added decoded layout-evidence overlays, Phase 58 added frame-domain layout timeline readouts, Phase 59 added the first scene-primitive draw pass, Phase 60 widened primitives into gameplay HUD proxy previews, Phase 61 audits gameplay HUD primitive scene ownership, Phase 62 adds primitive animation-bank/frame-cursor cues, Phase 63 surfaces those cues in the GUI detail pane, Phase 64 adds primitive channel-classification cues, Phase 65 adds a compact primitive channel-count legend in the preview, and Phase 66 adds host-level visual parity summaries:
+Phase 51 added the first native, windowed SWARD UI runtime workbench. Phase 52 added the first visual preview surface, Phase 53 added gameplay-HUD proxy atlas binding, Phase 54 added timer-driven playback controls, Phase 55 added state-aware preview motion, Phase 56 added exact-family preview layouts, Phase 57 added decoded layout-evidence overlays, Phase 58 added frame-domain layout timeline readouts, Phase 59 added the first scene-primitive draw pass, Phase 60 widened primitives into gameplay HUD proxy previews, Phase 61 audits gameplay HUD primitive scene ownership, Phase 62 adds primitive animation-bank/frame-cursor cues, Phase 63 surfaces those cues in the GUI detail pane, Phase 64 adds primitive channel-classification cues, Phase 65 adds a compact primitive channel-count legend in the preview, Phase 66 adds host-level visual parity summaries, and Phase 67 adds host-list readiness badges:
 
 ```text
-b/rr66/sward_ui_runtime_debug_gui.exe
+b/rr67/sward_ui_runtime_debug_gui.exe
 ```
 
 This is the first proper non-CLI executable surface around the recovered runtime contracts and workbench host catalog. It now draws local atlas previews and schematic runtime overlays, but it is still not yet a 1:1 Sonic Unleashed UI renderer.
@@ -18,6 +18,7 @@ This is the first proper non-CLI executable surface around the recovered runtime
 - resolves the generated `176`-host workbench catalog
 - groups hosts into the current `11` recovered ownership buckets
 - presents native Win32 group and host listboxes
+- tags host listbox labels with compact exact/proxy/layout/primitive/channel/contract readiness badges
 - runs a selected host through `ScreenRuntime`
 - exposes `Run Host`, `Move Next`, `Confirm`, `Cancel`, and `Reset` controls
 - exposes Play/Pause and Step controls for timer-driven contract playback
@@ -51,6 +52,7 @@ This is the first proper non-CLI executable surface around the recovered runtime
 - supports `--layout-primitive-channel-smoke` so automation can verify primitive channel classifications without opening a window
 - supports `--layout-primitive-channel-legend-smoke` so automation can verify preview channel-count legends without opening a window
 - supports `--visual-parity-smoke` so automation can verify exact/proxy visual readiness without opening a window
+- supports `--host-readiness-smoke` so automation can verify host-list readiness badges without opening a window
 - supports `--layer-fill-smoke` so automation can verify the atlas-preserving structural fill policy without opening a window
 
 Verified smoke output:
@@ -69,6 +71,7 @@ sward_ui_runtime_debug_gui layout primitive detail smoke ok primitives=6 keyfram
 sward_ui_runtime_debug_gui layout primitive channel smoke ok sonic_transform=3 sonic_color=4 sonic_visibility=2 sonic_static=1 speed_channels=color+transform info2_channels=visibility bg_channels=static
 sward_ui_runtime_debug_gui layout primitive channel legend smoke ok legend=T3 C4 V2 S0 static1 label=Channels T3 C4 V2 S0 static1
 sward_ui_runtime_debug_gui visual parity smoke ok sonic_atlas=proxy sonic_layout=none sonic_primitives=6 sonic_channels=T3 C4 V2 S0 static1 title_atlas=exact title_layout=ui_mainmenu title_primitives=6
+sward_ui_runtime_debug_gui host readiness smoke ok sonic_label=SonicMainDisplay.cpp [proxy primitive channels] title_label=GameModeMainMenu_Test.cpp [exact layout primitive channels] support_label=AchievementManager.cpp [contract]
 sward_ui_runtime_debug_gui layer fill smoke ok backdrop_alpha=0 cinematic_alpha=0 content_alpha=0.58
 ```
 
@@ -90,13 +93,13 @@ That is the correct foundation for the larger goal: a visual SWARD UI workbench 
 - It now surfaces parsed layout/timeline evidence in the preview, but that evidence is still a diagnostic overlay rather than the renderer source of truth.
 - It now projects runtime progress into recovered layout frame domains, but it still does not sample original animation channels.
 - It now draws evidence-backed scene primitives, but those primitives are diagnostic scene boxes rather than exact authored node transforms.
-- Gameplay HUD primitives for Sonic/Werehog remain tied to the explicit `ui_prov_playscreen` proxy boundary, now with audited scene/keyframe ownership, animation-bank/frame-cursor cues, readable detail-pane parity text, channel-classification tags, compact preview channel-count legends, and host-level visual parity summaries for the current proxy primitive set.
+- Gameplay HUD primitives for Sonic/Werehog remain tied to the explicit `ui_prov_playscreen` proxy boundary, now with audited scene/keyframe ownership, animation-bank/frame-cursor cues, readable detail-pane parity text, channel-classification tags, compact preview channel-count legends, host-level visual parity summaries, and host-list readiness badges for the current proxy primitive set.
 - It does not yet bind every translated PPC seam into executable host-specific behavior.
 - It currently exercises contract-backed behavior: states, transitions, timing bands, prompts, overlay roles, and host metadata.
 
 ## Practical Runway
 
-The first non-CLI executable is present, Phase 52 added the first visual preview panel, Phase 53 made the gameplay-HUD host preview useful enough to inspect in the window, Phase 54 keeps intro/action bands visible through timer-driven playback, Phase 55 gives those bands visible preview motion, Phase 56 splits exact Title/Pause/Loading placement away from the generic role stack, Phase 57 puts parsed layout/timeline evidence into the same visual surface, Phase 58 adds frame-domain progress over those recovered timelines, Phase 59 starts drawing recovered scene primitives, Phase 60 widens that primitive layer to gameplay HUD proxy previews, Phase 61 guards the gameplay HUD proxy primitive ownership against the parsed deep-analysis scene facts, Phase 62 attaches recovered animation-bank names plus sampled frame cursors to that primitive layer, Phase 63 makes the same evidence readable in the operator detail pane, Phase 64 classifies the recovered track summaries into typed channel cues, Phase 65 adds a compact preview legend for those channel counts, and Phase 66 folds the atlas/layout/primitive/channel readiness into a single detail-pane parity summary.
+The first non-CLI executable is present, Phase 52 added the first visual preview panel, Phase 53 made the gameplay-HUD host preview useful enough to inspect in the window, Phase 54 keeps intro/action bands visible through timer-driven playback, Phase 55 gives those bands visible preview motion, Phase 56 splits exact Title/Pause/Loading placement away from the generic role stack, Phase 57 puts parsed layout/timeline evidence into the same visual surface, Phase 58 adds frame-domain progress over those recovered timelines, Phase 59 starts drawing recovered scene primitives, Phase 60 widens that primitive layer to gameplay HUD proxy previews, Phase 61 guards the gameplay HUD proxy primitive ownership against the parsed deep-analysis scene facts, Phase 62 attaches recovered animation-bank names plus sampled frame cursors to that primitive layer, Phase 63 makes the same evidence readable in the operator detail pane, Phase 64 classifies the recovered track summaries into typed channel cues, Phase 65 adds a compact preview legend for those channel counts, Phase 66 folds the atlas/layout/primitive/channel readiness into a single detail-pane parity summary, and Phase 67 pushes that readiness signal into the host browser.
 
 The next useful windowed milestones are:
 
@@ -106,4 +109,4 @@ The next useful windowed milestones are:
 4. Replace more local-only scaffold ownership with translated PPC-backed host behavior.
 5. Expand from diagnostic contracts into family-specific visual playback.
 
-Full 1:1-style UI/UX parity for all relevant Sonic Unleashed UI families is still a long-range target, not a single remaining build step. The honest state is: the proper `.exe` shell exists now; visual timing/motion scaffolding exists; first exact-family placement adapters exist; parsed layout evidence, frame-domain timeline readouts, diagnostic scene primitives, audited gameplay HUD proxy primitives, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, primitive channel legends, and host-level visual parity summaries are visible in the window; the full asset/layout/animation renderer is the next major productization track.
+Full 1:1-style UI/UX parity for all relevant Sonic Unleashed UI families is still a long-range target, not a single remaining build step. The honest state is: the proper `.exe` shell exists now; visual timing/motion scaffolding exists; first exact-family placement adapters exist; parsed layout evidence, frame-domain timeline readouts, diagnostic scene primitives, audited gameplay HUD proxy primitives, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, primitive channel legends, host-level visual parity summaries, and host-list readiness badges are visible in the window; the full asset/layout/animation renderer is the next major productization track.

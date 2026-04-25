@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr66" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr67" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -144,6 +144,12 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("VisualParitySummary", source_text)
         self.assertIn("visualParitySummaryText", source_text)
         self.assertIn("--visual-parity-smoke", source_text)
+
+    def test_gui_source_exposes_host_readiness_badges(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("hostVisualReadinessBadge", source_text)
+        self.assertIn("hostDisplayLabel", source_text)
+        self.assertIn("--host-readiness-smoke", source_text)
 
     def test_gui_source_exposes_gameplay_hud_proxy_primitives(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -499,6 +505,24 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("title_atlas=exact", completed.stdout)
         self.assertIn("title_layout=ui_mainmenu", completed.stdout)
         self.assertIn("title_primitives=6", completed.stdout)
+
+    def test_host_readiness_smoke_reports_browse_labels_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--host-readiness-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui host readiness smoke ok", completed.stdout)
+        self.assertIn("sonic_label=SonicMainDisplay.cpp [proxy primitive channels]", completed.stdout)
+        self.assertIn("title_label=GameModeMainMenu_Test.cpp [exact layout primitive channels]", completed.stdout)
+        self.assertIn("support_label=AchievementManager.cpp [contract]", completed.stdout)
 
 
 if __name__ == "__main__":

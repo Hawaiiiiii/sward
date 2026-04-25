@@ -509,6 +509,14 @@
 - [x] Build, smoke, and GUI-control-check `b\rr66\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for visual parity summaries.
 
+## Phase 67 - GUI Host Readiness Badges
+
+- [x] Add compact visual readiness badges to GUI host-list labels.
+- [x] Surface exact/proxy/layout/primitive/channel/contract readiness before a host is launched.
+- [x] Add `--host-readiness-smoke` for Sonic proxy, Title exact-layout, and support contract-only labels.
+- [x] Build, smoke, and GUI-listbox-check `b\rr67\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for host readiness badges.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -637,3 +645,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive channel cues under `b\rr64`, with Sonic HUD transform/color/visibility/static classifications smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive channel legends under `b\rr65`, with Sonic HUD transform/color/visibility/sprite/static counts visible in the preview.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI visual parity summaries under `b\rr66`, with exact Title and proxy Sonic HUD readiness smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI host readiness badges under `b\rr67`, with native host listbox labels smoke- and control-checked.

@@ -665,6 +665,43 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return text.str();
 }
 
+[[nodiscard]] bool visualParityHasChannels(const PrimitiveChannelCounts& counts)
+{
+    return counts.color > 0 || counts.sprite > 0 || counts.transform > 0 || counts.visibility > 0;
+}
+
+[[nodiscard]] std::string hostVisualReadinessBadge(const DebugWorkbenchHostEntry& host)
+{
+    const VisualParitySummary summary = visualParitySummaryForContract(host.primaryContractFileName);
+    std::vector<std::string_view> tokens;
+    if (summary.atlasBinding == "exact" || summary.atlasBinding == "proxy")
+        tokens.push_back(summary.atlasBinding);
+    if (summary.layoutId != "none")
+        tokens.push_back("layout");
+    if (summary.primitiveCount > 0)
+        tokens.push_back("primitive");
+    if (visualParityHasChannels(summary.channels))
+        tokens.push_back("channels");
+    if (tokens.empty())
+        tokens.push_back("contract");
+
+    std::ostringstream text;
+    text << "[";
+    for (std::size_t index = 0; index < tokens.size(); ++index)
+    {
+        if (index > 0)
+            text << " ";
+        text << tokens[index];
+    }
+    text << "]";
+    return text.str();
+}
+
+[[nodiscard]] std::string hostDisplayLabel(const DebugWorkbenchHostEntry& host)
+{
+    return std::string(host.hostDisplayName) + " " + hostVisualReadinessBadge(host);
+}
+
 [[nodiscard]] std::string layoutPrimitiveCueSummary(std::string_view contractFileName, float progress)
 {
     const auto primitives = layoutScenePrimitivesForContract(contractFileName);
@@ -1582,6 +1619,47 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         : 1;
 }
 
+[[nodiscard]] const DebugWorkbenchHostEntry* findWorkbenchHostByDisplayName(std::string_view displayName)
+{
+    const auto found = std::find_if(
+        kDebugWorkbenchHostEntries.begin(),
+        kDebugWorkbenchHostEntries.end(),
+        [displayName](const DebugWorkbenchHostEntry& host)
+        {
+            return host.hostDisplayName == displayName;
+        });
+    return found == kDebugWorkbenchHostEntries.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] int runHostReadinessSmoke()
+{
+    const auto* sonic = findWorkbenchHostByDisplayName("SonicMainDisplay.cpp");
+    const auto* title = findWorkbenchHostByDisplayName("GameModeMainMenu_Test.cpp");
+    const auto* support = findWorkbenchHostByDisplayName("AchievementManager.cpp");
+    if (!sonic || !title || !support)
+    {
+        std::cerr << "sward_ui_runtime_debug_gui host readiness smoke failed missing host\n";
+        return 1;
+    }
+
+    const std::string sonicLabel = hostDisplayLabel(*sonic);
+    const std::string titleLabel = hostDisplayLabel(*title);
+    const std::string supportLabel = hostDisplayLabel(*support);
+
+    std::cout
+        << "sward_ui_runtime_debug_gui host readiness smoke ok "
+        << "sonic_label=" << sonicLabel
+        << " title_label=" << titleLabel
+        << " support_label=" << supportLabel
+        << '\n';
+
+    return sonicLabel == "SonicMainDisplay.cpp [proxy primitive channels]"
+        && titleLabel == "GameModeMainMenu_Test.cpp [exact layout primitive channels]"
+        && supportLabel == "AchievementManager.cpp [contract]"
+        ? 0
+        : 1;
+}
+
 [[nodiscard]] int runLayerFillSmoke()
 {
     const float backdropAlpha = previewLayerFillAlpha("backdrop");
@@ -2122,7 +2200,7 @@ private:
         SendMessageA(m_hostList, LB_RESETCONTENT, 0, 0);
         for (const auto hostIndex : m_visibleHostIndices)
         {
-            const std::string label = std::string(m_hosts[hostIndex].metadata->hostDisplayName);
+            const std::string label = hostDisplayLabel(*m_hosts[hostIndex].metadata);
             SendMessageA(m_hostList, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
         }
 
@@ -2384,6 +2462,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runLayoutPrimitiveChannelLegendSmoke();
         if (command.find("--visual-parity-smoke") != std::string::npos)
             return runVisualParitySmoke();
+        if (command.find("--host-readiness-smoke") != std::string::npos)
+            return runHostReadinessSmoke();
         if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
             return runLayoutPrimitiveChannelSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)
