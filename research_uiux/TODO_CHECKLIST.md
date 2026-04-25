@@ -551,6 +551,15 @@
 - [x] Build and smoke-check `b\rr71\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for authored cast transform descriptors.
 
+## Phase 72 - GUI Authored Keyframe Curve Descriptors
+
+- [x] Add exact-family authored CSD keyframe curve descriptors to the GUI detail path.
+- [x] Bind parsed `layout_deep_analysis.json` keyframe evidence for Title, Pause, and Loading into first/last frame/value descriptors.
+- [x] Surface `scene/animation/cast/track:kfN:firstFrame=firstValue->lastFrame=lastValue:interpolation` descriptors in the GUI detail pane.
+- [x] Add `--authored-keyframe-curve-smoke` for Title, Pause, and Loading authored keyframe curves.
+- [x] Build and smoke-check `b\rr72\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for authored keyframe curve descriptors.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -684,3 +693,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout channel sample cues under `b\rr69`, with Title, Pause, and Loading exact-family samples smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout draw command descriptors under `b\rr70`, with Title, Pause, and Loading exact-family geometry descriptors smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored cast transform descriptors under `b\rr71`, with Title, Pause, and Loading parsed CSD cast descriptors smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored keyframe curve descriptors under `b\rr72`, with Title, Pause, and Loading parsed CSD keyframe descriptors smoke-guarded.

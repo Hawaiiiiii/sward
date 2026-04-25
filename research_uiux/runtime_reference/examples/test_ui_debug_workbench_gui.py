@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr71" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr72" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -176,6 +176,13 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("layoutAuthoredCastTransformsForContract", source_text)
         self.assertIn("Authored cast transforms:", source_text)
         self.assertIn("--authored-cast-transform-smoke", source_text)
+
+    def test_gui_source_exposes_authored_keyframe_curve_descriptors(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("LayoutAuthoredKeyframeCurve", source_text)
+        self.assertIn("layoutAuthoredKeyframeCurvesForContract", source_text)
+        self.assertIn("Authored keyframe curves:", source_text)
+        self.assertIn("--authored-keyframe-curve-smoke", source_text)
 
     def test_gui_source_exposes_gameplay_hud_proxy_primitives(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -622,6 +629,24 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("title_cast=mm_donut_move/index_text_pos:408,296,16x16:r0.00:s1.00,1.00:0xFFFFFFFF", completed.stdout)
         self.assertIn("pause_cast=bg/img:0,0,1280x720:r0.00:s1.00,1.00:0x00000000", completed.stdout)
         self.assertIn("loading_cast=bg_2/pos_text_sonic:640,360,16x16:r0.00:s1.00,1.00:0xFFFFFFFF", completed.stdout)
+
+    def test_authored_keyframe_curve_smoke_reports_exact_family_curves_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--authored-keyframe-curve-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui authored keyframe curve smoke ok", completed.stdout)
+        self.assertIn("title_curve=mm_donut_move/intro/index_text_pos/YPosition:kf5:0=0.411111->40=0.188889:Linear", completed.stdout)
+        self.assertIn("pause_curve=bg/Intro_Anim/img/Color:kf2:0=0.000000->15=0.000000:Linear", completed.stdout)
+        self.assertIn("loading_curve=bg_2/360_sonic1/pos_text_sonic/XPosition:kf1:0=0.500000->0=0.500000:Linear", completed.stdout)
 
 
 if __name__ == "__main__":

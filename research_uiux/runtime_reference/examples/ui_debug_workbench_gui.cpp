@@ -136,6 +136,22 @@ struct LayoutAuthoredCastTransform
     std::string_view color;
 };
 
+struct LayoutAuthoredKeyframeCurve
+{
+    std::string_view contractFileName;
+    std::string_view packageFileName;
+    std::string_view sceneName;
+    std::string_view animationName;
+    std::string_view castName;
+    std::string_view trackType;
+    int keyframeCount = 0;
+    int firstFrame = 0;
+    float firstValue = 0.0F;
+    int lastFrame = 0;
+    float lastValue = 0.0F;
+    std::string_view interpolationType;
+};
+
 struct PrimitiveChannelMask
 {
     bool color = false;
@@ -284,6 +300,12 @@ inline constexpr std::array<LayoutAuthoredCastTransform, 3> kLayoutAuthoredCastT
     { "loading_transition_reference.json", "ui_loading.yncp", "bg_2", "pos_text_sonic", 640, 360, 16, 16, 0.0F, 1.0F, 1.0F, "0xFFFFFFFF" },
 }};
 
+inline constexpr std::array<LayoutAuthoredKeyframeCurve, 3> kLayoutAuthoredKeyframeCurves{{
+    { "title_menu_reference.json", "ui_mainmenu.xncp", "mm_donut_move", "intro", "index_text_pos", "YPosition", 5, 0, 0.411111F, 40, 0.188889F, "Linear" },
+    { "pause_menu_reference.json", "ui_pause.yncp", "bg", "Intro_Anim", "img", "Color", 2, 0, 0.0F, 15, 0.0F, "Linear" },
+    { "loading_transition_reference.json", "ui_loading.yncp", "bg_2", "360_sonic1", "pos_text_sonic", "XPosition", 1, 0, 0.5F, 0, 0.5F, "Linear" },
+}};
+
 enum ControlId
 {
     kGroupListId = 1001,
@@ -381,6 +403,17 @@ enum ControlId
             transforms.push_back(&transform);
     }
     return transforms;
+}
+
+[[nodiscard]] std::vector<const LayoutAuthoredKeyframeCurve*> layoutAuthoredKeyframeCurvesForContract(std::string_view contractFileName)
+{
+    std::vector<const LayoutAuthoredKeyframeCurve*> curves;
+    for (const auto& curve : kLayoutAuthoredKeyframeCurves)
+    {
+        if (curve.contractFileName == contractFileName)
+            curves.push_back(&curve);
+    }
+    return curves;
 }
 
 [[nodiscard]] int layoutScenePrimitiveKeyframeTotal(const std::vector<const LayoutScenePrimitive*>& primitives)
@@ -774,6 +807,47 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
         text
             << "  " << transform->packageFileName
             << " :: " << layoutAuthoredCastTransformDescriptor(*transform)
+            << "\r\n";
+    }
+
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutAuthoredKeyframeCurveDescriptor(const LayoutAuthoredKeyframeCurve& curve)
+{
+    std::ostringstream text;
+    text << std::fixed << std::setprecision(6);
+    text
+        << curve.sceneName
+        << "/" << curve.animationName
+        << "/" << curve.castName
+        << "/" << curve.trackType
+        << ":kf" << curve.keyframeCount
+        << ":" << curve.firstFrame
+        << "=" << curve.firstValue
+        << "->" << curve.lastFrame
+        << "=" << curve.lastValue
+        << ":" << curve.interpolationType;
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutAuthoredKeyframeCurveSummary(std::string_view contractFileName)
+{
+    const auto curves = layoutAuthoredKeyframeCurvesForContract(contractFileName);
+    std::ostringstream text;
+    text << "Authored keyframe curves:\r\n";
+
+    if (curves.empty())
+    {
+        text << "  none\r\n";
+        return text.str();
+    }
+
+    for (const auto* curve : curves)
+    {
+        text
+            << "  " << curve->packageFileName
+            << " :: " << layoutAuthoredKeyframeCurveDescriptor(*curve)
             << "\r\n";
     }
 
@@ -1365,6 +1439,7 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     text << "\r\n" << layoutPrimitiveChannelSampleSummary(host.primaryContractFileName, primitiveProgress);
     text << "\r\n" << layoutPrimitiveDrawCommandSummary(host.primaryContractFileName, primitiveProgress, 1280, 720);
     text << "\r\n" << layoutAuthoredCastTransformSummary(host.primaryContractFileName);
+    text << "\r\n" << layoutAuthoredKeyframeCurveSummary(host.primaryContractFileName);
 
     text << "\r\nNotes:\r\n" << host.notes << "\r\n";
     return text.str();
@@ -1935,6 +2010,35 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         && titleFirst == "mm_donut_move:102,202,563x115:color+transform@110/220"
         && pauseFirst == "stick:435,187,589x101:color+transform+visibility@120/240"
         && loadingFirst == "bg_2:64,101,1152x115:color+transform@1/2"
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAuthoredKeyframeCurveSmoke()
+{
+    const auto title = layoutAuthoredKeyframeCurvesForContract("title_menu_reference.json");
+    const auto pause = layoutAuthoredKeyframeCurvesForContract("pause_menu_reference.json");
+    const auto loading = layoutAuthoredKeyframeCurvesForContract("loading_transition_reference.json");
+    if (title.empty() || pause.empty() || loading.empty())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui authored keyframe curve smoke failed missing exact-family authored curve\n";
+        return 1;
+    }
+
+    const std::string titleCurve = layoutAuthoredKeyframeCurveDescriptor(*title.front());
+    const std::string pauseCurve = layoutAuthoredKeyframeCurveDescriptor(*pause.front());
+    const std::string loadingCurve = layoutAuthoredKeyframeCurveDescriptor(*loading.front());
+
+    std::cout
+        << "sward_ui_runtime_debug_gui authored keyframe curve smoke ok "
+        << "title_curve=" << titleCurve
+        << " pause_curve=" << pauseCurve
+        << " loading_curve=" << loadingCurve
+        << '\n';
+
+    return titleCurve == "mm_donut_move/intro/index_text_pos/YPosition:kf5:0=0.411111->40=0.188889:Linear"
+        && pauseCurve == "bg/Intro_Anim/img/Color:kf2:0=0.000000->15=0.000000:Linear"
+        && loadingCurve == "bg_2/360_sonic1/pos_text_sonic/XPosition:kf1:0=0.500000->0=0.500000:Linear"
         ? 0
         : 1;
 }
@@ -2780,6 +2884,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runLayoutDrawCommandSmoke();
         if (command.find("--authored-cast-transform-smoke") != std::string::npos)
             return runAuthoredCastTransformSmoke();
+        if (command.find("--authored-keyframe-curve-smoke") != std::string::npos)
+            return runAuthoredKeyframeCurveSmoke();
         if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
             return runLayoutPrimitiveChannelSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)

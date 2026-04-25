@@ -10,7 +10,7 @@ Phase 71 adds the first authored CSD cast transform descriptor layer to the nati
 b/rr71/sward_ui_runtime_debug_gui.exe
 ```
 
-The previous draw-command descriptors used recovered primitive rectangles. This beat starts binding the renderer surface back to parsed authored cast data from `research_uiux/data/layout_deep_analysis.json`, using exact-family CSD packages for Title, Pause, and Loading.
+The previous draw-command descriptors used recovered primitive rectangles. This beat starts binding the renderer surface back to parsed authored cast data from `research_uiux/data/layout_deep_analysis.json`, using exact-family CSD packages for Title, Pause, and Loading. Phase 72 extends this path with authored keyframe curve descriptors.
 
 ## What Changed
 
