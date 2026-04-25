@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RENDERER_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "su_ui_asset_renderer.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr89" / "sward_su_ui_asset_renderer.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr90" / "sward_su_ui_asset_renderer.exe"
 
 
 class SuUiAssetRendererTests(unittest.TestCase):
@@ -47,6 +47,19 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("ui_ps1_gauge1.dds", source_text)
         self.assertIn("--renderer-smoke", source_text)
 
+    def test_renderer_source_exposes_visible_viewer_navigation(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("kPrevButtonId", source_text)
+        self.assertIn("kNextButtonId", source_text)
+        self.assertIn("kScreenLabelId", source_text)
+        self.assertIn("createRendererControls", source_text)
+        self.assertIn("layoutRendererControls", source_text)
+        self.assertIn("updateRendererStatus", source_text)
+        self.assertIn("selectedScreenIndexText", source_text)
+        self.assertIn('CreateWindowExW(0, L"BUTTON", L"Prev"', source_text)
+        self.assertIn('CreateWindowExW(0, L"BUTTON", L"Next"', source_text)
+        self.assertIn("--renderer-navigation-smoke", source_text)
+
     def test_renderer_catalog_starts_with_full_screen_composition_not_single_arrow(self) -> None:
         source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
         self.assertIn('screen.id == "LoadingComposite"', source_text)
@@ -79,6 +92,27 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("SonicTitleMenu:mm_bg_usual/black3:ui_mm_parts1.dds:DXT5:1280x640", completed.stdout)
         self.assertIn("TitleLogoSheet:title/logo_en_001:mat_title_en_001.dds:DXT5:256x512", completed.stdout)
         self.assertIn("SonicStageHud:so_speed_gauge/position_hd:ui_ps1_gauge1.dds:DXT5:256x128", completed.stdout)
+
+    def test_renderer_navigation_smoke_reports_interactive_catalog(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-navigation-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer navigation smoke ok", completed.stdout)
+        self.assertIn("screens=5", completed.stdout)
+        self.assertIn("controls=3", completed.stdout)
+        self.assertIn("first=LoadingComposite", completed.stdout)
+        self.assertIn("last=SonicStageHud", completed.stdout)
+        self.assertIn("label=1/5 LoadingComposite - LoadingTransition Composite", completed.stdout)
+        self.assertIn("screen=MainMenuComposite:casts=3:contract=title_menu_reference.json", completed.stdout)
 
 
 if __name__ == "__main__":

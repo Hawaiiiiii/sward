@@ -670,6 +670,16 @@
 - [x] Capture-check the renderer window and verify it opens on the full Loading composition.
 - [x] Generate a dedicated report for renderer composite sheets.
 
+## Phase 90 - SU UI Renderer Navigation Shell
+
+- [x] Add visible `Prev` / `Next` controls to the clean asset renderer.
+- [x] Add a native screen-index label so the current renderer page is discoverable.
+- [x] Keep keyboard cycling intact for fast inspection.
+- [x] Add `--renderer-navigation-smoke` for no-window catalog/control verification.
+- [x] Move the render canvas below the control chrome so resized/fullscreen windows keep the interaction model visible.
+- [x] Build, smoke-check, and launch-check `b\rr90\sward_su_ui_asset_renderer.exe`.
+- [x] Generate a dedicated report for the renderer navigation shell.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.

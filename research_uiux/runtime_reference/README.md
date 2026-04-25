@@ -4,7 +4,7 @@
 
 # <img src="../../docs/assets/branding/icon_sward.png" width="34" alt="SWARD icon"/> Runtime Reference
 
-This directory contains the Phase 21/24/27/37/38/39/40/42/43/45/47/48/50/51/52/53/54/55/56/57/58/59/60/61/62/63/64/65/66/67/68/69/70/71/72/73/74/75/76/77/78/79/80/81/82/83/84/85/86/87 reusable runtime and port-kit layer for the SWARD template-pack concepts.
+This directory contains the Phase 21/24/27/37/38/39/40/42/43/45/47/48/50/51/52/53/54/55/56/57/58/59/60/61/62/63/64/65/66/67/68/69/70/71/72/73/74/75/76/77/78/79/80/81/82/83/84/85/86/87/88/89/90 reusable runtime and port-kit layer for the SWARD template-pack concepts.
 
 It is intentionally decoupled from game assets and from the asset-backed Unleashed Recompiled runtime. The goal is to provide reusable implementation layers for original projects that need:
 
@@ -57,6 +57,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - selected CSD cast/subimage descriptors and source/destination draw commands in Asset View
 - selected CSD render-target plan previews that project draw commands into virtual `1280x720` target-space rectangles
 - selected CSD DDS blit previews that decode local DXT5 source textures for first real source-rect drawing
+- a separate clean SU UI asset renderer with local DDS-backed screen samples and visible `Prev` / `Next` navigation shell controls
 
 Contents:
 
@@ -124,99 +125,100 @@ Bundled reference profiles:
 Build the native layer locally:
 
 ```powershell
-cmd /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" && "C:\Program Files\CMake\bin\cmake.exe" -S research_uiux/runtime_reference -B b/rr89 -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release && "C:\Program Files\CMake\bin\cmake.exe" --build b/rr89 --config Release'
-b/rr89/sward_ui_runtime_example.exe
-b/rr89/sward_ui_runtime_title_menu_example.exe
-b/rr89/sward_ui_runtime_toast_example.exe
-b/rr89/sward_ui_runtime_c_example.exe
-b/rr89/sward_ui_runtime_debug_selector.exe
-b/rr89/sward_ui_runtime_debug_workbench.exe
-b/rr89/sward_ui_runtime_debug_gui.exe
-b/rr89/sward_su_ui_asset_renderer.exe
+cmd /c 'call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" && "C:\Program Files\CMake\bin\cmake.exe" -S research_uiux/runtime_reference -B b/rr90 -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release && "C:\Program Files\CMake\bin\cmake.exe" --build b/rr90 --config Release'
+b/rr90/sward_ui_runtime_example.exe
+b/rr90/sward_ui_runtime_title_menu_example.exe
+b/rr90/sward_ui_runtime_toast_example.exe
+b/rr90/sward_ui_runtime_c_example.exe
+b/rr90/sward_ui_runtime_debug_selector.exe
+b/rr90/sward_ui_runtime_debug_workbench.exe
+b/rr90/sward_ui_runtime_debug_gui.exe
+b/rr90/sward_su_ui_asset_renderer.exe
 ```
 
 Run against the bundled contracts:
 
 ```powershell
-b/rr89/sward_ui_runtime_example.exe
-b/rr89/sward_ui_runtime_title_menu_example.exe
-b/rr89/sward_ui_runtime_toast_example.exe
-b/rr89/sward_ui_runtime_c_example.exe
-b/rr89/sward_ui_runtime_debug_selector.exe --list
-b/rr89/sward_ui_runtime_debug_selector.exe --list-families
-b/rr89/sward_ui_runtime_debug_selector.exe TitleMenu.cpp
-b/rr89/sward_ui_runtime_debug_selector.exe TownManager.cpp
-b/rr89/sward_ui_runtime_debug_selector.exe FreeCamera.cpp
-b/rr89/sward_ui_runtime_debug_selector.exe Player3DBossCamera.cpp
-b/rr89/sward_ui_runtime_debug_selector.exe Application.cpp
-b/rr89/sward_ui_runtime_debug_selector.exe SequenceManagerImpl.cpp
-b/rr89/sward_ui_runtime_debug_selector.exe AchievementManager.cpp
-b/rr89/sward_ui_runtime_debug_selector.exe SoundController.cpp
-b/rr89/sward_ui_runtime_debug_selector.exe XMLManager.cpp
-b/rr89/sward_ui_runtime_debug_selector.exe --stay-open TitleManager.cpp
-b/rr89/sward_ui_runtime_debug_workbench.exe --list-groups
-b/rr89/sward_ui_runtime_debug_workbench.exe --catalog
-b/rr89/sward_ui_runtime_debug_workbench.exe --host GameModeMenuSelectDebug.cpp
-b/rr89/sward_ui_runtime_debug_workbench.exe --host InspirePreview.cpp
-b/rr89/sward_ui_runtime_debug_workbench.exe --host HudSonicStage.cpp
-b/rr89/sward_ui_runtime_debug_workbench.exe --host TownManager.cpp
-b/rr89/sward_ui_runtime_debug_workbench.exe --host Player3DBossCamera.cpp
-b/rr89/sward_ui_runtime_debug_workbench.exe --host TitleManager.cpp
-b/rr89/sward_ui_runtime_debug_workbench.exe --host WorldMapSelect.cpp
-b/rr89/sward_ui_runtime_debug_workbench.exe --host SequenceManagerImpl.cpp
-b/rr89/sward_ui_runtime_debug_workbench.exe --host AchievementManager.cpp
-b/rr89/sward_ui_runtime_debug_workbench.exe --host SoundController.cpp
-b/rr89/sward_ui_runtime_debug_workbench.exe --host XMLManager.cpp
-b/rr89/sward_ui_runtime_debug_gui.exe
-b/rr89/sward_ui_runtime_debug_gui.exe --smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --asset-view-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --asset-gallery-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --asset-csd-binding-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --asset-csd-navigation-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --asset-csd-crop-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --asset-csd-subimage-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --asset-csd-draw-command-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --asset-csd-render-plan-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --asset-csd-dds-blit-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --preview-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --playback-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --motion-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --family-preview-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --layout-evidence-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --layout-timeline-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --layout-primitive-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --layout-primitive-playback-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --layout-primitive-detail-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --layout-primitive-channel-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --layout-primitive-channel-legend-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --visual-parity-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --host-readiness-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --renderer-blocker-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --layout-channel-sample-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --layout-draw-command-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --authored-cast-transform-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --authored-keyframe-curve-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --authored-keyframe-sample-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --authored-sampled-transform-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --authored-sampled-transform-preview-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --authored-sampled-draw-command-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --authored-sampled-channel-command-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --authored-sampled-channel-eval-smoke
-b/rr89/sward_ui_runtime_debug_gui.exe --layer-fill-smoke
-b/rr89/sward_su_ui_asset_renderer.exe
-b/rr89/sward_su_ui_asset_renderer.exe --renderer-smoke
+b/rr90/sward_ui_runtime_example.exe
+b/rr90/sward_ui_runtime_title_menu_example.exe
+b/rr90/sward_ui_runtime_toast_example.exe
+b/rr90/sward_ui_runtime_c_example.exe
+b/rr90/sward_ui_runtime_debug_selector.exe --list
+b/rr90/sward_ui_runtime_debug_selector.exe --list-families
+b/rr90/sward_ui_runtime_debug_selector.exe TitleMenu.cpp
+b/rr90/sward_ui_runtime_debug_selector.exe TownManager.cpp
+b/rr90/sward_ui_runtime_debug_selector.exe FreeCamera.cpp
+b/rr90/sward_ui_runtime_debug_selector.exe Player3DBossCamera.cpp
+b/rr90/sward_ui_runtime_debug_selector.exe Application.cpp
+b/rr90/sward_ui_runtime_debug_selector.exe SequenceManagerImpl.cpp
+b/rr90/sward_ui_runtime_debug_selector.exe AchievementManager.cpp
+b/rr90/sward_ui_runtime_debug_selector.exe SoundController.cpp
+b/rr90/sward_ui_runtime_debug_selector.exe XMLManager.cpp
+b/rr90/sward_ui_runtime_debug_selector.exe --stay-open TitleManager.cpp
+b/rr90/sward_ui_runtime_debug_workbench.exe --list-groups
+b/rr90/sward_ui_runtime_debug_workbench.exe --catalog
+b/rr90/sward_ui_runtime_debug_workbench.exe --host GameModeMenuSelectDebug.cpp
+b/rr90/sward_ui_runtime_debug_workbench.exe --host InspirePreview.cpp
+b/rr90/sward_ui_runtime_debug_workbench.exe --host HudSonicStage.cpp
+b/rr90/sward_ui_runtime_debug_workbench.exe --host TownManager.cpp
+b/rr90/sward_ui_runtime_debug_workbench.exe --host Player3DBossCamera.cpp
+b/rr90/sward_ui_runtime_debug_workbench.exe --host TitleManager.cpp
+b/rr90/sward_ui_runtime_debug_workbench.exe --host WorldMapSelect.cpp
+b/rr90/sward_ui_runtime_debug_workbench.exe --host SequenceManagerImpl.cpp
+b/rr90/sward_ui_runtime_debug_workbench.exe --host AchievementManager.cpp
+b/rr90/sward_ui_runtime_debug_workbench.exe --host SoundController.cpp
+b/rr90/sward_ui_runtime_debug_workbench.exe --host XMLManager.cpp
+b/rr90/sward_ui_runtime_debug_gui.exe
+b/rr90/sward_ui_runtime_debug_gui.exe --smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --asset-view-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --asset-gallery-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --asset-csd-binding-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --asset-csd-navigation-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --asset-csd-crop-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --asset-csd-subimage-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --asset-csd-draw-command-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --asset-csd-render-plan-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --asset-csd-dds-blit-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --preview-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --playback-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --motion-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --family-preview-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --layout-evidence-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --layout-timeline-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --layout-primitive-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --layout-primitive-playback-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --layout-primitive-detail-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --layout-primitive-channel-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --layout-primitive-channel-legend-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --visual-parity-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --host-readiness-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --renderer-blocker-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --layout-channel-sample-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --layout-draw-command-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --authored-cast-transform-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --authored-keyframe-curve-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --authored-keyframe-sample-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --authored-sampled-transform-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --authored-sampled-transform-preview-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --authored-sampled-draw-command-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --authored-sampled-channel-command-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --authored-sampled-channel-eval-smoke
+b/rr90/sward_ui_runtime_debug_gui.exe --layer-fill-smoke
+b/rr90/sward_su_ui_asset_renderer.exe
+b/rr90/sward_su_ui_asset_renderer.exe --renderer-smoke
+b/rr90/sward_su_ui_asset_renderer.exe --renderer-navigation-smoke
 ```
 
 Run against an explicit portable contract path:
 
 ```powershell
-b/rr89/sward_ui_runtime_example.exe research_uiux/runtime_reference/contracts/world_map_reference.json
-b/rr89/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/mission_result_reference.json
-b/rr89/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/subtitle_cutscene_reference.json
-b/rr89/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/sonic_stage_hud_reference.json
-b/rr89/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/application_world_shell_reference.json
-b/rr89/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/frontend_sequence_shell_reference.json
-b/rr89/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/audio_cue_support_reference.json
+b/rr90/sward_ui_runtime_example.exe research_uiux/runtime_reference/contracts/world_map_reference.json
+b/rr90/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/mission_result_reference.json
+b/rr90/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/subtitle_cutscene_reference.json
+b/rr90/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/sonic_stage_hud_reference.json
+b/rr90/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/application_world_shell_reference.json
+b/rr90/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/frontend_sequence_shell_reference.json
+b/rr90/sward_ui_runtime_c_example.exe research_uiux/runtime_reference/contracts/audio_cue_support_reference.json
 ```
 
 Build the managed port locally:
@@ -295,9 +297,10 @@ GUI workbench notes:
 Clean asset renderer notes:
 
 - `sward_su_ui_asset_renderer.exe` is the separate clean viewer path for asset-backed SU UI rendering experiments
-- it opens a native `1280x720` design canvas without the debug workbench panes or archaeology overlays
+- it opens a native `1280x720` design canvas below a small `Prev` / `Next` / screen-label navigation shell
 - `Left`, `Right`, and `Space` cycle the current seed screen samples; `Esc` exits
 - `--renderer-smoke` verifies the first Loading, Title, and Sonic HUD CSD/cast DDS blits without opening the window
+- `--renderer-navigation-smoke` verifies the visible controls and screen catalog without opening the window
 - `--layout-primitive-channel-legend-smoke` verifies that legend without opening the GUI window
 - the detail pane now includes a `Visual parity:` summary for atlas exact/proxy state, layout evidence, primitive coverage, keyframes, and channel totals
 - `--visual-parity-smoke` verifies exact Title vs proxy Sonic HUD readiness without opening the GUI window
@@ -326,3 +329,4 @@ Clean asset renderer notes:
 - the sampled draw command path now evaluates authored channel state into alpha, visibility, and cast-space deltas
 - `--authored-sampled-channel-eval-smoke` verifies Title/Pause/Loading evaluated channel states without opening the GUI window
 - `--layer-fill-smoke` verifies that backdrop and cinematic-frame overlays preserve the atlas underneath
+

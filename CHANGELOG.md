@@ -9,6 +9,16 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 > [!NOTE]
 > This changelog tracks the publishable repo layer. Local-only extracted assets, generated PPC output, staged tools, and private inputs stay outside git history by design.
 
+## 2026-04-26
+
+### Phase 90 SU UI renderer navigation shell
+
+- added [`research_uiux/SU_UI_RENDERER_NAVIGATION_SHELL.md`](./research_uiux/SU_UI_RENDERER_NAVIGATION_SHELL.md)
+- added visible `Prev` / `Next` buttons plus a native screen-index label to `sward_su_ui_asset_renderer.exe`
+- moved the renderer canvas below a small control chrome so fullscreen/window resizing no longer hides the interaction model
+- added `--renderer-navigation-smoke`, verifying the `5`-screen catalog, `3` visible controls, first/last screen IDs, and current label text under `b/rr90`
+- preserved the existing DDS-backed renderer smoke for `5` screen samples, `8` casts, and `8` resolved local DDS blits
+
 ## 2026-04-25
 
 ### Phase 89 SU UI asset renderer composite sheets

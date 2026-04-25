@@ -26,6 +26,10 @@ namespace
 {
 inline constexpr int kDesignWidth = 1280;
 inline constexpr int kDesignHeight = 720;
+inline constexpr int kRendererChromeHeight = 44;
+inline constexpr int kPrevButtonId = 1001;
+inline constexpr int kNextButtonId = 1002;
+inline constexpr int kScreenLabelId = 1003;
 
 struct TextureSourceCandidate
 {
@@ -398,9 +402,19 @@ struct CachedTexture
 class SwardSuUiAssetRenderer
 {
 public:
+    [[nodiscard]] std::size_t selectedScreenIndex() const
+    {
+        return selectedScreenIndex_ % kRendererScreens.size();
+    }
+
+    [[nodiscard]] std::size_t screenCount() const
+    {
+        return kRendererScreens.size();
+    }
+
     [[nodiscard]] const SuUiRendererScreen& selectedScreen() const
     {
-        return kRendererScreens[selectedScreenIndex_ % kRendererScreens.size()];
+        return kRendererScreens[selectedScreenIndex()];
     }
 
     void selectNext()
@@ -411,6 +425,21 @@ public:
     void selectPrevious()
     {
         selectedScreenIndex_ = (selectedScreenIndex_ + kRendererScreens.size() - 1) % kRendererScreens.size();
+    }
+
+    [[nodiscard]] std::string selectedScreenIndexText() const
+    {
+        const auto& screen = selectedScreen();
+        std::ostringstream text;
+        text
+            << (selectedScreenIndex() + 1)
+            << "/"
+            << screenCount()
+            << " "
+            << screen.id
+            << " - "
+            << screen.displayName;
+        return text.str();
     }
 
     [[nodiscard]] const CachedTexture* textureFor(std::string_view textureFileName)
@@ -456,7 +485,79 @@ private:
     const float scale = std::min(clientWidth / static_cast<float>(kDesignWidth), clientHeight / static_cast<float>(kDesignHeight));
     const float width = static_cast<float>(kDesignWidth) * scale;
     const float height = static_cast<float>(kDesignHeight) * scale;
-    return Gdiplus::RectF((clientWidth - width) * 0.5F, (clientHeight - height) * 0.5F, width, height);
+    return Gdiplus::RectF(
+        static_cast<float>(client.left) + ((clientWidth - width) * 0.5F),
+        static_cast<float>(client.top) + ((clientHeight - height) * 0.5F),
+        width,
+        height);
+}
+
+[[nodiscard]] std::wstring widenAscii(std::string_view text)
+{
+    return std::wstring(text.begin(), text.end());
+}
+
+void updateRendererStatus(HWND hwnd, const SwardSuUiAssetRenderer& renderer)
+{
+    const auto status = renderer.selectedScreenIndexText();
+    const auto wideStatus = widenAscii(status);
+    if (HWND label = GetDlgItem(hwnd, kScreenLabelId))
+        SetWindowTextW(label, wideStatus.c_str());
+
+    const std::wstring title = L"SWARD SU UI Asset Renderer - " + wideStatus;
+    SetWindowTextW(hwnd, title.c_str());
+}
+
+void layoutRendererControls(HWND hwnd)
+{
+    RECT client{};
+    GetClientRect(hwnd, &client);
+
+    const int margin = 10;
+    const int buttonWidth = 88;
+    const int buttonHeight = 28;
+    const int top = 8;
+    const int nextLeft = margin + buttonWidth + 8;
+    const int labelLeft = nextLeft + buttonWidth + 14;
+    const int labelWidth = std::max(160L, client.right - labelLeft - margin);
+
+    if (HWND previous = GetDlgItem(hwnd, kPrevButtonId))
+        MoveWindow(previous, margin, top, buttonWidth, buttonHeight, TRUE);
+    if (HWND next = GetDlgItem(hwnd, kNextButtonId))
+        MoveWindow(next, nextLeft, top, buttonWidth, buttonHeight, TRUE);
+    if (HWND label = GetDlgItem(hwnd, kScreenLabelId))
+        MoveWindow(label, labelLeft, top, labelWidth, buttonHeight, TRUE);
+}
+
+void createRendererControls(HWND hwnd)
+{
+    const auto instance = reinterpret_cast<HINSTANCE>(GetWindowLongPtrW(hwnd, GWLP_HINSTANCE));
+
+    CreateWindowExW(0, L"BUTTON", L"Prev",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+        0, 0, 0, 0,
+        hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kPrevButtonId)),
+        instance,
+        nullptr);
+
+    CreateWindowExW(0, L"BUTTON", L"Next",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+        0, 0, 0, 0,
+        hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kNextButtonId)),
+        instance,
+        nullptr);
+
+    CreateWindowExW(0, L"STATIC", L"",
+        WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,
+        0, 0, 0, 0,
+        hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(kScreenLabelId)),
+        instance,
+        nullptr);
+
+    layoutRendererControls(hwnd);
 }
 
 void drawMissingCast(Gdiplus::Graphics& graphics, const Gdiplus::RectF& destination)
@@ -471,6 +572,8 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 {
     RECT client{};
     GetClientRect(hwnd, &client);
+    RECT renderClient = client;
+    renderClient.top = std::min(renderClient.bottom, renderClient.top + kRendererChromeHeight);
 
     Gdiplus::Graphics graphics(dc);
     graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
@@ -479,7 +582,10 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     Gdiplus::SolidBrush windowBrush(Gdiplus::Color(255, 0, 0, 0));
     graphics.FillRectangle(&windowBrush, 0, 0, client.right - client.left, client.bottom - client.top);
 
-    const auto canvas = canvasRectForClient(client);
+    Gdiplus::SolidBrush chromeBrush(Gdiplus::Color(255, 236, 236, 236));
+    graphics.FillRectangle(&chromeBrush, 0, 0, client.right - client.left, kRendererChromeHeight);
+
+    const auto canvas = canvasRectForClient(renderClient);
     const auto& screen = renderer.selectedScreen();
     Gdiplus::SolidBrush canvasBrush(screen.background);
     graphics.FillRectangle(&canvasBrush, canvas);
@@ -510,25 +616,54 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 {
     if (message == WM_NCCREATE)
     {
-        auto* create = reinterpret_cast<CREATESTRUCTA*>(lParam);
+        auto* create = reinterpret_cast<CREATESTRUCTW*>(lParam);
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(create->lpCreateParams));
     }
 
     auto* renderer = reinterpret_cast<SwardSuUiAssetRenderer*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
     switch (message)
     {
+    case WM_CREATE:
+        createRendererControls(hwnd);
+        if (renderer)
+            updateRendererStatus(hwnd, *renderer);
+        return 0;
+    case WM_SIZE:
+        layoutRendererControls(hwnd);
+        InvalidateRect(hwnd, nullptr, FALSE);
+        return 0;
+    case WM_COMMAND:
+        if (!renderer)
+            break;
+        if (LOWORD(wParam) == kPrevButtonId)
+        {
+            renderer->selectPrevious();
+            updateRendererStatus(hwnd, *renderer);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        if (LOWORD(wParam) == kNextButtonId)
+        {
+            renderer->selectNext();
+            updateRendererStatus(hwnd, *renderer);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        break;
     case WM_KEYDOWN:
         if (!renderer)
             break;
         if (wParam == VK_RIGHT || wParam == VK_SPACE)
         {
             renderer->selectNext();
+            updateRendererStatus(hwnd, *renderer);
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
         }
         if (wParam == VK_LEFT)
         {
             renderer->selectPrevious();
+            updateRendererStatus(hwnd, *renderer);
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
         }
@@ -620,6 +755,30 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return resolvedTextureCount == castCount ? 0 : 1;
 }
 
+[[nodiscard]] int runRendererNavigationSmoke()
+{
+    SwardSuUiAssetRenderer renderer;
+    std::cout
+        << "sward_su_ui_asset_renderer navigation smoke ok "
+        << "screens=" << renderer.screenCount()
+        << " controls=3"
+        << " first=" << kRendererScreens.front().id
+        << " last=" << kRendererScreens.back().id
+        << " label=" << renderer.selectedScreenIndexText()
+        << '\n';
+
+    for (const auto& screen : kRendererScreens)
+    {
+        std::cout
+            << "screen=" << screen.id
+            << ":casts=" << screen.castCount
+            << ":contract=" << screen.contractFileName
+            << '\n';
+    }
+
+    return 0;
+}
+
 [[nodiscard]] bool commandLineHasFlag(std::string_view flag)
 {
     const std::string commandLine = GetCommandLineA();
@@ -682,6 +841,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
 {
     if (commandLineHasFlag("--renderer-smoke"))
         return runRendererSmoke();
+    if (commandLineHasFlag("--renderer-navigation-smoke"))
+        return runRendererNavigationSmoke();
 
     return runRendererWindow(instance, showCommand);
 }

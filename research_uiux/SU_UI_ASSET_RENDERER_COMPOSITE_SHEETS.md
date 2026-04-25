@@ -55,4 +55,4 @@ The correct next product lane is:
 1. shared renderer catalog extracted from the debug workbench evidence
 2. full-family CSD cast/draw-command batches for Loading, Main Menu, Pause, Status, Results, World Map, and Gameplay HUD
 3. timeline playback in the clean renderer
-4. a real viewer shell with screen/family navigation rather than only keyboard cycling
+4. broader visible screen/family navigation beyond the Phase 90 `Prev` / `Next` shell
