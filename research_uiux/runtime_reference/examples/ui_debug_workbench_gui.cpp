@@ -126,6 +126,15 @@ struct PrimitiveChannelCounts
     int staticPrimitive = 0;
 };
 
+struct VisualParitySummary
+{
+    std::string atlasBinding = "none";
+    std::string layoutId = "none";
+    int primitiveCount = 0;
+    int keyframeCount = 0;
+    PrimitiveChannelCounts channels;
+};
+
 inline constexpr const char* kPreviewPanelClassName = "SwardUiRuntimePreviewPanel";
 inline constexpr UINT_PTR kPlaybackTimerId = 2001;
 inline constexpr UINT kPlaybackTimerMilliseconds = 33;
@@ -604,6 +613,58 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return text.str();
 }
 
+[[nodiscard]] std::string visualParityChannelToken(const PrimitiveChannelCounts& counts)
+{
+    std::ostringstream text;
+    text
+        << "T" << counts.transform
+        << " C" << counts.color
+        << " V" << counts.visibility
+        << " S" << counts.sprite
+        << " static" << counts.staticPrimitive;
+    return text.str();
+}
+
+[[nodiscard]] VisualParitySummary visualParitySummaryForContract(std::string_view contractFileName)
+{
+    const auto* candidate = atlasCandidateForContract(contractFileName);
+    const auto* evidence = layoutEvidenceForContract(contractFileName);
+    const auto primitives = layoutScenePrimitivesForContract(contractFileName);
+
+    VisualParitySummary summary;
+    if (candidate)
+        summary.atlasBinding = std::string(candidate->matchKind);
+    if (evidence)
+        summary.layoutId = std::string(evidence->layoutId);
+    summary.primitiveCount = static_cast<int>(primitives.size());
+    summary.keyframeCount = layoutScenePrimitiveKeyframeTotal(primitives);
+    summary.channels = layoutPrimitiveChannelCounts(primitives);
+    return summary;
+}
+
+[[nodiscard]] std::string visualParitySummaryText(std::string_view contractFileName)
+{
+    const VisualParitySummary summary = visualParitySummaryForContract(contractFileName);
+    std::ostringstream text;
+    text
+        << "Visual parity:\r\n"
+        << "  atlas=" << summary.atlasBinding
+        << " layout=" << summary.layoutId
+        << " primitives=" << summary.primitiveCount
+        << " keyframes=" << summary.keyframeCount
+        << " channels=" << visualParityChannelToken(summary.channels)
+        << "\r\n";
+
+    if (summary.atlasBinding == "proxy")
+        text << "  boundary=proxy atlas; exact loose HUD payload still unrecovered\r\n";
+    else if (summary.atlasBinding == "exact")
+        text << "  boundary=exact atlas candidate; still diagnostic until CSD channels drive draw commands\r\n";
+    else
+        text << "  boundary=contract-only; atlas/layout primitive evidence not yet bound\r\n";
+
+    return text.str();
+}
+
 [[nodiscard]] std::string layoutPrimitiveCueSummary(std::string_view contractFileName, float progress)
 {
     const auto primitives = layoutScenePrimitivesForContract(contractFileName);
@@ -1057,6 +1118,8 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
 
     text
         << "\r\n"
+        << visualParitySummaryText(host.primaryContractFileName)
+        << "\r\n"
         << "State: " << toString(runtime.state()) << "\r\n"
         << "Input locked: " << (runtime.isInputLocked() ? "yes" : "no") << "\r\n\r\n"
         << "Visible layers:\r\n";
@@ -1487,6 +1550,34 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         && counts.sprite == 0
         && counts.staticPrimitive == 1
         && label == "Channels T3 C4 V2 S0 static1"
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runVisualParitySmoke()
+{
+    const VisualParitySummary sonic = visualParitySummaryForContract("sonic_stage_hud_reference.json");
+    const VisualParitySummary title = visualParitySummaryForContract("title_menu_reference.json");
+    const std::string sonicChannels = visualParityChannelToken(sonic.channels);
+
+    std::cout
+        << "sward_ui_runtime_debug_gui visual parity smoke ok "
+        << "sonic_atlas=" << sonic.atlasBinding
+        << " sonic_layout=" << sonic.layoutId
+        << " sonic_primitives=" << sonic.primitiveCount
+        << " sonic_channels=" << sonicChannels
+        << " title_atlas=" << title.atlasBinding
+        << " title_layout=" << title.layoutId
+        << " title_primitives=" << title.primitiveCount
+        << '\n';
+
+    return sonic.atlasBinding == "proxy"
+        && sonic.layoutId == "none"
+        && sonic.primitiveCount == 6
+        && sonicChannels == "T3 C4 V2 S0 static1"
+        && title.atlasBinding == "exact"
+        && title.layoutId == "ui_mainmenu"
+        && title.primitiveCount == 6
         ? 0
         : 1;
 }
@@ -2291,6 +2382,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runLayoutPrimitiveDetailSmoke();
         if (command.find("--layout-primitive-channel-legend-smoke") != std::string::npos)
             return runLayoutPrimitiveChannelLegendSmoke();
+        if (command.find("--visual-parity-smoke") != std::string::npos)
+            return runVisualParitySmoke();
         if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
             return runLayoutPrimitiveChannelSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)

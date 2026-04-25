@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 66 GUI visual parity summary
+
+- added [`research_uiux/GUI_VISUAL_PARITY_SUMMARY.md`](./research_uiux/GUI_VISUAL_PARITY_SUMMARY.md)
+- added a `Visual parity` detail-pane summary for selected hosts
+- surfaced exact/proxy/none atlas binding, layout evidence, primitive counts, keyframe totals, and primitive channel totals in one operator readout
+- added `--visual-parity-smoke`, verifying exact Title vs proxy Sonic HUD readiness under `b/rr66`
+
 ### Phase 65 GUI layout primitive channel legend
 
 - added [`research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_LEGEND.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_LEGEND.md)

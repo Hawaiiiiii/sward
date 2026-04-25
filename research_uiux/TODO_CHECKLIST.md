@@ -501,6 +501,14 @@
 - [x] Build, smoke, and capture-check `b\rr65\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for primitive channel legend.
 
+## Phase 66 - GUI Visual Parity Summary
+
+- [x] Add a compact detail-pane parity summary for selected visual hosts.
+- [x] Surface exact/proxy/none atlas binding, layout evidence, primitive counts, keyframes, and channel totals together.
+- [x] Add `--visual-parity-smoke` for exact Title vs proxy Sonic HUD readiness checks.
+- [x] Build, smoke, and GUI-control-check `b\rr66\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for visual parity summaries.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -628,3 +636,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive detail cues under `b\rr63`, with the Sonic HUD primitive parity summary visible through the native detail pane.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive channel cues under `b\rr64`, with Sonic HUD transform/color/visibility/static classifications smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive channel legends under `b\rr65`, with Sonic HUD transform/color/visibility/sprite/static counts visible in the preview.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI visual parity summaries under `b\rr66`, with exact Title and proxy Sonic HUD readiness smoke-guarded.

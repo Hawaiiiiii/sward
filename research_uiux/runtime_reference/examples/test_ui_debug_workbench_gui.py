@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr65" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr66" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -138,6 +138,12 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("PrimitiveChannelCounts", source_text)
         self.assertIn("drawLayoutPrimitiveChannelLegend", source_text)
         self.assertIn("--layout-primitive-channel-legend-smoke", source_text)
+
+    def test_gui_source_exposes_visual_parity_summary(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("VisualParitySummary", source_text)
+        self.assertIn("visualParitySummaryText", source_text)
+        self.assertIn("--visual-parity-smoke", source_text)
 
     def test_gui_source_exposes_gameplay_hud_proxy_primitives(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -471,6 +477,28 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("sward_ui_runtime_debug_gui layout primitive channel legend smoke ok", completed.stdout)
         self.assertIn("legend=T3 C4 V2 S0 static1", completed.stdout)
         self.assertIn("label=Channels T3 C4 V2 S0 static1", completed.stdout)
+
+    def test_visual_parity_smoke_reports_exact_proxy_and_primitive_readiness_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--visual-parity-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui visual parity smoke ok", completed.stdout)
+        self.assertIn("sonic_atlas=proxy", completed.stdout)
+        self.assertIn("sonic_layout=none", completed.stdout)
+        self.assertIn("sonic_primitives=6", completed.stdout)
+        self.assertIn("sonic_channels=T3 C4 V2 S0 static1", completed.stdout)
+        self.assertIn("title_atlas=exact", completed.stdout)
+        self.assertIn("title_layout=ui_mainmenu", completed.stdout)
+        self.assertIn("title_primitives=6", completed.stdout)
 
 
 if __name__ == "__main__":
