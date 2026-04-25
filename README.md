@@ -113,6 +113,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the first exact-family authored sampled transform descriptors, use [`research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_DESCRIPTORS.md).
 
+> [!TIP]
+> For the first preview markers drawn from those authored sampled transforms, use [`research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_PREVIEW.md`](./research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_PREVIEW.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:

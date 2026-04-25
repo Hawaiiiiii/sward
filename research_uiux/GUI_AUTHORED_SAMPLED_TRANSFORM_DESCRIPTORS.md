@@ -59,3 +59,5 @@ sward_ui_runtime_debug_gui authored sampled transform smoke ok title_transform=m
 ## Boundary
 
 These descriptors are still diagnostic. They prove that authored cast rectangles can be adjusted by sampled authored transform tracks, but the preview does not yet use these descriptors as the primary draw source for full CSD playback.
+
+Phase 75 builds directly on this descriptor layer by drawing the first Title and Loading authored sampled transform markers in the native GUI preview.

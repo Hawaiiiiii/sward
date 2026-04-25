@@ -162,6 +162,14 @@ struct LayoutAuthoredSampledTransform
     std::size_t sampleIndex = 0;
 };
 
+struct LayoutAuthoredSampledTransformPixels
+{
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+};
+
 struct PrimitiveChannelMask
 {
     bool color = false;
@@ -963,7 +971,7 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return text.str();
 }
 
-[[nodiscard]] std::string layoutAuthoredSampledTransformDescriptor(const LayoutAuthoredSampledTransform& sampledTransform)
+[[nodiscard]] LayoutAuthoredSampledTransformPixels layoutAuthoredSampledTransformPixels(const LayoutAuthoredSampledTransform& sampledTransform)
 {
     const auto& transform = kLayoutAuthoredCastTransforms[sampledTransform.transformIndex];
     const auto& sample = kLayoutAuthoredKeyframeSamples[sampledTransform.sampleIndex];
@@ -977,16 +985,43 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     else if (curve.trackType == std::string_view("YPosition"))
         y = static_cast<int>(std::lround(sampledValue * 720.0F));
 
+    return LayoutAuthoredSampledTransformPixels{ x, y, transform.width, transform.height };
+}
+
+[[nodiscard]] std::string layoutAuthoredSampledTransformPreviewDescriptor(const LayoutAuthoredSampledTransform& sampledTransform)
+{
+    const auto& transform = kLayoutAuthoredCastTransforms[sampledTransform.transformIndex];
+    const LayoutAuthoredSampledTransformPixels pixels = layoutAuthoredSampledTransformPixels(sampledTransform);
+
+    std::ostringstream text;
+    text
+        << transform.sceneName
+        << "/" << transform.castName
+        << ":" << pixels.x
+        << "," << pixels.y
+        << "," << pixels.width
+        << "x" << pixels.height;
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutAuthoredSampledTransformDescriptor(const LayoutAuthoredSampledTransform& sampledTransform)
+{
+    const auto& transform = kLayoutAuthoredCastTransforms[sampledTransform.transformIndex];
+    const auto& sample = kLayoutAuthoredKeyframeSamples[sampledTransform.sampleIndex];
+    const auto& curve = kLayoutAuthoredKeyframeCurves[sample.curveIndex];
+    const float sampledValue = layoutAuthoredKeyframeCurveValueAtFrame(curve, sample.frame);
+    const LayoutAuthoredSampledTransformPixels pixels = layoutAuthoredSampledTransformPixels(sampledTransform);
+
     std::ostringstream text;
     text << std::fixed << std::setprecision(6);
     text
         << transform.sceneName
         << "/" << transform.castName
         << "@" << sample.frame
-        << ":" << x
-        << "," << y
-        << "," << transform.width
-        << "x" << transform.height
+        << ":" << pixels.x
+        << "," << pixels.y
+        << "," << pixels.width
+        << "x" << pixels.height
         << ":" << curve.trackType
         << "=" << sampledValue;
     return text.str();
@@ -1212,6 +1247,56 @@ void drawLayoutTimelineBar(Gdiplus::Graphics& graphics, const Gdiplus::RectF& ba
 }
 
 [[nodiscard]] Gdiplus::RectF clampRectToCanvas(Gdiplus::RectF rect, const Gdiplus::RectF& canvas);
+
+[[nodiscard]] Gdiplus::RectF layoutAuthoredSampledTransformRect(const LayoutAuthoredSampledTransform& sampledTransform, const Gdiplus::RectF& canvas)
+{
+    const LayoutAuthoredSampledTransformPixels pixels = layoutAuthoredSampledTransformPixels(sampledTransform);
+    return clampRectToCanvas(
+        Gdiplus::RectF(
+            canvas.X + (static_cast<float>(pixels.x) / 1280.0F * canvas.Width),
+            canvas.Y + (static_cast<float>(pixels.y) / 720.0F * canvas.Height),
+            std::max(2.0F, static_cast<float>(pixels.width) / 1280.0F * canvas.Width),
+            std::max(2.0F, static_cast<float>(pixels.height) / 720.0F * canvas.Height)),
+        canvas);
+}
+
+void drawAuthoredSampledTransforms(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, std::string_view contractFileName)
+{
+    const auto sampledTransforms = layoutAuthoredSampledTransformsForContract(contractFileName);
+    if (sampledTransforms.empty())
+        return;
+
+    for (const auto* sampledTransform : sampledTransforms)
+    {
+        const Gdiplus::RectF markerRect = layoutAuthoredSampledTransformRect(*sampledTransform, canvas);
+        Gdiplus::SolidBrush markerBrush(Gdiplus::Color(110, 247, 211, 72));
+        Gdiplus::Pen markerPen(Gdiplus::Color(245, 255, 247, 177), 1.6F);
+        graphics.FillRectangle(&markerBrush, markerRect);
+        graphics.DrawRectangle(&markerPen, markerRect);
+
+        const float labelWidth = std::min(360.0F, std::max(190.0F, canvas.Width * 0.42F));
+        const float labelHeight = 22.0F;
+        float labelX = markerRect.X + markerRect.Width + 8.0F;
+        if (labelX + labelWidth > canvas.X + canvas.Width - 8.0F)
+            labelX = markerRect.X - labelWidth - 8.0F;
+        labelX = std::max(canvas.X + 8.0F, std::min(labelX, canvas.X + canvas.Width - labelWidth - 8.0F));
+        const float labelY = std::max(canvas.Y + 8.0F, std::min(markerRect.Y - 4.0F, canvas.Y + canvas.Height - labelHeight - 8.0F));
+
+        Gdiplus::RectF labelRect(labelX, labelY, labelWidth, labelHeight);
+        Gdiplus::SolidBrush labelBrush(Gdiplus::Color(230, 12, 18, 23));
+        Gdiplus::Pen labelPen(Gdiplus::Color(230, 247, 211, 72), 1.0F);
+        graphics.FillRectangle(&labelBrush, labelRect);
+        graphics.DrawRectangle(&labelPen, labelRect);
+
+        RECT textRect{
+            static_cast<LONG>(labelRect.X + 6.0F),
+            static_cast<LONG>(labelRect.Y),
+            static_cast<LONG>(labelRect.X + labelRect.Width - 6.0F),
+            static_cast<LONG>(labelRect.Y + labelRect.Height),
+        };
+        drawTextLine(dc, textRect, "authored sampled " + layoutAuthoredSampledTransformPreviewDescriptor(*sampledTransform), RGB(255, 247, 177));
+    }
+}
 
 void drawLayoutScenePrimitives(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const std::vector<const LayoutScenePrimitive*>& primitives, float timelineProgress)
 {
@@ -2308,6 +2393,31 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         : 1;
 }
 
+[[nodiscard]] int runAuthoredSampledTransformPreviewSmoke()
+{
+    const auto title = layoutAuthoredSampledTransformsForContract("title_menu_reference.json");
+    const auto loading = layoutAuthoredSampledTransformsForContract("loading_transition_reference.json");
+    if (title.empty() || loading.empty())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui authored sampled transform preview smoke failed missing exact-family transform sample\n";
+        return 1;
+    }
+
+    const std::string titlePreview = layoutAuthoredSampledTransformPreviewDescriptor(*title.front());
+    const std::string loadingPreview = layoutAuthoredSampledTransformPreviewDescriptor(*loading.front());
+
+    std::cout
+        << "sward_ui_runtime_debug_gui authored sampled transform preview smoke ok "
+        << "title_preview=" << titlePreview
+        << " loading_preview=" << loadingPreview
+        << '\n';
+
+    return titlePreview == "mm_donut_move/index_text_pos:408,163,16x16"
+        && loadingPreview == "bg_2/pos_text_sonic:640,360,16x16"
+        ? 0
+        : 1;
+}
+
 [[nodiscard]] int runAuthoredCastTransformSmoke()
 {
     const auto title = layoutAuthoredCastTransformsForContract("title_menu_reference.json");
@@ -2763,6 +2873,8 @@ private:
         }
 
         drawLayoutScenePrimitives(dc, graphics, canvas, layoutPrimitives, stateLinearProgress);
+        if (host)
+            drawAuthoredSampledTransforms(dc, graphics, canvas, host->primaryContractFileName);
         drawLayoutPrimitiveChannelLegend(dc, graphics, canvas, layoutPrimitives);
 
         if (m_runtime)
@@ -3153,6 +3265,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runAuthoredKeyframeCurveSmoke();
         if (command.find("--authored-keyframe-sample-smoke") != std::string::npos)
             return runAuthoredKeyframeSampleSmoke();
+        if (command.find("--authored-sampled-transform-preview-smoke") != std::string::npos)
+            return runAuthoredSampledTransformPreviewSmoke();
         if (command.find("--authored-sampled-transform-smoke") != std::string::npos)
             return runAuthoredSampledTransformSmoke();
         if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
