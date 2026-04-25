@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 70 GUI layout draw command descriptors
+
+- added [`research_uiux/GUI_LAYOUT_DRAW_COMMAND_DESCRIPTORS.md`](./research_uiux/GUI_LAYOUT_DRAW_COMMAND_DESCRIPTORS.md)
+- added renderer-facing draw command descriptors for exact-family layout primitives
+- converted recovered normalized primitive bounds into deterministic 1280x720 geometry plus sampled channel tokens
+- added `--layout-draw-command-smoke`, verifying Title, Pause, and Loading descriptor geometry under `b/rr70`
+
 ### Phase 69 GUI layout channel sample cues
 
 - added [`research_uiux/GUI_LAYOUT_CHANNEL_SAMPLE_CUES.md`](./research_uiux/GUI_LAYOUT_CHANNEL_SAMPLE_CUES.md)

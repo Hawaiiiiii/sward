@@ -109,6 +109,16 @@ struct LayoutScenePrimitive
     float height = 0.0F;
 };
 
+struct LayoutPrimitiveDrawCommand
+{
+    std::string_view sceneName;
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+    std::string channelSample;
+};
+
 struct PrimitiveChannelMask
 {
     bool color = false;
@@ -581,15 +591,19 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return text.str();
 }
 
-[[nodiscard]] std::string layoutPrimitiveChannelSampleToken(const LayoutScenePrimitive& primitive, float progress)
+[[nodiscard]] std::string layoutPrimitiveChannelFrameToken(const LayoutScenePrimitive& primitive, float progress)
 {
     std::ostringstream text;
     text
-        << primitive.sceneName
-        << ":" << layoutPrimitiveChannelTags(primitive)
+        << layoutPrimitiveChannelTags(primitive)
         << "@" << layoutScenePrimitiveFrame(primitive, progress)
         << "/" << primitive.frameCount;
     return text.str();
+}
+
+[[nodiscard]] std::string layoutPrimitiveChannelSampleToken(const LayoutScenePrimitive& primitive, float progress)
+{
+    return std::string(primitive.sceneName) + ":" + layoutPrimitiveChannelFrameToken(primitive, progress);
 }
 
 [[nodiscard]] PrimitiveChannelCounts layoutPrimitiveChannelCounts(const std::vector<const LayoutScenePrimitive*>& primitives)
@@ -638,6 +652,55 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
 
     for (const auto* primitive : primitives)
         text << "  " << layoutPrimitiveChannelSampleToken(*primitive, progress) << "\r\n";
+
+    return text.str();
+}
+
+[[nodiscard]] std::vector<LayoutPrimitiveDrawCommand> layoutPrimitiveDrawCommandsForContract(std::string_view contractFileName, float progress, int canvasWidth, int canvasHeight)
+{
+    std::vector<LayoutPrimitiveDrawCommand> commands;
+    for (const auto* primitive : layoutScenePrimitivesForContract(contractFileName))
+    {
+        commands.push_back(
+            LayoutPrimitiveDrawCommand{
+                .sceneName = primitive->sceneName,
+                .x = static_cast<int>(std::round(primitive->x * static_cast<float>(canvasWidth))),
+                .y = static_cast<int>(std::round(primitive->y * static_cast<float>(canvasHeight))),
+                .width = std::max(1, static_cast<int>(std::round(primitive->width * static_cast<float>(canvasWidth)))),
+                .height = std::max(1, static_cast<int>(std::round(primitive->height * static_cast<float>(canvasHeight)))),
+                .channelSample = layoutPrimitiveChannelFrameToken(*primitive, progress),
+            });
+    }
+    return commands;
+}
+
+[[nodiscard]] std::string layoutPrimitiveDrawCommandDescriptor(const LayoutPrimitiveDrawCommand& command)
+{
+    std::ostringstream text;
+    text
+        << command.sceneName
+        << ":" << command.x
+        << "," << command.y
+        << "," << command.width
+        << "x" << command.height
+        << ":" << command.channelSample;
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutPrimitiveDrawCommandSummary(std::string_view contractFileName, float progress, int canvasWidth, int canvasHeight)
+{
+    const auto commands = layoutPrimitiveDrawCommandsForContract(contractFileName, progress, canvasWidth, canvasHeight);
+    std::ostringstream text;
+    text << "Layout primitive draw commands:\r\n";
+
+    if (commands.empty())
+    {
+        text << "  none\r\n";
+        return text.str();
+    }
+
+    for (const auto& command : commands)
+        text << "  " << layoutPrimitiveDrawCommandDescriptor(command) << "\r\n";
 
     return text.str();
 }
@@ -1225,6 +1288,7 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         : (runtime.state() == ScreenState::Idle ? 1.0F : 0.0F);
     text << "\r\n" << layoutPrimitiveCueSummary(host.primaryContractFileName, primitiveProgress);
     text << "\r\n" << layoutPrimitiveChannelSampleSummary(host.primaryContractFileName, primitiveProgress);
+    text << "\r\n" << layoutPrimitiveDrawCommandSummary(host.primaryContractFileName, primitiveProgress, 1280, 720);
 
     text << "\r\nNotes:\r\n" << host.notes << "\r\n";
     return text.str();
@@ -1760,6 +1824,41 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     return titleSample == "mm_donut_move:color+transform@110/220"
         && pauseSample == "stick:color+transform+visibility@120/240"
         && loadingSample == "bg_2:color+transform@1/2"
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runLayoutDrawCommandSmoke()
+{
+    constexpr float kSampleProgress = 0.5F;
+    constexpr int kCanvasWidth = 1280;
+    constexpr int kCanvasHeight = 720;
+
+    const auto title = layoutPrimitiveDrawCommandsForContract("title_menu_reference.json", kSampleProgress, kCanvasWidth, kCanvasHeight);
+    const auto pause = layoutPrimitiveDrawCommandsForContract("pause_menu_reference.json", kSampleProgress, kCanvasWidth, kCanvasHeight);
+    const auto loading = layoutPrimitiveDrawCommandsForContract("loading_transition_reference.json", kSampleProgress, kCanvasWidth, kCanvasHeight);
+    if (title.empty() || pause.empty() || loading.empty())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui layout draw command smoke failed missing exact-family draw command\n";
+        return 1;
+    }
+
+    const std::string titleFirst = layoutPrimitiveDrawCommandDescriptor(title.front());
+    const std::string pauseFirst = layoutPrimitiveDrawCommandDescriptor(pause.front());
+    const std::string loadingFirst = layoutPrimitiveDrawCommandDescriptor(loading.front());
+
+    std::cout
+        << "sward_ui_runtime_debug_gui layout draw command smoke ok "
+        << "title_commands=" << title.size()
+        << " title_first=" << titleFirst
+        << " pause_first=" << pauseFirst
+        << " loading_first=" << loadingFirst
+        << '\n';
+
+    return title.size() == 6
+        && titleFirst == "mm_donut_move:102,202,563x115:color+transform@110/220"
+        && pauseFirst == "stick:435,187,589x101:color+transform+visibility@120/240"
+        && loadingFirst == "bg_2:64,101,1152x115:color+transform@1/2"
         ? 0
         : 1;
 }
@@ -2572,6 +2671,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runRendererBlockerSmoke();
         if (command.find("--layout-channel-sample-smoke") != std::string::npos)
             return runLayoutChannelSampleSmoke();
+        if (command.find("--layout-draw-command-smoke") != std::string::npos)
+            return runLayoutDrawCommandSmoke();
         if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
             return runLayoutPrimitiveChannelSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)

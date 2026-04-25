@@ -34,6 +34,7 @@ bg_2:color+transform@1/2
 ```
 
 These tokens are deliberately narrow. They prove that exact-family primitive ownership, channel classification, and runtime frame sampling now meet in one renderer-facing representation.
+Phase 70 extends the same sample token into draw command descriptors in [`GUI_LAYOUT_DRAW_COMMAND_DESCRIPTORS.md`](./GUI_LAYOUT_DRAW_COMMAND_DESCRIPTORS.md).
 
 ## Verification
 

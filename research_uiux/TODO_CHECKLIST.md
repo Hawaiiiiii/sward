@@ -533,6 +533,15 @@
 - [x] Build and smoke-check `b\rr69\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for layout channel sample cues.
 
+## Phase 70 - GUI Layout Draw Command Descriptors
+
+- [x] Add renderer-facing draw command descriptors for exact-family layout primitives.
+- [x] Convert recovered normalized primitive rectangles into deterministic 1280x720 geometry plus sampled channel tokens.
+- [x] Surface `scene:x,y,widthxheight:channels@frame/count` descriptors in the GUI detail pane.
+- [x] Add `--layout-draw-command-smoke` for Title, Pause, and Loading descriptor geometry.
+- [x] Build and smoke-check `b\rr70\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for layout draw command descriptors.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -664,3 +673,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI host readiness badges under `b\rr67`, with native host listbox labels smoke- and control-checked.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI renderer blocker cues under `b\rr68`, with Sonic HUD, Title, and support-substrate next-renderer blockers smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout channel sample cues under `b\rr69`, with Title, Pause, and Loading exact-family samples smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout draw command descriptors under `b\rr70`, with Title, Pause, and Loading exact-family geometry descriptors smoke-guarded.
