@@ -37,6 +37,7 @@ support_blocker=visual evidence binding
 ```
 
 This keeps the Sonic HUD proxy boundary explicit while making Title/Pause/Loading-style exact-atlas families the obvious next candidates for decoded CSD channel sampling work.
+Phase 69 starts that follow-up with exact-family `scene:channels@frame/count` sample tokens in [`GUI_LAYOUT_CHANNEL_SAMPLE_CUES.md`](./GUI_LAYOUT_CHANNEL_SAMPLE_CUES.md).
 
 ## Verification
 

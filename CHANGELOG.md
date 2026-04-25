@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 69 GUI layout channel sample cues
+
+- added [`research_uiux/GUI_LAYOUT_CHANNEL_SAMPLE_CUES.md`](./research_uiux/GUI_LAYOUT_CHANNEL_SAMPLE_CUES.md)
+- added renderer-facing primitive channel sample tokens in the GUI detail path
+- surfaced samples as `scene:channels@frame/count` for exact Title, Pause, and Loading primitive families
+- added `--layout-channel-sample-smoke`, verifying exact-family sampled channel tokens under `b/rr69`
+
 ### Phase 68 GUI renderer blocker cues
 
 - added [`research_uiux/GUI_RENDERER_BLOCKER_CUES.md`](./research_uiux/GUI_RENDERER_BLOCKER_CUES.md)

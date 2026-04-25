@@ -525,6 +525,14 @@
 - [x] Build and smoke-check `b\rr68\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for renderer blocker cues.
 
+## Phase 69 - GUI Layout Channel Sample Cues
+
+- [x] Add renderer-facing primitive channel sample tokens for exact-family layout primitives.
+- [x] Surface `scene:channels@frame/count` samples in the GUI detail pane.
+- [x] Add `--layout-channel-sample-smoke` for Title, Pause, and Loading exact-family samples.
+- [x] Build and smoke-check `b\rr69\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for layout channel sample cues.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -655,3 +663,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI visual parity summaries under `b\rr66`, with exact Title and proxy Sonic HUD readiness smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI host readiness badges under `b\rr67`, with native host listbox labels smoke- and control-checked.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI renderer blocker cues under `b\rr68`, with Sonic HUD, Title, and support-substrate next-renderer blockers smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout channel sample cues under `b\rr69`, with Title, Pause, and Loading exact-family samples smoke-guarded.

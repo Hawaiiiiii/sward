@@ -581,6 +581,17 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return text.str();
 }
 
+[[nodiscard]] std::string layoutPrimitiveChannelSampleToken(const LayoutScenePrimitive& primitive, float progress)
+{
+    std::ostringstream text;
+    text
+        << primitive.sceneName
+        << ":" << layoutPrimitiveChannelTags(primitive)
+        << "@" << layoutScenePrimitiveFrame(primitive, progress)
+        << "/" << primitive.frameCount;
+    return text.str();
+}
+
 [[nodiscard]] PrimitiveChannelCounts layoutPrimitiveChannelCounts(const std::vector<const LayoutScenePrimitive*>& primitives)
 {
     PrimitiveChannelCounts counts{};
@@ -610,6 +621,24 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
         << " V" << counts.visibility
         << " S" << counts.sprite
         << " static" << counts.staticPrimitive;
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutPrimitiveChannelSampleSummary(std::string_view contractFileName, float progress)
+{
+    const auto primitives = layoutScenePrimitivesForContract(contractFileName);
+    std::ostringstream text;
+    text << "Layout primitive channel samples:\r\n";
+
+    if (primitives.empty())
+    {
+        text << "  none\r\n";
+        return text.str();
+    }
+
+    for (const auto* primitive : primitives)
+        text << "  " << layoutPrimitiveChannelSampleToken(*primitive, progress) << "\r\n";
+
     return text.str();
 }
 
@@ -1195,6 +1224,7 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         ? static_cast<float>(std::min(1.0, runtime.stateElapsedSeconds() / stateDuration))
         : (runtime.state() == ScreenState::Idle ? 1.0F : 0.0F);
     text << "\r\n" << layoutPrimitiveCueSummary(host.primaryContractFileName, primitiveProgress);
+    text << "\r\n" << layoutPrimitiveChannelSampleSummary(host.primaryContractFileName, primitiveProgress);
 
     text << "\r\nNotes:\r\n" << host.notes << "\r\n";
     return text.str();
@@ -1696,6 +1726,40 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     return sonicBlocker == "exact loose HUD payload"
         && titleBlocker == "decoded CSD channel sampling"
         && supportBlocker == "visual evidence binding"
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runLayoutChannelSampleSmoke()
+{
+    const auto title = layoutScenePrimitivesForContract("title_menu_reference.json");
+    const auto pause = layoutScenePrimitivesForContract("pause_menu_reference.json");
+    const auto loading = layoutScenePrimitivesForContract("loading_transition_reference.json");
+
+    const auto* titlePrimitive = layoutScenePrimitiveForScene(title, "mm_donut_move");
+    const auto* pausePrimitive = layoutScenePrimitiveForScene(pause, "stick");
+    const auto* loadingPrimitive = layoutScenePrimitiveForScene(loading, "bg_2");
+    if (!titlePrimitive || !pausePrimitive || !loadingPrimitive)
+    {
+        std::cerr << "sward_ui_runtime_debug_gui layout channel sample smoke failed missing exact-family primitive\n";
+        return 1;
+    }
+
+    constexpr float kSampleProgress = 0.5F;
+    const std::string titleSample = layoutPrimitiveChannelSampleToken(*titlePrimitive, kSampleProgress);
+    const std::string pauseSample = layoutPrimitiveChannelSampleToken(*pausePrimitive, kSampleProgress);
+    const std::string loadingSample = layoutPrimitiveChannelSampleToken(*loadingPrimitive, kSampleProgress);
+
+    std::cout
+        << "sward_ui_runtime_debug_gui layout channel sample smoke ok "
+        << "title_sample=" << titleSample
+        << " pause_sample=" << pauseSample
+        << " loading_sample=" << loadingSample
+        << '\n';
+
+    return titleSample == "mm_donut_move:color+transform@110/220"
+        && pauseSample == "stick:color+transform+visibility@120/240"
+        && loadingSample == "bg_2:color+transform@1/2"
         ? 0
         : 1;
 }
@@ -2506,6 +2570,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runHostReadinessSmoke();
         if (command.find("--renderer-blocker-smoke") != std::string::npos)
             return runRendererBlockerSmoke();
+        if (command.find("--layout-channel-sample-smoke") != std::string::npos)
+            return runLayoutChannelSampleSmoke();
         if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
             return runLayoutPrimitiveChannelSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)
