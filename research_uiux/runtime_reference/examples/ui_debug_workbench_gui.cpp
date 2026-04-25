@@ -16,6 +16,7 @@
 #include <cmath>
 #include <exception>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -117,6 +118,22 @@ struct LayoutPrimitiveDrawCommand
     int width = 0;
     int height = 0;
     std::string channelSample;
+};
+
+struct LayoutAuthoredCastTransform
+{
+    std::string_view contractFileName;
+    std::string_view packageFileName;
+    std::string_view sceneName;
+    std::string_view castName;
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+    float rotation = 0.0F;
+    float scaleX = 1.0F;
+    float scaleY = 1.0F;
+    std::string_view color;
 };
 
 struct PrimitiveChannelMask
@@ -261,6 +278,12 @@ inline constexpr std::array<LayoutScenePrimitive, 36> kLayoutScenePrimitiveEntri
     { "extra_stage_hud_reference.json", "Root/bg", "bg", "DefaultAnim", "DefaultAnim", 100, 6, 29, 21, 0, 0.08F, 0.08F, 0.50F, 0.18F },
 }};
 
+inline constexpr std::array<LayoutAuthoredCastTransform, 3> kLayoutAuthoredCastTransforms{{
+    { "title_menu_reference.json", "ui_mainmenu.xncp", "mm_donut_move", "index_text_pos", 408, 296, 16, 16, 0.0F, 1.0F, 1.0F, "0xFFFFFFFF" },
+    { "pause_menu_reference.json", "ui_pause.yncp", "bg", "img", 0, 0, 1280, 720, 0.0F, 1.0F, 1.0F, "0x00000000" },
+    { "loading_transition_reference.json", "ui_loading.yncp", "bg_2", "pos_text_sonic", 640, 360, 16, 16, 0.0F, 1.0F, 1.0F, "0xFFFFFFFF" },
+}};
+
 enum ControlId
 {
     kGroupListId = 1001,
@@ -347,6 +370,17 @@ enum ControlId
             primitives.push_back(&primitive);
     }
     return primitives;
+}
+
+[[nodiscard]] std::vector<const LayoutAuthoredCastTransform*> layoutAuthoredCastTransformsForContract(std::string_view contractFileName)
+{
+    std::vector<const LayoutAuthoredCastTransform*> transforms;
+    for (const auto& transform : kLayoutAuthoredCastTransforms)
+    {
+        if (transform.contractFileName == contractFileName)
+            transforms.push_back(&transform);
+    }
+    return transforms;
 }
 
 [[nodiscard]] int layoutScenePrimitiveKeyframeTotal(const std::vector<const LayoutScenePrimitive*>& primitives)
@@ -701,6 +735,47 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
 
     for (const auto& command : commands)
         text << "  " << layoutPrimitiveDrawCommandDescriptor(command) << "\r\n";
+
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutAuthoredCastTransformDescriptor(const LayoutAuthoredCastTransform& transform)
+{
+    std::ostringstream text;
+    text << std::fixed << std::setprecision(2);
+    text
+        << transform.sceneName
+        << "/" << transform.castName
+        << ":" << transform.x
+        << "," << transform.y
+        << "," << transform.width
+        << "x" << transform.height
+        << ":r" << transform.rotation
+        << ":s" << transform.scaleX
+        << "," << transform.scaleY
+        << ":" << transform.color;
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutAuthoredCastTransformSummary(std::string_view contractFileName)
+{
+    const auto transforms = layoutAuthoredCastTransformsForContract(contractFileName);
+    std::ostringstream text;
+    text << "Authored cast transforms:\r\n";
+
+    if (transforms.empty())
+    {
+        text << "  none\r\n";
+        return text.str();
+    }
+
+    for (const auto* transform : transforms)
+    {
+        text
+            << "  " << transform->packageFileName
+            << " :: " << layoutAuthoredCastTransformDescriptor(*transform)
+            << "\r\n";
+    }
 
     return text.str();
 }
@@ -1289,6 +1364,7 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     text << "\r\n" << layoutPrimitiveCueSummary(host.primaryContractFileName, primitiveProgress);
     text << "\r\n" << layoutPrimitiveChannelSampleSummary(host.primaryContractFileName, primitiveProgress);
     text << "\r\n" << layoutPrimitiveDrawCommandSummary(host.primaryContractFileName, primitiveProgress, 1280, 720);
+    text << "\r\n" << layoutAuthoredCastTransformSummary(host.primaryContractFileName);
 
     text << "\r\nNotes:\r\n" << host.notes << "\r\n";
     return text.str();
@@ -1859,6 +1935,35 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         && titleFirst == "mm_donut_move:102,202,563x115:color+transform@110/220"
         && pauseFirst == "stick:435,187,589x101:color+transform+visibility@120/240"
         && loadingFirst == "bg_2:64,101,1152x115:color+transform@1/2"
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAuthoredCastTransformSmoke()
+{
+    const auto title = layoutAuthoredCastTransformsForContract("title_menu_reference.json");
+    const auto pause = layoutAuthoredCastTransformsForContract("pause_menu_reference.json");
+    const auto loading = layoutAuthoredCastTransformsForContract("loading_transition_reference.json");
+    if (title.empty() || pause.empty() || loading.empty())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui authored cast transform smoke failed missing exact-family authored cast\n";
+        return 1;
+    }
+
+    const std::string titleCast = layoutAuthoredCastTransformDescriptor(*title.front());
+    const std::string pauseCast = layoutAuthoredCastTransformDescriptor(*pause.front());
+    const std::string loadingCast = layoutAuthoredCastTransformDescriptor(*loading.front());
+
+    std::cout
+        << "sward_ui_runtime_debug_gui authored cast transform smoke ok "
+        << "title_cast=" << titleCast
+        << " pause_cast=" << pauseCast
+        << " loading_cast=" << loadingCast
+        << '\n';
+
+    return titleCast == "mm_donut_move/index_text_pos:408,296,16x16:r0.00:s1.00,1.00:0xFFFFFFFF"
+        && pauseCast == "bg/img:0,0,1280x720:r0.00:s1.00,1.00:0x00000000"
+        && loadingCast == "bg_2/pos_text_sonic:640,360,16x16:r0.00:s1.00,1.00:0xFFFFFFFF"
         ? 0
         : 1;
 }
@@ -2673,6 +2778,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runLayoutChannelSampleSmoke();
         if (command.find("--layout-draw-command-smoke") != std::string::npos)
             return runLayoutDrawCommandSmoke();
+        if (command.find("--authored-cast-transform-smoke") != std::string::npos)
+            return runAuthoredCastTransformSmoke();
         if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
             return runLayoutPrimitiveChannelSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)

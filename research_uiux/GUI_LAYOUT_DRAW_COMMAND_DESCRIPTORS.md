@@ -10,7 +10,7 @@ Phase 70 adds the first renderer-facing draw command descriptor layer to the nat
 b/rr70/sward_ui_runtime_debug_gui.exe
 ```
 
-Phase 69 gave exact-family primitives stable `scene:channels@frame/count` sample tokens. This beat adds the next renderer bridge: recovered normalized primitive rectangles are converted into deterministic 1280x720 command geometry and paired with the sampled channel token.
+Phase 69 gave exact-family primitives stable `scene:channels@frame/count` sample tokens. This beat adds the next renderer bridge: recovered normalized primitive rectangles are converted into deterministic 1280x720 command geometry and paired with the sampled channel token. Phase 71 extends this surface with first authored CSD cast transform descriptors from parsed exact-family layout data.
 
 ## What Changed
 

@@ -542,6 +542,15 @@
 - [x] Build and smoke-check `b\rr70\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for layout draw command descriptors.
 
+## Phase 71 - GUI Authored Cast Transform Descriptors
+
+- [x] Add exact-family authored CSD cast transform descriptors to the GUI detail path.
+- [x] Bind parsed `layout_deep_analysis.json` cast evidence for Title, Pause, and Loading into renderer-facing descriptors.
+- [x] Surface `scene/cast:x,y,widthxheight:rrotation:scaleX,scaleY:color` descriptors in the GUI detail pane.
+- [x] Add `--authored-cast-transform-smoke` for Title, Pause, and Loading authored cast transforms.
+- [x] Build and smoke-check `b\rr71\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for authored cast transform descriptors.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -674,3 +683,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI renderer blocker cues under `b\rr68`, with Sonic HUD, Title, and support-substrate next-renderer blockers smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout channel sample cues under `b\rr69`, with Title, Pause, and Loading exact-family samples smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout draw command descriptors under `b\rr70`, with Title, Pause, and Loading exact-family geometry descriptors smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored cast transform descriptors under `b\rr71`, with Title, Pause, and Loading parsed CSD cast descriptors smoke-guarded.

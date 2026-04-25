@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr70" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr71" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -169,6 +169,13 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("layoutPrimitiveDrawCommandsForContract", source_text)
         self.assertIn("Layout primitive draw commands:", source_text)
         self.assertIn("--layout-draw-command-smoke", source_text)
+
+    def test_gui_source_exposes_authored_cast_transform_descriptors(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("LayoutAuthoredCastTransform", source_text)
+        self.assertIn("layoutAuthoredCastTransformsForContract", source_text)
+        self.assertIn("Authored cast transforms:", source_text)
+        self.assertIn("--authored-cast-transform-smoke", source_text)
 
     def test_gui_source_exposes_gameplay_hud_proxy_primitives(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -597,6 +604,24 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("title_first=mm_donut_move:102,202,563x115:color+transform@110/220", completed.stdout)
         self.assertIn("pause_first=stick:435,187,589x101:color+transform+visibility@120/240", completed.stdout)
         self.assertIn("loading_first=bg_2:64,101,1152x115:color+transform@1/2", completed.stdout)
+
+    def test_authored_cast_transform_smoke_reports_exact_family_casts_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--authored-cast-transform-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui authored cast transform smoke ok", completed.stdout)
+        self.assertIn("title_cast=mm_donut_move/index_text_pos:408,296,16x16:r0.00:s1.00,1.00:0xFFFFFFFF", completed.stdout)
+        self.assertIn("pause_cast=bg/img:0,0,1280x720:r0.00:s1.00,1.00:0x00000000", completed.stdout)
+        self.assertIn("loading_cast=bg_2/pos_text_sonic:640,360,16x16:r0.00:s1.00,1.00:0xFFFFFFFF", completed.stdout)
 
 
 if __name__ == "__main__":
