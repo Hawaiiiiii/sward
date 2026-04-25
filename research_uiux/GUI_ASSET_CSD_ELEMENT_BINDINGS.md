@@ -10,6 +10,8 @@ Phase 81 moves the native GUI asset viewer past sheet-only browsing by binding s
 b/rr81/sward_ui_runtime_debug_gui.exe
 ```
 
+Phase 82 continues this foundation with navigable element selection in [`GUI_ASSET_CSD_ELEMENT_NAVIGATION.md`](./GUI_ASSET_CSD_ELEMENT_NAVIGATION.md); the binding smoke now counts the widened table while preserving the original Phase 81 seed samples.
+
 ## What Changed
 
 - added a `LayoutCsdElementBinding` table in the native GUI over parsed `layout_deep_analysis.json` facts
@@ -31,7 +33,7 @@ Current bound samples:
 ## Verification
 
 ```text
-sward_ui_runtime_debug_gui asset csd binding smoke ok bindings=6 sonic=ui_prov_playscreen.yncp/so_speed_gauge/position_hd:casts=47:subimages=109 loading=ui_loading.yncp/bg_1/arrow:casts=28:subimages=320 pause=ui_pause.yncp/bg/img:casts=1:subimages=99 title=ui_mainmenu.xncp/mm_bg_usual/black3:casts=47:subimages=46
+sward_ui_runtime_debug_gui asset csd binding smoke ok bindings=41 sonic=ui_prov_playscreen.yncp/so_speed_gauge/position_hd:casts=47:subimages=109 loading=ui_loading.yncp/bg_1/arrow:casts=28:subimages=320 pause=ui_pause.yncp/bg/img:casts=1:subimages=99 title=ui_mainmenu.xncp/mm_bg_usual/black3:casts=47:subimages=46
 ```
 
 This is still an element binding layer, not full decoded subimage rendering. The next product step is to turn these bindings into navigable subimage/cast selection: per-scene element lists, crop/rect previews where recoverable, and then family-specific CSD timeline playback.

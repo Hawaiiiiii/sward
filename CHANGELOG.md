@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 82 GUI asset CSD element navigation
+
+- added [`research_uiux/GUI_ASSET_CSD_ELEMENT_NAVIGATION.md`](./research_uiux/GUI_ASSET_CSD_ELEMENT_NAVIGATION.md)
+- widened the GUI CSD binding table from `6` seed bindings to `41` navigable package/scene/cast entries
+- added `Element Prev` / `Element Next` controls and selected-element highlighting in Asset View
+- added `--asset-csd-navigation-smoke`, verifying multi-element sets for Sonic HUD, Loading, Title, and Pause under `b/rr82`
+
 ### Phase 81 GUI asset CSD element bindings
 
 - added [`research_uiux/GUI_ASSET_CSD_ELEMENT_BINDINGS.md`](./research_uiux/GUI_ASSET_CSD_ELEMENT_BINDINGS.md)

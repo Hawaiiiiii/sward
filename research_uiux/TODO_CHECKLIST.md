@@ -589,6 +589,16 @@
 - [x] Build and smoke-check `b\rr81\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for Asset View CSD element bindings.
 
+## Phase 82 - GUI Asset CSD Element Navigation
+
+- [x] Widen CSD element bindings beyond one seed cue per family.
+- [x] Add `Element Prev` / `Element Next` controls.
+- [x] Keep CSD element selection independent from atlas gallery selection.
+- [x] Highlight the selected CSD element while keeping other markers visible.
+- [x] Add `--asset-csd-navigation-smoke`.
+- [x] Build and smoke-check `b\rr82\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for Asset View CSD element navigation.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -732,3 +742,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset viewer mode under `b\rr79`, with `22` local atlas sheet PNGs and the first unobstructed atlas inspection path smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset root discovery plus atlas gallery navigation under `b\rr80`, keeping Asset View populated from both repo-root and build-dir launches.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD element bindings under `b\rr81`, tying Title, Pause, Loading, and gameplay-HUD proxy atlas candidates to package/scene/cast/subimage evidence.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD element navigation under `b\rr82`, widening the binding set to `41` package/scene/cast entries with selected-element highlighting and `Element Prev` / `Element Next` controls.

@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr81" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr82" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -69,6 +69,16 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("ui_prov_playscreen.yncp", source_text)
         self.assertIn("so_speed_gauge", source_text)
         self.assertIn("--asset-csd-binding-smoke", source_text)
+
+    def test_gui_source_exposes_csd_element_navigation_for_asset_viewer(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("kCsdPrevButtonId", source_text)
+        self.assertIn("kCsdNextButtonId", source_text)
+        self.assertIn("Element Prev", source_text)
+        self.assertIn("Element Next", source_text)
+        self.assertIn("selectedCsdElementBindingIndex", source_text)
+        self.assertIn("shiftCsdElementBinding", source_text)
+        self.assertIn("--asset-csd-navigation-smoke", source_text)
 
     def test_gui_preview_binds_gameplay_hud_proxy_atlas_and_bounded_layout(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -421,6 +431,28 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("loading=ui_loading.yncp/bg_1/arrow:casts=28:subimages=320", completed.stdout)
         self.assertIn("pause=ui_pause.yncp/bg/img:casts=1:subimages=99", completed.stdout)
         self.assertIn("title=ui_mainmenu.xncp/mm_bg_usual/black3:casts=47:subimages=46", completed.stdout)
+
+    def test_asset_csd_navigation_smoke_reports_multi_element_sets(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE)).resolve()
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--asset-csd-navigation-smoke"],
+            cwd=exe.parent,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui asset csd navigation smoke ok", completed.stdout)
+        self.assertIn("sonic_count=6", completed.stdout)
+        self.assertIn("selected=ui_prov_playscreen.yncp/so_speed_gauge/position_hd:casts=47:subimages=109", completed.stdout)
+        self.assertIn("next=ui_prov_playscreen.yncp/so_ringenagy_gauge/position_hd:casts=43:subimages=109", completed.stdout)
+        self.assertIn("previous=ui_prov_playscreen.yncp/ring_get_effect/position_hd:casts=2:subimages=109", completed.stdout)
+        self.assertIn("loading_count=7", completed.stdout)
+        self.assertIn("title_count=8", completed.stdout)
+        self.assertIn("pause_count=8", completed.stdout)
 
     def test_playback_smoke_command_advances_timeline_without_opening_window(self) -> None:
         exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))

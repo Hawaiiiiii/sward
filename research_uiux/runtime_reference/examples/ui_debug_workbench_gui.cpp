@@ -363,103 +363,53 @@ inline constexpr std::array<LayoutScenePrimitive, 36> kLayoutScenePrimitiveEntri
     { "extra_stage_hud_reference.json", "Root/bg", "bg", "DefaultAnim", "DefaultAnim", 100, 6, 29, 21, 0, 0.08F, 0.08F, 0.50F, 0.18F },
 }};
 
-inline constexpr std::array<LayoutCsdElementBinding, 6> kLayoutCsdElementBindings{{
-    {
-        "title_menu_reference.json",
-        "ui_mainmenu.xncp",
-        "mainmenu__ui_mainmenu.png",
-        "mm_bg_usual",
-        "black3",
-        "circle",
-        "ui_mm_base.dds, ui_mm_parts1.dds, ui_mm_contentstext.dds",
-        47,
-        46,
-        736,
-        0.08F,
-        0.12F,
-        0.82F,
-        0.18F,
-    },
-    {
-        "pause_menu_reference.json",
-        "ui_pause.yncp",
-        "systemcommoncore__ui_pause.png",
-        "bg",
-        "img",
-        "img",
-        "mat_pause_en_*.dds, mat_comon_*.dds, mat_ex_common_002.dds",
-        1,
-        99,
-        2871,
-        0.04F,
-        0.08F,
-        0.92F,
-        0.82F,
-    },
-    {
-        "loading_transition_reference.json",
-        "ui_loading.yncp",
-        "loading__ui_loading.png",
-        "bg_1",
-        "arrow",
-        "img_1",
-        "mat_load_*.dds, mat_loadinfo_*.dds, mat_comon_txt_001.dds",
-        28,
-        320,
-        2240,
-        0.54F,
-        0.66F,
-        0.36F,
-        0.12F,
-    },
-    {
-        "extra_stage_hud_reference.json",
-        "ui_prov_playscreen.yncp",
-        "exstagetails_common__ui_prov_playscreen.png",
-        "so_speed_gauge",
-        "position_hd",
-        "speed_bg",
-        "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds",
-        47,
-        109,
-        654,
-        0.54F,
-        0.58F,
-        0.38F,
-        0.12F,
-    },
-    {
-        "sonic_stage_hud_reference.json",
-        "ui_prov_playscreen.yncp",
-        "exstagetails_common__ui_prov_playscreen.png",
-        "so_speed_gauge",
-        "position_hd",
-        "speed_bg",
-        "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds",
-        47,
-        109,
-        654,
-        0.54F,
-        0.58F,
-        0.38F,
-        0.12F,
-    },
-    {
-        "werehog_stage_hud_reference.json",
-        "ui_prov_playscreen.yncp",
-        "exstagetails_common__ui_prov_playscreen.png",
-        "so_speed_gauge",
-        "position_hd",
-        "speed_bg",
-        "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds",
-        47,
-        109,
-        654,
-        0.54F,
-        0.58F,
-        0.38F,
-        0.12F,
-    },
+inline constexpr std::array<LayoutCsdElementBinding, 41> kLayoutCsdElementBindings{{
+    { "title_menu_reference.json", "ui_mainmenu.xncp", "mainmenu__ui_mainmenu.png", "mm_bg_usual", "black3", "circle", "ui_mm_base.dds, ui_mm_parts1.dds, ui_mm_contentstext.dds", 47, 46, 736, 0.08F, 0.12F, 0.82F, 0.18F },
+    { "title_menu_reference.json", "ui_mainmenu.xncp", "mainmenu__ui_mainmenu.png", "mm_bg_intro", "black3", "led_a2", "ui_mm_base.dds, ui_mm_parts1.dds, ui_mm_contentstext.dds", 99, 46, 736, 0.08F, 0.04F, 0.84F, 0.20F },
+    { "title_menu_reference.json", "ui_mainmenu.xncp", "mainmenu__ui_mainmenu.png", "mm_donut_idle", "inner_donut", "compass", "ui_mm_base.dds, ui_mm_parts1.dds, ui_mm_contentstext.dds", 9, 46, 736, 0.52F, 0.32F, 0.28F, 0.14F },
+    { "title_menu_reference.json", "ui_mainmenu.xncp", "mainmenu__ui_mainmenu.png", "mm_donut_select", "inner_donut", "compass", "ui_mm_base.dds, ui_mm_parts1.dds, ui_mm_contentstext.dds", 9, 46, 736, 0.52F, 0.46F, 0.28F, 0.14F },
+    { "title_menu_reference.json", "ui_mainmenu.xncp", "mainmenu__ui_mainmenu.png", "mm_donut_move", "inner_donut", "compass", "ui_mm_base.dds, ui_mm_parts1.dds, ui_mm_contentstext.dds", 9, 46, 736, 0.08F, 0.28F, 0.44F, 0.16F },
+    { "title_menu_reference.json", "ui_mainmenu.xncp", "mainmenu__ui_mainmenu.png", "mm_donut_intro", "inner_donut", "compass", "ui_mm_base.dds, ui_mm_parts1.dds, ui_mm_contentstext.dds", 9, 46, 736, 0.52F, 0.18F, 0.28F, 0.14F },
+    { "title_menu_reference.json", "ui_mainmenu.xncp", "mainmenu__ui_mainmenu.png", "mm_contentsitem_select", "index_bg", "chain_l_top", "ui_mm_base.dds, ui_mm_parts1.dds, ui_mm_contentstext.dds", 19, 46, 736, 0.12F, 0.62F, 0.50F, 0.12F },
+    { "title_menu_reference.json", "ui_mainmenu.xncp", "mainmenu__ui_mainmenu.png", "mm_contentsitem_idle", "index_bg", "index_bar1", "ui_mm_base.dds, ui_mm_parts1.dds, ui_mm_contentstext.dds", 13, 46, 736, 0.12F, 0.74F, 0.50F, 0.10F },
+
+    { "pause_menu_reference.json", "ui_pause.yncp", "systemcommoncore__ui_pause.png", "bg", "img", "img", "mat_pause_en_*.dds, mat_comon_*.dds, mat_ex_common_002.dds", 1, 99, 2871, 0.04F, 0.08F, 0.92F, 0.82F },
+    { "pause_menu_reference.json", "ui_pause.yncp", "systemcommoncore__ui_pause.png", "bg_1", "position", "center", "mat_pause_en_*.dds, mat_comon_*.dds, mat_ex_common_002.dds", 14, 99, 2871, 0.18F, 0.44F, 0.54F, 0.10F },
+    { "pause_menu_reference.json", "ui_pause.yncp", "systemcommoncore__ui_pause.png", "bg_1_select", "position", "img", "mat_pause_en_*.dds, mat_comon_*.dds, mat_ex_common_002.dds", 4, 99, 2871, 0.17F, 0.56F, 0.60F, 0.12F },
+    { "pause_menu_reference.json", "ui_pause.yncp", "systemcommoncore__ui_pause.png", "bg_2", "position_deco_1", "center", "mat_pause_en_*.dds, mat_comon_*.dds, mat_ex_common_002.dds", 68, 99, 2871, 0.10F, 0.20F, 0.80F, 0.16F },
+    { "pause_menu_reference.json", "ui_pause.yncp", "systemcommoncore__ui_pause.png", "text_area", "text_area_1", "text_area_2", "mat_pause_en_*.dds, mat_comon_*.dds, mat_ex_common_002.dds", 3, 99, 2871, 0.24F, 0.36F, 0.52F, 0.12F },
+    { "pause_menu_reference.json", "ui_pause.yncp", "systemcommoncore__ui_pause.png", "skill_select", "text_area_1", "TL", "mat_pause_en_*.dds, mat_comon_*.dds, mat_ex_common_002.dds", 27, 99, 2871, 0.24F, 0.48F, 0.52F, 0.16F },
+    { "pause_menu_reference.json", "ui_pause.yncp", "systemcommoncore__ui_pause.png", "arrow", "L", "R", "mat_pause_en_*.dds, mat_comon_*.dds, mat_ex_common_002.dds", 2, 99, 2871, 0.06F, 0.82F, 0.88F, 0.10F },
+    { "pause_menu_reference.json", "ui_pause.yncp", "systemcommoncore__ui_pause.png", "skill_scroll_bar_bg", "position", "middle", "mat_pause_en_*.dds, mat_comon_*.dds, mat_ex_common_002.dds", 6, 99, 2871, 0.82F, 0.32F, 0.04F, 0.42F },
+
+    { "loading_transition_reference.json", "ui_loading.yncp", "loading__ui_loading.png", "bg_1", "arrow", "img_1", "mat_load_*.dds, mat_loadinfo_*.dds, mat_comon_txt_001.dds", 28, 320, 2240, 0.06F, 0.08F, 0.88F, 0.12F },
+    { "loading_transition_reference.json", "ui_loading.yncp", "loading__ui_loading.png", "loadinfo", "controller", "ps3", "mat_load_*.dds, mat_loadinfo_*.dds, mat_comon_txt_001.dds", 106, 320, 2240, 0.14F, 0.70F, 0.72F, 0.12F },
+    { "loading_transition_reference.json", "ui_loading.yncp", "loading__ui_loading.png", "n_2_d", "bg", "sky", "mat_load_*.dds, mat_loadinfo_*.dds, mat_comon_txt_001.dds", 10, 320, 2240, 0.08F, 0.24F, 0.36F, 0.32F },
+    { "loading_transition_reference.json", "ui_loading.yncp", "loading__ui_loading.png", "event_viewer", "bg", "position", "mat_load_*.dds, mat_loadinfo_*.dds, mat_comon_txt_001.dds", 83, 320, 2240, 0.06F, 0.05F, 0.88F, 0.10F },
+    { "loading_transition_reference.json", "ui_loading.yncp", "loading__ui_loading.png", "pda", "display", "imgbox", "mat_load_*.dds, mat_loadinfo_*.dds, mat_comon_txt_001.dds", 57, 320, 2240, 0.52F, 0.28F, 0.38F, 0.42F },
+    { "loading_transition_reference.json", "ui_loading.yncp", "loading__ui_loading.png", "pda_txt", "display", "contens", "mat_load_*.dds, mat_loadinfo_*.dds, mat_comon_txt_001.dds", 19, 320, 2240, 0.54F, 0.62F, 0.34F, 0.13F },
+    { "loading_transition_reference.json", "ui_loading.yncp", "loading__ui_loading.png", "bg_2", "arrow", "img_1", "mat_load_*.dds, mat_loadinfo_*.dds, mat_comon_txt_001.dds", 28, 320, 2240, 0.05F, 0.14F, 0.90F, 0.16F },
+
+    { "extra_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "so_speed_gauge", "position_hd", "speed_bg", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 47, 109, 654, 0.54F, 0.58F, 0.38F, 0.12F },
+    { "extra_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "so_ringenagy_gauge", "position_hd", "ringenagy_bg", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 43, 109, 654, 0.54F, 0.72F, 0.38F, 0.10F },
+    { "extra_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "bg", "icon_position_hd", "so", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 29, 109, 654, 0.08F, 0.08F, 0.50F, 0.18F },
+    { "extra_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "info_1", "position", "bg_1", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 24, 109, 654, 0.07F, 0.29F, 0.42F, 0.14F },
+    { "extra_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "info_2", "position", "bg_1", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 24, 109, 654, 0.07F, 0.66F, 0.38F, 0.12F },
+    { "extra_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "ring_get_effect", "position_hd", "flash", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 2, 109, 654, 0.64F, 0.26F, 0.28F, 0.14F },
+
+    { "sonic_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "so_speed_gauge", "position_hd", "speed_bg", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 47, 109, 654, 0.54F, 0.58F, 0.38F, 0.12F },
+    { "sonic_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "so_ringenagy_gauge", "position_hd", "ringenagy_bg", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 43, 109, 654, 0.54F, 0.72F, 0.38F, 0.10F },
+    { "sonic_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "bg", "icon_position_hd", "so", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 29, 109, 654, 0.08F, 0.08F, 0.50F, 0.18F },
+    { "sonic_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "info_1", "position", "bg_1", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 24, 109, 654, 0.07F, 0.29F, 0.42F, 0.14F },
+    { "sonic_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "info_2", "position", "bg_1", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 24, 109, 654, 0.07F, 0.66F, 0.38F, 0.12F },
+    { "sonic_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "ring_get_effect", "position_hd", "flash", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 2, 109, 654, 0.64F, 0.26F, 0.28F, 0.14F },
+
+    { "werehog_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "so_speed_gauge", "position_hd", "speed_bg", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 47, 109, 654, 0.54F, 0.58F, 0.38F, 0.12F },
+    { "werehog_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "so_ringenagy_gauge", "position_hd", "ringenagy_bg", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 43, 109, 654, 0.54F, 0.72F, 0.38F, 0.10F },
+    { "werehog_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "bg", "icon_position_hd", "so", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 29, 109, 654, 0.08F, 0.08F, 0.50F, 0.18F },
+    { "werehog_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "info_1", "position", "bg_1", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 24, 109, 654, 0.07F, 0.29F, 0.42F, 0.14F },
+    { "werehog_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "info_2", "position", "bg_1", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 24, 109, 654, 0.07F, 0.66F, 0.38F, 0.12F },
+    { "werehog_stage_hud_reference.json", "ui_prov_playscreen.yncp", "exstagetails_common__ui_prov_playscreen.png", "ring_get_effect", "position_hd", "flash", "ui_ps1_gauge1.dds, mat_playscreen_*.dds, mat_comon_num_001.dds", 2, 109, 654, 0.64F, 0.26F, 0.28F, 0.14F },
 }};
 
 inline constexpr std::array<LayoutAuthoredCastTransform, 3> kLayoutAuthoredCastTransforms{{
@@ -533,6 +483,8 @@ enum ControlId
     kPreviewModeButtonId = 1010,
     kAssetPrevButtonId = 1011,
     kAssetNextButtonId = 1012,
+    kCsdPrevButtonId = 1013,
+    kCsdNextButtonId = 1014,
 };
 
 [[nodiscard]] const AtlasCandidate* atlasCandidateForContract(std::string_view contractFileName)
@@ -623,6 +575,19 @@ enum ControlId
     return bindings;
 }
 
+[[nodiscard]] std::size_t selectedCsdElementBindingIndex(std::size_t requestedIndex, std::size_t bindingCount)
+{
+    return bindingCount == 0 ? 0 : requestedIndex % bindingCount;
+}
+
+[[nodiscard]] const LayoutCsdElementBinding* layoutCsdElementBindingAt(std::string_view contractFileName, std::size_t requestedIndex)
+{
+    const auto bindings = layoutCsdElementBindingsForContract(contractFileName);
+    if (bindings.empty())
+        return nullptr;
+    return bindings[selectedCsdElementBindingIndex(requestedIndex, bindings.size())];
+}
+
 [[nodiscard]] std::string layoutCsdElementBindingDescriptor(const LayoutCsdElementBinding& binding)
 {
     std::ostringstream text;
@@ -632,6 +597,29 @@ enum ControlId
         << "/" << binding.castName
         << ":casts=" << binding.sceneCastCount
         << ":subimages=" << binding.sceneSubimageCount;
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutCsdElementBindingNavigationSummary(std::string_view contractFileName, std::size_t requestedIndex)
+{
+    const auto bindings = layoutCsdElementBindingsForContract(contractFileName);
+    std::ostringstream text;
+    text << "CSD element selection:\r\n";
+
+    if (bindings.empty())
+    {
+        text << "  none\r\n";
+        return text.str();
+    }
+
+    const std::size_t selectedIndex = selectedCsdElementBindingIndex(requestedIndex, bindings.size());
+    const auto* selected = bindings[selectedIndex];
+    text
+        << "  " << (selectedIndex + 1) << "/" << bindings.size()
+        << " " << layoutCsdElementBindingDescriptor(*selected)
+        << " | anchor=" << selected->anchorCastName
+        << " | textures=" << selected->textureSummary
+        << "\r\n";
     return text.str();
 }
 
@@ -1822,14 +1810,17 @@ void drawAuthoredSampledTransforms(HDC dc, Gdiplus::Graphics& graphics, const Gd
     }
 }
 
-void drawAssetCsdElementBindings(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& atlasRect, std::string_view contractFileName)
+void drawAssetCsdElementBindings(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& atlasRect, std::string_view contractFileName, std::size_t requestedIndex)
 {
     const auto bindings = layoutCsdElementBindingsForContract(contractFileName);
     if (bindings.empty())
         return;
 
-    for (const auto* binding : bindings)
+    const std::size_t activeIndex = selectedCsdElementBindingIndex(requestedIndex, bindings.size());
+    for (std::size_t index = 0; index < bindings.size(); ++index)
     {
+        const auto* binding = bindings[index];
+        const bool selected = index == activeIndex;
         Gdiplus::RectF markerRect(
             atlasRect.X + (binding->x * atlasRect.Width),
             atlasRect.Y + (binding->y * atlasRect.Height),
@@ -1837,10 +1828,13 @@ void drawAssetCsdElementBindings(HDC dc, Gdiplus::Graphics& graphics, const Gdip
             binding->height * atlasRect.Height);
         markerRect = clampRectToCanvas(markerRect, atlasRect);
 
-        Gdiplus::SolidBrush markerBrush(Gdiplus::Color(64, 93, 245, 189));
-        Gdiplus::Pen markerPen(Gdiplus::Color(230, 151, 255, 223), 1.4F);
+        Gdiplus::SolidBrush markerBrush(selected ? Gdiplus::Color(76, 247, 211, 72) : Gdiplus::Color(34, 93, 245, 189));
+        Gdiplus::Pen markerPen(selected ? Gdiplus::Color(245, 255, 247, 177) : Gdiplus::Color(170, 151, 255, 223), selected ? 2.0F : 1.0F);
         graphics.FillRectangle(&markerBrush, markerRect);
         graphics.DrawRectangle(&markerPen, markerRect);
+
+        if (!selected)
+            continue;
 
         const float labelWidth = std::min(430.0F, std::max(230.0F, atlasRect.Width * 0.50F));
         const float labelHeight = 42.0F;
@@ -1867,7 +1861,9 @@ void drawAssetCsdElementBindings(HDC dc, Gdiplus::Graphics& graphics, const Gdip
             static_cast<LONG>(labelRect.X + labelRect.Width - 8.0F),
             static_cast<LONG>(labelRect.Y + 22.0F),
         };
-        drawTextLine(dc, titleRect, "CSD " + layoutCsdElementBindingDescriptor(*binding), RGB(236, 255, 248));
+        std::ostringstream title;
+        title << "CSD " << (index + 1) << "/" << bindings.size() << " " << layoutCsdElementBindingDescriptor(*binding);
+        drawTextLine(dc, titleRect, title.str(), RGB(236, 255, 248));
 
         std::ostringstream detail;
         detail
@@ -2295,6 +2291,8 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         << "\r\n"
         << assetViewerSummaryText(host.primaryContractFileName)
         << "\r\n"
+        << layoutCsdElementBindingNavigationSummary(host.primaryContractFileName, 0)
+        << "\r\n"
         << layoutCsdElementBindingSummary(host.primaryContractFileName)
         << "\r\n"
         << "State: " << toString(runtime.state()) << "\r\n"
@@ -2481,6 +2479,44 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         && pause->sceneSubimageCount == 99
         && title->sceneCastCount == 47
         && title->sceneSubimageCount == 46
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAssetCsdNavigationSmoke()
+{
+    const auto sonicBindings = layoutCsdElementBindingsForContract("sonic_stage_hud_reference.json");
+    const auto loadingBindings = layoutCsdElementBindingsForContract("loading_transition_reference.json");
+    const auto titleBindings = layoutCsdElementBindingsForContract("title_menu_reference.json");
+    const auto pauseBindings = layoutCsdElementBindingsForContract("pause_menu_reference.json");
+    if (sonicBindings.empty() || loadingBindings.empty() || titleBindings.empty() || pauseBindings.empty())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui asset csd navigation smoke failed missing binding set\n";
+        return 1;
+    }
+
+    const auto* selected = sonicBindings[selectedCsdElementBindingIndex(0, sonicBindings.size())];
+    const auto* next = sonicBindings[selectedCsdElementBindingIndex(1, sonicBindings.size())];
+    const auto* previous = sonicBindings[selectedCsdElementBindingIndex(sonicBindings.size() - 1, sonicBindings.size())];
+
+    std::cout
+        << "sward_ui_runtime_debug_gui asset csd navigation smoke ok "
+        << "sonic_count=" << sonicBindings.size()
+        << " selected=" << layoutCsdElementBindingDescriptor(*selected)
+        << " next=" << layoutCsdElementBindingDescriptor(*next)
+        << " previous=" << layoutCsdElementBindingDescriptor(*previous)
+        << " loading_count=" << loadingBindings.size()
+        << " title_count=" << titleBindings.size()
+        << " pause_count=" << pauseBindings.size()
+        << '\n';
+
+    return sonicBindings.size() == 6
+        && loadingBindings.size() == 7
+        && titleBindings.size() == 8
+        && pauseBindings.size() == 8
+        && selected->sceneName == "so_speed_gauge"
+        && next->sceneName == "so_ringenagy_gauge"
+        && previous->sceneName == "ring_get_effect"
         ? 0
         : 1;
 }
@@ -3405,6 +3441,8 @@ private:
         m_previewModeButton = createButton("Asset View", kPreviewModeButtonId);
         m_assetPrevButton = createButton("Asset Prev", kAssetPrevButtonId);
         m_assetNextButton = createButton("Asset Next", kAssetNextButtonId);
+        m_csdPrevButton = createButton("Element Prev", kCsdPrevButtonId);
+        m_csdNextButton = createButton("Element Next", kCsdNextButtonId);
         m_previewPanel = createPreviewPanel();
         m_detailText = createEdit();
         m_logText = createEdit();
@@ -3428,6 +3466,8 @@ private:
             m_previewModeButton,
             m_assetPrevButton,
             m_assetNextButton,
+            m_csdPrevButton,
+            m_csdNextButton,
             m_previewPanel,
             m_detailText,
             m_logText,
@@ -3533,7 +3573,11 @@ private:
         MoveWindow(m_assetPrevButton, rightX + 400, actionButtonY, buttonWidth, buttonHeight, TRUE);
         MoveWindow(m_assetNextButton, rightX + 500, actionButtonY, buttonWidth, buttonHeight, TRUE);
 
-        const int previewTop = actionButtonY + buttonHeight + margin;
+        const int elementButtonY = actionButtonY + buttonHeight + 8;
+        MoveWindow(m_csdPrevButton, rightX, elementButtonY, buttonWidth, buttonHeight, TRUE);
+        MoveWindow(m_csdNextButton, rightX + 100, elementButtonY, buttonWidth, buttonHeight, TRUE);
+
+        const int previewTop = elementButtonY + buttonHeight + margin;
         const int previewWantedHeight = (rightWidth * 9 / 16) + 46;
         const int previewMaxHeight = std::max(220, height * 45 / 100);
         const int previewHeight = std::min(std::max(220, previewWantedHeight), previewMaxHeight);
@@ -3589,6 +3633,11 @@ private:
         m_assetGalleryIndex = selectedAssetGalleryIndex(host, files);
     }
 
+    void syncCsdElementToSelectedHost()
+    {
+        m_csdElementIndex = 0;
+    }
+
     void shiftAssetGallery(int delta)
     {
         const auto files = visualAtlasSheetFiles();
@@ -3610,6 +3659,35 @@ private:
             InvalidateRect(m_previewPanel, nullptr, TRUE);
     }
 
+    [[nodiscard]] std::size_t currentCsdElementIndex(const DebugWorkbenchHostEntry& host) const
+    {
+        const auto bindings = layoutCsdElementBindingsForContract(host.primaryContractFileName);
+        return selectedCsdElementBindingIndex(m_csdElementIndex.value_or(0), bindings.size());
+    }
+
+    void shiftCsdElementBinding(int delta)
+    {
+        const auto* selected = selectedHostEntry();
+        const auto* host = selected ? selected->metadata : nullptr;
+        if (!host)
+            return;
+
+        const auto bindings = layoutCsdElementBindingsForContract(host->primaryContractFileName);
+        if (bindings.empty())
+            return;
+
+        const int count = static_cast<int>(bindings.size());
+        int next = static_cast<int>(currentCsdElementIndex(*host)) + delta;
+        while (next < 0)
+            next += count;
+        next %= count;
+        m_csdElementIndex = static_cast<std::size_t>(next);
+
+        showHostSummary();
+        if (m_previewPanel)
+            InvalidateRect(m_previewPanel, nullptr, TRUE);
+    }
+
     [[nodiscard]] std::string assetGallerySummaryText(const DebugWorkbenchHostEntry& host) const
     {
         const auto files = visualAtlasSheetFiles();
@@ -3621,6 +3699,20 @@ private:
         text
             << "Gallery asset: " << (*index + 1) << "/" << files.size()
             << " " << files[*index].filename().string();
+        return text.str();
+    }
+
+    [[nodiscard]] std::string csdElementGallerySummaryText(const DebugWorkbenchHostEntry& host) const
+    {
+        const auto bindings = layoutCsdElementBindingsForContract(host.primaryContractFileName);
+        if (bindings.empty())
+            return "CSD element: none";
+
+        const std::size_t index = currentCsdElementIndex(host);
+        std::ostringstream text;
+        text
+            << "CSD element: " << (index + 1) << "/" << bindings.size()
+            << " " << layoutCsdElementBindingDescriptor(*bindings[index]);
         return text.str();
     }
 
@@ -3691,7 +3783,7 @@ private:
         }
 
         if (host && drawnAtlasRect.has_value())
-            drawAssetCsdElementBindings(dc, graphics, *drawnAtlasRect, host->primaryContractFileName);
+            drawAssetCsdElementBindings(dc, graphics, *drawnAtlasRect, host->primaryContractFileName, currentCsdElementIndex(*host));
 
         Gdiplus::Pen canvasPen(Gdiplus::Color(255, 70, 88, 70), 2.0F);
         graphics.DrawRectangle(&canvasPen, canvas);
@@ -3727,8 +3819,9 @@ private:
             const auto bindings = layoutCsdElementBindingsForContract(host->primaryContractFileName);
             if (!bindings.empty())
             {
-                const auto* first = bindings.front();
-                detail << " | csd=" << first->packageFileName << "/" << first->sceneName << "/" << first->castName;
+                const std::size_t elementIndex = currentCsdElementIndex(*host);
+                const auto* selected = bindings[elementIndex];
+                detail << " | csd=" << (elementIndex + 1) << "/" << bindings.size() << " " << selected->packageFileName << "/" << selected->sceneName << "/" << selected->castName;
             }
         }
         drawTextLine(dc, subText, detail.str(), RGB(164, 214, 154));
@@ -3967,6 +4060,7 @@ private:
             SendMessageA(m_hostList, LB_SETCURSEL, 0, 0);
             m_selectedHostIndex = m_visibleHostIndices.front();
             syncAssetGalleryToSelectedHost();
+            syncCsdElementToSelectedHost();
             showHostSummary();
         }
     }
@@ -3988,6 +4082,7 @@ private:
             {
                 m_selectedHostIndex = m_visibleHostIndices[static_cast<std::size_t>(selected)];
                 syncAssetGalleryToSelectedHost();
+                syncCsdElementToSelectedHost();
                 showHostSummary();
             }
             return;
@@ -4008,6 +4103,10 @@ private:
             shiftAssetGallery(-1);
         else if (id == kAssetNextButtonId)
             shiftAssetGallery(1);
+        else if (id == kCsdPrevButtonId)
+            shiftCsdElementBinding(-1);
+        else if (id == kCsdNextButtonId)
+            shiftCsdElementBinding(1);
         else if (id == kMoveNextButtonId)
             requestAction(InputAction::MoveNext);
         else if (id == kConfirmButtonId)
@@ -4046,8 +4145,10 @@ private:
 
         text
             << assetViewerSummaryText(host.primaryContractFileName) << "\r\n"
+            << layoutCsdElementBindingNavigationSummary(host.primaryContractFileName, currentCsdElementIndex(host)) << "\r\n"
             << layoutCsdElementBindingSummary(host.primaryContractFileName) << "\r\n"
             << assetGallerySummaryText(host) << "\r\n"
+            << csdElementGallerySummaryText(host) << "\r\n"
             << host.notes << "\r\n\r\n"
             << "Click Run Host to drive this contract through the runtime.";
         SetWindowTextA(m_detailText, text.str().c_str());
@@ -4214,6 +4315,8 @@ private:
     HWND m_previewModeButton = nullptr;
     HWND m_assetPrevButton = nullptr;
     HWND m_assetNextButton = nullptr;
+    HWND m_csdPrevButton = nullptr;
+    HWND m_csdNextButton = nullptr;
     HWND m_previewPanel = nullptr;
     HWND m_detailText = nullptr;
     HWND m_logText = nullptr;
@@ -4224,6 +4327,7 @@ private:
     std::vector<std::size_t> m_visibleHostIndices;
     std::optional<std::size_t> m_selectedHostIndex;
     std::optional<std::size_t> m_assetGalleryIndex;
+    std::optional<std::size_t> m_csdElementIndex;
     std::optional<std::size_t> m_runningContractIndex;
     std::unique_ptr<ScreenRuntime> m_runtime;
     PreviewMode m_previewMode = PreviewMode::Runtime;
@@ -4285,6 +4389,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runMotionSmoke();
         if (command.find("--playback-smoke") != std::string::npos)
             return runPlaybackSmoke();
+        if (command.find("--asset-csd-navigation-smoke") != std::string::npos)
+            return runAssetCsdNavigationSmoke();
         if (command.find("--asset-csd-binding-smoke") != std::string::npos)
             return runAssetCsdBindingSmoke();
         if (command.find("--asset-gallery-smoke") != std::string::npos)
