@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 74 GUI authored sampled transform descriptors
+
+- added [`research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_DESCRIPTORS.md)
+- added renderer-facing sampled transform descriptors to the GUI detail path
+- combined authored cast transform rectangles with sampled X/Y keyframe values for Title and Loading exact-family samples
+- added `--authored-sampled-transform-smoke`, verifying sampled Title and Loading transform descriptors under `b/rr74`
+
 ### Phase 73 GUI authored keyframe sample descriptors
 
 - added [`research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md`](./research_uiux/GUI_AUTHORED_KEYFRAME_SAMPLE_DESCRIPTORS.md)

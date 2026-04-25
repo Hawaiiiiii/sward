@@ -570,6 +570,15 @@
 - [x] Build and smoke-check `b\rr73\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for authored keyframe sample descriptors.
 
+## Phase 74 - GUI Authored Sampled Transform Descriptors
+
+- [x] Add renderer-facing sampled transform descriptors to the GUI detail path.
+- [x] Pair authored cast rectangles with sampled authored X/Y keyframe values.
+- [x] Surface `scene/cast@frame:x,y,widthxheight:track=value` descriptors for Title and Loading exact-family samples.
+- [x] Add `--authored-sampled-transform-smoke` for sampled Title and Loading transform descriptors.
+- [x] Build and smoke-check `b\rr74\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for authored sampled transform descriptors.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -705,3 +714,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored cast transform descriptors under `b\rr71`, with Title, Pause, and Loading parsed CSD cast descriptors smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored keyframe curve descriptors under `b\rr72`, with Title, Pause, and Loading parsed CSD keyframe descriptors smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored keyframe sample descriptors under `b\rr73`, with Title, Pause, and Loading sampled CSD keyframe values smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored sampled transform descriptors under `b\rr74`, with Title and Loading sampled CSD transform values smoke-guarded.

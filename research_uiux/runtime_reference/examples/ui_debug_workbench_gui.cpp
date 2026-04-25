@@ -156,6 +156,12 @@ struct LayoutAuthoredKeyframeSample
     int frame = 0;
 };
 
+struct LayoutAuthoredSampledTransform
+{
+    std::size_t transformIndex = 0;
+    std::size_t sampleIndex = 0;
+};
+
 struct PrimitiveChannelMask
 {
     bool color = false;
@@ -349,6 +355,11 @@ inline constexpr std::array<LayoutAuthoredKeyframeSample, 3> kLayoutAuthoredKeyf
     { 2, 1 },
 }};
 
+inline constexpr std::array<LayoutAuthoredSampledTransform, 2> kLayoutAuthoredSampledTransforms{{
+    { 0, 0 },
+    { 2, 2 },
+}};
+
 enum ControlId
 {
     kGroupListId = 1001,
@@ -471,6 +482,28 @@ enum ControlId
             samples.push_back(&sample);
     }
     return samples;
+}
+
+[[nodiscard]] std::vector<const LayoutAuthoredSampledTransform*> layoutAuthoredSampledTransformsForContract(std::string_view contractFileName)
+{
+    std::vector<const LayoutAuthoredSampledTransform*> transforms;
+    for (const auto& sampledTransform : kLayoutAuthoredSampledTransforms)
+    {
+        if (sampledTransform.transformIndex >= kLayoutAuthoredCastTransforms.size())
+            continue;
+        if (sampledTransform.sampleIndex >= kLayoutAuthoredKeyframeSamples.size())
+            continue;
+
+        const auto& transform = kLayoutAuthoredCastTransforms[sampledTransform.transformIndex];
+        const auto& sample = kLayoutAuthoredKeyframeSamples[sampledTransform.sampleIndex];
+        if (sample.curveIndex >= kLayoutAuthoredKeyframeCurves.size())
+            continue;
+
+        const auto& curve = kLayoutAuthoredKeyframeCurves[sample.curveIndex];
+        if (transform.contractFileName == contractFileName && curve.contractFileName == contractFileName)
+            transforms.push_back(&sampledTransform);
+    }
+    return transforms;
 }
 
 [[nodiscard]] int layoutScenePrimitiveKeyframeTotal(const std::vector<const LayoutScenePrimitive*>& primitives)
@@ -930,6 +963,35 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return text.str();
 }
 
+[[nodiscard]] std::string layoutAuthoredSampledTransformDescriptor(const LayoutAuthoredSampledTransform& sampledTransform)
+{
+    const auto& transform = kLayoutAuthoredCastTransforms[sampledTransform.transformIndex];
+    const auto& sample = kLayoutAuthoredKeyframeSamples[sampledTransform.sampleIndex];
+    const auto& curve = kLayoutAuthoredKeyframeCurves[sample.curveIndex];
+    const float sampledValue = layoutAuthoredKeyframeCurveValueAtFrame(curve, sample.frame);
+
+    int x = transform.x;
+    int y = transform.y;
+    if (curve.trackType == std::string_view("XPosition"))
+        x = static_cast<int>(std::lround(sampledValue * 1280.0F));
+    else if (curve.trackType == std::string_view("YPosition"))
+        y = static_cast<int>(std::lround(sampledValue * 720.0F));
+
+    std::ostringstream text;
+    text << std::fixed << std::setprecision(6);
+    text
+        << transform.sceneName
+        << "/" << transform.castName
+        << "@" << sample.frame
+        << ":" << x
+        << "," << y
+        << "," << transform.width
+        << "x" << transform.height
+        << ":" << curve.trackType
+        << "=" << sampledValue;
+    return text.str();
+}
+
 [[nodiscard]] std::string layoutAuthoredKeyframeCurveSummary(std::string_view contractFileName)
 {
     const auto curves = layoutAuthoredKeyframeCurvesForContract(contractFileName);
@@ -971,6 +1033,30 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
         text
             << "  " << curve.packageFileName
             << " :: " << layoutAuthoredKeyframeSampleDescriptor(*sample)
+            << "\r\n";
+    }
+
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutAuthoredSampledTransformSummary(std::string_view contractFileName)
+{
+    const auto transforms = layoutAuthoredSampledTransformsForContract(contractFileName);
+    std::ostringstream text;
+    text << "Authored sampled transforms:\r\n";
+
+    if (transforms.empty())
+    {
+        text << "  none\r\n";
+        return text.str();
+    }
+
+    for (const auto* sampledTransform : transforms)
+    {
+        const auto& transform = kLayoutAuthoredCastTransforms[sampledTransform->transformIndex];
+        text
+            << "  " << transform.packageFileName
+            << " :: " << layoutAuthoredSampledTransformDescriptor(*sampledTransform)
             << "\r\n";
     }
 
@@ -1564,6 +1650,7 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     text << "\r\n" << layoutAuthoredCastTransformSummary(host.primaryContractFileName);
     text << "\r\n" << layoutAuthoredKeyframeCurveSummary(host.primaryContractFileName);
     text << "\r\n" << layoutAuthoredKeyframeSampleSummary(host.primaryContractFileName);
+    text << "\r\n" << layoutAuthoredSampledTransformSummary(host.primaryContractFileName);
 
     text << "\r\nNotes:\r\n" << host.notes << "\r\n";
     return text.str();
@@ -2192,6 +2279,31 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     return titleSample == "mm_donut_move/intro/index_text_pos/YPosition@30=0.225926"
         && pauseSample == "bg/Intro_Anim/img/Color@7=0.000000"
         && loadingSample == "bg_2/360_sonic1/pos_text_sonic/XPosition@1=0.500000"
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAuthoredSampledTransformSmoke()
+{
+    const auto title = layoutAuthoredSampledTransformsForContract("title_menu_reference.json");
+    const auto loading = layoutAuthoredSampledTransformsForContract("loading_transition_reference.json");
+    if (title.empty() || loading.empty())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui authored sampled transform smoke failed missing exact-family transform sample\n";
+        return 1;
+    }
+
+    const std::string titleTransform = layoutAuthoredSampledTransformDescriptor(*title.front());
+    const std::string loadingTransform = layoutAuthoredSampledTransformDescriptor(*loading.front());
+
+    std::cout
+        << "sward_ui_runtime_debug_gui authored sampled transform smoke ok "
+        << "title_transform=" << titleTransform
+        << " loading_transform=" << loadingTransform
+        << '\n';
+
+    return titleTransform == "mm_donut_move/index_text_pos@30:408,163,16x16:YPosition=0.225926"
+        && loadingTransform == "bg_2/pos_text_sonic@1:640,360,16x16:XPosition=0.500000"
         ? 0
         : 1;
 }
@@ -3041,6 +3153,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runAuthoredKeyframeCurveSmoke();
         if (command.find("--authored-keyframe-sample-smoke") != std::string::npos)
             return runAuthoredKeyframeSampleSmoke();
+        if (command.find("--authored-sampled-transform-smoke") != std::string::npos)
+            return runAuthoredSampledTransformSmoke();
         if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
             return runLayoutPrimitiveChannelSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)

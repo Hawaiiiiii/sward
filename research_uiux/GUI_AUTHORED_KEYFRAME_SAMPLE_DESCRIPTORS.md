@@ -10,7 +10,7 @@ Phase 73 adds the first authored CSD keyframe sample descriptor layer to the nat
 b/rr73/sward_ui_runtime_debug_gui.exe
 ```
 
-Phase 72 exposed first/last keyframe curve descriptors. This beat stores the bounded keyframe points for the same exact-family samples and adds deterministic linear sampling so the GUI can report a value at an inspected frame.
+Phase 72 exposed first/last keyframe curve descriptors. This beat stores the bounded keyframe points for the same exact-family samples and adds deterministic linear sampling so the GUI can report a value at an inspected frame. Phase 74 combines those sampled values with authored cast rectangles as renderer-facing sampled transform descriptors.
 
 ## What Changed
 
