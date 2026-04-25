@@ -83,6 +83,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the first primitive channel-classification layer in the native GUI, use [`research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_CUES.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_CUES.md).
 
+> [!TIP]
+> For the compact primitive channel-count legend in the native GUI preview, use [`research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_LEGEND.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_LEGEND.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
@@ -125,6 +128,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - GUI layout primitive playback cues via [`research_uiux/GUI_LAYOUT_PRIMITIVE_PLAYBACK_CUES.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_PLAYBACK_CUES.md)
 - GUI layout primitive detail cues via [`research_uiux/GUI_LAYOUT_PRIMITIVE_DETAIL_CUES.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_DETAIL_CUES.md)
 - GUI layout primitive channel cues via [`research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_CUES.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_CUES.md)
+- GUI layout primitive channel legends via [`research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_LEGEND.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_LEGEND.md)
 - A local-only support-substrate humanization pass via [`research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`](./research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md)
 - Runtime-backed support-substrate contracts via [`research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`](./research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md)
 - A source-tree mirror helper for the local-only `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py)

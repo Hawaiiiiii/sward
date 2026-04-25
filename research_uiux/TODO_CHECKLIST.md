@@ -493,6 +493,14 @@
 - [x] Build, smoke, and GUI-control-check `b\rr64\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for primitive channel cues.
 
+## Phase 65 - GUI Layout Primitive Channel Legend
+
+- [x] Add a compact preview legend for recovered primitive channel counts.
+- [x] Show transform/color/visibility/sprite/static counts for selected host primitives.
+- [x] Add `--layout-primitive-channel-legend-smoke`.
+- [x] Build, smoke, and capture-check `b\rr65\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for primitive channel legend.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -619,3 +627,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive playback cues under `b\rr62`, with recovered gameplay HUD animation-bank labels and sampled frame cursors smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive detail cues under `b\rr63`, with the Sonic HUD primitive parity summary visible through the native detail pane.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive channel cues under `b\rr64`, with Sonic HUD transform/color/visibility/static classifications smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive channel legends under `b\rr65`, with Sonic HUD transform/color/visibility/sprite/static counts visible in the preview.

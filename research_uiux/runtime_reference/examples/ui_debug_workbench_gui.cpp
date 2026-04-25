@@ -117,6 +117,15 @@ struct PrimitiveChannelMask
     bool visibility = false;
 };
 
+struct PrimitiveChannelCounts
+{
+    int color = 0;
+    int sprite = 0;
+    int transform = 0;
+    int visibility = 0;
+    int staticPrimitive = 0;
+};
+
 inline constexpr const char* kPreviewPanelClassName = "SwardUiRuntimePreviewPanel";
 inline constexpr UINT_PTR kPlaybackTimerId = 2001;
 inline constexpr UINT kPlaybackTimerMilliseconds = 33;
@@ -563,6 +572,38 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return text.str();
 }
 
+[[nodiscard]] PrimitiveChannelCounts layoutPrimitiveChannelCounts(const std::vector<const LayoutScenePrimitive*>& primitives)
+{
+    PrimitiveChannelCounts counts{};
+    for (const auto* primitive : primitives)
+    {
+        const PrimitiveChannelMask mask = layoutPrimitiveChannelMask(*primitive);
+        if (mask.color)
+            ++counts.color;
+        if (mask.sprite)
+            ++counts.sprite;
+        if (mask.transform)
+            ++counts.transform;
+        if (mask.visibility)
+            ++counts.visibility;
+        if (!hasAnyChannel(mask))
+            ++counts.staticPrimitive;
+    }
+    return counts;
+}
+
+[[nodiscard]] std::string layoutPrimitiveChannelLegendLabel(const PrimitiveChannelCounts& counts)
+{
+    std::ostringstream text;
+    text
+        << "Channels T" << counts.transform
+        << " C" << counts.color
+        << " V" << counts.visibility
+        << " S" << counts.sprite
+        << " static" << counts.staticPrimitive;
+    return text.str();
+}
+
 [[nodiscard]] std::string layoutPrimitiveCueSummary(std::string_view contractFileName, float progress)
 {
     const auto primitives = layoutScenePrimitivesForContract(contractFileName);
@@ -665,6 +706,34 @@ void drawLayoutScenePrimitives(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
             barHeight);
         drawLayoutTimelineBar(graphics, primitiveBar, timelineProgress);
     }
+}
+
+void drawLayoutPrimitiveChannelLegend(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const std::vector<const LayoutScenePrimitive*>& primitives)
+{
+    if (primitives.empty())
+        return;
+
+    const PrimitiveChannelCounts counts = layoutPrimitiveChannelCounts(primitives);
+    const std::string label = layoutPrimitiveChannelLegendLabel(counts);
+    const float legendWidth = std::min(292.0F, std::max(80.0F, canvas.Width - 20.0F));
+    Gdiplus::RectF legendRect(
+        std::max(canvas.X + 10.0F, canvas.X + canvas.Width - legendWidth - 10.0F),
+        std::max(6.0F, canvas.Y - 32.0F),
+        legendWidth,
+        24.0F);
+
+    Gdiplus::SolidBrush legendBrush(Gdiplus::Color(220, 8, 14, 20));
+    Gdiplus::Pen legendPen(Gdiplus::Color(235, 247, 211, 72), 1.0F);
+    graphics.FillRectangle(&legendBrush, legendRect);
+    graphics.DrawRectangle(&legendPen, legendRect);
+
+    RECT labelRect{
+        static_cast<LONG>(legendRect.X + 8.0F),
+        static_cast<LONG>(legendRect.Y),
+        static_cast<LONG>(legendRect.X + legendRect.Width - 8.0F),
+        static_cast<LONG>(legendRect.Y + legendRect.Height),
+    };
+    drawTextLine(dc, labelRect, label, RGB(248, 241, 176));
 }
 
 void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, const LayoutEvidence& evidence, float timelineProgress)
@@ -1396,6 +1465,32 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         : 1;
 }
 
+[[nodiscard]] int runLayoutPrimitiveChannelLegendSmoke()
+{
+    const auto sonicStage = layoutScenePrimitivesForContract("sonic_stage_hud_reference.json");
+    const PrimitiveChannelCounts counts = layoutPrimitiveChannelCounts(sonicStage);
+    const std::string label = layoutPrimitiveChannelLegendLabel(counts);
+
+    std::cout
+        << "sward_ui_runtime_debug_gui layout primitive channel legend smoke ok "
+        << "legend=T" << counts.transform
+        << " C" << counts.color
+        << " V" << counts.visibility
+        << " S" << counts.sprite
+        << " static" << counts.staticPrimitive
+        << " label=" << label
+        << '\n';
+
+    return counts.transform == 3
+        && counts.color == 4
+        && counts.visibility == 2
+        && counts.sprite == 0
+        && counts.staticPrimitive == 1
+        && label == "Channels T3 C4 V2 S0 static1"
+        ? 0
+        : 1;
+}
+
 [[nodiscard]] int runLayerFillSmoke()
 {
     const float backdropAlpha = previewLayerFillAlpha("backdrop");
@@ -1735,8 +1830,19 @@ private:
 
         const auto* selected = selectedHostEntry();
         const auto* host = selected ? selected->metadata : nullptr;
+        PreviewFamily previewFamily = PreviewFamily::Generic;
+        const LayoutEvidence* layoutEvidence = nullptr;
+        std::vector<const LayoutScenePrimitive*> layoutPrimitives;
+        if (host)
+        {
+            previewFamily = previewFamilyForContract(host->primaryContractFileName);
+            layoutEvidence = layoutEvidenceForContract(host->primaryContractFileName);
+            layoutPrimitives = layoutScenePrimitivesForContract(host->primaryContractFileName);
+        }
 
         RECT titleRect{ 12, 8, width - 12, 30 };
+        if (!layoutPrimitives.empty())
+            titleRect.right = std::max<LONG>(titleRect.left + 180, static_cast<LONG>(width - 330));
         std::string title = "Visual Preview";
         if (host)
             title += " - " + std::string(host->hostDisplayName);
@@ -1760,14 +1866,8 @@ private:
 
         bool drewAtlas = false;
         std::string atlasLabel = "Local atlas: none";
-        PreviewFamily previewFamily = PreviewFamily::Generic;
-        const LayoutEvidence* layoutEvidence = nullptr;
-        std::vector<const LayoutScenePrimitive*> layoutPrimitives;
         if (host)
         {
-            previewFamily = previewFamilyForContract(host->primaryContractFileName);
-            layoutEvidence = layoutEvidenceForContract(host->primaryContractFileName);
-            layoutPrimitives = layoutScenePrimitivesForContract(host->primaryContractFileName);
             if (const auto* candidate = atlasCandidateForContract(host->primaryContractFileName))
             {
                 const auto atlasPath = visualAtlasSheetRoot() / std::string(candidate->atlasFileName);
@@ -1817,6 +1917,7 @@ private:
         }
 
         drawLayoutScenePrimitives(dc, graphics, canvas, layoutPrimitives, stateLinearProgress);
+        drawLayoutPrimitiveChannelLegend(dc, graphics, canvas, layoutPrimitives);
 
         if (m_runtime)
         {
@@ -2188,6 +2289,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runLayoutPrimitivePlaybackSmoke();
         if (command.find("--layout-primitive-detail-smoke") != std::string::npos)
             return runLayoutPrimitiveDetailSmoke();
+        if (command.find("--layout-primitive-channel-legend-smoke") != std::string::npos)
+            return runLayoutPrimitiveChannelLegendSmoke();
         if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
             return runLayoutPrimitiveChannelSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)

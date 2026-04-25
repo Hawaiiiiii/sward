@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUI_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "ui_debug_workbench_gui.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr64" / "sward_ui_runtime_debug_gui.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr65" / "sward_ui_runtime_debug_gui.exe"
 
 
 class UiDebugWorkbenchGuiTests(unittest.TestCase):
@@ -132,6 +132,12 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("PrimitiveChannelMask", source_text)
         self.assertIn("layoutPrimitiveChannelTags", source_text)
         self.assertIn("--layout-primitive-channel-smoke", source_text)
+
+    def test_gui_source_exposes_layout_primitive_channel_legend(self) -> None:
+        source_text = GUI_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("PrimitiveChannelCounts", source_text)
+        self.assertIn("drawLayoutPrimitiveChannelLegend", source_text)
+        self.assertIn("--layout-primitive-channel-legend-smoke", source_text)
 
     def test_gui_source_exposes_gameplay_hud_proxy_primitives(self) -> None:
         source_text = GUI_SOURCE.read_text(encoding="utf-8")
@@ -448,6 +454,23 @@ class UiDebugWorkbenchGuiTests(unittest.TestCase):
         self.assertIn("speed_channels=color+transform", completed.stdout)
         self.assertIn("info2_channels=visibility", completed.stdout)
         self.assertIn("bg_channels=static", completed.stdout)
+
+    def test_layout_primitive_channel_legend_smoke_reports_gameplay_hud_counts_without_opening_window(self) -> None:
+        exe = Path(os.environ.get("SWARD_UI_DEBUG_GUI_EXE", DEFAULT_EXE))
+        self.assertTrue(exe.exists(), f"missing GUI executable: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--layout-primitive-channel-legend-smoke"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("sward_ui_runtime_debug_gui layout primitive channel legend smoke ok", completed.stdout)
+        self.assertIn("legend=T3 C4 V2 S0 static1", completed.stdout)
+        self.assertIn("label=Channels T3 C4 V2 S0 static1", completed.stdout)
 
 
 if __name__ == "__main__":

@@ -64,6 +64,8 @@ sward_ui_runtime_debug_gui layout primitive channel smoke ok sonic_transform=3 s
 
 The GUI was also launch-checked by selecting `Gameplay HUD Hosts -> SonicMainDisplay.cpp`, pressing `Run Host`, and reading the native detail edit control back with `WM_GETTEXT`. The detail text contained `channels=color+transform` for `so_speed_gauge`, `channels=visibility` for `info_2`, and `channels=static` for `bg`.
 
+Phase 65 extends this same channel layer with a compact visual count legend in [`GUI_LAYOUT_PRIMITIVE_CHANNEL_LEGEND.md`](./GUI_LAYOUT_PRIMITIVE_CHANNEL_LEGEND.md).
+
 ## Boundary
 
 This is still not original curve sampling. It is the first typed channel semantic layer over the recovered primitive track summaries, which gives the future renderer a cleaner bridge toward transform/color/visibility playback without overclaiming exact node evaluation yet.

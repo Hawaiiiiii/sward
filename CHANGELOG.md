@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 65 GUI layout primitive channel legend
+
+- added [`research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_LEGEND.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_LEGEND.md)
+- added a compact preview legend for recovered primitive channel counts
+- surfaced transform/color/visibility/sprite/static counts directly in the visual preview surface
+- added `--layout-primitive-channel-legend-smoke`, verifying Sonic HUD proxy channel totals under `b/rr65`
+
 ### Phase 64 GUI layout primitive channel cues
 
 - added [`research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_CUES.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_CUES.md)
