@@ -10,7 +10,7 @@ Phase 63 turns the primitive playback cues from tiny overlay labels into readabl
 b/rr63/sward_ui_runtime_debug_gui.exe
 ```
 
-The native GUI detail pane now reports the selected host's layout primitive cue summary: primitive count, total keyframes, animation bank, sampled frame cursor, per-primitive keyframes, and recovered track summary.
+The native GUI detail pane reports the selected host's layout primitive cue summary: primitive count, total keyframes, animation bank, sampled frame cursor, per-primitive keyframes, and recovered track summary. Phase 64 extends the current detail text with recovered channel classes.
 
 ## What Changed
 
@@ -19,15 +19,15 @@ The native GUI detail pane now reports the selected host's layout primitive cue 
 - added `--layout-primitive-detail-smoke` for headless Sonic HUD proxy parity checks
 - kept the summary diagnostic: it reads recovered scene/animation/frame facts but does not claim original CSD channel evaluation yet
 
-For `Gameplay HUD Hosts -> SonicMainDisplay.cpp`, the detail pane now includes entries like:
+As of Phase 64, `Gameplay HUD Hosts -> SonicMainDisplay.cpp` includes entries like:
 
 ```text
 Layout primitive cues:
   primitives=6 keyframes=680
-  so_speed_gauge / Size_Anim : frame 100/100, keyframes=360, tracks=Gradient, X/Y scale
-  so_ringenagy_gauge / Size_Anim : frame 100/100, keyframes=240, tracks=Gradient, X scale
-  info_1 / Count_Anim : frame 100/100, keyframes=57, tracks=Gradient, HideFlag
-  ring_get_effect / Intro_Anim : frame 5/5, keyframes=14, tracks=Gradient, Rotation
+  so_speed_gauge / Size_Anim : frame 100/100, keyframes=360, channels=color+transform, tracks=Gradient, X/Y scale
+  so_ringenagy_gauge / Size_Anim : frame 100/100, keyframes=240, channels=color+transform, tracks=Gradient, X scale
+  info_1 / Count_Anim : frame 100/100, keyframes=57, channels=color+visibility, tracks=Gradient, HideFlag
+  ring_get_effect / Intro_Anim : frame 5/5, keyframes=14, channels=color+transform, tracks=Gradient, Rotation
 ```
 
 ## Verification

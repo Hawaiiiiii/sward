@@ -109,6 +109,14 @@ struct LayoutScenePrimitive
     float height = 0.0F;
 };
 
+struct PrimitiveChannelMask
+{
+    bool color = false;
+    bool sprite = false;
+    bool transform = false;
+    bool visibility = false;
+};
+
 inline constexpr const char* kPreviewPanelClassName = "SwardUiRuntimePreviewPanel";
 inline constexpr UINT_PTR kPlaybackTimerId = 2001;
 inline constexpr UINT kPlaybackTimerMilliseconds = 33;
@@ -504,6 +512,57 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return static_cast<int>(std::round(clampedProgress * static_cast<float>(primitive.frameCount)));
 }
 
+[[nodiscard]] bool trackSummaryContains(std::string_view trackSummary, std::string_view token)
+{
+    return trackSummary.find(token) != std::string_view::npos;
+}
+
+[[nodiscard]] PrimitiveChannelMask layoutPrimitiveChannelMask(const LayoutScenePrimitive& primitive)
+{
+    PrimitiveChannelMask mask{};
+    mask.color =
+        trackSummaryContains(primitive.trackSummary, "Color")
+        || trackSummaryContains(primitive.trackSummary, "Gradient");
+    mask.sprite = trackSummaryContains(primitive.trackSummary, "SubImage");
+    mask.transform =
+        trackSummaryContains(primitive.trackSummary, "position")
+        || trackSummaryContains(primitive.trackSummary, "scale")
+        || trackSummaryContains(primitive.trackSummary, "Rotation");
+    mask.visibility = trackSummaryContains(primitive.trackSummary, "HideFlag");
+    return mask;
+}
+
+[[nodiscard]] bool hasAnyChannel(const PrimitiveChannelMask& mask)
+{
+    return mask.color || mask.sprite || mask.transform || mask.visibility;
+}
+
+[[nodiscard]] std::string layoutPrimitiveChannelTags(const LayoutScenePrimitive& primitive)
+{
+    const PrimitiveChannelMask mask = layoutPrimitiveChannelMask(primitive);
+    std::vector<std::string_view> tags;
+    if (mask.color)
+        tags.push_back("color");
+    if (mask.sprite)
+        tags.push_back("sprite");
+    if (mask.transform)
+        tags.push_back("transform");
+    if (mask.visibility)
+        tags.push_back("visibility");
+
+    if (tags.empty())
+        return "static";
+
+    std::ostringstream text;
+    for (std::size_t index = 0; index < tags.size(); ++index)
+    {
+        if (index > 0)
+            text << "+";
+        text << tags[index];
+    }
+    return text.str();
+}
+
 [[nodiscard]] std::string layoutPrimitiveCueSummary(std::string_view contractFileName, float progress)
 {
     const auto primitives = layoutScenePrimitivesForContract(contractFileName);
@@ -528,6 +587,7 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
             << " / " << primitive->animationName
             << " : frame " << layoutScenePrimitiveFrame(*primitive, progress) << "/" << primitive->frameCount
             << ", keyframes=" << primitive->keyframeCount
+            << ", channels=" << layoutPrimitiveChannelTags(*primitive)
             << ", tracks=" << primitive->trackSummary
             << "\r\n";
     }
@@ -585,6 +645,7 @@ void drawLayoutScenePrimitives(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
             << primitive->sceneName
             << " / " << primitive->animationName
             << " | kf=" << primitive->keyframeCount
+            << " | ch=" << layoutPrimitiveChannelTags(*primitive)
             << " | f=" << frame << "/" << primitive->frameCount;
 
         RECT labelRect{
@@ -1279,6 +1340,60 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
         << '\n';
 
     return hasHeader && hasAggregate && hasSpeedGauge && hasRingEffect ? 0 : 1;
+}
+
+[[nodiscard]] int runLayoutPrimitiveChannelSmoke()
+{
+    const auto sonicStage = layoutScenePrimitivesForContract("sonic_stage_hud_reference.json");
+    const auto* speedGauge = layoutScenePrimitiveForScene(sonicStage, "so_speed_gauge");
+    const auto* infoPanel2 = layoutScenePrimitiveForScene(sonicStage, "info_2");
+    const auto* background = layoutScenePrimitiveForScene(sonicStage, "bg");
+    if (!speedGauge || !infoPanel2 || !background)
+    {
+        std::cerr << "sward_ui_runtime_debug_gui layout primitive channel smoke failed missing Sonic HUD primitive\n";
+        return 1;
+    }
+
+    int transformCount = 0;
+    int colorCount = 0;
+    int visibilityCount = 0;
+    int staticCount = 0;
+    for (const auto* primitive : sonicStage)
+    {
+        const PrimitiveChannelMask mask = layoutPrimitiveChannelMask(*primitive);
+        if (mask.transform)
+            ++transformCount;
+        if (mask.color)
+            ++colorCount;
+        if (mask.visibility)
+            ++visibilityCount;
+        if (!hasAnyChannel(mask))
+            ++staticCount;
+    }
+
+    const std::string speedChannels = layoutPrimitiveChannelTags(*speedGauge);
+    const std::string info2Channels = layoutPrimitiveChannelTags(*infoPanel2);
+    const std::string bgChannels = layoutPrimitiveChannelTags(*background);
+    std::cout
+        << "sward_ui_runtime_debug_gui layout primitive channel smoke ok "
+        << "sonic_transform=" << transformCount
+        << " sonic_color=" << colorCount
+        << " sonic_visibility=" << visibilityCount
+        << " sonic_static=" << staticCount
+        << " speed_channels=" << speedChannels
+        << " info2_channels=" << info2Channels
+        << " bg_channels=" << bgChannels
+        << '\n';
+
+    return transformCount == 3
+        && colorCount == 4
+        && visibilityCount == 2
+        && staticCount == 1
+        && speedChannels == "color+transform"
+        && info2Channels == "visibility"
+        && bgChannels == "static"
+        ? 0
+        : 1;
 }
 
 [[nodiscard]] int runLayerFillSmoke()
@@ -2073,6 +2188,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runLayoutPrimitivePlaybackSmoke();
         if (command.find("--layout-primitive-detail-smoke") != std::string::npos)
             return runLayoutPrimitiveDetailSmoke();
+        if (command.find("--layout-primitive-channel-smoke") != std::string::npos)
+            return runLayoutPrimitiveChannelSmoke();
         if (command.find("--layout-primitive-smoke") != std::string::npos)
             return runLayoutPrimitiveSmoke();
         if (command.find("--family-preview-smoke") != std::string::npos)

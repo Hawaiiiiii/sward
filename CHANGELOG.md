@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 64 GUI layout primitive channel cues
+
+- added [`research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_CUES.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_CHANNEL_CUES.md)
+- added a conservative primitive channel classifier over recovered track summaries: color, sprite, transform, visibility, and static
+- surfaced channel tags in the primitive overlay and detail-pane cue summary
+- added `--layout-primitive-channel-smoke`, verifying Sonic HUD proxy channel counts and tags under `b/rr64`
+
 ### Phase 63 GUI layout primitive detail cues
 
 - added [`research_uiux/GUI_LAYOUT_PRIMITIVE_DETAIL_CUES.md`](./research_uiux/GUI_LAYOUT_PRIMITIVE_DETAIL_CUES.md)

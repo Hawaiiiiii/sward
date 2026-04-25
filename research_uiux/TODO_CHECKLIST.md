@@ -485,6 +485,14 @@
 - [x] Build, smoke, and GUI-control-check `b\rr63\sward_ui_runtime_debug_gui.exe`.
 - [x] Generate a dedicated report for primitive detail cues.
 
+## Phase 64 - GUI Layout Primitive Channel Cues
+
+- [x] Add a conservative primitive channel classifier for recovered track summaries.
+- [x] Surface color, sprite, transform, visibility, and static tags in the overlay/detail cue paths.
+- [x] Add `--layout-primitive-channel-smoke` for Sonic HUD proxy channel checks.
+- [x] Build, smoke, and GUI-control-check `b\rr64\sward_ui_runtime_debug_gui.exe`.
+- [x] Generate a dedicated report for primitive channel cues.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -610,3 +618,4 @@
 - [x] Follow-on phase audit on `2026-04-24`: added and verified gameplay HUD primitive ownership auditing under `b\rr61`, with `so_speed_gauge`, `so_ringenagy_gauge`, `ring_get_effect`, and `bg` scene/keyframe metrics smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive playback cues under `b\rr62`, with recovered gameplay HUD animation-bank labels and sampled frame cursors smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive detail cues under `b\rr63`, with the Sonic HUD primitive parity summary visible through the native detail pane.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI layout primitive channel cues under `b\rr64`, with Sonic HUD transform/color/visibility/static classifications smoke-guarded.
