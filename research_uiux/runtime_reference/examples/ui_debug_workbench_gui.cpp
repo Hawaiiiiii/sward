@@ -170,6 +170,17 @@ struct LayoutAuthoredSampledTransformPixels
     int height = 0;
 };
 
+struct LayoutAuthoredSampledDrawCommand
+{
+    std::string sceneName;
+    std::string castName;
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+    std::string sampledTrack;
+};
+
 struct PrimitiveChannelMask
 {
     bool color = false;
@@ -1004,6 +1015,58 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
     return text.str();
 }
 
+[[nodiscard]] std::string layoutAuthoredSampledTrackDescriptor(const LayoutAuthoredSampledTransform& sampledTransform)
+{
+    const auto& sample = kLayoutAuthoredKeyframeSamples[sampledTransform.sampleIndex];
+    const auto& curve = kLayoutAuthoredKeyframeCurves[sample.curveIndex];
+    const float sampledValue = layoutAuthoredKeyframeCurveValueAtFrame(curve, sample.frame);
+
+    std::ostringstream text;
+    text << std::fixed << std::setprecision(6);
+    text
+        << curve.trackType
+        << "@" << sample.frame
+        << "=" << sampledValue;
+    return text.str();
+}
+
+[[nodiscard]] LayoutAuthoredSampledDrawCommand layoutAuthoredSampledDrawCommand(const LayoutAuthoredSampledTransform& sampledTransform)
+{
+    const auto& transform = kLayoutAuthoredCastTransforms[sampledTransform.transformIndex];
+    const LayoutAuthoredSampledTransformPixels pixels = layoutAuthoredSampledTransformPixels(sampledTransform);
+    return LayoutAuthoredSampledDrawCommand{
+        std::string(transform.sceneName),
+        std::string(transform.castName),
+        pixels.x,
+        pixels.y,
+        pixels.width,
+        pixels.height,
+        layoutAuthoredSampledTrackDescriptor(sampledTransform),
+    };
+}
+
+[[nodiscard]] std::vector<LayoutAuthoredSampledDrawCommand> layoutAuthoredSampledDrawCommandsForContract(std::string_view contractFileName)
+{
+    std::vector<LayoutAuthoredSampledDrawCommand> commands;
+    for (const auto* sampledTransform : layoutAuthoredSampledTransformsForContract(contractFileName))
+        commands.push_back(layoutAuthoredSampledDrawCommand(*sampledTransform));
+    return commands;
+}
+
+[[nodiscard]] std::string layoutAuthoredSampledDrawCommandDescriptor(const LayoutAuthoredSampledDrawCommand& command)
+{
+    std::ostringstream text;
+    text
+        << command.sceneName
+        << "/" << command.castName
+        << ":" << command.x
+        << "," << command.y
+        << "," << command.width
+        << "x" << command.height
+        << ":" << command.sampledTrack;
+    return text.str();
+}
+
 [[nodiscard]] std::string layoutAuthoredSampledTransformDescriptor(const LayoutAuthoredSampledTransform& sampledTransform)
 {
     const auto& transform = kLayoutAuthoredCastTransforms[sampledTransform.transformIndex];
@@ -1094,6 +1157,24 @@ void drawTextLine(HDC dc, RECT bounds, const std::string& text, COLORREF color, 
             << " :: " << layoutAuthoredSampledTransformDescriptor(*sampledTransform)
             << "\r\n";
     }
+
+    return text.str();
+}
+
+[[nodiscard]] std::string layoutAuthoredSampledDrawCommandSummary(std::string_view contractFileName)
+{
+    const auto commands = layoutAuthoredSampledDrawCommandsForContract(contractFileName);
+    std::ostringstream text;
+    text << "Authored sampled draw commands:\r\n";
+
+    if (commands.empty())
+    {
+        text << "  none\r\n";
+        return text.str();
+    }
+
+    for (const auto& command : commands)
+        text << "  " << layoutAuthoredSampledDrawCommandDescriptor(command) << "\r\n";
 
     return text.str();
 }
@@ -1260,15 +1341,26 @@ void drawLayoutTimelineBar(Gdiplus::Graphics& graphics, const Gdiplus::RectF& ba
         canvas);
 }
 
+[[nodiscard]] Gdiplus::RectF layoutAuthoredSampledDrawCommandRect(const LayoutAuthoredSampledDrawCommand& command, const Gdiplus::RectF& canvas)
+{
+    return clampRectToCanvas(
+        Gdiplus::RectF(
+            canvas.X + (static_cast<float>(command.x) / 1280.0F * canvas.Width),
+            canvas.Y + (static_cast<float>(command.y) / 720.0F * canvas.Height),
+            std::max(2.0F, static_cast<float>(command.width) / 1280.0F * canvas.Width),
+            std::max(2.0F, static_cast<float>(command.height) / 720.0F * canvas.Height)),
+        canvas);
+}
+
 void drawAuthoredSampledTransforms(HDC dc, Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, std::string_view contractFileName)
 {
-    const auto sampledTransforms = layoutAuthoredSampledTransformsForContract(contractFileName);
-    if (sampledTransforms.empty())
+    const auto commands = layoutAuthoredSampledDrawCommandsForContract(contractFileName);
+    if (commands.empty())
         return;
 
-    for (const auto* sampledTransform : sampledTransforms)
+    for (const auto& command : commands)
     {
-        const Gdiplus::RectF markerRect = layoutAuthoredSampledTransformRect(*sampledTransform, canvas);
+        const Gdiplus::RectF markerRect = layoutAuthoredSampledDrawCommandRect(command, canvas);
         Gdiplus::SolidBrush markerBrush(Gdiplus::Color(110, 247, 211, 72));
         Gdiplus::Pen markerPen(Gdiplus::Color(245, 255, 247, 177), 1.6F);
         graphics.FillRectangle(&markerBrush, markerRect);
@@ -1294,7 +1386,7 @@ void drawAuthoredSampledTransforms(HDC dc, Gdiplus::Graphics& graphics, const Gd
             static_cast<LONG>(labelRect.X + labelRect.Width - 6.0F),
             static_cast<LONG>(labelRect.Y + labelRect.Height),
         };
-        drawTextLine(dc, textRect, "authored sampled " + layoutAuthoredSampledTransformPreviewDescriptor(*sampledTransform), RGB(255, 247, 177));
+        drawTextLine(dc, textRect, "authored sampled " + layoutAuthoredSampledDrawCommandDescriptor(command), RGB(255, 247, 177));
     }
 }
 
@@ -1736,6 +1828,7 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
     text << "\r\n" << layoutAuthoredKeyframeCurveSummary(host.primaryContractFileName);
     text << "\r\n" << layoutAuthoredKeyframeSampleSummary(host.primaryContractFileName);
     text << "\r\n" << layoutAuthoredSampledTransformSummary(host.primaryContractFileName);
+    text << "\r\n" << layoutAuthoredSampledDrawCommandSummary(host.primaryContractFileName);
 
     text << "\r\nNotes:\r\n" << host.notes << "\r\n";
     return text.str();
@@ -2414,6 +2507,31 @@ void drawLayoutEvidenceOverlay(HDC dc, Gdiplus::Graphics& graphics, const Gdiplu
 
     return titlePreview == "mm_donut_move/index_text_pos:408,163,16x16"
         && loadingPreview == "bg_2/pos_text_sonic:640,360,16x16"
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runAuthoredSampledDrawCommandSmoke()
+{
+    const auto title = layoutAuthoredSampledDrawCommandsForContract("title_menu_reference.json");
+    const auto loading = layoutAuthoredSampledDrawCommandsForContract("loading_transition_reference.json");
+    if (title.empty() || loading.empty())
+    {
+        std::cerr << "sward_ui_runtime_debug_gui authored sampled draw command smoke failed missing exact-family draw command\n";
+        return 1;
+    }
+
+    const std::string titleDraw = layoutAuthoredSampledDrawCommandDescriptor(title.front());
+    const std::string loadingDraw = layoutAuthoredSampledDrawCommandDescriptor(loading.front());
+
+    std::cout
+        << "sward_ui_runtime_debug_gui authored sampled draw command smoke ok "
+        << "title_draw=" << titleDraw
+        << " loading_draw=" << loadingDraw
+        << '\n';
+
+    return titleDraw == "mm_donut_move/index_text_pos:408,163,16x16:YPosition@30=0.225926"
+        && loadingDraw == "bg_2/pos_text_sonic:640,360,16x16:XPosition@1=0.500000"
         ? 0
         : 1;
 }
@@ -3265,6 +3383,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR commandLine, int showCom
             return runAuthoredKeyframeCurveSmoke();
         if (command.find("--authored-keyframe-sample-smoke") != std::string::npos)
             return runAuthoredKeyframeSampleSmoke();
+        if (command.find("--authored-sampled-draw-command-smoke") != std::string::npos)
+            return runAuthoredSampledDrawCommandSmoke();
         if (command.find("--authored-sampled-transform-preview-smoke") != std::string::npos)
             return runAuthoredSampledTransformPreviewSmoke();
         if (command.find("--authored-sampled-transform-smoke") != std::string::npos)

@@ -716,3 +716,4 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored keyframe sample descriptors under `b\rr73`, with Title, Pause, and Loading sampled CSD keyframe values smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored sampled transform descriptors under `b\rr74`, with Title and Loading sampled CSD transform values smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored sampled transform preview markers under `b\rr75`, with Title and Loading marker geometry smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-25`: added and verified GUI authored sampled draw commands under `b\rr76`, with Title and Loading renderer-facing command geometry smoke-guarded.

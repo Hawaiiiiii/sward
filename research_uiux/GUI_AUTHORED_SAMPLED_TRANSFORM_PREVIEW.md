@@ -61,3 +61,5 @@ sward_ui_runtime_debug_gui authored sampled transform preview smoke ok title_pre
 ## Boundary
 
 This is still a diagnostic preview layer, not full CSD playback. It proves that the GUI can draw authored sampled transform evidence on the same canvas as atlas sheets, runtime overlays, layout primitives, and evidence panels. The next product step is turning these sampled markers into broader family-specific draw commands driven by decoded CSD node transforms and animation channels.
+
+Phase 76 starts that bridge by wrapping the first Title and Loading sampled marker rectangles in renderer-facing draw-command descriptors.

@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-25
 
+### Phase 76 GUI authored sampled draw commands
+
+- added [`research_uiux/GUI_AUTHORED_SAMPLED_DRAW_COMMANDS.md`](./research_uiux/GUI_AUTHORED_SAMPLED_DRAW_COMMANDS.md)
+- added renderer-facing authored sampled draw-command descriptors for Title and Loading exact-family samples
+- changed the authored sampled preview marker draw path to consume draw commands rather than raw sampled-transform evidence
+- added `--authored-sampled-draw-command-smoke`, verifying sampled draw-command geometry under `b/rr76`
+
 ### Phase 75 GUI authored sampled transform preview
 
 - added [`research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_PREVIEW.md`](./research_uiux/GUI_AUTHORED_SAMPLED_TRANSFORM_PREVIEW.md)
