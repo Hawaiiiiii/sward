@@ -28,6 +28,7 @@
 #include <ui/game_window.h>
 #include <ui/black_bar.h>
 #include <patches/aspect_ratio_patches.h>
+#include <patches/ui_lab_patches.h>
 #include <user/config.h>
 #include <sdl_listener.h>
 #include <xxHashMap.h>
@@ -2600,6 +2601,7 @@ static void DrawImGui()
     ButtonGuide::Draw();
     Fader::Draw();
     BlackBar::Draw();
+    UiLab::DrawOverlay();
 
     assert(ImGui::GetBackgroundDrawList()->_ClipRectStack.Size == 1 && "Some clip rects were not removed from the stack!");
 

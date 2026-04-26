@@ -1,4 +1,5 @@
 #include <patches/ui_lab_patches.h>
+#include <gpu/imgui/imgui_common.h>
 #include <os/logger.h>
 #include <user/config.h>
 #include <string>
@@ -177,5 +178,54 @@ namespace UiLab
             cursorIndex,
             target.primaryCsdScene);
         g_loggedMenuHook = true;
+    }
+
+    void DrawOverlay()
+    {
+        if (!g_isEnabled)
+            return;
+
+        const auto& target = TargetFor(g_target);
+        const std::string targetLabel(target.label);
+        const std::string targetToken(target.token);
+        const std::string targetScene(target.primaryCsdScene);
+        const std::string targetFamily(target.sourceFamily);
+
+        ImGui::SetNextWindowPos({ 18.0f, 18.0f }, ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.82f);
+
+        constexpr ImGuiWindowFlags flags =
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_AlwaysAutoResize |
+            ImGuiWindowFlags_NoFocusOnAppearing;
+
+        if (ImGui::Begin("SWARD UI Lab", nullptr, flags))
+        {
+            ImGui::TextUnformatted("Runtime-backed UI Lab");
+            ImGui::Separator();
+            ImGui::Text("Target: %s [%s]", targetLabel.c_str(), targetToken.c_str());
+            ImGui::Text("CSD scene: %s", targetScene.c_str());
+            ImGui::Text("Source family: %s", targetFamily.c_str());
+            ImGui::Text("Stage context: %s", target.requiresStageContext ? "required" : "not required");
+            ImGui::Text("Title intro hook: %s", g_loggedIntroHook ? "attached" : "waiting");
+            ImGui::Text("Title menu hook: %s", g_loggedMenuHook ? "attached" : "waiting");
+            ImGui::Separator();
+            ImGui::TextUnformatted("Targets:");
+
+            for (const auto& runtimeTarget : kRuntimeTargets)
+            {
+                const std::string label(runtimeTarget.label);
+                const std::string token(runtimeTarget.token);
+                ImGui::Text("%s %s (%s)",
+                    runtimeTarget.id == g_target ? ">" : " ",
+                    label.c_str(),
+                    token.c_str());
+            }
+        }
+
+        ImGui::End();
     }
 }

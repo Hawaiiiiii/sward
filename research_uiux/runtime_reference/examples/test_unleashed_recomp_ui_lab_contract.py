@@ -44,6 +44,14 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("#include <patches/ui_lab_patches.h>", menu)
         self.assertIn("UiLab::OnTitleStateMenuUpdate", menu)
 
+    def test_ui_lab_draws_inside_the_real_imgui_runtime_frame(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        video = self.read("UnleashedRecomp/gpu/video.cpp")
+
+        self.assertIn("void DrawOverlay()", header)
+        self.assertIn("#include <patches/ui_lab_patches.h>", video)
+        self.assertIn("UiLab::DrawOverlay()", video)
+
     def test_ui_lab_is_documented_as_primary_parity_lane(self):
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
         self.assertIn("UnleashedRecomp UI Lab", report)

@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-26
 
+### Phase 95 Runtime UI Lab overlay attachment
+
+- added `UiLab::DrawOverlay()` so `--ui-lab` now has a visible in-runtime overlay instead of only a logged runtime attachment
+- drew the overlay from the real UnleashedRecomp ImGui frame path after the existing runtime UI draw calls in `gpu/video.cpp`
+- surfaced target token/label, CSD scene, recovered source-family owner, stage-context requirement, and live title intro/menu hook status
+- extended the UI Lab regression contract so the overlay cannot drift back into the standalone clean-renderer lane
+
 ### Phase 94 UnleashedRecomp UI Lab runtime pivot
 
 - added [`research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md`](./research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md)

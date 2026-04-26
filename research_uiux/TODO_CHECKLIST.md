@@ -710,6 +710,13 @@
 - [x] Attach the UI Lab to live `CTitleStateIntro::Update` and `CTitleStateMenu::Update` translated runtime states.
 - [x] Document the real-runtime UI Lab architecture and the immediate next implementation order.
 
+## Phase 95 - Runtime UI Lab Overlay Attachment
+
+- [x] Add a visible `UiLab::DrawOverlay()` entry point to the UnleashedRecomp patch module.
+- [x] Draw the UI Lab overlay inside the real ImGui runtime frame in `gpu/video.cpp`.
+- [x] Surface the selected runtime target, CSD scene, source family, stage-context requirement, and hook attachment status.
+- [x] Guard the overlay attachment with the UI Lab regression contract.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.

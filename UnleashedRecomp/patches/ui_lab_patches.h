@@ -39,4 +39,5 @@ namespace UiLab
 
     void OnTitleStateIntroUpdate(float elapsedSeconds);
     void OnTitleStateMenuUpdate(int32_t cursorIndex);
+    void DrawOverlay();
 }
