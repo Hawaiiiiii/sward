@@ -356,6 +356,7 @@ if (WIN32)
         comctl32
         dwmapi
         ntdll
+        runtimeobject
         Shcore
         Synchronization
         winmm
