@@ -10,6 +10,7 @@
 #include <user/paths.h>
 #include <app.h>
 #include <exports.h>
+#include <patches/ui_lab_patches.h>
 
 static bool g_installMessageOpen = false;
 static bool g_installMessageFaderBegun = false;
@@ -60,6 +61,8 @@ PPC_FUNC(sub_825882B8)
     auto isAccepted = pPadState.IsTapped(SWA::eKeyState_A) || pPadState.IsTapped(SWA::eKeyState_Start);
 
     auto pContext = pTitleStateMenu->GetContextBase<SWA::CTitleStateMenu::CTitleStateMenuContext>();
+    UiLab::OnTitleStateMenuUpdate(pContext->m_pTitleMenu->m_CursorIndex);
+
     auto isNewGameIndex = pContext->m_pTitleMenu->m_CursorIndex == 0;
     auto isOptionsIndex = pContext->m_pTitleMenu->m_CursorIndex == 2;
     auto isInstallIndex = pContext->m_pTitleMenu->m_CursorIndex == 3;

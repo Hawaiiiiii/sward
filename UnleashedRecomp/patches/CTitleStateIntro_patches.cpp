@@ -8,6 +8,7 @@
 #include <user/achievement_manager.h>
 #include <user/paths.h>
 #include <app.h>
+#include <patches/ui_lab_patches.h>
 
 static std::atomic<bool> g_faderBegun = false;
 
@@ -152,6 +153,7 @@ PPC_FUNC(sub_82587E50)
 {
     auto pTitleStateIntro = (SWA::CTitleStateIntro*)g_memory.Translate(ctx.r3.u32);
     auto pTime = (be<float>*)((uint8_t*)pTitleStateIntro->GetContextBase() + 0x10C);
+    UiLab::OnTitleStateIntroUpdate(*pTime);
 
     if (*SWA::SGlobals::ms_IsAutoSaveWarningShown)
     {

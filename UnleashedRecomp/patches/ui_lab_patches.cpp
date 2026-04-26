@@ -1,0 +1,181 @@
+#include <patches/ui_lab_patches.h>
+#include <os/logger.h>
+#include <user/config.h>
+#include <string>
+
+namespace UiLab
+{
+    static constexpr std::array<RuntimeTarget, 8> kRuntimeTargets =
+    {{
+        { ScreenId::TitleLoop, "title-loop", "Title Loop", "ui_title", "System/GameMode/Title/TitleStateIntro.cpp", false },
+        { ScreenId::TitleMenu, "title-menu", "Title Menu", "ui_title", "System/GameMode/Title/TitleMenu.cpp", false },
+        { ScreenId::Loading, "loading", "Loading / Miles Electric", "ui_loading", "System/Loading.cpp", false },
+        { ScreenId::SonicHud, "sonic-hud", "Sonic Stage HUD", "ui_prov_playscreen", "Player/Character/Sonic/Hud/SonicMainDisplay.cpp", true },
+        { ScreenId::Result, "result", "Stage Result", "ui_result", "HUD/Result/Result.cpp", true },
+        { ScreenId::Status, "status", "Status / Skill Upgrade", "ui_status", "HUD/Status/Status.cpp", false },
+        { ScreenId::Tutorial, "tutorial", "Tutorial / Control Guide", "ui_loading", "Player/Character/Sonic/Hud/SonicHudGuide.cpp", true },
+        { ScreenId::WorldMap, "world-map", "World Map", "ui_worldmap", "System/GameMode/WorldMap/WorldMapSelect.cpp", false },
+    }};
+
+    static bool g_isEnabled = false;
+    static ScreenId g_target = ScreenId::TitleLoop;
+    static bool g_loggedIntroHook = false;
+    static bool g_loggedMenuHook = false;
+
+    static const RuntimeTarget& TargetFor(ScreenId id)
+    {
+        for (const auto& target : kRuntimeTargets)
+        {
+            if (target.id == id)
+                return target;
+        }
+
+        return kRuntimeTargets.front();
+    }
+
+    static bool TrySetTarget(std::string_view token)
+    {
+        if (token == "title")
+            token = "title-loop";
+        else if (token == "menu")
+            token = "title-menu";
+        else if (token == "hud")
+            token = "sonic-hud";
+        else if (token == "worldmap")
+            token = "world-map";
+
+        for (const auto& target : kRuntimeTargets)
+        {
+            if (target.token == token)
+            {
+                g_target = target.id;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void ConfigureFromCommandLine(int argc, char* argv[])
+    {
+        for (int i = 1; i < argc; ++i)
+        {
+            std::string_view arg(argv[i]);
+
+            if (arg == "--ui-lab")
+            {
+                g_isEnabled = true;
+                continue;
+            }
+
+            if (arg == "--ui-lab-screen")
+            {
+                g_isEnabled = true;
+
+                if ((i + 1) < argc && TrySetTarget(argv[i + 1]))
+                    ++i;
+                else
+                    LOGN_WARNING("SWARD UI Lab: --ui-lab-screen was provided without a known target.");
+
+                continue;
+            }
+
+            constexpr std::string_view screenPrefix = "--ui-lab-screen=";
+            if (arg.starts_with(screenPrefix))
+            {
+                g_isEnabled = true;
+                auto token = arg.substr(screenPrefix.size());
+
+                if (!TrySetTarget(token))
+                    LOGFN_WARNING("SWARD UI Lab: unknown screen target '{}'.", std::string(token));
+
+                continue;
+            }
+
+            constexpr std::string_view labPrefix = "--ui-lab=";
+            if (arg.starts_with(labPrefix))
+            {
+                g_isEnabled = true;
+                auto token = arg.substr(labPrefix.size());
+
+                if (!TrySetTarget(token))
+                    LOGFN_WARNING("SWARD UI Lab: unknown screen target '{}'.", std::string(token));
+            }
+        }
+
+        if (g_isEnabled)
+        {
+            const auto& target = TargetFor(g_target);
+            LOGFN(
+                "SWARD UI Lab enabled: target={} label={} csd={} family={} stage_context={}",
+                target.token,
+                target.label,
+                target.primaryCsdScene,
+                target.sourceFamily,
+                target.requiresStageContext ? "yes" : "no");
+        }
+    }
+
+    void ApplyConfigOverrides()
+    {
+        if (!g_isEnabled)
+            return;
+
+        Config::ShowConsole = true;
+        Config::SkipIntroLogos = true;
+        Config::DisableAutoSaveWarning = true;
+    }
+
+    bool IsEnabled()
+    {
+        return g_isEnabled;
+    }
+
+    ScreenId GetTarget()
+    {
+        return g_target;
+    }
+
+    std::string_view GetTargetToken()
+    {
+        return TargetFor(g_target).token;
+    }
+
+    std::string_view GetTargetLabel()
+    {
+        return TargetFor(g_target).label;
+    }
+
+    const std::array<RuntimeTarget, 8>& GetRuntimeTargets()
+    {
+        return kRuntimeTargets;
+    }
+
+    void OnTitleStateIntroUpdate(float elapsedSeconds)
+    {
+        if (!g_isEnabled || g_loggedIntroHook)
+            return;
+
+        const auto& target = TargetFor(g_target);
+        LOGFN(
+            "SWARD UI Lab attached to CTitleStateIntro::Update: target={} elapsed={:.3f} csd={}",
+            target.token,
+            elapsedSeconds,
+            target.primaryCsdScene);
+        g_loggedIntroHook = true;
+    }
+
+    void OnTitleStateMenuUpdate(int32_t cursorIndex)
+    {
+        if (!g_isEnabled || g_loggedMenuHook)
+            return;
+
+        const auto& target = TargetFor(g_target);
+        LOGFN(
+            "SWARD UI Lab attached to CTitleStateMenu::Update: target={} cursor={} csd={}",
+            target.token,
+            cursorIndex,
+            target.primaryCsdScene);
+        g_loggedMenuHook = true;
+    }
+}

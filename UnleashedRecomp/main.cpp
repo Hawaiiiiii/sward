@@ -25,6 +25,7 @@
 #include <ui/installer_wizard.h>
 #include <mod/mod_loader.h>
 #include <preload_executable.h>
+#include <patches/ui_lab_patches.h>
 
 #ifdef _WIN32
 #include <timeapi.h>
@@ -200,6 +201,7 @@ int main(int argc, char *argv[])
         LOGN_WARNING("OS does not support registry.");
 
     os::logger::Init();
+    UiLab::ConfigureFromCommandLine(argc, argv);
 
     PreloadContext preloadContext;
     preloadContext.PreloadExecutable();
@@ -236,6 +238,7 @@ int main(int argc, char *argv[])
     }
 
     Config::Load();
+    UiLab::ApplyConfigOverrides();
 
     if (forceInstallationCheck)
     {

@@ -24,6 +24,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > For the direct answer to "how much of the game is actually recovered here?", start with [`research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md`](./research_uiux/WHOLE_GAME_COVERAGE_AND_GAPS.md).
 
 > [!TIP]
+> For the current product pivot from a clean diagnostic renderer to a real UnleashedRecomp-backed UI Lab, start with [`research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md`](./research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md).
+
+> [!TIP]
 > For the direct answer to "how close is the UI subset to a clean source-path-organized tree?", start with [`research_uiux/UI_SOURCE_PATH_RECOVERY_AND_HUMANIZATION_PLAN.md`](./research_uiux/UI_SOURCE_PATH_RECOVERY_AND_HUMANIZATION_PLAN.md).
 
 > [!TIP]

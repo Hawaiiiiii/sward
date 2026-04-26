@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-26
 
+### Phase 94 UnleashedRecomp UI Lab runtime pivot
+
+- added [`research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md`](./research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md)
+- added `UnleashedRecomp/patches/ui_lab_patches.*` as the first SWARD-owned runtime UI Lab attachment module inside the real UnleashedRecomp runtime lane
+- added `--ui-lab`, `--ui-lab=<target>`, `--ui-lab-screen <target>`, and `--ui-lab-screen=<target>` parsing before runtime boot
+- registered runtime targets for Title Loop, Title Menu, Loading, Sonic HUD, Result, Status, Tutorial, and World Map against real CSD/source-family ownership cues
+- attached the UI Lab to the existing translated-runtime title intro/menu update wrappers, replacing the clean renderer as the primary parity direction
+- added a regression contract that keeps the runtime-lab lane from drifting back into standalone approximation work
+
 ### Phase 93 SU UI renderer title loop reconstruction
 
 - added [`research_uiux/SU_UI_RENDERER_TITLE_LOOP_RECONSTRUCTION.md`](./research_uiux/SU_UI_RENDERER_TITLE_LOOP_RECONSTRUCTION.md)

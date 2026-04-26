@@ -701,6 +701,15 @@
 - [x] Build, smoke-check, launch-check, and screenshot-check `b\rr93\sward_su_ui_asset_renderer.exe`.
 - [x] Generate a dedicated report for renderer title-loop reconstruction.
 
+## Phase 94 - UnleashedRecomp UI Lab Runtime Pivot
+
+- [x] Demote the clean asset renderer to a diagnostic sidecar rather than the parity target.
+- [x] Add a real UnleashedRecomp `UiLab` patch module with CLI target selection.
+- [x] Register the UI Lab patch module in the UnleashedRecomp CMake source list.
+- [x] Parse `--ui-lab` / `--ui-lab-screen` before runtime boot.
+- [x] Attach the UI Lab to live `CTitleStateIntro::Update` and `CTitleStateMenu::Update` translated runtime states.
+- [x] Document the real-runtime UI Lab architecture and the immediate next implementation order.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
