@@ -9,6 +9,16 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 > [!NOTE]
 > This changelog tracks the publishable repo layer. Local-only extracted assets, generated PPC output, staged tools, and private inputs stay outside git history by design.
 
+## 2026-04-27
+
+### Phase 99 Runtime UI Lab context observation
+
+- added UI Lab evidence hooks for real loading requests, loading display-type changes, and CSD project creation
+- tied `SWA::Message::MsgRequestStartLoading::Impl`, `SWA::CLoading::Update`, and `CCsdProject::Make` into the local JSONL evidence stream
+- added long-observation capture support with periodic snapshots plus a `-KeepRunning` mode for manual screen-to-screen operator sessions
+- made the generated-runtime build helper sync the tracked UI Lab runtime files into the generated clone before configuring/building
+- extended the UI Lab regression contract around context evidence, long/manual observation, and generated-clone sync
+
 ## 2026-04-26
 
 ### Phase 98 Runtime UI Lab evidence capture

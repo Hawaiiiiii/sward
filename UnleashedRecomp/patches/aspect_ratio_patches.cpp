@@ -4,6 +4,7 @@
 #include <ui/game_window.h>
 #include <ui/black_bar.h>
 #include <gpu/video.h>
+#include <patches/ui_lab_patches.h>
 #include <xxHashMap.h>
 
 #include "aspect_ratio_patches.h"
@@ -154,6 +155,7 @@ void MakeCsdProjectMidAsmHook(PPCRegister& r3, PPCRegister& r29)
     uint8_t* base = g_memory.base;
     auto csdProject = reinterpret_cast<Chao::CSD::CProject*>(base + PPC_LOAD_U32(PPC_LOAD_U32(r3.u32 + 16) + 4));
     auto name = reinterpret_cast<const char*>(base + PPC_LOAD_U32(r29.u32));
+    UiLab::OnCsdProjectMade(name);
     TraverseSceneNode(csdProject->m_pResource->pRootNode, name);
 }
 

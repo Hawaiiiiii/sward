@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <unordered_set>
 
 namespace UiLab
 {
@@ -39,6 +40,9 @@ namespace UiLab
     static bool g_loggedIntroHook = false;
     static bool g_loggedMenuHook = false;
     static bool g_loggedStageHarness = false;
+    static uint32_t g_lastLoadingDisplayType = UINT32_MAX;
+    static bool g_loadingDisplayWasActive = false;
+    static std::unordered_set<std::string> g_loggedCsdProjects;
 
     static const RuntimeTarget& TargetFor(ScreenId id);
     static bool TargetNeedsStageHarness(ScreenId id);
@@ -487,6 +491,58 @@ namespace UiLab
             g_autoExitRequested = true;
             WriteEvidenceEvent("auto-exit");
             App::Exit();
+        }
+    }
+
+    void OnLoadingRequest(uint32_t displayType)
+    {
+        if (!g_isEnabled)
+            return;
+
+        g_routeStatus = "loading request observed";
+        WriteEvidenceEvent("loading-requested", "display_type=" + std::to_string(displayType));
+    }
+
+    void OnLoadingUpdate(uint32_t displayType)
+    {
+        if (!g_isEnabled)
+            return;
+
+        if (displayType == g_lastLoadingDisplayType)
+            return;
+
+        g_lastLoadingDisplayType = displayType;
+
+        if (displayType != 0)
+        {
+            g_loadingDisplayWasActive = true;
+            g_routeStatus = "loading display active";
+            WriteEvidenceEvent("loading-display-active", "display_type=" + std::to_string(displayType));
+        }
+        else if (g_loadingDisplayWasActive)
+        {
+            g_loadingDisplayWasActive = false;
+            g_routeStatus = "loading display ended";
+            WriteEvidenceEvent("loading-display-ended");
+        }
+    }
+
+    void OnCsdProjectMade(std::string_view projectName)
+    {
+        if (!g_isEnabled || projectName.empty())
+            return;
+
+        const std::string project(projectName);
+
+        if (!g_loggedCsdProjects.insert(project).second)
+            return;
+
+        WriteEvidenceEvent("csd-project-made", project);
+
+        if (projectName == TargetFor(g_target).primaryCsdScene)
+        {
+            g_routeStatus = "target csd project live";
+            WriteEvidenceEvent("target-csd-project-made", project);
         }
     }
 

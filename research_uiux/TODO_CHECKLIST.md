@@ -741,6 +741,17 @@
 - [x] Build the generated UnleashedRecomp clone and capture-check title/menu/stage-target evidence.
 - [x] Guard the evidence-capture and state-forcing contract with regression tests.
 
+## Phase 99 - Runtime UI Lab Context Observation
+
+- [x] Add runtime evidence hooks for loading requests and loading display-type transitions.
+- [x] Add CSD project creation evidence from the real `CCsdProject::Make` hook path.
+- [x] Add long-observation capture snapshots for runs that need more than early/late screenshots.
+- [x] Add a `-KeepRunning` capture mode so manual screen-to-screen operator sessions can keep the game alive.
+- [x] Sync tracked UI Lab runtime files into the generated clone before building.
+- [x] Build the generated UnleashedRecomp UI Lab after the context-observation hooks.
+- [x] Capture-check a longer loading route and verify CSD/loading/frame evidence.
+- [x] Guard the context-observation and long-observation contract with regression tests.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.

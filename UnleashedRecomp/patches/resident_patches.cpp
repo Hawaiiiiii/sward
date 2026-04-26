@@ -5,6 +5,7 @@
 #include <user/persistent_storage_manager.h>
 #include <user/config.h>
 #include <app.h>
+#include <patches/ui_lab_patches.h>
 
 // SWA::Message::MsgRequestStartLoading::Impl
 PPC_FUNC_IMPL(__imp__sub_824DCF38);
@@ -13,6 +14,7 @@ PPC_FUNC(sub_824DCF38)
     auto pLoading = (SWA::CLoading*)g_memory.Translate(ctx.r3.u32);
 
     App::s_isLoading = true;
+    UiLab::OnLoadingRequest(ctx.r4.u32);
 
     if (ctx.r4.u32 == SWA::eLoadingDisplayType_WerehogMovie)
     {
@@ -72,6 +74,7 @@ PPC_FUNC(sub_824DAB60)
     auto pLoading = (SWA::CLoading*)g_memory.Translate(ctx.r3.u32);
 
     __imp__sub_824DAB60(ctx, base);
+    UiLab::OnLoadingUpdate(pLoading->m_LoadingDisplayType);
 
     if (!pLoading->m_LoadingDisplayType)
         App::s_isLoading = false;

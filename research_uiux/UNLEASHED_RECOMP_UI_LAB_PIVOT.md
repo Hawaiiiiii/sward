@@ -58,7 +58,10 @@ Implemented now:
 - stage-context harness arming via `--ui-lab-stage <token>` / `--ui-lab-stage=<token>` and observation of the real `CGameModeStage::ExitLoading` point for Sonic HUD/tutorial/result targets
 - startup update/save/achievement prompt blockers bypassed during UI Lab runs so debug-state inspection is not interrupted by frontend modal checks
 - runtime evidence logging to local JSONL, including route requests, first presented frame, periodic presented frames, title/menu hook attachment, accept injection, stage-context observation, manual evidence markers, and auto-exit
-- a local capture helper at `research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1` that launches the generated runtime, normalizes the window, prefers `PrintWindow` capture before screen-copy fallback, captures screenshots, and writes a manifest under ignored `out/ui_lab_runtime_evidence/`
+- loading-route evidence from `SWA::Message::MsgRequestStartLoading::Impl` and `SWA::CLoading::Update`, including display-type transitions
+- CSD project creation evidence from the real `CCsdProject::Make` hook path, so target runs now report project names such as `ui_loading`, `ui_title`, `ui_status`, `ui_result`, `ui_worldmap`, and gameplay HUD projects when they load
+- a local capture helper at `research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1` that launches the generated runtime, normalizes the window, prefers `PrintWindow` capture before screen-copy fallback, captures screenshots, supports long observation snapshots, supports a `-KeepRunning` manual-operator mode, and writes a manifest under ignored `out/ui_lab_runtime_evidence/`
+- generated-clone sync in `build_unleashed_recomp_ui_lab.ps1`, so tracked UI Lab files are copied into `local_build_env/ur103clean` before each build
 - regression tests that guard the runtime-lab contract
 
 Verification note:
@@ -71,6 +74,7 @@ Verification note:
 - A smoke launch from the complete installation root with `--use-cwd --ui-lab-screen title-menu` stayed alive past 8 seconds and was stopped cleanly after the smoke window.
 - Static regression coverage guards the UI Lab source/module/CLI/hook/state-forcing contract.
 - `capture_unleashed_recomp_ui_lab.ps1` produced local-only screenshots and `ui_lab_events.jsonl` files for title/menu/loading/stage-target runs from the built generated clone.
+- A longer loading capture produced local-only observation snapshots plus CSD/loading/frame events under `out/ui_lab_runtime_evidence/`, including `csd-project-made`, `target-csd-project-made`, `loading-requested`, `loading-display-active`, and `loading-display-ended`.
 
 Still ahead:
 
@@ -87,8 +91,9 @@ The UI Lab now has a basic evidence loop:
 1. Launch the real generated UnleashedRecomp runtime with `--ui-lab-screen <target>`.
 2. Enable JSONL evidence with `--ui-lab-evidence-dir <ignored local dir>`.
 3. Let the real runtime present frames, attach translated title/menu hooks, and route through real state transitions.
-4. Capture early/late screenshots and `ui_lab_events.jsonl` into `out/ui_lab_runtime_evidence/<timestamp>/<target>/`.
-5. Use those screenshots and events as the next debugging oracle instead of guessing from the standalone renderer.
+4. Capture early/late screenshots, optional periodic observation screenshots, and `ui_lab_events.jsonl` into `out/ui_lab_runtime_evidence/<timestamp>/<target>/`.
+5. For manual sessions, launch with `-KeepRunning` so the process remains alive while the operator moves screen to screen and evidence continues accumulating.
+6. Use those screenshots and events as the next debugging oracle instead of guessing from the standalone renderer.
 
 This does not mean every target is deterministic yet. Current stage-family targets can observe a real stage context, but still depend on the installed runtime's current frontend/save/prompt path. The next hard blocker is deterministic stage-context creation or routing, not drawing another clean-room approximation of the HUD.
 

@@ -6,7 +6,10 @@ param(
     [int]$InitialWaitSeconds = 8,
     [int]$SecondCaptureDelaySeconds = 3,
     [int]$AutoExitSeconds = 16,
+    [int]$ObserveSeconds = 0,
+    [int]$SnapshotIntervalSeconds = 10,
     [bool]$NormalizeWindow = $true,
+    [switch]$KeepRunning,
     [switch]$NoBuild
 )
 
@@ -219,9 +222,12 @@ foreach ($target in $expandedTargets) {
     $args = @(
         "--use-cwd",
         "--ui-lab-screen", $target,
-        "--ui-lab-evidence-dir", $targetDir,
-        "--ui-lab-auto-exit", "$AutoExitSeconds"
+        "--ui-lab-evidence-dir", $targetDir
     )
+
+    if (-not $KeepRunning -and $AutoExitSeconds -gt 0) {
+        $args += @("--ui-lab-auto-exit", "$AutoExitSeconds")
+    }
 
     if ($stageTargets -contains $target) {
         $args += @("--ui-lab-stage", "auto")
@@ -234,6 +240,7 @@ foreach ($target in $expandedTargets) {
 
     $earlyShot = Join-Path $targetDir "screen_early.png"
     $lateShot = Join-Path $targetDir "screen_late.png"
+    $snapshots = @()
     $captureError = $null
 
     try {
@@ -241,7 +248,21 @@ foreach ($target in $expandedTargets) {
             Capture-Window $handle $earlyShot
         }
 
-        Start-Sleep -Seconds $SecondCaptureDelaySeconds
+        if ($ObserveSeconds -gt 0) {
+            $observeStart = Get-Date
+            $snapshotIndex = 0
+
+            while (-not $process.HasExited -and ((Get-Date) - $observeStart).TotalSeconds -lt $ObserveSeconds) {
+                Start-Sleep -Seconds ([Math]::Max(1, $SnapshotIntervalSeconds))
+                $snapshotIndex += 1
+                $snapshotPath = Join-Path $targetDir ("screen_observe_{0:D3}.png" -f $snapshotIndex)
+                Capture-Window $handle $snapshotPath
+                $snapshots += $snapshotPath
+            }
+        }
+        else {
+            Start-Sleep -Seconds $SecondCaptureDelaySeconds
+        }
 
         if (-not $process.HasExited) {
             Capture-Window $handle $lateShot
@@ -251,14 +272,15 @@ foreach ($target in $expandedTargets) {
         $captureError = $_.Exception.Message
     }
 
-    $deadline = (Get-Date).AddSeconds([Math]::Max(2, $AutoExitSeconds - $InitialWaitSeconds))
+    $waitSeconds = if ($AutoExitSeconds -gt 0) { [Math]::Max(2, $AutoExitSeconds - $InitialWaitSeconds) } else { 2 }
+    $deadline = (Get-Date).AddSeconds($waitSeconds)
     while (-not $process.HasExited -and (Get-Date) -lt $deadline) {
         Start-Sleep -Milliseconds 250
         $process.Refresh()
     }
 
     $stopped = $false
-    if (-not $process.HasExited) {
+    if (-not $KeepRunning -and -not $process.HasExited) {
         Stop-Process -Id $process.Id -Force
         $process.WaitForExit()
         $stopped = $true
@@ -271,9 +293,12 @@ foreach ($target in $expandedTargets) {
         directory = $targetDir
         earlyScreenshot = if (Test-Path -LiteralPath $earlyShot) { $earlyShot } else { $null }
         lateScreenshot = if (Test-Path -LiteralPath $lateShot) { $lateShot } else { $null }
+        snapshots = $snapshots
         events = if (Test-Path -LiteralPath $eventsPath) { $eventsPath } else { $null }
         stoppedByHarness = $stopped
-        exitCode = $process.ExitCode
+        stillRunning = -not $process.HasExited
+        processId = $process.Id
+        exitCode = if ($process.HasExited) { $process.ExitCode } else { $null }
         captureError = $captureError
     }
 }

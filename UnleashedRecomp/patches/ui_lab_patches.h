@@ -47,6 +47,9 @@ namespace UiLab
     void OnTitleStateMenuUpdate(int32_t cursorIndex);
     void OnStageExitLoading();
     void OnPresentedFrame();
+    void OnLoadingRequest(uint32_t displayType);
+    void OnLoadingUpdate(uint32_t displayType);
+    void OnCsdProjectMade(std::string_view projectName);
     bool ApplyTitleIntroStateForcing(float elapsedSeconds);
     bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept, bool& suppressAccept);
     void DrawOverlay();

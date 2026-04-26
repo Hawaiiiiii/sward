@@ -96,6 +96,23 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("ui_lab_events.jsonl", ui_lab)
         self.assertIn("UiLab::OnPresentedFrame()", video)
 
+    def test_ui_lab_records_loading_and_csd_context_evidence(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        resident = self.read("UnleashedRecomp/patches/resident_patches.cpp")
+        aspect = self.read("UnleashedRecomp/patches/aspect_ratio_patches.cpp")
+
+        self.assertIn("void OnLoadingRequest(uint32_t displayType)", header)
+        self.assertIn("void OnLoadingUpdate(uint32_t displayType)", header)
+        self.assertIn("void OnCsdProjectMade(std::string_view projectName)", header)
+        self.assertIn("loading-requested", ui_lab)
+        self.assertIn("loading-display-active", ui_lab)
+        self.assertIn("csd-project-made", ui_lab)
+        self.assertIn("g_loadingDisplayWasActive", ui_lab)
+        self.assertIn("UiLab::OnLoadingRequest(ctx.r4.u32)", resident)
+        self.assertIn("UiLab::OnLoadingUpdate(pLoading->m_LoadingDisplayType)", resident)
+        self.assertIn("UiLab::OnCsdProjectMade(name)", aspect)
+
     def test_ui_lab_capture_helper_collects_screenshots_and_events(self):
         script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
 
@@ -109,6 +126,17 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("--ui-lab-screen", script)
         self.assertIn("-split \",\"", script)
         self.assertIn("ui_lab_events.jsonl", script)
+
+    def test_ui_lab_capture_helper_supports_long_manual_observation(self):
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+
+        self.assertIn("ObserveSeconds", script)
+        self.assertIn("SnapshotIntervalSeconds", script)
+        self.assertIn("KeepRunning", script)
+        self.assertIn("snapshots", script)
+        self.assertIn("stillRunning", script)
+        self.assertIn("processId", script)
+        self.assertIn("if (-not $KeepRunning -and -not $process.HasExited)", script)
 
     def test_ui_lab_bypasses_startup_prompt_blockers_for_lab_runs(self):
         header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
@@ -131,6 +159,9 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
     def test_ui_lab_runtime_build_helper_captures_windows_environment_fix(self):
         script = self.read("research_uiux/runtime_reference/tools/build_unleashed_recomp_ui_lab.ps1")
         self.assertIn("subst $drive", script)
+        self.assertIn("Sync-TrackedRuntimeFile", script)
+        self.assertIn("resident_patches.cpp", script)
+        self.assertIn("aspect_ratio_patches.cpp", script)
         self.assertIn("VsDevCmd.bat", script)
         self.assertIn("C:\\Program Files\\LLVM\\bin", script)
         self.assertIn("DIRECTX_DXIL_LIBRARY", script)

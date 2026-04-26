@@ -8,6 +8,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..\..")
+
 function Resolve-RequiredPath([string]$Path, [string]$Label) {
     $resolved = Resolve-Path -LiteralPath $Path -ErrorAction SilentlyContinue
     if (-not $resolved) {
@@ -39,6 +41,19 @@ function Patch-SdlPrefetchShim([string]$ShortRoot) {
     }
 }
 
+function Sync-TrackedRuntimeFile([string]$RelativePath, [string]$GeneratedRoot) {
+    $source = Join-Path $repoRoot.Path $RelativePath
+    $destination = Join-Path $GeneratedRoot $RelativePath
+    $destinationDir = Split-Path -Parent $destination
+
+    if (-not (Test-Path -LiteralPath $source)) {
+        throw "Tracked runtime file not found: $source"
+    }
+
+    New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null
+    Copy-Item -LiteralPath $source -Destination $destination -Force
+}
+
 function Invoke-DevCmd([string]$Command) {
     $vsDevCmd = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"
     $llvmBin = "C:\Program Files\LLVM\bin"
@@ -58,6 +73,16 @@ function Invoke-DevCmd([string]$Command) {
 }
 
 $root = Resolve-RequiredPath $GeneratedRoot "Generated UnleashedRecomp root"
+
+@(
+    "UnleashedRecomp\gpu\video.cpp",
+    "UnleashedRecomp\patches\aspect_ratio_patches.cpp",
+    "UnleashedRecomp\patches\CTitleStateMenu_patches.cpp",
+    "UnleashedRecomp\patches\resident_patches.cpp",
+    "UnleashedRecomp\patches\ui_lab_patches.cpp",
+    "UnleashedRecomp\patches\ui_lab_patches.h"
+) | ForEach-Object { Sync-TrackedRuntimeFile $_ $root }
+
 $drive = "$DriveLetter`:"
 $shortRoot = "$drive\"
 
