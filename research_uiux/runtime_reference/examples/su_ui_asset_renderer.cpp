@@ -68,6 +68,7 @@ enum class RendererScreenKind
 {
     CastCatalog,
     AtlasGallery,
+    TitleLoopReconstruction,
     SonicHudReconstruction,
 };
 
@@ -82,18 +83,28 @@ struct SuUiRendererScreen
     RendererScreenKind kind = RendererScreenKind::CastCatalog;
 };
 
-inline constexpr std::array<TextureSourceCandidate, 11> kTextureSourceCandidates{{
+inline constexpr std::array<TextureSourceCandidate, 13> kTextureSourceCandidates{{
     { "mat_load_comon_001.dds", "ui_extended_archives/Loading/mat_load_comon_001.dds" },
+    { "OPmovie_titlelogo_EN.decompressed.dds", "runtime_previews/title/decompressed/OPmovie_titlelogo_EN.decompressed.dds" },
     { "ui_mm_base.dds", "ui_frontend_archives/MainMenu/ui_mm_base.dds" },
     { "ui_mm_parts1.dds", "ui_frontend_archives/MainMenu/ui_mm_parts1.dds" },
     { "ui_mm_contentstext.dds", "ui_frontend_archives/MainMenu/ui_mm_contentstext.dds" },
     { "mat_title_en_001.dds", "ui_broader_archives/Languages/English/Title/mat_title_en_001.dds" },
     { "mat_title_en_002.dds", "ui_broader_archives/Languages/English/Title/mat_title_en_002.dds" },
+    { "mat_start_en_001.dds", "phase25_commonflow_archives/Languages/English/ActionCommon/mat_start_en_001.dds" },
     { "ui_ps1_gauge1.dds", "phase16_support_archives/ExStageTails_Common/ui_ps1_gauge1.dds" },
     { "mat_playscreen_001.dds", "phase16_support_archives/ExStageTails_Common/mat_playscreen_001.dds" },
     { "mat_playscreen_en_001.dds", "phase25_commonflow_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds" },
     { "mat_comon_num_001.dds", "ui_extended_archives/SystemCommonCore/mat_comon_num_001.dds" },
     { "mat_comon_001.dds", "ui_extended_archives/SystemCommonCore/mat_comon_001.dds" },
+}};
+
+inline constexpr std::array<SuUiRenderCast, 4> kTitleLoopReconstructionCasts{{
+    { "ui_title/bg/bg", "title_movie_frame", "ui_mm_base.dds", 0, 0, 1280, 720, 0, 0, 1280, 720 },
+    { "ui_title/logo", "opmovie_titlelogo_en", "OPmovie_titlelogo_EN.decompressed.dds", 0, 0, 1280, 720, 0, 0, 1280, 720 },
+    { "mm_title_intro", "press_start_text", "mat_title_en_001.dds", 32, 0, 192, 24, 550, 540, 180, 24 },
+    // Evidence seam: UseAlternateTitleMidAsmHook switches EN/JP title treatment.
+    { "CTitleStateIntro::Update", "alternate_title_gate", "mat_title_en_001.dds", 0, 456, 256, 56, 548, 638, 184, 40 },
 }};
 
 inline constexpr std::array<SuUiRenderCast, 8> kSonicHudReconstructionCasts{{
@@ -130,7 +141,16 @@ inline constexpr std::array<SuUiRenderCast, 1> kSonicStageHudCasts{{
     { "so_speed_gauge", "position_hd", "ui_ps1_gauge1.dds", 4, 64, 16, 20, 752, 357, 16, 20 },
 }};
 
-inline const std::array<SuUiRendererScreen, 7> kRendererScreens{{
+inline const std::array<SuUiRendererScreen, 8> kRendererScreens{{
+    {
+        "TitleLoopReconstruction",
+        "Title Loop Reconstructed",
+        "title_menu_reference.json",
+        kTitleLoopReconstructionCasts.data(),
+        kTitleLoopReconstructionCasts.size(),
+        Gdiplus::Color(255, 0, 0, 0),
+        RendererScreenKind::TitleLoopReconstruction,
+    },
     {
         "SonicHudReconstruction",
         "Sonic HUD Reconstructed",
@@ -310,6 +330,59 @@ void appendAncestorAssetRoots(std::vector<std::filesystem::path>& candidates, st
     }
 
     return std::nullopt;
+}
+
+[[nodiscard]] std::optional<std::filesystem::path> findTitleMoviePreviewFramePath()
+{
+    // Local-only frame extracted from game/movie/evmo_title_loop.sfd with ffmpeg.
+    // The binary never embeds or publishes the proprietary movie frame; it only
+    // consumes the operator's generated preview if it exists beside extracted assets.
+    constexpr std::string_view kTitlePreviewRelativePath =
+        "runtime_previews/title/evmo_title_loop_00_00_35_000.png";
+
+    for (const auto& root : extractedAssetRootCandidates())
+    {
+        std::error_code error;
+        const auto path = root / std::filesystem::path(kTitlePreviewRelativePath);
+        if (std::filesystem::is_regular_file(path, error))
+            return path;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<std::filesystem::path> findTitleLogoPreviewPath()
+{
+    // Local-only PNG decoded from Loading/OPmovie_titlelogo_EN.dds after the
+    // Xbox LZX container is expanded with tools/x_decompress. This keeps the
+    // operator preview exact while the native renderer grows full X360 DDS
+    // decode coverage.
+    constexpr std::string_view kTitleLogoPreviewRelativePath =
+        "runtime_previews/title/decompressed/OPmovie_titlelogo_EN.decompressed.png";
+
+    for (const auto& root : extractedAssetRootCandidates())
+    {
+        std::error_code error;
+        const auto path = root / std::filesystem::path(kTitleLogoPreviewRelativePath);
+        if (std::filesystem::is_regular_file(path, error))
+            return path;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] bool gdiplusBitmapLoads(const std::filesystem::path& path)
+{
+    Gdiplus::GdiplusStartupInput gdiplusInput{};
+    ULONG_PTR gdiplusToken = 0;
+    if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr) != Gdiplus::Ok)
+        return false;
+
+    auto bitmap = std::unique_ptr<Gdiplus::Bitmap>(Gdiplus::Bitmap::FromFile(path.wstring().c_str(), FALSE));
+    const bool loaded = bitmap && bitmap->GetLastStatus() == Gdiplus::Ok && bitmap->GetWidth() > 0 && bitmap->GetHeight() > 0;
+    bitmap.reset();
+    Gdiplus::GdiplusShutdown(gdiplusToken);
+    return loaded;
 }
 
 [[nodiscard]] std::uint16_t readLe16(const std::uint8_t* data)
@@ -633,12 +706,52 @@ public:
         return atlasBitmap_.get();
     }
 
+    [[nodiscard]] Gdiplus::Bitmap* titleMovieFrameBitmap()
+    {
+        if (!titleMovieFrameLoadAttempted_)
+        {
+            titleMovieFrameLoadAttempted_ = true;
+            titleMovieFramePath_ = findTitleMoviePreviewFramePath();
+            if (titleMovieFramePath_)
+            {
+                auto bitmap = std::unique_ptr<Gdiplus::Bitmap>(Gdiplus::Bitmap::FromFile(titleMovieFramePath_->wstring().c_str(), FALSE));
+                if (bitmap && bitmap->GetLastStatus() == Gdiplus::Ok)
+                    titleMovieFrameBitmap_ = std::move(bitmap);
+            }
+        }
+
+        return titleMovieFrameBitmap_.get();
+    }
+
+    [[nodiscard]] Gdiplus::Bitmap* titleLogoBitmap()
+    {
+        if (!titleLogoLoadAttempted_)
+        {
+            titleLogoLoadAttempted_ = true;
+            titleLogoPath_ = findTitleLogoPreviewPath();
+            if (titleLogoPath_)
+            {
+                auto bitmap = std::unique_ptr<Gdiplus::Bitmap>(Gdiplus::Bitmap::FromFile(titleLogoPath_->wstring().c_str(), FALSE));
+                if (bitmap && bitmap->GetLastStatus() == Gdiplus::Ok)
+                    titleLogoBitmap_ = std::move(bitmap);
+            }
+        }
+
+        return titleLogoBitmap_.get();
+    }
+
 private:
     std::size_t selectedScreenIndex_ = 0;
     std::size_t selectedAtlasIndex_ = 0;
     std::vector<std::filesystem::path> atlasSheets_;
     std::filesystem::path atlasBitmapPath_;
     std::unique_ptr<Gdiplus::Bitmap> atlasBitmap_;
+    bool titleMovieFrameLoadAttempted_ = false;
+    std::optional<std::filesystem::path> titleMovieFramePath_;
+    std::unique_ptr<Gdiplus::Bitmap> titleMovieFrameBitmap_;
+    bool titleLogoLoadAttempted_ = false;
+    std::optional<std::filesystem::path> titleLogoPath_;
+    std::unique_ptr<Gdiplus::Bitmap> titleLogoBitmap_;
     std::vector<std::unique_ptr<CachedTexture>> textureCache_;
 };
 
@@ -779,6 +892,44 @@ void drawMissingCast(Gdiplus::Graphics& graphics, const Gdiplus::RectF& destinat
     graphics.DrawRectangle(&outline, destination);
 }
 
+[[nodiscard]] Gdiplus::PointF designPointToCanvas(const Gdiplus::RectF& canvas, float x, float y);
+
+void drawOutlinedText(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    std::string_view text,
+    float x,
+    float y,
+    float size,
+    Gdiplus::Color fill,
+    Gdiplus::Color outline,
+    INT style);
+
+[[nodiscard]] bool drawRenderCastTexture(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    SwardSuUiAssetRenderer& renderer,
+    const SuUiRenderCast& cast)
+{
+    const auto destination = designRectToCanvas(canvas, cast.destinationX, cast.destinationY, cast.destinationWidth, cast.destinationHeight);
+    const auto* texture = renderer.textureFor(cast.textureName);
+    if (!texture || !texture->image || !texture->bitmap || !castSourceFits(cast, *texture->image))
+    {
+        drawMissingCast(graphics, destination);
+        return false;
+    }
+
+    graphics.DrawImage(
+        texture->bitmap.get(),
+        destination,
+        static_cast<float>(cast.sourceX),
+        static_cast<float>(cast.sourceY),
+        static_cast<float>(cast.sourceWidth),
+        static_cast<float>(cast.sourceHeight),
+        Gdiplus::UnitPixel);
+    return true;
+}
+
 void renderAtlasGalleryScreen(Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, SwardSuUiAssetRenderer& renderer)
 {
     auto* bitmap = renderer.currentAtlasBitmap();
@@ -797,6 +948,141 @@ void renderAtlasGalleryScreen(Gdiplus::Graphics& graphics, const Gdiplus::RectF&
         static_cast<float>(bitmap->GetWidth()),
         static_cast<float>(bitmap->GetHeight()),
             Gdiplus::UnitPixel);
+}
+
+void drawTitleWordArt(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    std::string_view text,
+    float x,
+    float y,
+    float size,
+    Gdiplus::Color fill,
+    Gdiplus::Color outline,
+    Gdiplus::Color glow,
+    float outlineWidth)
+{
+    const float scale = canvas.Width / static_cast<float>(kDesignWidth);
+    Gdiplus::FontFamily family(L"Arial Black");
+    Gdiplus::StringFormat format;
+    Gdiplus::GraphicsPath path;
+    const auto wideText = widenAscii(text);
+    const auto point = designPointToCanvas(canvas, x, y);
+    path.AddString(
+        wideText.c_str(),
+        -1,
+        &family,
+        Gdiplus::FontStyleBold | Gdiplus::FontStyleItalic,
+        std::max(1.0F, size * scale),
+        point,
+        &format);
+
+    Gdiplus::Pen glowPen(glow, std::max(1.0F, outlineWidth * 1.65F * scale));
+    Gdiplus::Pen outlinePen(outline, std::max(1.0F, outlineWidth * scale));
+    Gdiplus::SolidBrush fillBrush(fill);
+    graphics.DrawPath(&glowPen, &path);
+    graphics.DrawPath(&outlinePen, &path);
+    graphics.FillPath(&fillBrush, &path);
+}
+
+void drawTitlePromptShell(Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas)
+{
+    const auto glow = designRectToCanvas(canvas, 445, 510, 390, 76);
+    Gdiplus::SolidBrush glowBrush(Gdiplus::Color(120, 86, 160, 22));
+    graphics.FillEllipse(&glowBrush, glow);
+
+    const auto shadow = designRectToCanvas(canvas, 488, 520, 304, 56);
+    Gdiplus::SolidBrush shadowBrush(Gdiplus::Color(190, 50, 70, 42));
+    graphics.FillRectangle(&shadowBrush, shadow);
+
+    const auto frame = designRectToCanvas(canvas, 498, 526, 284, 42);
+    Gdiplus::SolidBrush frameBrush(Gdiplus::Color(235, 194, 206, 142));
+    Gdiplus::SolidBrush innerBrush(Gdiplus::Color(255, 248, 225, 40));
+    Gdiplus::Pen edgePen(Gdiplus::Color(255, 238, 238, 142), std::max(1.0F, 2.0F * (canvas.Width / static_cast<float>(kDesignWidth))));
+    graphics.FillRectangle(&frameBrush, frame);
+    const auto inner = designRectToCanvas(canvas, 512, 534, 256, 26);
+    graphics.FillRectangle(&innerBrush, inner);
+    graphics.DrawRectangle(&edgePen, frame);
+}
+
+void renderTitleLoopReconstructionScreen(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    SwardSuUiAssetRenderer& renderer)
+{
+    if (auto* titleFrame = renderer.titleMovieFrameBitmap())
+    {
+        graphics.DrawImage(
+            titleFrame,
+            canvas,
+            0.0F,
+            0.0F,
+            static_cast<float>(titleFrame->GetWidth()),
+            static_cast<float>(titleFrame->GetHeight()),
+            Gdiplus::UnitPixel);
+    }
+    else
+    {
+        (void)drawRenderCastTexture(graphics, canvas, renderer, kTitleLoopReconstructionCasts[0]);
+        Gdiplus::SolidBrush fallbackDim(Gdiplus::Color(180, 0, 0, 0));
+        graphics.FillRectangle(&fallbackDim, canvas);
+    }
+
+    Gdiplus::SolidBrush filmDim(Gdiplus::Color(105, 0, 0, 0));
+    graphics.FillRectangle(&filmDim, canvas);
+
+    bool drewTitleLogo = false;
+    if (auto* titleLogo = renderer.titleLogoBitmap())
+    {
+        const auto titleLogoDestination = designRectToCanvas(canvas, 280, 175, 720, 320);
+        graphics.DrawImage(
+            titleLogo,
+            titleLogoDestination,
+            300.0F,
+            210.0F,
+            720.0F,
+            320.0F,
+            Gdiplus::UnitPixel);
+        drewTitleLogo = true;
+    }
+    else
+    {
+        // Keep the decompressed DDS as smoke-test evidence, but do not use the
+        // current hand-rolled DXT path for this logo in the visual renderer; it
+        // is not spatially faithful for the XCompress-derived texture yet.
+        drewTitleLogo = false;
+    }
+
+    if (!drewTitleLogo)
+    {
+        drawTitleWordArt(
+            graphics,
+            canvas,
+            "SONIC",
+            358,
+            170,
+            132,
+            Gdiplus::Color(255, 255, 218, 18),
+            Gdiplus::Color(255, 0, 0, 0),
+            Gdiplus::Color(230, 255, 255, 255),
+            18.0F);
+        drawTitleWordArt(
+            graphics,
+            canvas,
+            "UNLEASHED",
+            388,
+            316,
+            76,
+            Gdiplus::Color(255, 248, 248, 248),
+            Gdiplus::Color(255, 0, 0, 0),
+            Gdiplus::Color(230, 255, 255, 255),
+            12.0F);
+        drawOutlinedText(graphics, canvas, "TM", 915, 318, 18, Gdiplus::Color(255, 240, 240, 240), Gdiplus::Color(255, 0, 0, 0), Gdiplus::FontStyleBold);
+    }
+
+    drawTitlePromptShell(graphics, canvas);
+    (void)drawRenderCastTexture(graphics, canvas, renderer, kTitleLoopReconstructionCasts[2]);
+    (void)drawRenderCastTexture(graphics, canvas, renderer, kTitleLoopReconstructionCasts[3]);
 }
 
 [[nodiscard]] Gdiplus::PointF designPointToCanvas(const Gdiplus::RectF& canvas, float x, float y)
@@ -953,6 +1239,12 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     Gdiplus::SolidBrush canvasBrush(screen.background);
     graphics.FillRectangle(&canvasBrush, canvas);
 
+    if (screen.kind == RendererScreenKind::TitleLoopReconstruction)
+    {
+        renderTitleLoopReconstructionScreen(graphics, canvas, renderer);
+        return;
+    }
+
     if (screen.kind == RendererScreenKind::SonicHudReconstruction)
     {
         renderSonicHudReconstructionScreen(graphics, canvas);
@@ -967,23 +1259,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 
     for (std::size_t index = 0; index < screen.castCount; ++index)
     {
-        const auto& cast = screen.casts[index];
-        const auto destination = designRectToCanvas(canvas, cast.destinationX, cast.destinationY, cast.destinationWidth, cast.destinationHeight);
-        const auto* texture = renderer.textureFor(cast.textureName);
-        if (!texture || !texture->image || !texture->bitmap || !castSourceFits(cast, *texture->image))
-        {
-            drawMissingCast(graphics, destination);
-            continue;
-        }
-
-        graphics.DrawImage(
-            texture->bitmap.get(),
-            destination,
-            static_cast<float>(cast.sourceX),
-            static_cast<float>(cast.sourceY),
-            static_cast<float>(cast.sourceWidth),
-            static_cast<float>(cast.sourceHeight),
-            Gdiplus::UnitPixel);
+        (void)drawRenderCastTexture(graphics, canvas, renderer, screen.casts[index]);
     }
 }
 
@@ -1200,9 +1476,90 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return sheets.empty() || loading == "missing" || mainMenu == "missing" || status == "missing" ? 1 : 0;
 }
 
-[[nodiscard]] int runRendererReconstructedScreenSmoke()
+[[nodiscard]] const SuUiRendererScreen* rendererScreenById(std::string_view id)
+{
+    const auto found = std::find_if(
+        kRendererScreens.begin(),
+        kRendererScreens.end(),
+        [id](const SuUiRendererScreen& screen)
+        {
+            return screen.id == id;
+        });
+    return found == kRendererScreens.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] int runRendererTitleScreenSmoke()
 {
     const auto& screen = kRendererScreens.front();
+    const auto movieFramePath = findTitleMoviePreviewFramePath();
+    const auto titleLogoPreviewPath = findTitleLogoPreviewPath();
+    const bool titleLogoPreviewLoads = titleLogoPreviewPath && gdiplusBitmapLoads(*titleLogoPreviewPath);
+    const auto titleLogoPath = textureSourcePathForFileName("OPmovie_titlelogo_EN.decompressed.dds");
+    std::size_t resolvedCastCount = 0;
+    std::size_t inBoundsCastCount = 0;
+    std::vector<std::string> descriptors;
+
+    for (std::size_t index = 0; index < screen.castCount; ++index)
+    {
+        const auto& cast = screen.casts[index];
+        const auto image = loadDdsTextureImage(cast.textureName);
+        const bool fits = image && castSourceFits(cast, *image);
+        if (image)
+            ++resolvedCastCount;
+        if (fits)
+            ++inBoundsCastCount;
+
+        std::ostringstream descriptor;
+        descriptor
+            << cast.castName
+            << ":" << cast.textureName
+            << ":src=" << cast.sourceX << "," << cast.sourceY << ","
+            << cast.sourceWidth << "x" << cast.sourceHeight
+            << ":dst=" << cast.destinationX << "," << cast.destinationY << ","
+            << cast.destinationWidth << "x" << cast.destinationHeight;
+        if (image)
+            descriptor << ":" << image->format << ":" << image->width << "x" << image->height;
+        else
+            descriptor << ":missing";
+        if (image && !fits)
+            descriptor << ":source-out-of-bounds";
+        descriptors.push_back(descriptor.str());
+    }
+
+    std::cout
+        << "sward_su_ui_asset_renderer title screen smoke ok "
+        << "first=" << screen.id
+        << " source=evmo_title_loop.sfd"
+        << " contract=" << screen.contractFileName
+        << " movie_frame=" << (movieFramePath ? "exists" : "missing")
+        << " title_logo_preview=" << (titleLogoPreviewPath ? "exists" : "missing")
+        << " title_logo_preview_bitmap=" << (titleLogoPreviewLoads ? "loads" : "not_loaded")
+        << " title_logo=" << (titleLogoPath ? "exists" : "missing")
+        << " casts=" << screen.castCount
+        << " resolved=" << resolvedCastCount
+        << " in_bounds=" << inBoundsCastCount
+        << " scenes=ui_title/bg/bg,mm_title_intro,CTitleStateIntro::Update"
+        << '\n';
+
+    for (const auto& descriptor : descriptors)
+        std::cout << descriptor << '\n';
+
+    return screen.id == "TitleLoopReconstruction"
+        && movieFramePath
+        && titleLogoPreviewPath
+        && titleLogoPreviewLoads
+        && resolvedCastCount == screen.castCount
+        && inBoundsCastCount == screen.castCount
+        ? 0
+        : 1;
+}
+
+[[nodiscard]] int runRendererReconstructedScreenSmoke()
+{
+    const auto* foundScreen = rendererScreenById("SonicHudReconstruction");
+    if (!foundScreen)
+        return 1;
+    const auto& screen = *foundScreen;
     std::size_t resolvedCastCount = 0;
     std::size_t inBoundsCastCount = 0;
     std::vector<std::string> descriptors;
@@ -1237,7 +1594,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     const auto source = screen.castCount == 0 ? std::string_view("none") : screen.casts[0].sceneName;
     std::cout
         << "sward_su_ui_asset_renderer reconstructed screen smoke ok "
-        << "first=" << screen.id
+        << "screen=" << screen.id
         << " source=" << source
         << " contract=" << screen.contractFileName
         << " casts=" << screen.castCount
@@ -1321,6 +1678,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererNavigationSmoke();
     if (commandLineHasFlag("--renderer-atlas-gallery-smoke"))
         return runRendererAtlasGallerySmoke();
+    if (commandLineHasFlag("--renderer-title-screen-smoke"))
+        return runRendererTitleScreenSmoke();
     if (commandLineHasFlag("--renderer-reconstructed-screen-smoke"))
         return runRendererReconstructedScreenSmoke();
 

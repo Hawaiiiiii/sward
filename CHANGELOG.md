@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-26
 
+### Phase 93 SU UI renderer title loop reconstruction
+
+- added [`research_uiux/SU_UI_RENDERER_TITLE_LOOP_RECONSTRUCTION.md`](./research_uiux/SU_UI_RENDERER_TITLE_LOOP_RECONSTRUCTION.md)
+- moved the clean renderer's first screen to `TitleLoopReconstruction`, a title-loop composition backed by local SFD frame and title-logo evidence instead of word-art-only approximation
+- expanded the renderer catalog to `8` screen samples and `20` local DDS-backed evidence casts under `b/rr93`
+- wired the local-only `OPmovie_titlelogo_EN` decompression path into the renderer evidence model, with `title_logo_preview_bitmap=loads` guarded by `--renderer-title-screen-smoke`
+- documented the exact boundary between translated PPC/UnleashedRecomp state evidence and the real render substrates that still need native decoding/playback
+
 ### Phase 92 SU UI renderer reconstructed screen
 
 - added [`research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md`](./research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md)

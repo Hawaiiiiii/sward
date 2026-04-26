@@ -167,6 +167,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the clean renderer's first default reconstructed Sonic HUD screen, use [`research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md`](./research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md).
 
+> [!TIP]
+> For the clean renderer's first title-loop screen that binds the local SFD movie frame and decompressed title-logo evidence, use [`research_uiux/SU_UI_RENDERER_TITLE_LOOP_RECONSTRUCTION.md`](./research_uiux/SU_UI_RENDERER_TITLE_LOOP_RECONSTRUCTION.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
@@ -225,6 +228,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - A visible clean SU UI renderer navigation shell via [`research_uiux/SU_UI_RENDERER_NAVIGATION_SHELL.md`](./research_uiux/SU_UI_RENDERER_NAVIGATION_SHELL.md)
 - A clean SU UI renderer local atlas-gallery pass via [`research_uiux/SU_UI_RENDERER_ATLAS_GALLERY.md`](./research_uiux/SU_UI_RENDERER_ATLAS_GALLERY.md)
 - A clean SU UI renderer reconstructed Sonic HUD screen via [`research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md`](./research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md)
+- A clean SU UI renderer title-loop reconstruction via [`research_uiux/SU_UI_RENDERER_TITLE_LOOP_RECONSTRUCTION.md`](./research_uiux/SU_UI_RENDERER_TITLE_LOOP_RECONSTRUCTION.md)
 - A local-only support-substrate humanization pass via [`research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`](./research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md)
 - Runtime-backed support-substrate contracts via [`research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`](./research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md)
 - A source-tree mirror helper for the local-only `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py)

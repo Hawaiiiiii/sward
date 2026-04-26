@@ -690,6 +690,17 @@
 - [x] Build, smoke-check, launch-check, and screenshot-check `b\rr91\sward_su_ui_asset_renderer.exe`.
 - [x] Generate a dedicated report for the renderer atlas gallery.
 
+## Phase 93 - SU UI Renderer Title Loop Reconstruction
+
+- [x] Bind the clean renderer's first screen to a title-loop composition instead of a symbolic or atlas-only view.
+- [x] Use the local `evmo_title_loop.sfd` preview frame as the title background substrate.
+- [x] Expand `Loading/OPmovie_titlelogo_EN.dds` with the local `tools\x_decompress` path and bind its decompressed title-logo evidence.
+- [x] Use the decoded local title-logo PNG preview for the visual path while keeping the decompressed DDS as source-cast evidence.
+- [x] Keep `CTitleStateIntro::Update`, `UseAlternateTitleMidAsmHook`, `ui_title/bg/bg`, and `mm_title_intro` in the renderer evidence chain.
+- [x] Add `--renderer-title-screen-smoke` checks for movie frame, title-logo preview, bitmap load, and in-bounds title casts.
+- [x] Build, smoke-check, launch-check, and screenshot-check `b\rr93\sward_su_ui_asset_renderer.exe`.
+- [x] Generate a dedicated report for renderer title-loop reconstruction.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -844,3 +855,4 @@
 - [x] Follow-on phase audit on `2026-04-26`: added visible screen navigation for the clean renderer under `b\rr90`, including `Prev` / `Next`, screen-index labeling, and no-window navigation smoke.
 - [x] Follow-on phase audit on `2026-04-26`: added local visual-atlas gallery navigation under `b\rr91`, keeping `22` ignored atlas sheets inspectable without publishing proprietary PNG outputs.
 - [x] Follow-on phase audit on `2026-04-26`: corrected the clean renderer product lane under `b\rr92` so it opens on `SonicHudReconstruction` instead of the atlas gallery, with `7` screen samples, `16` local DDS-backed casts, and a family-specific readable Sonic HUD reconstruction path smoke-guarded.
+- [x] Follow-on phase audit on `2026-04-26`: corrected the clean renderer title lane under `b\rr93` so it opens on `TitleLoopReconstruction`, with `8` screen samples, `20` DDS-backed evidence casts, local `evmo_title_loop.sfd` frame evidence, decompressed `OPmovie_titlelogo_EN` evidence, and a screenshot-checked title composition.
