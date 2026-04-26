@@ -46,22 +46,28 @@ Implemented now:
 - title intro/menu update hooks that prove the lab can attach to live translated runtime states
 - visible ImGui overlay drawn inside the real UnleashedRecomp frame path, after the existing runtime UI draw calls
 - overlay target controls for cycling the runtime target table without changing command-line arguments
+- overlay route controls and route status for forcing selected UI Lab targets through the real title/menu runtime path
+- title-loop to title-menu forcing by injecting the real translated title-state accept input after the intro state is live
+- title-menu to loading forcing by pinning the translated title menu cursor to New Game and injecting the real accept input once
+- stage-context harness arming via `--ui-lab-stage <token>` / `--ui-lab-stage=<token>` and observation of the real `CGameModeStage::ExitLoading` point for Sonic HUD/tutorial/result targets
 - startup update/save/achievement prompt blockers bypassed during UI Lab runs so debug-state inspection is not interrupted by frontend modal checks
 - regression tests that guard the runtime-lab contract
 
 Verification note:
 
 - The repo-root `UnleashedRecompLib` does not currently contain generated PPC/shader output, so the tracked root cannot build the full runtime directly.
-- The generated clone under `local_build_env/ur103clean` does contain `261` `ppc_recomp.*.cpp` files and `shader_cache.cpp`, but its existing CMake cache was created from `U:/local_build_env/ur103clean`; a fresh configure in this workspace path is required before a compile.
-- This shell currently exposes `ninja`, but not `clang-cl`, `cl`, `clang++`, or `g++`, so the runtime compile is environment-blocked in this beat.
-- Static regression coverage was added so the UI Lab source/module/CLI/hook contract is guarded until the compiler path is restored.
+- The generated clone under `local_build_env/ur103clean` does contain `261` `ppc_recomp.*.cpp` files and `shader_cache.cpp`.
+- The Windows build is now unblocked locally by mounting `local_build_env/ur103clean` on a short drive letter, using the Visual Studio Build Tools developer environment, adding `C:\Program Files\LLVM\bin` to `PATH`, and passing the resolved vcpkg `dxil.dll` path into CMake.
+- The reproducible helper for this is `research_uiux/runtime_reference/tools/build_unleashed_recomp_ui_lab.ps1`.
+- `W:\b\ui_lab_runtime\UnleashedRecomp\UnleashedRecomp.exe` builds successfully from the generated clone after the local SDL Clang 22 shim patch and tracked `runtimeobject` link fix.
+- A smoke launch from the complete installation root with `--use-cwd --ui-lab-screen title-menu` stayed alive past 8 seconds and was stopped cleanly after the smoke window.
+- Static regression coverage guards the UI Lab source/module/CLI/hook/state-forcing contract.
 
 Still ahead:
 
 - visible in-game debug menu or overlay
-- state forcing for title/menu/loading without relying on normal user navigation
 - CSD-project host creation for non-title screens
-- stage-context harness for Sonic HUD/tutorial/result targets
+- direct stage boot/routing for Sonic HUD/tutorial/result targets after the stage harness observes the correct owner context
 - screenshot/vision verification against live UnleashedRecomp frames
 - demotion of the clean renderer in docs to diagnostic/evidence-only status everywhere it is still described too strongly
 
@@ -69,9 +75,9 @@ Still ahead:
 
 The next beats should build on `UiLab` in this order:
 
-1. Add a visible runtime overlay/menu that lists `UiLab::GetRuntimeTargets()`.
-2. Add title-loop/title-menu forcing first, because those states already run without a stage world.
-3. Add loading/Miles Electric forcing, using the existing `ui_loading` and movie/loading hooks.
+1. Screenshot-verify `--ui-lab-screen title-loop`, `--ui-lab-screen title-menu`, and `--ui-lab-screen loading` from the built runtime.
+2. Promote the current title/menu/loading route forcing from input injection into direct state-machine requests where the translated PPC owner functions are confidently mapped.
+3. Add CSD-project host creation for non-title screens.
 4. Add a lightweight stage-context harness for Sonic HUD and tutorial overlays.
 5. Add result/status/world-map only after their owner contexts can be created or routed without corrupting save/progression state.
 

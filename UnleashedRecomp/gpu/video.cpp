@@ -6962,6 +6962,7 @@ PPC_FUNC(sub_825369A0)
     }
 
     __imp__sub_825369A0(ctx, base);
+    UiLab::OnStageExitLoading();
 }
 
 // CModelData::CheckMadeAll

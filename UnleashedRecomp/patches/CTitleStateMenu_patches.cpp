@@ -49,6 +49,13 @@ static bool ProcessInstallMessage()
     return true;
 }
 
+static void InjectTitleAccept(SWA::SPadState& padState)
+{
+    constexpr uint32_t acceptMask = SWA::eKeyState_A | SWA::eKeyState_Start;
+    padState.DownState = (uint32_t)padState.DownState | acceptMask;
+    padState.TappedState = (uint32_t)padState.TappedState | acceptMask;
+}
+
 // SWA::CTitleStateMenu::Update
 PPC_FUNC_IMPL(__imp__sub_825882B8);
 PPC_FUNC(sub_825882B8)
@@ -57,11 +64,21 @@ PPC_FUNC(sub_825882B8)
     auto pGameDocument = SWA::CGameDocument::GetInstance();
 
     auto pInputState = SWA::CInputState::GetInstance();
-    auto& pPadState = pInputState->GetPadState();
-    auto isAccepted = pPadState.IsTapped(SWA::eKeyState_A) || pPadState.IsTapped(SWA::eKeyState_Start);
+    auto& pPadState = pInputState->m_PadStates[(uint32_t)pInputState->m_CurrentPadStateIndex];
 
     auto pContext = pTitleStateMenu->GetContextBase<SWA::CTitleStateMenu::CTitleStateMenuContext>();
     UiLab::OnTitleStateMenuUpdate(pContext->m_pTitleMenu->m_CursorIndex);
+
+    auto forcedCursorIndex = (int32_t)pContext->m_pTitleMenu->m_CursorIndex;
+    bool injectAccept = false;
+
+    if (UiLab::ApplyTitleMenuStateForcing(forcedCursorIndex, injectAccept))
+        pContext->m_pTitleMenu->m_CursorIndex = (uint32_t)forcedCursorIndex;
+
+    if (injectAccept)
+        InjectTitleAccept(pPadState);
+
+    auto isAccepted = pPadState.IsTapped(SWA::eKeyState_A) || pPadState.IsTapped(SWA::eKeyState_Start);
 
     auto isNewGameIndex = pContext->m_pTitleMenu->m_CursorIndex == 0;
     auto isOptionsIndex = pContext->m_pTitleMenu->m_CursorIndex == 2;

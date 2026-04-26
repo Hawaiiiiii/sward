@@ -44,6 +44,36 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("#include <patches/ui_lab_patches.h>", menu)
         self.assertIn("UiLab::OnTitleStateMenuUpdate", menu)
 
+    def test_ui_lab_can_force_real_title_and_loading_routes(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        intro = self.read("UnleashedRecomp/patches/CTitleStateIntro_patches.cpp")
+        menu = self.read("UnleashedRecomp/patches/CTitleStateMenu_patches.cpp")
+
+        self.assertIn("void RequestRouteToCurrentTarget()", header)
+        self.assertIn("bool ApplyTitleIntroStateForcing", header)
+        self.assertIn("bool ApplyTitleMenuStateForcing", header)
+        self.assertIn("GetRouteStatusLabel", header)
+        self.assertIn("Route Selected Target", ui_lab)
+        self.assertIn("UiLab::ApplyTitleIntroStateForcing", intro)
+        self.assertIn("eKeyState_Start", intro)
+        self.assertIn("TappedState", intro)
+        self.assertIn("UiLab::ApplyTitleMenuStateForcing", menu)
+        self.assertIn("m_CursorIndex = (uint32_t)forcedCursorIndex", menu)
+        self.assertIn("InjectTitleAccept(pPadState)", menu)
+
+    def test_ui_lab_stage_harness_observes_real_stage_loading_exit(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        video = self.read("UnleashedRecomp/gpu/video.cpp")
+
+        self.assertIn("void OnStageExitLoading()", header)
+        self.assertIn("GetStageHarnessLabel", header)
+        self.assertIn("--ui-lab-stage", ui_lab)
+        self.assertIn("stage harness armed", ui_lab)
+        self.assertIn("CGameModeStage::ExitLoading", ui_lab)
+        self.assertIn("UiLab::OnStageExitLoading()", video)
+
     def test_ui_lab_bypasses_startup_prompt_blockers_for_lab_runs(self):
         header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
         intro = self.read("UnleashedRecomp/patches/CTitleStateIntro_patches.cpp")
@@ -61,6 +91,14 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("void SelectNextTarget()", header)
         self.assertIn("#include <patches/ui_lab_patches.h>", video)
         self.assertIn("UiLab::DrawOverlay()", video)
+
+    def test_ui_lab_runtime_build_helper_captures_windows_environment_fix(self):
+        script = self.read("research_uiux/runtime_reference/tools/build_unleashed_recomp_ui_lab.ps1")
+        self.assertIn("subst $drive", script)
+        self.assertIn("VsDevCmd.bat", script)
+        self.assertIn("C:\\Program Files\\LLVM\\bin", script)
+        self.assertIn("DIRECTX_DXIL_LIBRARY", script)
+        self.assertIn("Patch-SdlPrefetchShim", script)
 
     def test_ui_lab_is_documented_as_primary_parity_lane(self):
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")

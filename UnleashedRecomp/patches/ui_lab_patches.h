@@ -36,11 +36,17 @@ namespace UiLab
     ScreenId GetTarget();
     std::string_view GetTargetToken();
     std::string_view GetTargetLabel();
+    std::string_view GetRouteStatusLabel();
+    std::string_view GetStageHarnessLabel();
     const std::array<RuntimeTarget, 8>& GetRuntimeTargets();
+    void RequestRouteToCurrentTarget();
     void SelectPreviousTarget();
     void SelectNextTarget();
 
     void OnTitleStateIntroUpdate(float elapsedSeconds);
     void OnTitleStateMenuUpdate(int32_t cursorIndex);
+    void OnStageExitLoading();
+    bool ApplyTitleIntroStateForcing(float elapsedSeconds);
+    bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept);
     void DrawOverlay();
 }

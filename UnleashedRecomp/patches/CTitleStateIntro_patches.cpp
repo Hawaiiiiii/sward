@@ -116,6 +116,18 @@ static bool ProcessUpdateAvailableMessage()
     return true;
 }
 
+static void InjectTitleAccept()
+{
+    auto pInputState = SWA::CInputState::GetInstance();
+    if (!pInputState)
+        return;
+
+    constexpr uint32_t acceptMask = SWA::eKeyState_A | SWA::eKeyState_Start;
+    auto& padState = pInputState->m_PadStates[(uint32_t)pInputState->m_CurrentPadStateIndex];
+    padState.DownState = (uint32_t)padState.DownState | acceptMask;
+    padState.TappedState = (uint32_t)padState.TappedState | acceptMask;
+}
+
 void StorageDevicePromptMidAsmHook() {}
 
 // Save data validation hook.
@@ -157,6 +169,9 @@ PPC_FUNC(sub_82587E50)
     auto pTitleStateIntro = (SWA::CTitleStateIntro*)g_memory.Translate(ctx.r3.u32);
     auto pTime = (be<float>*)((uint8_t*)pTitleStateIntro->GetContextBase() + 0x10C);
     UiLab::OnTitleStateIntroUpdate(*pTime);
+
+    if (UiLab::ApplyTitleIntroStateForcing(*pTime))
+        InjectTitleAccept();
 
     if (*SWA::SGlobals::ms_IsAutoSaveWarningShown)
     {

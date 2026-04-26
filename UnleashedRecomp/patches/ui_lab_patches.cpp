@@ -20,8 +20,15 @@ namespace UiLab
 
     static bool g_isEnabled = false;
     static ScreenId g_target = ScreenId::TitleLoop;
+    static bool g_routePending = false;
+    static bool g_titleIntroAcceptInjected = false;
+    static bool g_titleMenuAcceptInjected = false;
+    static bool g_stageContextObserved = false;
+    static std::string_view g_routeStatus = "idle";
+    static std::string g_requestedStageHarness = "auto";
     static bool g_loggedIntroHook = false;
     static bool g_loggedMenuHook = false;
+    static bool g_loggedStageHarness = false;
 
     static const RuntimeTarget& TargetFor(ScreenId id)
     {
@@ -51,8 +58,19 @@ namespace UiLab
             index = 0;
 
         g_target = kRuntimeTargets[index].id;
+        RequestRouteToCurrentTarget();
         const auto& target = TargetFor(g_target);
         LOGFN("SWARD UI Lab target selected: {} ({})", target.token, target.label);
+    }
+
+    static bool TargetCanRouteFromTitleIntro(ScreenId id)
+    {
+        return id == ScreenId::TitleMenu || id == ScreenId::Loading;
+    }
+
+    static bool TargetNeedsStageHarness(ScreenId id)
+    {
+        return TargetFor(id).requiresStageContext;
     }
 
     static bool TrySetTarget(std::string_view token)
@@ -122,11 +140,33 @@ namespace UiLab
 
                 if (!TrySetTarget(token))
                     LOGFN_WARNING("SWARD UI Lab: unknown screen target '{}'.", std::string(token));
+
+                continue;
+            }
+
+            if (arg == "--ui-lab-stage")
+            {
+                g_isEnabled = true;
+
+                if ((i + 1) < argc)
+                    g_requestedStageHarness = argv[++i];
+                else
+                    LOGN_WARNING("SWARD UI Lab: --ui-lab-stage was provided without a stage token.");
+
+                continue;
+            }
+
+            constexpr std::string_view stagePrefix = "--ui-lab-stage=";
+            if (arg.starts_with(stagePrefix))
+            {
+                g_isEnabled = true;
+                g_requestedStageHarness = std::string(arg.substr(stagePrefix.size()));
             }
         }
 
         if (g_isEnabled)
         {
+            RequestRouteToCurrentTarget();
             const auto& target = TargetFor(g_target);
             LOGFN(
                 "SWARD UI Lab enabled: target={} label={} csd={} family={} stage_context={}",
@@ -135,6 +175,9 @@ namespace UiLab
                 target.primaryCsdScene,
                 target.sourceFamily,
                 target.requiresStageContext ? "yes" : "no");
+
+            if (target.requiresStageContext)
+                LOGFN("SWARD UI Lab stage harness armed: requested_stage={}", g_requestedStageHarness);
         }
     }
 
@@ -173,9 +216,45 @@ namespace UiLab
         return TargetFor(g_target).label;
     }
 
+    std::string_view GetRouteStatusLabel()
+    {
+        return g_routeStatus;
+    }
+
+    std::string_view GetStageHarnessLabel()
+    {
+        if (!TargetNeedsStageHarness(g_target))
+            return "not required";
+
+        if (g_stageContextObserved)
+            return "stage context observed";
+
+        return g_requestedStageHarness;
+    }
+
     const std::array<RuntimeTarget, 8>& GetRuntimeTargets()
     {
         return kRuntimeTargets;
+    }
+
+    void RequestRouteToCurrentTarget()
+    {
+        g_titleIntroAcceptInjected = false;
+        g_titleMenuAcceptInjected = false;
+        g_stageContextObserved = false;
+        g_loggedStageHarness = false;
+
+        if (g_target == ScreenId::TitleLoop)
+        {
+            g_routePending = false;
+            g_routeStatus = "holding title loop";
+            return;
+        }
+
+        g_routePending = true;
+        g_routeStatus = TargetNeedsStageHarness(g_target)
+            ? "stage harness armed"
+            : "route pending";
     }
 
     void SelectPreviousTarget()
@@ -217,6 +296,80 @@ namespace UiLab
         g_loggedMenuHook = true;
     }
 
+    void OnStageExitLoading()
+    {
+        if (!g_isEnabled || !TargetNeedsStageHarness(g_target))
+            return;
+
+        g_stageContextObserved = true;
+        g_routeStatus = "stage context live";
+
+        if (!g_loggedStageHarness)
+        {
+            const auto& target = TargetFor(g_target);
+            LOGFN(
+                "SWARD UI Lab stage harness observed CGameModeStage::ExitLoading: target={} requested_stage={} csd={}",
+                target.token,
+                g_requestedStageHarness,
+                target.primaryCsdScene);
+            g_loggedStageHarness = true;
+        }
+    }
+
+    bool ApplyTitleIntroStateForcing(float elapsedSeconds)
+    {
+        if (!g_isEnabled || !g_routePending || g_titleIntroAcceptInjected)
+            return false;
+
+        if (!TargetCanRouteFromTitleIntro(g_target))
+            return false;
+
+        if (elapsedSeconds < 0.75f)
+            return false;
+
+        g_titleIntroAcceptInjected = true;
+        g_routeStatus = "title accept injected";
+        LOGFN("SWARD UI Lab route: injected title accept for target={}", TargetFor(g_target).token);
+        return true;
+    }
+
+    bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept)
+    {
+        injectAccept = false;
+
+        if (!g_isEnabled)
+            return false;
+
+        if (g_target == ScreenId::TitleMenu)
+        {
+            if (g_routePending)
+            {
+                g_routePending = false;
+                g_routeStatus = "title menu reached";
+                LOGN("SWARD UI Lab route: title menu reached.");
+            }
+
+            return false;
+        }
+
+        if (g_target != ScreenId::Loading || !g_routePending)
+            return false;
+
+        cursorIndex = 0;
+        g_routeStatus = "loading route via new game";
+
+        if (!g_titleMenuAcceptInjected)
+        {
+            injectAccept = true;
+            g_titleMenuAcceptInjected = true;
+            g_routePending = false;
+            g_routeStatus = "loading accept injected";
+            LOGN("SWARD UI Lab route: forced title menu New Game accept for loading target.");
+        }
+
+        return true;
+    }
+
     void DrawOverlay()
     {
         if (!g_isEnabled)
@@ -247,8 +400,10 @@ namespace UiLab
             ImGui::Text("CSD scene: %s", targetScene.c_str());
             ImGui::Text("Source family: %s", targetFamily.c_str());
             ImGui::Text("Stage context: %s", target.requiresStageContext ? "required" : "not required");
+            ImGui::Text("Stage harness: %s", std::string(GetStageHarnessLabel()).c_str());
             ImGui::Text("Title intro hook: %s", g_loggedIntroHook ? "attached" : "waiting");
             ImGui::Text("Title menu hook: %s", g_loggedMenuHook ? "attached" : "waiting");
+            ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
             ImGui::Text("Startup prompt blockers: %s", ShouldBypassStartupPromptBlockers() ? "bypassed" : "normal");
             ImGui::Separator();
 
@@ -259,6 +414,11 @@ namespace UiLab
 
             if (ImGui::Button("Next Target"))
                 SelectNextTarget();
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Route Selected Target"))
+                RequestRouteToCurrentTarget();
 
             ImGui::Separator();
             ImGui::TextUnformatted("Targets:");
