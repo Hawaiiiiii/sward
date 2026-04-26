@@ -32,6 +32,7 @@ namespace UiLab
     void ApplyConfigOverrides();
 
     bool IsEnabled();
+    bool ShouldBypassStartupPromptBlockers();
     ScreenId GetTarget();
     std::string_view GetTargetToken();
     std::string_view GetTargetLabel();

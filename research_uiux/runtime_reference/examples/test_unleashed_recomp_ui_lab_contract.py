@@ -44,6 +44,14 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("#include <patches/ui_lab_patches.h>", menu)
         self.assertIn("UiLab::OnTitleStateMenuUpdate", menu)
 
+    def test_ui_lab_bypasses_startup_prompt_blockers_for_lab_runs(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        intro = self.read("UnleashedRecomp/patches/CTitleStateIntro_patches.cpp")
+
+        self.assertIn("bool ShouldBypassStartupPromptBlockers()", header)
+        self.assertIn("UiLab::ShouldBypassStartupPromptBlockers()", intro)
+        self.assertIn("return;", intro)
+
     def test_ui_lab_draws_inside_the_real_imgui_runtime_frame(self):
         header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
         video = self.read("UnleashedRecomp/gpu/video.cpp")

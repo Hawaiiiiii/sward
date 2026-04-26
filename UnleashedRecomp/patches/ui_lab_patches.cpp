@@ -132,6 +132,11 @@ namespace UiLab
         return g_isEnabled;
     }
 
+    bool ShouldBypassStartupPromptBlockers()
+    {
+        return g_isEnabled;
+    }
+
     ScreenId GetTarget()
     {
         return g_target;
@@ -212,6 +217,7 @@ namespace UiLab
             ImGui::Text("Stage context: %s", target.requiresStageContext ? "required" : "not required");
             ImGui::Text("Title intro hook: %s", g_loggedIntroHook ? "attached" : "waiting");
             ImGui::Text("Title menu hook: %s", g_loggedMenuHook ? "attached" : "waiting");
+            ImGui::Text("Startup prompt blockers: %s", ShouldBypassStartupPromptBlockers() ? "bypassed" : "normal");
             ImGui::Separator();
             ImGui::TextUnformatted("Targets:");
 

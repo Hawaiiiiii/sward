@@ -717,6 +717,13 @@
 - [x] Surface the selected runtime target, CSD scene, source family, stage-context requirement, and hook attachment status.
 - [x] Guard the overlay attachment with the UI Lab regression contract.
 
+## Phase 96 - Runtime UI Lab Startup Prompt Bypass
+
+- [x] Add `UiLab::ShouldBypassStartupPromptBlockers()` for lab-only frontend modal suppression.
+- [x] Bypass update/save/achievement prompt checks in `PressStartSaveLoadThreadMidAsmHook()` during UI Lab runs.
+- [x] Surface startup-prompt bypass status in the UI Lab overlay.
+- [x] Guard the bypass attachment with the UI Lab regression contract.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.

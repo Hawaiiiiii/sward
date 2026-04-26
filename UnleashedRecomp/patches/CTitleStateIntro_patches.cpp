@@ -130,6 +130,9 @@ PPC_FUNC(sub_822C55B0)
 
 void PressStartSaveLoadThreadMidAsmHook()
 {
+    if (UiLab::ShouldBypassStartupPromptBlockers())
+        return;
+
     if (UpdateChecker::check() == UpdateChecker::Result::UpdateAvailable)
     {
         g_updateAvailableMessageOpen = true;

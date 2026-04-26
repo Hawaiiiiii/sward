@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-26
 
+### Phase 96 Runtime UI Lab startup prompt bypass
+
+- added `UiLab::ShouldBypassStartupPromptBlockers()` as the first lab-only runtime behavior gate
+- bypassed the title press-start save/update/achievement prompt path during `--ui-lab` runs so UI-state inspection is not interrupted by frontend modal checks
+- surfaced startup-prompt bypass status in the UI Lab overlay
+- extended the UI Lab regression contract around the bypass hook
+
 ### Phase 95 Runtime UI Lab overlay attachment
 
 - added `UiLab::DrawOverlay()` so `--ui-lab` now has a visible in-runtime overlay instead of only a logged runtime attachment
