@@ -59,6 +59,8 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("eKeyState_Start", intro)
         self.assertIn("TappedState", intro)
         self.assertIn("UiLab::ApplyTitleMenuStateForcing", menu)
+        self.assertIn("suppressAccept", menu)
+        self.assertIn("SuppressTitleAccept(pPadState)", menu)
         self.assertIn("m_CursorIndex = (uint32_t)forcedCursorIndex", menu)
         self.assertIn("InjectTitleAccept(pPadState)", menu)
 
@@ -73,6 +75,40 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("stage harness armed", ui_lab)
         self.assertIn("CGameModeStage::ExitLoading", ui_lab)
         self.assertIn("UiLab::OnStageExitLoading()", video)
+
+    def test_ui_lab_stage_targets_route_through_real_loading_path(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+
+        self.assertIn("TargetShouldRouteThroughLoading", ui_lab)
+        self.assertIn("TargetNeedsStageHarness(id)", ui_lab)
+        self.assertIn("stage route via new game", ui_lab)
+        self.assertIn("stage accept injected", ui_lab)
+
+    def test_ui_lab_writes_runtime_evidence_log(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        video = self.read("UnleashedRecomp/gpu/video.cpp")
+
+        self.assertIn("void OnPresentedFrame()", header)
+        self.assertIn("--ui-lab-evidence-dir", ui_lab)
+        self.assertIn("--ui-lab-auto-exit", ui_lab)
+        self.assertIn("WriteEvidenceEvent", ui_lab)
+        self.assertIn("ui_lab_events.jsonl", ui_lab)
+        self.assertIn("UiLab::OnPresentedFrame()", video)
+
+    def test_ui_lab_capture_helper_collects_screenshots_and_events(self):
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+
+        self.assertIn("PrintWindow", script)
+        self.assertIn("CopyFromScreen", script)
+        self.assertIn("GetWindowRect", script)
+        self.assertIn("Test-BitmapHasSignal", script)
+        self.assertIn("ProcessStartInfo", script)
+        self.assertIn("ArgumentList.Add", script)
+        self.assertIn("--ui-lab-evidence-dir", script)
+        self.assertIn("--ui-lab-screen", script)
+        self.assertIn("-split \",\"", script)
+        self.assertIn("ui_lab_events.jsonl", script)
 
     def test_ui_lab_bypasses_startup_prompt_blockers_for_lab_runs(self):
         header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")

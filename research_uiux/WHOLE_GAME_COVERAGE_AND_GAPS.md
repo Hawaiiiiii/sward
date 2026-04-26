@@ -90,6 +90,7 @@
   - a Phase 91 clean SU UI renderer atlas-gallery report at `research_uiux/SU_UI_RENDERER_ATLAS_GALLERY.md`
   - a Phase 92 clean SU UI renderer reconstructed-screen report at `research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md`
   - a Phase 93 clean SU UI renderer title-loop reconstruction report at `research_uiux/SU_UI_RENDERER_TITLE_LOOP_RECONSTRUCTION.md`
+  - a Phase 94+ real-runtime UI Lab pivot report at `research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md`
   - a shell/debug host recovery map at `research_uiux/data/frontend_shell_recovery.json`
   - a human-readable shell/debug host report at `research_uiux/FRONTEND_SHELL_AND_DEBUG_HOST_RECOVERY.md`
   - a dedicated frontend-sequence bridge report at `research_uiux/FRONTEND_SEQUENCE_SHELL_RUNTIME_BRIDGE.md`
@@ -97,6 +98,7 @@
   - a verified native selector with persistent interactive/stay-open behavior at `b/rr89/sward_ui_runtime_debug_selector.exe`
   - a first proper native GUI operator shell with visual gameplay-HUD proxy preview, state-aware motion, exact-family Title/Pause/Loading placement, `ui_mainmenu` / `ui_pause` / `ui_loading` layout-evidence overlays, recovered frame-domain timeline readouts, keyframe-density scene primitives, audited `ui_prov_playscreen` gameplay HUD proxy primitives, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, compact channel legends, visual parity summaries, host readiness badges, next-renderer blocker cues, first exact-family primitive channel sample tokens, first exact-family primitive draw command descriptors, first authored CSD cast/keyframe/sample/evaluation descriptors, first unobstructed local atlas asset-viewer mode, cwd-safe asset-root discovery, sorted atlas-gallery controls, navigable CSD element-binding cues, selected-element crop previews, selected cast/subimage descriptors, source/destination draw-command descriptors, render-plan previews, and first decoded DDS source blits at `b/rr89/sward_ui_runtime_debug_gui.exe`
   - a separate clean asset-backed renderer at `b/rr93/sward_su_ui_asset_renderer.exe`, currently smoke-guarding a title-loop reconstruction backed by the local `evmo_title_loop.sfd` preview frame, decompressed `OPmovie_titlelogo_EN` evidence, `mat_title_en_001.dds` title text crops, visible navigation shell, a local `22`-sheet visual-atlas gallery, a full-screen Loading composition, and Main Menu / Sonic HUD DDS-backed samples
+  - a real-runtime UI Lab path inside the generated UnleashedRecomp build at `W:\b\ui_lab_runtime\UnleashedRecomp\UnleashedRecomp.exe`, with visible overlay controls, title/menu/loading route forcing, stage-context observation, JSONL evidence logging, and a local-only screenshot/event capture helper
   - a compact workbench catalog report at `research_uiux/DEBUG_WORKBENCH_CATALOG_VIEW.md`
   - a dedicated CSD/UI foundation map at `research_uiux/data/csd_ui_foundation_map.json`
   - a human-readable foundation report at `research_uiux/CSD_UI_FOUNDATION_HUMANIZATION.md`
@@ -172,7 +174,7 @@ What it still does not justify:
 
 The current workspace is:
 
-- `100%` complete against the tracked research plan through Phase `93`
+- `100%` complete against the tracked research plan through Phase `98`
 - strong for UI/UX reverse-engineering and template extraction
 - strong for local executable-backed timing/state archaeology
 - strong for reusable runtime/template productization across C++, C, and C#
@@ -190,6 +192,7 @@ The current workspace is:
 - now materially stronger for non-CLI debug-tool usability, with `b/rr89/sward_ui_runtime_debug_gui.exe` providing a native Windows group/host browser, host readiness badges, asset/runtime preview mode switching, asset-sheet gallery controls, CSD element controls, selected-element crop previews, selected cast/subimage cues, source/destination draw-command cues, render-plan previews, decoded DDS source blits, and runtime action controls over the same evidence-backed catalog
 - now materially stronger for visual debug-tool usability, with `b/rr89/sward_ui_runtime_debug_gui.exe` drawing local atlas previews, runtime visible layers, prompt rows, state timeline strips, marked Sonic/Werehog gameplay-HUD proxy previews, timer-driven intro/action playback, eased state-aware preview motion, exact-family Title/Pause/Loading placement adapters, compact decoded layout-evidence panels, frame-domain timeline readouts, exact-family scene-primitive overlays, audited gameplay HUD proxy primitives, primitive animation/frame cues, readable primitive detail summaries, primitive channel cues, compact channel legends, visual parity summaries, host-list readiness badges, next-renderer blocker cues, first exact-family primitive channel sample tokens, first exact-family draw command descriptors, first authored CSD cast/keyframe/sample/evaluation descriptors, first unobstructed local atlas asset-viewer path, cwd-safe asset-root discovery, sorted atlas-gallery controls, navigable CSD element-binding cues, selected-element crop previews, selected cast/subimage descriptors, source/destination draw-command descriptors, render-plan previews, and first decoded DDS source blits for exact/proxy/readiness triage
 - now materially stronger for product-facing UI renderer direction, with `b/rr93/sward_su_ui_asset_renderer.exe` separating clean asset-backed screen rendering from the archaeology/debug workbench, opening on a title-loop reconstruction that binds the local SFD movie frame, decompressed title-logo evidence, title text crops, and translated/patch state seams instead of a raw atlas gallery, while retaining visible screen/atlas navigation controls, browsing local visual-atlas PNG sheets, and exposing no-window renderer catalog/title/reconstruction smoke
+- now materially stronger for real-runtime UI parity work, with the generated UnleashedRecomp UI Lab able to route title/menu/loading targets through live translated runtime states, emit frame/state JSONL evidence, capture local-only screenshots, and expose selected routes from an in-game overlay
 - now materially stronger for host coverage, with a verified `176`-host workbench map across `11` groups
 - partial for whole-game loose-file asset extraction
 - not yet equivalent to a whole-game clean human-readable source tree
@@ -199,10 +202,10 @@ The current workspace is:
 If the goal is to move closer to a broader `1:1` UI portability basis, the next concrete work would be:
 
 1. Keep replacing the widened local-only debug-oriented source tree with cleaner translated ownership so the mirrored `SONIC UNLEASHED/` paths stop reading like scaffolds and start reading like readable source.
-2. Convert more atlas-backed families into family-specific reconstructed render paths rather than static preview sheets.
+2. Keep advancing the real-runtime UI Lab instead of spending parity time on standalone approximations: native/backbuffer capture, deterministic route forcing, and direct stage-context creation are the immediate blockers.
 3. Keep widening the current contract-backed shell layer beyond the present `269`-path seed instead of treating the current subset as the whole game.
 4. Continue correlating generated PPC seams against extracted layouts, source-path seeds, and readable patch hosts for the still-unmapped or still debug/tool-only families.
 5. Keep tightening the local-only `SONIC UNLEASHED/` tree until the recovered source-family paths carry readable translated ownership at a much broader whole-game shell level.
 
 > [!NOTE]
-> After Phase 93, the current bottleneck is no longer just "make an executable" or "show a visual panel." The debug workbench explains the evidence chain, and the separate clean renderer now opens on a title-loop reconstruction that uses the local title movie frame plus decompressed title-logo/text evidence. The remaining product gap is native XCompress/LZX texture decode, SFD frame playback, CSD transform/timeline evaluation, and widening that first reconstructed path into family-specific multi-cast texture compositing/playback backed by decoded node transforms, original animation channels, exact HUD payloads, and translated host behavior.
+> After Phase 98, the clean renderer is explicitly a diagnostic sidecar. The parity lane is the generated UnleashedRecomp UI Lab because it runs the real game renderer, CSD/material/movie substrate, local game files, and translated runtime states. The remaining product gap is deterministic state/context forcing plus native frame capture, not drawing more inspired standalone screens.

@@ -56,6 +56,13 @@ static void InjectTitleAccept(SWA::SPadState& padState)
     padState.TappedState = (uint32_t)padState.TappedState | acceptMask;
 }
 
+static void SuppressTitleAccept(SWA::SPadState& padState)
+{
+    constexpr uint32_t acceptMask = SWA::eKeyState_A | SWA::eKeyState_Start;
+    padState.DownState = (uint32_t)padState.DownState & ~acceptMask;
+    padState.TappedState = (uint32_t)padState.TappedState & ~acceptMask;
+}
+
 // SWA::CTitleStateMenu::Update
 PPC_FUNC_IMPL(__imp__sub_825882B8);
 PPC_FUNC(sub_825882B8)
@@ -71,9 +78,13 @@ PPC_FUNC(sub_825882B8)
 
     auto forcedCursorIndex = (int32_t)pContext->m_pTitleMenu->m_CursorIndex;
     bool injectAccept = false;
+    bool suppressAccept = false;
 
-    if (UiLab::ApplyTitleMenuStateForcing(forcedCursorIndex, injectAccept))
+    if (UiLab::ApplyTitleMenuStateForcing(forcedCursorIndex, injectAccept, suppressAccept))
         pContext->m_pTitleMenu->m_CursorIndex = (uint32_t)forcedCursorIndex;
+
+    if (suppressAccept)
+        SuppressTitleAccept(pPadState);
 
     if (injectAccept)
         InjectTitleAccept(pPadState);

@@ -1,7 +1,12 @@
 #include <patches/ui_lab_patches.h>
+#include <app.h>
 #include <gpu/imgui/imgui_common.h>
 #include <os/logger.h>
 #include <user/config.h>
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 namespace UiLab
@@ -26,9 +31,104 @@ namespace UiLab
     static bool g_stageContextObserved = false;
     static std::string_view g_routeStatus = "idle";
     static std::string g_requestedStageHarness = "auto";
+    static std::filesystem::path g_evidenceDirectory;
+    static double g_autoExitSeconds = 0.0;
+    static uint64_t g_presentedFrameCount = 0;
+    static bool g_autoExitRequested = false;
+    static const std::chrono::steady_clock::time_point g_startedAt = std::chrono::steady_clock::now();
     static bool g_loggedIntroHook = false;
     static bool g_loggedMenuHook = false;
     static bool g_loggedStageHarness = false;
+
+    static const RuntimeTarget& TargetFor(ScreenId id);
+    static bool TargetNeedsStageHarness(ScreenId id);
+    static bool TargetShouldRouteThroughLoading(ScreenId id);
+
+    static std::string JsonEscape(std::string_view value)
+    {
+        std::string escaped;
+        escaped.reserve(value.size());
+
+        for (char c : value)
+        {
+            switch (c)
+            {
+                case '\\':
+                    escaped += "\\\\";
+                    break;
+
+                case '"':
+                    escaped += "\\\"";
+                    break;
+
+                case '\n':
+                    escaped += "\\n";
+                    break;
+
+                case '\r':
+                    escaped += "\\r";
+                    break;
+
+                case '\t':
+                    escaped += "\\t";
+                    break;
+
+                default:
+                    escaped += c;
+                    break;
+            }
+        }
+
+        return escaped;
+    }
+
+    static double SecondsSinceStart()
+    {
+        const auto elapsed = std::chrono::steady_clock::now() - g_startedAt;
+        return std::chrono::duration<double>(elapsed).count();
+    }
+
+    static void WriteEvidenceEvent(std::string_view event, std::string_view detail = {})
+    {
+        if (!g_isEnabled || g_evidenceDirectory.empty())
+            return;
+
+        std::error_code ec;
+        std::filesystem::create_directories(g_evidenceDirectory, ec);
+
+        if (ec)
+        {
+            LOGFN_WARNING("SWARD UI Lab: failed to create evidence directory '{}': {}",
+                g_evidenceDirectory.string(),
+                ec.message());
+            return;
+        }
+
+        const auto eventPath = g_evidenceDirectory / "ui_lab_events.jsonl";
+        std::ofstream out(eventPath, std::ios::app);
+
+        if (!out)
+        {
+            LOGFN_WARNING("SWARD UI Lab: failed to open evidence log '{}'.", eventPath.string());
+            return;
+        }
+
+        const auto& target = TargetFor(g_target);
+        out
+            << "{\"time\":" << SecondsSinceStart()
+            << ",\"frame\":" << g_presentedFrameCount
+            << ",\"event\":\"" << JsonEscape(event) << "\""
+            << ",\"target\":\"" << JsonEscape(target.token) << "\""
+            << ",\"label\":\"" << JsonEscape(target.label) << "\""
+            << ",\"csd\":\"" << JsonEscape(target.primaryCsdScene) << "\""
+            << ",\"route\":\"" << JsonEscape(g_routeStatus) << "\""
+            << ",\"stage\":\"" << JsonEscape(GetStageHarnessLabel()) << "\"";
+
+        if (!detail.empty())
+            out << ",\"detail\":\"" << JsonEscape(detail) << "\"";
+
+        out << "}\n";
+    }
 
     static const RuntimeTarget& TargetFor(ScreenId id)
     {
@@ -65,12 +165,17 @@ namespace UiLab
 
     static bool TargetCanRouteFromTitleIntro(ScreenId id)
     {
-        return id == ScreenId::TitleMenu || id == ScreenId::Loading;
+        return id == ScreenId::TitleMenu || TargetShouldRouteThroughLoading(id);
     }
 
     static bool TargetNeedsStageHarness(ScreenId id)
     {
         return TargetFor(id).requiresStageContext;
+    }
+
+    static bool TargetShouldRouteThroughLoading(ScreenId id)
+    {
+        return id == ScreenId::Loading || TargetNeedsStageHarness(id);
     }
 
     static bool TrySetTarget(std::string_view token)
@@ -161,6 +266,44 @@ namespace UiLab
             {
                 g_isEnabled = true;
                 g_requestedStageHarness = std::string(arg.substr(stagePrefix.size()));
+                continue;
+            }
+
+            if (arg == "--ui-lab-evidence-dir")
+            {
+                g_isEnabled = true;
+
+                if ((i + 1) < argc)
+                    g_evidenceDirectory = argv[++i];
+                else
+                    LOGN_WARNING("SWARD UI Lab: --ui-lab-evidence-dir was provided without a directory.");
+
+                continue;
+            }
+
+            constexpr std::string_view evidencePrefix = "--ui-lab-evidence-dir=";
+            if (arg.starts_with(evidencePrefix))
+            {
+                g_isEnabled = true;
+                g_evidenceDirectory = std::string(arg.substr(evidencePrefix.size()));
+                continue;
+            }
+
+            if (arg == "--ui-lab-auto-exit")
+            {
+                if ((i + 1) < argc)
+                    g_autoExitSeconds = std::strtod(argv[++i], nullptr);
+                else
+                    LOGN_WARNING("SWARD UI Lab: --ui-lab-auto-exit was provided without a seconds value.");
+
+                continue;
+            }
+
+            constexpr std::string_view autoExitPrefix = "--ui-lab-auto-exit=";
+            if (arg.starts_with(autoExitPrefix))
+            {
+                g_autoExitSeconds = std::strtod(std::string(arg.substr(autoExitPrefix.size())).c_str(), nullptr);
+                continue;
             }
         }
 
@@ -178,6 +321,12 @@ namespace UiLab
 
             if (target.requiresStageContext)
                 LOGFN("SWARD UI Lab stage harness armed: requested_stage={}", g_requestedStageHarness);
+
+            if (!g_evidenceDirectory.empty())
+            {
+                LOGFN("SWARD UI Lab evidence directory: {}", g_evidenceDirectory.string());
+                WriteEvidenceEvent("configured");
+            }
         }
     }
 
@@ -248,6 +397,7 @@ namespace UiLab
         {
             g_routePending = false;
             g_routeStatus = "holding title loop";
+            WriteEvidenceEvent("route-hold-title-loop");
             return;
         }
 
@@ -255,6 +405,7 @@ namespace UiLab
         g_routeStatus = TargetNeedsStageHarness(g_target)
             ? "stage harness armed"
             : "route pending";
+        WriteEvidenceEvent("route-requested");
     }
 
     void SelectPreviousTarget()
@@ -279,6 +430,7 @@ namespace UiLab
             target.token,
             elapsedSeconds,
             target.primaryCsdScene);
+        WriteEvidenceEvent("title-intro-attached");
         g_loggedIntroHook = true;
     }
 
@@ -293,6 +445,7 @@ namespace UiLab
             target.token,
             cursorIndex,
             target.primaryCsdScene);
+        WriteEvidenceEvent("title-menu-attached");
         g_loggedMenuHook = true;
     }
 
@@ -312,7 +465,28 @@ namespace UiLab
                 target.token,
                 g_requestedStageHarness,
                 target.primaryCsdScene);
+            WriteEvidenceEvent("stage-context-observed", "CGameModeStage::ExitLoading");
             g_loggedStageHarness = true;
+        }
+    }
+
+    void OnPresentedFrame()
+    {
+        if (!g_isEnabled)
+            return;
+
+        ++g_presentedFrameCount;
+
+        if (g_presentedFrameCount == 1)
+            WriteEvidenceEvent("first-presented-frame");
+        else if ((g_presentedFrameCount % 60) == 0)
+            WriteEvidenceEvent("presented-frame");
+
+        if (g_autoExitSeconds > 0.0 && !g_autoExitRequested && SecondsSinceStart() >= g_autoExitSeconds)
+        {
+            g_autoExitRequested = true;
+            WriteEvidenceEvent("auto-exit");
+            App::Exit();
         }
     }
 
@@ -330,12 +504,14 @@ namespace UiLab
         g_titleIntroAcceptInjected = true;
         g_routeStatus = "title accept injected";
         LOGFN("SWARD UI Lab route: injected title accept for target={}", TargetFor(g_target).token);
+        WriteEvidenceEvent("title-accept-injected");
         return true;
     }
 
-    bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept)
+    bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept, bool& suppressAccept)
     {
         injectAccept = false;
+        suppressAccept = false;
 
         if (!g_isEnabled)
             return false;
@@ -347,24 +523,32 @@ namespace UiLab
                 g_routePending = false;
                 g_routeStatus = "title menu reached";
                 LOGN("SWARD UI Lab route: title menu reached.");
+                WriteEvidenceEvent("title-menu-reached");
+                suppressAccept = true;
+                WriteEvidenceEvent("title-menu-accept-suppressed");
             }
 
             return false;
         }
 
-        if (g_target != ScreenId::Loading || !g_routePending)
+        if (!TargetShouldRouteThroughLoading(g_target) || !g_routePending)
             return false;
 
         cursorIndex = 0;
-        g_routeStatus = "loading route via new game";
+        g_routeStatus = TargetNeedsStageHarness(g_target)
+            ? "stage route via new game"
+            : "loading route via new game";
 
         if (!g_titleMenuAcceptInjected)
         {
             injectAccept = true;
             g_titleMenuAcceptInjected = true;
             g_routePending = false;
-            g_routeStatus = "loading accept injected";
-            LOGN("SWARD UI Lab route: forced title menu New Game accept for loading target.");
+            g_routeStatus = TargetNeedsStageHarness(g_target)
+                ? "stage accept injected"
+                : "loading accept injected";
+            LOGFN("SWARD UI Lab route: forced title menu New Game accept for target={}", TargetFor(g_target).token);
+            WriteEvidenceEvent("title-menu-new-game-accept-injected");
         }
 
         return true;
@@ -404,6 +588,8 @@ namespace UiLab
             ImGui::Text("Title intro hook: %s", g_loggedIntroHook ? "attached" : "waiting");
             ImGui::Text("Title menu hook: %s", g_loggedMenuHook ? "attached" : "waiting");
             ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
+            ImGui::Text("Presented frames: %llu", static_cast<unsigned long long>(g_presentedFrameCount));
+            ImGui::Text("Evidence: %s", g_evidenceDirectory.empty() ? "off" : g_evidenceDirectory.string().c_str());
             ImGui::Text("Startup prompt blockers: %s", ShouldBypassStartupPromptBlockers() ? "bypassed" : "normal");
             ImGui::Separator();
 
@@ -420,17 +606,26 @@ namespace UiLab
             if (ImGui::Button("Route Selected Target"))
                 RequestRouteToCurrentTarget();
 
-            ImGui::Separator();
-            ImGui::TextUnformatted("Targets:");
+            ImGui::SameLine();
 
-            for (const auto& runtimeTarget : kRuntimeTargets)
+            if (ImGui::Button("Mark Evidence"))
+                WriteEvidenceEvent("manual-evidence-marker");
+
+            ImGui::Separator();
+            ImGui::TextUnformatted("Real screen routes:");
+
+            for (size_t i = 0; i < kRuntimeTargets.size(); ++i)
             {
+                const auto& runtimeTarget = kRuntimeTargets[i];
                 const std::string label(runtimeTarget.label);
                 const std::string token(runtimeTarget.token);
-                ImGui::Text("%s %s (%s)",
-                    runtimeTarget.id == g_target ? ">" : " ",
-                    label.c_str(),
-                    token.c_str());
+                const std::string buttonLabel = (runtimeTarget.id == g_target ? "> " : "  ") + label + "###ui-lab-target-" + std::to_string(i);
+
+                if (ImGui::Button(buttonLabel.c_str()))
+                    SelectTargetIndex(i);
+
+                ImGui::SameLine();
+                ImGui::Text("(%s)", token.c_str());
             }
         }
 

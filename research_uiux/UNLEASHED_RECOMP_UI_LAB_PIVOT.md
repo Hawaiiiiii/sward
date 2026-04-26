@@ -31,6 +31,10 @@ The module currently provides:
 - `--ui-lab=<target>`
 - `--ui-lab-screen <target>`
 - `--ui-lab-screen=<target>`
+- `--ui-lab-evidence-dir <dir>`
+- `--ui-lab-evidence-dir=<dir>`
+- `--ui-lab-auto-exit <seconds>`
+- `--ui-lab-auto-exit=<seconds>`
 - a curated target table for `TitleLoop`, `TitleMenu`, `Loading`, `SonicHud`, `Result`, `Status`, `Tutorial`, and `WorldMap`
 - runtime config overrides that keep the lab path debug-friendly (`ShowConsole`, `SkipIntroLogos`, `DisableAutoSaveWarning`)
 - attachment points in `CTitleStateIntro::Update` and `CTitleStateMenu::Update`
@@ -49,8 +53,12 @@ Implemented now:
 - overlay route controls and route status for forcing selected UI Lab targets through the real title/menu runtime path
 - title-loop to title-menu forcing by injecting the real translated title-state accept input after the intro state is live
 - title-menu to loading forcing by pinning the translated title menu cursor to New Game and injecting the real accept input once
+- stage-required targets now route through the same real title/menu/loading path before relying on stage-context observation
+- title-menu accept suppression so a `title-menu` capture reaches the menu without immediately carrying the injected intro accept into the next flow
 - stage-context harness arming via `--ui-lab-stage <token>` / `--ui-lab-stage=<token>` and observation of the real `CGameModeStage::ExitLoading` point for Sonic HUD/tutorial/result targets
 - startup update/save/achievement prompt blockers bypassed during UI Lab runs so debug-state inspection is not interrupted by frontend modal checks
+- runtime evidence logging to local JSONL, including route requests, first presented frame, periodic presented frames, title/menu hook attachment, accept injection, stage-context observation, manual evidence markers, and auto-exit
+- a local capture helper at `research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1` that launches the generated runtime, normalizes the window, prefers `PrintWindow` capture before screen-copy fallback, captures screenshots, and writes a manifest under ignored `out/ui_lab_runtime_evidence/`
 - regression tests that guard the runtime-lab contract
 
 Verification note:
@@ -62,23 +70,36 @@ Verification note:
 - `W:\b\ui_lab_runtime\UnleashedRecomp\UnleashedRecomp.exe` builds successfully from the generated clone after the local SDL Clang 22 shim patch and tracked `runtimeobject` link fix.
 - A smoke launch from the complete installation root with `--use-cwd --ui-lab-screen title-menu` stayed alive past 8 seconds and was stopped cleanly after the smoke window.
 - Static regression coverage guards the UI Lab source/module/CLI/hook/state-forcing contract.
+- `capture_unleashed_recomp_ui_lab.ps1` produced local-only screenshots and `ui_lab_events.jsonl` files for title/menu/loading/stage-target runs from the built generated clone.
 
 Still ahead:
 
-- visible in-game debug menu or overlay
 - CSD-project host creation for non-title screens
-- direct stage boot/routing for Sonic HUD/tutorial/result targets after the stage harness observes the correct owner context
-- screenshot/vision verification against live UnleashedRecomp frames
+- deterministic direct stage boot/routing for Sonic HUD/tutorial/result targets after the stage harness observes or creates the correct owner context
+- backbuffer/native capture so evidence screenshots do not depend on desktop/window focus or include editor/window chrome
+- route cleanup for startup prompts, save-state prompts, and DLC/install confirmation flows that can appear in front of requested UI targets
 - demotion of the clean renderer in docs to diagnostic/evidence-only status everywhere it is still described too strongly
+
+## Evidence Capture Contract
+
+The UI Lab now has a basic evidence loop:
+
+1. Launch the real generated UnleashedRecomp runtime with `--ui-lab-screen <target>`.
+2. Enable JSONL evidence with `--ui-lab-evidence-dir <ignored local dir>`.
+3. Let the real runtime present frames, attach translated title/menu hooks, and route through real state transitions.
+4. Capture early/late screenshots and `ui_lab_events.jsonl` into `out/ui_lab_runtime_evidence/<timestamp>/<target>/`.
+5. Use those screenshots and events as the next debugging oracle instead of guessing from the standalone renderer.
+
+This does not mean every target is deterministic yet. Current stage-family targets can observe a real stage context, but still depend on the installed runtime's current frontend/save/prompt path. The next hard blocker is deterministic stage-context creation or routing, not drawing another clean-room approximation of the HUD.
 
 ## Immediate Product Direction
 
 The next beats should build on `UiLab` in this order:
 
-1. Screenshot-verify `--ui-lab-screen title-loop`, `--ui-lab-screen title-menu`, and `--ui-lab-screen loading` from the built runtime.
-2. Promote the current title/menu/loading route forcing from input injection into direct state-machine requests where the translated PPC owner functions are confidently mapped.
-3. Add CSD-project host creation for non-title screens.
-4. Add a lightweight stage-context harness for Sonic HUD and tutorial overlays.
+1. Replace desktop screenshot capture with backbuffer/native frame capture so AI review sees the exact rendered frame.
+2. Promote title/menu/loading route forcing from input injection into direct state-machine requests where the translated PPC owner functions are confidently mapped.
+3. Add deterministic stage-context creation or stage boot routing for Sonic HUD and tutorial overlays.
+4. Add CSD-project host creation for non-title screens that can be displayed without a full gameplay owner.
 5. Add result/status/world-map only after their owner contexts can be created or routed without corrupting save/progression state.
 
 The end-state is a real runtime-backed UI debug executable: Sonic Unleashed UI screens running through the game files and game renderer, not an inspired viewer.

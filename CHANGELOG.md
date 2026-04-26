@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-26
 
+### Phase 98 Runtime UI Lab evidence capture
+
+- added `--ui-lab-evidence-dir` and `--ui-lab-auto-exit` so real runtime UI Lab launches can produce local JSONL evidence and shut down without manual cleanup
+- connected the UI Lab to the presented-frame path so captures record first-frame, periodic frame, route, title-state, menu-state, stage-context, and auto-exit events
+- added `research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1` for local-only screenshot and event capture across curated real-runtime targets, preferring `PrintWindow` capture before falling back to screen-copy capture
+- routed stage-required targets through the real title/menu/loading path and suppressed title-menu accept carry-through when the target is the menu itself
+- extended the UI Lab regression contract around evidence logging, route forcing, capture automation, and menu accept suppression
+
 ### Phase 97 Runtime UI Lab target controls
 
 - added `UiLab::SelectPreviousTarget()` and `UiLab::SelectNextTarget()` over the curated real-runtime target table

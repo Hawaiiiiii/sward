@@ -731,6 +731,16 @@
 - [x] Keep target selection tied to the curated runtime target table, CSD scene, and source-family metadata.
 - [x] Guard the target-control surface with the UI Lab regression contract.
 
+## Phase 98 - Runtime UI Lab Evidence Capture
+
+- [x] Add `--ui-lab-evidence-dir` and `--ui-lab-auto-exit` for local automated captures.
+- [x] Write JSONL route/frame/state events from the real runtime UI Lab path.
+- [x] Add a local-only screenshot/event capture helper for curated UI Lab targets.
+- [x] Route stage-required targets through the real title/menu/loading path instead of only arming the harness.
+- [x] Suppress title-menu accept carry-through when the requested real screen is the title menu itself.
+- [x] Build the generated UnleashedRecomp clone and capture-check title/menu/stage-target evidence.
+- [x] Guard the evidence-capture and state-forcing contract with regression tests.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.

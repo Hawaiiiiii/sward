@@ -2827,6 +2827,8 @@ void Video::Present()
         g_swapChainValid = g_swapChain->present(g_backBufferIndex, signalSemaphores, std::size(signalSemaphores));
     }
 
+    UiLab::OnPresentedFrame();
+
     g_pendingWaitOnSwapChain = true;
 
     g_frame = g_nextFrame;
