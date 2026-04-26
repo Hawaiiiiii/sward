@@ -68,6 +68,7 @@ enum class RendererScreenKind
 {
     CastCatalog,
     AtlasGallery,
+    SonicHudReconstruction,
 };
 
 struct SuUiRendererScreen
@@ -81,7 +82,7 @@ struct SuUiRendererScreen
     RendererScreenKind kind = RendererScreenKind::CastCatalog;
 };
 
-inline constexpr std::array<TextureSourceCandidate, 7> kTextureSourceCandidates{{
+inline constexpr std::array<TextureSourceCandidate, 11> kTextureSourceCandidates{{
     { "mat_load_comon_001.dds", "ui_extended_archives/Loading/mat_load_comon_001.dds" },
     { "ui_mm_base.dds", "ui_frontend_archives/MainMenu/ui_mm_base.dds" },
     { "ui_mm_parts1.dds", "ui_frontend_archives/MainMenu/ui_mm_parts1.dds" },
@@ -89,6 +90,21 @@ inline constexpr std::array<TextureSourceCandidate, 7> kTextureSourceCandidates{
     { "mat_title_en_001.dds", "ui_broader_archives/Languages/English/Title/mat_title_en_001.dds" },
     { "mat_title_en_002.dds", "ui_broader_archives/Languages/English/Title/mat_title_en_002.dds" },
     { "ui_ps1_gauge1.dds", "phase16_support_archives/ExStageTails_Common/ui_ps1_gauge1.dds" },
+    { "mat_playscreen_001.dds", "phase16_support_archives/ExStageTails_Common/mat_playscreen_001.dds" },
+    { "mat_playscreen_en_001.dds", "phase25_commonflow_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds" },
+    { "mat_comon_num_001.dds", "ui_extended_archives/SystemCommonCore/mat_comon_num_001.dds" },
+    { "mat_comon_001.dds", "ui_extended_archives/SystemCommonCore/mat_comon_001.dds" },
+}};
+
+inline constexpr std::array<SuUiRenderCast, 8> kSonicHudReconstructionCasts{{
+    { "ui_prov_playscreen.yncp", "so_speed_gauge_body", "ui_ps1_gauge1.dds", 0, 0, 256, 128, 18, 512, 430, 215 },
+    { "ui_prov_playscreen.yncp", "so_ring_energy_body", "ui_ps1_gauge1.dds", 0, 64, 192, 48, 40, 636, 320, 80 },
+    { "ui_prov_playscreen.yncp", "so_speed_gauge_meter", "ui_ps1_gauge1.dds", 48, 64, 150, 34, 94, 632, 240, 54 },
+    { "ui_prov_playscreen.yncp", "ring_get_flash", "ui_ps1_gauge1.dds", 72, 82, 24, 22, 326, 622, 54, 48 },
+    { "ui_prov_playscreen.yncp", "hud_label_stack", "mat_playscreen_001.dds", 0, 0, 128, 164, 480, 116, 200, 256 },
+    { "ui_prov_playscreen.yncp", "ring_energy_label", "mat_playscreen_en_001.dds", 0, 0, 128, 72, 76, 634, 260, 80 },
+    { "ui_prov_playscreen.yncp", "ring_digits_zeroes", "mat_comon_num_001.dds", 0, 0, 192, 32, 112, 672, 190, 42 },
+    { "ui_prov_playscreen.yncp", "so_head_life_icon", "mat_comon_001.dds", 0, 0, 96, 64, 32, 24, 96, 64 },
 }};
 
 inline constexpr std::array<SuUiRenderCast, 1> kLoadingCompositeCasts{{
@@ -114,7 +130,16 @@ inline constexpr std::array<SuUiRenderCast, 1> kSonicStageHudCasts{{
     { "so_speed_gauge", "position_hd", "ui_ps1_gauge1.dds", 4, 64, 16, 20, 752, 357, 16, 20 },
 }};
 
-inline const std::array<SuUiRendererScreen, 6> kRendererScreens{{
+inline const std::array<SuUiRendererScreen, 7> kRendererScreens{{
+    {
+        "SonicHudReconstruction",
+        "Sonic HUD Reconstructed",
+        "sonic_stage_hud_reference.json",
+        kSonicHudReconstructionCasts.data(),
+        kSonicHudReconstructionCasts.size(),
+        Gdiplus::Color(255, 0, 0, 0),
+        RendererScreenKind::SonicHudReconstruction,
+    },
     {
         "VisualAtlasGallery",
         "Visual Atlas Gallery",
@@ -165,6 +190,16 @@ inline const std::array<SuUiRendererScreen, 6> kRendererScreens{{
         Gdiplus::Color(255, 0, 0, 0),
     },
 }};
+
+[[nodiscard]] std::size_t atlasGalleryScreenIndex()
+{
+    for (std::size_t index = 0; index < kRendererScreens.size(); ++index)
+    {
+        if (kRendererScreens[index].kind == RendererScreenKind::AtlasGallery)
+            return index;
+    }
+    return 0;
+}
 
 [[nodiscard]] std::filesystem::path executableDirectory()
 {
@@ -496,7 +531,7 @@ public:
     {
         if (atlasSheets_.empty())
             return;
-        selectedScreenIndex_ = 0;
+        selectedScreenIndex_ = atlasGalleryScreenIndex();
         selectedAtlasIndex_ = (selectedAtlasIndex_ + 1) % atlasSheets_.size();
         atlasBitmap_.reset();
     }
@@ -505,7 +540,7 @@ public:
     {
         if (atlasSheets_.empty())
             return;
-        selectedScreenIndex_ = 0;
+        selectedScreenIndex_ = atlasGalleryScreenIndex();
         selectedAtlasIndex_ = (selectedAtlasIndex_ + atlasSheets_.size() - 1) % atlasSheets_.size();
         atlasBitmap_.reset();
     }
@@ -761,7 +796,139 @@ void renderAtlasGalleryScreen(Gdiplus::Graphics& graphics, const Gdiplus::RectF&
         0.0F,
         static_cast<float>(bitmap->GetWidth()),
         static_cast<float>(bitmap->GetHeight()),
-        Gdiplus::UnitPixel);
+            Gdiplus::UnitPixel);
+}
+
+[[nodiscard]] Gdiplus::PointF designPointToCanvas(const Gdiplus::RectF& canvas, float x, float y)
+{
+    const float scale = canvas.Width / static_cast<float>(kDesignWidth);
+    return Gdiplus::PointF(canvas.X + (x * scale), canvas.Y + (y * scale));
+}
+
+void drawOutlinedText(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    std::string_view text,
+    float x,
+    float y,
+    float size,
+    Gdiplus::Color fill,
+    Gdiplus::Color outline,
+    INT style = Gdiplus::FontStyleBold)
+{
+    const float scale = canvas.Width / static_cast<float>(kDesignWidth);
+    Gdiplus::FontFamily family(L"Arial");
+    Gdiplus::Font font(&family, std::max(1.0F, size * scale), style, Gdiplus::UnitPixel);
+    const auto wideText = widenAscii(text);
+    const auto point = designPointToCanvas(canvas, x, y);
+    Gdiplus::SolidBrush outlineBrush(outline);
+    Gdiplus::SolidBrush fillBrush(fill);
+    const float offset = std::max(1.0F, 2.0F * scale);
+
+    graphics.DrawString(wideText.c_str(), -1, &font, Gdiplus::PointF(point.X - offset, point.Y), &outlineBrush);
+    graphics.DrawString(wideText.c_str(), -1, &font, Gdiplus::PointF(point.X + offset, point.Y), &outlineBrush);
+    graphics.DrawString(wideText.c_str(), -1, &font, Gdiplus::PointF(point.X, point.Y - offset), &outlineBrush);
+    graphics.DrawString(wideText.c_str(), -1, &font, Gdiplus::PointF(point.X, point.Y + offset), &outlineBrush);
+    graphics.DrawString(wideText.c_str(), -1, &font, point, &fillBrush);
+}
+
+void drawSlantedHudPanel(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    float x,
+    float y,
+    float width,
+    float height,
+    Gdiplus::Color fill,
+    Gdiplus::Color outline)
+{
+    const float scale = canvas.Width / static_cast<float>(kDesignWidth);
+    const float cut = 28.0F * scale;
+    const auto topLeft = designPointToCanvas(canvas, x, y);
+    const auto bottomRight = designPointToCanvas(canvas, x + width, y + height);
+    Gdiplus::PointF points[] = {
+        Gdiplus::PointF(topLeft.X + cut, topLeft.Y),
+        Gdiplus::PointF(bottomRight.X, topLeft.Y),
+        Gdiplus::PointF(bottomRight.X - cut, bottomRight.Y),
+        Gdiplus::PointF(topLeft.X, bottomRight.Y),
+    };
+    Gdiplus::SolidBrush fillBrush(fill);
+    Gdiplus::Pen outlinePen(outline, std::max(1.0F, 2.0F * scale));
+    graphics.FillPolygon(&fillBrush, points, 4);
+    graphics.DrawPolygon(&outlinePen, points, 4);
+}
+
+void drawGaugeSegments(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    float x,
+    float y,
+    int segmentCount,
+    int activeCount,
+    Gdiplus::Color active,
+    Gdiplus::Color inactive)
+{
+    const float segmentWidth = 15.0F;
+    const float segmentHeight = 18.0F;
+    const float gap = 4.0F;
+    for (int index = 0; index < segmentCount; ++index)
+    {
+        const auto rect = designRectToCanvas(
+            canvas,
+            static_cast<int>(x + (index * (segmentWidth + gap))),
+            static_cast<int>(y),
+            static_cast<int>(segmentWidth),
+            static_cast<int>(segmentHeight));
+        Gdiplus::SolidBrush brush(index < activeCount ? active : inactive);
+        Gdiplus::Pen outline(Gdiplus::Color(180, 220, 220, 220), 1.0F);
+        graphics.FillRectangle(&brush, rect);
+        graphics.DrawRectangle(&outline, rect);
+    }
+}
+
+void drawRingIcon(Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, float x, float y, float size)
+{
+    const auto outer = designRectToCanvas(canvas, static_cast<int>(x), static_cast<int>(y), static_cast<int>(size), static_cast<int>(size));
+    const auto inner = designRectToCanvas(canvas, static_cast<int>(x + (size * 0.23F)), static_cast<int>(y + (size * 0.23F)), static_cast<int>(size * 0.54F), static_cast<int>(size * 0.54F));
+    Gdiplus::SolidBrush orange(Gdiplus::Color(255, 232, 119, 24));
+    Gdiplus::SolidBrush yellow(Gdiplus::Color(255, 255, 232, 74));
+    Gdiplus::SolidBrush black(Gdiplus::Color(255, 0, 0, 0));
+    Gdiplus::Pen darkEdge(Gdiplus::Color(255, 96, 48, 4), 2.0F);
+    graphics.FillEllipse(&orange, outer);
+    graphics.FillEllipse(&yellow, designRectToCanvas(canvas, static_cast<int>(x + 6), static_cast<int>(y + 5), static_cast<int>(size - 14), static_cast<int>(size - 14)));
+    graphics.FillEllipse(&black, inner);
+    graphics.DrawEllipse(&darkEdge, outer);
+}
+
+void renderSonicHudReconstructionScreen(Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas)
+{
+    Gdiplus::SolidBrush shade(Gdiplus::Color(255, 0, 0, 0));
+    graphics.FillRectangle(&shade, canvas);
+
+    drawSlantedHudPanel(graphics, canvas, -18, 82, 280, 44, Gdiplus::Color(210, 58, 68, 102), Gdiplus::Color(230, 206, 214, 228));
+    drawOutlinedText(graphics, canvas, "05", 104, 80, 40, Gdiplus::Color(255, 250, 250, 250), Gdiplus::Color(255, 24, 24, 24));
+    drawOutlinedText(graphics, canvas, "TIME", 138, 134, 22, Gdiplus::Color(255, 236, 236, 236), Gdiplus::Color(255, 24, 24, 24));
+    drawSlantedHudPanel(graphics, canvas, -22, 162, 356, 34, Gdiplus::Color(210, 82, 94, 136), Gdiplus::Color(220, 196, 202, 220));
+    drawOutlinedText(graphics, canvas, "00:00:31", 136, 154, 38, Gdiplus::Color(255, 250, 250, 250), Gdiplus::Color(255, 24, 24, 24));
+    drawOutlinedText(graphics, canvas, "SCORE", 138, 222, 22, Gdiplus::Color(255, 236, 236, 236), Gdiplus::Color(255, 24, 24, 24));
+    drawSlantedHudPanel(graphics, canvas, -22, 250, 356, 34, Gdiplus::Color(210, 82, 94, 136), Gdiplus::Color(220, 196, 202, 220));
+    drawOutlinedText(graphics, canvas, "00000000", 136, 242, 38, Gdiplus::Color(255, 250, 250, 250), Gdiplus::Color(255, 24, 24, 24));
+
+    drawOutlinedText(graphics, canvas, "GO!", 520, 286, 92, Gdiplus::Color(255, 238, 238, 238), Gdiplus::Color(255, 24, 24, 24));
+    drawGaugeSegments(graphics, canvas, 690, 360, 9, 5, Gdiplus::Color(255, 245, 216, 44), Gdiplus::Color(120, 180, 180, 180));
+
+    drawSlantedHudPanel(graphics, canvas, 34, 596, 334, 36, Gdiplus::Color(225, 36, 41, 48), Gdiplus::Color(240, 200, 205, 210));
+    drawOutlinedText(graphics, canvas, "SPEED", 108, 588, 24, Gdiplus::Color(255, 236, 236, 236), Gdiplus::Color(255, 18, 18, 18));
+    drawGaugeSegments(graphics, canvas, 178, 604, 12, 7, Gdiplus::Color(255, 255, 219, 36), Gdiplus::Color(120, 174, 176, 178));
+
+    drawRingIcon(graphics, canvas, 34, 634, 70);
+    drawSlantedHudPanel(graphics, canvas, 86, 640, 306, 40, Gdiplus::Color(225, 42, 47, 54), Gdiplus::Color(240, 200, 205, 210));
+    drawOutlinedText(graphics, canvas, "RINGS", 112, 630, 26, Gdiplus::Color(255, 236, 236, 236), Gdiplus::Color(255, 18, 18, 18));
+    drawOutlinedText(graphics, canvas, "000", 112, 654, 38, Gdiplus::Color(255, 248, 248, 248), Gdiplus::Color(255, 18, 18, 18));
+
+    drawSlantedHudPanel(graphics, canvas, 84, 688, 424, 36, Gdiplus::Color(225, 42, 47, 54), Gdiplus::Color(240, 200, 205, 210));
+    drawOutlinedText(graphics, canvas, "RING ENERGY", 112, 680, 26, Gdiplus::Color(255, 236, 236, 236), Gdiplus::Color(255, 18, 18, 18));
+    drawGaugeSegments(graphics, canvas, 278, 696, 12, 8, Gdiplus::Color(255, 95, 220, 82), Gdiplus::Color(120, 174, 176, 178));
 }
 
 void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
@@ -785,6 +952,12 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     const auto& screen = renderer.selectedScreen();
     Gdiplus::SolidBrush canvasBrush(screen.background);
     graphics.FillRectangle(&canvasBrush, canvas);
+
+    if (screen.kind == RendererScreenKind::SonicHudReconstruction)
+    {
+        renderSonicHudReconstructionScreen(graphics, canvas);
+        return;
+    }
 
     if (screen.kind == RendererScreenKind::AtlasGallery)
     {
@@ -1027,6 +1200,61 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return sheets.empty() || loading == "missing" || mainMenu == "missing" || status == "missing" ? 1 : 0;
 }
 
+[[nodiscard]] int runRendererReconstructedScreenSmoke()
+{
+    const auto& screen = kRendererScreens.front();
+    std::size_t resolvedCastCount = 0;
+    std::size_t inBoundsCastCount = 0;
+    std::vector<std::string> descriptors;
+
+    for (std::size_t index = 0; index < screen.castCount; ++index)
+    {
+        const auto& cast = screen.casts[index];
+        const auto image = loadDdsTextureImage(cast.textureName);
+        const bool fits = image && castSourceFits(cast, *image);
+        if (image)
+            ++resolvedCastCount;
+        if (fits)
+            ++inBoundsCastCount;
+
+        std::ostringstream descriptor;
+        descriptor
+            << cast.castName
+            << ":" << cast.textureName
+            << ":src=" << cast.sourceX << "," << cast.sourceY << ","
+            << cast.sourceWidth << "x" << cast.sourceHeight
+            << ":dst=" << cast.destinationX << "," << cast.destinationY << ","
+            << cast.destinationWidth << "x" << cast.destinationHeight;
+        if (image)
+            descriptor << ":" << image->format << ":" << image->width << "x" << image->height;
+        else
+            descriptor << ":missing";
+        if (image && !fits)
+            descriptor << ":source-out-of-bounds";
+        descriptors.push_back(descriptor.str());
+    }
+
+    const auto source = screen.castCount == 0 ? std::string_view("none") : screen.casts[0].sceneName;
+    std::cout
+        << "sward_su_ui_asset_renderer reconstructed screen smoke ok "
+        << "first=" << screen.id
+        << " source=" << source
+        << " contract=" << screen.contractFileName
+        << " casts=" << screen.castCount
+        << " resolved=" << resolvedCastCount
+        << " in_bounds=" << inBoundsCastCount
+        << '\n';
+
+    for (const auto& descriptor : descriptors)
+        std::cout << descriptor << '\n';
+
+    return screen.id == "SonicHudReconstruction"
+        && resolvedCastCount == screen.castCount
+        && inBoundsCastCount == screen.castCount
+        ? 0
+        : 1;
+}
+
 [[nodiscard]] bool commandLineHasFlag(std::string_view flag)
 {
     const std::string commandLine = GetCommandLineA();
@@ -1093,6 +1321,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererNavigationSmoke();
     if (commandLineHasFlag("--renderer-atlas-gallery-smoke"))
         return runRendererAtlasGallerySmoke();
+    if (commandLineHasFlag("--renderer-reconstructed-screen-smoke"))
+        return runRendererReconstructedScreenSmoke();
 
     return runRendererWindow(instance, showCommand);
 }

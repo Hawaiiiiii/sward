@@ -164,6 +164,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the clean renderer's first broad local visual-atlas gallery, use [`research_uiux/SU_UI_RENDERER_ATLAS_GALLERY.md`](./research_uiux/SU_UI_RENDERER_ATLAS_GALLERY.md).
 
+> [!TIP]
+> For the clean renderer's first default reconstructed Sonic HUD screen, use [`research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md`](./research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
@@ -221,6 +224,7 @@ The codebase includes a snapshot of the open-source Unleashed Recompiled integra
 - A corrected clean SU UI asset renderer composite-sheet pass via [`research_uiux/SU_UI_ASSET_RENDERER_COMPOSITE_SHEETS.md`](./research_uiux/SU_UI_ASSET_RENDERER_COMPOSITE_SHEETS.md)
 - A visible clean SU UI renderer navigation shell via [`research_uiux/SU_UI_RENDERER_NAVIGATION_SHELL.md`](./research_uiux/SU_UI_RENDERER_NAVIGATION_SHELL.md)
 - A clean SU UI renderer local atlas-gallery pass via [`research_uiux/SU_UI_RENDERER_ATLAS_GALLERY.md`](./research_uiux/SU_UI_RENDERER_ATLAS_GALLERY.md)
+- A clean SU UI renderer reconstructed Sonic HUD screen via [`research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md`](./research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md)
 - A local-only support-substrate humanization pass via [`research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md`](./research_uiux/LOCAL_SUPPORT_SUBSTRATE_HUMANIZATION.md)
 - Runtime-backed support-substrate contracts via [`research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md`](./research_uiux/SUPPORT_SUBSTRATE_RUNTIME_CONTRACTS.md)
 - A source-tree mirror helper for the local-only `SONIC UNLEASHED/` scaffold via [`research_uiux/tools/materialize_source_tree.py`](./research_uiux/tools/materialize_source_tree.py)

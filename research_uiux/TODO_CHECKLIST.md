@@ -841,3 +841,6 @@
 - [x] Follow-on phase audit on `2026-04-25`: added and verified GUI asset CSD DDS blit previews under `b\rr87`, with local DXT5 source texture decode for Sonic HUD, Loading, and Title smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-25`: added and verified the separate clean SU UI asset renderer under `b\rr88`, with Loading, Title, and Sonic HUD local DDS blits smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-26`: corrected the clean renderer under `b\rr89` to open on a full-screen Loading composition and widened it to `5` screen samples / `8` local DDS blits.
+- [x] Follow-on phase audit on `2026-04-26`: added visible screen navigation for the clean renderer under `b\rr90`, including `Prev` / `Next`, screen-index labeling, and no-window navigation smoke.
+- [x] Follow-on phase audit on `2026-04-26`: added local visual-atlas gallery navigation under `b\rr91`, keeping `22` ignored atlas sheets inspectable without publishing proprietary PNG outputs.
+- [x] Follow-on phase audit on `2026-04-26`: corrected the clean renderer product lane under `b\rr92` so it opens on `SonicHudReconstruction` instead of the atlas gallery, with `7` screen samples, `16` local DDS-backed casts, and a family-specific readable Sonic HUD reconstruction path smoke-guarded.

@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-26
 
+### Phase 92 SU UI renderer reconstructed screen
+
+- added [`research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md`](./research_uiux/SU_UI_RENDERER_RECONSTRUCTED_SCREEN.md)
+- changed the clean renderer to open on `SonicHudReconstruction` instead of the atlas gallery
+- added a family-specific readable Sonic HUD reconstruction path that draws screen-space HUD structure rather than dumping raw atlas/contact-sheet fragments
+- retained `8` Sonic HUD evidence casts from `ui_prov_playscreen.yncp` / `sonic_stage_hud_reference.json`, including play-screen, English label, common-number, and common-icon DDS bindings
+- added `--renderer-reconstructed-screen-smoke`, verifying the default reconstructed screen, `8` resolved/in-bounds casts, and the current `b/rr92` renderer lane
+
 ### Phase 91 SU UI renderer atlas gallery
 
 - added [`research_uiux/SU_UI_RENDERER_ATLAS_GALLERY.md`](./research_uiux/SU_UI_RENDERER_ATLAS_GALLERY.md)

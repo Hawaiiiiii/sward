@@ -1,8 +1,10 @@
 # SWARD SU UI Renderer Atlas Gallery
 
-Phase 91 moves the clean renderer from a fixed five-sample viewer toward a real local SU UI asset viewer.
+Phase 91 moved the clean renderer from a fixed five-sample viewer toward a local SU UI asset viewer.
 
-It now starts on a `VisualAtlasGallery` page that discovers the local, ignored visual-atlas PNG sheets at runtime and renders them directly inside the clean native viewer.
+It added a `VisualAtlasGallery` page that discovers the local, ignored visual-atlas PNG sheets at runtime and renders them directly inside the clean native viewer.
+
+> Phase 92 changed the renderer's default first page to `SonicHudReconstruction`. The atlas gallery remains available through the visible `Prev` / `Next` and `Atlas Prev` / `Atlas Next` controls, but it is no longer the product-facing start page.
 
 ## Native Target
 
