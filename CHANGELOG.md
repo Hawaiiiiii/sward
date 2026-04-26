@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-26
 
+### Phase 97 Runtime UI Lab target controls
+
+- added `UiLab::SelectPreviousTarget()` and `UiLab::SelectNextTarget()` over the curated real-runtime target table
+- added visible Previous/Next target controls to the in-runtime UI Lab overlay
+- kept overlay selection tied to the CSD scene and recovered source-family metadata that will drive later state forcing
+- extended the UI Lab regression contract around the operator target-control surface
+
 ### Phase 96 Runtime UI Lab startup prompt bypass
 
 - added `UiLab::ShouldBypassStartupPromptBlockers()` as the first lab-only runtime behavior gate

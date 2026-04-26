@@ -724,6 +724,13 @@
 - [x] Surface startup-prompt bypass status in the UI Lab overlay.
 - [x] Guard the bypass attachment with the UI Lab regression contract.
 
+## Phase 97 - Runtime UI Lab Target Controls
+
+- [x] Add `UiLab::SelectPreviousTarget()` and `UiLab::SelectNextTarget()`.
+- [x] Add visible Previous/Next target controls to the runtime overlay.
+- [x] Keep target selection tied to the curated runtime target table, CSD scene, and source-family metadata.
+- [x] Guard the target-control surface with the UI Lab regression contract.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.

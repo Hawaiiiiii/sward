@@ -37,6 +37,8 @@ namespace UiLab
     std::string_view GetTargetToken();
     std::string_view GetTargetLabel();
     const std::array<RuntimeTarget, 8>& GetRuntimeTargets();
+    void SelectPreviousTarget();
+    void SelectNextTarget();
 
     void OnTitleStateIntroUpdate(float elapsedSeconds);
     void OnTitleStateMenuUpdate(int32_t cursorIndex);

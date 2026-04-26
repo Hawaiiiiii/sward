@@ -34,6 +34,27 @@ namespace UiLab
         return kRuntimeTargets.front();
     }
 
+    static size_t TargetIndexFor(ScreenId id)
+    {
+        for (size_t i = 0; i < kRuntimeTargets.size(); ++i)
+        {
+            if (kRuntimeTargets[i].id == id)
+                return i;
+        }
+
+        return 0;
+    }
+
+    static void SelectTargetIndex(size_t index)
+    {
+        if (index >= kRuntimeTargets.size())
+            index = 0;
+
+        g_target = kRuntimeTargets[index].id;
+        const auto& target = TargetFor(g_target);
+        LOGFN("SWARD UI Lab target selected: {} ({})", target.token, target.label);
+    }
+
     static bool TrySetTarget(std::string_view token)
     {
         if (token == "title")
@@ -157,6 +178,17 @@ namespace UiLab
         return kRuntimeTargets;
     }
 
+    void SelectPreviousTarget()
+    {
+        auto index = TargetIndexFor(g_target);
+        SelectTargetIndex(index == 0 ? kRuntimeTargets.size() - 1 : index - 1);
+    }
+
+    void SelectNextTarget()
+    {
+        SelectTargetIndex((TargetIndexFor(g_target) + 1) % kRuntimeTargets.size());
+    }
+
     void OnTitleStateIntroUpdate(float elapsedSeconds)
     {
         if (!g_isEnabled || g_loggedIntroHook)
@@ -218,6 +250,16 @@ namespace UiLab
             ImGui::Text("Title intro hook: %s", g_loggedIntroHook ? "attached" : "waiting");
             ImGui::Text("Title menu hook: %s", g_loggedMenuHook ? "attached" : "waiting");
             ImGui::Text("Startup prompt blockers: %s", ShouldBypassStartupPromptBlockers() ? "bypassed" : "normal");
+            ImGui::Separator();
+
+            if (ImGui::Button("Previous Target"))
+                SelectPreviousTarget();
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Next Target"))
+                SelectNextTarget();
+
             ImGui::Separator();
             ImGui::TextUnformatted("Targets:");
 

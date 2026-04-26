@@ -45,6 +45,7 @@ Implemented now:
 - initial target taxonomy tied to CSD scene names and recovered source-family ownership
 - title intro/menu update hooks that prove the lab can attach to live translated runtime states
 - visible ImGui overlay drawn inside the real UnleashedRecomp frame path, after the existing runtime UI draw calls
+- overlay target controls for cycling the runtime target table without changing command-line arguments
 - startup update/save/achievement prompt blockers bypassed during UI Lab runs so debug-state inspection is not interrupted by frontend modal checks
 - regression tests that guard the runtime-lab contract
 
@@ -58,7 +59,6 @@ Verification note:
 Still ahead:
 
 - visible in-game debug menu or overlay
-- interactive target switching from the overlay
 - state forcing for title/menu/loading without relying on normal user navigation
 - CSD-project host creation for non-title screens
 - stage-context harness for Sonic HUD/tutorial/result targets

@@ -57,6 +57,8 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         video = self.read("UnleashedRecomp/gpu/video.cpp")
 
         self.assertIn("void DrawOverlay()", header)
+        self.assertIn("void SelectPreviousTarget()", header)
+        self.assertIn("void SelectNextTarget()", header)
         self.assertIn("#include <patches/ui_lab_patches.h>", video)
         self.assertIn("UiLab::DrawOverlay()", video)
 
