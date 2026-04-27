@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 107 Native UI Lab frame-series controls and hang-safe observer capture
+
+- extended UI Lab native capture with opt-in `--ui-lab-native-capture-count` and `--ui-lab-native-capture-interval-frames` controls, plus manifest reporting for all `native-frame-captured` BMP entries instead of only the last capture
+- let passive observer/native-capture launches record presented frames without waiting for the default title CSD when no route target is explicitly selected
+- added `-SkipWindowScreenshots` to `capture_unleashed_recomp_ui_lab.ps1` so evidence runs can avoid blocking `PrintWindow` calls and rely on native backbuffer evidence when the runtime is in a long load/freeze state
+- verified the helper now completes and kills the harness-owned process cleanly under native-only observer/title-loop captures instead of hanging indefinitely
+- captured new local-only evidence showing the next blocker precisely: the routed title path reaches `ui_title`, but the current native readback still produces a black BMP and presentation stops after the first captured frame, so the next beat is readback timing/source correction rather than more clean-renderer approximation
+
 ### Phase 106 Native UI Lab capture and passive evidence safety
 
 - added real-runtime native backbuffer capture for the UI Lab, writing local-only top-down 32-bit BMP frames from the GPU readback path instead of relying only on Windows window screenshots

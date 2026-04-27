@@ -75,7 +75,9 @@ Implemented now:
 - a passive observer launch path via `--ui-lab-observer` / capture-helper `-Observer`, which records the normal runtime without route forcing or lab-only startup prompt bypasses
 - optional overlay hiding via `--ui-lab-overlay off` / capture-helper `-HideOverlay`, so manual evidence captures can show the real game frame cleanly while JSONL evidence continues in the background
 - native backbuffer capture via `--ui-lab-native-capture` and `--ui-lab-native-capture-dir`, writing local-only 32-bit BMP frames from the runtime GPU readback path so evidence can use the actual rendered frame instead of relying only on Windows window capture
+- native frame-series capture controls via `--ui-lab-native-capture-count` and `--ui-lab-native-capture-interval-frames`, with capture-helper manifest reporting for every `native-frame-captured` BMP entry
 - passive capture/evidence safety: `--ui-lab-evidence-dir` and `--ui-lab-native-capture` no longer force the default title route by themselves. A launch becomes `capture/evidence observer mode` unless `--ui-lab-screen` / `--ui-lab=<target>` explicitly selects a routed screen target.
+- capture-helper `-SkipWindowScreenshots` mode for native-only runs, avoiding `PrintWindow`/desktop screenshot hangs when the runtime is stalled in loading or a black frame
 - direct title-intro state requests from the translated `sub_825811C8` field contract (`context+0x180` requested state and `context+0x181` dirty flag), used by the experimental direct-context policy instead of synthetic Start at the first route gate
 - direct title-menu entry via the real title CSD completion byte (`CSD scene +84`) while keeping the title owner-output bridge (`title context +0x1D1`) off for menu-only routes
 - owner-output arming remains enabled for loading/stage-required targets, where the intended behavior is to leave the title owner and enter the real loading path
@@ -105,6 +107,7 @@ Verification note:
 - A passive observer capture under `out/ui_lab_runtime_evidence/20260427_120439/` proved the native-capture path can record real runtime frames while preserving observer mode.
 - A capture-only direct launch under `out/ui_lab_runtime_evidence/manual_capture_only_20260427_120854/` proved the freeze-risk boundary: evidence/native-capture flags alone now log `capture-evidence-observer-mode`, do not emit `route-requested`, and exit normally after auto-exit.
 - A focused `sonic-hud` capture under `out/ui_lab_runtime_evidence/20260427_120951/` re-proved explicit routed targets still work after the observer safety change, with `native_frame_sonic-hud_1_1600x900.bmp` showing the real Miles Electric loading/tutorial screen.
+- Native-only observer/title-loop captures under `out/ui_lab_runtime_evidence/20260427_131218/` and `out/ui_lab_runtime_evidence/20260427_131421/` proved the helper now completes without hanging when window screenshots are disabled, and also exposed the next readback blocker: the routed title path reaches `ui_title`, but the current native BMP is black and presentation stops after the first captured frame.
 - Therefore the normal Sonic HUD route is now real-runtime CSD-bound, while the remaining `ui_prov_playscreen` blocker is deterministic Extra/Tornado stage owner selection rather than generic stage-context observation.
 
 Current alpha focus:
@@ -117,7 +120,7 @@ Still ahead:
 - deterministic direct stage boot/routing for tutorial/result/status routes after the stage harness observes or creates the correct owner context
 - deterministic Extra/Tornado owner selection for `ui_prov_playscreen`, after the early-game alpha is useful
 - CSD-project host creation for non-title screens that do not require a full gameplay owner
-- deeper native capture integration for repeated/manual frame series and named state snapshots now that single-frame backbuffer capture is working
+- native readback timing/source correction so repeated/manual frame series produce nonblack real frames after target CSDs are live
 - route cleanup for startup prompts, save-state prompts, and DLC/install confirmation flows that can appear in front of requested UI targets
 - demotion of the clean renderer in docs to diagnostic/evidence-only status everywhere it is still described too strongly
 
@@ -140,7 +143,7 @@ This does not mean every target is deterministic yet. The normal Sonic HUD can n
 The next beats should build on `UiLab` in this order:
 
 1. Keep the first alpha narrow: title loop, title menu, title options, loading, and normal Sonic HUD.
-2. Extend native backbuffer capture from single target frames to repeated/manual observation snapshots so AI review sees the exact rendered frame during operator-driven navigation.
+2. Correct native readback timing/source selection so the new repeated/manual capture controls produce nonblack frames after the selected real CSD has drawn.
 3. Promote the proven title/menu/loading/options direct-context path into a stable default once more route captures confirm it against normal saves and prompt variants.
 4. Add deterministic stage-context creation or stage boot routing for tutorial/result/status routes, starting from the observed `CGameModeStage::ExitLoading` boundary and the confirmed `ui_playscreen` Sonic HUD bind.
 5. Return to Extra/Tornado, Werehog, boss/final, and broader late-game UI after the early-game alpha is useful enough to drive source recovery.

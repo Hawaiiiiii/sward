@@ -15,9 +15,12 @@ param(
     [ValidateSet("input", "direct-context")]
     [string]$RoutePolicy = "direct-context",
     [bool]$NativeCapture = $true,
+    [int]$NativeCaptureCount = 1,
+    [int]$NativeCaptureIntervalFrames = 120,
     [bool]$NormalizeWindow = $true,
     [switch]$Observer,
     [switch]$HideOverlay,
+    [switch]$SkipWindowScreenshots,
     [switch]$KeepRunning,
     [switch]$NoBuild
 )
@@ -307,12 +310,12 @@ function Wait-UiLabEvidenceEvents([string]$Target, [string]$EventsPath, [int]$Ti
     return $checks
 }
 
-function Get-UiLabNativeFrameCapture([string]$EventsPath) {
+function Get-UiLabNativeFrameCaptures([string]$EventsPath) {
     if (-not (Test-Path -LiteralPath $EventsPath)) {
-        return $null
+        return @()
     }
 
-    $nativeCapture = $null
+    $nativeCaptures = @()
 
     foreach ($line in Get-Content -LiteralPath $EventsPath) {
         if ([string]::IsNullOrWhiteSpace($line)) {
@@ -334,6 +337,8 @@ function Get-UiLabNativeFrameCapture([string]$EventsPath) {
         $path = $null
         $width = $null
         $height = $null
+        $index = $null
+        $max = $null
 
         if ($detail -match "path=(.*?) width=") {
             $path = $Matches[1]
@@ -347,16 +352,36 @@ function Get-UiLabNativeFrameCapture([string]$EventsPath) {
             $height = [int]$Matches[1]
         }
 
-        $nativeCapture = [ordered]@{
+        if ($detail -match "index=([0-9]+)") {
+            $index = [int]$Matches[1]
+        }
+
+        if ($detail -match "max=([0-9]+)") {
+            $max = [int]$Matches[1]
+        }
+
+        $nativeCaptures += [ordered]@{
             path = $path
             width = $width
             height = $height
+            index = $index
+            max = $max
             exists = if ($path) { Test-Path -LiteralPath $path } else { $false }
             detail = $detail
         }
     }
 
-    return $nativeCapture
+    return $nativeCaptures
+}
+
+function Get-UiLabNativeFrameCapture([string]$EventsPath) {
+    $nativeCaptures = @(Get-UiLabNativeFrameCaptures $EventsPath)
+
+    if ($nativeCaptures.Count -eq 0) {
+        return $null
+    }
+
+    return $nativeCaptures[$nativeCaptures.Count - 1]
 }
 
 function Wait-UiLabNativeFrameCapture([string]$EventsPath, [int]$TimeoutSeconds, [System.Diagnostics.Process]$Process = $null) {
@@ -446,6 +471,8 @@ foreach ($target in $expandedTargets) {
     if ($NativeCapture) {
         $args += @("--ui-lab-native-capture")
         $args += @("--ui-lab-native-capture-dir", $targetDir)
+        $args += @("--ui-lab-native-capture-count", "$([Math]::Max(1, $NativeCaptureCount))")
+        $args += @("--ui-lab-native-capture-interval-frames", "$([Math]::Max(1, $NativeCaptureIntervalFrames))")
     }
 
     if (-not $KeepRunning -and $AutoExitSeconds -gt 0) {
@@ -468,10 +495,11 @@ foreach ($target in $expandedTargets) {
     $evidenceReady = $false
     $lateCaptureReason = "fixed-delay"
     $nativeFrameCapture = $null
+    $nativeFrameCaptures = @()
     $skipLateWindowCapture = $false
 
     try {
-        if (-not $process.HasExited) {
+        if (-not $SkipWindowScreenshots -and -not $process.HasExited) {
             Capture-Window $handle $earlyShot $process.Id
         }
 
@@ -481,6 +509,16 @@ foreach ($target in $expandedTargets) {
 
             while (-not $process.HasExited -and ((Get-Date) - $observeStart).TotalSeconds -lt $ObserveSeconds) {
                 Start-Sleep -Seconds ([Math]::Max(1, $SnapshotIntervalSeconds))
+                $process.Refresh()
+
+                if ($process.HasExited) {
+                    break
+                }
+
+                if ($SkipWindowScreenshots) {
+                    continue
+                }
+
                 $snapshotIndex += 1
                 $snapshotPath = Join-Path $targetDir ("screen_observe_{0:D3}.png" -f $snapshotIndex)
                 Capture-Window $handle $snapshotPath $process.Id
@@ -526,7 +564,11 @@ foreach ($target in $expandedTargets) {
             }
         }
 
-        if (-not $skipLateWindowCapture -and -not $process.HasExited) {
+        if ($SkipWindowScreenshots -and $lateCaptureReason -eq "fixed-delay") {
+            $lateCaptureReason = "window-screenshots-skipped"
+        }
+
+        if (-not $SkipWindowScreenshots -and -not $skipLateWindowCapture -and -not $process.HasExited) {
             Capture-Window $handle $lateShot $process.Id
         }
     }
@@ -549,8 +591,11 @@ foreach ($target in $expandedTargets) {
     }
 
     $evidenceChecks = Test-UiLabEvidenceEvents $target $eventsPath
+    $nativeFrameCaptures = @(Get-UiLabNativeFrameCaptures $eventsPath)
     if ($null -eq $nativeFrameCapture) {
-        $nativeFrameCapture = Get-UiLabNativeFrameCapture $eventsPath
+        if ($nativeFrameCaptures.Count -gt 0) {
+            $nativeFrameCapture = $nativeFrameCaptures[$nativeFrameCaptures.Count - 1]
+        }
     }
     $records += [ordered]@{
         target = $target
@@ -567,8 +612,10 @@ foreach ($target in $expandedTargets) {
         captureError = $captureError
         evidenceReady = $evidenceReady
         lateCaptureReason = $lateCaptureReason
+        windowScreenshotsSkipped = [bool]$SkipWindowScreenshots
         evidenceChecks = $evidenceChecks
         nativeFrameCapture = $nativeFrameCapture
+        nativeFrameCaptures = $nativeFrameCaptures
     }
 
     if ($evidenceChecks.passed) {

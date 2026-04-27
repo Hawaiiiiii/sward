@@ -53,8 +53,11 @@ namespace UiLab
     static bool g_autoExitRequested = false;
     static bool g_nativeFrameCaptureEnabled = false;
     static bool g_nativeFrameCaptureReserved = false;
-    static bool g_nativeFrameCaptureWritten = false;
+    static uint32_t g_nativeFrameCaptureMaxCount = 1;
+    static uint32_t g_nativeFrameCaptureWrittenCount = 0;
+    static uint32_t g_nativeFrameCaptureIntervalFrames = 120;
     static uint32_t g_nativeFrameCaptureIndex = 0;
+    static uint64_t g_lastNativeFrameCaptureFrame = 0;
     static const std::chrono::steady_clock::time_point g_startedAt = std::chrono::steady_clock::now();
     static bool g_loggedIntroHook = false;
     static bool g_loggedMenuHook = false;
@@ -116,6 +119,24 @@ namespace UiLab
     static bool IsFalsy(std::string_view value)
     {
         return value == "0" || value == "false" || value == "off" || value == "no" || value == "none";
+    }
+
+    static uint32_t ParsePositiveU32(std::string_view value, uint32_t fallback)
+    {
+        std::string text(value);
+        char* end = nullptr;
+        const auto parsed = std::strtoul(text.c_str(), &end, 10);
+
+        if (end == text.c_str())
+            return fallback;
+
+        if (parsed == 0)
+            return 1;
+
+        if (parsed > UINT32_MAX)
+            return UINT32_MAX;
+
+        return static_cast<uint32_t>(parsed);
     }
 
     static bool ShouldDrawOverlay()
@@ -319,11 +340,24 @@ namespace UiLab
 
     static bool IsNativeFrameCaptureReady()
     {
-        if (!g_isEnabled || !g_nativeFrameCaptureEnabled || g_nativeFrameCaptureReserved || g_nativeFrameCaptureWritten)
+        if (!g_isEnabled || !g_nativeFrameCaptureEnabled || g_nativeFrameCaptureReserved)
+            return false;
+
+        if (g_nativeFrameCaptureWrittenCount >= g_nativeFrameCaptureMaxCount)
             return false;
 
         if (g_presentedFrameCount < 2)
             return false;
+
+        if (g_nativeFrameCaptureWrittenCount > 0 &&
+            (g_presentedFrameCount <= g_lastNativeFrameCaptureFrame ||
+                (g_presentedFrameCount - g_lastNativeFrameCaptureFrame) < g_nativeFrameCaptureIntervalFrames))
+        {
+            return false;
+        }
+
+        if (g_observerMode && !g_routeTargetExplicit)
+            return true;
 
         if (TargetNeedsStageHarness(g_target))
             return g_stageContextObserved && g_targetCsdObserved;
@@ -566,6 +600,54 @@ namespace UiLab
                 continue;
             }
 
+            if (arg == "--ui-lab-native-capture-count")
+            {
+                g_isEnabled = true;
+                g_nativeFrameCaptureEnabled = true;
+
+                if ((i + 1) < argc)
+                    g_nativeFrameCaptureMaxCount = ParsePositiveU32(argv[++i], g_nativeFrameCaptureMaxCount);
+                else
+                    LOGN_WARNING("SWARD UI Lab: --ui-lab-native-capture-count was provided without a count.");
+
+                continue;
+            }
+
+            constexpr std::string_view nativeCaptureCountPrefix = "--ui-lab-native-capture-count=";
+            if (arg.starts_with(nativeCaptureCountPrefix))
+            {
+                g_isEnabled = true;
+                g_nativeFrameCaptureEnabled = true;
+                g_nativeFrameCaptureMaxCount = ParsePositiveU32(
+                    arg.substr(nativeCaptureCountPrefix.size()),
+                    g_nativeFrameCaptureMaxCount);
+                continue;
+            }
+
+            if (arg == "--ui-lab-native-capture-interval-frames")
+            {
+                g_isEnabled = true;
+                g_nativeFrameCaptureEnabled = true;
+
+                if ((i + 1) < argc)
+                    g_nativeFrameCaptureIntervalFrames = ParsePositiveU32(argv[++i], g_nativeFrameCaptureIntervalFrames);
+                else
+                    LOGN_WARNING("SWARD UI Lab: --ui-lab-native-capture-interval-frames was provided without a frame count.");
+
+                continue;
+            }
+
+            constexpr std::string_view nativeCaptureIntervalPrefix = "--ui-lab-native-capture-interval-frames=";
+            if (arg.starts_with(nativeCaptureIntervalPrefix))
+            {
+                g_isEnabled = true;
+                g_nativeFrameCaptureEnabled = true;
+                g_nativeFrameCaptureIntervalFrames = ParsePositiveU32(
+                    arg.substr(nativeCaptureIntervalPrefix.size()),
+                    g_nativeFrameCaptureIntervalFrames);
+                continue;
+            }
+
             constexpr std::string_view nativeCaptureDirPrefix = "--ui-lab-native-capture-dir=";
             if (arg.starts_with(nativeCaptureDirPrefix))
             {
@@ -730,7 +812,8 @@ namespace UiLab
         g_loggedTargetCsdProjectLive = false;
         g_loggedStageTargetCsdBound = false;
         g_nativeFrameCaptureReserved = false;
-        g_nativeFrameCaptureWritten = false;
+        g_nativeFrameCaptureWrittenCount = 0;
+        g_lastNativeFrameCaptureFrame = 0;
         g_lastStageContextDetail.clear();
 
         if (g_target == ScreenId::TitleLoop)
@@ -1008,13 +1091,17 @@ namespace UiLab
         if (!g_isEnabled)
             return;
 
-        g_nativeFrameCaptureWritten = true;
+        g_nativeFrameCaptureReserved = false;
+        ++g_nativeFrameCaptureWrittenCount;
+        g_lastNativeFrameCaptureFrame = g_presentedFrameCount;
         WriteEvidenceEvent(
             "native-frame-captured",
             "path=" + std::string(path) +
             " width=" + std::to_string(width) +
             " height=" + std::to_string(height) +
-            " format=B8G8R8A8 bmp=1");
+            " format=B8G8R8A8 bmp=1" +
+            " index=" + std::to_string(g_nativeFrameCaptureWrittenCount) +
+            " max=" + std::to_string(g_nativeFrameCaptureMaxCount));
     }
 
     void OnNativeFrameCaptureFailed(std::string_view reason)
@@ -1022,6 +1109,7 @@ namespace UiLab
         if (!g_isEnabled)
             return;
 
+        g_nativeFrameCaptureReserved = false;
         WriteEvidenceEvent("native-frame-capture-failed", reason);
     }
 
@@ -1243,9 +1331,14 @@ namespace UiLab
             ImGui::Text(
                 "Native capture: %s",
                 !g_nativeFrameCaptureEnabled ? "off" :
-                g_nativeFrameCaptureWritten ? "written" :
                 g_nativeFrameCaptureReserved ? "reserved" :
+                g_nativeFrameCaptureWrittenCount >= g_nativeFrameCaptureMaxCount ? "complete" :
                 IsNativeFrameCaptureReady() ? "ready" : "waiting");
+            ImGui::Text(
+                "Native captures: %u/%u every %u frames",
+                g_nativeFrameCaptureWrittenCount,
+                g_nativeFrameCaptureMaxCount,
+                g_nativeFrameCaptureIntervalFrames);
             ImGui::Text("Startup prompt blockers: %s", ShouldBypassStartupPromptBlockers() ? "bypassed" : "normal");
             ImGui::Separator();
 

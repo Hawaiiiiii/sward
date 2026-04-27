@@ -269,6 +269,24 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("UnleashedRecomp\\gpu\\rhi\\plume_d3d12.cpp", build_script)
         self.assertIn("UnleashedRecomp\\gpu\\rhi\\plume_vulkan.cpp", build_script)
 
+    def test_ui_lab_can_write_native_backbuffer_capture_series(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+
+        self.assertIn("--ui-lab-native-capture-count", ui_lab)
+        self.assertIn("--ui-lab-native-capture-interval-frames", ui_lab)
+        self.assertIn("g_nativeFrameCaptureMaxCount", ui_lab)
+        self.assertIn("g_nativeFrameCaptureWrittenCount", ui_lab)
+        self.assertIn("g_lastNativeFrameCaptureFrame", ui_lab)
+        self.assertIn("if (g_observerMode && !g_routeTargetExplicit)", ui_lab)
+        self.assertIn("NativeCaptureCount", script)
+        self.assertIn("NativeCaptureIntervalFrames", script)
+        self.assertIn("Get-UiLabNativeFrameCaptures", script)
+        self.assertIn("$process.Refresh()", script)
+        self.assertIn("SkipWindowScreenshots", script)
+        self.assertIn("window-screenshots-skipped", script)
+        self.assertIn("nativeFrameCaptures =", script)
+
     def test_ui_lab_records_loading_and_csd_context_evidence(self):
         header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
