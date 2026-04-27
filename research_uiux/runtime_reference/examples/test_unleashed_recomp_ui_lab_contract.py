@@ -693,6 +693,91 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("--ui-lab-live-bridge-name", script)
         self.assertIn("liveBridgeName =", script)
 
+    def test_ui_lab_has_repo_safe_live_bridge_client_tool(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1"
+        self.assertTrue(script_path.is_file())
+
+        script = self.read("research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1")
+        for token in [
+            "NamedPipeClientStream",
+            "sward_ui_lab_live",
+            "Invoke-UiLabBridgeCommand",
+            "Read-UiLabBridgeResponse",
+            '[ValidateSet("state", "events", "route", "reset", "set-global", "capture", "help")]',
+            "route <target>",
+            "set-global <name> <0|1>",
+            "Connect($TimeoutMilliseconds)",
+            "PipeOptions.None",
+            "ConvertFrom-Json",
+            "AsJson",
+            "Raw",
+        ]:
+            self.assertIn(token, script)
+
+    def test_ui_lab_capture_helper_can_wait_on_live_bridge_readiness(self):
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+
+        for token in [
+            "[switch]$UseLiveBridgeReadiness",
+            "Get-UiLabLiveBridgeState",
+            "Test-UiLabLiveBridgeReadiness",
+            "Wait-UiLabLiveBridgeReadiness",
+            "Invoke-UiLabBridgeCommand",
+            "required-events-observed-via-live-bridge",
+            "required-events-timeout-via-live-bridge",
+            "readinessSource =",
+            "liveBridgeReadiness =",
+            "liveBridgeState =",
+            '"titleMenuVisible"',
+            '"loadingActive"',
+            '"stageTargetReady"',
+            '"stageTargetReadyEvent"',
+            "Wait-UiLabEvidenceEvents $target $eventsPath",
+            "Test-UiLabEvidenceEvents $target $eventsPath",
+        ]:
+            self.assertIn(token, script)
+
+    def test_ui_lab_live_state_promotes_debug_fork_fields_into_typed_inspectors(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "struct CsdLiveInspectorSnapshot",
+            "struct LoadingLiveInspectorSnapshot",
+            "struct SonicHudLiveInspectorSnapshot",
+            "LoadingDisplayTypeLabel",
+            "MotionRepeatTypeLabel",
+            "AppendTypedInspectors",
+            '"typedInspectors"',
+            '"csd"',
+            '"titleMenu"',
+            '"loading"',
+            '"sonicHud"',
+            '"sceneMotionFrame"',
+            '"sceneMotionRepeatType"',
+            '"loadingDisplayTypeLabel"',
+            '"titleMenuOwnerContextAddress"',
+            '"titleMenuCursor"',
+            '"hudOwnerAddress"',
+            '"playScreenProject"',
+            '"speedGaugeScene"',
+            "CSD.Manager.CScene.m_MotionFrame",
+            "SWA.HUD.CHudSonicStage.m_rcPlayScreen",
+            "SWA.System.GameMode.Title.CTitleMenu.m_CursorIndex",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 117",
+            "live-bridge client",
+            "typedInspectors",
+            "CSD scene motion frame",
+            "loading display type",
+            "title cursor/menu owner",
+            "Sonic HUD owner fields",
+        ]:
+            self.assertIn(token, report)
+
 
 if __name__ == "__main__":
     unittest.main()

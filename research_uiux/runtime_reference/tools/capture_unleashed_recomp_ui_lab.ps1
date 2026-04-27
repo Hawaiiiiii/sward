@@ -20,6 +20,8 @@ param(
     [switch]$RequireNativeRgbSignal,
     [bool]$LiveBridge = $true,
     [string]$LiveBridgeName = "sward_ui_lab_live",
+    [switch]$UseLiveBridgeReadiness,
+    [int]$LiveBridgeReadinessPollMilliseconds = 250,
     [bool]$NormalizeWindow = $true,
     [switch]$Observer,
     [switch]$HideOverlay,
@@ -352,6 +354,194 @@ function Wait-UiLabEvidenceEvents([string]$Target, [string]$EventsPath, [int]$Ti
 
         Start-Sleep -Milliseconds 500
         $checks = Test-UiLabEvidenceEvents $Target $EventsPath
+    }
+
+    return $checks
+}
+
+function Read-UiLabBridgeResponse([System.IO.Pipes.NamedPipeClientStream]$Pipe, [int]$TimeoutMilliseconds) {
+    try {
+        $Pipe.ReadTimeout = $TimeoutMilliseconds
+    }
+    catch {
+    }
+
+    $buffer = New-Object byte[] 65536
+    $builder = [System.Text.StringBuilder]::new()
+
+    do {
+        $read = $Pipe.Read($buffer, 0, $buffer.Length)
+        if ($read -le 0) {
+            break
+        }
+
+        [void]$builder.Append([System.Text.Encoding]::UTF8.GetString($buffer, 0, $read))
+    } while ($Pipe.IsMessageComplete -eq $false)
+
+    return $builder.ToString()
+}
+
+function Invoke-UiLabBridgeCommand([string]$CommandText, [string]$PipeName, [int]$TimeoutMilliseconds = 1000) {
+    $pipe = [System.IO.Pipes.NamedPipeClientStream]::new(
+        ".",
+        $PipeName,
+        [System.IO.Pipes.PipeDirection]::InOut,
+        [System.IO.Pipes.PipeOptions]::None)
+
+    try {
+        $pipe.Connect($TimeoutMilliseconds)
+        $pipe.ReadMode = [System.IO.Pipes.PipeTransmissionMode]::Message
+
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($CommandText)
+        $pipe.Write($bytes, 0, $bytes.Length)
+        $pipe.Flush()
+
+        return Read-UiLabBridgeResponse $pipe $TimeoutMilliseconds
+    }
+    finally {
+        $pipe.Dispose()
+    }
+}
+
+function Get-UiLabLiveBridgeState([string]$PipeName, [int]$TimeoutMilliseconds = 1000) {
+    try {
+        $raw = Invoke-UiLabBridgeCommand "state" $PipeName $TimeoutMilliseconds
+        $state = $raw | ConvertFrom-Json
+
+        return [ordered]@{
+            ok = $true
+            raw = $raw
+            state = $state
+            error = $null
+        }
+    }
+    catch {
+        return [ordered]@{
+            ok = $false
+            raw = $null
+            state = $null
+            error = $_.Exception.Message
+        }
+    }
+}
+
+function Test-UiLabLiveBridgeReadiness([string]$Target, [object]$State) {
+    $observedEvents = New-Object "System.Collections.Generic.HashSet[string]"
+
+    if ($null -ne $State -and $null -ne $State.recentEvents) {
+        foreach ($event in @($State.recentEvents)) {
+            if ($event.event) {
+                [void]$observedEvents.Add([string]$event.event)
+            }
+        }
+    }
+
+    $readiness = if ($null -ne $State) { $State.readiness } else { $null }
+    $titleMenuVisible = $null -ne $readiness -and [bool]$readiness.titleMenuVisible
+    $loadingActive = $null -ne $readiness -and [bool]$readiness.loadingActive
+    $stageContextObserved = $null -ne $readiness -and [bool]$readiness.stageContextObserved
+    $targetCsdObserved = $null -ne $State -and [bool]$State.targetCsdObserved
+    $stageTargetReady = $null -ne $readiness -and [bool]$readiness.stageTargetReady
+    $stageTargetReadyEvent = if ($null -ne $State) { [string]$State.stageReadyEvent } else { "" }
+    $route = if ($null -ne $State) { [string]$State.route } else { "" }
+    $passed = $false
+
+    switch ($Target) {
+        "title-loop" {
+            $passed = $targetCsdObserved -or $observedEvents.Contains("target-csd-project-made")
+        }
+        "title-menu" {
+            $passed = $titleMenuVisible -or ($null -ne $State -and [bool]$State.titleMenuVisualReady)
+        }
+        "title-options" {
+            $passed = $observedEvents.Contains("title-options-accept-injected") -or $route -eq "title options accept injected"
+        }
+        "loading" {
+            $passed = $loadingActive -or ($null -ne $State -and [bool]$State.loadingDisplayActive) -or $observedEvents.Contains("loading-display-active")
+        }
+        "sonic-hud" {
+            $passed = ($stageContextObserved -and $targetCsdObserved -and $stageTargetReady) -or $stageTargetReadyEvent -eq "sonic-hud-ready"
+        }
+        "tutorial" {
+            $passed = ($stageContextObserved -and $targetCsdObserved -and $stageTargetReady) -or $stageTargetReadyEvent -eq "tutorial-ready"
+        }
+        "result" {
+            $passed = ($stageContextObserved -and $targetCsdObserved -and $stageTargetReady) -or $stageTargetReadyEvent -eq "result-ready"
+        }
+        "extra-stage-hud" {
+            $passed = ($stageContextObserved -and $targetCsdObserved -and $stageTargetReady) -or $stageTargetReadyEvent -eq "extra-stage-hud-ready"
+        }
+        default {
+            $passed = $observedEvents.Contains("first-presented-frame")
+        }
+    }
+
+    $missingEvents = @()
+    if (-not $passed) {
+        $missingEvents = @(Get-UiLabRequiredEvents $Target | Where-Object { -not $observedEvents.Contains($_) })
+    }
+
+    return [ordered]@{
+        passed = $passed
+        source = "liveBridge"
+        target = $Target
+        targetState = if ($null -ne $State) { [string]$State.target } else { $null }
+        route = $route
+        stateFrame = if ($null -ne $State) { $State.frame } else { $null }
+        observedEvents = @($observedEvents | Sort-Object)
+        missingEvents = $missingEvents
+        "titleMenuVisible" = $titleMenuVisible
+        "loadingActive" = $loadingActive
+        "stageContextObserved" = $stageContextObserved
+        "targetCsdObserved" = $targetCsdObserved
+        "stageTargetReady" = $stageTargetReady
+        "stageTargetReadyEvent" = $stageTargetReadyEvent
+        state = $State
+    }
+}
+
+function Wait-UiLabLiveBridgeReadiness(
+    [string]$Target,
+    [string]$PipeName,
+    [int]$TimeoutSeconds,
+    [System.Diagnostics.Process]$Process = $null
+) {
+    $timeout = [Math]::Max(0, $TimeoutSeconds)
+    $deadline = (Get-Date).AddSeconds($timeout)
+    $checks = [ordered]@{
+        passed = $false
+        source = "liveBridge"
+        target = $Target
+        error = "not checked"
+    }
+
+    while ((Get-Date) -lt $deadline) {
+        if ($null -ne $Process) {
+            $Process.Refresh()
+
+            if ($Process.HasExited) {
+                break
+            }
+        }
+
+        $stateResponse = Get-UiLabLiveBridgeState $PipeName 1000
+        if ($stateResponse.ok) {
+            $checks = Test-UiLabLiveBridgeReadiness $Target $stateResponse.state
+
+            if ($checks.passed) {
+                return $checks
+            }
+        }
+        else {
+            $checks = [ordered]@{
+                passed = $false
+                source = "liveBridge"
+                target = $Target
+                error = $stateResponse.error
+            }
+        }
+
+        Start-Sleep -Milliseconds ([Math]::Max(50, $LiveBridgeReadinessPollMilliseconds))
     }
 
     return $checks
@@ -707,6 +897,9 @@ foreach ($target in $expandedTargets) {
     $snapshots = @()
     $captureError = $null
     $evidenceReady = $false
+    $readinessSource = "jsonl"
+    $liveBridgeReadiness = $null
+    $liveBridgeState = $null
     $lateCaptureReason = "fixed-delay"
     $nativeFrameCapture = $null
     $nativeFrameCaptures = @()
@@ -748,19 +941,39 @@ foreach ($target in $expandedTargets) {
                     $maxEvidenceWaitSeconds = [Math]::Max($maxEvidenceWaitSeconds, $remainingWindowSeconds)
                 }
 
-                $waitedEvidence = Wait-UiLabEvidenceEvents $target $eventsPath $maxEvidenceWaitSeconds $process
-                $evidenceReady = $waitedEvidence.passed
+                if ($UseLiveBridgeReadiness -and $LiveBridge) {
+                    $liveBridgeReadiness = Wait-UiLabLiveBridgeReadiness $target $LiveBridgeName $maxEvidenceWaitSeconds $process
+                    $liveBridgeState = if ($null -ne $liveBridgeReadiness -and $liveBridgeReadiness.Contains("state")) { $liveBridgeReadiness.state } else { $null }
+                    $evidenceReady = $liveBridgeReadiness.passed
+
+                    if ($evidenceReady) {
+                        $readinessSource = "live-bridge"
+                        $lateCaptureReason = "required-events-observed-via-live-bridge"
+                    }
+                    else {
+                        $lateCaptureReason = "required-events-timeout-via-live-bridge"
+                    }
+                }
+
+                if (-not $evidenceReady) {
+                    $waitedEvidence = Wait-UiLabEvidenceEvents $target $eventsPath $maxEvidenceWaitSeconds $process
+                    $evidenceReady = $waitedEvidence.passed
+
+                    if ($evidenceReady) {
+                        $readinessSource = "jsonl"
+                        $lateCaptureReason = "required-events-observed"
+                    }
+                    elseif (-not $UseLiveBridgeReadiness) {
+                        $lateCaptureReason = "required-events-timeout"
+                    }
+                }
 
                 if ($evidenceReady) {
-                    $lateCaptureReason = "required-events-observed"
                     $settleSeconds = if ($stageTargets -contains $target) { $StagePostEvidenceDelaySeconds } else { $PostEvidenceDelaySeconds }
 
                     if ($settleSeconds -gt 0) {
                         Start-Sleep -Seconds $settleSeconds
                     }
-                }
-                else {
-                    $lateCaptureReason = "required-events-timeout"
                 }
             }
             else {
@@ -833,6 +1046,9 @@ foreach ($target in $expandedTargets) {
         exitCode = if ($process.HasExited) { $process.ExitCode } else { $null }
         captureError = $captureError
         evidenceReady = $evidenceReady
+        readinessSource = $readinessSource
+        liveBridgeReadiness = $liveBridgeReadiness
+        liveBridgeState = $liveBridgeState
         lateCaptureReason = $lateCaptureReason
         windowScreenshotsSkipped = [bool]$SkipWindowScreenshots
         evidenceChecks = $evidenceChecks

@@ -8,6 +8,7 @@
 #include <atomic>
 #include <chrono>
 #include <cctype>
+#include <cstring>
 #include <cstdlib>
 #include <deque>
 #include <filesystem>
@@ -85,6 +86,39 @@ namespace UiLab
         bool postPressStartMenuReady = false;
         uint64_t stableFrames = 0;
         uint64_t frame = 0;
+    };
+
+    struct CsdLiveInspectorSnapshot
+    {
+        bool sceneKnown = false;
+        uint32_t sceneAddress = 0;
+        bool sceneMotionKnown = false;
+        float sceneMotionFrame = 0.0f;
+        uint32_t sceneMotionRepeatType = UINT32_MAX;
+        std::string projectName;
+        std::string source;
+    };
+
+    struct LoadingLiveInspectorSnapshot
+    {
+        uint32_t requestType = UINT32_MAX;
+        uint32_t displayType = UINT32_MAX;
+        bool displayActive = false;
+        uint64_t requestFrame = 0;
+        uint64_t displayFrame = 0;
+    };
+
+    struct SonicHudLiveInspectorSnapshot
+    {
+        bool stageContextObserved = false;
+        bool targetCsdObserved = false;
+        bool stageTargetReady = false;
+        uint32_t hudOwnerAddress = 0;
+        uint32_t stageGameModeAddress = 0;
+        std::string playScreenProject;
+        std::string speedGaugeScene;
+        std::string readyEvent;
+        std::string source;
     };
 
     struct OperatorWindowEntry
@@ -356,6 +390,14 @@ namespace UiLab
     static bool ReadGuestBool(uint32_t guestAddress);
     static void WriteGuestBool(uint32_t guestAddress, bool value);
     static uint64_t TitleMenuStableFrames();
+    static bool TryReadGuestU32(uint32_t guestAddress, uint32_t& value);
+    static bool TryReadGuestFloat(uint32_t guestAddress, float& value);
+    static std::string_view MotionRepeatTypeLabel(uint32_t repeatType);
+    static std::string_view LoadingDisplayTypeLabel(uint32_t displayType);
+    static CsdLiveInspectorSnapshot BuildCsdLiveInspectorSnapshot();
+    static LoadingLiveInspectorSnapshot BuildLoadingLiveInspectorSnapshot();
+    static SonicHudLiveInspectorSnapshot BuildSonicHudLiveInspectorSnapshot();
+    static void AppendTypedInspectors(std::ostringstream& out);
 
     static std::string_view RoutePolicyLabel()
     {
@@ -515,6 +557,87 @@ namespace UiLab
         std::ostringstream out;
         out << "0x" << std::hex << std::uppercase << value;
         return out.str();
+    }
+
+    static bool TryReadGuestU32(uint32_t guestAddress, uint32_t& value)
+    {
+        if (g_memory.base == nullptr || guestAddress == 0)
+            return false;
+
+        const auto* bytes = reinterpret_cast<const uint8_t*>(g_memory.Translate(guestAddress));
+        value =
+            (static_cast<uint32_t>(bytes[0]) << 24) |
+            (static_cast<uint32_t>(bytes[1]) << 16) |
+            (static_cast<uint32_t>(bytes[2]) << 8) |
+            static_cast<uint32_t>(bytes[3]);
+        return true;
+    }
+
+    static bool TryReadGuestFloat(uint32_t guestAddress, float& value)
+    {
+        uint32_t bits = 0;
+        if (!TryReadGuestU32(guestAddress, bits))
+            return false;
+
+        std::memcpy(&value, &bits, sizeof(value));
+        return true;
+    }
+
+    static std::string_view MotionRepeatTypeLabel(uint32_t repeatType)
+    {
+        switch (repeatType)
+        {
+            case 0:
+                return "eMotionRepeatType_PlayOnce";
+
+            case 1:
+                return "eMotionRepeatType_Loop";
+
+            case 2:
+                return "eMotionRepeatType_PingPong";
+
+            case 3:
+                return "eMotionRepeatType_PlayThenDestroy";
+
+            default:
+                return "unknown";
+        }
+    }
+
+    static std::string_view LoadingDisplayTypeLabel(uint32_t displayType)
+    {
+        switch (displayType)
+        {
+            case 0:
+                return "eLoadingDisplayType_MilesElectric";
+
+            case 1:
+                return "eLoadingDisplayType_None";
+
+            case 2:
+                return "eLoadingDisplayType_WerehogMovie";
+
+            case 3:
+                return "eLoadingDisplayType_MilesElectricContext";
+
+            case 4:
+                return "eLoadingDisplayType_Arrows";
+
+            case 5:
+                return "eLoadingDisplayType_NowLoading";
+
+            case 6:
+                return "eLoadingDisplayType_EventGallery";
+
+            case 7:
+                return "eLoadingDisplayType_ChangeTimeOfDay";
+
+            case 8:
+                return "eLoadingDisplayType_Blank";
+
+            default:
+                return "unknown";
+        }
     }
 
     static void WriteEvidenceEvent(std::string_view event, std::string_view detail = {})
@@ -816,6 +939,26 @@ namespace UiLab
     static constexpr std::string_view kLiveStateRouteFieldName = R"("route")";
     static constexpr std::string_view kLiveStateStageGameModeAddressFieldName = R"("stageGameModeAddress")";
     static constexpr std::string_view kLiveStateNativeCaptureStatusFieldName = R"("nativeCaptureStatus")";
+    static constexpr std::string_view kLiveStateTypedInspectorsFieldName = R"("typedInspectors")";
+    static constexpr std::array<std::string_view, 16> kLiveStateTypedInspectorJsonFields =
+    {{
+        R"("csd")",
+        R"("titleMenu")",
+        R"("loading")",
+        R"("sonicHud")",
+        R"("sceneMotionFrame")",
+        R"("sceneMotionRepeatType")",
+        R"("loadingDisplayTypeLabel")",
+        R"("titleMenuOwnerContextAddress")",
+        R"("titleMenuCursor")",
+        R"("hudOwnerAddress")",
+        R"("playScreenProject")",
+        R"("speedGaugeScene")",
+        R"("stageTargetReady")",
+        R"("stageGameModeAddress")",
+        R"("targetCsdObserved")",
+        R"("readyEvent")",
+    }};
 
     static void AppendStringArray(std::ostringstream& out, const std::vector<std::string_view>& values)
     {
@@ -869,6 +1012,146 @@ namespace UiLab
                 << "}";
         }
         out << "]";
+    }
+
+    static CsdLiveInspectorSnapshot BuildCsdLiveInspectorSnapshot()
+    {
+        static constexpr uint32_t kCsdSceneMotionFrameOffset = 0x64;
+        static constexpr uint32_t kCsdSceneMotionRepeatTypeOffset = 0x94;
+
+        CsdLiveInspectorSnapshot snapshot;
+        snapshot.projectName = g_targetCsdObserved
+            ? std::string(TargetFor(g_target).primaryCsdScene)
+            : g_lastCsdProjectName;
+        snapshot.source = "CSD project event stream";
+
+        if (g_titleOwnerInspector.titleCsdAddress != 0)
+        {
+            snapshot.sceneKnown = true;
+            snapshot.sceneAddress = g_titleOwnerInspector.titleCsdAddress;
+            snapshot.source = "title owner title_csd488";
+
+            float motionFrame = 0.0f;
+            uint32_t repeatType = UINT32_MAX;
+            const bool motionFrameKnown = TryReadGuestFloat(
+                snapshot.sceneAddress + kCsdSceneMotionFrameOffset,
+                motionFrame);
+            const bool repeatTypeKnown = TryReadGuestU32(
+                snapshot.sceneAddress + kCsdSceneMotionRepeatTypeOffset,
+                repeatType);
+
+            snapshot.sceneMotionKnown = motionFrameKnown || repeatTypeKnown;
+            if (motionFrameKnown)
+                snapshot.sceneMotionFrame = motionFrame;
+
+            if (repeatTypeKnown)
+                snapshot.sceneMotionRepeatType = repeatType;
+        }
+
+        return snapshot;
+    }
+
+    static LoadingLiveInspectorSnapshot BuildLoadingLiveInspectorSnapshot()
+    {
+        LoadingLiveInspectorSnapshot snapshot;
+        snapshot.requestType = g_lastLoadingRequestType;
+        snapshot.displayType = g_lastLoadingDisplayType;
+        snapshot.displayActive = g_loadingDisplayWasActive;
+        snapshot.requestFrame = g_lastLoadingRequestFrame;
+        snapshot.displayFrame = g_lastLoadingDisplayFrame;
+        return snapshot;
+    }
+
+    static SonicHudLiveInspectorSnapshot BuildSonicHudLiveInspectorSnapshot()
+    {
+        SonicHudLiveInspectorSnapshot snapshot;
+        const auto& target = TargetFor(g_target);
+        snapshot.stageContextObserved = g_stageContextObserved;
+        snapshot.targetCsdObserved = g_targetCsdObserved;
+        snapshot.stageTargetReady = g_loggedStageTargetReady;
+        snapshot.stageGameModeAddress = g_lastStageGameModeAddress;
+        snapshot.readyEvent = g_lastStageReadyEventName;
+        snapshot.source = "stage/CSD latches";
+
+        if (target.id == ScreenId::SonicHud && g_targetCsdObserved)
+        {
+            snapshot.playScreenProject = std::string(target.primaryCsdScene);
+            snapshot.speedGaugeScene = "ui_playscreen/so_speed_gauge";
+            snapshot.source = "stage-target-csd-bound";
+        }
+
+        return snapshot;
+    }
+
+    static void AppendTypedInspectors(std::ostringstream& out)
+    {
+        const auto& target = TargetFor(g_target);
+        const auto csd = BuildCsdLiveInspectorSnapshot();
+        const auto loading = BuildLoadingLiveInspectorSnapshot();
+        const auto sonicHud = BuildSonicHudLiveInspectorSnapshot();
+
+        out
+            << "{\n"
+            << "    \"csd\": {\n"
+            << "      \"source\": \"" << JsonEscape(csd.source) << "\",\n"
+            << "      \"projectName\": \"" << JsonEscape(csd.projectName) << "\",\n"
+            << "      \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
+            << "      \"targetObserved\": " << (g_targetCsdObserved ? "true" : "false") << ",\n"
+            << "      \"sceneKnown\": " << (csd.sceneKnown ? "true" : "false") << ",\n"
+            << "      \"sceneAddress\": \"" << JsonEscape(HexU32(csd.sceneAddress)) << "\",\n"
+            << "      \"sceneMotionKnown\": " << (csd.sceneMotionKnown ? "true" : "false") << ",\n"
+            << "      \"sceneMotionFrame\": ";
+
+        if (csd.sceneMotionKnown)
+            out << csd.sceneMotionFrame;
+        else
+            out << "null";
+
+        out
+            << ",\n"
+            << "      \"sceneMotionRepeatType\": "
+            << (csd.sceneMotionRepeatType == UINT32_MAX ? -1 : static_cast<int32_t>(csd.sceneMotionRepeatType))
+            << ",\n"
+            << "      \"sceneMotionRepeatTypeLabel\": \""
+            << JsonEscape(MotionRepeatTypeLabel(csd.sceneMotionRepeatType)) << "\"\n"
+            << "    },\n"
+            << "    \"titleMenu\": {\n"
+            << "      \"titleMenuOwnerContextAddress\": \""
+            << JsonEscape(HexU32(g_titleOwnerInspector.titleContextAddress)) << "\",\n"
+            << "      \"titleMenuOwnerCsdAddress\": \""
+            << JsonEscape(HexU32(g_titleOwnerInspector.titleCsdAddress)) << "\",\n"
+            << "      \"titleMenuOwnerReady\": " << (g_titleOwnerInspector.ownerReady ? "true" : "false") << ",\n"
+            << "      \"titleMenuCursor\": " << g_titleMenuInspector.menuCursor << ",\n"
+            << "      \"titleMenuContextPhase\": " << g_titleMenuInspector.contextPhase << ",\n"
+            << "      \"titleMenuVisualReady\": " << (g_titleMenuVisualReady ? "true" : "false") << ",\n"
+            << "      \"titleMenuPostPressStartReady\": "
+            << (g_titleMenuInspector.postPressStartMenuReady ? "true" : "false") << "\n"
+            << "    },\n"
+            << "    \"loading\": {\n"
+            << "      \"loadingRequestType\": "
+            << (loading.requestType == UINT32_MAX ? -1 : static_cast<int32_t>(loading.requestType)) << ",\n"
+            << "      \"loadingRequestTypeLabel\": \""
+            << JsonEscape(LoadingDisplayTypeLabel(loading.requestType)) << "\",\n"
+            << "      \"loadingDisplayType\": "
+            << (loading.displayType == UINT32_MAX ? -1 : static_cast<int32_t>(loading.displayType)) << ",\n"
+            << "      \"loadingDisplayTypeLabel\": \""
+            << JsonEscape(LoadingDisplayTypeLabel(loading.displayType)) << "\",\n"
+            << "      \"loadingDisplayActive\": " << (loading.displayActive ? "true" : "false") << ",\n"
+            << "      \"requestFrame\": " << loading.requestFrame << ",\n"
+            << "      \"displayFrame\": " << loading.displayFrame << "\n"
+            << "    },\n"
+            << "    \"sonicHud\": {\n"
+            << "      \"source\": \"" << JsonEscape(sonicHud.source) << "\",\n"
+            << "      \"hudOwnerAddress\": \"" << JsonEscape(HexU32(sonicHud.hudOwnerAddress)) << "\",\n"
+            << "      \"stageGameModeAddress\": \"" << JsonEscape(HexU32(sonicHud.stageGameModeAddress)) << "\",\n"
+            << "      \"playScreenProject\": \"" << JsonEscape(sonicHud.playScreenProject) << "\",\n"
+            << "      \"speedGaugeScene\": \"" << JsonEscape(sonicHud.speedGaugeScene) << "\",\n"
+            << "      \"stageContextObserved\": " << (sonicHud.stageContextObserved ? "true" : "false") << ",\n"
+            << "      \"targetCsdObserved\": " << (sonicHud.targetCsdObserved ? "true" : "false") << ",\n"
+            << "      \"stageTargetReady\": " << (sonicHud.stageTargetReady ? "true" : "false") << ",\n"
+            << "      \"readyEvent\": \"" << JsonEscape(sonicHud.readyEvent) << "\"\n"
+            << "    }\n"
+            << "  }";
     }
 
     static void AppendRecentEvents(std::ostringstream& out)
@@ -975,6 +1258,10 @@ namespace UiLab
             << "  },\n"
             << "  \"debugForkTypedFields\": ";
         AppendDebugForkTypedFields(out);
+        out
+            << ",\n"
+            << "  " << kLiveStateTypedInspectorsFieldName << ": ";
+        AppendTypedInspectors(out);
         out
             << ",\n"
             << "  \"recentEvents\": ";
@@ -3004,6 +3291,31 @@ namespace UiLab
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
             ImGui::Text("commands: state, events, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
+
+            if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                const auto csd = BuildCsdLiveInspectorSnapshot();
+                const auto loading = BuildLoadingLiveInspectorSnapshot();
+                const auto sonicHud = BuildSonicHudLiveInspectorSnapshot();
+
+                ImGui::Text("CSD project: %s", csd.projectName.empty() ? "waiting" : csd.projectName.c_str());
+                DrawHexField("CSD scene", csd.sceneAddress);
+                ImGui::Text("CSD scene motion frame: %.3f", csd.sceneMotionKnown ? csd.sceneMotionFrame : 0.0f);
+                ImGui::Text("CSD scene repeat: %s", std::string(MotionRepeatTypeLabel(csd.sceneMotionRepeatType)).c_str());
+                ImGui::Separator();
+                ImGui::Text(
+                    "Loading display type: %d (%s)",
+                    loading.displayType == UINT32_MAX ? -1 : static_cast<int32_t>(loading.displayType),
+                    std::string(LoadingDisplayTypeLabel(loading.displayType)).c_str());
+                DrawPredicate("Loading display active", loading.displayActive);
+                ImGui::Separator();
+                ImGui::Text("Title cursor/menu owner: cursor=%u owner=%s",
+                    g_titleMenuInspector.menuCursor,
+                    HexU32(g_titleOwnerInspector.titleContextAddress).c_str());
+                ImGui::Text("Sonic HUD play screen: %s", sonicHud.playScreenProject.empty() ? "waiting" : sonicHud.playScreenProject.c_str());
+                ImGui::Text("Sonic HUD speed gauge: %s", sonicHud.speedGaugeScene.empty() ? "waiting" : sonicHud.speedGaugeScene.c_str());
+                DrawHexField("Sonic HUD owner", sonicHud.hudOwnerAddress);
+            }
 
             if (ImGui::CollapsingHeader("Debug-menu fork typed fields"))
             {

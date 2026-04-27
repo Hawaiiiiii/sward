@@ -138,6 +138,19 @@ The bridge exposes:
 
 This does not replace evidence. It makes the real runtime easier to interrogate while native BMPs and JSONL remain the oracle.
 
+## Phase 117 Live-Bridge Client And Typed Inspectors
+
+Phase 117 adds a repo-safe live-bridge client at `research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1`. It can query `state`, `events`, `route`, `set-global`, and `capture` through the named pipe without screen scraping.
+
+The capture helper can now use live bridge readiness as the capture driver with `-UseLiveBridgeReadiness`. JSONL remains the durable evidence log, and native BMPs remain the visual confirmation path.
+
+The live state now promotes the fork harvest into a `typedInspectors` block:
+
+- CSD scene motion frame and motion repeat type, when a live scene pointer is known.
+- loading display type plus a debug-menu enum label.
+- title cursor/menu owner readiness and owner CSD pointer.
+- Sonic HUD owner fields carried as typed latches: stage game-mode address, `m_rcPlayScreen` project, and `m_rcSpeedGauge` scene identity once the real stage/CSD route binds.
+
 ## Verification
 
 Local-only evidence, not committed:
@@ -160,3 +173,22 @@ Local-only evidence, not committed:
   - post-rebuild title-loop native capture passed after the Live API window also displayed the bridge command list and fork-derived field count
   - `3 / 3` native BMP captures were RGB-nonblack
   - manifest reported `liveBridgeName=sward_ui_lab_live` and `bestRoute=loading display ended`
+
+- `out/ui_lab_runtime_evidence/phase117_bridge_20260427_220101/`
+  - launched the real UI Lab runtime
+  - queried `state`, `help`, and `events` through `query_unleashed_recomp_ui_lab_bridge.ps1`
+  - `state` reported `target=title-loop`, bridge started, and a populated `typedInspectors` block
+
+- `out/ui_lab_runtime_evidence/20260427_222005/`
+  - focused title-menu capture with `-UseLiveBridgeReadiness`
+  - manifest reported `readinessSource=live-bridge`, `liveRoute=title menu visual ready`, and JSONL evidence passed
+  - native BMP scoring selected `bestRoute=title menu visual ready` with `14` RGB-nonblack frames
+
+- `out/ui_lab_runtime_evidence/20260427_221031/`
+  - focused title-options capture after adding route-based live readiness
+  - manifest reported `readinessSource=live-bridge`, `liveRoute=title options accept injected`, typed inspectors present, and `6` RGB-nonblack native frames
+
+- `out/ui_lab_runtime_evidence/20260427_221250/`
+  - current full early-game live-bridge sweep passed `title-loop`, `title-options`, `loading`, and `sonic-hud`
+  - `title-menu` missed the route in that combined run, while the focused title-menu run above passed immediately afterward
+  - treat this as the next full-sweep route-stability gap, not as a failure of the bridge client or typed inspector path
