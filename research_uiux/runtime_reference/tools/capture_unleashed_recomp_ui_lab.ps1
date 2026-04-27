@@ -240,7 +240,7 @@ function Get-UiLabTargetSet([string]$Name) {
             return @("title-loop", "title-menu", "title-options", "loading")
         }
         "all" {
-            return @("title-loop", "title-menu", "title-options", "loading", "sonic-hud", "status", "world-map", "tutorial", "result", "extra-stage-hud")
+            return @("title-loop", "title-menu", "title-options", "loading", "sonic-hud", "pause", "status", "world-map", "tutorial", "result", "extra-stage-hud")
         }
         default {
             return @()
@@ -282,6 +282,9 @@ function Get-UiLabRequiredEvents([string]$Target) {
         "sonic-hud" {
             return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "sonic-hud-ready")
         }
+        "pause" {
+            return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "pause-owner-observed", "pause-route-start-injected", "pause-target-ready", "pause-ready")
+        }
         "tutorial" {
             return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "tutorial-ready")
         }
@@ -306,6 +309,10 @@ function Get-UiLabNativeCapturePlan([string]$Target, [int]$RequestedCount, [int]
             $effectiveNativeCaptureCount = [Math]::Max($effectiveNativeCaptureCount, 12)
             $effectiveNativeCaptureIntervalFrames = [Math]::Min($effectiveNativeCaptureIntervalFrames, 15)
         }
+        "pause" {
+            $effectiveNativeCaptureCount = [Math]::Max($effectiveNativeCaptureCount, 4)
+            $effectiveNativeCaptureIntervalFrames = [Math]::Min($effectiveNativeCaptureIntervalFrames, 30)
+        }
         { $_ -in @("sonic-hud", "tutorial", "result", "extra-stage-hud") } {
             $effectiveNativeCaptureCount = [Math]::Max($effectiveNativeCaptureCount, 6)
             $effectiveNativeCaptureIntervalFrames = [Math]::Min($effectiveNativeCaptureIntervalFrames, 30)
@@ -325,6 +332,21 @@ function Get-UiLabNativeCapturePlan([string]$Target, [int]$RequestedCount, [int]
         requestedIntervalFrames = $RequestedIntervalFrames
         effectiveNativeCaptureCount = $effectiveNativeCaptureCount
         effectiveNativeCaptureIntervalFrames = $effectiveNativeCaptureIntervalFrames
+    }
+}
+
+function Get-UiLabEffectiveAutoExitSeconds([string]$Target, [int]$RequestedAutoExitSeconds) {
+    if ($RequestedAutoExitSeconds -le 0) {
+        return $RequestedAutoExitSeconds
+    }
+
+    switch ($Target) {
+        "pause" {
+            return [Math]::Max($RequestedAutoExitSeconds, 95)
+        }
+        default {
+            return $RequestedAutoExitSeconds
+        }
     }
 }
 
@@ -510,6 +532,9 @@ function Test-UiLabLiveBridgeReadiness([string]$Target, [object]$State) {
         }
         "sonic-hud" {
             $passed = ($stageContextObserved -and $targetCsdObserved -and $stageTargetReady) -or $stageTargetReadyEvent -eq "sonic-hud-ready"
+        }
+        "pause" {
+            $passed = (($stageContextObserved -and $targetCsdObserved -and $stageTargetReady) -or $stageTargetReadyEvent -eq "pause-ready" -or $route -eq "pause target ready") -and $observedEvents.Contains("pause-target-ready")
         }
         "tutorial" {
             $passed = ($stageContextObserved -and $targetCsdObserved -and $stageTargetReady) -or $stageTargetReadyEvent -eq "tutorial-ready"
@@ -697,7 +722,8 @@ function Get-UiLabNativeFramePreferenceScore([string]$Target, [string]$Route, [s
             if ($Route -eq "loading display ended") { $score -= 200 }
             if ($Csd -eq "ui_loading") { $score += 80 }
         }
-        { $_ -in @("sonic-hud", "tutorial", "result", "extra-stage-hud") } {
+        { $_ -in @("sonic-hud", "tutorial", "result", "extra-stage-hud", "pause") } {
+            if ($Route -eq "pause target ready") { $score += 380 }
             if ($Route -eq "stage target ready") { $score += 340 }
             if ($Route -eq "stage target csd bound") { $score += 300 }
             if ($Route -eq "stage context live") { $score += 220 }
@@ -705,6 +731,7 @@ function Get-UiLabNativeFramePreferenceScore([string]$Target, [string]$Route, [s
             if ($Route -eq "loading request observed") { $score -= 80 }
             if ($Stage -eq "stage context observed") { $score += 80 }
             if ($Csd -eq "ui_playscreen") { $score += 80 }
+            if ($Csd -eq "ui_pause") { $score += 100 }
         }
         default {
             if ($Route -match "target csd|context|menu|options|loading display active") { $score += 120 }
@@ -817,6 +844,17 @@ function Get-UiLabNativeFrameSignalSummary([object[]]$NativeCaptures) {
                 @{ Expression = { if ($_.rgbNonBlack) { 1 } else { 0 } }; Descending = $true },
                 @{ Expression = { if ($_.preferredScore) { [int]$_.preferredScore } else { 0 } }; Descending = $true },
                 @{ Expression = { if ($_.target -eq "title-menu" -and $_.route -eq "title menu visual ready" -and $null -ne $_.index) { [int]$_.index } else { 0 } }; Descending = $true },
+                @{ Expression = {
+                    if ($_.target -eq "pause" -and $_.route -eq "pause target ready" -and $null -ne $_.index) {
+                        $pauseIndex = [int]$_.index
+                        if ($pauseIndex -ge 2 -and $pauseIndex -le 4) { 100 + $pauseIndex }
+                        elseif ($pauseIndex -eq 1) { 1 }
+                        else { 0 }
+                    }
+                    else {
+                        0
+                    }
+                }; Descending = $true },
                 @{ Expression = { if ($_.signal.rgbSum) { [Int64]$_.signal.rgbSum } else { 0 } }; Descending = $true } |
             Select-Object -First 1
     }
@@ -879,7 +917,7 @@ if (-not (Test-Path -LiteralPath $install)) {
 $sessionDir = Join-Path $output (Get-Date -Format "yyyyMMdd_HHmmss")
 New-Item -ItemType Directory -Force -Path $sessionDir | Out-Null
 
-$stageTargets = @("sonic-hud", "extra-stage-hud", "tutorial", "result")
+$stageTargets = @("sonic-hud", "extra-stage-hud", "tutorial", "result", "pause")
 $records = @()
 $expandedTargets = @()
 $requiredNativeSignalFailed = $false
@@ -904,6 +942,7 @@ foreach ($target in $expandedTargets) {
     $eventsPath = Join-Path $targetDir "ui_lab_events.jsonl"
     $liveStatePath = Join-Path $targetDir "ui_lab_live_state.json"
     $nativeCapturePlan = Get-UiLabNativeCapturePlan $target $NativeCaptureCount $NativeCaptureIntervalFrames
+    $effectiveAutoExitSeconds = Get-UiLabEffectiveAutoExitSeconds $target $AutoExitSeconds
     $effectiveLiveBridgeName = Get-UiLabEffectiveLiveBridgeName $LiveBridgeName (Split-Path -Leaf $sessionDir) $safeTarget ([bool]$UseUniqueLiveBridgeName)
 
     $args = @(
@@ -938,8 +977,8 @@ foreach ($target in $expandedTargets) {
         $args += @("--ui-lab-native-capture-interval-frames", "$($nativeCapturePlan.effectiveNativeCaptureIntervalFrames)")
     }
 
-    if (-not $KeepRunning -and $AutoExitSeconds -gt 0) {
-        $args += @("--ui-lab-auto-exit", "$AutoExitSeconds")
+    if (-not $KeepRunning -and $effectiveAutoExitSeconds -gt 0) {
+        $args += @("--ui-lab-auto-exit", "$effectiveAutoExitSeconds")
     }
 
     if (-not $Observer -and $stageTargets -contains $target) {
@@ -999,8 +1038,8 @@ foreach ($target in $expandedTargets) {
             if (-not $Observer) {
                 $maxEvidenceWaitSeconds = [Math]::Max(0, $SecondCaptureDelaySeconds)
 
-                if ($AutoExitSeconds -gt 0) {
-                    $remainingWindowSeconds = $AutoExitSeconds - $InitialWaitSeconds - 2
+                if ($effectiveAutoExitSeconds -gt 0) {
+                    $remainingWindowSeconds = $effectiveAutoExitSeconds - $InitialWaitSeconds - 2
                     $maxEvidenceWaitSeconds = [Math]::Max($maxEvidenceWaitSeconds, $remainingWindowSeconds)
                 }
 
@@ -1074,7 +1113,7 @@ foreach ($target in $expandedTargets) {
         $captureError = $_.Exception.Message
     }
 
-    $waitSeconds = if ($AutoExitSeconds -gt 0) { [Math]::Max(2, $AutoExitSeconds - $InitialWaitSeconds) } else { 2 }
+    $waitSeconds = if ($effectiveAutoExitSeconds -gt 0) { [Math]::Max(2, $effectiveAutoExitSeconds - $InitialWaitSeconds) } else { 2 }
     $deadline = (Get-Date).AddSeconds($waitSeconds)
     while (-not $process.HasExited -and (Get-Date) -lt $deadline) {
         Start-Sleep -Milliseconds 250
@@ -1127,6 +1166,8 @@ foreach ($target in $expandedTargets) {
         nativeFrameCaptures = $nativeFrameCaptures
         nativeFrameSignalSummary = $nativeFrameSignalSummary
         nativeCapturePlan = $nativeCapturePlan
+        requestedAutoExitSeconds = $AutoExitSeconds
+        effectiveAutoExitSeconds = $effectiveAutoExitSeconds
         effectiveLiveBridgeName = if ($LiveBridge) { $effectiveLiveBridgeName } else { $null }
         liveBridgeName = if ($LiveBridge) { $effectiveLiveBridgeName } else { $null }
         nativeSignalRequired = $nativeSignalRequired

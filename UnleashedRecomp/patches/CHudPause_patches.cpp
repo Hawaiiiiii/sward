@@ -20,8 +20,16 @@ static uint32_t GuestAddressOf(const void* host)
     return host != nullptr ? g_memory.MapVirtual(host) : 0;
 }
 
+static bool IsPlausibleGuestAddress(uint32_t address)
+{
+    return address >= 0x10000;
+}
+
 static void RecordHudPauseInspector(uint32_t pauseAddress, const SWA::CHudPause* pHudPause)
 {
+    if (pHudPause == nullptr || !IsPlausibleGuestAddress(pauseAddress))
+        return;
+
     UiLab::OnHudPauseUpdate(
         pauseAddress,
         GuestAddressOf(pHudPause->m_rcPause.Get()),
@@ -133,6 +141,20 @@ bool CHudPauseMiscItemCountMidAsmHook(PPCRegister& count)
 bool CHudPauseMiscInjectOptionsMidAsmHook(PPCRegister& pThis)
 {
     return InjectMenuBehaviour(pThis.u32, 3);
+}
+
+// SWA::CHudPause pause transition helper sub_824B1810
+PPC_FUNC_IMPL(__imp__sub_824B1810);
+PPC_FUNC(sub_824B1810)
+{
+    const uint32_t pauseAddress = ctx.r3.u32;
+    auto* pHudPause = IsPlausibleGuestAddress(pauseAddress)
+        ? reinterpret_cast<SWA::CHudPause*>(g_memory.Translate(pauseAddress))
+        : nullptr;
+
+    __imp__sub_824B1810(ctx, base);
+
+    RecordHudPauseInspector(pauseAddress, pHudPause);
 }
 
 // SWA::CHudPause::Update

@@ -1,5 +1,6 @@
 #include <patches/ui_lab_patches.h>
 #include <app.h>
+#include <api/SWA.h>
 #include <gpu/imgui/imgui_common.h>
 #include <kernel/memory.h>
 #include <os/logger.h>
@@ -154,11 +155,15 @@ namespace UiLab
         bool stageContextObserved = false;
         bool targetCsdObserved = false;
         bool stageTargetReady = false;
+        bool rawOwnerKnown = false;
+        bool rawOwnerFieldsReady = false;
         uint32_t hudOwnerAddress = 0;
         uint32_t stageGameModeAddress = 0;
+        uint64_t rawOwnerFrame = 0;
         std::string playScreenProject;
         std::string speedGaugeScene;
         std::string readyEvent;
+        std::string rawHookSource;
         std::string source;
     };
 
@@ -170,9 +175,13 @@ namespace UiLab
         uint32_t rcSpeedGaugeSceneAddress = 0;
         uint32_t rcRingEnergyGaugeSceneAddress = 0;
         uint32_t rcGaugeFrameSceneAddress = 0;
+        bool rawOwnerKnown = false;
+        bool rawOwnerFieldsReady = false;
+        uint64_t rawOwnerFrame = 0;
         bool resolvedFromCsdProjectTree = false;
         std::string ownerPointerStatus;
         std::string expectedOwnerFieldSource;
+        std::string rawHookSource;
     };
 
     struct PauseGeneralSaveLiveInspectorSnapshot
@@ -356,13 +365,14 @@ namespace UiLab
         },
     }};
 
-    static constexpr std::array<RuntimeTarget, 10> kRuntimeTargets =
+    static constexpr std::array<RuntimeTarget, 11> kRuntimeTargets =
     {{
         { ScreenId::TitleLoop, "title-loop", "Title Loop", "ui_title", "System/GameMode/Title/TitleStateIntro.cpp", false },
         { ScreenId::TitleMenu, "title-menu", "Title Menu", "ui_title", "System/GameMode/Title/TitleMenu.cpp", false },
         { ScreenId::TitleOptions, "title-options", "Title Options", "ui_title", "UnleashedRecomp/ui/options_menu.cpp", false },
         { ScreenId::Loading, "loading", "Loading / Miles Electric", "ui_loading", "System/Loading.cpp", false },
         { ScreenId::SonicHud, "sonic-hud", "Sonic Stage HUD", "ui_playscreen", "Player/Character/Sonic/Hud/SonicMainDisplay.cpp", true },
+        { ScreenId::Pause, "pause", "Pause Menu", "ui_pause", "HUD/Pause/HudPause.cpp", true },
         { ScreenId::ExtraStageHud, "extra-stage-hud", "Extra Stage / Tornado HUD", "ui_prov_playscreen", "ExtraStage/Tails/Hud/HudExQte.cpp", true },
         { ScreenId::Result, "result", "Stage Result", "ui_result", "HUD/Result/Result.cpp", true },
         { ScreenId::Status, "status", "Status / Skill Upgrade", "ui_status", "HUD/Status/Status.cpp", false },
@@ -421,6 +431,7 @@ namespace UiLab
     static uint64_t g_lastNativeFrameCaptureFrame = 0;
     static std::string g_lastNativeFrameCapturePath;
     static std::string g_lastNativeFrameCaptureFailure;
+    static bool g_nativeFrameCaptureCompleteExitPending = false;
     static const std::chrono::steady_clock::time_point g_startedAt = std::chrono::steady_clock::now();
     static bool g_loggedIntroHook = false;
     static bool g_loggedMenuHook = false;
@@ -449,6 +460,19 @@ namespace UiLab
     static uint32_t g_lastStageGameModeAddress = 0;
     static uint64_t g_lastStageContextFrame = 0;
     static uint64_t g_lastStageReadyFrame = 0;
+    static bool g_pauseRouteStartInjected = false;
+    static uint64_t g_pauseRouteInputHoldStartFrame = 0;
+    static uint64_t g_pauseRouteInputLastFrame = 0;
+    static bool g_loggedPauseOwnerObserved = false;
+    static std::unordered_set<std::string> g_loggedPauseRouteInputSources;
+    static uint32_t g_chudSonicStageOwnerAddress = 0;
+    static uint32_t g_chudSonicStagePlayScreenProjectAddress = 0;
+    static uint32_t g_chudSonicStageSpeedGaugeSceneAddress = 0;
+    static uint32_t g_chudSonicStageRingEnergyGaugeSceneAddress = 0;
+    static uint32_t g_chudSonicStageGaugeFrameSceneAddress = 0;
+    static uint64_t g_chudSonicStageRawHookFrame = 0;
+    static std::string g_chudSonicStageRawHookSource;
+    static bool g_loggedChudSonicStageOwnerHook = false;
     static uint64_t g_lastLiveStateSnapshotFrame = 0;
     static std::string g_lastStageReadyEventName;
     static std::string g_lastCsdProjectName;
@@ -468,6 +492,7 @@ namespace UiLab
     static bool TargetRoutesThroughTitleMenu(ScreenId id);
     static void RefreshTargetCsdProjectStatus();
     static void ResetRouteLatchState();
+    static bool IsPauseTargetRuntimeReady();
     static bool IsNativeFrameCaptureReady();
     static std::string_view NativeFrameCaptureStatusLabel();
     static void EmitStageTargetReadyIfNeeded();
@@ -661,6 +686,11 @@ namespace UiLab
         std::ostringstream out;
         out << "0x" << std::hex << std::uppercase << value;
         return out.str();
+    }
+
+    static bool IsPlausibleGuestPointer(uint32_t value)
+    {
+        return value >= 0x10000;
     }
 
     static bool TryReadGuestU32(uint32_t guestAddress, uint32_t& value)
@@ -1013,6 +1043,9 @@ namespace UiLab
             case ScreenId::SonicHud:
                 return "sonic-hud-ready";
 
+            case ScreenId::Pause:
+                return "pause-ready";
+
             case ScreenId::Tutorial:
                 return "tutorial-ready";
 
@@ -1027,6 +1060,26 @@ namespace UiLab
         }
     }
 
+    static bool IsPauseTargetRuntimeReady()
+    {
+        if (g_target != ScreenId::Pause)
+            return true;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        return g_pauseGeneralSaveInspector.pauseKnown &&
+            g_pauseGeneralSaveInspector.pauseAddress != 0 &&
+            g_pauseGeneralSaveInspector.pauseProjectAddress != 0 &&
+            (g_pauseGeneralSaveInspector.pauseVisible || g_pauseGeneralSaveInspector.pauseShown);
+    }
+
+    static bool IsPauseRouteOwnerObserved()
+    {
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        return g_pauseGeneralSaveInspector.pauseKnown &&
+            g_pauseGeneralSaveInspector.pauseAddress != 0 &&
+            g_pauseGeneralSaveInspector.pauseProjectAddress != 0;
+    }
+
     void OnStageTargetReady(std::string_view eventName, std::string_view detail)
     {
         if (!g_isEnabled)
@@ -1034,7 +1087,7 @@ namespace UiLab
 
         g_lastStageReadyEventName = std::string(eventName);
         g_lastStageReadyFrame = g_presentedFrameCount;
-        g_routeStatus = "stage target ready";
+        g_routeStatus = g_target == ScreenId::Pause ? "pause target ready" : "stage target ready";
         WriteEvidenceEvent(eventName, detail);
         WriteLiveStateSnapshot();
     }
@@ -1045,7 +1098,8 @@ namespace UiLab
             !TargetNeedsStageHarness(g_target) ||
             g_loggedStageTargetReady ||
             !g_stageContextObserved ||
-            !g_targetCsdObserved)
+            !g_targetCsdObserved ||
+            !IsPauseTargetRuntimeReady())
         {
             return;
         }
@@ -1124,6 +1178,9 @@ namespace UiLab
         if (g_observerMode && !g_routeTargetExplicit)
             return true;
 
+        if (g_target == ScreenId::Pause)
+            return IsPauseTargetRuntimeReady();
+
         if (TargetNeedsStageHarness(g_target))
             return g_stageContextObserved && g_targetCsdObserved;
 
@@ -1201,6 +1258,10 @@ namespace UiLab
         R"("hudOwnerAddress")",
         R"("playScreenProject")",
         R"("speedGaugeScene")",
+        R"("rawOwnerKnown")",
+        R"("rawOwnerFieldsReady")",
+        R"("rawOwnerFrame")",
+        R"("rawHookSource")",
         R"("pause")",
         R"("generalWindow")",
         R"("saveIcon")",
@@ -1448,18 +1509,46 @@ namespace UiLab
         const CsdProjectTreeInspectorSnapshot& csdProjectTree)
     {
         SonicHudOwnerPathInspectorSnapshot snapshot;
+        snapshot.chudSonicStageOwnerAddress = g_chudSonicStageOwnerAddress;
         snapshot.stageGameModeAddress = g_lastStageGameModeAddress;
+        snapshot.rcPlayScreenProjectAddress = g_chudSonicStagePlayScreenProjectAddress;
+        snapshot.rcSpeedGaugeSceneAddress = g_chudSonicStageSpeedGaugeSceneAddress;
+        snapshot.rcRingEnergyGaugeSceneAddress = g_chudSonicStageRingEnergyGaugeSceneAddress;
+        snapshot.rcGaugeFrameSceneAddress = g_chudSonicStageGaugeFrameSceneAddress;
+        snapshot.rawOwnerKnown = g_chudSonicStageOwnerAddress != 0;
+        snapshot.rawOwnerFieldsReady =
+            g_chudSonicStagePlayScreenProjectAddress != 0 ||
+            g_chudSonicStageSpeedGaugeSceneAddress != 0 ||
+            g_chudSonicStageRingEnergyGaugeSceneAddress != 0 ||
+            g_chudSonicStageGaugeFrameSceneAddress != 0;
+        snapshot.rawOwnerFrame = g_chudSonicStageRawHookFrame;
+        snapshot.rawHookSource = g_chudSonicStageRawHookSource;
         snapshot.expectedOwnerFieldSource = "api/SWA/HUD/Sonic/HudSonicStage.h";
-        snapshot.ownerPointerStatus = "raw CHudSonicStage owner pointer not hooked yet";
+        if (snapshot.rawOwnerKnown)
+        {
+            snapshot.ownerPointerStatus = snapshot.rawOwnerFieldsReady
+                ? "raw CHudSonicStage owner hook live"
+                : "raw CHudSonicStage owner hook live; CSD owner fields pending";
+        }
+        else
+        {
+            snapshot.ownerPointerStatus = "raw CHudSonicStage owner hook pending runtime observation";
+        }
 
         if (csdProjectTree.projectKnown && csdProjectTree.activeProject == "ui_playscreen")
         {
             snapshot.resolvedFromCsdProjectTree = true;
-            snapshot.rcPlayScreenProjectAddress = csdProjectTree.projectAddress;
-            snapshot.rcSpeedGaugeSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/so_speed_gauge");
-            snapshot.rcRingEnergyGaugeSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/so_ringenagy_gauge");
-            snapshot.rcGaugeFrameSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/gauge_frame");
-            snapshot.ownerPointerStatus = "resolved CSD ownership; raw owner pointer pending CHudSonicStage hook";
+            if (snapshot.rcPlayScreenProjectAddress == 0)
+                snapshot.rcPlayScreenProjectAddress = csdProjectTree.projectAddress;
+            if (snapshot.rcSpeedGaugeSceneAddress == 0)
+                snapshot.rcSpeedGaugeSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/so_speed_gauge");
+            if (snapshot.rcRingEnergyGaugeSceneAddress == 0)
+                snapshot.rcRingEnergyGaugeSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/so_ringenagy_gauge");
+            if (snapshot.rcGaugeFrameSceneAddress == 0)
+                snapshot.rcGaugeFrameSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/gauge_frame");
+
+            if (!snapshot.rawOwnerKnown)
+                snapshot.ownerPointerStatus = "resolved CSD ownership; raw CHudSonicStage owner hook pending runtime observation";
         }
 
         return snapshot;
@@ -1478,15 +1567,25 @@ namespace UiLab
         snapshot.stageContextObserved = g_stageContextObserved;
         snapshot.targetCsdObserved = g_targetCsdObserved;
         snapshot.stageTargetReady = g_loggedStageTargetReady;
+        snapshot.rawOwnerKnown = g_chudSonicStageOwnerAddress != 0;
+        snapshot.rawOwnerFieldsReady =
+            g_chudSonicStagePlayScreenProjectAddress != 0 ||
+            g_chudSonicStageSpeedGaugeSceneAddress != 0 ||
+            g_chudSonicStageRingEnergyGaugeSceneAddress != 0 ||
+            g_chudSonicStageGaugeFrameSceneAddress != 0;
+        snapshot.hudOwnerAddress = g_chudSonicStageOwnerAddress;
         snapshot.stageGameModeAddress = g_lastStageGameModeAddress;
+        snapshot.rawOwnerFrame = g_chudSonicStageRawHookFrame;
         snapshot.readyEvent = g_lastStageReadyEventName;
-        snapshot.source = "stage/CSD latches";
+        snapshot.rawHookSource = g_chudSonicStageRawHookSource;
+        snapshot.source = snapshot.rawOwnerKnown ? "raw CHudSonicStage owner hook" : "stage/CSD latches";
 
         if (target.id == ScreenId::SonicHud && g_targetCsdObserved)
         {
             snapshot.playScreenProject = std::string(target.primaryCsdScene);
             snapshot.speedGaugeScene = "ui_playscreen/so_speed_gauge";
-            snapshot.source = "stage-target-csd-bound";
+            if (!snapshot.rawOwnerKnown)
+                snapshot.source = "stage-target-csd-bound";
         }
 
         return snapshot;
@@ -1669,8 +1768,12 @@ namespace UiLab
             << "    },\n"
             << "    \"sonicHud\": {\n"
             << "      \"source\": \"" << JsonEscape(sonicHud.source) << "\",\n"
+            << "      \"rawOwnerKnown\": " << (sonicHud.rawOwnerKnown ? "true" : "false") << ",\n"
+            << "      \"rawOwnerFieldsReady\": " << (sonicHud.rawOwnerFieldsReady ? "true" : "false") << ",\n"
             << "      \"hudOwnerAddress\": \"" << JsonEscape(HexU32(sonicHud.hudOwnerAddress)) << "\",\n"
             << "      \"stageGameModeAddress\": \"" << JsonEscape(HexU32(sonicHud.stageGameModeAddress)) << "\",\n"
+            << "      \"rawOwnerFrame\": " << sonicHud.rawOwnerFrame << ",\n"
+            << "      \"rawHookSource\": \"" << JsonEscape(sonicHud.rawHookSource) << "\",\n"
             << "      \"playScreenProject\": \"" << JsonEscape(sonicHud.playScreenProject) << "\",\n"
             << "      \"speedGaugeScene\": \"" << JsonEscape(sonicHud.speedGaugeScene) << "\",\n"
             << "      \"stageContextObserved\": " << (sonicHud.stageContextObserved ? "true" : "false") << ",\n"
@@ -1680,6 +1783,10 @@ namespace UiLab
             << "      \"ownerPath\": {\n"
             << "        \"chudSonicStageOwnerAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.chudSonicStageOwnerAddress)) << "\",\n"
             << "        \"ownerPointerStatus\": \"" << JsonEscape(sonicOwnerPath.ownerPointerStatus) << "\",\n"
+            << "        \"rawOwnerKnown\": " << (sonicOwnerPath.rawOwnerKnown ? "true" : "false") << ",\n"
+            << "        \"rawOwnerFieldsReady\": " << (sonicOwnerPath.rawOwnerFieldsReady ? "true" : "false") << ",\n"
+            << "        \"rawOwnerFrame\": " << sonicOwnerPath.rawOwnerFrame << ",\n"
+            << "        \"rawHookSource\": \"" << JsonEscape(sonicOwnerPath.rawHookSource) << "\",\n"
             << "        \"stageGameModeAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.stageGameModeAddress)) << "\",\n"
             << "        \"rcPlayScreenProjectAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcPlayScreenProjectAddress)) << "\",\n"
             << "        \"rcSpeedGaugeSceneAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcSpeedGaugeSceneAddress)) << "\",\n"
@@ -2377,7 +2484,7 @@ namespace UiLab
         return "waiting";
     }
 
-    const std::array<RuntimeTarget, 10>& GetRuntimeTargets()
+    const std::array<RuntimeTarget, 11>& GetRuntimeTargets()
     {
         return kRuntimeTargets;
     }
@@ -2412,6 +2519,7 @@ namespace UiLab
         g_lastNativeFrameCaptureFrame = 0;
         g_lastNativeFrameCapturePath.clear();
         g_lastNativeFrameCaptureFailure.clear();
+        g_nativeFrameCaptureCompleteExitPending = false;
         g_lastLoadingRequestType = UINT32_MAX;
         g_lastLoadingRequestFrame = 0;
         g_lastLoadingDisplayType = UINT32_MAX;
@@ -2422,6 +2530,19 @@ namespace UiLab
         g_lastStageGameModeAddress = 0;
         g_lastStageContextFrame = 0;
         g_lastStageReadyFrame = 0;
+        g_pauseRouteStartInjected = false;
+        g_pauseRouteInputHoldStartFrame = 0;
+        g_pauseRouteInputLastFrame = 0;
+        g_loggedPauseOwnerObserved = false;
+        g_loggedPauseRouteInputSources.clear();
+        g_chudSonicStageOwnerAddress = 0;
+        g_chudSonicStagePlayScreenProjectAddress = 0;
+        g_chudSonicStageSpeedGaugeSceneAddress = 0;
+        g_chudSonicStageRingEnergyGaugeSceneAddress = 0;
+        g_chudSonicStageGaugeFrameSceneAddress = 0;
+        g_chudSonicStageRawHookFrame = 0;
+        g_chudSonicStageRawHookSource.clear();
+        g_loggedChudSonicStageOwnerHook = false;
         g_lastCsdProjectName.clear();
         g_lastCsdProjectFrame = 0;
         g_lastTitleIntroContextDetail.clear();
@@ -2861,6 +2982,100 @@ namespace UiLab
         WriteLiveStateSnapshot();
     }
 
+    bool ApplyPauseRouteInput(std::string_view hookSource)
+    {
+        if (!g_isEnabled ||
+            g_observerMode ||
+            g_target != ScreenId::Pause ||
+            !g_stageContextObserved ||
+            g_loggedStageTargetReady ||
+            IsPauseTargetRuntimeReady())
+        {
+            return false;
+        }
+
+        const std::string source = hookSource.empty() ? "unknown" : std::string(hookSource);
+
+        if (g_loggedPauseRouteInputSources.insert(source).second)
+        {
+            WriteEvidenceEvent(
+                "pause-route-input-gate-observed",
+                "frame=" + std::to_string(g_presentedFrameCount) +
+                " pause-route-input-source=" + source +
+                " stage_address=" + HexU32(g_lastStageGameModeAddress));
+        }
+
+        constexpr uint64_t kPauseRouteStageSettleFrames = 45;
+        constexpr uint64_t kPauseRoutePostLoadingSettleFrames = 60;
+        constexpr uint64_t kPauseRouteHoldFrames = 30;
+        constexpr uint64_t kPauseRouteRetryFrames = 45;
+
+        if (g_presentedFrameCount < g_lastStageContextFrame + kPauseRouteStageSettleFrames)
+            return false;
+
+        const uint64_t lastLoadingFrame = std::max(g_lastLoadingRequestFrame, g_lastLoadingDisplayFrame);
+        const bool runtimeLoading = SWA::SGlobals::ms_IsLoading && *SWA::SGlobals::ms_IsLoading;
+        if (runtimeLoading || g_loadingDisplayWasActive ||
+            (lastLoadingFrame != 0 && g_presentedFrameCount < lastLoadingFrame + kPauseRoutePostLoadingSettleFrames))
+        {
+            return false;
+        }
+
+        if (!IsPauseRouteOwnerObserved())
+            return false;
+
+        if (g_pauseRouteInputHoldStartFrame == 0 ||
+            g_presentedFrameCount > g_pauseRouteInputLastFrame + kPauseRouteRetryFrames)
+        {
+            g_pauseRouteInputHoldStartFrame = g_presentedFrameCount;
+            g_pauseRouteInputLastFrame = g_presentedFrameCount;
+
+            if (!g_pauseRouteStartInjected)
+            {
+                g_pauseRouteStartInjected = true;
+                g_routeStatus = "pause start injected";
+                WriteEvidenceEvent(
+                    "pause-route-start-injected",
+                    "frame=" + std::to_string(g_presentedFrameCount) +
+                    " stage_address=" + HexU32(g_lastStageGameModeAddress) +
+                    " pause-route-input-source=" + source);
+            }
+            else
+            {
+                WriteEvidenceEvent(
+                    "pause-route-start-retried",
+                    "frame=" + std::to_string(g_presentedFrameCount) +
+                    " stage_address=" + HexU32(g_lastStageGameModeAddress) +
+                    " pause-route-input-source=" + source);
+            }
+        }
+
+        if (g_presentedFrameCount >= g_pauseRouteInputHoldStartFrame + kPauseRouteHoldFrames)
+            return false;
+
+        auto pInputState = SWA::CInputState::GetInstance();
+        if (!pInputState)
+            return false;
+
+        auto& padState = pInputState->m_PadStates[(uint32_t)pInputState->m_CurrentPadStateIndex];
+        constexpr uint32_t startMask = SWA::eKeyState_Start;
+        padState.DownState = (uint32_t)padState.DownState | startMask;
+        padState.TappedState = (uint32_t)padState.TappedState | startMask;
+        g_pauseRouteInputLastFrame = g_presentedFrameCount;
+        g_routeStatus = "pause start injected";
+        return true;
+    }
+
+    static void RequestUiLabExit(std::string_view eventName, std::string_view detail = {})
+    {
+        if (g_autoExitRequested)
+            return;
+
+        g_autoExitRequested = true;
+        WriteEvidenceEvent(eventName, detail);
+        App::Exit();
+    }
+
     void OnPresentedFrame()
     {
         if (!g_isEnabled)
@@ -2876,11 +3091,19 @@ namespace UiLab
         if ((g_presentedFrameCount % 30) == 0 && g_lastLiveStateSnapshotFrame != g_presentedFrameCount)
             WriteLiveStateSnapshot();
 
+        if (g_nativeFrameCaptureCompleteExitPending &&
+            g_autoExitSeconds > 0.0 &&
+            !g_autoExitRequested)
+        {
+            RequestUiLabExit(
+                "native-frame-capture-complete-auto-exit",
+                "captures=" + std::to_string(g_nativeFrameCaptureWrittenCount) +
+                " max=" + std::to_string(g_nativeFrameCaptureMaxCount));
+        }
+
         if (g_autoExitSeconds > 0.0 && !g_autoExitRequested && SecondsSinceStart() >= g_autoExitSeconds)
         {
-            g_autoExitRequested = true;
-            WriteEvidenceEvent("auto-exit");
-            App::Exit();
+            RequestUiLabExit("auto-exit");
         }
     }
 
@@ -2942,6 +3165,12 @@ namespace UiLab
             " index=" + std::to_string(g_nativeFrameCaptureWrittenCount) +
             " max=" + std::to_string(g_nativeFrameCaptureMaxCount));
         WriteLiveStateSnapshot();
+
+        if (g_autoExitSeconds > 0.0 &&
+            g_nativeFrameCaptureWrittenCount >= g_nativeFrameCaptureMaxCount)
+        {
+            g_nativeFrameCaptureCompleteExitPending = true;
+        }
     }
 
     void OnNativeFrameCaptureFailed(std::string_view reason)
@@ -2976,17 +3205,20 @@ namespace UiLab
 
         g_lastLoadingDisplayType = displayType;
         g_lastLoadingDisplayFrame = g_presentedFrameCount;
+        const bool preservePauseReadyRoute = g_target == ScreenId::Pause && g_loggedStageTargetReady;
 
         if (displayType != 0)
         {
             g_loadingDisplayWasActive = true;
-            g_routeStatus = "loading display active";
+            if (!preservePauseReadyRoute)
+                g_routeStatus = "loading display active";
             WriteEvidenceEvent("loading-display-active", "display_type=" + std::to_string(displayType));
         }
         else if (g_loadingDisplayWasActive)
         {
             g_loadingDisplayWasActive = false;
-            g_routeStatus = "loading display ended";
+            if (!preservePauseReadyRoute)
+                g_routeStatus = "loading display ended";
             WriteEvidenceEvent("loading-display-ended");
         }
     }
@@ -3114,6 +3346,67 @@ namespace UiLab
             castIndex);
     }
 
+    void OnHudSonicStageUpdate(
+        uint32_t ownerAddress,
+        uint32_t playScreenProjectAddress,
+        uint32_t speedGaugeSceneAddress,
+        uint32_t ringEnergyGaugeSceneAddress,
+        uint32_t gaugeFrameSceneAddress,
+        std::string_view hookSource)
+    {
+        if (!g_isEnabled || !IsPlausibleGuestPointer(ownerAddress))
+            return;
+
+        if (!IsPlausibleGuestPointer(playScreenProjectAddress))
+            playScreenProjectAddress = 0;
+        if (!IsPlausibleGuestPointer(speedGaugeSceneAddress))
+            speedGaugeSceneAddress = 0;
+        if (!IsPlausibleGuestPointer(ringEnergyGaugeSceneAddress))
+            ringEnergyGaugeSceneAddress = 0;
+        if (!IsPlausibleGuestPointer(gaugeFrameSceneAddress))
+            gaugeFrameSceneAddress = 0;
+
+        const bool hasOwnerFields =
+            playScreenProjectAddress != 0 ||
+            speedGaugeSceneAddress != 0 ||
+            ringEnergyGaugeSceneAddress != 0 ||
+            gaugeFrameSceneAddress != 0;
+
+        const bool changed =
+            g_chudSonicStageOwnerAddress != ownerAddress ||
+            g_chudSonicStagePlayScreenProjectAddress != playScreenProjectAddress ||
+            g_chudSonicStageSpeedGaugeSceneAddress != speedGaugeSceneAddress ||
+            g_chudSonicStageRingEnergyGaugeSceneAddress != ringEnergyGaugeSceneAddress ||
+            g_chudSonicStageGaugeFrameSceneAddress != gaugeFrameSceneAddress ||
+            g_chudSonicStageRawHookSource != hookSource;
+
+        g_chudSonicStageOwnerAddress = ownerAddress;
+        g_chudSonicStagePlayScreenProjectAddress = playScreenProjectAddress;
+        g_chudSonicStageSpeedGaugeSceneAddress = speedGaugeSceneAddress;
+        g_chudSonicStageRingEnergyGaugeSceneAddress = ringEnergyGaugeSceneAddress;
+        g_chudSonicStageGaugeFrameSceneAddress = gaugeFrameSceneAddress;
+        g_chudSonicStageRawHookFrame = g_presentedFrameCount;
+        g_chudSonicStageRawHookSource = hookSource;
+
+        if (!g_loggedChudSonicStageOwnerHook || changed)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-owner-hooked",
+                "owner=" + HexU32(ownerAddress) +
+                " play_screen=" + HexU32(playScreenProjectAddress) +
+                " speed_gauge=" + HexU32(speedGaugeSceneAddress) +
+                " ring_energy_gauge=" + HexU32(ringEnergyGaugeSceneAddress) +
+                " gauge_frame=" + HexU32(gaugeFrameSceneAddress) +
+                " owner_fields_ready=" + std::string(hasOwnerFields ? "1" : "0") +
+                " source=" + std::string(hookSource) +
+                (hasOwnerFields
+                    ? " status=raw CHudSonicStage owner hook"
+                    : " status=raw CHudSonicStage owner hook owner-only; CSD owner fields pending"));
+            g_loggedChudSonicStageOwnerHook = true;
+            WriteLiveStateSnapshot();
+        }
+    }
+
     void OnHudPauseUpdate(
         uint32_t pauseAddress,
         uint32_t pauseProjectAddress,
@@ -3128,18 +3421,67 @@ namespace UiLab
         if (!g_isEnabled)
             return;
 
-        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
-        g_pauseGeneralSaveInspector.pauseKnown = true;
-        g_pauseGeneralSaveInspector.pauseAddress = pauseAddress;
-        g_pauseGeneralSaveInspector.pauseProjectAddress = pauseProjectAddress;
-        g_pauseGeneralSaveInspector.pauseBgSceneAddress = bgSceneAddress;
-        g_pauseGeneralSaveInspector.pauseAction = action;
-        g_pauseGeneralSaveInspector.pauseMenu = menu;
-        g_pauseGeneralSaveInspector.pauseStatus = status;
-        g_pauseGeneralSaveInspector.pauseTransition = transition;
-        g_pauseGeneralSaveInspector.pauseVisible = isVisible;
-        g_pauseGeneralSaveInspector.pauseShown = isShown;
-        g_pauseGeneralSaveInspector.pauseFrame = g_presentedFrameCount;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            g_pauseGeneralSaveInspector.pauseKnown = true;
+            g_pauseGeneralSaveInspector.pauseAddress = pauseAddress;
+            g_pauseGeneralSaveInspector.pauseProjectAddress = pauseProjectAddress;
+            g_pauseGeneralSaveInspector.pauseBgSceneAddress = bgSceneAddress;
+            g_pauseGeneralSaveInspector.pauseAction = action;
+            g_pauseGeneralSaveInspector.pauseMenu = menu;
+            g_pauseGeneralSaveInspector.pauseStatus = status;
+            g_pauseGeneralSaveInspector.pauseTransition = transition;
+            g_pauseGeneralSaveInspector.pauseVisible = isVisible;
+            g_pauseGeneralSaveInspector.pauseShown = isShown;
+            g_pauseGeneralSaveInspector.pauseFrame = g_presentedFrameCount;
+        }
+
+        if (g_target == ScreenId::Pause && pauseProjectAddress != 0)
+        {
+            g_targetCsdObserved = true;
+
+            if (!g_loggedPauseOwnerObserved)
+            {
+                WriteEvidenceEvent(
+                    "pause-owner-observed",
+                    "pause_address=" + HexU32(pauseAddress) +
+                    " pause_project=" + HexU32(pauseProjectAddress) +
+                    " visible=" + std::to_string(isVisible ? 1 : 0) +
+                    " shown=" + std::to_string(isShown ? 1 : 0));
+                g_loggedPauseOwnerObserved = true;
+            }
+
+            if (!g_loggedTargetCsdProjectLive)
+            {
+                WriteEvidenceEvent("target-csd-project-made", "ui_pause source=CHudPause.m_rcPause");
+                g_loggedTargetCsdProjectLive = true;
+            }
+
+            if (g_stageContextObserved && !g_loggedStageTargetCsdBound)
+            {
+                WriteEvidenceEvent(
+                    "stage-target-csd-bound",
+                    "target_csd=ui_pause stage_context=1 source=CHudPause.m_rcPause");
+                g_loggedStageTargetCsdBound = true;
+            }
+
+            if ((isVisible || isShown) && !g_loggedStageTargetReady)
+            {
+                const auto detail =
+                    "pause_address=" + HexU32(pauseAddress) +
+                    " pause_project=" + HexU32(pauseProjectAddress) +
+                    " action=" + std::to_string(action) +
+                    " menu=" + std::to_string(menu) +
+                    " status=" + std::to_string(status) +
+                    " transition=" + std::to_string(transition) +
+                    " visible=" + std::to_string(isVisible ? 1 : 0) +
+                    " shown=" + std::to_string(isShown ? 1 : 0);
+                WriteEvidenceEvent("pause-target-ready", detail);
+            }
+        }
+
+        EmitStageTargetReadyIfNeeded();
+        WriteLiveStateSnapshot();
     }
 
     void OnGeneralWindowUpdate(

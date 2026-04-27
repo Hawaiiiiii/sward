@@ -165,6 +165,14 @@ Pause, general-window, and save-icon runtime owners are now first-class live ins
 
 `CHudSonicStage owner pointer paths` are also exposed more deeply. The live bridge reports resolved CSD ownership for `m_rcPlayScreen`, `m_rcSpeedGauge`, `m_rcRingEnergyGauge`, and `m_rcGaugeFrame` through the observed CSD tree. The raw owner pointer is still explicitly marked as pending a dedicated `CHudSonicStage` object hook; it is not inferred from screenshots or treated as solved until that hook exists.
 
+## Phase 120 Raw Sonic Owner And Pause Route
+
+Phase 120 adds the raw `CHudSonicStage` owner object hook: the raw CHudSonicStage owner object hook. The new `CHudSonicStage_patches.cpp` seam reports the owner plus `m_rcPlayScreen`, `m_rcSpeedGauge`, `m_rcRingEnergyGauge`, and `m_rcGaugeFrame` through `UiLab::OnHudSonicStageUpdate`; the live bridge emits `sonic-hud-owner-hooked` once a plausible owner is observed. The event and live state expose `owner_fields_ready` / `rawOwnerFieldsReady` separately, so an owner-only hook is not misread as proven CSD-field ownership.
+
+Phase 120 also adds a deterministic pause route. `pause` is now a stage-harness target with `ui_pause` as its primary CSD, a scoped Start-input injector after stage load, and explicit `pause-target-ready` / `pause-ready` evidence once `CHudPause` reports a visible or shown owner. Native BMP capture remains the visual confirmation path; live bridge state drives readiness, not screenshot inference.
+
+The capture helper now gives `pause` a target-aware effective auto-exit floor. A requested `75s` run records `requestedAutoExitSeconds=75` and `effectiveAutoExitSeconds=95`, which keeps slower stage/loading cycles alive long enough for the late `pause-target-ready` latch without changing non-pause targets. Native-capture sessions also request runtime exit on the next presented frame after the requested BMP set completes, so evidence runs stop at the proof point instead of sitting in the target state until a generic timeout.
+
 ## Verification
 
 Local-only evidence, not committed:
@@ -227,3 +235,16 @@ Local-only evidence, not committed:
   - Phase 119 full early-game live-bridge/native sweep passed `title-loop`, `title-menu`, `title-options`, `loading`, and `sonic-hud`
   - all targets used live-bridge readiness and RGB-nonblack native BMP evidence
   - the final `sonic-hud` state again reported `ui_playscreen`, `13` scenes, `209` layers, and resolved gauge scene addresses from the CSD tree
+
+- `out/ui_lab_runtime_evidence/20260428_011255/`
+  - focused Phase 120 `sonic-hud` live-bridge/native capture passed on the final raw-owner hook build
+  - JSONL emitted `sonic-hud-owner-hooked` with `owner_fields_ready=0`, proving the raw `CHudSonicStage` owner pointer while keeping embedded CSD owner fields marked pending
+  - live state reported `rawOwnerKnown=true`, `rawOwnerFieldsReady=false`, `rawHookSource=raw CHudSonicStage owner hook sub_824D9308`, and `ownerPointerStatus=raw CHudSonicStage owner hook live; CSD owner fields pending`
+  - native BMP signal remained visual confirmation: `6 / 6` RGB-nonblack captures, best route `stage target ready`
+
+- `out/ui_lab_runtime_evidence/20260428_012413/`
+  - focused Phase 120 `pause` live-bridge/native capture passed with the target-aware pause timeout floor and clean runtime exit
+  - manifest reported `requestedAutoExitSeconds=75`, `effectiveAutoExitSeconds=95`, `readinessSource=live-bridge`, `exitCode=0`, and no missing evidence events
+  - JSONL emitted `pause-owner-observed`, `pause-route-start-injected`, `pause-target-ready`, and `pause-ready`
+  - native BMP signal passed with `4 / 4` RGB-nonblack captures, `bestIndex=4`, and `bestRoute=pause target ready`
+  - JSONL ended with `native-frame-capture-complete-auto-exit` after the fourth native BMP, keeping the proof session bounded

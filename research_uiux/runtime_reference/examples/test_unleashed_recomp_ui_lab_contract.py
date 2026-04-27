@@ -29,6 +29,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "TitleOptions",
             "Loading",
             "SonicHud",
+            "Pause",
             "ExtraStageHud",
             "Result",
             "Status",
@@ -44,9 +45,10 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         aspect = self.read("UnleashedRecomp/patches/aspect_ratio_patches.cpp")
         script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
 
-        self.assertIn("const std::array<RuntimeTarget, 10>& GetRuntimeTargets()", header)
-        self.assertIn("static constexpr std::array<RuntimeTarget, 10> kRuntimeTargets", ui_lab)
+        self.assertIn("const std::array<RuntimeTarget, 11>& GetRuntimeTargets()", header)
+        self.assertIn("static constexpr std::array<RuntimeTarget, 11> kRuntimeTargets", ui_lab)
         self.assertIn('{ ScreenId::SonicHud, "sonic-hud", "Sonic Stage HUD", "ui_playscreen"', ui_lab)
+        self.assertIn('{ ScreenId::Pause, "pause", "Pause Menu", "ui_pause"', ui_lab)
         self.assertIn('{ ScreenId::ExtraStageHud, "extra-stage-hud", "Extra Stage / Tornado HUD", "ui_prov_playscreen"', ui_lab)
         self.assertIn('token == "prov-hud"', ui_lab)
         self.assertIn('token == "tornado-hud"', ui_lab)
@@ -599,7 +601,11 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         script = self.read("research_uiux/runtime_reference/tools/build_unleashed_recomp_ui_lab.ps1")
         self.assertIn("subst $drive", script)
         self.assertIn("Sync-TrackedRuntimeFile", script)
+        self.assertIn("CMakeLists.txt", script)
         self.assertIn("resident_patches.cpp", script)
+        self.assertIn("CHudPause_patches.cpp", script)
+        self.assertIn("CHudSonicStage_patches.cpp", script)
+        self.assertIn("CGameModeStage_patches.cpp", script)
         self.assertIn("aspect_ratio_patches.cpp", script)
         self.assertIn("CGameModeStageTitle_patches.cpp", script)
         self.assertIn("CTitleStateIntro_patches.cpp", script)
@@ -971,6 +977,162 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "raw owner pointer",
         ]:
             self.assertIn(token, report)
+
+    def test_ui_lab_phase120_hooks_raw_chud_sonic_stage_owner(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        cmake = self.read("UnleashedRecomp/CMakeLists.txt")
+        sonic = self.read("UnleashedRecomp/patches/CHudSonicStage_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "void OnHudSonicStageUpdate",
+            "uint32_t ownerAddress",
+            "uint32_t playScreenProjectAddress",
+            "uint32_t speedGaugeSceneAddress",
+            "uint32_t ringEnergyGaugeSceneAddress",
+            "uint32_t gaugeFrameSceneAddress",
+            "std::string_view hookSource",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            '"patches/CHudSonicStage_patches.cpp"',
+            "CHudSonicStage_patches.cpp",
+        ]:
+            self.assertIn(token, cmake)
+
+        for token in [
+            "#include <api/SWA.h>",
+            "#include <patches/ui_lab_patches.h>",
+            "SWA::CHudSonicStage",
+            "IsPlausibleGuestAddress",
+            "RecordHudSonicStageInspector",
+            "UiLab::OnHudSonicStageUpdate",
+            "GuestAddressOf(pHudSonicStage->m_rcPlayScreen.Get())",
+            "GuestAddressOf(pHudSonicStage->m_rcSpeedGauge.Get())",
+            "GuestAddressOf(pHudSonicStage->m_rcRingEnergyGauge.Get())",
+            "GuestAddressOf(pHudSonicStage->m_rcGaugeFrame.Get())",
+            "PPC_FUNC_IMPL(__imp__sub_824D89B0)",
+            "PPC_FUNC_IMPL(__imp__sub_824D9308)",
+            "PPC_FUNC_IMPL(__imp__sub_824D95F8)",
+            "raw CHudSonicStage owner hook",
+        ]:
+            self.assertIn(token, sonic)
+
+        for token in [
+            "g_chudSonicStageOwnerAddress",
+            "g_chudSonicStageRawHookFrame",
+            "g_chudSonicStageRawHookSource",
+            "sonic-hud-owner-hooked",
+            '"rawOwnerKnown"',
+            '"rawOwnerFieldsReady"',
+            '"rawOwnerFrame"',
+            '"rawHookSource"',
+            "owner_fields_ready=",
+            "raw CHudSonicStage owner hook live",
+            "raw CHudSonicStage owner hook live; CSD owner fields pending",
+            "raw CHudSonicStage owner hook pending runtime observation",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 120",
+            "raw CHudSonicStage owner object hook",
+            "sonic-hud-owner-hooked",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_phase120_adds_deterministic_pause_route_target(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        cmake = self.read("UnleashedRecomp/CMakeLists.txt")
+        stage = self.read("UnleashedRecomp/patches/CGameModeStage_patches.cpp")
+        pause = self.read("UnleashedRecomp/patches/CHudPause_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "Pause",
+            "const std::array<RuntimeTarget, 11>& GetRuntimeTargets()",
+            "bool ApplyPauseRouteInput",
+        ]:
+            self.assertIn(token, header)
+
+        self.assertIn('"patches/CGameModeStage_patches.cpp"', cmake)
+
+        for token in [
+            "#include <patches/ui_lab_patches.h>",
+            "PPC_FUNC_IMPL(__imp__sub_8253B7C0)",
+            'UiLab::ApplyPauseRouteInput("CGameModeStage::Update pause gate sub_8253B7C0")',
+            "__imp__sub_8253B7C0(ctx, base)",
+        ]:
+            self.assertIn(token, stage)
+
+        for token in [
+            "PPC_FUNC_IMPL(__imp__sub_824B1810)",
+            "RecordHudPauseInspector(pauseAddress, pHudPause)",
+            "pause transition helper sub_824B1810",
+            "IsPlausibleGuestAddress",
+        ]:
+            self.assertIn(token, pause)
+
+        for token in [
+            "static constexpr std::array<RuntimeTarget, 11> kRuntimeTargets",
+            '{ ScreenId::Pause, "pause", "Pause Menu", "ui_pause", "HUD/Pause/HudPause.cpp", true }',
+            'case ScreenId::Pause:',
+            'return "pause-ready"',
+            "ApplyPauseRouteInput",
+            "g_pauseRouteStartInjected",
+            "g_pauseRouteInputHoldStartFrame",
+            "pause-route-start-injected",
+            "pause-route-start-retried",
+            "pause-owner-observed",
+            "g_loggedStageTargetReady",
+            "preservePauseReadyRoute",
+            "pause-route-input-source",
+            "pause target ready",
+            "pause-target-ready",
+            "IsPauseTargetRuntimeReady",
+            "native-frame-capture-complete-auto-exit",
+            "RequestUiLabExit",
+            "if (g_target == ScreenId::Pause)",
+            "return IsPauseTargetRuntimeReady();",
+            "eKeyState_Start",
+            "TappedState",
+            "SWA::CInputState::GetInstance()",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "deterministic pause route",
+            "pause-ready",
+            "pause-target-ready",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_phase120_capture_helper_supports_pause_live_bridge_readiness(self):
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+
+        for token in [
+            '"pause"',
+            '"pause-ready"',
+            '"pause-target-ready"',
+            '"pause-owner-observed"',
+            '"pause-route-start-injected"',
+            '@("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "pause-owner-observed", "pause-route-start-injected", "pause-target-ready", "pause-ready")',
+            '@("sonic-hud", "extra-stage-hud", "tutorial", "result", "pause")',
+            '$stageTargetReadyEvent -eq "pause-ready"',
+            '$route -eq "pause target ready"',
+            '$Csd -eq "ui_pause"',
+            '$_.target -eq "pause" -and $_.route -eq "pause target ready"',
+            '$effectiveNativeCaptureCount = [Math]::Max($effectiveNativeCaptureCount, 4)',
+            'Get-UiLabEffectiveAutoExitSeconds',
+            'return [Math]::Max($RequestedAutoExitSeconds, 95)',
+            'requestedAutoExitSeconds',
+            'effectiveAutoExitSeconds',
+            '$pauseIndex -ge 2 -and $pauseIndex -le 4',
+        ]:
+            self.assertIn(token, script)
 
 
 if __name__ == "__main__":

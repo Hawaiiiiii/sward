@@ -14,6 +14,7 @@ namespace UiLab
         TitleOptions,
         Loading,
         SonicHud,
+        Pause,
         ExtraStageHud,
         Result,
         Status,
@@ -47,7 +48,7 @@ namespace UiLab
     bool IsLiveBridgeEnabled();
     std::string_view GetLiveBridgeName();
     std::string BuildLiveStateJson();
-    const std::array<RuntimeTarget, 10>& GetRuntimeTargets();
+    const std::array<RuntimeTarget, 11>& GetRuntimeTargets();
     void RequestRouteToCurrentTarget();
     void SelectPreviousTarget();
     void SelectNextTarget();
@@ -107,6 +108,7 @@ namespace UiLab
         bool menuField9A);
     void OnStageExitLoading(uint32_t gameModeStageAddress = 0);
     void OnStageTargetReady(std::string_view eventName, std::string_view detail);
+    bool ApplyPauseRouteInput(std::string_view hookSource = {});
     void OnPresentedFrame();
     void WriteLiveStateSnapshot();
     std::string ConsumeNativeFrameCapturePath(uint32_t width, uint32_t height);
@@ -145,6 +147,13 @@ namespace UiLab
         uint32_t transition,
         bool isVisible,
         bool isShown);
+    void OnHudSonicStageUpdate(
+        uint32_t ownerAddress,
+        uint32_t playScreenProjectAddress,
+        uint32_t speedGaugeSceneAddress,
+        uint32_t ringEnergyGaugeSceneAddress,
+        uint32_t gaugeFrameSceneAddress,
+        std::string_view hookSource);
     void OnGeneralWindowUpdate(
         uint32_t generalWindowAddress,
         uint32_t generalProjectAddress,
