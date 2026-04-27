@@ -68,6 +68,26 @@ static uint32_t ReadGuestU32(const void* address)
     return reinterpret_cast<const be<uint32_t>*>(address)->get();
 }
 
+static uint32_t GuestAddressOf(const void* host)
+{
+    return host != nullptr ? g_memory.MapVirtual(host) : 0;
+}
+
+static void RecordGeneralWindowInspector(const SWA::CGameDocument* pGameDocument)
+{
+    if (pGameDocument == nullptr || !pGameDocument->m_pMember || !pGameDocument->m_pMember->m_pGeneralWindow)
+        return;
+
+    const auto* pGeneralWindow = pGameDocument->m_pMember->m_pGeneralWindow.get();
+    UiLab::OnGeneralWindowUpdate(
+        GuestAddressOf(pGeneralWindow),
+        GuestAddressOf(pGeneralWindow->m_rcGeneral.Get()),
+        GuestAddressOf(pGeneralWindow->m_rcBg.Get()),
+        static_cast<uint32_t>(pGeneralWindow->m_Status),
+        static_cast<uint32_t>(pGeneralWindow->m_CursorIndex),
+        static_cast<uint32_t>(pGeneralWindow->m_SelectedIndex));
+}
+
 static void ApplyDirectTitleMenuContext(SWA::CTitleMenu& titleMenu)
 {
     titleMenu.m_CursorIndex = 0;
@@ -82,6 +102,7 @@ PPC_FUNC(sub_825882B8)
 {
     auto pTitleStateMenu = (SWA::CTitleStateMenu*)g_memory.Translate(ctx.r3.u32);
     auto pGameDocument = SWA::CGameDocument::GetInstance();
+    RecordGeneralWindowInspector(pGameDocument);
 
     auto pInputState = SWA::CInputState::GetInstance();
     auto& pPadState = pInputState->m_PadStates[(uint32_t)pInputState->m_CurrentPadStateIndex];
@@ -176,6 +197,8 @@ PPC_FUNC(sub_825882B8)
             OptionsMenu::Close();
         }
     }
+
+    RecordGeneralWindowInspector(pGameDocument);
 }
 
 void TitleMenuRemoveContinueOnCorruptSaveMidAsmHook(PPCRegister& r3)

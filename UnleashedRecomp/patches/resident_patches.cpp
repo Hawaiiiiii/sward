@@ -100,6 +100,7 @@ PPC_FUNC(sub_824E5170)
     __imp__sub_824E5170(ctx, base);
 
     App::s_isSaving = pSaveIcon->m_IsVisible;
+    UiLab::OnSaveIconUpdate(ctx.r3.u32, pSaveIcon->m_IsVisible);
 
     static bool isSavedExtraData = false;
 

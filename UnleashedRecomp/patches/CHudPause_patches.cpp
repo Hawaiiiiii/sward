@@ -5,6 +5,7 @@
 #include <ui/options_menu.h>
 #include <locale/locale.h>
 #include <app.h>
+#include <patches/ui_lab_patches.h>
 
 bool g_isClosed;
 
@@ -13,6 +14,25 @@ constexpr float g_achievementMenuIntroThreshold = 3.0f;
 float g_achievementMenuOutroTime = 0.0f;
 constexpr float g_achievementMenuOutroThreshold = 0.32f;
 bool g_isAchievementMenuOutro = false;
+
+static uint32_t GuestAddressOf(const void* host)
+{
+    return host != nullptr ? g_memory.MapVirtual(host) : 0;
+}
+
+static void RecordHudPauseInspector(uint32_t pauseAddress, const SWA::CHudPause* pHudPause)
+{
+    UiLab::OnHudPauseUpdate(
+        pauseAddress,
+        GuestAddressOf(pHudPause->m_rcPause.Get()),
+        GuestAddressOf(pHudPause->m_rcBg.Get()),
+        static_cast<uint32_t>(pHudPause->m_Action),
+        static_cast<uint32_t>(pHudPause->m_Menu),
+        static_cast<uint32_t>(pHudPause->m_Status),
+        static_cast<uint32_t>(pHudPause->m_Transition),
+        pHudPause->m_IsVisible,
+        pHudPause->m_IsShown);
+}
 
 void CHudPauseAddOptionsItemMidAsmHook(PPCRegister& pThis)
 {
@@ -183,4 +203,6 @@ PPC_FUNC(sub_824B0930)
 
         __imp__sub_824B0930(ctx, base);
     }
+
+    RecordHudPauseInspector(ctx.r3.u32, pHudPause);
 }

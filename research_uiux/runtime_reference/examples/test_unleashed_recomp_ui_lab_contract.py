@@ -841,6 +841,137 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, report)
 
+    def test_ui_lab_phase119_promotes_full_csd_tree_traversal_into_live_bridge(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        aspect = self.read("UnleashedRecomp/patches/aspect_ratio_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "struct CsdProjectTreeInspectorSnapshot",
+            "struct CsdTreeEntry",
+            "BuildCsdProjectTreeInspectorSnapshot",
+            "AppendCsdTreeEntries",
+            "OnCsdProjectTreeMade",
+            "OnCsdSceneNodeTraversed",
+            "OnCsdSceneTraversed",
+            "OnCsdLayerTraversed",
+            '"csdProjectTree"',
+            '"observedProjects"',
+            '"projectAddress"',
+            '"rootNodeAddress"',
+            '"sceneCount"',
+            '"nodeCount"',
+            '"layerCount"',
+            '"scenes"',
+            '"nodes"',
+            '"layers"',
+            '"runtimeSceneMotionFrame"',
+            '"runtimeSceneMotionRepeatTypeLabel"',
+            "CCsdProject::Make resource traversal",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "void OnCsdProjectTreeMade",
+            "void OnCsdSceneNodeTraversed",
+            "void OnCsdSceneTraversed",
+            "void OnCsdLayerTraversed",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "UiLab::OnCsdProjectTreeMade",
+            "UiLab::OnCsdSceneNodeTraversed",
+            "UiLab::OnCsdSceneTraversed",
+            "UiLab::OnCsdLayerTraversed",
+            "GuestAddressOf",
+        ]:
+            self.assertIn(token, aspect)
+
+        for token in [
+            "Phase 119",
+            "full CSD project/scene/node/layer traversal",
+            "CCsdProject::Make",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_phase119_promotes_pause_general_save_inspectors(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        pause = self.read("UnleashedRecomp/patches/CHudPause_patches.cpp")
+        resident = self.read("UnleashedRecomp/patches/resident_patches.cpp")
+        title_menu = self.read("UnleashedRecomp/patches/CTitleStateMenu_patches.cpp")
+
+        for token in [
+            "struct PauseGeneralSaveLiveInspectorSnapshot",
+            "BuildPauseGeneralSaveLiveInspectorSnapshot",
+            "OnHudPauseUpdate",
+            "OnGeneralWindowUpdate",
+            "OnSaveIconUpdate",
+            '"pauseGeneralSave"',
+            '"pause"',
+            '"generalWindow"',
+            '"saveIcon"',
+            '"pauseAddress"',
+            '"pauseProjectAddress"',
+            '"pauseAction"',
+            '"pauseActionLabel"',
+            '"generalWindowAddress"',
+            '"generalProjectAddress"',
+            '"generalWindowStatusLabel"',
+            '"saveIconAddress"',
+            '"saveIconVisible"',
+            "PauseActionTypeLabel",
+            "GeneralWindowStatusLabel",
+            "SWA.HUD.CHudPause.m_Action",
+            "SWA.HUD.CGeneralWindow.m_rcGeneral",
+            "SWA.HUD.CSaveIcon.m_IsVisible",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "void OnHudPauseUpdate",
+            "void OnGeneralWindowUpdate",
+            "void OnSaveIconUpdate",
+        ]:
+            self.assertIn(token, header)
+
+        self.assertIn("#include <patches/ui_lab_patches.h>", pause)
+        self.assertIn("UiLab::OnHudPauseUpdate", pause)
+        self.assertIn("UiLab::OnSaveIconUpdate", resident)
+        self.assertIn("UiLab::OnGeneralWindowUpdate", title_menu)
+
+    def test_ui_lab_phase119_exposes_sonic_hud_owner_pointer_paths(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "struct SonicHudOwnerPathInspectorSnapshot",
+            "BuildSonicHudOwnerPathInspectorSnapshot",
+            '"ownerPath"',
+            '"chudSonicStageOwnerAddress"',
+            '"ownerPointerStatus"',
+            '"stageGameModeAddress"',
+            '"rcPlayScreenProjectAddress"',
+            '"rcSpeedGaugeSceneAddress"',
+            '"rcRingEnergyGaugeSceneAddress"',
+            '"rcGaugeFrameSceneAddress"',
+            '"resolvedFromCsdProjectTree"',
+            '"expectedOwnerFieldSource"',
+            "SWA.HUD.CHudSonicStage.m_rcPlayScreen",
+            "SWA.HUD.CHudSonicStage.m_rcSpeedGauge",
+            "api/SWA/HUD/Sonic/HudSonicStage.h",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "CHudSonicStage owner pointer paths",
+            "resolved CSD ownership",
+            "raw owner pointer",
+        ]:
+            self.assertIn(token, report)
+
 
 if __name__ == "__main__":
     unittest.main()

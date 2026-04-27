@@ -1,5 +1,5 @@
 {
-  "phase": 116,
+  "phase": 119,
   "source": "UnleashedRecomp-debug-menu",
   "policy": "reference-only harvest; no fork source or assets are vendored into SWARD",
   "liveBridge": {
@@ -9,6 +9,7 @@
     "commands": [
       "state",
       "events",
+      "route-status",
       "route <target>",
       "reset",
       "set-global <name> <0|1>",
@@ -29,7 +30,8 @@
       "typedFields": [
         "CSD.Manager.CScene.m_MotionFrame",
         "CSD.Manager.CScene.m_MotionRepeatType",
-        "CSD.Manager.CNode.m_pMotionPattern"
+        "CSD.Manager.CNode.m_pMotionPattern",
+        "CSD.Manager.CProject resource tree scenes/nodes/layers"
       ],
       "swardUse": "CSD project, scene, node, motion-frame, repeat-type, and layer-readiness inspection"
     },
@@ -59,9 +61,13 @@
       "typedFields": [
         "SWA.HUD.CHudSonicStage.m_rcPlayScreen",
         "SWA.HUD.CHudSonicStage.m_rcSpeedGauge",
+        "SWA.HUD.CHudSonicStage.m_rcRingEnergyGauge",
+        "SWA.HUD.CHudSonicStage.m_rcGaugeFrame",
         "SWA.HUD.CLoading.m_LoadingDisplayType",
         "SWA.HUD.CHudPause.m_Action",
+        "SWA.HUD.CHudPause.m_Status",
         "SWA.HUD.CGeneralWindow.m_rcGeneral",
+        "SWA.HUD.CGeneralWindow.m_Status",
         "SWA.HUD.CSaveIcon.m_IsVisible"
       ],
       "swardUse": "Typed readiness and owner/status inspection for Sonic HUD, loading, pause, reusable window, and save icon"

@@ -99,6 +99,47 @@ namespace UiLab
         std::string source;
     };
 
+    struct CsdTreeEntry
+    {
+        std::string path;
+        uint32_t address = 0;
+        uint32_t relatedAddress = 0;
+        uint32_t firstMetric = 0;
+        uint32_t secondMetric = 0;
+        uint64_t frame = 0;
+    };
+
+    struct CsdProjectTreeRecord
+    {
+        std::string projectName;
+        uint32_t projectAddress = 0;
+        uint32_t rootNodeAddress = 0;
+        uint32_t sceneCount = 0;
+        uint32_t nodeCount = 0;
+        uint32_t layerCount = 0;
+        uint64_t frame = 0;
+        std::vector<CsdTreeEntry> scenes;
+        std::vector<CsdTreeEntry> nodes;
+        std::vector<CsdTreeEntry> layers;
+    };
+
+    struct CsdProjectTreeInspectorSnapshot
+    {
+        bool projectKnown = false;
+        std::string activeProject;
+        uint32_t projectAddress = 0;
+        uint32_t rootNodeAddress = 0;
+        uint32_t sceneCount = 0;
+        uint32_t nodeCount = 0;
+        uint32_t layerCount = 0;
+        uint32_t observedProjectCount = 0;
+        std::vector<std::string> observedProjects;
+        std::vector<CsdTreeEntry> scenes;
+        std::vector<CsdTreeEntry> nodes;
+        std::vector<CsdTreeEntry> layers;
+        std::string source;
+    };
+
     struct LoadingLiveInspectorSnapshot
     {
         uint32_t requestType = UINT32_MAX;
@@ -119,6 +160,46 @@ namespace UiLab
         std::string speedGaugeScene;
         std::string readyEvent;
         std::string source;
+    };
+
+    struct SonicHudOwnerPathInspectorSnapshot
+    {
+        uint32_t chudSonicStageOwnerAddress = 0;
+        uint32_t stageGameModeAddress = 0;
+        uint32_t rcPlayScreenProjectAddress = 0;
+        uint32_t rcSpeedGaugeSceneAddress = 0;
+        uint32_t rcRingEnergyGaugeSceneAddress = 0;
+        uint32_t rcGaugeFrameSceneAddress = 0;
+        bool resolvedFromCsdProjectTree = false;
+        std::string ownerPointerStatus;
+        std::string expectedOwnerFieldSource;
+    };
+
+    struct PauseGeneralSaveLiveInspectorSnapshot
+    {
+        bool pauseKnown = false;
+        uint32_t pauseAddress = 0;
+        uint32_t pauseProjectAddress = 0;
+        uint32_t pauseBgSceneAddress = 0;
+        uint32_t pauseAction = UINT32_MAX;
+        uint32_t pauseMenu = UINT32_MAX;
+        uint32_t pauseStatus = UINT32_MAX;
+        uint32_t pauseTransition = UINT32_MAX;
+        bool pauseVisible = false;
+        bool pauseShown = false;
+        uint64_t pauseFrame = 0;
+        bool generalWindowKnown = false;
+        uint32_t generalWindowAddress = 0;
+        uint32_t generalProjectAddress = 0;
+        uint32_t generalBgSceneAddress = 0;
+        uint32_t generalWindowStatus = UINT32_MAX;
+        uint32_t generalCursorIndex = UINT32_MAX;
+        uint32_t generalSelectedIndex = UINT32_MAX;
+        uint64_t generalFrame = 0;
+        bool saveIconKnown = false;
+        uint32_t saveIconAddress = 0;
+        bool saveIconVisible = false;
+        uint64_t saveIconFrame = 0;
     };
 
     struct OperatorWindowEntry
@@ -229,21 +310,21 @@ namespace UiLab
             "api/SWA/HUD/Pause/HudPause.h",
             "SWA.HUD.CHudPause.m_Action",
             "pause action/status owner",
-            "next-inspector"
+            "live"
         },
         {
             "SWA HUD",
             "api/SWA/HUD/GeneralWindow/GeneralWindow.h",
             "SWA.HUD.CGeneralWindow.m_rcGeneral",
             "shared general-window CSD project owner",
-            "next-inspector"
+            "live"
         },
         {
             "SWA HUD",
             "api/SWA/HUD/SaveIcon/SaveIcon.h",
             "SWA.HUD.CSaveIcon.m_IsVisible",
             "autosave/save-icon visibility",
-            "next-inspector"
+            "live"
         },
         {
             "SWA System/GameMode",
@@ -313,6 +394,7 @@ namespace UiLab
     static std::atomic<bool> g_liveBridgeStarted = false;
     static std::atomic<bool> g_liveBridgeStopRequested = false;
     static std::mutex g_liveBridgeMutex;
+    static std::mutex g_typedInspectorMutex;
     static std::deque<std::string> g_recentEvidenceEvents;
     static std::string g_lastLiveBridgeCommand;
     static uint64_t g_liveBridgeCommandCount = 0;
@@ -376,6 +458,9 @@ namespace UiLab
     static std::string g_lastTitleMenuContextDetail;
     static std::string g_lastStageContextDetail;
     static std::unordered_set<std::string> g_loggedCsdProjects;
+    static std::vector<std::string> g_observedCsdProjectOrder;
+    static std::vector<CsdProjectTreeRecord> g_csdProjectTrees;
+    static PauseGeneralSaveLiveInspectorSnapshot g_pauseGeneralSaveInspector;
 
     static const RuntimeTarget& TargetFor(ScreenId id);
     static bool TargetNeedsStageHarness(ScreenId id);
@@ -397,9 +482,25 @@ namespace UiLab
     static bool TryReadGuestFloat(uint32_t guestAddress, float& value);
     static std::string_view MotionRepeatTypeLabel(uint32_t repeatType);
     static std::string_view LoadingDisplayTypeLabel(uint32_t displayType);
+    static std::string_view PauseActionTypeLabel(uint32_t action);
+    static std::string_view PauseMenuTypeLabel(uint32_t menu);
+    static std::string_view PauseStatusTypeLabel(uint32_t status);
+    static std::string_view PauseTransitionTypeLabel(uint32_t transition);
+    static std::string_view GeneralWindowStatusLabel(uint32_t status);
     static CsdLiveInspectorSnapshot BuildCsdLiveInspectorSnapshot();
+    static CsdProjectTreeInspectorSnapshot BuildCsdProjectTreeInspectorSnapshot();
     static LoadingLiveInspectorSnapshot BuildLoadingLiveInspectorSnapshot();
     static SonicHudLiveInspectorSnapshot BuildSonicHudLiveInspectorSnapshot();
+    static SonicHudOwnerPathInspectorSnapshot BuildSonicHudOwnerPathInspectorSnapshot(
+        const CsdProjectTreeInspectorSnapshot& csdProjectTree);
+    static PauseGeneralSaveLiveInspectorSnapshot BuildPauseGeneralSaveLiveInspectorSnapshot();
+    static void AppendCsdTreeEntries(
+        std::ostringstream& out,
+        const std::vector<CsdTreeEntry>& entries,
+        std::string_view addressFieldName,
+        std::string_view relatedAddressFieldName,
+        std::string_view firstMetricName,
+        std::string_view secondMetricName);
     static void AppendTypedInspectors(std::ostringstream& out);
 
     static std::string_view RoutePolicyLabel()
@@ -637,6 +738,135 @@ namespace UiLab
 
             case 8:
                 return "eLoadingDisplayType_Blank";
+
+            default:
+                return "unknown";
+        }
+    }
+
+    static std::string_view PauseActionTypeLabel(uint32_t action)
+    {
+        switch (action)
+        {
+            case 0:
+                return "eActionType_Undefined";
+
+            case 1:
+                return "eActionType_Status";
+
+            case 2:
+                return "eActionType_Return";
+
+            case 3:
+                return "eActionType_Inventory";
+
+            case 4:
+                return "eActionType_Skills";
+
+            case 5:
+                return "eActionType_Lab";
+
+            case 6:
+                return "eActionType_Wait";
+
+            case 8:
+                return "eActionType_Restart";
+
+            case 9:
+                return "eActionType_Continue";
+
+            default:
+                return "unknown";
+        }
+    }
+
+    static std::string_view PauseMenuTypeLabel(uint32_t menu)
+    {
+        switch (menu)
+        {
+            case 0:
+                return "eMenuType_WorldMap";
+
+            case 1:
+                return "eMenuType_Village";
+
+            case 2:
+                return "eMenuType_Stage";
+
+            case 3:
+                return "eMenuType_Hub";
+
+            case 4:
+                return "eMenuType_Misc";
+
+            default:
+                return "unknown";
+        }
+    }
+
+    static std::string_view PauseStatusTypeLabel(uint32_t status)
+    {
+        switch (status)
+        {
+            case 0:
+                return "eStatusType_Idle";
+
+            case 1:
+                return "eStatusType_Accept";
+
+            case 2:
+                return "eStatusType_Decline";
+
+            default:
+                return "unknown";
+        }
+    }
+
+    static std::string_view PauseTransitionTypeLabel(uint32_t transition)
+    {
+        switch (transition)
+        {
+            case 0:
+                return "eTransitionType_Undefined";
+
+            case 2:
+                return "eTransitionType_Quit";
+
+            case 5:
+                return "eTransitionType_Dialog";
+
+            case 6:
+                return "eTransitionType_Hide";
+
+            case 7:
+                return "eTransitionType_Abort";
+
+            case 8:
+                return "eTransitionType_SubMenu";
+
+            default:
+                return "unknown";
+        }
+    }
+
+    static std::string_view GeneralWindowStatusLabel(uint32_t status)
+    {
+        switch (status)
+        {
+            case 0:
+                return "eWindowStatus_Closed";
+
+            case 2:
+                return "eWindowStatus_OpeningMessage";
+
+            case 3:
+                return "eWindowStatus_DisplayingMessage";
+
+            case 4:
+                return "eWindowStatus_OpeningControls";
+
+            case 5:
+                return "eWindowStatus_DisplayingControls";
 
             default:
                 return "unknown";
@@ -943,12 +1173,26 @@ namespace UiLab
     static constexpr std::string_view kLiveStateStageGameModeAddressFieldName = R"("stageGameModeAddress")";
     static constexpr std::string_view kLiveStateNativeCaptureStatusFieldName = R"("nativeCaptureStatus")";
     static constexpr std::string_view kLiveStateTypedInspectorsFieldName = R"("typedInspectors")";
-    static constexpr std::array<std::string_view, 16> kLiveStateTypedInspectorJsonFields =
-    {{
+    static constexpr std::string_view kLiveStateTypedInspectorJsonFields[] =
+    {
         R"("csd")",
+        R"("csdProjectTree")",
         R"("titleMenu")",
         R"("loading")",
+        R"("pauseGeneralSave")",
         R"("sonicHud")",
+        R"("ownerPath")",
+        R"("observedProjects")",
+        R"("projectAddress")",
+        R"("rootNodeAddress")",
+        R"("sceneCount")",
+        R"("nodeCount")",
+        R"("layerCount")",
+        R"("scenes")",
+        R"("nodes")",
+        R"("layers")",
+        R"("runtimeSceneMotionFrame")",
+        R"("runtimeSceneMotionRepeatTypeLabel")",
         R"("sceneMotionFrame")",
         R"("sceneMotionRepeatType")",
         R"("loadingDisplayTypeLabel")",
@@ -957,11 +1201,31 @@ namespace UiLab
         R"("hudOwnerAddress")",
         R"("playScreenProject")",
         R"("speedGaugeScene")",
+        R"("pause")",
+        R"("generalWindow")",
+        R"("saveIcon")",
+        R"("pauseAddress")",
+        R"("pauseProjectAddress")",
+        R"("pauseAction")",
+        R"("pauseActionLabel")",
+        R"("generalWindowAddress")",
+        R"("generalProjectAddress")",
+        R"("generalWindowStatusLabel")",
+        R"("saveIconAddress")",
+        R"("saveIconVisible")",
+        R"("chudSonicStageOwnerAddress")",
+        R"("ownerPointerStatus")",
+        R"("rcPlayScreenProjectAddress")",
+        R"("rcSpeedGaugeSceneAddress")",
+        R"("rcRingEnergyGaugeSceneAddress")",
+        R"("rcGaugeFrameSceneAddress")",
+        R"("resolvedFromCsdProjectTree")",
+        R"("expectedOwnerFieldSource")",
         R"("stageTargetReady")",
         R"("stageGameModeAddress")",
         R"("targetCsdObserved")",
         R"("readyEvent")",
-    }};
+    };
 
     static void AppendStringArray(std::ostringstream& out, const std::vector<std::string_view>& values)
     {
@@ -1017,6 +1281,72 @@ namespace UiLab
         out << "]";
     }
 
+    static CsdProjectTreeRecord& EnsureCsdProjectTreeRecordLocked(std::string_view projectName)
+    {
+        const std::string project(projectName);
+
+        for (auto& record : g_csdProjectTrees)
+        {
+            if (record.projectName == project)
+                return record;
+        }
+
+        CsdProjectTreeRecord record;
+        record.projectName = project;
+        record.frame = g_presentedFrameCount;
+        g_csdProjectTrees.push_back(record);
+        return g_csdProjectTrees.back();
+    }
+
+    static void StoreCsdTreeEntry(
+        std::vector<CsdTreeEntry>& entries,
+        std::string_view path,
+        uint32_t address,
+        uint32_t relatedAddress,
+        uint32_t firstMetric,
+        uint32_t secondMetric)
+    {
+        static constexpr size_t kMaxCsdTreeEntrySamples = 48;
+
+        for (auto& entry : entries)
+        {
+            if (entry.path == path)
+            {
+                entry.address = address;
+                entry.relatedAddress = relatedAddress;
+                entry.firstMetric = firstMetric;
+                entry.secondMetric = secondMetric;
+                entry.frame = g_presentedFrameCount;
+                return;
+            }
+        }
+
+        if (entries.size() >= kMaxCsdTreeEntrySamples)
+            return;
+
+        CsdTreeEntry entry;
+        entry.path = std::string(path);
+        entry.address = address;
+        entry.relatedAddress = relatedAddress;
+        entry.firstMetric = firstMetric;
+        entry.secondMetric = secondMetric;
+        entry.frame = g_presentedFrameCount;
+        entries.push_back(std::move(entry));
+    }
+
+    static const CsdProjectTreeRecord* FindCsdProjectTreeRecord(
+        const std::vector<CsdProjectTreeRecord>& records,
+        std::string_view projectName)
+    {
+        for (const auto& record : records)
+        {
+            if (record.projectName == projectName)
+                return &record;
+        }
+
+        return nullptr;
+    }
+
     static CsdLiveInspectorSnapshot BuildCsdLiveInspectorSnapshot()
     {
         static constexpr uint32_t kCsdSceneMotionFrameOffset = 0x64;
@@ -1054,6 +1384,39 @@ namespace UiLab
         return snapshot;
     }
 
+    static CsdProjectTreeInspectorSnapshot BuildCsdProjectTreeInspectorSnapshot()
+    {
+        CsdProjectTreeInspectorSnapshot snapshot;
+        snapshot.activeProject = g_targetCsdObserved
+            ? std::string(TargetFor(g_target).primaryCsdScene)
+            : g_lastCsdProjectName;
+        snapshot.source = "CCsdProject::Make resource traversal";
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        snapshot.observedProjects = g_observedCsdProjectOrder;
+        snapshot.observedProjectCount = static_cast<uint32_t>(g_observedCsdProjectOrder.size());
+
+        const CsdProjectTreeRecord* record = FindCsdProjectTreeRecord(g_csdProjectTrees, snapshot.activeProject);
+
+        if (record == nullptr && !g_csdProjectTrees.empty())
+            record = &g_csdProjectTrees.back();
+
+        if (record == nullptr)
+            return snapshot;
+
+        snapshot.projectKnown = true;
+        snapshot.activeProject = record->projectName;
+        snapshot.projectAddress = record->projectAddress;
+        snapshot.rootNodeAddress = record->rootNodeAddress;
+        snapshot.sceneCount = record->sceneCount;
+        snapshot.nodeCount = record->nodeCount;
+        snapshot.layerCount = record->layerCount;
+        snapshot.scenes = record->scenes;
+        snapshot.nodes = record->nodes;
+        snapshot.layers = record->layers;
+        return snapshot;
+    }
+
     static LoadingLiveInspectorSnapshot BuildLoadingLiveInspectorSnapshot()
     {
         LoadingLiveInspectorSnapshot snapshot;
@@ -1063,6 +1426,49 @@ namespace UiLab
         snapshot.requestFrame = g_lastLoadingRequestFrame;
         snapshot.displayFrame = g_lastLoadingDisplayFrame;
         return snapshot;
+    }
+
+    static uint32_t FindCsdTreeAddressBySuffix(
+        const CsdProjectTreeInspectorSnapshot& snapshot,
+        std::string_view suffix)
+    {
+        for (const auto& entry : snapshot.scenes)
+        {
+            if (entry.path.size() >= suffix.size() &&
+                entry.path.compare(entry.path.size() - suffix.size(), suffix.size(), suffix) == 0)
+            {
+                return entry.address;
+            }
+        }
+
+        return 0;
+    }
+
+    static SonicHudOwnerPathInspectorSnapshot BuildSonicHudOwnerPathInspectorSnapshot(
+        const CsdProjectTreeInspectorSnapshot& csdProjectTree)
+    {
+        SonicHudOwnerPathInspectorSnapshot snapshot;
+        snapshot.stageGameModeAddress = g_lastStageGameModeAddress;
+        snapshot.expectedOwnerFieldSource = "api/SWA/HUD/Sonic/HudSonicStage.h";
+        snapshot.ownerPointerStatus = "raw CHudSonicStage owner pointer not hooked yet";
+
+        if (csdProjectTree.projectKnown && csdProjectTree.activeProject == "ui_playscreen")
+        {
+            snapshot.resolvedFromCsdProjectTree = true;
+            snapshot.rcPlayScreenProjectAddress = csdProjectTree.projectAddress;
+            snapshot.rcSpeedGaugeSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/so_speed_gauge");
+            snapshot.rcRingEnergyGaugeSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/so_ringenagy_gauge");
+            snapshot.rcGaugeFrameSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/gauge_frame");
+            snapshot.ownerPointerStatus = "resolved CSD ownership; raw owner pointer pending CHudSonicStage hook";
+        }
+
+        return snapshot;
+    }
+
+    static PauseGeneralSaveLiveInspectorSnapshot BuildPauseGeneralSaveLiveInspectorSnapshot()
+    {
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        return g_pauseGeneralSaveInspector;
     }
 
     static SonicHudLiveInspectorSnapshot BuildSonicHudLiveInspectorSnapshot()
@@ -1086,12 +1492,56 @@ namespace UiLab
         return snapshot;
     }
 
+    static void AppendCsdTreeEntries(
+        std::ostringstream& out,
+        const std::vector<CsdTreeEntry>& entries,
+        std::string_view addressFieldName,
+        std::string_view relatedAddressFieldName,
+        std::string_view firstMetricName,
+        std::string_view secondMetricName)
+    {
+        out << "[";
+        for (size_t i = 0; i < entries.size(); ++i)
+        {
+            const auto& entry = entries[i];
+            if (i != 0)
+                out << ",";
+
+            out
+                << "{"
+                << "\"path\":\"" << JsonEscape(entry.path) << "\","
+                << "\"" << addressFieldName << "\":\"" << JsonEscape(HexU32(entry.address)) << "\","
+                << "\"" << relatedAddressFieldName << "\":\"" << JsonEscape(HexU32(entry.relatedAddress)) << "\","
+                << "\"" << firstMetricName << "\":" << entry.firstMetric << ","
+                << "\"" << secondMetricName << "\":" << entry.secondMetric << ","
+                << "\"frame\":" << entry.frame
+                << "}";
+        }
+        out << "]";
+    }
+
+    static void AppendStringVector(std::ostringstream& out, const std::vector<std::string>& values)
+    {
+        out << "[";
+        for (size_t i = 0; i < values.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            out << "\"" << JsonEscape(values[i]) << "\"";
+        }
+        out << "]";
+    }
+
     static void AppendTypedInspectors(std::ostringstream& out)
     {
         const auto& target = TargetFor(g_target);
         const auto csd = BuildCsdLiveInspectorSnapshot();
+        const auto csdProjectTree = BuildCsdProjectTreeInspectorSnapshot();
         const auto loading = BuildLoadingLiveInspectorSnapshot();
         const auto sonicHud = BuildSonicHudLiveInspectorSnapshot();
+        const auto sonicOwnerPath = BuildSonicHudOwnerPathInspectorSnapshot(csdProjectTree);
+        const auto pauseGeneralSave = BuildPauseGeneralSaveLiveInspectorSnapshot();
 
         out
             << "{\n"
@@ -1118,6 +1568,44 @@ namespace UiLab
             << "      \"sceneMotionRepeatTypeLabel\": \""
             << JsonEscape(MotionRepeatTypeLabel(csd.sceneMotionRepeatType)) << "\"\n"
             << "    },\n"
+            << "    \"csdProjectTree\": {\n"
+            << "      \"source\": \"" << JsonEscape(csdProjectTree.source) << "\",\n"
+            << "      \"activeProject\": \"" << JsonEscape(csdProjectTree.activeProject) << "\",\n"
+            << "      \"projectKnown\": " << (csdProjectTree.projectKnown ? "true" : "false") << ",\n"
+            << "      \"projectAddress\": \"" << JsonEscape(HexU32(csdProjectTree.projectAddress)) << "\",\n"
+            << "      \"rootNodeAddress\": \"" << JsonEscape(HexU32(csdProjectTree.rootNodeAddress)) << "\",\n"
+            << "      \"observedProjectCount\": " << csdProjectTree.observedProjectCount << ",\n"
+            << "      \"observedProjects\": ";
+        AppendStringVector(out, csdProjectTree.observedProjects);
+        out
+            << ",\n"
+            << "      \"sceneCount\": " << csdProjectTree.sceneCount << ",\n"
+            << "      \"nodeCount\": " << csdProjectTree.nodeCount << ",\n"
+            << "      \"layerCount\": " << csdProjectTree.layerCount << ",\n"
+            << "      \"runtimeSceneMotionFrame\": ";
+
+        if (csd.sceneMotionKnown)
+            out << csd.sceneMotionFrame;
+        else
+            out << "null";
+
+        out
+            << ",\n"
+            << "      \"runtimeSceneMotionRepeatTypeLabel\": \""
+            << JsonEscape(MotionRepeatTypeLabel(csd.sceneMotionRepeatType)) << "\",\n"
+            << "      \"scenes\": ";
+        AppendCsdTreeEntries(out, csdProjectTree.scenes, "sceneAddress", "projectAddress", "castNodeCount", "castCount");
+        out
+            << ",\n"
+            << "      \"nodes\": ";
+        AppendCsdTreeEntries(out, csdProjectTree.nodes, "nodeAddress", "projectAddress", "sceneCount", "childNodeCount");
+        out
+            << ",\n"
+            << "      \"layers\": ";
+        AppendCsdTreeEntries(out, csdProjectTree.layers, "layerAddress", "castNodeAddress", "castNodeIndex", "castIndex");
+        out
+            << "\n"
+            << "    },\n"
             << "    \"titleMenu\": {\n"
             << "      \"titleMenuOwnerContextAddress\": \""
             << JsonEscape(HexU32(g_titleOwnerInspector.titleContextAddress)) << "\",\n"
@@ -1143,6 +1631,42 @@ namespace UiLab
             << "      \"requestFrame\": " << loading.requestFrame << ",\n"
             << "      \"displayFrame\": " << loading.displayFrame << "\n"
             << "    },\n"
+            << "    \"pauseGeneralSave\": {\n"
+            << "      \"pause\": {\n"
+            << "        \"known\": " << (pauseGeneralSave.pauseKnown ? "true" : "false") << ",\n"
+            << "        \"pauseAddress\": \"" << JsonEscape(HexU32(pauseGeneralSave.pauseAddress)) << "\",\n"
+            << "        \"pauseProjectAddress\": \"" << JsonEscape(HexU32(pauseGeneralSave.pauseProjectAddress)) << "\",\n"
+            << "        \"pauseBgSceneAddress\": \"" << JsonEscape(HexU32(pauseGeneralSave.pauseBgSceneAddress)) << "\",\n"
+            << "        \"pauseAction\": " << (pauseGeneralSave.pauseAction == UINT32_MAX ? -1 : static_cast<int32_t>(pauseGeneralSave.pauseAction)) << ",\n"
+            << "        \"pauseActionLabel\": \"" << JsonEscape(PauseActionTypeLabel(pauseGeneralSave.pauseAction)) << "\",\n"
+            << "        \"pauseMenu\": " << (pauseGeneralSave.pauseMenu == UINT32_MAX ? -1 : static_cast<int32_t>(pauseGeneralSave.pauseMenu)) << ",\n"
+            << "        \"pauseMenuLabel\": \"" << JsonEscape(PauseMenuTypeLabel(pauseGeneralSave.pauseMenu)) << "\",\n"
+            << "        \"pauseStatus\": " << (pauseGeneralSave.pauseStatus == UINT32_MAX ? -1 : static_cast<int32_t>(pauseGeneralSave.pauseStatus)) << ",\n"
+            << "        \"pauseStatusLabel\": \"" << JsonEscape(PauseStatusTypeLabel(pauseGeneralSave.pauseStatus)) << "\",\n"
+            << "        \"pauseTransition\": " << (pauseGeneralSave.pauseTransition == UINT32_MAX ? -1 : static_cast<int32_t>(pauseGeneralSave.pauseTransition)) << ",\n"
+            << "        \"pauseTransitionLabel\": \"" << JsonEscape(PauseTransitionTypeLabel(pauseGeneralSave.pauseTransition)) << "\",\n"
+            << "        \"pauseVisible\": " << (pauseGeneralSave.pauseVisible ? "true" : "false") << ",\n"
+            << "        \"pauseShown\": " << (pauseGeneralSave.pauseShown ? "true" : "false") << ",\n"
+            << "        \"frame\": " << pauseGeneralSave.pauseFrame << "\n"
+            << "      },\n"
+            << "      \"generalWindow\": {\n"
+            << "        \"known\": " << (pauseGeneralSave.generalWindowKnown ? "true" : "false") << ",\n"
+            << "        \"generalWindowAddress\": \"" << JsonEscape(HexU32(pauseGeneralSave.generalWindowAddress)) << "\",\n"
+            << "        \"generalProjectAddress\": \"" << JsonEscape(HexU32(pauseGeneralSave.generalProjectAddress)) << "\",\n"
+            << "        \"generalBgSceneAddress\": \"" << JsonEscape(HexU32(pauseGeneralSave.generalBgSceneAddress)) << "\",\n"
+            << "        \"generalWindowStatus\": " << (pauseGeneralSave.generalWindowStatus == UINT32_MAX ? -1 : static_cast<int32_t>(pauseGeneralSave.generalWindowStatus)) << ",\n"
+            << "        \"generalWindowStatusLabel\": \"" << JsonEscape(GeneralWindowStatusLabel(pauseGeneralSave.generalWindowStatus)) << "\",\n"
+            << "        \"cursorIndex\": " << (pauseGeneralSave.generalCursorIndex == UINT32_MAX ? -1 : static_cast<int32_t>(pauseGeneralSave.generalCursorIndex)) << ",\n"
+            << "        \"selectedIndex\": " << (pauseGeneralSave.generalSelectedIndex == UINT32_MAX ? -1 : static_cast<int32_t>(pauseGeneralSave.generalSelectedIndex)) << ",\n"
+            << "        \"frame\": " << pauseGeneralSave.generalFrame << "\n"
+            << "      },\n"
+            << "      \"saveIcon\": {\n"
+            << "        \"known\": " << (pauseGeneralSave.saveIconKnown ? "true" : "false") << ",\n"
+            << "        \"saveIconAddress\": \"" << JsonEscape(HexU32(pauseGeneralSave.saveIconAddress)) << "\",\n"
+            << "        \"saveIconVisible\": " << (pauseGeneralSave.saveIconVisible ? "true" : "false") << ",\n"
+            << "        \"frame\": " << pauseGeneralSave.saveIconFrame << "\n"
+            << "      }\n"
+            << "    },\n"
             << "    \"sonicHud\": {\n"
             << "      \"source\": \"" << JsonEscape(sonicHud.source) << "\",\n"
             << "      \"hudOwnerAddress\": \"" << JsonEscape(HexU32(sonicHud.hudOwnerAddress)) << "\",\n"
@@ -1152,7 +1676,18 @@ namespace UiLab
             << "      \"stageContextObserved\": " << (sonicHud.stageContextObserved ? "true" : "false") << ",\n"
             << "      \"targetCsdObserved\": " << (sonicHud.targetCsdObserved ? "true" : "false") << ",\n"
             << "      \"stageTargetReady\": " << (sonicHud.stageTargetReady ? "true" : "false") << ",\n"
-            << "      \"readyEvent\": \"" << JsonEscape(sonicHud.readyEvent) << "\"\n"
+            << "      \"readyEvent\": \"" << JsonEscape(sonicHud.readyEvent) << "\",\n"
+            << "      \"ownerPath\": {\n"
+            << "        \"chudSonicStageOwnerAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.chudSonicStageOwnerAddress)) << "\",\n"
+            << "        \"ownerPointerStatus\": \"" << JsonEscape(sonicOwnerPath.ownerPointerStatus) << "\",\n"
+            << "        \"stageGameModeAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.stageGameModeAddress)) << "\",\n"
+            << "        \"rcPlayScreenProjectAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcPlayScreenProjectAddress)) << "\",\n"
+            << "        \"rcSpeedGaugeSceneAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcSpeedGaugeSceneAddress)) << "\",\n"
+            << "        \"rcRingEnergyGaugeSceneAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcRingEnergyGaugeSceneAddress)) << "\",\n"
+            << "        \"rcGaugeFrameSceneAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcGaugeFrameSceneAddress)) << "\",\n"
+            << "        \"resolvedFromCsdProjectTree\": " << (sonicOwnerPath.resolvedFromCsdProjectTree ? "true" : "false") << ",\n"
+            << "        \"expectedOwnerFieldSource\": \"" << JsonEscape(sonicOwnerPath.expectedOwnerFieldSource) << "\"\n"
+            << "      }\n"
             << "    }\n"
             << "  }";
     }
@@ -1895,6 +2430,13 @@ namespace UiLab
         g_loggedCsdProjects.clear();
 
         {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            g_observedCsdProjectOrder.clear();
+            g_csdProjectTrees.clear();
+            g_pauseGeneralSaveInspector = {};
+        }
+
+        {
             std::lock_guard<std::mutex> lock(g_liveBridgeMutex);
             g_recentEvidenceEvents.clear();
         }
@@ -2458,12 +3000,180 @@ namespace UiLab
         g_lastCsdProjectName = project;
         g_lastCsdProjectFrame = g_presentedFrameCount;
 
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            if (std::find(g_observedCsdProjectOrder.begin(), g_observedCsdProjectOrder.end(), project) ==
+                g_observedCsdProjectOrder.end())
+            {
+                g_observedCsdProjectOrder.push_back(project);
+            }
+
+            auto& record = EnsureCsdProjectTreeRecordLocked(project);
+            record.frame = g_presentedFrameCount;
+        }
+
         if (!g_loggedCsdProjects.insert(project).second)
             return;
 
         WriteEvidenceEvent("csd-project-made", project);
 
         MarkTargetCsdProjectLive(projectName);
+    }
+
+    void OnCsdProjectTreeMade(std::string_view projectName, uint32_t projectAddress, uint32_t rootNodeAddress)
+    {
+        if (!g_isEnabled || projectName.empty())
+            return;
+
+        const std::string project(projectName);
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            if (std::find(g_observedCsdProjectOrder.begin(), g_observedCsdProjectOrder.end(), project) ==
+                g_observedCsdProjectOrder.end())
+            {
+                g_observedCsdProjectOrder.push_back(project);
+            }
+
+            auto& record = EnsureCsdProjectTreeRecordLocked(project);
+            record.projectAddress = projectAddress;
+            record.rootNodeAddress = rootNodeAddress;
+            record.sceneCount = 0;
+            record.nodeCount = 0;
+            record.layerCount = 0;
+            record.scenes.clear();
+            record.nodes.clear();
+            record.layers.clear();
+            record.frame = g_presentedFrameCount;
+        }
+    }
+
+    void OnCsdSceneNodeTraversed(
+        std::string_view projectName,
+        std::string_view nodePath,
+        uint32_t nodeAddress,
+        uint32_t sceneCount,
+        uint32_t childNodeCount)
+    {
+        if (!g_isEnabled || projectName.empty() || nodePath.empty())
+            return;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        auto& record = EnsureCsdProjectTreeRecordLocked(projectName);
+        ++record.nodeCount;
+        StoreCsdTreeEntry(
+            record.nodes,
+            nodePath,
+            nodeAddress,
+            record.projectAddress,
+            sceneCount,
+            childNodeCount);
+    }
+
+    void OnCsdSceneTraversed(
+        std::string_view projectName,
+        std::string_view scenePath,
+        uint32_t sceneAddress,
+        uint32_t castNodeCount,
+        uint32_t castCount)
+    {
+        if (!g_isEnabled || projectName.empty() || scenePath.empty())
+            return;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        auto& record = EnsureCsdProjectTreeRecordLocked(projectName);
+        ++record.sceneCount;
+        StoreCsdTreeEntry(
+            record.scenes,
+            scenePath,
+            sceneAddress,
+            record.projectAddress,
+            castNodeCount,
+            castCount);
+    }
+
+    void OnCsdLayerTraversed(
+        std::string_view projectName,
+        std::string_view layerPath,
+        uint32_t layerAddress,
+        uint32_t castNodeAddress,
+        uint32_t castNodeIndex,
+        uint32_t castIndex)
+    {
+        if (!g_isEnabled || projectName.empty() || layerPath.empty())
+            return;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        auto& record = EnsureCsdProjectTreeRecordLocked(projectName);
+        ++record.layerCount;
+        StoreCsdTreeEntry(
+            record.layers,
+            layerPath,
+            layerAddress,
+            castNodeAddress,
+            castNodeIndex,
+            castIndex);
+    }
+
+    void OnHudPauseUpdate(
+        uint32_t pauseAddress,
+        uint32_t pauseProjectAddress,
+        uint32_t bgSceneAddress,
+        uint32_t action,
+        uint32_t menu,
+        uint32_t status,
+        uint32_t transition,
+        bool isVisible,
+        bool isShown)
+    {
+        if (!g_isEnabled)
+            return;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        g_pauseGeneralSaveInspector.pauseKnown = true;
+        g_pauseGeneralSaveInspector.pauseAddress = pauseAddress;
+        g_pauseGeneralSaveInspector.pauseProjectAddress = pauseProjectAddress;
+        g_pauseGeneralSaveInspector.pauseBgSceneAddress = bgSceneAddress;
+        g_pauseGeneralSaveInspector.pauseAction = action;
+        g_pauseGeneralSaveInspector.pauseMenu = menu;
+        g_pauseGeneralSaveInspector.pauseStatus = status;
+        g_pauseGeneralSaveInspector.pauseTransition = transition;
+        g_pauseGeneralSaveInspector.pauseVisible = isVisible;
+        g_pauseGeneralSaveInspector.pauseShown = isShown;
+        g_pauseGeneralSaveInspector.pauseFrame = g_presentedFrameCount;
+    }
+
+    void OnGeneralWindowUpdate(
+        uint32_t generalWindowAddress,
+        uint32_t generalProjectAddress,
+        uint32_t bgSceneAddress,
+        uint32_t status,
+        uint32_t cursorIndex,
+        uint32_t selectedIndex)
+    {
+        if (!g_isEnabled)
+            return;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        g_pauseGeneralSaveInspector.generalWindowKnown = true;
+        g_pauseGeneralSaveInspector.generalWindowAddress = generalWindowAddress;
+        g_pauseGeneralSaveInspector.generalProjectAddress = generalProjectAddress;
+        g_pauseGeneralSaveInspector.generalBgSceneAddress = bgSceneAddress;
+        g_pauseGeneralSaveInspector.generalWindowStatus = status;
+        g_pauseGeneralSaveInspector.generalCursorIndex = cursorIndex;
+        g_pauseGeneralSaveInspector.generalSelectedIndex = selectedIndex;
+        g_pauseGeneralSaveInspector.generalFrame = g_presentedFrameCount;
+    }
+
+    void OnSaveIconUpdate(uint32_t saveIconAddress, bool isVisible)
+    {
+        if (!g_isEnabled)
+            return;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        g_pauseGeneralSaveInspector.saveIconKnown = true;
+        g_pauseGeneralSaveInspector.saveIconAddress = saveIconAddress;
+        g_pauseGeneralSaveInspector.saveIconVisible = isVisible;
+        g_pauseGeneralSaveInspector.saveIconFrame = g_presentedFrameCount;
     }
 
     bool ApplyTitleIntroStateForcing(float elapsedSeconds, bool& directState)

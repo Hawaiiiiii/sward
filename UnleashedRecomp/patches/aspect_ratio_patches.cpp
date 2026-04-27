@@ -80,6 +80,11 @@ namespace Chao::CSD
 static Mutex g_pathMutex;
 static std::map<const void*, XXH64_hash_t> g_paths;
 
+static uint32_t GuestAddressOf(const void* host)
+{
+    return host != nullptr ? g_memory.MapVirtual(host) : 0;
+}
+
 static XXH64_hash_t HashStr(const std::string_view& value)
 {
     return XXH3_64bits(value.data(), value.size());
@@ -91,12 +96,18 @@ static void EmplacePath(const void* key, const std::string_view& value)
     g_paths.emplace(key, HashStr(value));
 }
 
-static void TraverseCast(Chao::CSD::Scene* scene, uint32_t castNodeIndex, Chao::CSD::CastNode* castNode, uint32_t castIndex, const std::string& parentPath)
+static void TraverseCast(
+    std::string_view projectName,
+    Chao::CSD::Scene* scene,
+    uint32_t castNodeIndex,
+    Chao::CSD::CastNode* castNode,
+    uint32_t castIndex,
+    const std::string& parentPath)
 {
     if (castIndex == ~0)
         return;
 
-    TraverseCast(scene, castNodeIndex, castNode, castNode->pCastLinks[castIndex].SiblingCastIndex, parentPath);
+    TraverseCast(projectName, scene, castNodeIndex, castNode, castNode->pCastLinks[castIndex].SiblingCastIndex, parentPath);
 
     std::string path = parentPath;
 
@@ -111,52 +122,74 @@ static void TraverseCast(Chao::CSD::Scene* scene, uint32_t castNodeIndex, Chao::
     }
 
     EmplacePath(castNode->pCasts[castIndex].get(), path);
+    UiLab::OnCsdLayerTraversed(
+        projectName,
+        path,
+        GuestAddressOf(castNode->pCasts[castIndex].get()),
+        GuestAddressOf(castNode),
+        castNodeIndex,
+        castIndex);
 
     if (castNode->RootCastIndex == castIndex)
         EmplacePath(castNode, path);
 
     path += "/";
 
-    TraverseCast(scene, castNodeIndex, castNode, castNode->pCastLinks[castIndex].ChildCastIndex, path);
+    TraverseCast(projectName, scene, castNodeIndex, castNode, castNode->pCastLinks[castIndex].ChildCastIndex, path);
 }
 
-static void TraverseScene(Chao::CSD::Scene* scene, std::string path)
+static void TraverseScene(std::string_view projectName, Chao::CSD::Scene* scene, std::string path)
 {
     EmplacePath(scene, path);
+    UiLab::OnCsdSceneTraversed(
+        projectName,
+        path,
+        GuestAddressOf(scene),
+        scene->CastNodeCount,
+        scene->CastCount);
     path += "/";
 
     for (size_t i = 0; i < scene->CastNodeCount; i++)
     {
         auto& castNode = scene->pCastNodes[i];
-        TraverseCast(scene, i, &castNode, castNode.RootCastIndex, path);
+        TraverseCast(projectName, scene, i, &castNode, castNode.RootCastIndex, path);
     }
 }
 
-static void TraverseSceneNode(Chao::CSD::SceneNode* sceneNode, std::string path)
+static void TraverseSceneNode(std::string_view projectName, Chao::CSD::SceneNode* sceneNode, std::string path)
 {
     EmplacePath(sceneNode, path);
+    UiLab::OnCsdSceneNodeTraversed(
+        projectName,
+        path,
+        GuestAddressOf(sceneNode),
+        sceneNode->SceneCount,
+        sceneNode->SceneNodeCount);
     path += "/";
 
     for (size_t i = 0; i < sceneNode->SceneCount; i++)
     {
         auto& sceneIndex = sceneNode->pSceneIndices[i];
-        TraverseScene(sceneNode->pScenes[sceneIndex.SceneIndex], path + sceneIndex.pSceneName.get());
+        TraverseScene(projectName, sceneNode->pScenes[sceneIndex.SceneIndex], path + sceneIndex.pSceneName.get());
     }
 
     for (size_t i = 0; i < sceneNode->SceneNodeCount; i++)
     {
         auto& sceneNodeIndex = sceneNode->pSceneNodeIndices[i];
-        TraverseSceneNode(&sceneNode->pSceneNodes[sceneNodeIndex.SceneNodeIndex], path + sceneNodeIndex.pSceneNodeName.get());
+        TraverseSceneNode(projectName, &sceneNode->pSceneNodes[sceneNodeIndex.SceneNodeIndex], path + sceneNodeIndex.pSceneNodeName.get());
     }
 }
 
 void MakeCsdProjectMidAsmHook(PPCRegister& r3, PPCRegister& r29)
 {
     uint8_t* base = g_memory.base;
-    auto csdProject = reinterpret_cast<Chao::CSD::CProject*>(base + PPC_LOAD_U32(PPC_LOAD_U32(r3.u32 + 16) + 4));
+    const uint32_t csdProjectAddress = PPC_LOAD_U32(PPC_LOAD_U32(r3.u32 + 16) + 4);
+    auto csdProject = reinterpret_cast<Chao::CSD::CProject*>(base + csdProjectAddress);
     auto name = reinterpret_cast<const char*>(base + PPC_LOAD_U32(r29.u32));
+    auto rootNode = csdProject->m_pResource->pRootNode.get();
     UiLab::OnCsdProjectMade(name);
-    TraverseSceneNode(csdProject->m_pResource->pRootNode, name);
+    UiLab::OnCsdProjectTreeMade(name, csdProjectAddress, GuestAddressOf(rootNode));
+    TraverseSceneNode(name, rootNode, name);
 }
 
 // Chao::CSD::CMemoryAlloc::Free

@@ -115,6 +115,44 @@ namespace UiLab
     void OnLoadingRequest(uint32_t displayType);
     void OnLoadingUpdate(uint32_t displayType);
     void OnCsdProjectMade(std::string_view projectName);
+    void OnCsdProjectTreeMade(std::string_view projectName, uint32_t projectAddress, uint32_t rootNodeAddress);
+    void OnCsdSceneNodeTraversed(
+        std::string_view projectName,
+        std::string_view nodePath,
+        uint32_t nodeAddress,
+        uint32_t sceneCount,
+        uint32_t childNodeCount);
+    void OnCsdSceneTraversed(
+        std::string_view projectName,
+        std::string_view scenePath,
+        uint32_t sceneAddress,
+        uint32_t castNodeCount,
+        uint32_t castCount);
+    void OnCsdLayerTraversed(
+        std::string_view projectName,
+        std::string_view layerPath,
+        uint32_t layerAddress,
+        uint32_t castNodeAddress,
+        uint32_t castNodeIndex,
+        uint32_t castIndex);
+    void OnHudPauseUpdate(
+        uint32_t pauseAddress,
+        uint32_t pauseProjectAddress,
+        uint32_t bgSceneAddress,
+        uint32_t action,
+        uint32_t menu,
+        uint32_t status,
+        uint32_t transition,
+        bool isVisible,
+        bool isShown);
+    void OnGeneralWindowUpdate(
+        uint32_t generalWindowAddress,
+        uint32_t generalProjectAddress,
+        uint32_t bgSceneAddress,
+        uint32_t status,
+        uint32_t cursorIndex,
+        uint32_t selectedIndex);
+    void OnSaveIconUpdate(uint32_t saveIconAddress, bool isVisible);
     bool ApplyTitleIntroStateForcing(float elapsedSeconds, bool& directState);
     bool ShouldArmTitleIntroOwnerOutput();
     bool ShouldArmTitleIntroCsdCompletion();

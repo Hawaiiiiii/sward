@@ -157,6 +157,14 @@ Phase 118 hardens the live bridge for combined sweeps. The capture helper now us
 
 For `title-menu`, live bridge readiness is no longer enough by itself. The helper requires the durable JSONL `title-menu-visible` event before completing the readiness wait, so native BMP capture remains visual confirmation and JSONL remains the oracle. The goal is a full early-game live-bridge sweep where title-loop, title-menu, title-options, loading, and sonic-hud all pass in one run before deeper CSD/HUD owner traversal continues.
 
+## Phase 119 Deeper Typed Inspectors
+
+Phase 119 promotes the existing real `CCsdProject::Make` resource traversal into the live bridge. The runtime now records full CSD project/scene/node/layer traversal samples under `typedInspectors.csdProjectTree`, including the active project, observed projects, project/root addresses, scene/node/layer counts, sampled paths, and live `CScene` motion-frame / repeat-type fields when a scene pointer is known.
+
+Pause, general-window, and save-icon runtime owners are now first-class live inspectors instead of harvest-only labels. `CHudPause`, `CGeneralWindow`, and `CSaveIcon` update `typedInspectors.pauseGeneralSave` with owner addresses, backing CSD object pointers, status/action/cursor labels, and visibility state.
+
+`CHudSonicStage owner pointer paths` are also exposed more deeply. The live bridge reports resolved CSD ownership for `m_rcPlayScreen`, `m_rcSpeedGauge`, `m_rcRingEnergyGauge`, and `m_rcGaugeFrame` through the observed CSD tree. The raw owner pointer is still explicitly marked as pending a dedicated `CHudSonicStage` object hook; it is not inferred from screenshots or treated as solved until that hook exists.
+
 ## Verification
 
 Local-only evidence, not committed:
@@ -208,3 +216,14 @@ Local-only evidence, not committed:
 - `out/ui_lab_runtime_evidence/phase118_route_status_<timestamp>/`
   - direct client smoke queried `route-status` through `query_unleashed_recomp_ui_lab_bridge.ps1`
   - response reported route generation/reset counters, hook-observed flags, last title/stage context details, and readiness booleans from the running runtime
+
+- `out/ui_lab_runtime_evidence/20260427_231946/`
+  - focused Phase 119 `sonic-hud` live-bridge/native capture passed
+  - `typedInspectors.csdProjectTree` reported `activeProject=ui_playscreen`, `sceneCount=13`, `nodeCount=2`, and `layerCount=209`
+  - `typedInspectors.sonicHud.ownerPath` resolved `m_rcPlayScreen`, `m_rcSpeedGauge`, `m_rcRingEnergyGauge`, and `m_rcGaugeFrame` to real CSD project/scene addresses while keeping the raw `CHudSonicStage` owner pointer marked pending
+  - `typedInspectors.pauseGeneralSave` populated live `CGeneralWindow` and `CSaveIcon` state; pause stayed unknown because this route does not open pause
+
+- `out/ui_lab_runtime_evidence/20260427_232129/`
+  - Phase 119 full early-game live-bridge/native sweep passed `title-loop`, `title-menu`, `title-options`, `loading`, and `sonic-hud`
+  - all targets used live-bridge readiness and RGB-nonblack native BMP evidence
+  - the final `sonic-hud` state again reported `ui_playscreen`, `13` scenes, `209` layers, and resolved gauge scene addresses from the CSD tree
