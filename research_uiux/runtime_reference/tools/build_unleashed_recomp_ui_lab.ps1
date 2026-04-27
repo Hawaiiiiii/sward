@@ -77,6 +77,8 @@ $root = Resolve-RequiredPath $GeneratedRoot "Generated UnleashedRecomp root"
 @(
     "UnleashedRecomp\gpu\video.cpp",
     "UnleashedRecomp\patches\aspect_ratio_patches.cpp",
+    "UnleashedRecomp\patches\CGameModeStageTitle_patches.cpp",
+    "UnleashedRecomp\patches\CTitleStateIntro_patches.cpp",
     "UnleashedRecomp\patches\CTitleStateMenu_patches.cpp",
     "UnleashedRecomp\patches\resident_patches.cpp",
     "UnleashedRecomp\patches\ui_lab_patches.cpp",

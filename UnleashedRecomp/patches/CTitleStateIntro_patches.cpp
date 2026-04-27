@@ -128,6 +128,80 @@ static void InjectTitleAccept()
     padState.TappedState = (uint32_t)padState.TappedState | acceptMask;
 }
 
+static uint32_t ReadGuestU32(const void* address)
+{
+    return reinterpret_cast<const be<uint32_t>*>(address)->get();
+}
+
+PPC_FUNC_IMPL(__imp__sub_825811C8);
+
+static uint8_t ArmTitleIntroCsdCompletion(uint8_t* base, uint32_t titleStateGuestAddress)
+{
+    if (!UiLab::ShouldArmTitleIntroCsdCompletion() || !titleStateGuestAddress)
+        return 0;
+
+    const auto titleContextGuestAddress = PPC_LOAD_U32(titleStateGuestAddress + 8);
+    if (!titleContextGuestAddress)
+        return 0;
+
+    const auto csdSceneGuestAddress = PPC_LOAD_U32(titleContextGuestAddress + 0x1E8);
+    if (!csdSceneGuestAddress)
+        return 0;
+
+    auto csdCompleteArmed = PPC_LOAD_U8(csdSceneGuestAddress + 84);
+    if (csdCompleteArmed == 0)
+    {
+        PPC_STORE_U8(csdSceneGuestAddress + 84, 1);
+        csdCompleteArmed = 1;
+    }
+
+    return csdCompleteArmed;
+}
+
+static void RequestTitleIntroDirectState(PPCContext& ctx, uint8_t* base, uint32_t titleStateGuestAddress, uint8_t csdCompleteArmed)
+{
+    if (!titleStateGuestAddress)
+        return;
+
+    const auto titleContextGuestAddress = PPC_LOAD_U32(titleStateGuestAddress + 8);
+    if (!titleContextGuestAddress)
+        return;
+
+    const auto savedR3 = ctx.r3;
+    const auto savedR4 = ctx.r4;
+
+    ctx.r3.u32 = titleContextGuestAddress;
+    ctx.r4.u32 = 1;
+    __imp__sub_825811C8(ctx, base);
+
+    const auto requestedState = PPC_LOAD_U8(titleContextGuestAddress + 0x180);
+    auto dirtyFlag = PPC_LOAD_U8(titleContextGuestAddress + 0x181);
+    if (requestedState == 1 && dirtyFlag == 0)
+    {
+        PPC_STORE_U8(titleContextGuestAddress + 0x181, 1);
+        dirtyFlag = 1;
+    }
+
+    auto transitionArmed = PPC_LOAD_U8(titleContextGuestAddress + 0x238);
+    if (transitionArmed == 0)
+    {
+        PPC_STORE_U8(titleContextGuestAddress + 0x238, 1);
+        transitionArmed = 1;
+    }
+
+    auto outputArmed = PPC_LOAD_U8(titleContextGuestAddress + 0x1D1);
+    if (UiLab::ShouldArmTitleIntroOwnerOutput() && outputArmed == 0)
+    {
+        PPC_STORE_U8(titleContextGuestAddress + 0x1D1, 1);
+        outputArmed = 1;
+    }
+
+    ctx.r3 = savedR3;
+    ctx.r4 = savedR4;
+
+    UiLab::OnTitleIntroDirectStateApplied(requestedState, dirtyFlag, transitionArmed, outputArmed, csdCompleteArmed);
+}
+
 void StorageDevicePromptMidAsmHook() {}
 
 // Save data validation hook.
@@ -166,12 +240,30 @@ void PressStartSaveLoadThreadMidAsmHook()
 PPC_FUNC_IMPL(__imp__sub_82587E50);
 PPC_FUNC(sub_82587E50)
 {
+    const auto titleStateGuestAddress = ctx.r3.u32;
     auto pTitleStateIntro = (SWA::CTitleStateIntro*)g_memory.Translate(ctx.r3.u32);
-    auto pTime = (be<float>*)((uint8_t*)pTitleStateIntro->GetContextBase() + 0x10C);
+    auto pContext = pTitleStateIntro->GetContextBase();
+    auto pTime = (be<float>*)((uint8_t*)pContext + 0x10C);
     UiLab::OnTitleStateIntroUpdate(*pTime);
 
-    if (UiLab::ApplyTitleIntroStateForcing(*pTime))
+    const auto contextBase = reinterpret_cast<const uint8_t*>(pContext);
+    UiLab::OnTitleIntroContext(
+        pTitleStateIntro->m_pContext.ptr.get(),
+        pTitleStateIntro->m_pStateMachine.ptr.get(),
+        *pTime,
+        *(contextBase + 0x180),
+        *(contextBase + 0x181),
+        *(contextBase + 0x238),
+        *(contextBase + 0x244),
+        ReadGuestU32(contextBase + 0x1D8),
+        ReadGuestU32(contextBase + 0x1E0),
+        ReadGuestU32(contextBase + 0x1E8));
+
+    bool directState = false;
+    if (UiLab::ApplyTitleIntroStateForcing(*pTime, directState))
         InjectTitleAccept();
+
+    const auto csdCompleteArmed = directState ? ArmTitleIntroCsdCompletion(base, titleStateGuestAddress) : 0;
 
     if (*SWA::SGlobals::ms_IsAutoSaveWarningShown)
     {
@@ -188,4 +280,7 @@ PPC_FUNC(sub_82587E50)
         if (!ProcessQuitMessage())
             __imp__sub_82587E50(ctx, base);
     }
+
+    if (directState)
+        RequestTitleIntroDirectState(ctx, base, titleStateGuestAddress, csdCompleteArmed);
 }

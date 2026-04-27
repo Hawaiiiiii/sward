@@ -63,6 +63,19 @@ static void SuppressTitleAccept(SWA::SPadState& padState)
     padState.TappedState = (uint32_t)padState.TappedState & ~acceptMask;
 }
 
+static uint32_t ReadGuestU32(const void* address)
+{
+    return reinterpret_cast<const be<uint32_t>*>(address)->get();
+}
+
+static void ApplyDirectTitleMenuContext(SWA::CTitleMenu& titleMenu)
+{
+    titleMenu.m_CursorIndex = 0;
+    titleMenu.m_Field3C = true;
+    titleMenu.m_Field54 = true;
+    titleMenu.m_Field9A = true;
+}
+
 // SWA::CTitleStateMenu::Update
 PPC_FUNC_IMPL(__imp__sub_825882B8);
 PPC_FUNC(sub_825882B8)
@@ -74,34 +87,51 @@ PPC_FUNC(sub_825882B8)
     auto& pPadState = pInputState->m_PadStates[(uint32_t)pInputState->m_CurrentPadStateIndex];
 
     auto pContext = pTitleStateMenu->GetContextBase<SWA::CTitleStateMenu::CTitleStateMenuContext>();
-    UiLab::OnTitleStateMenuUpdate(pContext->m_pTitleMenu->m_CursorIndex);
+    auto pTitleMenu = pContext->m_pTitleMenu.get();
+    UiLab::OnTitleStateMenuUpdate(pTitleMenu->m_CursorIndex);
 
-    auto forcedCursorIndex = (int32_t)pContext->m_pTitleMenu->m_CursorIndex;
+    const auto contextBase = reinterpret_cast<const uint8_t*>(pContext);
+    UiLab::OnTitleMenuContext(
+        ReadGuestU32(contextBase + 0x1D8),
+        ReadGuestU32(contextBase + 0x1E0),
+        ReadGuestU32(contextBase + 0x1E8),
+        ReadGuestU32(contextBase + 0x240),
+        *(contextBase + 0x244),
+        pTitleMenu->m_CursorIndex,
+        pTitleMenu->m_Field3C,
+        pTitleMenu->m_Field54,
+        pTitleMenu->m_Field9A);
+
+    auto forcedCursorIndex = (int32_t)pTitleMenu->m_CursorIndex;
     bool injectAccept = false;
     bool suppressAccept = false;
+    bool directContext = false;
 
-    if (UiLab::ApplyTitleMenuStateForcing(forcedCursorIndex, injectAccept, suppressAccept))
-        pContext->m_pTitleMenu->m_CursorIndex = (uint32_t)forcedCursorIndex;
+    if (UiLab::ApplyTitleMenuStateForcing(forcedCursorIndex, injectAccept, suppressAccept, directContext))
+        pTitleMenu->m_CursorIndex = (uint32_t)forcedCursorIndex;
 
     if (suppressAccept)
         SuppressTitleAccept(pPadState);
+
+    if (directContext)
+        ApplyDirectTitleMenuContext(*pTitleMenu);
 
     if (injectAccept)
         InjectTitleAccept(pPadState);
 
     auto isAccepted = pPadState.IsTapped(SWA::eKeyState_A) || pPadState.IsTapped(SWA::eKeyState_Start);
 
-    auto isNewGameIndex = pContext->m_pTitleMenu->m_CursorIndex == 0;
-    auto isOptionsIndex = pContext->m_pTitleMenu->m_CursorIndex == 2;
-    auto isInstallIndex = pContext->m_pTitleMenu->m_CursorIndex == 3;
+    auto isNewGameIndex = pTitleMenu->m_CursorIndex == 0;
+    auto isOptionsIndex = pTitleMenu->m_CursorIndex == 2;
+    auto isInstallIndex = pTitleMenu->m_CursorIndex == 3;
 
     // Always default to New Game with corrupted save data.
-    if (App::s_isSaveDataCorrupt && pContext->m_pTitleMenu->m_CursorIndex == 1)
-        pContext->m_pTitleMenu->m_CursorIndex = 0;
+    if (App::s_isSaveDataCorrupt && pTitleMenu->m_CursorIndex == 1)
+        pTitleMenu->m_CursorIndex = 0;
 
     if (isNewGameIndex && isAccepted)
     {
-        if (pContext->m_pTitleMenu->m_IsDeleteCheckMessageOpen &&
+        if (pTitleMenu->m_IsDeleteCheckMessageOpen &&
             pGameDocument->m_pMember->m_pGeneralWindow->m_SelectedIndex == 1)
         {
             LOGN("Resetting achievements...");

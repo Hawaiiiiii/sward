@@ -12,6 +12,12 @@
 
 namespace UiLab
 {
+    enum class RoutePolicy : uint8_t
+    {
+        InputInjection,
+        DirectContext
+    };
+
     static constexpr std::array<RuntimeTarget, 8> kRuntimeTargets =
     {{
         { ScreenId::TitleLoop, "title-loop", "Title Loop", "ui_title", "System/GameMode/Title/TitleStateIntro.cpp", false },
@@ -27,6 +33,7 @@ namespace UiLab
     static bool g_isEnabled = false;
     static bool g_observerMode = false;
     static bool g_hideOverlay = false;
+    static RoutePolicy g_routePolicy = RoutePolicy::InputInjection;
     static ScreenId g_target = ScreenId::TitleLoop;
     static bool g_routePending = false;
     static bool g_titleIntroAcceptInjected = false;
@@ -42,13 +49,48 @@ namespace UiLab
     static bool g_loggedIntroHook = false;
     static bool g_loggedMenuHook = false;
     static bool g_loggedStageHarness = false;
+    static uint64_t g_titleIntroContextSampleCount = 0;
+    static uint64_t g_stageTitleContextSampleCount = 0;
     static uint32_t g_lastLoadingDisplayType = UINT32_MAX;
     static bool g_loadingDisplayWasActive = false;
+    static std::string g_lastTitleIntroContextDetail;
+    static std::string g_lastStageTitleContextDetail;
+    static std::string g_lastTitleMenuContextDetail;
     static std::unordered_set<std::string> g_loggedCsdProjects;
 
     static const RuntimeTarget& TargetFor(ScreenId id);
     static bool TargetNeedsStageHarness(ScreenId id);
     static bool TargetShouldRouteThroughLoading(ScreenId id);
+
+    static std::string_view RoutePolicyLabel()
+    {
+        switch (g_routePolicy)
+        {
+            case RoutePolicy::DirectContext:
+                return "direct-context";
+
+            case RoutePolicy::InputInjection:
+            default:
+                return "input";
+        }
+    }
+
+    static bool TrySetRoutePolicy(std::string_view value)
+    {
+        if (value == "input" || value == "input-injection")
+        {
+            g_routePolicy = RoutePolicy::InputInjection;
+            return true;
+        }
+
+        if (value == "direct" || value == "direct-context" || value == "context")
+        {
+            g_routePolicy = RoutePolicy::DirectContext;
+            return true;
+        }
+
+        return false;
+    }
 
     static bool ShouldDrawOverlay()
     {
@@ -264,6 +306,30 @@ namespace UiLab
                 continue;
             }
 
+            if (arg == "--ui-lab-route-policy")
+            {
+                g_isEnabled = true;
+
+                if ((i + 1) < argc && TrySetRoutePolicy(argv[i + 1]))
+                    ++i;
+                else
+                    LOGN_WARNING("SWARD UI Lab: --ui-lab-route-policy was provided without a known policy.");
+
+                continue;
+            }
+
+            constexpr std::string_view routePolicyPrefix = "--ui-lab-route-policy=";
+            if (arg.starts_with(routePolicyPrefix))
+            {
+                g_isEnabled = true;
+                const auto policy = arg.substr(routePolicyPrefix.size());
+
+                if (!TrySetRoutePolicy(policy))
+                    LOGFN_WARNING("SWARD UI Lab: unknown route policy '{}'.", std::string(policy));
+
+                continue;
+            }
+
             if (arg == "--ui-lab-screen")
             {
                 g_isEnabled = true;
@@ -374,6 +440,8 @@ namespace UiLab
                 target.primaryCsdScene,
                 target.sourceFamily,
                 target.requiresStageContext ? "yes" : "no");
+
+            LOGFN("SWARD UI Lab route policy: {}", RoutePolicyLabel());
 
             if (target.requiresStageContext)
                 LOGFN("SWARD UI Lab stage harness armed: requested_stage={}", g_requestedStageHarness);
@@ -507,6 +575,91 @@ namespace UiLab
         g_loggedIntroHook = true;
     }
 
+    void OnTitleIntroContext(
+        uint32_t contextAddress,
+        uint32_t stateMachineAddress,
+        float elapsedSeconds,
+        uint8_t requestedState,
+        uint8_t dirtyFlag,
+        uint8_t transitionArmed,
+        uint8_t contextFlag580,
+        uint32_t context472,
+        uint32_t context480,
+        uint32_t context488)
+    {
+        if (!g_isEnabled)
+            return;
+
+        ++g_titleIntroContextSampleCount;
+
+        const auto detail =
+            "context=" + std::to_string(contextAddress) +
+            " state_machine=" + std::to_string(stateMachineAddress) +
+            " elapsed_ms=" + std::to_string(static_cast<uint32_t>(elapsedSeconds * 1000.0f)) +
+            " requested_state=" + std::to_string(requestedState) +
+            " dirty=" + std::to_string(dirtyFlag) +
+            " transition_armed=" + std::to_string(transitionArmed) +
+            " context_flag580=" + std::to_string(contextFlag580) +
+            " context_472=" + std::to_string(context472) +
+            " context_480=" + std::to_string(context480) +
+            " context_488=" + std::to_string(context488);
+
+        if (detail == g_lastTitleIntroContextDetail && (g_titleIntroContextSampleCount % 60) != 0)
+            return;
+
+        g_lastTitleIntroContextDetail = detail;
+        WriteEvidenceEvent("title-intro-context", detail);
+    }
+
+    void OnTitleIntroDirectStateApplied(
+        uint8_t requestedState,
+        uint8_t dirtyFlag,
+        uint8_t transitionArmed,
+        uint8_t outputArmed,
+        uint8_t csdCompleteArmed)
+    {
+        if (!g_isEnabled)
+            return;
+
+        WriteEvidenceEvent(
+            "title-intro-direct-state-applied",
+            "requested_state=" + std::to_string(requestedState) +
+            " dirty=" + std::to_string(dirtyFlag) +
+            " transition_armed=" + std::to_string(transitionArmed) +
+            " output_armed=" + std::to_string(outputArmed) +
+            " csd_complete_armed=" + std::to_string(csdCompleteArmed));
+    }
+
+    void OnGameModeStageTitleContext(
+        uint32_t gameModeAddress,
+        uint32_t contextAddress,
+        uint32_t stateMachineAddress,
+        float stateTime,
+        bool isTitleStateMenu,
+        bool isAutoSaveWarningShown,
+        std::string_view ownerDetail)
+    {
+        if (!g_isEnabled)
+            return;
+
+        ++g_stageTitleContextSampleCount;
+
+        const auto detail =
+            "game_mode=" + std::to_string(gameModeAddress) +
+            " context=" + std::to_string(contextAddress) +
+            " state_machine=" + std::to_string(stateMachineAddress) +
+            " state_time_ms=" + std::to_string(static_cast<uint32_t>(stateTime * 1000.0f)) +
+            " is_title_state_menu=" + std::to_string(isTitleStateMenu ? 1 : 0) +
+            " autosave_warning=" + std::to_string(isAutoSaveWarningShown ? 1 : 0) +
+            (ownerDetail.empty() ? "" : " " + std::string(ownerDetail));
+
+        if (detail == g_lastStageTitleContextDetail && (g_stageTitleContextSampleCount % 60) != 0)
+            return;
+
+        g_lastStageTitleContextDetail = detail;
+        WriteEvidenceEvent("stage-title-context", detail);
+    }
+
     void OnTitleStateMenuUpdate(int32_t cursorIndex)
     {
         if (!g_isEnabled || g_loggedMenuHook)
@@ -520,6 +673,38 @@ namespace UiLab
             target.primaryCsdScene);
         WriteEvidenceEvent("title-menu-attached");
         g_loggedMenuHook = true;
+    }
+
+    void OnTitleMenuContext(
+        uint32_t context472,
+        uint32_t context480,
+        uint32_t context488,
+        uint32_t contextPhase,
+        uint8_t contextFlag580,
+        uint32_t menuCursor,
+        bool menuField3C,
+        bool menuField54,
+        bool menuField9A)
+    {
+        if (!g_isEnabled)
+            return;
+
+        const auto detail =
+            "context_472=" + std::to_string(context472) +
+            " context_480=" + std::to_string(context480) +
+            " context_488=" + std::to_string(context488) +
+            " context_phase=" + std::to_string(contextPhase) +
+            " context_flag580=" + std::to_string(contextFlag580) +
+            " menu_cursor=" + std::to_string(menuCursor) +
+            " menu_field3c=" + std::to_string(menuField3C ? 1 : 0) +
+            " menu_field54=" + std::to_string(menuField54 ? 1 : 0) +
+            " menu_field9a=" + std::to_string(menuField9A ? 1 : 0);
+
+        if (detail == g_lastTitleMenuContextDetail)
+            return;
+
+        g_lastTitleMenuContextDetail = detail;
+        WriteEvidenceEvent("title-menu-context", detail);
     }
 
     void OnStageExitLoading()
@@ -615,8 +800,10 @@ namespace UiLab
         }
     }
 
-    bool ApplyTitleIntroStateForcing(float elapsedSeconds)
+    bool ApplyTitleIntroStateForcing(float elapsedSeconds, bool& directState)
     {
+        directState = false;
+
         if (!g_isEnabled || !g_routePending || g_titleIntroAcceptInjected)
             return false;
 
@@ -627,16 +814,41 @@ namespace UiLab
             return false;
 
         g_titleIntroAcceptInjected = true;
+
+        if (g_routePolicy == RoutePolicy::DirectContext)
+        {
+            directState = true;
+            g_routeStatus = "title intro direct state requested";
+            LOGFN("SWARD UI Lab route: requested direct title intro state for target={}", TargetFor(g_target).token);
+            WriteEvidenceEvent("title-intro-direct-state-requested", "state=1 dirty=1");
+            return false;
+        }
+
         g_routeStatus = "title accept injected";
         LOGFN("SWARD UI Lab route: injected title accept for target={}", TargetFor(g_target).token);
         WriteEvidenceEvent("title-accept-injected");
         return true;
     }
 
-    bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept, bool& suppressAccept)
+    bool ShouldArmTitleIntroOwnerOutput()
+    {
+        return g_isEnabled &&
+            g_routePolicy == RoutePolicy::DirectContext &&
+            TargetShouldRouteThroughLoading(g_target);
+    }
+
+    bool ShouldArmTitleIntroCsdCompletion()
+    {
+        return g_isEnabled &&
+            g_routePolicy == RoutePolicy::DirectContext &&
+            g_target == ScreenId::TitleMenu;
+    }
+
+    bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept, bool& suppressAccept, bool& directContext)
     {
         injectAccept = false;
         suppressAccept = false;
+        directContext = false;
 
         if (!g_isEnabled)
             return false;
@@ -666,14 +878,25 @@ namespace UiLab
 
         if (!g_titleMenuAcceptInjected)
         {
-            injectAccept = true;
             g_titleMenuAcceptInjected = true;
             g_routePending = false;
-            g_routeStatus = TargetNeedsStageHarness(g_target)
-                ? "stage accept injected"
-                : "loading accept injected";
-            LOGFN("SWARD UI Lab route: forced title menu New Game accept for target={}", TargetFor(g_target).token);
-            WriteEvidenceEvent("title-menu-new-game-accept-injected");
+
+            if (g_routePolicy == RoutePolicy::DirectContext)
+            {
+                directContext = true;
+                g_routeStatus = "direct context requested";
+                LOGFN("SWARD UI Lab route: requested direct title menu context latch for target={}", TargetFor(g_target).token);
+                WriteEvidenceEvent("title-menu-direct-context-requested");
+            }
+            else
+            {
+                injectAccept = true;
+                g_routeStatus = TargetNeedsStageHarness(g_target)
+                    ? "stage accept injected"
+                    : "loading accept injected";
+                LOGFN("SWARD UI Lab route: forced title menu New Game accept for target={}", TargetFor(g_target).token);
+                WriteEvidenceEvent("title-menu-new-game-accept-injected");
+            }
         }
 
         return true;
@@ -717,6 +940,7 @@ namespace UiLab
             ImGui::Text("Title intro hook: %s", g_loggedIntroHook ? "attached" : "waiting");
             ImGui::Text("Title menu hook: %s", g_loggedMenuHook ? "attached" : "waiting");
             ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
+            ImGui::Text("Route policy: %s", std::string(RoutePolicyLabel()).c_str());
             ImGui::Text("Presented frames: %llu", static_cast<unsigned long long>(g_presentedFrameCount));
             ImGui::Text("Evidence: %s", g_evidenceDirectory.empty() ? "off" : g_evidenceDirectory.string().c_str());
             ImGui::Text("Startup prompt blockers: %s", ShouldBypassStartupPromptBlockers() ? "bypassed" : "normal");

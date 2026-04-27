@@ -11,6 +11,24 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 102 Runtime UI Lab title/menu direct-context evidence
+
+- split direct title-intro forcing into two evidence-backed paths: CSD completion byte arming for `title-menu`, and owner-output arming only for loading/stage routes
+- proved `title_ctx465` is an owner-output bridge rather than the title-menu switch; title-menu direct forcing now leaves `output_armed=0` and arms the real CSD completion byte instead
+- captured a real `CTitleStateMenu::Update` attach under direct-context policy, with `title-menu-reached` and `title-menu-context` evidence in the JSONL stream
+- re-verified loading/stage-required direct-context routes still request real loading through owner output (`output_armed=1`, `loading-requested display_type=8`)
+- captured a Sonic HUD stage probe that observes `CGameModeStage::ExitLoading`, confirming the next blocker is deterministic stage/HUD owner selection rather than title-route forcing
+- extended the UI Lab regression contract around CSD completion arming, owner-output gating, and direct-context evidence fields
+
+### Phase 101 Runtime UI Lab direct-context forcing prep
+
+- added an experimental `--ui-lab-route-policy direct-context` route mode beside the default input-injection path
+- added direct title-intro state requests from the translated `sub_825811C8` field contract (`context+0x180` state, `context+0x181` dirty), so direct-context runs no longer depend on synthetic Start at the first gate
+- added title-menu context evidence from the real translated runtime state, including context owner/pointer fields, phase/flag fields, and title menu cursor/transition/select booleans
+- wired the title-menu route path so direct-context runs latch the translated `CTitleMenu` cursor/selection/transition fields instead of pressing synthetic A/Start
+- extended the capture helper with `-RoutePolicy direct-context` for focused direct-state captures while preserving `input` as the default route policy
+- extended the UI Lab regression contract around context evidence, direct-route policy parsing, and the title-menu direct latch
+
 ### Phase 100 Runtime UI Lab manual observer
 
 - added `--ui-lab-observer` so the generated UnleashedRecomp UI Lab can run as a passive real-runtime evidence recorder without forcing title/loading/stage routes

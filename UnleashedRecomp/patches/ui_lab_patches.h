@@ -45,13 +45,50 @@ namespace UiLab
     void SelectNextTarget();
 
     void OnTitleStateIntroUpdate(float elapsedSeconds);
+    void OnTitleIntroContext(
+        uint32_t contextAddress,
+        uint32_t stateMachineAddress,
+        float elapsedSeconds,
+        uint8_t requestedState,
+        uint8_t dirtyFlag,
+        uint8_t transitionArmed,
+        uint8_t contextFlag580,
+        uint32_t context472,
+        uint32_t context480,
+        uint32_t context488);
+    void OnTitleIntroDirectStateApplied(
+        uint8_t requestedState,
+        uint8_t dirtyFlag,
+        uint8_t transitionArmed,
+        uint8_t outputArmed,
+        uint8_t csdCompleteArmed);
+    void OnGameModeStageTitleContext(
+        uint32_t gameModeAddress,
+        uint32_t contextAddress,
+        uint32_t stateMachineAddress,
+        float stateTime,
+        bool isTitleStateMenu,
+        bool isAutoSaveWarningShown,
+        std::string_view ownerDetail);
     void OnTitleStateMenuUpdate(int32_t cursorIndex);
+    void OnTitleMenuContext(
+        uint32_t context472,
+        uint32_t context480,
+        uint32_t context488,
+        uint32_t contextPhase,
+        uint8_t contextFlag580,
+        uint32_t menuCursor,
+        bool menuField3C,
+        bool menuField54,
+        bool menuField9A);
     void OnStageExitLoading();
     void OnPresentedFrame();
     void OnLoadingRequest(uint32_t displayType);
     void OnLoadingUpdate(uint32_t displayType);
     void OnCsdProjectMade(std::string_view projectName);
-    bool ApplyTitleIntroStateForcing(float elapsedSeconds);
-    bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept, bool& suppressAccept);
+    bool ApplyTitleIntroStateForcing(float elapsedSeconds, bool& directState);
+    bool ShouldArmTitleIntroOwnerOutput();
+    bool ShouldArmTitleIntroCsdCompletion();
+    bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept, bool& suppressAccept, bool& directContext);
     void DrawOverlay();
 }

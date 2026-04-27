@@ -8,6 +8,8 @@ param(
     [int]$AutoExitSeconds = 16,
     [int]$ObserveSeconds = 0,
     [int]$SnapshotIntervalSeconds = 10,
+    [ValidateSet("input", "direct-context")]
+    [string]$RoutePolicy = "input",
     [bool]$NormalizeWindow = $true,
     [switch]$Observer,
     [switch]$HideOverlay,
@@ -233,6 +235,7 @@ foreach ($target in $expandedTargets) {
 
     if (-not $Observer) {
         $args += @("--ui-lab-screen", $target)
+        $args += @("--ui-lab-route-policy", $RoutePolicy)
     }
     else {
         $args += "--ui-lab-observer"

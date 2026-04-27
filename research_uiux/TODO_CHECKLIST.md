@@ -762,6 +762,27 @@
 - [x] Launch-check an observer capture and verify it writes screenshots/events without the harness killing the process.
 - [x] Guard observer mode and helper routing with regression tests.
 
+## Phase 101 - Runtime UI Lab Direct-Context Forcing Prep
+
+- [x] Add `--ui-lab-route-policy direct-context` beside the default input-injection route policy.
+- [x] Add direct title-intro state requests through the translated `sub_825811C8` contract.
+- [x] Record title intro, title owner, and title-menu context fields into the JSONL evidence stream.
+- [x] Add direct title-menu latch scaffolding for cursor/selection/transition fields.
+- [x] Extend the capture helper with `-RoutePolicy`.
+- [x] Build the generated UnleashedRecomp UI Lab after the direct-context prep.
+- [x] Capture-check direct-context title/menu behavior and preserve the owner-output bridge finding.
+- [x] Guard direct-context route policy and context evidence with regression tests.
+
+## Phase 102 - Runtime UI Lab Title/Menu Direct-Context Evidence
+
+- [x] Split direct title-intro forcing so `title-menu` arms the CSD completion byte while loading/stage routes arm owner output.
+- [x] Prove `title_ctx465` is the owner-output bridge, not the title-menu switch.
+- [x] Capture-check `title-menu` direct-context routing and verify `title-menu-attached`, `title-menu-context`, and `title-menu-reached`.
+- [x] Capture-check `loading` direct-context routing and verify owner-output still requests real loading.
+- [x] Capture-check `sonic-hud` direct-context routing and verify `CGameModeStage::ExitLoading` is observable.
+- [x] Update the UI Lab pivot and whole-game gap reports with the new route boundary.
+- [x] Guard CSD completion arming, owner-output gating, and direct-context evidence fields with regression tests.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -917,3 +938,5 @@
 - [x] Follow-on phase audit on `2026-04-26`: added local visual-atlas gallery navigation under `b\rr91`, keeping `22` ignored atlas sheets inspectable without publishing proprietary PNG outputs.
 - [x] Follow-on phase audit on `2026-04-26`: corrected the clean renderer product lane under `b\rr92` so it opens on `SonicHudReconstruction` instead of the atlas gallery, with `7` screen samples, `16` local DDS-backed casts, and a family-specific readable Sonic HUD reconstruction path smoke-guarded.
 - [x] Follow-on phase audit on `2026-04-26`: corrected the clean renderer title lane under `b\rr93` so it opens on `TitleLoopReconstruction`, with `8` screen samples, `20` DDS-backed evidence casts, local `evmo_title_loop.sfd` frame evidence, decompressed `OPmovie_titlelogo_EN` evidence, and a screenshot-checked title composition.
+- [x] Follow-on phase audit on `2026-04-27`: added UI Lab direct-context route policy prep, direct title-intro state requests, title-menu context evidence, capture-helper route-policy selection, and regression coverage so title/loading/stage routing can move from input guessing toward translated state-field forcing.
+- [x] Follow-on phase audit on `2026-04-27`: split title-menu direct forcing onto the real CSD completion byte, kept owner-output for loading/stage routes, captured title-menu/loading/sonic-hud direct-context evidence, and marked stage/HUD owner selection as the next blocker.
