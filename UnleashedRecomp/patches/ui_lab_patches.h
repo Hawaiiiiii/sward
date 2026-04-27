@@ -36,6 +36,7 @@ namespace UiLab
 
     bool IsEnabled();
     bool IsObserverMode();
+    bool IsNativeFrameCaptureEnabled();
     bool ShouldBypassStartupPromptBlockers();
     ScreenId GetTarget();
     std::string_view GetTargetToken();

@@ -1571,7 +1571,8 @@ static void BeginCommandList()
         uint32_t height = Video::s_viewportHeight;
 
         bool usingIntermediaryTexture = (width != g_swapChain->getWidth()) || (height != g_swapChain->getHeight()) ||
-            Config::XboxColorCorrection || (abs(Config::Brightness - 0.5f) > 0.001f);
+            Config::XboxColorCorrection || (abs(Config::Brightness - 0.5f) > 0.001f) ||
+            UiLab::IsNativeFrameCaptureEnabled();
 
         if (usingIntermediaryTexture)
         {
@@ -3030,6 +3031,7 @@ static void SetRootDescriptor(const UploadAllocation& allocation, size_t index)
 static void ProcExecuteCommandList(const RenderCommand& cmd)
 {    
     UiLabNativeFrameCapture uiLabNativeFrameCapture;
+    bool commandFenceAlreadyWaited = false;
 
     if (g_swapChainValid)
     {
@@ -3100,16 +3102,15 @@ static void ProcExecuteCommandList(const RenderCommand& cmd)
             commandList->setScissors(RenderRect(0, 0, g_swapChain->getWidth(), g_swapChain->getHeight()));
             commandList->drawInstanced(6, 1, 0, 0);
 
-            if (!QueueUiLabNativeFrameCapture(
+            QueueUiLabNativeFrameCapture(
                 commandList.get(),
-                swapChainTexture,
-                g_swapChain->getWidth(),
-                g_swapChain->getHeight(),
-                RenderTextureLayout::PRESENT,
-                uiLabNativeFrameCapture))
-            {
-                commandList->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(swapChainTexture, RenderTextureLayout::PRESENT));
-            }
+                g_intermediaryBackBufferTexture.get(),
+                Video::s_viewportWidth,
+                Video::s_viewportHeight,
+                RenderTextureLayout::SHADER_READ,
+                uiLabNativeFrameCapture);
+
+            commandList->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(swapChainTexture, RenderTextureLayout::PRESENT));
         }
         else
         {
@@ -3153,6 +3154,7 @@ static void ProcExecuteCommandList(const RenderCommand& cmd)
     if (uiLabNativeFrameCapture.readbackBuffer)
     {
         g_queue->waitForCommandFence(g_commandFences[g_frame].get());
+        commandFenceAlreadyWaited = true;
 
         if (WriteUiLabNativeFrameBmp(uiLabNativeFrameCapture))
         {
@@ -3167,7 +3169,7 @@ static void ProcExecuteCommandList(const RenderCommand& cmd)
         }
     }
 
-    g_commandListStates[g_frame] = true;
+    g_commandListStates[g_frame] = !commandFenceAlreadyWaited;
 
     g_executedCommandList = true;
     g_executedCommandList.notify_one();

@@ -75,7 +75,7 @@ Implemented now:
 - a passive observer launch path via `--ui-lab-observer` / capture-helper `-Observer`, which records the normal runtime without route forcing or lab-only startup prompt bypasses
 - optional overlay hiding via `--ui-lab-overlay off` / capture-helper `-HideOverlay`, so manual evidence captures can show the real game frame cleanly while JSONL evidence continues in the background
 - native backbuffer capture via `--ui-lab-native-capture` and `--ui-lab-native-capture-dir`, writing local-only 32-bit BMP frames from the runtime GPU readback path so evidence can use the actual rendered frame instead of relying only on Windows window capture
-- native frame-series capture controls via `--ui-lab-native-capture-count` and `--ui-lab-native-capture-interval-frames`, with capture-helper manifest reporting for every `native-frame-captured` BMP entry. Native BMP readback is currently opt-in in the helper because the readback path is still black/stall-prone.
+- native frame-series capture controls via `--ui-lab-native-capture-count` and `--ui-lab-native-capture-interval-frames`, with capture-helper manifest reporting for every `native-frame-captured` BMP entry. Native BMP readback remains opt-in in the helper while it is expanded target-by-target, but the title-loop and normal Sonic HUD paths now write real nonblack backbuffer BMPs and exit cleanly.
 - passive capture/evidence safety: `--ui-lab-evidence-dir` and `--ui-lab-native-capture` no longer force the default title route by themselves. A launch becomes `capture/evidence observer mode` unless `--ui-lab-screen` / `--ui-lab=<target>` explicitly selects a routed screen target.
 - capture-helper `-SkipWindowScreenshots` mode for native-only runs, avoiding `PrintWindow`/desktop screenshot hangs while still preparing/focusing the real runtime window
 - direct title-intro state requests from the translated `sub_825811C8` field contract (`context+0x180` requested state and `context+0x181` dirty flag), used by the experimental direct-context policy instead of synthetic Start at the first route gate
@@ -110,6 +110,9 @@ Verification note:
 - Native-only observer/title-loop captures under `out/ui_lab_runtime_evidence/20260427_131218/` and `out/ui_lab_runtime_evidence/20260427_131421/` proved the helper now completes without hanging when window screenshots are disabled, and also exposed the next readback blocker: the routed title path reaches `ui_title`, but the current native BMP is black and presentation stops after the first captured frame.
 - A comparison title-loop capture under `out/ui_lab_runtime_evidence/20260427_133641/` with native capture disabled reached the visible title/menu screen, continued presenting through frame `1314`, emitted `auto-exit`, and exited normally. This isolates the black/stall issue to the native readback path rather than the title route or real CSD bootstrap.
 - A default-argument title-loop capture under `out/ui_lab_runtime_evidence/20260427_135138/` proved the helper now avoids native readback unless explicitly requested: required-event validation passed, the runtime exited cleanly, and `nativeFrameCaptures` was empty.
+- Native readback now copies from the intermediary backbuffer when UI Lab capture is enabled, avoiding swapchain present-image source limitations, and the capture path no longer leaves an already-waited command fence marked pending for the next frame.
+- A native title-loop capture under `out/ui_lab_runtime_evidence/20260427_142813/` proved the corrected readback path: required events passed, `auto-exit` fired, `3` native BMPs were written, and the final frame shows the real rendered Sonic Unleashed title screen.
+- A native normal Sonic HUD capture under `out/ui_lab_runtime_evidence/20260427_143208/` proved the same path across the stage harness: `stage-context-observed`, `target-csd-project-made`, and `stage-target-csd-bound` all passed, `4` native BMPs were written, and the first frame shows the real Miles Electric / Sonic tutorial loading screen.
 - Therefore the normal Sonic HUD route is now real-runtime CSD-bound, while the remaining `ui_prov_playscreen` blocker is deterministic Extra/Tornado stage owner selection rather than generic stage-context observation.
 
 Current alpha focus:
@@ -122,7 +125,7 @@ Still ahead:
 - deterministic direct stage boot/routing for tutorial/result/status routes after the stage harness observes or creates the correct owner context
 - deterministic Extra/Tornado owner selection for `ui_prov_playscreen`, after the early-game alpha is useful
 - CSD-project host creation for non-title screens that do not require a full gameplay owner
-- native readback timing/source correction so repeated/manual frame series produce nonblack real frames after target CSDs are live
+- native frame timing controls so repeated/manual frame series bias toward UI-bearing frames after target CSDs are live, rather than capturing later camera-only frames
 - route cleanup for startup prompts, save-state prompts, and DLC/install confirmation flows that can appear in front of requested UI targets
 - demotion of the clean renderer in docs to diagnostic/evidence-only status everywhere it is still described too strongly
 
@@ -145,7 +148,7 @@ This does not mean every target is deterministic yet. The normal Sonic HUD can n
 The next beats should build on `UiLab` in this order:
 
 1. Keep the first alpha narrow: title loop, title menu, title options, loading, and normal Sonic HUD.
-2. Correct native readback timing/source selection so the new repeated/manual capture controls produce nonblack frames after the selected real CSD has drawn.
+2. Bias native capture timing/selection toward UI-bearing frames after the selected real CSD has drawn; the title-loop and normal Sonic HUD readback source/fence path is now proven.
 3. Promote the proven title/menu/loading/options direct-context path into a stable default once more route captures confirm it against normal saves and prompt variants.
 4. Add deterministic stage-context creation or stage boot routing for tutorial/result/status routes, starting from the observed `CGameModeStage::ExitLoading` boundary and the confirmed `ui_playscreen` Sonic HUD bind.
 5. Return to Extra/Tornado, Werehog, boss/final, and broader late-game UI after the early-game alpha is useful enough to drive source recovery.

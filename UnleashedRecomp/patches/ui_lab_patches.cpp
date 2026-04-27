@@ -745,6 +745,11 @@ namespace UiLab
         return g_observerMode;
     }
 
+    bool IsNativeFrameCaptureEnabled()
+    {
+        return g_isEnabled && g_nativeFrameCaptureEnabled;
+    }
+
     bool ShouldBypassStartupPromptBlockers()
     {
         return g_isEnabled && !g_observerMode;

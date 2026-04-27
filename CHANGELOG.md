@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 109 UI Lab native readback source/fence fix
+
+- forced UI Lab native frame capture through the intermediary backbuffer path so readback copies from a transfer-capable rendered source instead of the swapchain present image
+- guarded command-list frame-state bookkeeping after native readback waits, preventing the capture path from marking an already-consumed fence as still pending
+- added regression coverage for the native-capture enable gate, intermediary-backbuffer source selection, shader-read source layout, and fence-state guard
+- rebuilt the generated UnleashedRecomp UI Lab and verified native `title-loop` capture under `out/ui_lab_runtime_evidence/20260427_142813/`: required evidence passed, `auto-exit` fired, all `3` BMPs were written, and the final frame shows the real title screen
+- verified native `sonic-hud` capture under `out/ui_lab_runtime_evidence/20260427_143208/`: stage context was observed, `ui_playscreen` was bound through `CGameModeStage::ExitLoading`, all `4` BMPs were written, and the first frame shows the real Miles Electric / Sonic tutorial loading screen
+
 ### Phase 108 UI Lab capture-helper stable defaults
 
 - split UI Lab window preparation from screenshot capture so `-SkipWindowScreenshots` still shows, focuses, and normalizes the real runtime window before native-only evidence runs

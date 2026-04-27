@@ -803,6 +803,52 @@
 - [x] Update the UI Lab pivot and whole-game gap reports with the one-week alpha scope boundary.
 - [x] Guard the options target and capture target-set behavior with regression tests.
 
+## Phase 105 - Runtime UI Lab Evidence-Gated Capture
+
+- [x] Make direct-context routing the helper default for early-game alpha captures.
+- [x] Add per-target required-event validation before declaring evidence success.
+- [x] Refuse desktop screenshot fallback when the foreground window does not belong to the UI Lab process.
+- [x] Gate late captures on required runtime evidence instead of blind timer-only capture.
+- [x] Capture-check normal Sonic HUD after the real `ui_playscreen` bind.
+- [x] Guard evidence-gated capture behavior with regression tests.
+
+## Phase 106 - Runtime UI Lab Native Backbuffer Capture
+
+- [x] Add `--ui-lab-native-capture` and `--ui-lab-native-capture-dir`.
+- [x] Write local-only top-down 32-bit BMP frames from the runtime GPU readback path.
+- [x] Fix D3D12/Vulkan placed-footprint readback handling for native capture.
+- [x] Keep capture/evidence-only launches passive unless a target screen is explicitly requested.
+- [x] Re-verify explicit routed `sonic-hud` still reaches real runtime evidence.
+- [x] Guard native capture and passive observer safety with regression tests.
+
+## Phase 107 - Runtime UI Lab Native Frame-Series Controls
+
+- [x] Add native capture count and interval controls.
+- [x] Report every native BMP in the capture-helper manifest.
+- [x] Add native-only `-SkipWindowScreenshots` capture-helper mode.
+- [x] Prove helper-owned native-only captures complete instead of hanging indefinitely.
+- [x] Isolate the remaining blocker to native readback source/synchronization after `ui_title`.
+- [x] Guard frame-series and screenshot-skip behavior with regression tests.
+
+## Phase 108 - Runtime UI Lab Capture-Helper Stable Defaults
+
+- [x] Split UI Lab window preparation from screenshot capture.
+- [x] Make helper native BMP capture opt-in by default.
+- [x] Verify default title-loop capture passes required evidence with no native BMPs emitted.
+- [x] Comparison-check title-loop with and without native capture to isolate the readback blocker.
+- [x] Update the UI Lab pivot and whole-game reports with the stable-default boundary.
+- [x] Guard helper defaults with regression tests.
+
+## Phase 109 - Runtime UI Lab Native Readback Source/Fence Fix
+
+- [x] Force UI Lab native capture through the intermediary backbuffer instead of the swapchain present image.
+- [x] Add a native-capture enable gate that forces the intermediary render path when capture is active.
+- [x] Prevent an already-waited native-capture command fence from being marked pending for the next frame.
+- [x] Rebuild the generated UnleashedRecomp UI Lab after the readback fix.
+- [x] Native-capture-check `title-loop` and verify real nonblack title-screen BMPs plus clean `auto-exit`.
+- [x] Native-capture-check `sonic-hud` and verify real Miles Electric / Sonic tutorial loading BMPs plus `ui_playscreen` stage binding.
+- [x] Guard source selection and fence-state behavior with regression tests.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -965,3 +1011,4 @@
 - [x] Follow-on phase audit on `2026-04-27`: added native UI Lab backbuffer capture, fixed D3D12/Vulkan readback-copy handling, and made evidence/native-capture-only launches passive observer runs unless a target screen is explicitly requested.
 - [x] Follow-on phase audit on `2026-04-27`: extended native UI Lab capture with count/interval frame-series controls, manifest reporting for all native BMP captures, native-only `-SkipWindowScreenshots` runs, and local evidence proving the next blocker is black/stalled readback timing after `ui_title` is reached.
 - [x] Follow-on phase audit on `2026-04-27`: split capture-helper window preparation from screenshot capture, made native BMP capture opt-in while readback is black/stall-prone, and comparison-verified title-loop screenshots/events remain stable through auto-exit without native readback.
+- [x] Follow-on phase audit on `2026-04-27`: fixed native UI Lab readback to copy from the intermediary backbuffer, guarded already-waited capture fences from frame-reuse stalls, and verified real nonblack native BMPs for `title-loop` plus `sonic-hud`.
