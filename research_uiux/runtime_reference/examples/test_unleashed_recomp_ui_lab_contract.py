@@ -281,9 +281,11 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("if (g_observerMode && !g_routeTargetExplicit)", ui_lab)
         self.assertIn("NativeCaptureCount", script)
         self.assertIn("NativeCaptureIntervalFrames", script)
+        self.assertIn('[bool]$NativeCapture = $false', script)
         self.assertIn("Get-UiLabNativeFrameCaptures", script)
         self.assertIn("$process.Refresh()", script)
         self.assertIn("SkipWindowScreenshots", script)
+        self.assertIn("Prepare-UiLabWindow", script)
         self.assertIn("window-screenshots-skipped", script)
         self.assertIn("nativeFrameCaptures =", script)
 

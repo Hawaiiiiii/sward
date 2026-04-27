@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 108 UI Lab capture-helper stable defaults
+
+- split UI Lab window preparation from screenshot capture so `-SkipWindowScreenshots` still shows, focuses, and normalizes the real runtime window before native-only evidence runs
+- changed `capture_unleashed_recomp_ui_lab.ps1` so native BMP capture is opt-in instead of default while the readback path is still black/stall-prone
+- comparison-verified `title-loop` without native capture reaches the real visible title/menu screen, continues presenting through frame `1314`, logs `auto-exit`, and exits cleanly
+- verified the new helper default under `out/ui_lab_runtime_evidence/20260427_135138/`: `title-loop` passed required-event validation, exited cleanly, and emitted no native BMP captures unless explicitly requested
+- comparison-verified `title-loop` with native capture still reaches `ui_title` but emits a black BMP and stops presenting after the first native readback, isolating the next blocker to the native readback synchronization/source path rather than the title route or CSD bootstrap
+
 ### Phase 107 Native UI Lab frame-series controls and hang-safe observer capture
 
 - extended UI Lab native capture with opt-in `--ui-lab-native-capture-count` and `--ui-lab-native-capture-interval-frames` controls, plus manifest reporting for all `native-frame-captured` BMP entries instead of only the last capture

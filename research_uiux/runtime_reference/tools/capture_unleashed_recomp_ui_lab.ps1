@@ -14,7 +14,7 @@ param(
     [int]$SnapshotIntervalSeconds = 10,
     [ValidateSet("input", "direct-context")]
     [string]$RoutePolicy = "direct-context",
-    [bool]$NativeCapture = $true,
+    [bool]$NativeCapture = $false,
     [int]$NativeCaptureCount = 1,
     [int]$NativeCaptureIntervalFrames = 120,
     [bool]$NormalizeWindow = $true,
@@ -129,9 +129,9 @@ function Test-ForegroundBelongsToProcess([int]$ProcessId) {
     return $foregroundProcessId -eq $ProcessId
 }
 
-function Capture-Window([IntPtr]$Handle, [string]$Path, [int]$ProcessId) {
+function Prepare-UiLabWindow([IntPtr]$Handle) {
     if ($Handle -eq [IntPtr]::Zero) {
-        throw "Cannot capture screenshot because the process has no window handle."
+        throw "Cannot prepare UI Lab window because the process has no window handle."
     }
 
     [UiLabNative]::ShowWindow($Handle, 9) | Out-Null
@@ -142,6 +142,10 @@ function Capture-Window([IntPtr]$Handle, [string]$Path, [int]$ProcessId) {
 
     [UiLabNative]::SetForegroundWindow($Handle) | Out-Null
     Start-Sleep -Milliseconds 500
+}
+
+function Capture-Window([IntPtr]$Handle, [string]$Path, [int]$ProcessId) {
+    Prepare-UiLabWindow $Handle
 
     $rect = New-Object UiLabRect
     if (-not [UiLabNative]::GetWindowRect($Handle, [ref]$rect)) {
@@ -485,6 +489,10 @@ foreach ($target in $expandedTargets) {
 
     $process = Start-UiLabProcess $exe $args $install
     $handle = Wait-UiLabWindow $process 12
+
+    if ($SkipWindowScreenshots -and -not $process.HasExited) {
+        Prepare-UiLabWindow $handle
+    }
 
     Start-Sleep -Seconds $InitialWaitSeconds
 
