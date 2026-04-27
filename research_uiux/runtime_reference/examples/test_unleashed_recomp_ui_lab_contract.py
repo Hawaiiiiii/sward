@@ -703,7 +703,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "sward_ui_lab_live",
             "Invoke-UiLabBridgeCommand",
             "Read-UiLabBridgeResponse",
-            '[ValidateSet("state", "events", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "route", "reset", "set-global", "capture", "help")]',
             "route <target>",
             "set-global <name> <0|1>",
             "Connect($TimeoutMilliseconds)",
@@ -736,6 +736,69 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "Test-UiLabEvidenceEvents $target $eventsPath",
         ]:
             self.assertIn(token, script)
+
+    def test_ui_lab_phase118_exposes_route_status_and_resets_latches(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        client = self.read("research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1")
+
+        for token in [
+            "void ResetRouteLatchState()",
+            "g_routeGeneration",
+            "g_routeResetCount",
+            "++g_routeGeneration",
+            "++g_routeResetCount",
+            "g_loggedIntroHook = false",
+            "g_loggedMenuHook = false",
+            "g_lastLoadingRequestType = UINT32_MAX",
+            "g_lastLoadingDisplayType = UINT32_MAX",
+            "g_loadingDisplayWasActive = false",
+            "BuildRouteStatusJson",
+            "routePending",
+            "routeGeneration",
+            "routeResetCount",
+            "titleIntroHookObserved",
+            "titleMenuHookObserved",
+            "lastTitleIntroContext",
+            "lastTitleMenuContext",
+            "lastStageTitleContext",
+            "route-status",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn(
+            '[ValidateSet("state", "events", "route-status", "route", "reset", "set-global", "capture", "help")]',
+            client,
+        )
+
+    def test_ui_lab_phase118_capture_helper_uses_unique_bridge_and_durable_title_menu_event(self):
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "[switch]$UseUniqueLiveBridgeName",
+            "Get-UiLabEffectiveLiveBridgeName",
+            "effectiveLiveBridgeName =",
+            "sward_ui_lab_live_",
+            "Wait-UiLabLiveBridgeReadiness $target $effectiveLiveBridgeName $maxEvidenceWaitSeconds $process $eventsPath",
+            "Test-UiLabDurableEvidenceEvent",
+            '"title-menu-visible"',
+            "durableEvidenceEvent",
+            "durableEvidencePassed",
+            "required-events-observed-via-live-bridge-and-jsonl",
+            "required-events-timeout-via-live-bridge-jsonl",
+            "--ui-lab-live-bridge-name\", $effectiveLiveBridgeName",
+            "liveBridgeName = if ($LiveBridge) { $effectiveLiveBridgeName } else { $null }",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 118",
+            "unique live bridge pipe",
+            "title-menu-visible",
+            "route-status",
+            "full early-game live-bridge sweep",
+        ]:
+            self.assertIn(token, report)
 
     def test_ui_lab_live_state_promotes_debug_fork_fields_into_typed_inspectors(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")

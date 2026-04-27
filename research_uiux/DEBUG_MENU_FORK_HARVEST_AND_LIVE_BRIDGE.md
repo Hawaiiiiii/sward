@@ -151,6 +151,12 @@ The live state now promotes the fork harvest into a `typedInspectors` block:
 - title cursor/menu owner readiness and owner CSD pointer.
 - Sonic HUD owner fields carried as typed latches: stage game-mode address, `m_rcPlayScreen` project, and `m_rcSpeedGauge` scene identity once the real stage/CSD route binds.
 
+## Phase 118 Route Stability Through The Live Bridge
+
+Phase 118 hardens the live bridge for combined sweeps. The capture helper now uses a unique live bridge pipe per target by default when `-UseLiveBridgeReadiness` is active, keeping one capture target from talking to a stale or previous target pipe. The runtime also exposes a `route-status` command with route generation, reset count, hook-observed flags, latest title/menu/stage context strings, and readiness fields.
+
+For `title-menu`, live bridge readiness is no longer enough by itself. The helper requires the durable JSONL `title-menu-visible` event before completing the readiness wait, so native BMP capture remains visual confirmation and JSONL remains the oracle. The goal is a full early-game live-bridge sweep where title-loop, title-menu, title-options, loading, and sonic-hud all pass in one run before deeper CSD/HUD owner traversal continues.
+
 ## Verification
 
 Local-only evidence, not committed:
@@ -192,3 +198,13 @@ Local-only evidence, not committed:
   - current full early-game live-bridge sweep passed `title-loop`, `title-options`, `loading`, and `sonic-hud`
   - `title-menu` missed the route in that combined run, while the focused title-menu run above passed immediately afterward
   - treat this as the next full-sweep route-stability gap, not as a failure of the bridge client or typed inspector path
+
+- `out/ui_lab_runtime_evidence/20260427_225000/`
+  - Phase 118 full early-game live-bridge/native sweep passed `title-loop`, `title-menu`, `title-options`, `loading`, and `sonic-hud` in one combined run
+  - each target used a unique pipe name such as `sward_ui_lab_live_20260427_225000_title-menu`
+  - title-menu readiness came from the live bridge but also required durable JSONL `title-menu-visible`; manifest reported `durableEvidenceEvent=title-menu-visible`, `durableEvidencePassed=true`, and `bestRoute=title menu visual ready`
+  - title-menu produced `14` RGB-nonblack native BMPs, keeping native capture as the visual proof path
+
+- `out/ui_lab_runtime_evidence/phase118_route_status_<timestamp>/`
+  - direct client smoke queried `route-status` through `query_unleashed_recomp_ui_lab_bridge.ps1`
+  - response reported route generation/reset counters, hook-observed flags, last title/stage context details, and readiness booleans from the running runtime

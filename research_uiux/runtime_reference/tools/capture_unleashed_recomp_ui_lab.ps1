@@ -21,6 +21,7 @@ param(
     [bool]$LiveBridge = $true,
     [string]$LiveBridgeName = "sward_ui_lab_live",
     [switch]$UseLiveBridgeReadiness,
+    [switch]$UseUniqueLiveBridgeName,
     [int]$LiveBridgeReadinessPollMilliseconds = 250,
     [bool]$NormalizeWindow = $true,
     [switch]$Observer,
@@ -31,6 +32,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $PSBoundParameters.ContainsKey("UseUniqueLiveBridgeName")) {
+    $UseUniqueLiveBridgeName = [bool]$UseLiveBridgeReadiness
+}
 
 $repoRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..\..")
 
@@ -243,6 +248,23 @@ function Get-UiLabTargetSet([string]$Name) {
     }
 }
 
+function Get-UiLabEffectiveLiveBridgeName(
+    [string]$BaseName,
+    [string]$SessionName,
+    [string]$Target,
+    [bool]$Unique
+) {
+    if (-not $Unique) {
+        return $BaseName
+    }
+
+    $safeSession = $SessionName -replace "[^A-Za-z0-9_.-]", "_"
+    $safeTarget = $Target -replace "[^A-Za-z0-9_.-]", "_"
+    $safeBase = $BaseName -replace "[^A-Za-z0-9_.-]", "_"
+    # Default unique pipe shape: sward_ui_lab_live_<session>_<target>.
+    return "$safeBase`_$safeSession`_$safeTarget"
+}
+
 function Get-UiLabRequiredEvents([string]$Target) {
     switch ($Target) {
         "title-loop" {
@@ -336,6 +358,33 @@ function Test-UiLabEvidenceEvents([string]$Target, [string]$EventsPath) {
         missingEvents = $missingEvents
         passed = $missingEvents.Count -eq 0
     }
+}
+
+function Test-UiLabDurableEvidenceEvent([string]$EventsPath, [string]$EventName) {
+    if ([string]::IsNullOrWhiteSpace($EventName)) {
+        return $true
+    }
+
+    if (-not (Test-Path -LiteralPath $EventsPath)) {
+        return $false
+    }
+
+    foreach ($line in Get-Content -LiteralPath $EventsPath) {
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+
+        try {
+            $event = $line | ConvertFrom-Json
+            if ([string]$event.event -eq $EventName) {
+                return $true
+            }
+        }
+        catch {
+        }
+    }
+
+    return $false
 }
 
 function Wait-UiLabEvidenceEvents([string]$Target, [string]$EventsPath, [int]$TimeoutSeconds, [System.Diagnostics.Process]$Process = $null) {
@@ -504,14 +553,18 @@ function Wait-UiLabLiveBridgeReadiness(
     [string]$Target,
     [string]$PipeName,
     [int]$TimeoutSeconds,
-    [System.Diagnostics.Process]$Process = $null
+    [System.Diagnostics.Process]$Process = $null,
+    [string]$EventsPath = ""
 ) {
     $timeout = [Math]::Max(0, $TimeoutSeconds)
     $deadline = (Get-Date).AddSeconds($timeout)
+    $durableEvidenceEvent = if ($Target -eq "title-menu") { "title-menu-visible" } else { "" }
     $checks = [ordered]@{
         passed = $false
         source = "liveBridge"
         target = $Target
+        durableEvidenceEvent = $durableEvidenceEvent
+        durableEvidencePassed = [string]::IsNullOrWhiteSpace($durableEvidenceEvent)
         error = "not checked"
     }
 
@@ -527,9 +580,16 @@ function Wait-UiLabLiveBridgeReadiness(
         $stateResponse = Get-UiLabLiveBridgeState $PipeName 1000
         if ($stateResponse.ok) {
             $checks = Test-UiLabLiveBridgeReadiness $Target $stateResponse.state
+            $checks["durableEvidenceEvent"] = $durableEvidenceEvent
+            $checks["durableEvidencePassed"] = Test-UiLabDurableEvidenceEvent $EventsPath $durableEvidenceEvent
 
             if ($checks.passed) {
-                return $checks
+                if ($checks.durableEvidencePassed) {
+                    return $checks
+                }
+
+                $checks["passed"] = $false
+                $checks["error"] = "waiting for durable JSONL event $durableEvidenceEvent"
             }
         }
         else {
@@ -537,6 +597,8 @@ function Wait-UiLabLiveBridgeReadiness(
                 passed = $false
                 source = "liveBridge"
                 target = $Target
+                durableEvidenceEvent = $durableEvidenceEvent
+                durableEvidencePassed = Test-UiLabDurableEvidenceEvent $EventsPath $durableEvidenceEvent
                 error = $stateResponse.error
             }
         }
@@ -842,6 +904,7 @@ foreach ($target in $expandedTargets) {
     $eventsPath = Join-Path $targetDir "ui_lab_events.jsonl"
     $liveStatePath = Join-Path $targetDir "ui_lab_live_state.json"
     $nativeCapturePlan = Get-UiLabNativeCapturePlan $target $NativeCaptureCount $NativeCaptureIntervalFrames
+    $effectiveLiveBridgeName = Get-UiLabEffectiveLiveBridgeName $LiveBridgeName (Split-Path -Leaf $sessionDir) $safeTarget ([bool]$UseUniqueLiveBridgeName)
 
     $args = @(
         "--use-cwd",
@@ -862,7 +925,7 @@ foreach ($target in $expandedTargets) {
 
     if ($LiveBridge) {
         $args += @("--ui-lab-live-bridge")
-        $args += @("--ui-lab-live-bridge-name", $LiveBridgeName)
+        $args += @("--ui-lab-live-bridge-name", $effectiveLiveBridgeName)
     }
     else {
         $args += @("--ui-lab-live-bridge", "off")
@@ -942,16 +1005,24 @@ foreach ($target in $expandedTargets) {
                 }
 
                 if ($UseLiveBridgeReadiness -and $LiveBridge) {
-                    $liveBridgeReadiness = Wait-UiLabLiveBridgeReadiness $target $LiveBridgeName $maxEvidenceWaitSeconds $process
+                    $liveBridgeReadiness = Wait-UiLabLiveBridgeReadiness $target $effectiveLiveBridgeName $maxEvidenceWaitSeconds $process $eventsPath
                     $liveBridgeState = if ($null -ne $liveBridgeReadiness -and $liveBridgeReadiness.Contains("state")) { $liveBridgeReadiness.state } else { $null }
                     $evidenceReady = $liveBridgeReadiness.passed
 
                     if ($evidenceReady) {
                         $readinessSource = "live-bridge"
-                        $lateCaptureReason = "required-events-observed-via-live-bridge"
+                        $lateCaptureReason = if (-not [string]::IsNullOrWhiteSpace([string]$liveBridgeReadiness.durableEvidenceEvent)) {
+                            "required-events-observed-via-live-bridge-and-jsonl"
+                        } else {
+                            "required-events-observed-via-live-bridge"
+                        }
                     }
                     else {
-                        $lateCaptureReason = "required-events-timeout-via-live-bridge"
+                        $lateCaptureReason = if ($null -ne $liveBridgeReadiness -and -not [string]::IsNullOrWhiteSpace([string]$liveBridgeReadiness.durableEvidenceEvent)) {
+                            "required-events-timeout-via-live-bridge-jsonl"
+                        } else {
+                            "required-events-timeout-via-live-bridge"
+                        }
                     }
                 }
 
@@ -1056,7 +1127,8 @@ foreach ($target in $expandedTargets) {
         nativeFrameCaptures = $nativeFrameCaptures
         nativeFrameSignalSummary = $nativeFrameSignalSummary
         nativeCapturePlan = $nativeCapturePlan
-        liveBridgeName = if ($LiveBridge) { $LiveBridgeName } else { $null }
+        effectiveLiveBridgeName = if ($LiveBridge) { $effectiveLiveBridgeName } else { $null }
+        liveBridgeName = if ($LiveBridge) { $effectiveLiveBridgeName } else { $null }
         nativeSignalRequired = $nativeSignalRequired
         nativeSignalPassed = $nativeSignalPassed
     }

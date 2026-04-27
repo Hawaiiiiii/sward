@@ -149,6 +149,8 @@ Verification note:
 - A focused Phase 117 title-menu capture under `out/ui_lab_runtime_evidence/20260427_222005/` used `-UseLiveBridgeReadiness`; manifest state reported `readinessSource=live-bridge`, `liveRoute=title menu visual ready`, JSONL evidence passed, and native BMP scoring selected `bestRoute=title menu visual ready` with `14` RGB-nonblack frames.
 - A focused Phase 117 title-options capture under `out/ui_lab_runtime_evidence/20260427_221031/` confirmed the route-based live predicate fix: `readinessSource=live-bridge`, `liveRoute=title options accept injected`, typed inspectors present, and `6` RGB-nonblack native BMP frames.
 - A current full early-game live-bridge sweep under `out/ui_lab_runtime_evidence/20260427_221250/` passed `title-loop`, `title-options`, `loading`, and `sonic-hud`, but exposed a nondeterministic `title-menu` route miss in that combined run. Focused `title-menu` verification above passed immediately afterward, so the remaining issue is full-sweep route stability, not the Phase 117 bridge/client/typed-inspector path.
+- A Phase 118 full early-game live-bridge/native sweep under `out/ui_lab_runtime_evidence/20260427_225000/` passed all five targets in one combined run after adding per-target unique pipe names and requiring durable JSONL `title-menu-visible` for title-menu live readiness. Title-menu reported `durableEvidencePassed=true`, `bestRoute=title menu visual ready`, and `14` RGB-nonblack native BMPs.
+- A Phase 118 direct `route-status` client smoke under `out/ui_lab_runtime_evidence/phase118_route_status_<timestamp>/` confirmed the bridge can report route generation/reset counters, hook-observed flags, last title/menu/stage context strings, and readiness booleans without screenshot inference.
 - Therefore the normal Sonic HUD route is now real-runtime CSD-bound, while the remaining `ui_prov_playscreen` blocker is deterministic Extra/Tornado stage owner selection rather than generic stage-context observation.
 
 Current alpha focus:
@@ -172,7 +174,7 @@ The UI Lab now has a basic evidence loop:
 1. Launch the real generated UnleashedRecomp runtime with `--ui-lab-screen <target>`.
 2. Enable JSONL evidence with `--ui-lab-evidence-dir <ignored local dir>`.
 3. Let the real runtime present frames, attach translated title/menu hooks, and route through real state transitions.
-4. For automated runs, optionally use `-UseLiveBridgeReadiness` to wait on named-pipe live state instead of reading screenshots or only polling files; JSONL is still checked afterward as durable evidence.
+4. For automated runs, optionally use `-UseLiveBridgeReadiness` to wait on named-pipe live state instead of reading screenshots or only polling files; JSONL is still checked afterward as durable evidence, and `title-menu` specifically requires durable `title-menu-visible` before the bridge wait can pass.
 5. Capture an early screenshot, wait for the target's required evidence/readiness, then capture the late screenshot after a short settle delay.
 6. For manual sessions, launch with `-KeepRunning` so the process remains alive while the operator moves screen to screen and evidence continues accumulating.
 7. For manual observer sessions, prefer `-Observer -HideOverlay -KeepRunning`: this runs the real installed runtime as normally as possible, keeps the lab from forcing routes, hides the side panel, and still records CSD/loading/frame evidence.

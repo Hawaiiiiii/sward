@@ -317,6 +317,8 @@ namespace UiLab
     static std::string g_lastLiveBridgeCommand;
     static uint64_t g_liveBridgeCommandCount = 0;
     static bool g_routePending = false;
+    static uint64_t g_routeGeneration = 0;
+    static uint64_t g_routeResetCount = 0;
     static bool g_titleIntroAcceptInjected = false;
     static bool g_titleMenuAcceptInjected = false;
     static bool g_stageContextObserved = false;
@@ -380,6 +382,7 @@ namespace UiLab
     static bool TargetShouldRouteThroughLoading(ScreenId id);
     static bool TargetRoutesThroughTitleMenu(ScreenId id);
     static void RefreshTargetCsdProjectStatus();
+    static void ResetRouteLatchState();
     static bool IsNativeFrameCaptureReady();
     static std::string_view NativeFrameCaptureStatusLabel();
     static void EmitStageTargetReadyIfNeeded();
@@ -1183,6 +1186,9 @@ namespace UiLab
             << "  \"targetCsd\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
             << "  \"sourceFamily\": \"" << JsonEscape(target.sourceFamily) << "\",\n"
             << "  " << kLiveStateRouteFieldName << ": \"" << JsonEscape(g_routeStatus) << "\",\n"
+            << "  \"routePending\": " << (g_routePending ? "true" : "false") << ",\n"
+            << "  \"routeGeneration\": " << g_routeGeneration << ",\n"
+            << "  \"routeResetCount\": " << g_routeResetCount << ",\n"
             << "  \"routePolicy\": \"" << JsonEscape(RoutePolicyLabel()) << "\",\n"
             << "  \"stageHarness\": \"" << JsonEscape(GetStageHarnessLabel()) << "\",\n"
             << "  " << kLiveStateStageGameModeAddressFieldName << ": \"" << JsonEscape(HexU32(g_lastStageGameModeAddress)) << "\",\n"
@@ -1206,6 +1212,11 @@ namespace UiLab
             << "  \"titleMenuPressStartAccepted\": " << (g_titleMenuPressStartAccepted ? "true" : "false") << ",\n"
             << "  \"titleMenuPostPressStartHeld\": " << (g_titleMenuPostPressStartHeld ? "true" : "false") << ",\n"
             << "  \"titleMenuStableFrames\": " << TitleMenuStableFrames() << ",\n"
+            << "  \"titleIntroHookObserved\": " << (g_loggedIntroHook ? "true" : "false") << ",\n"
+            << "  \"titleMenuHookObserved\": " << (g_loggedMenuHook ? "true" : "false") << ",\n"
+            << "  \"lastTitleIntroContext\": \"" << JsonEscape(g_lastTitleIntroContextDetail) << "\",\n"
+            << "  \"lastTitleMenuContext\": \"" << JsonEscape(g_lastTitleMenuContextDetail) << "\",\n"
+            << "  \"lastStageTitleContext\": \"" << JsonEscape(g_lastStageTitleContextDetail) << "\",\n"
             << "  \"title\": {\n"
             << "    \"introContextAddress\": \"" << JsonEscape(HexU32(g_titleIntroInspector.contextAddress)) << "\",\n"
             << "    \"introStateMachineAddress\": \"" << JsonEscape(HexU32(g_titleIntroInspector.stateMachineAddress)) << "\",\n"
@@ -1230,7 +1241,7 @@ namespace UiLab
             << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
             << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
             << "    \"commands\": ";
-        AppendStringArray(out, { "state", "events", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out
             << "\n"
             << "  },\n"
@@ -1836,20 +1847,16 @@ namespace UiLab
         return kRuntimeTargets;
     }
 
-    void RequestRouteToCurrentTarget()
+    static void ResetRouteLatchState()
     {
-        if (g_observerMode)
-        {
-            g_routePending = false;
-            g_routeStatus = "observer mode";
-            WriteEvidenceEvent("route-disabled-observer");
-            return;
-        }
-
+        ++g_routeGeneration;
+        ++g_routeResetCount;
         g_titleIntroAcceptInjected = false;
         g_titleMenuAcceptInjected = false;
         g_stageContextObserved = false;
         g_targetCsdObserved = false;
+        g_loggedIntroHook = false;
+        g_loggedMenuHook = false;
         g_loggedStageHarness = false;
         g_loggedTargetCsdProjectLive = false;
         g_loggedStageTargetCsdBound = false;
@@ -1870,11 +1877,40 @@ namespace UiLab
         g_lastNativeFrameCaptureFrame = 0;
         g_lastNativeFrameCapturePath.clear();
         g_lastNativeFrameCaptureFailure.clear();
+        g_lastLoadingRequestType = UINT32_MAX;
+        g_lastLoadingRequestFrame = 0;
+        g_lastLoadingDisplayType = UINT32_MAX;
+        g_lastLoadingDisplayFrame = 0;
+        g_loadingDisplayWasActive = false;
         g_lastStageContextDetail.clear();
         g_lastStageReadyEventName.clear();
         g_lastStageGameModeAddress = 0;
         g_lastStageContextFrame = 0;
         g_lastStageReadyFrame = 0;
+        g_lastCsdProjectName.clear();
+        g_lastCsdProjectFrame = 0;
+        g_lastTitleIntroContextDetail.clear();
+        g_lastStageTitleContextDetail.clear();
+        g_lastTitleMenuContextDetail.clear();
+        g_loggedCsdProjects.clear();
+
+        {
+            std::lock_guard<std::mutex> lock(g_liveBridgeMutex);
+            g_recentEvidenceEvents.clear();
+        }
+    }
+
+    void RequestRouteToCurrentTarget()
+    {
+        ResetRouteLatchState();
+
+        if (g_observerMode)
+        {
+            g_routePending = false;
+            g_routeStatus = "observer mode";
+            WriteEvidenceEvent("route-disabled-observer");
+            return;
+        }
 
         if (g_target == ScreenId::TitleLoop)
         {
@@ -2623,11 +2659,51 @@ namespace UiLab
         return out.str();
     }
 
+    static std::string BuildRouteStatusJson()
+    {
+        const auto& target = TargetFor(g_target);
+        std::ostringstream out;
+
+        out
+            << "{"
+            << "\"ok\":true"
+            << ",\"target\":\"" << JsonEscape(target.token) << "\""
+            << ",\"targetLabel\":\"" << JsonEscape(target.label) << "\""
+            << ",\"route\":\"" << JsonEscape(g_routeStatus) << "\""
+            << ",\"routePending\":" << (g_routePending ? "true" : "false")
+            << ",\"routePolicy\":\"" << JsonEscape(RoutePolicyLabel()) << "\""
+            << ",\"routeGeneration\":" << g_routeGeneration
+            << ",\"routeResetCount\":" << g_routeResetCount
+            << ",\"frame\":" << g_presentedFrameCount
+            << ",\"titleIntroHookObserved\":" << (g_loggedIntroHook ? "true" : "false")
+            << ",\"titleMenuHookObserved\":" << (g_loggedMenuHook ? "true" : "false")
+            << ",\"titleMenuPressStartAccepted\":" << (g_titleMenuPressStartAccepted ? "true" : "false")
+            << ",\"titleMenuPostPressStartHeld\":" << (g_titleMenuPostPressStartHeld ? "true" : "false")
+            << ",\"titleMenuVisualReady\":" << (g_titleMenuVisualReady ? "true" : "false")
+            << ",\"titleMenuStableFrames\":" << TitleMenuStableFrames()
+            << ",\"titleMenuOwnerReady\":" << (g_titleOwnerInspector.ownerReady ? "true" : "false")
+            << ",\"titleMenuPostPressStartReady\":" << (g_titleMenuInspector.postPressStartMenuReady ? "true" : "false")
+            << ",\"titleMenuContextPhase\":" << g_titleMenuInspector.contextPhase
+            << ",\"titleMenuCursor\":" << g_titleMenuInspector.menuCursor
+            << ",\"lastTitleIntroContext\":\"" << JsonEscape(g_lastTitleIntroContextDetail) << "\""
+            << ",\"lastTitleMenuContext\":\"" << JsonEscape(g_lastTitleMenuContextDetail) << "\""
+            << ",\"lastStageTitleContext\":\"" << JsonEscape(g_lastStageTitleContextDetail) << "\""
+            << ",\"loadingDisplayActive\":" << (g_loadingDisplayWasActive ? "true" : "false")
+            << ",\"loadingDisplayType\":"
+            << (g_lastLoadingDisplayType == UINT32_MAX ? -1 : static_cast<int32_t>(g_lastLoadingDisplayType))
+            << ",\"stageContextObserved\":" << (g_stageContextObserved ? "true" : "false")
+            << ",\"targetCsdObserved\":" << (g_targetCsdObserved ? "true" : "false")
+            << ",\"stageReadyEvent\":\"" << JsonEscape(g_lastStageReadyEventName) << "\""
+            << "}\n";
+
+        return out.str();
+    }
+
     static std::string BuildHelpJson()
     {
         std::ostringstream out;
         out << "{\"ok\":true,\"commands\":";
-        AppendStringArray(out, { "state", "events", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out << "}\n";
         return out.str();
     }
@@ -2657,6 +2733,9 @@ namespace UiLab
 
         if (verb == "events" || verb == "recent-events")
             return BuildRecentEventsJson();
+
+        if (verb == "route-status" || verb == "status")
+            return BuildRouteStatusJson();
 
         if (verb == "help" || verb == "commands")
             return BuildHelpJson();
@@ -3289,7 +3368,7 @@ namespace UiLab
             ImGui::Separator();
             ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
-            ImGui::Text("commands: state, events, route, reset, set-global, capture, help");
+            ImGui::Text("commands: state, events, route-status, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
 
             if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))
