@@ -55,6 +55,59 @@ static std::string BuildTitleOwnerDetail(const SWA::CGameModeStageTitle* pGameMo
     return detail;
 }
 
+static void ForwardTitleOwnerContext(
+    const SWA::CGameModeStageTitle* pGameModeStageTitle,
+    uint8_t* base,
+    bool isTitleStateMenu)
+{
+    const auto gameModeBase = reinterpret_cast<const uint8_t*>(pGameModeStageTitle);
+    const auto titleContextGuestAddress = ReadGuestU32(gameModeBase + 0x220);
+    const bool ownerGate568 = *(gameModeBase + 0x238) != 0;
+    const bool ownerGate570 = *(gameModeBase + 0x23A) != 0;
+
+    uint32_t csdSceneGuestAddress = 0;
+    uint8_t titleRequest = 0;
+    uint8_t titleDirty = 0;
+    uint8_t titleTransition = 0;
+    uint8_t titleFlag580 = 0;
+    uint8_t csdByte62 = 0;
+    uint8_t csdByte84 = 0;
+    uint8_t csdByte152 = 0;
+    uint8_t csdByte160 = 0;
+
+    if (titleContextGuestAddress)
+    {
+        csdSceneGuestAddress = PPC_LOAD_U32(titleContextGuestAddress + 0x1E8);
+        titleRequest = PPC_LOAD_U8(titleContextGuestAddress + 0x180);
+        titleDirty = PPC_LOAD_U8(titleContextGuestAddress + 0x181);
+        titleTransition = PPC_LOAD_U8(titleContextGuestAddress + 0x238);
+        titleFlag580 = PPC_LOAD_U8(titleContextGuestAddress + 0x244);
+
+        if (csdSceneGuestAddress)
+        {
+            csdByte62 = PPC_LOAD_U8(csdSceneGuestAddress + 62);
+            csdByte84 = PPC_LOAD_U8(csdSceneGuestAddress + 84);
+            csdByte152 = PPC_LOAD_U8(csdSceneGuestAddress + 152);
+            csdByte160 = PPC_LOAD_U8(csdSceneGuestAddress + 160);
+        }
+    }
+
+    UiLab::OnTitleOwnerContext(
+        isTitleStateMenu,
+        titleContextGuestAddress,
+        csdSceneGuestAddress,
+        ownerGate568,
+        ownerGate570,
+        titleRequest,
+        titleDirty,
+        titleTransition,
+        titleFlag580,
+        csdByte62,
+        csdByte84,
+        csdByte152,
+        csdByte160);
+}
+
 // SWA::CGameModeStageTitle::Update
 PPC_FUNC_IMPL(__imp__sub_825518B8);
 PPC_FUNC(sub_825518B8)
@@ -64,14 +117,17 @@ PPC_FUNC(sub_825518B8)
 
     __imp__sub_825518B8(ctx, base);
 
+    const bool isTitleStateMenu = *SWA::SGlobals::ms_IsTitleStateMenu;
+
     UiLab::OnGameModeStageTitleContext(
         gameModeGuestAddress,
         pGameModeStageTitle->m_pContext.ptr.get(),
         pGameModeStageTitle->m_pStateMachine.ptr.get(),
         pGameModeStageTitle->m_Time,
-        *SWA::SGlobals::ms_IsTitleStateMenu,
+        isTitleStateMenu,
         *SWA::SGlobals::ms_IsAutoSaveWarningShown,
         BuildTitleOwnerDetail(pGameModeStageTitle, base));
+    ForwardTitleOwnerContext(pGameModeStageTitle, base, isTitleStateMenu);
 
     if (g_quitMessageOpen)
         pGameModeStageTitle->m_AdvertiseMovieWaitTime = 0;

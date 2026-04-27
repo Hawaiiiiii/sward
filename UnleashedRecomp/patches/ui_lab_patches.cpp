@@ -64,6 +64,14 @@ namespace UiLab
     static bool g_loggedStageHarness = false;
     static bool g_loggedTargetCsdProjectLive = false;
     static bool g_loggedStageTargetCsdBound = false;
+    static bool g_titleMenuTransitionPulseObserved = false;
+    static bool g_titleMenuVisualReady = false;
+    static bool g_titleMenuPressStartAccepted = false;
+    static bool g_titleMenuPostPressStartHeld = false;
+    static bool g_titleMenuAcceptSuppressionLogged = false;
+    static bool g_titleMenuPostPressStartReadyLogged = false;
+    static uint64_t g_titleMenuStableFrameStart = 0;
+    static uint64_t g_titleMenuOwnerStableFrameStart = 0;
     static uint64_t g_titleIntroContextSampleCount = 0;
     static uint64_t g_stageTitleContextSampleCount = 0;
     static uint32_t g_lastLoadingDisplayType = UINT32_MAX;
@@ -371,7 +379,7 @@ namespace UiLab
                 return g_targetCsdObserved;
 
             case ScreenId::TitleMenu:
-                return !g_routePending && g_loggedMenuHook;
+                return g_titleMenuVisualReady;
 
             case ScreenId::TitleOptions:
                 return g_titleMenuAcceptInjected;
@@ -816,6 +824,14 @@ namespace UiLab
         g_loggedStageHarness = false;
         g_loggedTargetCsdProjectLive = false;
         g_loggedStageTargetCsdBound = false;
+        g_titleMenuTransitionPulseObserved = false;
+        g_titleMenuVisualReady = false;
+        g_titleMenuPressStartAccepted = false;
+        g_titleMenuPostPressStartHeld = false;
+        g_titleMenuAcceptSuppressionLogged = false;
+        g_titleMenuPostPressStartReadyLogged = false;
+        g_titleMenuStableFrameStart = 0;
+        g_titleMenuOwnerStableFrameStart = 0;
         g_nativeFrameCaptureReserved = false;
         g_nativeFrameCaptureWrittenCount = 0;
         g_lastNativeFrameCaptureFrame = 0;
@@ -948,6 +964,71 @@ namespace UiLab
         WriteEvidenceEvent("stage-title-context", detail);
     }
 
+    void OnTitleOwnerContext(
+        bool isTitleStateMenu,
+        uint32_t titleContextAddress,
+        uint32_t titleCsdAddress,
+        bool ownerGate568,
+        bool ownerGate570,
+        uint8_t titleRequest,
+        uint8_t titleDirty,
+        uint8_t titleTransition,
+        uint8_t titleFlag580,
+        uint8_t csdByte62,
+        uint8_t csdByte84,
+        uint8_t csdByte152,
+        uint8_t csdByte160)
+    {
+        if (!g_isEnabled || g_target != ScreenId::TitleMenu || g_titleMenuVisualReady)
+            return;
+
+        const auto detail =
+            "is_title_state_menu=" + std::to_string(isTitleStateMenu ? 1 : 0) +
+            " owner_title_context=" + std::to_string(titleContextAddress) +
+            " title_csd488=" + std::to_string(titleCsdAddress) +
+            " owner_gate568=" + std::to_string(ownerGate568 ? 1 : 0) +
+            " owner_gate570=" + std::to_string(ownerGate570 ? 1 : 0) +
+            " title_request=" + std::to_string(titleRequest) +
+            " title_dirty=" + std::to_string(titleDirty) +
+            " title_transition=" + std::to_string(titleTransition) +
+            " title_flag580=" + std::to_string(titleFlag580) +
+            " csd_byte62=" + std::to_string(csdByte62) +
+            " csd_byte84=" + std::to_string(csdByte84) +
+            " csd_byte152=" + std::to_string(csdByte152) +
+            " csd_byte160=" + std::to_string(csdByte160);
+
+        const bool ownerReady =
+            g_titleMenuPostPressStartHeld &&
+            isTitleStateMenu &&
+            titleContextAddress != 0 &&
+            titleCsdAddress != 0 &&
+            ownerGate568 &&
+            titleRequest != 0 &&
+            titleTransition != 0 &&
+            csdByte84 != 0;
+
+        if (!ownerReady)
+        {
+            g_titleMenuOwnerStableFrameStart = 0;
+            return;
+        }
+
+        if (g_titleMenuOwnerStableFrameStart == 0)
+        {
+            g_titleMenuOwnerStableFrameStart = g_presentedFrameCount;
+
+            if (!g_titleMenuPostPressStartReadyLogged)
+            {
+                g_titleMenuPostPressStartReadyLogged = true;
+                WriteEvidenceEvent("title-menu-post-press-start-ready", detail);
+            }
+        }
+
+        // The owner/CSD bytes prove the post-Press-Start state exists, but they
+        // can become true before the menu is a good capture target. The visual
+        // latch is completed from CTitleStateMenu context below.
+    }
+
     void OnTitleStateMenuUpdate(int32_t cursorIndex)
     {
         if (!g_isEnabled || g_loggedMenuHook)
@@ -987,6 +1068,72 @@ namespace UiLab
             " menu_field3c=" + std::to_string(menuField3C ? 1 : 0) +
             " menu_field54=" + std::to_string(menuField54 ? 1 : 0) +
             " menu_field9a=" + std::to_string(menuField9A ? 1 : 0);
+
+        if (g_target == ScreenId::TitleMenu && !g_titleMenuVisualReady)
+        {
+            const bool postPressStartMenuReady =
+                g_titleMenuPressStartAccepted &&
+                g_titleMenuPostPressStartHeld &&
+                g_titleMenuPostPressStartReadyLogged &&
+                menuField54 &&
+                context488 != 0 &&
+                context472 == 0 &&
+                contextPhase == 0 &&
+                menuCursor != 0;
+
+            if (postPressStartMenuReady)
+            {
+                if (g_titleMenuStableFrameStart == 0)
+                    g_titleMenuStableFrameStart = g_presentedFrameCount;
+
+                constexpr uint64_t kTitleMenuContextVisualSettleFrames = 40;
+                const auto stableFrames = g_presentedFrameCount - g_titleMenuStableFrameStart;
+
+                if (stableFrames < kTitleMenuContextVisualSettleFrames)
+                    return;
+
+                g_titleMenuVisualReady = true;
+                g_routeStatus = "title menu visual ready";
+                WriteEvidenceEvent(
+                    "title-menu-visible",
+                    detail + " stable_frames=" + std::to_string(stableFrames) +
+                    " source=title-menu-context");
+            }
+            else if (menuField3C)
+            {
+                g_titleMenuTransitionPulseObserved = true;
+                g_titleMenuStableFrameStart = 0;
+            }
+            else if (
+                g_titleMenuPressStartAccepted &&
+                g_titleMenuPostPressStartReadyLogged &&
+                g_titleMenuTransitionPulseObserved &&
+                menuField54 &&
+                context488 != 0 &&
+                context472 == 0 &&
+                contextPhase == 0)
+            {
+                if (g_titleMenuStableFrameStart == 0)
+                    g_titleMenuStableFrameStart = g_presentedFrameCount;
+
+                constexpr uint64_t kTitleMenuVisualSettleFrames = 75;
+                const auto stableFrames = g_presentedFrameCount - g_titleMenuStableFrameStart;
+
+                if (stableFrames >= kTitleMenuVisualSettleFrames)
+                {
+                    g_titleMenuVisualReady = true;
+                    g_routeStatus = "title menu visual ready";
+                    WriteEvidenceEvent(
+                        "title-menu-visible",
+                        detail + " stable_frames=" + std::to_string(stableFrames) +
+                        " source=title-menu-context");
+                }
+            }
+            else
+            {
+                g_titleMenuStableFrameStart = 0;
+            }
+        }
 
         if (detail == g_lastTitleMenuContextDetail)
             return;
@@ -1181,13 +1328,22 @@ namespace UiLab
 
         g_titleIntroAcceptInjected = true;
 
-        if (g_routePolicy == RoutePolicy::DirectContext)
+        if (g_routePolicy == RoutePolicy::DirectContext && g_target != ScreenId::TitleMenu)
         {
             directState = true;
             g_routeStatus = "title intro direct state requested";
             LOGFN("SWARD UI Lab route: requested direct title intro state for target={}", TargetFor(g_target).token);
             WriteEvidenceEvent("title-intro-direct-state-requested", "state=1 dirty=1");
             return false;
+        }
+
+        if (g_target == ScreenId::TitleMenu)
+        {
+            g_titleMenuPressStartAccepted = true;
+            g_routeStatus = "title press start accept injected";
+            LOGFN("SWARD UI Lab route: injected real Press Start accept for target={}", TargetFor(g_target).token);
+            WriteEvidenceEvent("title-press-start-accept-injected");
+            return true;
         }
 
         g_routeStatus = "title accept injected";
@@ -1223,13 +1379,26 @@ namespace UiLab
 
         if (g_target == ScreenId::TitleMenu)
         {
+            suppressAccept = true;
+
             if (g_routePending)
             {
                 g_routePending = false;
                 g_routeStatus = "title menu reached";
                 LOGN("SWARD UI Lab route: title menu reached.");
                 WriteEvidenceEvent("title-menu-reached");
-                suppressAccept = true;
+            }
+
+            if (!g_titleMenuPostPressStartHeld)
+            {
+                g_titleMenuPostPressStartHeld = true;
+                g_routeStatus = "title menu post press start held";
+                WriteEvidenceEvent("title-menu-post-press-start-held");
+            }
+
+            if (!g_titleMenuAcceptSuppressionLogged)
+            {
+                g_titleMenuAcceptSuppressionLogged = true;
                 WriteEvidenceEvent("title-menu-accept-suppressed");
             }
 

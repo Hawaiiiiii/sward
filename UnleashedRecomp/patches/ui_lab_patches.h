@@ -75,6 +75,20 @@ namespace UiLab
         bool isTitleStateMenu,
         bool isAutoSaveWarningShown,
         std::string_view ownerDetail);
+    void OnTitleOwnerContext(
+        bool isTitleStateMenu,
+        uint32_t titleContextAddress,
+        uint32_t titleCsdAddress,
+        bool ownerGate568,
+        bool ownerGate570,
+        uint8_t titleRequest,
+        uint8_t titleDirty,
+        uint8_t titleTransition,
+        uint8_t titleFlag580,
+        uint8_t csdByte62,
+        uint8_t csdByte84,
+        uint8_t csdByte152,
+        uint8_t csdByte160);
     void OnTitleStateMenuUpdate(int32_t cursorIndex);
     void OnTitleMenuContext(
         uint32_t context472,

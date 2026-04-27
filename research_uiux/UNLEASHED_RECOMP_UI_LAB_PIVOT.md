@@ -122,7 +122,9 @@ Verification note:
 - A full early-game RGB-gated native capture under `out/ui_lab_runtime_evidence/20260427_152452/` passed all five target evidence checks and exposed the raw-RGB selection flaw: `loading` could pick a brighter post-loading title frame over the intended loading state.
 - A tuned loading capture under `out/ui_lab_runtime_evidence/20260427_155739/` proved the target-aware cadence/selection fix: requested `4x60` became effective `12x15`, `12` BMPs were written, `5` were RGB-nonblack, and `bestIndex=7` selected `loading display active` with a real `NOW LOADING` frame.
 - A follow-up early-game RGB-gated native sweep under `out/ui_lab_runtime_evidence/20260427_160029/` passed title loop, title menu, title options, loading, and normal Sonic HUD. `loading` selected `loading display active`; normal Sonic HUD selected `stage target csd bound`; title options selected `title options accept injected`.
-- The title-menu target still needs a stronger visual-ready latch: evidence reports `title menu reached`, but the selected native BMP still visually reads as the title / Press Start screen in the current direct-context route.
+- A focused title-menu run under `out/ui_lab_runtime_evidence/20260427_175915/` proved the first real post-Press-Start/menu-ready latch: `title-press-start-accept-injected` fired in the intro state, `title-menu-post-press-start-ready` observed owner/CSD bytes (`title_request=1`, `title_transition=1`, `csd_byte84=1`), and `title-menu-visible` selected native BMP index `1` on route `title menu visual ready`.
+- A later full early-game RGB-gated native sweep under `out/ui_lab_runtime_evidence/20260427_181101/` passed `title-loop`, `title-menu`, `title-options`, `loading`, and normal `sonic-hud`; the selected title-menu BMP now shows the real Sonic Unleashed menu with `CONTINUE` rather than the title / Press Start screen.
+- The rejected menu-level accept experiment stays removed: the title-menu route injects only the real intro Press Start accept, suppresses menu accept once the menu hook is reached, and treats the menu as visually ready only after owner/CSD readiness plus `CTitleStateMenu` context settles at `context_472=0`, `context_phase=0`, `menu_cursor=1`, and `stable_frames=40`.
 - Therefore the normal Sonic HUD route is now real-runtime CSD-bound, while the remaining `ui_prov_playscreen` blocker is deterministic Extra/Tornado stage owner selection rather than generic stage-context observation.
 
 Current alpha focus:
@@ -158,7 +160,7 @@ This does not mean every target is deterministic yet. The normal Sonic HUD can n
 The next beats should build on `UiLab` in this order:
 
 1. Keep the first alpha narrow: title loop, title menu, title options, loading, and normal Sonic HUD.
-2. Continue target-aware native capture timing/selection: loading and normal Sonic HUD now select UI-bearing native BMPs, while title-menu still needs a post-press-start/menu-ready latch before it should be treated as visually complete.
+2. Continue target-aware native capture timing/selection: loading, title-menu, and normal Sonic HUD now select UI-bearing native BMPs, with the title-menu latch proven only after real intro Press Start, owner/CSD readiness, and settled menu context.
 3. Promote the proven title/menu/loading/options direct-context path into a stable default once more route captures confirm it against normal saves and prompt variants.
 4. Add deterministic stage-context creation or stage boot routing for tutorial/result/status routes, starting from the observed `CGameModeStage::ExitLoading` boundary and the confirmed `ui_playscreen` Sonic HUD bind.
 5. Return to Extra/Tornado, Werehog, boss/final, and broader late-game UI after the early-game alpha is useful enough to drive source recovery.

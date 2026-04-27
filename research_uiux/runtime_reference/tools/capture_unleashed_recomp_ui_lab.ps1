@@ -245,7 +245,7 @@ function Get-UiLabRequiredEvents([string]$Target) {
             return @("target-csd-project-made")
         }
         "title-menu" {
-            return @("target-csd-project-made", "title-menu-reached")
+            return @("target-csd-project-made", "title-press-start-accept-injected", "title-menu-reached", "title-menu-post-press-start-held", "title-menu-post-press-start-ready", "title-menu-visible")
         }
         "title-options" {
             return @("target-csd-project-made", "title-options-accept-injected")
@@ -420,7 +420,8 @@ function Get-UiLabNativeFramePreferenceScore([string]$Target, [string]$Route, [s
             if ($Csd -eq "ui_title") { $score += 80 }
         }
         "title-menu" {
-            if ($Route -eq "title menu reached") { $score += 300 }
+            if ($Route -eq "title menu visual ready") { $score += 500 }
+            if ($Route -eq "title menu reached") { $score += 220 }
             if ($Csd -eq "ui_title") { $score += 80 }
         }
         "title-options" {
@@ -551,6 +552,7 @@ function Get-UiLabNativeFrameSignalSummary([object[]]$NativeCaptures) {
             Sort-Object `
                 @{ Expression = { if ($_.rgbNonBlack) { 1 } else { 0 } }; Descending = $true },
                 @{ Expression = { if ($_.preferredScore) { [int]$_.preferredScore } else { 0 } }; Descending = $true },
+                @{ Expression = { if ($_.target -eq "title-menu" -and $_.route -eq "title menu visual ready" -and $null -ne $_.index) { 1000 - [int]$_.index } else { 0 } }; Descending = $true },
                 @{ Expression = { if ($_.signal.rgbSum) { [Int64]$_.signal.rgbSum } else { 0 } }; Descending = $true } |
             Select-Object -First 1
     }
