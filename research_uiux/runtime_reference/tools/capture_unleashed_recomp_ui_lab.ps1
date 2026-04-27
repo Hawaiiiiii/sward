@@ -1,5 +1,7 @@
 param(
-    [string[]]$Targets = @("title-loop", "title-menu", "loading", "sonic-hud"),
+    [string[]]$Targets = @(),
+    [ValidateSet("early-game", "frontend", "all", "custom")]
+    [string]$TargetSet = "early-game",
     [string]$ExePath = "W:\b\ui_lab_runtime\UnleashedRecomp\UnleashedRecomp.exe",
     [string]$InstallRoot = "Unleashed Recomp - Windows (Complete Installation) 1.0.3",
     [string]$OutputRoot = "out\ui_lab_runtime_evidence",
@@ -187,6 +189,23 @@ function Start-UiLabProcess([string]$FilePath, [string[]]$Arguments, [string]$Wo
     return [System.Diagnostics.Process]::Start($startInfo)
 }
 
+function Get-UiLabTargetSet([string]$Name) {
+    switch ($Name) {
+        "early-game" {
+            return @("title-loop", "title-menu", "title-options", "loading", "sonic-hud")
+        }
+        "frontend" {
+            return @("title-loop", "title-menu", "title-options", "loading")
+        }
+        "all" {
+            return @("title-loop", "title-menu", "title-options", "loading", "sonic-hud", "status", "world-map", "tutorial", "result", "extra-stage-hud")
+        }
+        default {
+            return @()
+        }
+    }
+}
+
 $exe = Resolve-InRepo $ExePath
 $install = Resolve-InRepo $InstallRoot
 $output = Resolve-InRepo $OutputRoot
@@ -218,6 +237,10 @@ if ($Observer) {
     $expandedTargets = @("manual-observer")
 }
 else {
+    if ($Targets.Count -eq 0) {
+        $Targets = Get-UiLabTargetSet $TargetSet
+    }
+
     foreach ($target in $Targets) {
         $expandedTargets += $target -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ }
     }

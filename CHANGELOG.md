@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 104 Runtime UI Lab early-game alpha scope
+
+- added a first-class `title-options` UI Lab target for the visible title-menu options path
+- routed `title-options` through the real title menu by forcing cursor index `2` and injecting the existing accept input that opens `OptionsMenu::Open`
+- made `capture_unleashed_recomp_ui_lab.ps1` default to an `early-game` target set: `title-loop`, `title-menu`, `title-options`, `loading`, and normal `sonic-hud`
+- kept `extra-stage-hud` available but moved rare Extra/Tornado work out of the default capture loop until the early-game alpha is useful
+- updated the UI Lab docs and regression contract around the narrower one-week alpha target
+
 ### Phase 103 Runtime UI Lab stage HUD target binding
 
 - split normal Sonic HUD from the Extra/Tornado-family HUD target in the UI Lab target table: `sonic-hud` now targets real runtime `ui_playscreen`, while `extra-stage-hud` / `prov-hud` / `tornado-hud` target `ui_prov_playscreen`

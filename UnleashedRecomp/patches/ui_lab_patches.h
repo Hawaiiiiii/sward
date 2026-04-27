@@ -10,6 +10,7 @@ namespace UiLab
     {
         TitleLoop,
         TitleMenu,
+        TitleOptions,
         Loading,
         SonicHud,
         ExtraStageHud,
@@ -41,7 +42,7 @@ namespace UiLab
     std::string_view GetRouteStatusLabel();
     std::string_view GetStageHarnessLabel();
     std::string_view GetTargetCsdStatusLabel();
-    const std::array<RuntimeTarget, 9>& GetRuntimeTargets();
+    const std::array<RuntimeTarget, 10>& GetRuntimeTargets();
     void RequestRouteToCurrentTarget();
     void SelectPreviousTarget();
     void SelectNextTarget();

@@ -794,6 +794,15 @@
 - [x] Update the UI Lab pivot and whole-game gap reports with the corrected HUD-family split.
 - [x] Guard the target-table split, helper target list, stage-address hook, and target-CSD binding evidence with regression tests.
 
+## Phase 104 - Runtime UI Lab Early-Game Alpha Scope
+
+- [x] Add a first-class `title-options` UI Lab target for the visible options path reachable from the title menu.
+- [x] Force `title-options` through the real title menu cursor index `2` and existing `OptionsMenu::Open` path instead of creating a fake options surface.
+- [x] Make the capture helper default to an `early-game` target set: `title-loop`, `title-menu`, `title-options`, `loading`, and normal `sonic-hud`.
+- [x] Keep `extra-stage-hud` available but move it out of the default capture path until the early-game alpha is useful.
+- [x] Update the UI Lab pivot and whole-game gap reports with the one-week alpha scope boundary.
+- [x] Guard the options target and capture target-set behavior with regression tests.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.

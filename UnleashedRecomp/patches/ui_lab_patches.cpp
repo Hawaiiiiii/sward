@@ -19,10 +19,11 @@ namespace UiLab
         DirectContext
     };
 
-    static constexpr std::array<RuntimeTarget, 9> kRuntimeTargets =
+    static constexpr std::array<RuntimeTarget, 10> kRuntimeTargets =
     {{
         { ScreenId::TitleLoop, "title-loop", "Title Loop", "ui_title", "System/GameMode/Title/TitleStateIntro.cpp", false },
         { ScreenId::TitleMenu, "title-menu", "Title Menu", "ui_title", "System/GameMode/Title/TitleMenu.cpp", false },
+        { ScreenId::TitleOptions, "title-options", "Title Options", "ui_title", "UnleashedRecomp/ui/options_menu.cpp", false },
         { ScreenId::Loading, "loading", "Loading / Miles Electric", "ui_loading", "System/Loading.cpp", false },
         { ScreenId::SonicHud, "sonic-hud", "Sonic Stage HUD", "ui_playscreen", "Player/Character/Sonic/Hud/SonicMainDisplay.cpp", true },
         { ScreenId::ExtraStageHud, "extra-stage-hud", "Extra Stage / Tornado HUD", "ui_prov_playscreen", "ExtraStage/Tails/Hud/HudExQte.cpp", true },
@@ -67,6 +68,7 @@ namespace UiLab
     static const RuntimeTarget& TargetFor(ScreenId id);
     static bool TargetNeedsStageHarness(ScreenId id);
     static bool TargetShouldRouteThroughLoading(ScreenId id);
+    static bool TargetRoutesThroughTitleMenu(ScreenId id);
     static void RefreshTargetCsdProjectStatus();
 
     static std::string_view RoutePolicyLabel()
@@ -235,7 +237,7 @@ namespace UiLab
 
     static bool TargetCanRouteFromTitleIntro(ScreenId id)
     {
-        return id == ScreenId::TitleMenu || TargetShouldRouteThroughLoading(id);
+        return TargetRoutesThroughTitleMenu(id);
     }
 
     static bool TargetNeedsStageHarness(ScreenId id)
@@ -246,6 +248,13 @@ namespace UiLab
     static bool TargetShouldRouteThroughLoading(ScreenId id)
     {
         return id == ScreenId::Loading || TargetNeedsStageHarness(id);
+    }
+
+    static bool TargetRoutesThroughTitleMenu(ScreenId id)
+    {
+        return id == ScreenId::TitleMenu ||
+            id == ScreenId::TitleOptions ||
+            TargetShouldRouteThroughLoading(id);
     }
 
     static bool HasObservedCsdProject(std::string_view projectName)
@@ -295,6 +304,8 @@ namespace UiLab
             token = "title-loop";
         else if (token == "menu")
             token = "title-menu";
+        else if (token == "options" || token == "option")
+            token = "title-options";
         else if (token == "hud")
             token = "sonic-hud";
         else if (token == "prov-hud" || token == "tornado-hud")
@@ -579,7 +590,7 @@ namespace UiLab
         return "waiting";
     }
 
-    const std::array<RuntimeTarget, 9>& GetRuntimeTargets()
+    const std::array<RuntimeTarget, 10>& GetRuntimeTargets()
     {
         return kRuntimeTargets;
     }
@@ -923,7 +934,7 @@ namespace UiLab
     {
         return g_isEnabled &&
             g_routePolicy == RoutePolicy::DirectContext &&
-            g_target == ScreenId::TitleMenu;
+            (g_target == ScreenId::TitleMenu || g_target == ScreenId::TitleOptions);
     }
 
     bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept, bool& suppressAccept, bool& directContext)
@@ -948,6 +959,27 @@ namespace UiLab
             }
 
             return false;
+        }
+
+        if (g_target == ScreenId::TitleOptions)
+        {
+            if (!g_routePending)
+                return false;
+
+            cursorIndex = 2;
+            g_routeStatus = "title options via menu";
+
+            if (!g_titleMenuAcceptInjected)
+            {
+                g_titleMenuAcceptInjected = true;
+                g_routePending = false;
+                injectAccept = true;
+                g_routeStatus = "title options accept injected";
+                LOGN("SWARD UI Lab route: forced title menu Options accept.");
+                WriteEvidenceEvent("title-options-accept-injected");
+            }
+
+            return true;
         }
 
         if (!TargetShouldRouteThroughLoading(g_target) || !g_routePending)

@@ -26,6 +26,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         for screen_id in [
             "TitleLoop",
             "TitleMenu",
+            "TitleOptions",
             "Loading",
             "SonicHud",
             "ExtraStageHud",
@@ -43,8 +44,8 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         aspect = self.read("UnleashedRecomp/patches/aspect_ratio_patches.cpp")
         script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
 
-        self.assertIn("const std::array<RuntimeTarget, 9>& GetRuntimeTargets()", header)
-        self.assertIn("static constexpr std::array<RuntimeTarget, 9> kRuntimeTargets", ui_lab)
+        self.assertIn("const std::array<RuntimeTarget, 10>& GetRuntimeTargets()", header)
+        self.assertIn("static constexpr std::array<RuntimeTarget, 10> kRuntimeTargets", ui_lab)
         self.assertIn('{ ScreenId::SonicHud, "sonic-hud", "Sonic Stage HUD", "ui_playscreen"', ui_lab)
         self.assertIn('{ ScreenId::ExtraStageHud, "extra-stage-hud", "Extra Stage / Tornado HUD", "ui_prov_playscreen"', ui_lab)
         self.assertIn('token == "prov-hud"', ui_lab)
@@ -56,6 +57,25 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn('HashStr("ui_playscreen/so_speed_gauge")', aspect)
         self.assertIn('HashStr("ui_prov_playscreen/so_speed_gauge")', aspect)
         self.assertIn('"extra-stage-hud"', script)
+
+    def test_ui_lab_promotes_early_game_visible_targets(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        menu = self.read("UnleashedRecomp/patches/CTitleStateMenu_patches.cpp")
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+
+        self.assertIn("TitleOptions", header)
+        self.assertIn('{ ScreenId::TitleOptions, "title-options", "Title Options"', ui_lab)
+        self.assertIn('token == "options"', ui_lab)
+        self.assertIn("TargetRoutesThroughTitleMenu", ui_lab)
+        self.assertIn("g_target == ScreenId::TitleOptions", ui_lab)
+        self.assertIn("title-options-accept-injected", ui_lab)
+        self.assertIn("cursorIndex = 2", ui_lab)
+        self.assertIn("OptionsMenu::Open", menu)
+        self.assertIn("TargetSet", script)
+        self.assertIn('"early-game"', script)
+        self.assertIn('@("title-loop", "title-menu", "title-options", "loading", "sonic-hud")', script)
+        self.assertIn('"all"', script)
 
     def test_ui_lab_hooks_existing_title_runtime_states(self):
         intro = self.read("UnleashedRecomp/patches/CTitleStateIntro_patches.cpp")
