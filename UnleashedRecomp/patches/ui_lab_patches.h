@@ -103,7 +103,9 @@ namespace UiLab
         bool menuField54,
         bool menuField9A);
     void OnStageExitLoading(uint32_t gameModeStageAddress = 0);
+    void OnStageTargetReady(std::string_view eventName, std::string_view detail);
     void OnPresentedFrame();
+    void WriteLiveStateSnapshot();
     std::string ConsumeNativeFrameCapturePath(uint32_t width, uint32_t height);
     void OnNativeFrameCaptured(std::string_view path, uint32_t width, uint32_t height);
     void OnNativeFrameCaptureFailed(std::string_view reason);

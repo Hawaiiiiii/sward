@@ -1,6 +1,7 @@
 #include <patches/ui_lab_patches.h>
 #include <app.h>
 #include <gpu/imgui/imgui_common.h>
+#include <kernel/memory.h>
 #include <os/logger.h>
 #include <user/config.h>
 #include <chrono>
@@ -79,6 +80,35 @@ namespace UiLab
         bool* visible;
     };
 
+    struct GuestBoolRef
+    {
+        const char* name;
+        uint32_t guestAddress;
+        bool readOnly;
+    };
+
+    static constexpr std::array<GuestBoolRef, 7> kGuestRenderGlobals =
+    {{
+        { "ms_IsRenderHud", 0x8328BB26, false },
+        { "ms_IsRenderGameMainHud", 0x8328BB27, false },
+        { "ms_IsRenderHudPause", 0x8328BB28, false },
+        { "ms_IsLoading", 0x83367A4C, true },
+        { "ms_VisualizeLoadedLevel", 0x833678C1, false },
+        { "ms_LightFieldDebug", 0x83367BCD, false },
+        { "ms_IgnoreLightFieldData", 0x83367BCF, false },
+    }};
+
+    static constexpr std::array<GuestBoolRef, 7> kGuestDebugDrawGlobals =
+    {{
+        { "ms_IsRenderDebugDraw", 0x8328BB23, false },
+        { "ms_IsRenderDebugPositionDraw", 0x8328BB24, false },
+        { "ms_IsRenderDebugDrawText", 0x8328BB25, false },
+        { "ms_IsCollisionRender", 0x833678A6, false },
+        { "ms_IsObjectCollisionRender", 0x83367905, false },
+        { "ms_IsTriggerRender", 0x83367904, false },
+        { "ms_DrawLightFieldSamplingPoint", 0x83367BCE, false },
+    }};
+
     static constexpr std::array<RuntimeTarget, 10> kRuntimeTargets =
     {{
         { ScreenId::TitleLoop, "title-loop", "Title Loop", "ui_title", "System/GameMode/Title/TitleStateIntro.cpp", false },
@@ -99,12 +129,15 @@ namespace UiLab
     static bool g_hideOverlay = false;
     static bool g_operatorShellVisible = true;
     static bool g_operatorShellToggleWasDown = false;
-    static bool g_operatorWindowListVisible = false;
+    static bool g_operatorWindowListVisible = true;
     static bool g_operatorInspectorVisible = true;
-    static bool g_operatorCounterVisible = false;
-    static bool g_operatorViewVisible = false;
-    static bool g_operatorExportsVisible = false;
-    static bool g_operatorDebugDrawVisible = false;
+    static bool g_operatorCounterVisible = true;
+    static bool g_operatorViewVisible = true;
+    static bool g_operatorExportsVisible = true;
+    static bool g_operatorDebugDrawVisible = true;
+    static bool g_operatorWelcomeVisible = true;
+    static bool g_operatorStageHudVisible = true;
+    static bool g_operatorLiveApiVisible = true;
     static bool g_operatorDebugDrawLayerVisible = true;
     static ImVec2 g_operatorDebugIconPos = { 18.0f, 18.0f };
     static RoutePolicy g_routePolicy = RoutePolicy::InputInjection;
@@ -136,6 +169,7 @@ namespace UiLab
     static bool g_loggedStageHarness = false;
     static bool g_loggedTargetCsdProjectLive = false;
     static bool g_loggedStageTargetCsdBound = false;
+    static bool g_loggedStageTargetReady = false;
     static bool g_titleMenuTransitionPulseObserved = false;
     static bool g_titleMenuVisualReady = false;
     static bool g_titleMenuPressStartAccepted = false;
@@ -154,6 +188,11 @@ namespace UiLab
     static uint32_t g_lastLoadingDisplayType = UINT32_MAX;
     static uint64_t g_lastLoadingDisplayFrame = 0;
     static bool g_loadingDisplayWasActive = false;
+    static uint32_t g_lastStageGameModeAddress = 0;
+    static uint64_t g_lastStageContextFrame = 0;
+    static uint64_t g_lastStageReadyFrame = 0;
+    static uint64_t g_lastLiveStateSnapshotFrame = 0;
+    static std::string g_lastStageReadyEventName;
     static std::string g_lastCsdProjectName;
     static uint64_t g_lastCsdProjectFrame = 0;
     static std::string g_lastTitleIntroContextDetail;
@@ -168,7 +207,9 @@ namespace UiLab
     static bool TargetRoutesThroughTitleMenu(ScreenId id);
     static void RefreshTargetCsdProjectStatus();
     static bool IsNativeFrameCaptureReady();
-    static std::array<OperatorWindowEntry, 5> GetOperatorWindowEntries();
+    static std::string_view NativeFrameCaptureStatusLabel();
+    static void EmitStageTargetReadyIfNeeded();
+    static std::array<OperatorWindowEntry, 8> GetOperatorWindowEntries();
 
     static std::string_view RoutePolicyLabel()
     {
@@ -236,15 +277,18 @@ namespace UiLab
         return false;
     }
 
-    static std::array<OperatorWindowEntry, 5> GetOperatorWindowEntries()
+    static std::array<OperatorWindowEntry, 8> GetOperatorWindowEntries()
     {
         return
         {{
+            { "Welcome", "Default-open operator shell summary and direct-read stance", &g_operatorWelcomeVisible },
             { "Inspector", "Runtime state, route latches, native capture, targets", &g_operatorInspectorVisible },
             { "Counter", "Frame, timing, hook, and capture counters", &g_operatorCounterVisible },
             { "View", "Runtime view and debug visibility toggles", &g_operatorViewVisible },
             { "Exports", "Patch/config toggles useful during UI archaeology", &g_operatorExportsVisible },
             { "Debug Draw", "Foreground operator annotations and debug-view switches", &g_operatorDebugDrawVisible },
+            { "Stage / HUD", "Stage harness, HUD CSD binding, and target-ready latches", &g_operatorStageHudVisible },
+            { "Live API", "Machine-readable live-state-json snapshot path and current values", &g_operatorLiveApiVisible },
         }};
     }
 
@@ -426,6 +470,65 @@ namespace UiLab
         return g_loggedCsdProjects.find(std::string(projectName)) != g_loggedCsdProjects.end();
     }
 
+    static std::string_view StageReadyEventName()
+    {
+        switch (g_target)
+        {
+            case ScreenId::SonicHud:
+                return "sonic-hud-ready";
+
+            case ScreenId::Tutorial:
+                return "tutorial-ready";
+
+            case ScreenId::Result:
+                return "result-ready";
+
+            case ScreenId::ExtraStageHud:
+                return "extra-stage-hud-ready";
+
+            default:
+                return "stage-target-ready";
+        }
+    }
+
+    void OnStageTargetReady(std::string_view eventName, std::string_view detail)
+    {
+        if (!g_isEnabled)
+            return;
+
+        g_lastStageReadyEventName = std::string(eventName);
+        g_lastStageReadyFrame = g_presentedFrameCount;
+        g_routeStatus = "stage target ready";
+        WriteEvidenceEvent(eventName, detail);
+        WriteLiveStateSnapshot();
+    }
+
+    static void EmitStageTargetReadyIfNeeded()
+    {
+        if (!g_isEnabled ||
+            !TargetNeedsStageHarness(g_target) ||
+            g_loggedStageTargetReady ||
+            !g_stageContextObserved ||
+            !g_targetCsdObserved)
+        {
+            return;
+        }
+
+        const auto& target = TargetFor(g_target);
+        const auto detail =
+            "stage_address=" + HexU32(g_lastStageGameModeAddress) +
+            " target=" + std::string(target.token) +
+            " requested_stage=" + g_requestedStageHarness +
+            " target_csd=" + std::string(target.primaryCsdScene);
+
+        g_loggedStageTargetReady = true;
+        const auto readyEvent = StageReadyEventName();
+        OnStageTargetReady(readyEvent, detail);
+
+        if (readyEvent != "stage-target-ready")
+            WriteEvidenceEvent("stage-target-ready", detail);
+    }
+
     static void MarkTargetCsdProjectLive(std::string_view projectName)
     {
         if (projectName != TargetFor(g_target).primaryCsdScene)
@@ -452,6 +555,8 @@ namespace UiLab
                 " stage_context=1");
             g_loggedStageTargetCsdBound = true;
         }
+
+        EmitStageTargetReadyIfNeeded();
     }
 
     static void RefreshTargetCsdProjectStatus()
@@ -517,6 +622,65 @@ namespace UiLab
             return "complete";
 
         return IsNativeFrameCaptureReady() ? "ready" : "waiting";
+    }
+
+    static std::filesystem::path LiveStateSnapshotPath()
+    {
+        if (g_evidenceDirectory.empty())
+            return {};
+
+        return g_evidenceDirectory / "ui_lab_live_state.json";
+    }
+
+    static constexpr std::string_view kLiveStateTargetFieldName = R"("target")";
+    static constexpr std::string_view kLiveStateRouteFieldName = R"("route")";
+    static constexpr std::string_view kLiveStateStageGameModeAddressFieldName = R"("stageGameModeAddress")";
+    static constexpr std::string_view kLiveStateNativeCaptureStatusFieldName = R"("nativeCaptureStatus")";
+
+    void WriteLiveStateSnapshot()
+    {
+        if (!g_isEnabled || g_evidenceDirectory.empty())
+            return;
+
+        std::error_code ec;
+        std::filesystem::create_directories(g_evidenceDirectory, ec);
+
+        if (ec)
+            return;
+
+        const auto liveStatePath = LiveStateSnapshotPath();
+        if (liveStatePath.empty())
+            return;
+
+        std::ofstream out(liveStatePath, std::ios::trunc);
+        if (!out)
+            return;
+
+        const auto& target = TargetFor(g_target);
+        out
+            << "{\n"
+            << "  \"time\": " << SecondsSinceStart() << ",\n"
+            << "  \"frame\": " << g_presentedFrameCount << ",\n"
+            << "  " << kLiveStateTargetFieldName << ": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetLabel\": \"" << JsonEscape(target.label) << "\",\n"
+            << "  " << kLiveStateRouteFieldName << ": \"" << JsonEscape(g_routeStatus) << "\",\n"
+            << "  \"routePolicy\": \"" << JsonEscape(RoutePolicyLabel()) << "\",\n"
+            << "  \"stageHarness\": \"" << JsonEscape(GetStageHarnessLabel()) << "\",\n"
+            << "  " << kLiveStateStageGameModeAddressFieldName << ": \"" << JsonEscape(HexU32(g_lastStageGameModeAddress)) << "\",\n"
+            << "  \"stageContextFrame\": " << g_lastStageContextFrame << ",\n"
+            << "  \"stageReadyEvent\": \"" << JsonEscape(g_lastStageReadyEventName) << "\",\n"
+            << "  \"stageReadyFrame\": " << g_lastStageReadyFrame << ",\n"
+            << "  \"targetCsdObserved\": " << (g_targetCsdObserved ? "true" : "false") << ",\n"
+            << "  " << kLiveStateNativeCaptureStatusFieldName << ": \"" << JsonEscape(NativeFrameCaptureStatusLabel()) << "\",\n"
+            << "  \"lastNativeFrameCapturePath\": \"" << JsonEscape(g_lastNativeFrameCapturePath) << "\",\n"
+            << "  \"lastCsdProject\": \"" << JsonEscape(g_lastCsdProjectName) << "\",\n"
+            << "  \"loadingDisplayType\": "
+            << (g_lastLoadingDisplayType == UINT32_MAX ? -1 : static_cast<int32_t>(g_lastLoadingDisplayType))
+            << ",\n"
+            << "  \"titleMenuVisualReady\": " << (g_titleMenuVisualReady ? "true" : "false") << "\n"
+            << "}\n";
+
+        g_lastLiveStateSnapshotFrame = g_presentedFrameCount;
     }
 
     static uint64_t TitleMenuStableFrames()
@@ -1010,6 +1174,7 @@ namespace UiLab
         g_loggedStageHarness = false;
         g_loggedTargetCsdProjectLive = false;
         g_loggedStageTargetCsdBound = false;
+        g_loggedStageTargetReady = false;
         g_titleMenuTransitionPulseObserved = false;
         g_titleMenuVisualReady = false;
         g_titleMenuPressStartAccepted = false;
@@ -1027,6 +1192,10 @@ namespace UiLab
         g_lastNativeFrameCapturePath.clear();
         g_lastNativeFrameCaptureFailure.clear();
         g_lastStageContextDetail.clear();
+        g_lastStageReadyEventName.clear();
+        g_lastStageGameModeAddress = 0;
+        g_lastStageContextFrame = 0;
+        g_lastStageReadyFrame = 0;
 
         if (g_target == ScreenId::TitleLoop)
         {
@@ -1041,6 +1210,17 @@ namespace UiLab
             ? "stage harness armed"
             : "route pending";
         WriteEvidenceEvent("route-requested");
+
+        if (TargetNeedsStageHarness(g_target))
+        {
+            const auto& target = TargetFor(g_target);
+            WriteEvidenceEvent(
+                "stage-harness-selected",
+                "target=" + std::string(target.token) +
+                " requested_stage=" + g_requestedStageHarness +
+                " target_csd=" + std::string(target.primaryCsdScene));
+        }
+
         RefreshTargetCsdProjectStatus();
     }
 
@@ -1389,6 +1569,8 @@ namespace UiLab
             return;
 
         g_stageContextObserved = true;
+        g_lastStageGameModeAddress = gameModeStageAddress;
+        g_lastStageContextFrame = g_presentedFrameCount;
         g_routeStatus = "stage context live";
 
         const auto& target = TargetFor(g_target);
@@ -1418,6 +1600,8 @@ namespace UiLab
 
         g_lastStageContextDetail = detail;
         RefreshTargetCsdProjectStatus();
+        EmitStageTargetReadyIfNeeded();
+        WriteLiveStateSnapshot();
     }
 
     void OnPresentedFrame()
@@ -1431,6 +1615,9 @@ namespace UiLab
             WriteEvidenceEvent("first-presented-frame");
         else if ((g_presentedFrameCount % 60) == 0)
             WriteEvidenceEvent("presented-frame");
+
+        if ((g_presentedFrameCount % 30) == 0 && g_lastLiveStateSnapshotFrame != g_presentedFrameCount)
+            WriteLiveStateSnapshot();
 
         if (g_autoExitSeconds > 0.0 && !g_autoExitRequested && SecondsSinceStart() >= g_autoExitSeconds)
         {
@@ -1497,6 +1684,7 @@ namespace UiLab
             " format=B8G8R8A8 bmp=1" +
             " index=" + std::to_string(g_nativeFrameCaptureWrittenCount) +
             " max=" + std::to_string(g_nativeFrameCaptureMaxCount));
+        WriteLiveStateSnapshot();
     }
 
     void OnNativeFrameCaptureFailed(std::string_view reason)
@@ -1507,6 +1695,7 @@ namespace UiLab
         g_nativeFrameCaptureReserved = false;
         g_lastNativeFrameCaptureFailure = std::string(reason);
         WriteEvidenceEvent("native-frame-capture-failed", reason);
+        WriteLiveStateSnapshot();
     }
 
     void OnLoadingRequest(uint32_t displayType)
@@ -1730,6 +1919,40 @@ namespace UiLab
     static void DrawHexField(const char* label, uint32_t value)
     {
         ImGui::Text("%s: %s", label, HexU32(value).c_str());
+    }
+
+    static bool ReadGuestBool(uint32_t guestAddress)
+    {
+        if (g_memory.base == nullptr || guestAddress == 0)
+            return false;
+
+        return *reinterpret_cast<const bool*>(g_memory.Translate(guestAddress));
+    }
+
+    static void WriteGuestBool(uint32_t guestAddress, bool value)
+    {
+        if (g_memory.base == nullptr || guestAddress == 0)
+            return;
+
+        *reinterpret_cast<bool*>(g_memory.Translate(guestAddress)) = value;
+    }
+
+    static void DrawGuestBoolCheckbox(const GuestBoolRef& guestBool)
+    {
+        bool value = ReadGuestBool(guestBool.guestAddress);
+        const auto label = std::string(guestBool.name) + " " + HexU32(guestBool.guestAddress);
+
+        if (guestBool.readOnly)
+        {
+            ImGui::Text("%s: %s", label.c_str(), value ? "true" : "false");
+            return;
+        }
+
+        if (ImGui::Checkbox(label.c_str(), &value))
+            WriteGuestBool(guestBool.guestAddress, value);
+
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("direct guest-memory debug globals");
     }
 
     static void DrawRuntimeInspectorOverview()
@@ -2000,6 +2223,25 @@ namespace UiLab
         ImGui::End();
     }
 
+    static void DrawOperatorWelcomeWindow()
+    {
+        if (!g_operatorWelcomeVisible)
+            return;
+
+        if (ImGui::Begin("SWARD Welcome", &g_operatorWelcomeVisible))
+        {
+            ImGui::TextUnformatted("Default-open operator windows");
+            ImGui::Separator();
+            ImGui::Text("Target: %s", std::string(GetTargetToken()).c_str());
+            ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
+            ImGui::Text("Evidence: %s", g_evidenceDirectory.empty() ? "off" : g_evidenceDirectory.string().c_str());
+            ImGui::Text("Native: %s", std::string(NativeFrameCaptureStatusLabel()).c_str());
+            ImGui::Text("Stage/HUD ready: %s", g_lastStageReadyEventName.empty() ? "waiting" : g_lastStageReadyEventName.c_str());
+        }
+
+        ImGui::End();
+    }
+
     static void DrawOperatorCounterWindow()
     {
         if (!g_operatorCounterVisible)
@@ -2032,6 +2274,11 @@ namespace UiLab
         if (ImGui::Begin("SWARD View", &g_operatorViewVisible))
         {
             ImGui::Checkbox("Render FPS", &Config::ShowFPS.Value);
+            ImGui::Separator();
+            ImGui::TextUnformatted("SGlobals HUD/render switches");
+            for (const auto& guestBool : kGuestRenderGlobals)
+                DrawGuestBoolCheckbox(guestBool);
+
             ImGui::Separator();
             ImGui::Checkbox("Event collision debug view", &Config::EnableEventCollisionDebugView.Value);
             ImGui::Checkbox("Object collision debug view", &Config::EnableObjectCollisionDebugView.Value);
@@ -2075,6 +2322,11 @@ namespace UiLab
         {
             ImGui::Checkbox("Operator foreground layer", &g_operatorDebugDrawLayerVisible);
             ImGui::Separator();
+            ImGui::TextUnformatted("SGlobals debug-draw switches");
+            for (const auto& guestBool : kGuestDebugDrawGlobals)
+                DrawGuestBoolCheckbox(guestBool);
+
+            ImGui::Separator();
             ImGui::Checkbox("Event collision debug view", &Config::EnableEventCollisionDebugView.Value);
             ImGui::Checkbox("Object collision debug view", &Config::EnableObjectCollisionDebugView.Value);
             ImGui::Checkbox("Stage collision debug view", &Config::EnableStageCollisionDebugView.Value);
@@ -2083,6 +2335,60 @@ namespace UiLab
             ImGui::Text("Target: %s", std::string(GetTargetToken()).c_str());
             ImGui::Text("Native ready: %s", IsNativeFrameCaptureReady() ? "yes" : "waiting");
             ImGui::Text("Title menu stable frames: %llu", static_cast<unsigned long long>(TitleMenuStableFrames()));
+        }
+
+        ImGui::End();
+    }
+
+    static void DrawOperatorStageHudWindow()
+    {
+        if (!g_operatorStageHudVisible)
+            return;
+
+        if (ImGui::Begin("SWARD Stage / HUD", &g_operatorStageHudVisible))
+        {
+            const auto& target = TargetFor(g_target);
+            ImGui::TextUnformatted("Stage/HUD operator");
+            ImGui::Separator();
+            ImGui::Text("Target: %s", std::string(target.token).c_str());
+            ImGui::Text("Target CSD: %s", std::string(target.primaryCsdScene).c_str());
+            ImGui::Text("Requested stage: %s", g_requestedStageHarness.c_str());
+            ImGui::Text("Stage harness: %s", std::string(GetStageHarnessLabel()).c_str());
+            DrawPredicate("Stage context", g_stageContextObserved);
+            DrawPredicate("Target CSD observed", g_targetCsdObserved);
+            DrawPredicate("Stage target ready", g_loggedStageTargetReady);
+            DrawHexField("stageGameModeAddress", g_lastStageGameModeAddress);
+            ImGui::Text("stageContextFrame: %llu", static_cast<unsigned long long>(g_lastStageContextFrame));
+            ImGui::Text("stageReadyEvent: %s", g_lastStageReadyEventName.empty() ? "waiting" : g_lastStageReadyEventName.c_str());
+            ImGui::Text("stageReadyFrame: %llu", static_cast<unsigned long long>(g_lastStageReadyFrame));
+            ImGui::Text("nextReadyEvent: %s", std::string(StageReadyEventName()).c_str());
+
+            if (ImGui::Button("Emit Stage Ready If Latched"))
+                EmitStageTargetReadyIfNeeded();
+        }
+
+        ImGui::End();
+    }
+
+    static void DrawOperatorLiveApiWindow()
+    {
+        if (!g_operatorLiveApiVisible)
+            return;
+
+        if (ImGui::Begin("SWARD Live API", &g_operatorLiveApiVisible))
+        {
+            const auto liveStatePath = LiveStateSnapshotPath();
+            ImGui::TextUnformatted("live-state-json");
+            ImGui::Separator();
+            ImGui::TextWrapped("ui_lab_live_state.json: %s", liveStatePath.empty() ? "off" : liveStatePath.string().c_str());
+            ImGui::Text("target: %s", std::string(GetTargetToken()).c_str());
+            ImGui::Text("route: %s", std::string(GetRouteStatusLabel()).c_str());
+            ImGui::Text("stageGameModeAddress: %s", HexU32(g_lastStageGameModeAddress).c_str());
+            ImGui::Text("nativeCaptureStatus: %s", std::string(NativeFrameCaptureStatusLabel()).c_str());
+            ImGui::Text("last snapshot frame: %llu", static_cast<unsigned long long>(g_lastLiveStateSnapshotFrame));
+
+            if (ImGui::Button("Write Live State Snapshot"))
+                WriteLiveStateSnapshot();
         }
 
         ImGui::End();
@@ -2134,6 +2440,7 @@ namespace UiLab
         DrawOperatorDebugDrawLayer();
         DrawOperatorDebugIcon();
         DrawOperatorWindowList();
+        DrawOperatorWelcomeWindow();
 
         if (!g_operatorInspectorVisible)
         {
@@ -2141,6 +2448,8 @@ namespace UiLab
             DrawOperatorViewWindow();
             DrawOperatorExportsWindow();
             DrawOperatorDebugDrawWindow();
+            DrawOperatorStageHudWindow();
+            DrawOperatorLiveApiWindow();
             return;
         }
 
@@ -2191,5 +2500,7 @@ namespace UiLab
         DrawOperatorViewWindow();
         DrawOperatorExportsWindow();
         DrawOperatorDebugDrawWindow();
+        DrawOperatorStageHudWindow();
+        DrawOperatorLiveApiWindow();
     }
 }

@@ -254,7 +254,16 @@ function Get-UiLabRequiredEvents([string]$Target) {
             return @("target-csd-project-made", "loading-requested", "loading-display-active")
         }
         "sonic-hud" {
-            return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound")
+            return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "sonic-hud-ready")
+        }
+        "tutorial" {
+            return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "tutorial-ready")
+        }
+        "result" {
+            return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "result-ready")
+        }
+        "extra-stage-hud" {
+            return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "extra-stage-hud-ready")
         }
         default {
             return @("first-presented-frame")
@@ -435,6 +444,7 @@ function Get-UiLabNativeFramePreferenceScore([string]$Target, [string]$Route, [s
             if ($Csd -eq "ui_loading") { $score += 80 }
         }
         { $_ -in @("sonic-hud", "tutorial", "result", "extra-stage-hud") } {
+            if ($Route -eq "stage target ready") { $score += 340 }
             if ($Route -eq "stage target csd bound") { $score += 300 }
             if ($Route -eq "stage context live") { $score += 220 }
             if ($Route -eq "loading display active") { $score += 120 }
@@ -638,6 +648,7 @@ foreach ($target in $expandedTargets) {
     $targetDir = Join-Path $sessionDir $safeTarget
     New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
     $eventsPath = Join-Path $targetDir "ui_lab_events.jsonl"
+    $liveStatePath = Join-Path $targetDir "ui_lab_live_state.json"
     $nativeCapturePlan = Get-UiLabNativeCapturePlan $target $NativeCaptureCount $NativeCaptureIntervalFrames
 
     $args = @(
@@ -805,6 +816,7 @@ foreach ($target in $expandedTargets) {
         lateScreenshot = if (Test-Path -LiteralPath $lateShot) { $lateShot } else { $null }
         snapshots = $snapshots
         events = if (Test-Path -LiteralPath $eventsPath) { $eventsPath } else { $null }
+        liveStatePath = if (Test-Path -LiteralPath $liveStatePath) { $liveStatePath } else { $null }
         stoppedByHarness = $stopped
         stillRunning = -not $process.HasExited
         processId = $process.Id
