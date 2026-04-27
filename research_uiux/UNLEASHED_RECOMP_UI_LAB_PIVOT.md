@@ -78,6 +78,8 @@ Implemented now:
 - native frame-series capture controls via `--ui-lab-native-capture-count` and `--ui-lab-native-capture-interval-frames`, with capture-helper manifest reporting for every `native-frame-captured` BMP entry. Native BMP readback remains opt-in in the helper while it is expanded target-by-target, but the title-loop and normal Sonic HUD paths now write real nonblack backbuffer BMPs and exit cleanly.
 - capture-helper native BMP signal summaries, including per-frame RGB/alpha signal stats plus a `nativeFrameSignalSummary` block that identifies all-black runs and the strongest RGB frame without opening the images manually
 - optional `-RequireNativeRgbSignal` capture-helper gating, so native-evidence runs can fail explicitly when target runtime events pass but the captured BMP series is still all black or missing
+- target-aware native frame selection in the capture helper: every native BMP capture now records target, route, CSD, stage, and `preferredScore`, while `nativeFrameSignalSummary` reports `bestRoute`, `bestTarget`, and `bestPreferenceScore` so the chosen evidence frame is tied to the requested UI state instead of raw brightness alone
+- per-target native capture cadence plans in the helper: `loading` uses a denser frame series to catch short-lived `NOW LOADING` frames, `title-menu` spans later frames for the slower frontend transition, and stage HUD targets keep a shorter UI-bearing cadence
 - passive capture/evidence safety: `--ui-lab-evidence-dir` and `--ui-lab-native-capture` no longer force the default title route by themselves. A launch becomes `capture/evidence observer mode` unless `--ui-lab-screen` / `--ui-lab=<target>` explicitly selects a routed screen target.
 - capture-helper `-SkipWindowScreenshots` mode for native-only runs, avoiding `PrintWindow`/desktop screenshot hangs while still preparing/focusing the real runtime window
 - direct title-intro state requests from the translated `sub_825811C8` field contract (`context+0x180` requested state and `context+0x181` dirty flag), used by the experimental direct-context policy instead of synthetic Start at the first route gate
@@ -117,6 +119,10 @@ Verification note:
 - A native normal Sonic HUD capture under `out/ui_lab_runtime_evidence/20260427_143208/` proved the same path across the stage harness: `stage-context-observed`, `target-csd-project-made`, and `stage-target-csd-bound` all passed, `4` native BMPs were written, and the first frame shows the real Miles Electric / Sonic tutorial loading screen.
 - A native title-loop capture under `out/ui_lab_runtime_evidence/20260427_145527/` proved the manifest signal layer: `3` BMPs were written, `2` were RGB-nonblack, `allBlack=false`, and `bestIndex=3` selected the strongest title-frame capture.
 - A required-signal native title-loop capture under `out/ui_lab_runtime_evidence/20260427_150814/` proved the new gate: `nativeSignalRequired=true`, `nativeSignalPassed=true`, and `bestIndex=3`.
+- A full early-game RGB-gated native capture under `out/ui_lab_runtime_evidence/20260427_152452/` passed all five target evidence checks and exposed the raw-RGB selection flaw: `loading` could pick a brighter post-loading title frame over the intended loading state.
+- A tuned loading capture under `out/ui_lab_runtime_evidence/20260427_155739/` proved the target-aware cadence/selection fix: requested `4x60` became effective `12x15`, `12` BMPs were written, `5` were RGB-nonblack, and `bestIndex=7` selected `loading display active` with a real `NOW LOADING` frame.
+- A follow-up early-game RGB-gated native sweep under `out/ui_lab_runtime_evidence/20260427_160029/` passed title loop, title menu, title options, loading, and normal Sonic HUD. `loading` selected `loading display active`; normal Sonic HUD selected `stage target csd bound`; title options selected `title options accept injected`.
+- The title-menu target still needs a stronger visual-ready latch: evidence reports `title menu reached`, but the selected native BMP still visually reads as the title / Press Start screen in the current direct-context route.
 - Therefore the normal Sonic HUD route is now real-runtime CSD-bound, while the remaining `ui_prov_playscreen` blocker is deterministic Extra/Tornado stage owner selection rather than generic stage-context observation.
 
 Current alpha focus:
@@ -152,7 +158,7 @@ This does not mean every target is deterministic yet. The normal Sonic HUD can n
 The next beats should build on `UiLab` in this order:
 
 1. Keep the first alpha narrow: title loop, title menu, title options, loading, and normal Sonic HUD.
-2. Bias native capture timing/selection toward UI-bearing frames after the selected real CSD has drawn; the title-loop and normal Sonic HUD readback source/fence path is now proven.
+2. Continue target-aware native capture timing/selection: loading and normal Sonic HUD now select UI-bearing native BMPs, while title-menu still needs a post-press-start/menu-ready latch before it should be treated as visually complete.
 3. Promote the proven title/menu/loading/options direct-context path into a stable default once more route captures confirm it against normal saves and prompt variants.
 4. Add deterministic stage-context creation or stage boot routing for tutorial/result/status routes, starting from the observed `CGameModeStage::ExitLoading` boundary and the confirmed `ui_playscreen` Sonic HUD bind.
 5. Return to Extra/Tornado, Werehog, boss/final, and broader late-game UI after the early-game alpha is useful enough to drive source recovery.

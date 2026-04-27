@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 112 UI Lab target-aware native capture timing
+
+- added route-aware native BMP scoring to `capture_unleashed_recomp_ui_lab.ps1`, recording per-frame target, route, CSD, stage, and `preferredScore` metadata instead of selecting the best frame by raw RGB sum alone
+- added `nativeFrameSignalSummary.bestRoute`, `bestTarget`, and `bestPreferenceScore` so capture manifests explain why a frame was selected
+- added per-target native capture plans: `loading` now uses denser samples, `title-menu` spans later frames, and stage HUD targets keep shorter UI-bearing cadence without changing the operator command shape
+- verified the tuned `loading` capture under `out/ui_lab_runtime_evidence/20260427_155739/`: requested `4x60`, effective `12x15`, evidence passed, and the best frame selected `loading display active` with a real `NOW LOADING` BMP
+- verified the early-game native target set under `out/ui_lab_runtime_evidence/20260427_160029/`: title loop, title menu, title options, loading, and normal Sonic HUD all passed required events and RGB-gated native capture
+- noted a remaining title-menu visual gap: the route marker reaches the title-menu path, but the selected native frame still visually reads as the title / Press Start screen, so the next forcing pass needs a stronger post-press-start/menu-ready visual latch
+
 ### Phase 111 UI Lab native RGB evidence gate
 
 - added `-RequireNativeRgbSignal` to `capture_unleashed_recomp_ui_lab.ps1`, making native BMP evidence optionally fail-fast when no captured BMP contains RGB signal

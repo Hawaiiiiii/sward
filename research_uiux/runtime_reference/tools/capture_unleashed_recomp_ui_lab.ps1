@@ -262,6 +262,37 @@ function Get-UiLabRequiredEvents([string]$Target) {
     }
 }
 
+function Get-UiLabNativeCapturePlan([string]$Target, [int]$RequestedCount, [int]$RequestedIntervalFrames) {
+    $effectiveNativeCaptureCount = [Math]::Max(1, $RequestedCount)
+    $effectiveNativeCaptureIntervalFrames = [Math]::Max(1, $RequestedIntervalFrames)
+
+    switch ($Target) {
+        "loading" {
+            $effectiveNativeCaptureCount = [Math]::Max($effectiveNativeCaptureCount, 12)
+            $effectiveNativeCaptureIntervalFrames = [Math]::Min($effectiveNativeCaptureIntervalFrames, 15)
+        }
+        { $_ -in @("sonic-hud", "tutorial", "result", "extra-stage-hud") } {
+            $effectiveNativeCaptureCount = [Math]::Max($effectiveNativeCaptureCount, 6)
+            $effectiveNativeCaptureIntervalFrames = [Math]::Min($effectiveNativeCaptureIntervalFrames, 30)
+        }
+        "title-menu" {
+            $effectiveNativeCaptureCount = [Math]::Max($effectiveNativeCaptureCount, 14)
+            $effectiveNativeCaptureIntervalFrames = [Math]::Max($effectiveNativeCaptureIntervalFrames, 60)
+        }
+        "title-options" {
+            $effectiveNativeCaptureCount = [Math]::Max($effectiveNativeCaptureCount, 6)
+            $effectiveNativeCaptureIntervalFrames = [Math]::Min($effectiveNativeCaptureIntervalFrames, 30)
+        }
+    }
+
+    return [ordered]@{
+        requestedCount = $RequestedCount
+        requestedIntervalFrames = $RequestedIntervalFrames
+        effectiveNativeCaptureCount = $effectiveNativeCaptureCount
+        effectiveNativeCaptureIntervalFrames = $effectiveNativeCaptureIntervalFrames
+    }
+}
+
 function Test-UiLabEvidenceEvents([string]$Target, [string]$EventsPath) {
     $requiredEvents = @(Get-UiLabRequiredEvents $Target)
     $observedEvents = New-Object "System.Collections.Generic.HashSet[string]"
@@ -380,6 +411,45 @@ function Get-BmpSignalStats([string]$Path) {
     }
 }
 
+function Get-UiLabNativeFramePreferenceScore([string]$Target, [string]$Route, [string]$Csd, [string]$Stage) {
+    $score = 0
+
+    switch ($Target) {
+        "title-loop" {
+            if ($Route -eq "loading display ended") { $score += 300 }
+            if ($Csd -eq "ui_title") { $score += 80 }
+        }
+        "title-menu" {
+            if ($Route -eq "title menu reached") { $score += 300 }
+            if ($Csd -eq "ui_title") { $score += 80 }
+        }
+        "title-options" {
+            if ($Route -eq "title options accept injected") { $score += 300 }
+            if ($Csd -eq "ui_title") { $score += 80 }
+        }
+        "loading" {
+            if ($Route -eq "loading display active") { $score += 300 }
+            if ($Route -eq "loading request observed") { $score += 180 }
+            if ($Route -eq "loading display ended") { $score -= 200 }
+            if ($Csd -eq "ui_loading") { $score += 80 }
+        }
+        { $_ -in @("sonic-hud", "tutorial", "result", "extra-stage-hud") } {
+            if ($Route -eq "stage target csd bound") { $score += 300 }
+            if ($Route -eq "stage context live") { $score += 220 }
+            if ($Route -eq "loading display active") { $score += 120 }
+            if ($Route -eq "loading request observed") { $score -= 80 }
+            if ($Stage -eq "stage context observed") { $score += 80 }
+            if ($Csd -eq "ui_playscreen") { $score += 80 }
+        }
+        default {
+            if ($Route -match "target csd|context|menu|options|loading display active") { $score += 120 }
+            if ($Csd) { $score += 40 }
+        }
+    }
+
+    return $score
+}
+
 function Get-UiLabNativeFrameCaptures([string]$EventsPath) {
     if (-not (Test-Path -LiteralPath $EventsPath)) {
         return @()
@@ -432,6 +502,11 @@ function Get-UiLabNativeFrameCaptures([string]$EventsPath) {
 
         $exists = if ($path) { Test-Path -LiteralPath $path } else { $false }
         $signal = if ($exists) { Get-BmpSignalStats $path } else { $null }
+        $target = [string]$event.target
+        $route = [string]$event.route
+        $csd = [string]$event.csd
+        $stage = [string]$event.stage
+        $preferredScore = Get-UiLabNativeFramePreferenceScore $target $route $csd $stage
 
         $nativeCaptures += [ordered]@{
             path = $path
@@ -439,6 +514,13 @@ function Get-UiLabNativeFrameCaptures([string]$EventsPath) {
             height = $height
             index = $index
             max = $max
+            eventTime = $event.time
+            eventFrame = $event.frame
+            target = $target
+            route = $route
+            csd = $csd
+            stage = $stage
+            preferredScore = $preferredScore
             exists = $exists
             signal = $signal
             rgbNonBlack = if ($null -ne $signal -and $signal.Contains("rgbNonBlack")) { $signal.rgbNonBlack } else { $false }
@@ -466,7 +548,10 @@ function Get-UiLabNativeFrameSignalSummary([object[]]$NativeCaptures) {
 
     if ($validCaptures.Count -gt 0) {
         $bestCapture = $validCaptures |
-            Sort-Object @{ Expression = { if ($_.signal.rgbSum) { [Int64]$_.signal.rgbSum } else { 0 } }; Descending = $true } |
+            Sort-Object `
+                @{ Expression = { if ($_.rgbNonBlack) { 1 } else { 0 } }; Descending = $true },
+                @{ Expression = { if ($_.preferredScore) { [int]$_.preferredScore } else { 0 } }; Descending = $true },
+                @{ Expression = { if ($_.signal.rgbSum) { [Int64]$_.signal.rgbSum } else { 0 } }; Descending = $true } |
             Select-Object -First 1
     }
 
@@ -476,6 +561,9 @@ function Get-UiLabNativeFrameSignalSummary([object[]]$NativeCaptures) {
         rgbNonBlack = $nonBlackCaptures.Count
         allBlack = $validCaptures.Count -gt 0 -and $nonBlackCaptures.Count -eq 0
         bestIndex = if ($null -ne $bestCapture) { $bestCapture.index } else { $null }
+        bestRoute = if ($null -ne $bestCapture) { $bestCapture.route } else { $null }
+        bestTarget = if ($null -ne $bestCapture) { $bestCapture.target } else { $null }
+        bestPreferenceScore = if ($null -ne $bestCapture) { $bestCapture.preferredScore } else { $null }
         bestRgbSum = if ($null -ne $bestCapture) { $bestCapture.signal.rgbSum } else { $null }
         bestPath = if ($null -ne $bestCapture) { $bestCapture.path } else { $null }
     }
@@ -548,6 +636,7 @@ foreach ($target in $expandedTargets) {
     $targetDir = Join-Path $sessionDir $safeTarget
     New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
     $eventsPath = Join-Path $targetDir "ui_lab_events.jsonl"
+    $nativeCapturePlan = Get-UiLabNativeCapturePlan $target $NativeCaptureCount $NativeCaptureIntervalFrames
 
     $args = @(
         "--use-cwd",
@@ -569,8 +658,8 @@ foreach ($target in $expandedTargets) {
     if ($NativeCapture) {
         $args += @("--ui-lab-native-capture")
         $args += @("--ui-lab-native-capture-dir", $targetDir)
-        $args += @("--ui-lab-native-capture-count", "$([Math]::Max(1, $NativeCaptureCount))")
-        $args += @("--ui-lab-native-capture-interval-frames", "$([Math]::Max(1, $NativeCaptureIntervalFrames))")
+        $args += @("--ui-lab-native-capture-count", "$($nativeCapturePlan.effectiveNativeCaptureCount)")
+        $args += @("--ui-lab-native-capture-interval-frames", "$($nativeCapturePlan.effectiveNativeCaptureIntervalFrames)")
     }
 
     if (-not $KeepRunning -and $AutoExitSeconds -gt 0) {
@@ -726,6 +815,7 @@ foreach ($target in $expandedTargets) {
         nativeFrameCapture = $nativeFrameCapture
         nativeFrameCaptures = $nativeFrameCaptures
         nativeFrameSignalSummary = $nativeFrameSignalSummary
+        nativeCapturePlan = $nativeCapturePlan
         nativeSignalRequired = $nativeSignalRequired
         nativeSignalPassed = $nativeSignalPassed
     }

@@ -1030,3 +1030,4 @@
 - [x] Follow-on phase audit on `2026-04-27`: fixed native UI Lab readback to copy from the intermediary backbuffer, guarded already-waited capture fences from frame-reuse stalls, and verified real nonblack native BMPs for `title-loop` plus `sonic-hud`.
 - [x] Follow-on phase audit on `2026-04-27`: added native BMP signal stats and manifest summaries so title-loop captures now self-report black/nonblack frame usefulness and strongest RGB frame metadata.
 - [x] Follow-on phase audit on `2026-04-27`: added the required native RGB signal gate so future captures can fail explicitly when runtime events pass but native visual evidence is all black or missing.
+- [x] Follow-on phase audit on `2026-04-27`: added target-aware native BMP scoring plus per-target capture cadence plans, verified `loading` now selects a real `NOW LOADING` frame from `loading display active`, and re-ran the RGB-gated early-game target set through the real runtime.
