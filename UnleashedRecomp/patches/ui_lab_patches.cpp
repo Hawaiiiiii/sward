@@ -19,6 +19,66 @@ namespace UiLab
         DirectContext
     };
 
+    struct TitleIntroInspectorSnapshot
+    {
+        bool valid = false;
+        uint32_t contextAddress = 0;
+        uint32_t stateMachineAddress = 0;
+        float elapsedSeconds = 0.0f;
+        uint8_t requestedState = 0;
+        uint8_t dirtyFlag = 0;
+        uint8_t transitionArmed = 0;
+        uint8_t contextFlag580 = 0;
+        uint32_t context472 = 0;
+        uint32_t context480 = 0;
+        uint32_t context488 = 0;
+        uint64_t frame = 0;
+    };
+
+    struct TitleOwnerInspectorSnapshot
+    {
+        bool valid = false;
+        bool isTitleStateMenu = false;
+        uint32_t titleContextAddress = 0;
+        uint32_t titleCsdAddress = 0;
+        bool ownerGate568 = false;
+        bool ownerGate570 = false;
+        uint8_t titleRequest = 0;
+        uint8_t titleDirty = 0;
+        uint8_t titleTransition = 0;
+        uint8_t titleFlag580 = 0;
+        uint8_t csdByte62 = 0;
+        uint8_t csdByte84 = 0;
+        uint8_t csdByte152 = 0;
+        uint8_t csdByte160 = 0;
+        bool ownerReady = false;
+        uint64_t frame = 0;
+    };
+
+    struct TitleMenuInspectorSnapshot
+    {
+        bool valid = false;
+        uint32_t context472 = 0;
+        uint32_t context480 = 0;
+        uint32_t context488 = 0;
+        uint32_t contextPhase = 0;
+        uint8_t contextFlag580 = 0;
+        uint32_t menuCursor = 0;
+        bool menuField3C = false;
+        bool menuField54 = false;
+        bool menuField9A = false;
+        bool postPressStartMenuReady = false;
+        uint64_t stableFrames = 0;
+        uint64_t frame = 0;
+    };
+
+    struct OperatorWindowEntry
+    {
+        const char* name;
+        const char* description;
+        bool* visible;
+    };
+
     static constexpr std::array<RuntimeTarget, 10> kRuntimeTargets =
     {{
         { ScreenId::TitleLoop, "title-loop", "Title Loop", "ui_title", "System/GameMode/Title/TitleStateIntro.cpp", false },
@@ -37,6 +97,16 @@ namespace UiLab
     static bool g_observerMode = false;
     static bool g_routeTargetExplicit = false;
     static bool g_hideOverlay = false;
+    static bool g_operatorShellVisible = true;
+    static bool g_operatorShellToggleWasDown = false;
+    static bool g_operatorWindowListVisible = false;
+    static bool g_operatorInspectorVisible = true;
+    static bool g_operatorCounterVisible = false;
+    static bool g_operatorViewVisible = false;
+    static bool g_operatorExportsVisible = false;
+    static bool g_operatorDebugDrawVisible = false;
+    static bool g_operatorDebugDrawLayerVisible = true;
+    static ImVec2 g_operatorDebugIconPos = { 18.0f, 18.0f };
     static RoutePolicy g_routePolicy = RoutePolicy::InputInjection;
     static ScreenId g_target = ScreenId::TitleLoop;
     static bool g_routePending = false;
@@ -58,6 +128,8 @@ namespace UiLab
     static uint32_t g_nativeFrameCaptureIntervalFrames = 120;
     static uint32_t g_nativeFrameCaptureIndex = 0;
     static uint64_t g_lastNativeFrameCaptureFrame = 0;
+    static std::string g_lastNativeFrameCapturePath;
+    static std::string g_lastNativeFrameCaptureFailure;
     static const std::chrono::steady_clock::time_point g_startedAt = std::chrono::steady_clock::now();
     static bool g_loggedIntroHook = false;
     static bool g_loggedMenuHook = false;
@@ -72,10 +144,18 @@ namespace UiLab
     static bool g_titleMenuPostPressStartReadyLogged = false;
     static uint64_t g_titleMenuStableFrameStart = 0;
     static uint64_t g_titleMenuOwnerStableFrameStart = 0;
+    static TitleIntroInspectorSnapshot g_titleIntroInspector;
+    static TitleOwnerInspectorSnapshot g_titleOwnerInspector;
+    static TitleMenuInspectorSnapshot g_titleMenuInspector;
     static uint64_t g_titleIntroContextSampleCount = 0;
     static uint64_t g_stageTitleContextSampleCount = 0;
+    static uint32_t g_lastLoadingRequestType = UINT32_MAX;
+    static uint64_t g_lastLoadingRequestFrame = 0;
     static uint32_t g_lastLoadingDisplayType = UINT32_MAX;
+    static uint64_t g_lastLoadingDisplayFrame = 0;
     static bool g_loadingDisplayWasActive = false;
+    static std::string g_lastCsdProjectName;
+    static uint64_t g_lastCsdProjectFrame = 0;
     static std::string g_lastTitleIntroContextDetail;
     static std::string g_lastStageTitleContextDetail;
     static std::string g_lastTitleMenuContextDetail;
@@ -88,6 +168,7 @@ namespace UiLab
     static bool TargetRoutesThroughTitleMenu(ScreenId id);
     static void RefreshTargetCsdProjectStatus();
     static bool IsNativeFrameCaptureReady();
+    static std::array<OperatorWindowEntry, 5> GetOperatorWindowEntries();
 
     static std::string_view RoutePolicyLabel()
     {
@@ -153,6 +234,23 @@ namespace UiLab
             return true;
 
         return false;
+    }
+
+    static std::array<OperatorWindowEntry, 5> GetOperatorWindowEntries()
+    {
+        return
+        {{
+            { "Inspector", "Runtime state, route latches, native capture, targets", &g_operatorInspectorVisible },
+            { "Counter", "Frame, timing, hook, and capture counters", &g_operatorCounterVisible },
+            { "View", "Runtime view and debug visibility toggles", &g_operatorViewVisible },
+            { "Exports", "Patch/config toggles useful during UI archaeology", &g_operatorExportsVisible },
+            { "Debug Draw", "Foreground operator annotations and debug-view switches", &g_operatorDebugDrawVisible },
+        }};
+    }
+
+    bool ShouldReserveF1DebugToggle()
+    {
+        return g_isEnabled && ShouldDrawOverlay();
     }
 
     static std::string JsonEscape(std::string_view value)
@@ -246,6 +344,24 @@ namespace UiLab
             out << ",\"detail\":\"" << JsonEscape(detail) << "\"";
 
         out << "}\n";
+    }
+
+    void UpdateOperatorShellToggle(bool f1Down)
+    {
+        if (!ShouldReserveF1DebugToggle())
+        {
+            g_operatorShellToggleWasDown = false;
+            return;
+        }
+
+        if (!g_operatorShellToggleWasDown && f1Down)
+        {
+            g_operatorShellVisible = !g_operatorShellVisible;
+            g_routeStatus = g_operatorShellVisible ? "operator shell visible" : "operator shell hidden";
+            WriteEvidenceEvent("operator-shell-f1-toggle", g_operatorShellVisible ? "visible" : "hidden");
+        }
+
+        g_operatorShellToggleWasDown = f1Down;
     }
 
     static const RuntimeTarget& TargetFor(ScreenId id)
@@ -387,6 +503,76 @@ namespace UiLab
             default:
                 return g_targetCsdObserved;
         }
+    }
+
+    static std::string_view NativeFrameCaptureStatusLabel()
+    {
+        if (!g_nativeFrameCaptureEnabled)
+            return "off";
+
+        if (g_nativeFrameCaptureReserved)
+            return "reserved";
+
+        if (g_nativeFrameCaptureWrittenCount >= g_nativeFrameCaptureMaxCount)
+            return "complete";
+
+        return IsNativeFrameCaptureReady() ? "ready" : "waiting";
+    }
+
+    static uint64_t TitleMenuStableFrames()
+    {
+        if (g_titleMenuStableFrameStart == 0 || g_presentedFrameCount < g_titleMenuStableFrameStart)
+            return 0;
+
+        return g_presentedFrameCount - g_titleMenuStableFrameStart;
+    }
+
+    static bool IsTitleMenuContextReady(
+        uint32_t context472,
+        uint32_t context488,
+        uint32_t contextPhase,
+        uint32_t menuCursor,
+        bool menuField54)
+    {
+        return g_titleMenuPressStartAccepted &&
+            g_titleMenuPostPressStartHeld &&
+            g_titleMenuPostPressStartReadyLogged &&
+            menuField54 &&
+            context488 != 0 &&
+            context472 == 0 &&
+            contextPhase == 0 &&
+            menuCursor != 0;
+    }
+
+    static void StoreTitleMenuInspectorSnapshot(
+        uint32_t context472,
+        uint32_t context480,
+        uint32_t context488,
+        uint32_t contextPhase,
+        uint8_t contextFlag580,
+        uint32_t menuCursor,
+        bool menuField3C,
+        bool menuField54,
+        bool menuField9A)
+    {
+        g_titleMenuInspector.valid = true;
+        g_titleMenuInspector.context472 = context472;
+        g_titleMenuInspector.context480 = context480;
+        g_titleMenuInspector.context488 = context488;
+        g_titleMenuInspector.contextPhase = contextPhase;
+        g_titleMenuInspector.contextFlag580 = contextFlag580;
+        g_titleMenuInspector.menuCursor = menuCursor;
+        g_titleMenuInspector.menuField3C = menuField3C;
+        g_titleMenuInspector.menuField54 = menuField54;
+        g_titleMenuInspector.menuField9A = menuField9A;
+        g_titleMenuInspector.postPressStartMenuReady = IsTitleMenuContextReady(
+            context472,
+            context488,
+            contextPhase,
+            menuCursor,
+            menuField54);
+        g_titleMenuInspector.stableFrames = TitleMenuStableFrames();
+        g_titleMenuInspector.frame = g_presentedFrameCount;
     }
 
     static bool TrySetTarget(std::string_view token)
@@ -832,9 +1018,14 @@ namespace UiLab
         g_titleMenuPostPressStartReadyLogged = false;
         g_titleMenuStableFrameStart = 0;
         g_titleMenuOwnerStableFrameStart = 0;
+        g_titleIntroInspector = {};
+        g_titleOwnerInspector = {};
+        g_titleMenuInspector = {};
         g_nativeFrameCaptureReserved = false;
         g_nativeFrameCaptureWrittenCount = 0;
         g_lastNativeFrameCaptureFrame = 0;
+        g_lastNativeFrameCapturePath.clear();
+        g_lastNativeFrameCaptureFailure.clear();
         g_lastStageContextDetail.clear();
 
         if (g_target == ScreenId::TitleLoop)
@@ -895,6 +1086,18 @@ namespace UiLab
             return;
 
         ++g_titleIntroContextSampleCount;
+        g_titleIntroInspector.valid = true;
+        g_titleIntroInspector.contextAddress = contextAddress;
+        g_titleIntroInspector.stateMachineAddress = stateMachineAddress;
+        g_titleIntroInspector.elapsedSeconds = elapsedSeconds;
+        g_titleIntroInspector.requestedState = requestedState;
+        g_titleIntroInspector.dirtyFlag = dirtyFlag;
+        g_titleIntroInspector.transitionArmed = transitionArmed;
+        g_titleIntroInspector.contextFlag580 = contextFlag580;
+        g_titleIntroInspector.context472 = context472;
+        g_titleIntroInspector.context480 = context480;
+        g_titleIntroInspector.context488 = context488;
+        g_titleIntroInspector.frame = g_presentedFrameCount;
 
         const auto detail =
             "context=" + std::to_string(contextAddress) +
@@ -979,7 +1182,37 @@ namespace UiLab
         uint8_t csdByte152,
         uint8_t csdByte160)
     {
-        if (!g_isEnabled || g_target != ScreenId::TitleMenu || g_titleMenuVisualReady)
+        if (!g_isEnabled)
+            return;
+
+        const bool ownerReady =
+            g_titleMenuPostPressStartHeld &&
+            isTitleStateMenu &&
+            titleContextAddress != 0 &&
+            titleCsdAddress != 0 &&
+            ownerGate568 &&
+            titleRequest != 0 &&
+            titleTransition != 0 &&
+            csdByte84 != 0;
+
+        g_titleOwnerInspector.valid = true;
+        g_titleOwnerInspector.isTitleStateMenu = isTitleStateMenu;
+        g_titleOwnerInspector.titleContextAddress = titleContextAddress;
+        g_titleOwnerInspector.titleCsdAddress = titleCsdAddress;
+        g_titleOwnerInspector.ownerGate568 = ownerGate568;
+        g_titleOwnerInspector.ownerGate570 = ownerGate570;
+        g_titleOwnerInspector.titleRequest = titleRequest;
+        g_titleOwnerInspector.titleDirty = titleDirty;
+        g_titleOwnerInspector.titleTransition = titleTransition;
+        g_titleOwnerInspector.titleFlag580 = titleFlag580;
+        g_titleOwnerInspector.csdByte62 = csdByte62;
+        g_titleOwnerInspector.csdByte84 = csdByte84;
+        g_titleOwnerInspector.csdByte152 = csdByte152;
+        g_titleOwnerInspector.csdByte160 = csdByte160;
+        g_titleOwnerInspector.ownerReady = ownerReady;
+        g_titleOwnerInspector.frame = g_presentedFrameCount;
+
+        if (g_target != ScreenId::TitleMenu || g_titleMenuVisualReady)
             return;
 
         const auto detail =
@@ -996,16 +1229,6 @@ namespace UiLab
             " csd_byte84=" + std::to_string(csdByte84) +
             " csd_byte152=" + std::to_string(csdByte152) +
             " csd_byte160=" + std::to_string(csdByte160);
-
-        const bool ownerReady =
-            g_titleMenuPostPressStartHeld &&
-            isTitleStateMenu &&
-            titleContextAddress != 0 &&
-            titleCsdAddress != 0 &&
-            ownerGate568 &&
-            titleRequest != 0 &&
-            titleTransition != 0 &&
-            csdByte84 != 0;
 
         if (!ownerReady)
         {
@@ -1069,17 +1292,25 @@ namespace UiLab
             " menu_field54=" + std::to_string(menuField54 ? 1 : 0) +
             " menu_field9a=" + std::to_string(menuField9A ? 1 : 0);
 
+        StoreTitleMenuInspectorSnapshot(
+            context472,
+            context480,
+            context488,
+            contextPhase,
+            contextFlag580,
+            menuCursor,
+            menuField3C,
+            menuField54,
+            menuField9A);
+
         if (g_target == ScreenId::TitleMenu && !g_titleMenuVisualReady)
         {
-            const bool postPressStartMenuReady =
-                g_titleMenuPressStartAccepted &&
-                g_titleMenuPostPressStartHeld &&
-                g_titleMenuPostPressStartReadyLogged &&
-                menuField54 &&
-                context488 != 0 &&
-                context472 == 0 &&
-                contextPhase == 0 &&
-                menuCursor != 0;
+            const bool postPressStartMenuReady = IsTitleMenuContextReady(
+                context472,
+                context488,
+                contextPhase,
+                menuCursor,
+                menuField54);
 
             if (postPressStartMenuReady)
             {
@@ -1088,6 +1319,16 @@ namespace UiLab
 
                 constexpr uint64_t kTitleMenuContextVisualSettleFrames = 40;
                 const auto stableFrames = g_presentedFrameCount - g_titleMenuStableFrameStart;
+                StoreTitleMenuInspectorSnapshot(
+                    context472,
+                    context480,
+                    context488,
+                    contextPhase,
+                    contextFlag580,
+                    menuCursor,
+                    menuField3C,
+                    menuField54,
+                    menuField9A);
 
                 if (stableFrames < kTitleMenuContextVisualSettleFrames)
                     return;
@@ -1246,6 +1487,8 @@ namespace UiLab
         g_nativeFrameCaptureReserved = false;
         ++g_nativeFrameCaptureWrittenCount;
         g_lastNativeFrameCaptureFrame = g_presentedFrameCount;
+        g_lastNativeFrameCapturePath = std::string(path);
+        g_lastNativeFrameCaptureFailure.clear();
         WriteEvidenceEvent(
             "native-frame-captured",
             "path=" + std::string(path) +
@@ -1262,6 +1505,7 @@ namespace UiLab
             return;
 
         g_nativeFrameCaptureReserved = false;
+        g_lastNativeFrameCaptureFailure = std::string(reason);
         WriteEvidenceEvent("native-frame-capture-failed", reason);
     }
 
@@ -1270,6 +1514,8 @@ namespace UiLab
         if (!g_isEnabled)
             return;
 
+        g_lastLoadingRequestType = displayType;
+        g_lastLoadingRequestFrame = g_presentedFrameCount;
         g_routeStatus = "loading request observed";
         WriteEvidenceEvent("loading-requested", "display_type=" + std::to_string(displayType));
     }
@@ -1283,6 +1529,7 @@ namespace UiLab
             return;
 
         g_lastLoadingDisplayType = displayType;
+        g_lastLoadingDisplayFrame = g_presentedFrameCount;
 
         if (displayType != 0)
         {
@@ -1304,6 +1551,8 @@ namespace UiLab
             return;
 
         const std::string project(projectName);
+        g_lastCsdProjectName = project;
+        g_lastCsdProjectFrame = g_presentedFrameCount;
 
         if (!g_loggedCsdProjects.insert(project).second)
             return;
@@ -1368,6 +1617,14 @@ namespace UiLab
             (g_target == ScreenId::TitleMenu || g_target == ScreenId::TitleOptions);
     }
 
+    bool ShouldHoldTitleMenuRuntime()
+    {
+        return g_isEnabled &&
+            !g_observerMode &&
+            g_target == ScreenId::TitleMenu &&
+            g_titleMenuVisualReady;
+    }
+
     bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept, bool& suppressAccept, bool& directContext)
     {
         injectAccept = false;
@@ -1379,6 +1636,7 @@ namespace UiLab
 
         if (g_target == ScreenId::TitleMenu)
         {
+            cursorIndex = 1;
             suppressAccept = true;
 
             if (g_routePending)
@@ -1402,7 +1660,7 @@ namespace UiLab
                 WriteEvidenceEvent("title-menu-accept-suppressed");
             }
 
-            return false;
+            return true;
         }
 
         if (g_target == ScreenId::TitleOptions)
@@ -1460,6 +1718,408 @@ namespace UiLab
         return true;
     }
 
+    static void DrawPredicate(const char* label, bool value)
+    {
+        const ImVec4 color = value
+            ? ImVec4(0.35f, 0.92f, 0.42f, 1.0f)
+            : ImVec4(1.0f, 0.78f, 0.28f, 1.0f);
+
+        ImGui::TextColored(color, "%s: %s", label, value ? "yes" : "waiting");
+    }
+
+    static void DrawHexField(const char* label, uint32_t value)
+    {
+        ImGui::Text("%s: %s", label, HexU32(value).c_str());
+    }
+
+    static void DrawRuntimeInspectorOverview()
+    {
+        const auto& target = TargetFor(g_target);
+        const std::string targetLabel(target.label);
+        const std::string targetToken(target.token);
+
+        ImGui::TextUnformatted("Runtime-backed UI Lab inspector");
+        ImGui::Separator();
+
+        if (ImGui::BeginCombo("Target", targetLabel.c_str()))
+        {
+            for (size_t i = 0; i < kRuntimeTargets.size(); ++i)
+            {
+                const auto& runtimeTarget = kRuntimeTargets[i];
+                const bool selected = runtimeTarget.id == g_target;
+                const std::string selectableLabel =
+                    std::string(runtimeTarget.label) + " [" + std::string(runtimeTarget.token) + "]";
+
+                if (ImGui::Selectable(selectableLabel.c_str(), selected))
+                    SelectTargetIndex(i);
+
+                if (selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+
+            ImGui::EndCombo();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Route"))
+            RequestRouteToCurrentTarget();
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Mark Evidence"))
+            WriteEvidenceEvent("manual-evidence-marker");
+
+        ImGui::Text("Mode: %s", g_observerMode ? "observer mode" : "route forcing");
+        ImGui::Text("Target token: %s", targetToken.c_str());
+        ImGui::Text("CSD scene: %s", std::string(target.primaryCsdScene).c_str());
+        ImGui::Text("Source family: %s", std::string(target.sourceFamily).c_str());
+        ImGui::Text("Stage harness: %s", std::string(GetStageHarnessLabel()).c_str());
+        ImGui::Text("Target CSD: %s", std::string(GetTargetCsdStatusLabel()).c_str());
+        ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
+        ImGui::Text("Route policy: %s", std::string(RoutePolicyLabel()).c_str());
+        ImGui::Text("Presented frames: %llu", static_cast<unsigned long long>(g_presentedFrameCount));
+        ImGui::Text("Startup prompt blockers: %s", ShouldBypassStartupPromptBlockers() ? "bypassed" : "normal");
+        ImGui::Separator();
+        ImGui::Text("Last CSD project: %s", g_lastCsdProjectName.empty() ? "none" : g_lastCsdProjectName.c_str());
+        ImGui::Text("Last CSD frame: %llu", static_cast<unsigned long long>(g_lastCsdProjectFrame));
+        ImGui::Text(
+            "Loading request: %s",
+            g_lastLoadingRequestType == UINT32_MAX ? "none" : std::to_string(g_lastLoadingRequestType).c_str());
+        ImGui::Text("Loading request frame: %llu", static_cast<unsigned long long>(g_lastLoadingRequestFrame));
+        ImGui::Text(
+            "Loading display: %s",
+            g_lastLoadingDisplayType == UINT32_MAX ? "none" : std::to_string(g_lastLoadingDisplayType).c_str());
+        ImGui::Text("Loading display frame: %llu", static_cast<unsigned long long>(g_lastLoadingDisplayFrame));
+        ImGui::Separator();
+        DrawPredicate("Title intro hook", g_loggedIntroHook);
+        DrawPredicate("Title menu hook", g_loggedMenuHook);
+        DrawPredicate("Stage context", !target.requiresStageContext || g_stageContextObserved);
+    }
+
+    static void DrawTitleMenuLatchInspector()
+    {
+        ImGui::TextUnformatted("Title menu latch predicates");
+        ImGui::Separator();
+        DrawPredicate("Intro Press Start accepted", g_titleMenuPressStartAccepted);
+        DrawPredicate("Menu post-Press-Start held", g_titleMenuPostPressStartHeld);
+        DrawPredicate("Owner/CSD ready", g_titleMenuPostPressStartReadyLogged);
+        DrawPredicate("Menu context ready", g_titleMenuInspector.postPressStartMenuReady);
+        DrawPredicate("Visual ready", g_titleMenuVisualReady);
+        DrawPredicate("Native capture ready", IsNativeFrameCaptureReady());
+        ImGui::Text("Stable frames: %llu", static_cast<unsigned long long>(TitleMenuStableFrames()));
+
+        if (ImGui::CollapsingHeader("Title intro context", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            if (!g_titleIntroInspector.valid)
+            {
+                ImGui::TextUnformatted("waiting");
+            }
+            else
+            {
+                DrawHexField("context", g_titleIntroInspector.contextAddress);
+                DrawHexField("state machine", g_titleIntroInspector.stateMachineAddress);
+                ImGui::Text("elapsed: %.3f", g_titleIntroInspector.elapsedSeconds);
+                ImGui::Text("requested_state: %u", static_cast<unsigned>(g_titleIntroInspector.requestedState));
+                ImGui::Text("dirty: %u", static_cast<unsigned>(g_titleIntroInspector.dirtyFlag));
+                ImGui::Text("transition_armed: %u", static_cast<unsigned>(g_titleIntroInspector.transitionArmed));
+                ImGui::Text("context_flag580: %u", static_cast<unsigned>(g_titleIntroInspector.contextFlag580));
+                DrawHexField("context_472", g_titleIntroInspector.context472);
+                DrawHexField("context_480", g_titleIntroInspector.context480);
+                DrawHexField("context_488", g_titleIntroInspector.context488);
+                ImGui::Text("frame: %llu", static_cast<unsigned long long>(g_titleIntroInspector.frame));
+            }
+        }
+
+        if (ImGui::CollapsingHeader("Title owner / CSD", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            if (!g_titleOwnerInspector.valid)
+            {
+                ImGui::TextUnformatted("waiting");
+            }
+            else
+            {
+                DrawPredicate("owner ready", g_titleOwnerInspector.ownerReady);
+                ImGui::Text("is_title_state_menu: %u", g_titleOwnerInspector.isTitleStateMenu ? 1u : 0u);
+                DrawHexField("owner_title_context", g_titleOwnerInspector.titleContextAddress);
+                DrawHexField("title_csd488", g_titleOwnerInspector.titleCsdAddress);
+                ImGui::Text("owner_gate568: %u", g_titleOwnerInspector.ownerGate568 ? 1u : 0u);
+                ImGui::Text("owner_gate570: %u", g_titleOwnerInspector.ownerGate570 ? 1u : 0u);
+                ImGui::Text("title_request: %u", static_cast<unsigned>(g_titleOwnerInspector.titleRequest));
+                ImGui::Text("title_dirty: %u", static_cast<unsigned>(g_titleOwnerInspector.titleDirty));
+                ImGui::Text("title_transition: %u", static_cast<unsigned>(g_titleOwnerInspector.titleTransition));
+                ImGui::Text("title_flag580: %u", static_cast<unsigned>(g_titleOwnerInspector.titleFlag580));
+                ImGui::Text("csd bytes +62/+84/+152/+160: %u / %u / %u / %u",
+                    static_cast<unsigned>(g_titleOwnerInspector.csdByte62),
+                    static_cast<unsigned>(g_titleOwnerInspector.csdByte84),
+                    static_cast<unsigned>(g_titleOwnerInspector.csdByte152),
+                    static_cast<unsigned>(g_titleOwnerInspector.csdByte160));
+                ImGui::Text("frame: %llu", static_cast<unsigned long long>(g_titleOwnerInspector.frame));
+            }
+        }
+
+        if (ImGui::CollapsingHeader("CTitleStateMenu context", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            if (!g_titleMenuInspector.valid)
+            {
+                ImGui::TextUnformatted("waiting");
+            }
+            else
+            {
+                DrawPredicate("post-Press-Start menu ready", g_titleMenuInspector.postPressStartMenuReady);
+                DrawHexField("context_472", g_titleMenuInspector.context472);
+                DrawHexField("context_480", g_titleMenuInspector.context480);
+                DrawHexField("context_488", g_titleMenuInspector.context488);
+                ImGui::Text("context_phase: %u", g_titleMenuInspector.contextPhase);
+                ImGui::Text("context_flag580: %u", static_cast<unsigned>(g_titleMenuInspector.contextFlag580));
+                ImGui::Text("menu_cursor: %u", g_titleMenuInspector.menuCursor);
+                ImGui::Text("menu_field3c: %u", g_titleMenuInspector.menuField3C ? 1u : 0u);
+                ImGui::Text("menu_field54: %u", g_titleMenuInspector.menuField54 ? 1u : 0u);
+                ImGui::Text("menu_field9a: %u", g_titleMenuInspector.menuField9A ? 1u : 0u);
+                ImGui::Text("stable_frames: %llu", static_cast<unsigned long long>(g_titleMenuInspector.stableFrames));
+                ImGui::Text("frame: %llu", static_cast<unsigned long long>(g_titleMenuInspector.frame));
+            }
+        }
+    }
+
+    static void DrawCaptureInspector()
+    {
+        ImGui::TextUnformatted("Capture and evidence");
+        ImGui::Separator();
+        ImGui::Text("Evidence: %s", g_evidenceDirectory.empty() ? "off" : g_evidenceDirectory.string().c_str());
+        ImGui::Text(
+            "Native capture: %s",
+            std::string(NativeFrameCaptureStatusLabel()).c_str());
+        ImGui::Text(
+            "Native captures: %u/%u every %u frames",
+            g_nativeFrameCaptureWrittenCount,
+            g_nativeFrameCaptureMaxCount,
+            g_nativeFrameCaptureIntervalFrames);
+        ImGui::Text("Last native frame: %llu", static_cast<unsigned long long>(g_lastNativeFrameCaptureFrame));
+        ImGui::TextWrapped(
+            "Last native path: %s",
+            g_lastNativeFrameCapturePath.empty() ? "none" : g_lastNativeFrameCapturePath.c_str());
+        ImGui::TextWrapped(
+            "Last native failure: %s",
+            g_lastNativeFrameCaptureFailure.empty() ? "none" : g_lastNativeFrameCaptureFailure.c_str());
+        ImGui::Text("Auto exit: %.2f", g_autoExitSeconds);
+        ImGui::Text("Auto exit requested: %s", g_autoExitRequested ? "yes" : "no");
+        ImGui::Separator();
+
+        if (ImGui::Button("Write Manual Evidence Marker"))
+            WriteEvidenceEvent("manual-evidence-marker");
+    }
+
+    static void DrawTargetRouterInspector()
+    {
+        ImGui::TextUnformatted("Real screen routes");
+        ImGui::Separator();
+
+        if (ImGui::Button("Previous Target"))
+            SelectPreviousTarget();
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Next Target"))
+            SelectNextTarget();
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Route Selected Target"))
+            RequestRouteToCurrentTarget();
+
+        for (size_t i = 0; i < kRuntimeTargets.size(); ++i)
+        {
+            const auto& runtimeTarget = kRuntimeTargets[i];
+            const std::string label(runtimeTarget.label);
+            const std::string token(runtimeTarget.token);
+            const std::string buttonLabel = (runtimeTarget.id == g_target ? "> " : "  ") + label + "###ui-lab-target-" + std::to_string(i);
+
+            if (ImGui::Button(buttonLabel.c_str()))
+                SelectTargetIndex(i);
+
+            ImGui::SameLine();
+            ImGui::Text("(%s, %s)", token.c_str(), std::string(runtimeTarget.primaryCsdScene).c_str());
+        }
+    }
+
+    static void DrawOperatorDebugIcon()
+    {
+        ImGui::SetNextWindowPos(g_operatorDebugIconPos, ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowBgAlpha(0.78f);
+
+        constexpr ImGuiWindowFlags flags =
+            ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_AlwaysAutoResize |
+            ImGuiWindowFlags_NoFocusOnAppearing;
+
+        if (ImGui::Begin("SWARD Operator Debug Icon", nullptr, flags))
+        {
+            g_operatorDebugIconPos = ImGui::GetWindowPos();
+
+            if (ImGui::Button("UI", ImVec2(34.0f, 34.0f)))
+                g_operatorWindowListVisible = !g_operatorWindowListVisible;
+
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("SWARD operator windows");
+        }
+
+        ImGui::End();
+    }
+
+    static void DrawOperatorWindowList()
+    {
+        if (!g_operatorWindowListVisible)
+            return;
+
+        ImGui::SetNextWindowPos(
+            ImVec2(g_operatorDebugIconPos.x, g_operatorDebugIconPos.y + 48.0f),
+            ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowBgAlpha(0.88f);
+
+        constexpr ImGuiWindowFlags flags =
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_AlwaysAutoResize;
+
+        if (ImGui::Begin("SWARD Operator Window List", &g_operatorWindowListVisible, flags))
+        {
+            for (const auto& entry : GetOperatorWindowEntries())
+            {
+                ImGui::Checkbox(entry.name, entry.visible);
+
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", entry.description);
+            }
+        }
+
+        ImGui::End();
+    }
+
+    static void DrawOperatorCounterWindow()
+    {
+        if (!g_operatorCounterVisible)
+            return;
+
+        if (ImGui::Begin("SWARD Counter", &g_operatorCounterVisible))
+        {
+            const double frameMs = App::s_deltaTime * 1000.0;
+            const double fps = App::s_deltaTime > 0.0 ? 1.0 / App::s_deltaTime : 0.0;
+
+            ImGui::Text("Frame: %llu", static_cast<unsigned long long>(g_presentedFrameCount));
+            ImGui::Text("Delta: %.3f ms", frameMs);
+            ImGui::Text("FPS: %.1f", fps);
+            ImGui::Separator();
+            ImGui::Text("Title intro samples: %llu", static_cast<unsigned long long>(g_titleIntroContextSampleCount));
+            ImGui::Text("Stage title samples: %llu", static_cast<unsigned long long>(g_stageTitleContextSampleCount));
+            ImGui::Text("Native captures: %u/%u", g_nativeFrameCaptureWrittenCount, g_nativeFrameCaptureMaxCount);
+            ImGui::Text("Native status: %s", std::string(NativeFrameCaptureStatusLabel()).c_str());
+            ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
+        }
+
+        ImGui::End();
+    }
+
+    static void DrawOperatorViewWindow()
+    {
+        if (!g_operatorViewVisible)
+            return;
+
+        if (ImGui::Begin("SWARD View", &g_operatorViewVisible))
+        {
+            ImGui::Checkbox("Render FPS", &Config::ShowFPS.Value);
+            ImGui::Separator();
+            ImGui::Checkbox("Event collision debug view", &Config::EnableEventCollisionDebugView.Value);
+            ImGui::Checkbox("Object collision debug view", &Config::EnableObjectCollisionDebugView.Value);
+            ImGui::Checkbox("Stage collision debug view", &Config::EnableStageCollisionDebugView.Value);
+            ImGui::Checkbox("GI mip-level debug view", &Config::EnableGIMipLevelDebugView.Value);
+            ImGui::Separator();
+            ImGui::TextUnformatted("Some render debug switches are sampled by game patches and may need a stage restart.");
+        }
+
+        ImGui::End();
+    }
+
+    static void DrawOperatorExportsWindow()
+    {
+        if (!g_operatorExportsVisible)
+            return;
+
+        if (ImGui::Begin("SWARD Exports", &g_operatorExportsVisible))
+        {
+            ImGui::TextUnformatted("Runtime patch/config switches for UI archaeology sessions.");
+            ImGui::Separator();
+            ImGui::Checkbox("Allow Cancelling Unleash", &Config::AllowCancellingUnleash.Value);
+            ImGui::Checkbox("Disable Auto Save Warning", &Config::DisableAutoSaveWarning.Value);
+            ImGui::Checkbox("Disable DLC Icon", &Config::DisableDLCIcon.Value);
+            ImGui::Checkbox("Fix Unleash Out Of Control Drain", &Config::FixUnleashOutOfControlDrain.Value);
+            ImGui::Checkbox("Homing Attack On Jump", &Config::HomingAttackOnJump.Value);
+            ImGui::Checkbox("Save Score At Checkpoints", &Config::SaveScoreAtCheckpoints.Value);
+            ImGui::Checkbox("Skip Intro Logos", &Config::SkipIntroLogos.Value);
+            ImGui::Checkbox("Use Alternate Title", &Config::UseAlternateTitle.Value);
+        }
+
+        ImGui::End();
+    }
+
+    static void DrawOperatorDebugDrawWindow()
+    {
+        if (!g_operatorDebugDrawVisible)
+            return;
+
+        if (ImGui::Begin("SWARD Debug Draw", &g_operatorDebugDrawVisible))
+        {
+            ImGui::Checkbox("Operator foreground layer", &g_operatorDebugDrawLayerVisible);
+            ImGui::Separator();
+            ImGui::Checkbox("Event collision debug view", &Config::EnableEventCollisionDebugView.Value);
+            ImGui::Checkbox("Object collision debug view", &Config::EnableObjectCollisionDebugView.Value);
+            ImGui::Checkbox("Stage collision debug view", &Config::EnableStageCollisionDebugView.Value);
+            ImGui::Checkbox("GI mip-level debug view", &Config::EnableGIMipLevelDebugView.Value);
+            ImGui::Separator();
+            ImGui::Text("Target: %s", std::string(GetTargetToken()).c_str());
+            ImGui::Text("Native ready: %s", IsNativeFrameCaptureReady() ? "yes" : "waiting");
+            ImGui::Text("Title menu stable frames: %llu", static_cast<unsigned long long>(TitleMenuStableFrames()));
+        }
+
+        ImGui::End();
+    }
+
+    static void DrawOperatorDebugDrawLayer()
+    {
+        if (!g_operatorDebugDrawLayerVisible)
+            return;
+
+        ImDrawList* drawList = ImGui::GetForegroundDrawList();
+        const ImGuiIO& io = ImGui::GetIO();
+        const ImU32 lineColor = ImGui::GetColorU32(ImVec4(0.15f, 0.85f, 0.72f, 0.72f));
+        const ImU32 textColor = ImGui::GetColorU32(ImVec4(0.95f, 1.0f, 0.82f, 0.92f));
+        const ImU32 waitingColor = ImGui::GetColorU32(ImVec4(1.0f, 0.64f, 0.22f, 0.92f));
+        const float top = 8.0f;
+        const float right = io.DisplaySize.x - 12.0f;
+
+        drawList->AddLine(ImVec2(12.0f, top), ImVec2(right, top), lineColor, 1.0f);
+        drawList->AddLine(ImVec2(12.0f, top), ImVec2(12.0f, top + 24.0f), lineColor, 1.0f);
+
+        const std::string status =
+            "SWARD operator layer | target=" + std::string(GetTargetToken()) +
+            " | route=" + std::string(GetRouteStatusLabel()) +
+            " | native=" + std::string(NativeFrameCaptureStatusLabel());
+
+        drawList->AddText(ImVec2(18.0f, top + 4.0f), textColor, status.c_str());
+
+        if (g_target == ScreenId::TitleMenu && !g_titleMenuVisualReady)
+        {
+            drawList->AddText(
+                ImVec2(18.0f, top + 24.0f),
+                waitingColor,
+                "title-menu visual latch waiting");
+        }
+    }
+
     void DrawOverlay()
     {
         if (!g_isEnabled)
@@ -1468,18 +2128,26 @@ namespace UiLab
         if (!ShouldDrawOverlay())
             return;
 
-        const auto& target = TargetFor(g_target);
-        const std::string targetLabel(target.label);
-        const std::string targetToken(target.token);
-        const std::string targetScene(target.primaryCsdScene);
-        const std::string targetFamily(target.sourceFamily);
+        if (!g_operatorShellVisible)
+            return;
 
-        ImGui::SetNextWindowPos({ 18.0f, 18.0f }, ImGuiCond_Always);
+        DrawOperatorDebugDrawLayer();
+        DrawOperatorDebugIcon();
+        DrawOperatorWindowList();
+
+        if (!g_operatorInspectorVisible)
+        {
+            DrawOperatorCounterWindow();
+            DrawOperatorViewWindow();
+            DrawOperatorExportsWindow();
+            DrawOperatorDebugDrawWindow();
+            return;
+        }
+
+        ImGui::SetNextWindowPos({ 18.0f, 72.0f }, ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowBgAlpha(0.82f);
 
         constexpr ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_AlwaysAutoResize |
@@ -1487,71 +2155,41 @@ namespace UiLab
 
         if (ImGui::Begin("SWARD UI Lab", nullptr, flags))
         {
-            ImGui::TextUnformatted("Runtime-backed UI Lab");
-            ImGui::Separator();
-            ImGui::Text("Mode: %s", g_observerMode ? "observer mode" : "route forcing");
-            ImGui::Text("Target: %s [%s]", targetLabel.c_str(), targetToken.c_str());
-            ImGui::Text("CSD scene: %s", targetScene.c_str());
-            ImGui::Text("Source family: %s", targetFamily.c_str());
-            ImGui::Text("Stage context: %s", target.requiresStageContext ? "required" : "not required");
-            ImGui::Text("Stage harness: %s", std::string(GetStageHarnessLabel()).c_str());
-            ImGui::Text("Target CSD: %s", std::string(GetTargetCsdStatusLabel()).c_str());
-            ImGui::Text("Title intro hook: %s", g_loggedIntroHook ? "attached" : "waiting");
-            ImGui::Text("Title menu hook: %s", g_loggedMenuHook ? "attached" : "waiting");
-            ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
-            ImGui::Text("Route policy: %s", std::string(RoutePolicyLabel()).c_str());
-            ImGui::Text("Presented frames: %llu", static_cast<unsigned long long>(g_presentedFrameCount));
-            ImGui::Text("Evidence: %s", g_evidenceDirectory.empty() ? "off" : g_evidenceDirectory.string().c_str());
-            ImGui::Text(
-                "Native capture: %s",
-                !g_nativeFrameCaptureEnabled ? "off" :
-                g_nativeFrameCaptureReserved ? "reserved" :
-                g_nativeFrameCaptureWrittenCount >= g_nativeFrameCaptureMaxCount ? "complete" :
-                IsNativeFrameCaptureReady() ? "ready" : "waiting");
-            ImGui::Text(
-                "Native captures: %u/%u every %u frames",
-                g_nativeFrameCaptureWrittenCount,
-                g_nativeFrameCaptureMaxCount,
-                g_nativeFrameCaptureIntervalFrames);
-            ImGui::Text("Startup prompt blockers: %s", ShouldBypassStartupPromptBlockers() ? "bypassed" : "normal");
-            ImGui::Separator();
-
-            if (ImGui::Button("Previous Target"))
-                SelectPreviousTarget();
-
-            ImGui::SameLine();
-
-            if (ImGui::Button("Next Target"))
-                SelectNextTarget();
-
-            ImGui::SameLine();
-
-            if (ImGui::Button("Route Selected Target"))
-                RequestRouteToCurrentTarget();
-
-            ImGui::SameLine();
-
-            if (ImGui::Button("Mark Evidence"))
-                WriteEvidenceEvent("manual-evidence-marker");
-
-            ImGui::Separator();
-            ImGui::TextUnformatted("Real screen routes:");
-
-            for (size_t i = 0; i < kRuntimeTargets.size(); ++i)
+            if (ImGui::BeginTabBar("ui-lab-inspector-tabs"))
             {
-                const auto& runtimeTarget = kRuntimeTargets[i];
-                const std::string label(runtimeTarget.label);
-                const std::string token(runtimeTarget.token);
-                const std::string buttonLabel = (runtimeTarget.id == g_target ? "> " : "  ") + label + "###ui-lab-target-" + std::to_string(i);
+                if (ImGui::BeginTabItem("Overview"))
+                {
+                    DrawRuntimeInspectorOverview();
+                    ImGui::EndTabItem();
+                }
 
-                if (ImGui::Button(buttonLabel.c_str()))
-                    SelectTargetIndex(i);
+                if (ImGui::BeginTabItem("Title/Menu"))
+                {
+                    DrawTitleMenuLatchInspector();
+                    ImGui::EndTabItem();
+                }
 
-                ImGui::SameLine();
-                ImGui::Text("(%s)", token.c_str());
+                if (ImGui::BeginTabItem("Capture"))
+                {
+                    DrawCaptureInspector();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Targets"))
+                {
+                    DrawTargetRouterInspector();
+                    ImGui::EndTabItem();
+                }
+
+                ImGui::EndTabBar();
             }
         }
 
         ImGui::End();
+
+        DrawOperatorCounterWindow();
+        DrawOperatorViewWindow();
+        DrawOperatorExportsWindow();
+        DrawOperatorDebugDrawWindow();
     }
 }

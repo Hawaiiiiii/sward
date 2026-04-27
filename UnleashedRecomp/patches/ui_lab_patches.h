@@ -48,6 +48,8 @@ namespace UiLab
     void RequestRouteToCurrentTarget();
     void SelectPreviousTarget();
     void SelectNextTarget();
+    bool ShouldReserveF1DebugToggle();
+    void UpdateOperatorShellToggle(bool f1Down);
 
     void OnTitleStateIntroUpdate(float elapsedSeconds);
     void OnTitleIntroContext(
@@ -111,6 +113,7 @@ namespace UiLab
     bool ApplyTitleIntroStateForcing(float elapsedSeconds, bool& directState);
     bool ShouldArmTitleIntroOwnerOutput();
     bool ShouldArmTitleIntroCsdCompletion();
+    bool ShouldHoldTitleMenuRuntime();
     bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept, bool& suppressAccept, bool& directContext);
     void DrawOverlay();
 }

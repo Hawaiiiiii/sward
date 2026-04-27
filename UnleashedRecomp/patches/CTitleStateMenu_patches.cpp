@@ -160,8 +160,13 @@ PPC_FUNC(sub_825882B8)
         g_installMessageOpen = true;
     }
 
-    if (!OptionsMenu::s_isVisible && !OptionsMenu::s_isRestartRequired && !ProcessInstallMessage())
+    if (!OptionsMenu::s_isVisible &&
+        !OptionsMenu::s_isRestartRequired &&
+        !UiLab::ShouldHoldTitleMenuRuntime() &&
+        !ProcessInstallMessage())
+    {
         __imp__sub_825882B8(ctx, base);
+    }
 
     if (isOptionsIndex)
     {

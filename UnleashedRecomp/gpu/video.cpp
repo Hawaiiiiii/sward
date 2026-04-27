@@ -2372,6 +2372,12 @@ static void DrawProfiler()
 {
     bool toggleProfiler = SDL_GetKeyboardState(nullptr)[SDL_SCANCODE_F1] != 0;
 
+    if (UiLab::ShouldReserveF1DebugToggle())
+    {
+        UiLab::UpdateOperatorShellToggle(toggleProfiler);
+        toggleProfiler = false;
+    }
+
     if (!g_profilerWasToggled && toggleProfiler)
     {
         g_profilerVisible = !g_profilerVisible;

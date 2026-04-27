@@ -552,7 +552,7 @@ function Get-UiLabNativeFrameSignalSummary([object[]]$NativeCaptures) {
             Sort-Object `
                 @{ Expression = { if ($_.rgbNonBlack) { 1 } else { 0 } }; Descending = $true },
                 @{ Expression = { if ($_.preferredScore) { [int]$_.preferredScore } else { 0 } }; Descending = $true },
-                @{ Expression = { if ($_.target -eq "title-menu" -and $_.route -eq "title menu visual ready" -and $null -ne $_.index) { 1000 - [int]$_.index } else { 0 } }; Descending = $true },
+                @{ Expression = { if ($_.target -eq "title-menu" -and $_.route -eq "title menu visual ready" -and $null -ne $_.index) { [int]$_.index } else { 0 } }; Descending = $true },
                 @{ Expression = { if ($_.signal.rgbSum) { [Int64]$_.signal.rgbSum } else { 0 } }; Descending = $true } |
             Select-Object -First 1
     }
