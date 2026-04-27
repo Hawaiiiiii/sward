@@ -849,6 +849,14 @@
 - [x] Native-capture-check `sonic-hud` and verify real Miles Electric / Sonic tutorial loading BMPs plus `ui_playscreen` stage binding.
 - [x] Guard source selection and fence-state behavior with regression tests.
 
+## Phase 110 - Runtime UI Lab Native Capture Signal Manifest
+
+- [x] Add manifest-side BMP signal analysis for native UI Lab captures.
+- [x] Report RGB sum, alpha sum, nonzero byte counts, dimensions, and `rgbNonBlack` for every native BMP.
+- [x] Add a `nativeFrameSignalSummary` block with capture count, valid BMP count, nonblack count, all-black status, and best RGB frame metadata.
+- [x] Verify a no-build native `title-loop` run records nonblack frame evidence in the manifest.
+- [x] Guard native signal-manifest fields with regression tests.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -1012,3 +1020,4 @@
 - [x] Follow-on phase audit on `2026-04-27`: extended native UI Lab capture with count/interval frame-series controls, manifest reporting for all native BMP captures, native-only `-SkipWindowScreenshots` runs, and local evidence proving the next blocker is black/stalled readback timing after `ui_title` is reached.
 - [x] Follow-on phase audit on `2026-04-27`: split capture-helper window preparation from screenshot capture, made native BMP capture opt-in while readback is black/stall-prone, and comparison-verified title-loop screenshots/events remain stable through auto-exit without native readback.
 - [x] Follow-on phase audit on `2026-04-27`: fixed native UI Lab readback to copy from the intermediary backbuffer, guarded already-waited capture fences from frame-reuse stalls, and verified real nonblack native BMPs for `title-loop` plus `sonic-hud`.
+- [x] Follow-on phase audit on `2026-04-27`: added native BMP signal stats and manifest summaries so title-loop captures now self-report black/nonblack frame usefulness and strongest RGB frame metadata.

@@ -314,6 +314,71 @@ function Wait-UiLabEvidenceEvents([string]$Target, [string]$EventsPath, [int]$Ti
     return $checks
 }
 
+function Get-BmpSignalStats([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -lt 54 -or $bytes[0] -ne [byte][char]'B' -or $bytes[1] -ne [byte][char]'M') {
+        return [ordered]@{
+            validBmp = $false
+            error = "not a BMP file"
+        }
+    }
+
+    $pixelOffset = [BitConverter]::ToInt32($bytes, 10)
+    $bmpWidth = [BitConverter]::ToInt32($bytes, 18)
+    $bmpHeight = [Math]::Abs([BitConverter]::ToInt32($bytes, 22))
+    $bitsPerPixel = [BitConverter]::ToInt16($bytes, 28)
+
+    if ($bitsPerPixel -ne 32 -or $pixelOffset -lt 0 -or $pixelOffset -ge $bytes.Length) {
+        return [ordered]@{
+            validBmp = $false
+            bytes = $bytes.Length
+            bmpWidth = $bmpWidth
+            bmpHeight = $bmpHeight
+            bitsPerPixel = $bitsPerPixel
+            pixelOffset = $pixelOffset
+            error = "unsupported BMP layout"
+        }
+    }
+
+    [Int64]$rgbSum = 0
+    [Int64]$alphaSum = 0
+    [Int64]$rgbNonZeroBytes = 0
+    [Int64]$alphaNonZeroBytes = 0
+
+    for ($i = $pixelOffset; $i + 3 -lt $bytes.Length; $i += 4) {
+        $b = [int]$bytes[$i]
+        $g = [int]$bytes[$i + 1]
+        $r = [int]$bytes[$i + 2]
+        $a = [int]$bytes[$i + 3]
+
+        $rgbSum += $b + $g + $r
+        $alphaSum += $a
+
+        if ($b -ne 0) { ++$rgbNonZeroBytes }
+        if ($g -ne 0) { ++$rgbNonZeroBytes }
+        if ($r -ne 0) { ++$rgbNonZeroBytes }
+        if ($a -ne 0) { ++$alphaNonZeroBytes }
+    }
+
+    return [ordered]@{
+        validBmp = $true
+        bytes = $bytes.Length
+        bmpWidth = $bmpWidth
+        bmpHeight = $bmpHeight
+        bitsPerPixel = $bitsPerPixel
+        pixelOffset = $pixelOffset
+        rgbSum = $rgbSum
+        alphaSum = $alphaSum
+        rgbNonZeroBytes = $rgbNonZeroBytes
+        alphaNonZeroBytes = $alphaNonZeroBytes
+        rgbNonBlack = $rgbSum -gt 0
+    }
+}
+
 function Get-UiLabNativeFrameCaptures([string]$EventsPath) {
     if (-not (Test-Path -LiteralPath $EventsPath)) {
         return @()
@@ -364,13 +429,18 @@ function Get-UiLabNativeFrameCaptures([string]$EventsPath) {
             $max = [int]$Matches[1]
         }
 
+        $exists = if ($path) { Test-Path -LiteralPath $path } else { $false }
+        $signal = if ($exists) { Get-BmpSignalStats $path } else { $null }
+
         $nativeCaptures += [ordered]@{
             path = $path
             width = $width
             height = $height
             index = $index
             max = $max
-            exists = if ($path) { Test-Path -LiteralPath $path } else { $false }
+            exists = $exists
+            signal = $signal
+            rgbNonBlack = if ($null -ne $signal -and $signal.Contains("rgbNonBlack")) { $signal.rgbNonBlack } else { $false }
             detail = $detail
         }
     }
@@ -386,6 +456,28 @@ function Get-UiLabNativeFrameCapture([string]$EventsPath) {
     }
 
     return $nativeCaptures[$nativeCaptures.Count - 1]
+}
+
+function Get-UiLabNativeFrameSignalSummary([object[]]$NativeCaptures) {
+    $validCaptures = @($NativeCaptures | Where-Object { $_.exists -and $null -ne $_.signal -and $_.signal.validBmp })
+    $nonBlackCaptures = @($validCaptures | Where-Object { $_.rgbNonBlack })
+    $bestCapture = $null
+
+    if ($validCaptures.Count -gt 0) {
+        $bestCapture = $validCaptures |
+            Sort-Object @{ Expression = { if ($_.signal.rgbSum) { [Int64]$_.signal.rgbSum } else { 0 } }; Descending = $true } |
+            Select-Object -First 1
+    }
+
+    return [ordered]@{
+        captures = $NativeCaptures.Count
+        validBmp = $validCaptures.Count
+        rgbNonBlack = $nonBlackCaptures.Count
+        allBlack = $validCaptures.Count -gt 0 -and $nonBlackCaptures.Count -eq 0
+        bestIndex = if ($null -ne $bestCapture) { $bestCapture.index } else { $null }
+        bestRgbSum = if ($null -ne $bestCapture) { $bestCapture.signal.rgbSum } else { $null }
+        bestPath = if ($null -ne $bestCapture) { $bestCapture.path } else { $null }
+    }
 }
 
 function Wait-UiLabNativeFrameCapture([string]$EventsPath, [int]$TimeoutSeconds, [System.Diagnostics.Process]$Process = $null) {
@@ -600,6 +692,7 @@ foreach ($target in $expandedTargets) {
 
     $evidenceChecks = Test-UiLabEvidenceEvents $target $eventsPath
     $nativeFrameCaptures = @(Get-UiLabNativeFrameCaptures $eventsPath)
+    $nativeFrameSignalSummary = Get-UiLabNativeFrameSignalSummary $nativeFrameCaptures
     if ($null -eq $nativeFrameCapture) {
         if ($nativeFrameCaptures.Count -gt 0) {
             $nativeFrameCapture = $nativeFrameCaptures[$nativeFrameCaptures.Count - 1]
@@ -624,6 +717,7 @@ foreach ($target in $expandedTargets) {
         evidenceChecks = $evidenceChecks
         nativeFrameCapture = $nativeFrameCapture
         nativeFrameCaptures = $nativeFrameCaptures
+        nativeFrameSignalSummary = $nativeFrameSignalSummary
     }
 
     if ($evidenceChecks.passed) {

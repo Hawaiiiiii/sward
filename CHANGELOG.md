@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 110 UI Lab native capture signal manifest
+
+- added BMP signal analysis to `capture_unleashed_recomp_ui_lab.ps1` for every native UI Lab frame, including dimensions, byte count, RGB sum, alpha sum, nonzero byte counts, and an `rgbNonBlack` flag
+- added `nativeFrameSignalSummary` to capture manifests so evidence runs report capture count, valid BMP count, nonblack count, all-black status, and the strongest RGB frame path/index
+- regression-guarded the manifest-side signal fields so future native-capture changes keep producing machine-readable visual evidence
+- verified a no-build native `title-loop` capture under `out/ui_lab_runtime_evidence/20260427_145527/`: evidence passed, `3` BMPs were written, `2` were RGB-nonblack, and the best frame was index `3`
+
 ### Phase 109 UI Lab native readback source/fence fix
 
 - forced UI Lab native frame capture through the intermediary backbuffer path so readback copies from a transfer-capable rendered source instead of the swapchain present image
