@@ -1,0 +1,105 @@
+{
+  "phase": 116,
+  "source": "UnleashedRecomp-debug-menu",
+  "policy": "reference-only harvest; no fork source or assets are vendored into SWARD",
+  "liveBridge": {
+    "transport": "Windows named pipe",
+    "label": "live bridge",
+    "defaultName": "sward_ui_lab_live",
+    "commands": [
+      "state",
+      "events",
+      "route <target>",
+      "reset",
+      "set-global <name> <0|1>",
+      "capture",
+      "help"
+    ]
+  },
+  "harvestedSurfaces": [
+    {
+      "bucket": "CSD manager",
+      "paths": [
+        "api/CSD/Manager/csdmProject.h",
+        "api/CSD/Manager/csdmScene.h",
+        "api/CSD/Manager/csdmNode.h",
+        "api/CSD/Manager/csdmRCPtr.h",
+        "api/CSD/Platform/csdTexList.h"
+      ],
+      "typedFields": [
+        "CSD.Manager.CScene.m_MotionFrame",
+        "CSD.Manager.CScene.m_MotionRepeatType",
+        "CSD.Manager.CNode.m_pMotionPattern"
+      ],
+      "swardUse": "CSD project, scene, node, motion-frame, repeat-type, and layer-readiness inspection"
+    },
+    {
+      "bucket": "SWA CSD wrappers",
+      "paths": [
+        "api/SWA/CSD/CsdProject.h",
+        "api/SWA/CSD/CsdDatabaseWrapper.h",
+        "api/SWA/CSD/CsdTexListMirage.h",
+        "api/SWA/CSD/GameObjectCSD.h"
+      ],
+      "typedFields": [
+        "SWA.CSD.CCsdProject.m_rcProject",
+        "SWA.CSD.CGameObjectCSD.m_rcProject"
+      ],
+      "swardUse": "Map runtime CSD project creation and owner objects to UI Lab target CSD readiness"
+    },
+    {
+      "bucket": "SWA HUD owners",
+      "paths": [
+        "api/SWA/HUD/Sonic/HudSonicStage.h",
+        "api/SWA/HUD/Loading/Loading.h",
+        "api/SWA/HUD/Pause/HudPause.h",
+        "api/SWA/HUD/GeneralWindow/GeneralWindow.h",
+        "api/SWA/HUD/SaveIcon/SaveIcon.h"
+      ],
+      "typedFields": [
+        "SWA.HUD.CHudSonicStage.m_rcPlayScreen",
+        "SWA.HUD.CHudSonicStage.m_rcSpeedGauge",
+        "SWA.HUD.CLoading.m_LoadingDisplayType",
+        "SWA.HUD.CHudPause.m_Action",
+        "SWA.HUD.CGeneralWindow.m_rcGeneral",
+        "SWA.HUD.CSaveIcon.m_IsVisible"
+      ],
+      "swardUse": "Typed readiness and owner/status inspection for Sonic HUD, loading, pause, reusable window, and save icon"
+    },
+    {
+      "bucket": "SWA System and GameMode",
+      "paths": [
+        "api/SWA/System/ApplicationDocument.h",
+        "api/SWA/System/GameDocument.h",
+        "api/SWA/System/GameMode/GameModeStage.h",
+        "api/SWA/System/GameMode/Title/TitleMenu.h",
+        "api/SWA/System/GameMode/Title/TitleStateBase.h"
+      ],
+      "typedFields": [
+        "SWA.System.GameMode.CGameModeStage",
+        "SWA.System.GameMode.Title.CTitleMenu.m_CursorIndex",
+        "SWA.System.GameMode.Title.CTitleStateBase.CMember.m_pTitleMenu",
+        "SWA.System.GameDocument.CMember.m_StageName"
+      ],
+      "swardUse": "Title-menu readiness, stage boot ownership, active stage labels, and game-mode context"
+    },
+    {
+      "bucket": "Reddog operator shell",
+      "paths": [
+        "ui/reddog/reddog_manager.h",
+        "ui/reddog/reddog_window.h",
+        "ui/reddog/debug_draw.h",
+        "ui/reddog/windows/window_list.h",
+        "ui/reddog/windows/counter_window.h",
+        "ui/reddog/windows/view_window.h",
+        "ui/reddog/windows/exports_window.h",
+        "ui/reddog/windows/welcome_window.h"
+      ],
+      "typedFields": [
+        "Reddog.Manager",
+        "Reddog.DebugDraw"
+      ],
+      "swardUse": "Default-open operator shell, window list, counters, exports, view toggles, and debug draw reference pattern"
+    }
+  ]
+}

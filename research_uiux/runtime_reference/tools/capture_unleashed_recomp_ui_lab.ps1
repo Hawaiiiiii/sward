@@ -18,6 +18,8 @@ param(
     [int]$NativeCaptureCount = 1,
     [int]$NativeCaptureIntervalFrames = 120,
     [switch]$RequireNativeRgbSignal,
+    [bool]$LiveBridge = $true,
+    [string]$LiveBridgeName = "sward_ui_lab_live",
     [bool]$NormalizeWindow = $true,
     [switch]$Observer,
     [switch]$HideOverlay,
@@ -668,6 +670,14 @@ foreach ($target in $expandedTargets) {
         $args += @("--ui-lab-overlay", "off")
     }
 
+    if ($LiveBridge) {
+        $args += @("--ui-lab-live-bridge")
+        $args += @("--ui-lab-live-bridge-name", $LiveBridgeName)
+    }
+    else {
+        $args += @("--ui-lab-live-bridge", "off")
+    }
+
     if ($NativeCapture) {
         $args += @("--ui-lab-native-capture")
         $args += @("--ui-lab-native-capture-dir", $targetDir)
@@ -830,6 +840,7 @@ foreach ($target in $expandedTargets) {
         nativeFrameCaptures = $nativeFrameCaptures
         nativeFrameSignalSummary = $nativeFrameSignalSummary
         nativeCapturePlan = $nativeCapturePlan
+        liveBridgeName = if ($LiveBridge) { $LiveBridgeName } else { $null }
         nativeSignalRequired = $nativeSignalRequired
         nativeSignalPassed = $nativeSignalPassed
     }

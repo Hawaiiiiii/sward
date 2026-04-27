@@ -44,6 +44,9 @@ namespace UiLab
     std::string_view GetRouteStatusLabel();
     std::string_view GetStageHarnessLabel();
     std::string_view GetTargetCsdStatusLabel();
+    bool IsLiveBridgeEnabled();
+    std::string_view GetLiveBridgeName();
+    std::string BuildLiveStateJson();
     const std::array<RuntimeTarget, 10>& GetRuntimeTargets();
     void RequestRouteToCurrentTarget();
     void SelectPreviousTarget();

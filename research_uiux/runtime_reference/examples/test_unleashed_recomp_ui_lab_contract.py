@@ -615,6 +615,84 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("real CSD/material/movie/render stack", report)
         self.assertIn("diagnostic sidecar", report)
 
+    def test_ui_lab_harvests_debug_menu_fork_typed_api_surfaces(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        harvest = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        harvest_data = self.read("research_uiux/data/debug_menu_fork_harvest.json")
+        report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
+
+        for token in [
+            "DebugMenuForkField",
+            "CSD.Manager.CScene.m_MotionFrame",
+            "CSD.Manager.CScene.m_MotionRepeatType",
+            "SWA.CSD.CCsdProject.m_rcProject",
+            "SWA.HUD.CHudSonicStage.m_rcPlayScreen",
+            "SWA.HUD.CLoading.m_LoadingDisplayType",
+            "SWA.HUD.CHudPause.m_Action",
+            "SWA.HUD.CGeneralWindow.m_rcGeneral",
+            "SWA.HUD.CSaveIcon.m_IsVisible",
+            "SWA.System.GameMode.CGameModeStage",
+            "SWA.System.GameMode.Title.CTitleMenu.m_CursorIndex",
+            "Reddog.Manager",
+            "Reddog.DebugDraw",
+            "debugForkTypedFields",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "api/CSD/Manager/csdmScene.h",
+            "api/SWA/CSD/CsdProject.h",
+            "api/SWA/HUD/Sonic/HudSonicStage.h",
+            "api/SWA/HUD/Loading/Loading.h",
+            "api/SWA/HUD/Pause/HudPause.h",
+            "api/SWA/HUD/GeneralWindow/GeneralWindow.h",
+            "api/SWA/HUD/SaveIcon/SaveIcon.h",
+            "api/SWA/System/GameMode/GameModeStage.h",
+            "api/SWA/System/GameMode/Title/TitleMenu.h",
+            "api/SWA/System/GameMode/Title/TitleStateBase.h",
+            "ui/reddog/reddog_manager.h",
+            "ui/reddog/debug_draw.h",
+            "live bridge",
+        ]:
+            self.assertIn(token, harvest)
+            self.assertIn(token, harvest_data)
+
+        self.assertIn("Phase 116", report)
+        self.assertIn("debug-menu fork-derived typed fields", report)
+
+    def test_ui_lab_live_bridge_exposes_state_events_and_commands(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+
+        self.assertIn("GetLiveBridgeName", header)
+        self.assertIn("IsLiveBridgeEnabled", header)
+        self.assertIn("BuildLiveStateJson", header)
+        self.assertIn("--ui-lab-live-bridge", ui_lab)
+        self.assertIn("--ui-lab-live-bridge-name", ui_lab)
+        self.assertIn("StartLiveBridge", ui_lab)
+        self.assertIn("UiLabLiveBridgeThread", ui_lab)
+        self.assertIn("\\\\\\\\.\\\\pipe\\\\sward_ui_lab_live", ui_lab)
+        self.assertIn("HandleLiveBridgeCommand", ui_lab)
+        self.assertIn("capabilities", ui_lab)
+        self.assertIn("recentEvents", ui_lab)
+        self.assertIn("sglobals", ui_lab)
+        self.assertIn("debugForkTypedFields", ui_lab)
+        self.assertIn("commands", ui_lab)
+        self.assertIn("route <target>", ui_lab)
+        self.assertIn("set-global <name> <0|1>", ui_lab)
+        self.assertIn("capture", ui_lab)
+        self.assertIn("state", ui_lab)
+        self.assertIn("events", ui_lab)
+        self.assertIn("live-bridge-started", ui_lab)
+        self.assertIn("live-bridge-command", ui_lab)
+        self.assertIn("live-bridge-capture-requested", ui_lab)
+        self.assertIn("LiveBridge", script)
+        self.assertIn("LiveBridgeName", script)
+        self.assertIn("--ui-lab-live-bridge", script)
+        self.assertIn("--ui-lab-live-bridge-name", script)
+        self.assertIn("liveBridgeName =", script)
+
 
 if __name__ == "__main__":
     unittest.main()

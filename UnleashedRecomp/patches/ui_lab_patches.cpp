@@ -4,13 +4,27 @@
 #include <kernel/memory.h>
 #include <os/logger.h>
 #include <user/config.h>
+#include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <cctype>
 #include <cstdlib>
+#include <deque>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <unordered_set>
+#include <vector>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace UiLab
 {
@@ -87,6 +101,15 @@ namespace UiLab
         bool readOnly;
     };
 
+    struct DebugMenuForkField
+    {
+        const char* group;
+        const char* sourcePath;
+        const char* field;
+        const char* usage;
+        const char* status;
+    };
+
     static constexpr std::array<GuestBoolRef, 7> kGuestRenderGlobals =
     {{
         { "ms_IsRenderHud", 0x8328BB26, false },
@@ -107,6 +130,115 @@ namespace UiLab
         { "ms_IsObjectCollisionRender", 0x83367905, false },
         { "ms_IsTriggerRender", 0x83367904, false },
         { "ms_DrawLightFieldSamplingPoint", 0x83367BCE, false },
+    }};
+
+    static constexpr std::array<DebugMenuForkField, 15> kDebugMenuForkTypedFields =
+    {{
+        {
+            "CSD manager",
+            "api/CSD/Manager/csdmScene.h",
+            "CSD.Manager.CScene.m_MotionFrame",
+            "scene motion-frame readiness and animation progress",
+            "harvested"
+        },
+        {
+            "CSD manager",
+            "api/CSD/Manager/csdmScene.h",
+            "CSD.Manager.CScene.m_MotionRepeatType",
+            "scene repeat-mode inspection for intro/usual/loop latches",
+            "harvested"
+        },
+        {
+            "CSD manager",
+            "api/CSD/Manager/csdmNode.h",
+            "CSD.Manager.CNode.m_pMotionPattern",
+            "node/layer motion ownership inspection",
+            "harvested"
+        },
+        {
+            "SWA CSD",
+            "api/SWA/CSD/CsdProject.h",
+            "SWA.CSD.CCsdProject.m_rcProject",
+            "database CSD project to runtime CProject ownership",
+            "harvested"
+        },
+        {
+            "SWA CSD",
+            "api/SWA/CSD/GameObjectCSD.h",
+            "SWA.CSD.CGameObjectCSD.m_rcProject",
+            "game-object CSD project owner inspection",
+            "harvested"
+        },
+        {
+            "SWA HUD",
+            "api/SWA/HUD/Sonic/HudSonicStage.h",
+            "SWA.HUD.CHudSonicStage.m_rcPlayScreen",
+            "normal Sonic HUD project owner",
+            "harvested"
+        },
+        {
+            "SWA HUD",
+            "api/SWA/HUD/Sonic/HudSonicStage.h",
+            "SWA.HUD.CHudSonicStage.m_rcSpeedGauge",
+            "normal Sonic speed-gauge scene owner",
+            "harvested"
+        },
+        {
+            "SWA HUD",
+            "api/SWA/HUD/Loading/Loading.h",
+            "SWA.HUD.CLoading.m_LoadingDisplayType",
+            "loading display state enum",
+            "live"
+        },
+        {
+            "SWA HUD",
+            "api/SWA/HUD/Pause/HudPause.h",
+            "SWA.HUD.CHudPause.m_Action",
+            "pause action/status owner",
+            "next-inspector"
+        },
+        {
+            "SWA HUD",
+            "api/SWA/HUD/GeneralWindow/GeneralWindow.h",
+            "SWA.HUD.CGeneralWindow.m_rcGeneral",
+            "shared general-window CSD project owner",
+            "next-inspector"
+        },
+        {
+            "SWA HUD",
+            "api/SWA/HUD/SaveIcon/SaveIcon.h",
+            "SWA.HUD.CSaveIcon.m_IsVisible",
+            "autosave/save-icon visibility",
+            "next-inspector"
+        },
+        {
+            "SWA System/GameMode",
+            "api/SWA/System/GameMode/GameModeStage.h",
+            "SWA.System.GameMode.CGameModeStage",
+            "stage game-mode ownership boundary",
+            "live"
+        },
+        {
+            "SWA System/GameMode",
+            "api/SWA/System/GameMode/Title/TitleMenu.h",
+            "SWA.System.GameMode.Title.CTitleMenu.m_CursorIndex",
+            "title menu cursor readiness",
+            "live"
+        },
+        {
+            "Reddog",
+            "ui/reddog/reddog_manager.h",
+            "Reddog.Manager",
+            "operator shell/window-list manager reference pattern",
+            "ported-pattern"
+        },
+        {
+            "Reddog",
+            "ui/reddog/debug_draw.h",
+            "Reddog.DebugDraw",
+            "foreground operator debug-draw reference pattern",
+            "ported-pattern"
+        },
     }};
 
     static constexpr std::array<RuntimeTarget, 10> kRuntimeTargets =
@@ -142,6 +274,14 @@ namespace UiLab
     static ImVec2 g_operatorDebugIconPos = { 18.0f, 18.0f };
     static RoutePolicy g_routePolicy = RoutePolicy::InputInjection;
     static ScreenId g_target = ScreenId::TitleLoop;
+    static bool g_liveBridgeEnabled = true;
+    static std::string g_liveBridgeName = "sward_ui_lab_live";
+    static std::atomic<bool> g_liveBridgeStarted = false;
+    static std::atomic<bool> g_liveBridgeStopRequested = false;
+    static std::mutex g_liveBridgeMutex;
+    static std::deque<std::string> g_recentEvidenceEvents;
+    static std::string g_lastLiveBridgeCommand;
+    static uint64_t g_liveBridgeCommandCount = 0;
     static bool g_routePending = false;
     static bool g_titleIntroAcceptInjected = false;
     static bool g_titleMenuAcceptInjected = false;
@@ -210,6 +350,12 @@ namespace UiLab
     static std::string_view NativeFrameCaptureStatusLabel();
     static void EmitStageTargetReadyIfNeeded();
     static std::array<OperatorWindowEntry, 8> GetOperatorWindowEntries();
+    static void StartLiveBridge();
+    static void UiLabLiveBridgeThread();
+    static std::string HandleLiveBridgeCommand(std::string_view command);
+    static bool ReadGuestBool(uint32_t guestAddress);
+    static void WriteGuestBool(uint32_t guestAddress, bool value);
+    static uint64_t TitleMenuStableFrames();
 
     static std::string_view RoutePolicyLabel()
     {
@@ -335,6 +481,29 @@ namespace UiLab
         return escaped;
     }
 
+    static std::string Trim(std::string_view value)
+    {
+        size_t begin = 0;
+        while (begin < value.size() && std::isspace(static_cast<unsigned char>(value[begin])))
+            ++begin;
+
+        size_t end = value.size();
+        while (end > begin && std::isspace(static_cast<unsigned char>(value[end - 1])))
+            --end;
+
+        return std::string(value.substr(begin, end - begin));
+    }
+
+    static std::string ToLower(std::string_view value)
+    {
+        std::string lowered(value);
+        std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c)
+        {
+            return static_cast<char>(std::tolower(c));
+        });
+        return lowered;
+    }
+
     static double SecondsSinceStart()
     {
         const auto elapsed = std::chrono::steady_clock::now() - g_startedAt;
@@ -374,7 +543,8 @@ namespace UiLab
         }
 
         const auto& target = TargetFor(g_target);
-        out
+        std::ostringstream eventJson;
+        eventJson
             << "{\"time\":" << SecondsSinceStart()
             << ",\"frame\":" << g_presentedFrameCount
             << ",\"event\":\"" << JsonEscape(event) << "\""
@@ -385,9 +555,19 @@ namespace UiLab
             << ",\"stage\":\"" << JsonEscape(GetStageHarnessLabel()) << "\"";
 
         if (!detail.empty())
-            out << ",\"detail\":\"" << JsonEscape(detail) << "\"";
+            eventJson << ",\"detail\":\"" << JsonEscape(detail) << "\"";
 
-        out << "}\n";
+        eventJson << "}";
+        const auto eventLine = eventJson.str();
+        out << eventLine << "\n";
+
+        {
+            std::lock_guard<std::mutex> lock(g_liveBridgeMutex);
+            g_recentEvidenceEvents.push_back(eventLine);
+
+            while (g_recentEvidenceEvents.size() > 80)
+                g_recentEvidenceEvents.pop_front();
+        }
     }
 
     void UpdateOperatorShellToggle(bool f1Down)
@@ -637,6 +817,175 @@ namespace UiLab
     static constexpr std::string_view kLiveStateStageGameModeAddressFieldName = R"("stageGameModeAddress")";
     static constexpr std::string_view kLiveStateNativeCaptureStatusFieldName = R"("nativeCaptureStatus")";
 
+    static void AppendStringArray(std::ostringstream& out, const std::vector<std::string_view>& values)
+    {
+        out << "[";
+        for (size_t i = 0; i < values.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            out << "\"" << JsonEscape(values[i]) << "\"";
+        }
+        out << "]";
+    }
+
+    static void AppendGuestBoolArray(std::ostringstream& out, const std::array<GuestBoolRef, 7>& values)
+    {
+        out << "[";
+        for (size_t i = 0; i < values.size(); ++i)
+        {
+            const auto& guestBool = values[i];
+            if (i != 0)
+                out << ",";
+
+            out
+                << "{"
+                << "\"name\":\"" << JsonEscape(guestBool.name) << "\","
+                << "\"address\":\"" << JsonEscape(HexU32(guestBool.guestAddress)) << "\","
+                << "\"readOnly\":" << (guestBool.readOnly ? "true" : "false") << ","
+                << "\"value\":" << (ReadGuestBool(guestBool.guestAddress) ? "true" : "false")
+                << "}";
+        }
+        out << "]";
+    }
+
+    static void AppendDebugForkTypedFields(std::ostringstream& out)
+    {
+        out << "[";
+        for (size_t i = 0; i < kDebugMenuForkTypedFields.size(); ++i)
+        {
+            const auto& field = kDebugMenuForkTypedFields[i];
+            if (i != 0)
+                out << ",";
+
+            out
+                << "{"
+                << "\"group\":\"" << JsonEscape(field.group) << "\","
+                << "\"sourcePath\":\"" << JsonEscape(field.sourcePath) << "\","
+                << "\"field\":\"" << JsonEscape(field.field) << "\","
+                << "\"usage\":\"" << JsonEscape(field.usage) << "\","
+                << "\"status\":\"" << JsonEscape(field.status) << "\""
+                << "}";
+        }
+        out << "]";
+    }
+
+    static void AppendRecentEvents(std::ostringstream& out)
+    {
+        std::lock_guard<std::mutex> lock(g_liveBridgeMutex);
+
+        out << "[";
+        for (size_t i = 0; i < g_recentEvidenceEvents.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            out << g_recentEvidenceEvents[i];
+        }
+        out << "]";
+    }
+
+    std::string BuildLiveStateJson()
+    {
+        const auto& target = TargetFor(g_target);
+        std::ostringstream out;
+
+        out
+            << "{\n"
+            << "  \"time\": " << SecondsSinceStart() << ",\n"
+            << "  \"frame\": " << g_presentedFrameCount << ",\n"
+            << "  " << kLiveStateTargetFieldName << ": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetLabel\": \"" << JsonEscape(target.label) << "\",\n"
+            << "  \"targetCsd\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
+            << "  \"sourceFamily\": \"" << JsonEscape(target.sourceFamily) << "\",\n"
+            << "  " << kLiveStateRouteFieldName << ": \"" << JsonEscape(g_routeStatus) << "\",\n"
+            << "  \"routePolicy\": \"" << JsonEscape(RoutePolicyLabel()) << "\",\n"
+            << "  \"stageHarness\": \"" << JsonEscape(GetStageHarnessLabel()) << "\",\n"
+            << "  " << kLiveStateStageGameModeAddressFieldName << ": \"" << JsonEscape(HexU32(g_lastStageGameModeAddress)) << "\",\n"
+            << "  \"stageContextFrame\": " << g_lastStageContextFrame << ",\n"
+            << "  \"stageReadyEvent\": \"" << JsonEscape(g_lastStageReadyEventName) << "\",\n"
+            << "  \"stageReadyFrame\": " << g_lastStageReadyFrame << ",\n"
+            << "  \"targetCsdObserved\": " << (g_targetCsdObserved ? "true" : "false") << ",\n"
+            << "  " << kLiveStateNativeCaptureStatusFieldName << ": \"" << JsonEscape(NativeFrameCaptureStatusLabel()) << "\",\n"
+            << "  \"lastNativeFrameCapturePath\": \"" << JsonEscape(g_lastNativeFrameCapturePath) << "\",\n"
+            << "  \"lastNativeFrameCaptureFailure\": \"" << JsonEscape(g_lastNativeFrameCaptureFailure) << "\",\n"
+            << "  \"lastCsdProject\": \"" << JsonEscape(g_lastCsdProjectName) << "\",\n"
+            << "  \"lastCsdProjectFrame\": " << g_lastCsdProjectFrame << ",\n"
+            << "  \"loadingRequestType\": "
+            << (g_lastLoadingRequestType == UINT32_MAX ? -1 : static_cast<int32_t>(g_lastLoadingRequestType))
+            << ",\n"
+            << "  \"loadingDisplayType\": "
+            << (g_lastLoadingDisplayType == UINT32_MAX ? -1 : static_cast<int32_t>(g_lastLoadingDisplayType))
+            << ",\n"
+            << "  \"loadingDisplayActive\": " << (g_loadingDisplayWasActive ? "true" : "false") << ",\n"
+            << "  \"titleMenuVisualReady\": " << (g_titleMenuVisualReady ? "true" : "false") << ",\n"
+            << "  \"titleMenuPressStartAccepted\": " << (g_titleMenuPressStartAccepted ? "true" : "false") << ",\n"
+            << "  \"titleMenuPostPressStartHeld\": " << (g_titleMenuPostPressStartHeld ? "true" : "false") << ",\n"
+            << "  \"titleMenuStableFrames\": " << TitleMenuStableFrames() << ",\n"
+            << "  \"title\": {\n"
+            << "    \"introContextAddress\": \"" << JsonEscape(HexU32(g_titleIntroInspector.contextAddress)) << "\",\n"
+            << "    \"introStateMachineAddress\": \"" << JsonEscape(HexU32(g_titleIntroInspector.stateMachineAddress)) << "\",\n"
+            << "    \"ownerTitleContextAddress\": \"" << JsonEscape(HexU32(g_titleOwnerInspector.titleContextAddress)) << "\",\n"
+            << "    \"ownerTitleCsdAddress\": \"" << JsonEscape(HexU32(g_titleOwnerInspector.titleCsdAddress)) << "\",\n"
+            << "    \"ownerReady\": " << (g_titleOwnerInspector.ownerReady ? "true" : "false") << ",\n"
+            << "    \"menuCursor\": " << g_titleMenuInspector.menuCursor << ",\n"
+            << "    \"contextPhase\": " << g_titleMenuInspector.contextPhase << "\n"
+            << "  },\n"
+            << "  \"readiness\": {\n"
+            << "    \"titleMenuVisible\": " << (g_titleMenuVisualReady ? "true" : "false") << ",\n"
+            << "    \"loadingActive\": " << (g_loadingDisplayWasActive ? "true" : "false") << ",\n"
+            << "    \"stageContextObserved\": " << (g_stageContextObserved ? "true" : "false") << ",\n"
+            << "    \"targetCsdObserved\": " << (g_targetCsdObserved ? "true" : "false") << ",\n"
+            << "    \"stageTargetReady\": " << (g_loggedStageTargetReady ? "true" : "false") << "\n"
+            << "  },\n"
+            << "  \"liveBridge\": {\n"
+            << "    \"enabled\": " << (g_liveBridgeEnabled ? "true" : "false") << ",\n"
+            << "    \"transport\": \"windows-named-pipe\",\n"
+            << "    \"name\": \"" << JsonEscape(g_liveBridgeName) << "\",\n"
+            << "    \"started\": " << (g_liveBridgeStarted.load() ? "true" : "false") << ",\n"
+            << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
+            << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
+            << "    \"commands\": ";
+        AppendStringArray(out, { "state", "events", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        out
+            << "\n"
+            << "  },\n"
+            << "  \"capabilities\": ";
+        AppendStringArray(out, {
+            "current target",
+            "route/event latch",
+            "title/menu/loading/stage/HUD readiness",
+            "CSD project and scene pointers",
+            "SGlobals toggles",
+            "debug-menu fork-derived typed fields",
+            "command channel"
+        });
+        out
+            << ",\n"
+            << "  \"sglobals\": {\n"
+            << "    \"render\": ";
+        AppendGuestBoolArray(out, kGuestRenderGlobals);
+        out
+            << ",\n"
+            << "    \"debugDraw\": ";
+        AppendGuestBoolArray(out, kGuestDebugDrawGlobals);
+        out
+            << "\n"
+            << "  },\n"
+            << "  \"debugForkTypedFields\": ";
+        AppendDebugForkTypedFields(out);
+        out
+            << ",\n"
+            << "  \"recentEvents\": ";
+        AppendRecentEvents(out);
+        out
+            << "\n"
+            << "}\n";
+
+        return out.str();
+    }
+
     void WriteLiveStateSnapshot()
     {
         if (!g_isEnabled || g_evidenceDirectory.empty())
@@ -656,29 +1005,7 @@ namespace UiLab
         if (!out)
             return;
 
-        const auto& target = TargetFor(g_target);
-        out
-            << "{\n"
-            << "  \"time\": " << SecondsSinceStart() << ",\n"
-            << "  \"frame\": " << g_presentedFrameCount << ",\n"
-            << "  " << kLiveStateTargetFieldName << ": \"" << JsonEscape(target.token) << "\",\n"
-            << "  \"targetLabel\": \"" << JsonEscape(target.label) << "\",\n"
-            << "  " << kLiveStateRouteFieldName << ": \"" << JsonEscape(g_routeStatus) << "\",\n"
-            << "  \"routePolicy\": \"" << JsonEscape(RoutePolicyLabel()) << "\",\n"
-            << "  \"stageHarness\": \"" << JsonEscape(GetStageHarnessLabel()) << "\",\n"
-            << "  " << kLiveStateStageGameModeAddressFieldName << ": \"" << JsonEscape(HexU32(g_lastStageGameModeAddress)) << "\",\n"
-            << "  \"stageContextFrame\": " << g_lastStageContextFrame << ",\n"
-            << "  \"stageReadyEvent\": \"" << JsonEscape(g_lastStageReadyEventName) << "\",\n"
-            << "  \"stageReadyFrame\": " << g_lastStageReadyFrame << ",\n"
-            << "  \"targetCsdObserved\": " << (g_targetCsdObserved ? "true" : "false") << ",\n"
-            << "  " << kLiveStateNativeCaptureStatusFieldName << ": \"" << JsonEscape(NativeFrameCaptureStatusLabel()) << "\",\n"
-            << "  \"lastNativeFrameCapturePath\": \"" << JsonEscape(g_lastNativeFrameCapturePath) << "\",\n"
-            << "  \"lastCsdProject\": \"" << JsonEscape(g_lastCsdProjectName) << "\",\n"
-            << "  \"loadingDisplayType\": "
-            << (g_lastLoadingDisplayType == UINT32_MAX ? -1 : static_cast<int32_t>(g_lastLoadingDisplayType))
-            << ",\n"
-            << "  \"titleMenuVisualReady\": " << (g_titleMenuVisualReady ? "true" : "false") << "\n"
-            << "}\n";
+        out << BuildLiveStateJson();
 
         g_lastLiveStateSnapshotFrame = g_presentedFrameCount;
     }
@@ -836,6 +1163,56 @@ namespace UiLab
                 if (!TrySetRoutePolicy(policy))
                     LOGFN_WARNING("SWARD UI Lab: unknown route policy '{}'.", std::string(policy));
 
+                continue;
+            }
+
+            if (arg == "--ui-lab-live-bridge")
+            {
+                g_isEnabled = true;
+                g_liveBridgeEnabled = true;
+                continue;
+            }
+
+            if (arg == "--ui-lab-no-live-bridge")
+            {
+                g_isEnabled = true;
+                g_liveBridgeEnabled = false;
+                continue;
+            }
+
+            constexpr std::string_view liveBridgePrefix = "--ui-lab-live-bridge=";
+            if (arg.starts_with(liveBridgePrefix))
+            {
+                g_isEnabled = true;
+                const auto value = arg.substr(liveBridgePrefix.size());
+
+                if (IsTruthy(value))
+                    g_liveBridgeEnabled = true;
+                else if (IsFalsy(value))
+                    g_liveBridgeEnabled = false;
+                else
+                    LOGFN_WARNING("SWARD UI Lab: unknown live bridge value '{}'.", std::string(value));
+
+                continue;
+            }
+
+            if (arg == "--ui-lab-live-bridge-name")
+            {
+                g_isEnabled = true;
+
+                if ((i + 1) < argc)
+                    g_liveBridgeName = argv[++i];
+                else
+                    LOGN_WARNING("SWARD UI Lab: --ui-lab-live-bridge-name was provided without a name.");
+
+                continue;
+            }
+
+            constexpr std::string_view liveBridgeNamePrefix = "--ui-lab-live-bridge-name=";
+            if (arg.starts_with(liveBridgeNamePrefix))
+            {
+                g_isEnabled = true;
+                g_liveBridgeName = std::string(arg.substr(liveBridgeNamePrefix.size()));
                 continue;
             }
 
@@ -1076,6 +1453,11 @@ namespace UiLab
                 LOGFN("SWARD UI Lab native frame capture directory: {}", g_nativeFrameCaptureDirectory.string());
                 WriteEvidenceEvent("native-frame-capture-armed", g_nativeFrameCaptureDirectory.string());
             }
+
+            if (g_liveBridgeEnabled)
+                StartLiveBridge();
+
+            WriteLiveStateSnapshot();
         }
     }
 
@@ -1106,6 +1488,16 @@ namespace UiLab
     bool IsNativeFrameCaptureEnabled()
     {
         return g_isEnabled && g_nativeFrameCaptureEnabled;
+    }
+
+    bool IsLiveBridgeEnabled()
+    {
+        return g_isEnabled && g_liveBridgeEnabled;
+    }
+
+    std::string_view GetLiveBridgeName()
+    {
+        return g_liveBridgeName;
     }
 
     bool ShouldBypassStartupPromptBlockers()
@@ -1907,6 +2299,227 @@ namespace UiLab
         return true;
     }
 
+    static const GuestBoolRef* FindGuestBool(std::string_view name)
+    {
+        const auto requested = ToLower(name);
+
+        for (const auto& guestBool : kGuestRenderGlobals)
+        {
+            if (ToLower(guestBool.name) == requested)
+                return &guestBool;
+        }
+
+        for (const auto& guestBool : kGuestDebugDrawGlobals)
+        {
+            if (ToLower(guestBool.name) == requested)
+                return &guestBool;
+        }
+
+        return nullptr;
+    }
+
+    static std::string BuildBridgeResult(bool ok, std::string_view message)
+    {
+        std::ostringstream out;
+        out
+            << "{\"ok\":" << (ok ? "true" : "false")
+            << ",\"message\":\"" << JsonEscape(message) << "\"}\n";
+        return out.str();
+    }
+
+    static std::string BuildRecentEventsJson()
+    {
+        std::ostringstream out;
+        out << "{\"ok\":true,\"events\":";
+        AppendRecentEvents(out);
+        out << "}\n";
+        return out.str();
+    }
+
+    static std::string BuildHelpJson()
+    {
+        std::ostringstream out;
+        out << "{\"ok\":true,\"commands\":";
+        AppendStringArray(out, { "state", "events", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        out << "}\n";
+        return out.str();
+    }
+
+    static std::string HandleLiveBridgeCommand(std::string_view commandText)
+    {
+        std::string command = Trim(commandText);
+        command.erase(std::remove(command.begin(), command.end(), '\0'), command.end());
+        command = Trim(command);
+
+        if (command.empty())
+            command = "state";
+
+        {
+            std::lock_guard<std::mutex> lock(g_liveBridgeMutex);
+            g_lastLiveBridgeCommand = command;
+            ++g_liveBridgeCommandCount;
+        }
+
+        std::istringstream input(command);
+        std::string verb;
+        input >> verb;
+        verb = ToLower(verb);
+
+        if (verb == "state" || verb == "get-state")
+            return BuildLiveStateJson();
+
+        if (verb == "events" || verb == "recent-events")
+            return BuildRecentEventsJson();
+
+        if (verb == "help" || verb == "commands")
+            return BuildHelpJson();
+
+        if (verb == "route")
+        {
+            std::string token;
+            input >> token;
+
+            if (token.empty())
+                return BuildBridgeResult(false, "route command needs a target token");
+
+            if (!TrySetTarget(token))
+                return BuildBridgeResult(false, "unknown route target");
+
+            g_routeTargetExplicit = true;
+            g_observerMode = false;
+            RequestRouteToCurrentTarget();
+            WriteEvidenceEvent("live-bridge-command", "route target=" + token);
+            return BuildBridgeResult(true, "route requested");
+        }
+
+        if (verb == "reset")
+        {
+            RequestRouteToCurrentTarget();
+            WriteEvidenceEvent("live-bridge-command", "reset");
+            return BuildBridgeResult(true, "route reset");
+        }
+
+        if (verb == "set-global")
+        {
+            std::string name;
+            std::string valueText;
+            input >> name >> valueText;
+
+            if (name.empty() || valueText.empty())
+                return BuildBridgeResult(false, "set-global <name> <0|1>");
+
+            const auto* guestBool = FindGuestBool(name);
+            if (guestBool == nullptr)
+                return BuildBridgeResult(false, "unknown SGlobals toggle");
+
+            if (guestBool->readOnly)
+                return BuildBridgeResult(false, "SGlobals toggle is read-only");
+
+            const bool value = IsTruthy(valueText) || valueText == "1";
+            WriteGuestBool(guestBool->guestAddress, value);
+            WriteEvidenceEvent(
+                "live-bridge-command",
+                "set-global " + std::string(guestBool->name) + "=" + (value ? "1" : "0"));
+            return BuildBridgeResult(true, "SGlobals toggle written");
+        }
+
+        if (verb == "capture")
+        {
+            g_nativeFrameCaptureEnabled = true;
+
+            if (g_nativeFrameCaptureDirectory.empty() && !g_evidenceDirectory.empty())
+                g_nativeFrameCaptureDirectory = g_evidenceDirectory;
+
+            if (g_nativeFrameCaptureMaxCount <= g_nativeFrameCaptureWrittenCount)
+                g_nativeFrameCaptureMaxCount = g_nativeFrameCaptureWrittenCount + 1;
+
+            g_lastNativeFrameCaptureFrame = 0;
+            WriteEvidenceEvent("live-bridge-capture-requested", "next ready native frame");
+            return BuildBridgeResult(true, "capture requested");
+        }
+
+        return BuildBridgeResult(false, "unknown command");
+    }
+
+    static constexpr std::string_view kDefaultLiveBridgePipePath = "\\\\.\\pipe\\sward_ui_lab_live";
+
+    static std::string LiveBridgePipePath()
+    {
+        if (g_liveBridgeName.empty() || g_liveBridgeName == "sward_ui_lab_live")
+            return std::string(kDefaultLiveBridgePipePath);
+
+        return std::string("\\\\.\\pipe\\") + g_liveBridgeName;
+    }
+
+    static void StartLiveBridge()
+    {
+        if (!g_isEnabled || !g_liveBridgeEnabled)
+            return;
+
+        bool expected = false;
+        if (!g_liveBridgeStarted.compare_exchange_strong(expected, true))
+            return;
+
+        std::thread(UiLabLiveBridgeThread).detach();
+        LOGFN("SWARD UI Lab live bridge started: {}", LiveBridgePipePath());
+        WriteEvidenceEvent("live-bridge-started", LiveBridgePipePath());
+    }
+
+    static void UiLabLiveBridgeThread()
+    {
+#ifdef _WIN32
+        while (!g_liveBridgeStopRequested.load())
+        {
+            const auto pipePath = LiveBridgePipePath();
+            HANDLE pipe = CreateNamedPipeA(
+                pipePath.c_str(),
+                PIPE_ACCESS_DUPLEX,
+                PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
+                1,
+                65536,
+                65536,
+                250,
+                nullptr);
+
+            if (pipe == INVALID_HANDLE_VALUE)
+            {
+                Sleep(500);
+                continue;
+            }
+
+            const BOOL connected = ConnectNamedPipe(pipe, nullptr)
+                ? TRUE
+                : (GetLastError() == ERROR_PIPE_CONNECTED);
+
+            if (connected)
+            {
+                char buffer[4096];
+                DWORD bytesRead = 0;
+
+                while (ReadFile(pipe, buffer, sizeof(buffer) - 1, &bytesRead, nullptr) && bytesRead > 0)
+                {
+                    buffer[bytesRead] = '\0';
+                    const auto response = HandleLiveBridgeCommand(buffer);
+                    DWORD bytesWritten = 0;
+                    WriteFile(
+                        pipe,
+                        response.data(),
+                        static_cast<DWORD>(response.size()),
+                        &bytesWritten,
+                        nullptr);
+                }
+            }
+
+            FlushFileBuffers(pipe);
+            DisconnectNamedPipe(pipe);
+            CloseHandle(pipe);
+        }
+#else
+        while (!g_liveBridgeStopRequested.load())
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+#endif
+    }
+
     static void DrawPredicate(const char* label, bool value)
     {
         const ImVec4 color = value
@@ -2386,6 +2999,17 @@ namespace UiLab
             ImGui::Text("stageGameModeAddress: %s", HexU32(g_lastStageGameModeAddress).c_str());
             ImGui::Text("nativeCaptureStatus: %s", std::string(NativeFrameCaptureStatusLabel()).c_str());
             ImGui::Text("last snapshot frame: %llu", static_cast<unsigned long long>(g_lastLiveStateSnapshotFrame));
+            ImGui::Separator();
+            ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
+            ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
+            ImGui::Text("commands: state, events, route, reset, set-global, capture, help");
+            ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
+
+            if (ImGui::CollapsingHeader("Debug-menu fork typed fields"))
+            {
+                for (const auto& field : kDebugMenuForkTypedFields)
+                    ImGui::TextWrapped("%s | %s | %s", field.group, field.field, field.status);
+            }
 
             if (ImGui::Button("Write Live State Snapshot"))
                 WriteLiveStateSnapshot();
