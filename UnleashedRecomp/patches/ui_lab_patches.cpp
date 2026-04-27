@@ -25,6 +25,8 @@ namespace UiLab
     }};
 
     static bool g_isEnabled = false;
+    static bool g_observerMode = false;
+    static bool g_hideOverlay = false;
     static ScreenId g_target = ScreenId::TitleLoop;
     static bool g_routePending = false;
     static bool g_titleIntroAcceptInjected = false;
@@ -47,6 +49,14 @@ namespace UiLab
     static const RuntimeTarget& TargetFor(ScreenId id);
     static bool TargetNeedsStageHarness(ScreenId id);
     static bool TargetShouldRouteThroughLoading(ScreenId id);
+
+    static bool ShouldDrawOverlay()
+    {
+        if (!g_hideOverlay)
+            return true;
+
+        return false;
+    }
 
     static std::string JsonEscape(std::string_view value)
     {
@@ -217,6 +227,43 @@ namespace UiLab
                 continue;
             }
 
+            if (arg == "--ui-lab-observer")
+            {
+                g_isEnabled = true;
+                g_observerMode = true;
+                g_routeStatus = "observer mode";
+                continue;
+            }
+
+            if (arg == "--ui-lab-hide-overlay")
+            {
+                g_hideOverlay = true;
+                continue;
+            }
+
+            if (arg == "--ui-lab-overlay")
+            {
+                if ((i + 1) < argc)
+                {
+                    const std::string_view value(argv[++i]);
+                    g_hideOverlay = value == "off" || value == "false" || value == "0" || value == "hidden";
+                }
+                else
+                {
+                    LOGN_WARNING("SWARD UI Lab: --ui-lab-overlay was provided without a value.");
+                }
+
+                continue;
+            }
+
+            constexpr std::string_view overlayPrefix = "--ui-lab-overlay=";
+            if (arg.starts_with(overlayPrefix))
+            {
+                const auto value = arg.substr(overlayPrefix.size());
+                g_hideOverlay = value == "off" || value == "false" || value == "0" || value == "hidden";
+                continue;
+            }
+
             if (arg == "--ui-lab-screen")
             {
                 g_isEnabled = true;
@@ -313,10 +360,15 @@ namespace UiLab
 
         if (g_isEnabled)
         {
-            RequestRouteToCurrentTarget();
+            if (!g_observerMode)
+                RequestRouteToCurrentTarget();
+            else
+                WriteEvidenceEvent("observer-mode");
+
             const auto& target = TargetFor(g_target);
             LOGFN(
-                "SWARD UI Lab enabled: target={} label={} csd={} family={} stage_context={}",
+                "SWARD UI Lab enabled: mode={} target={} label={} csd={} family={} stage_context={}",
+                g_observerMode ? "observer" : "route",
                 target.token,
                 target.label,
                 target.primaryCsdScene,
@@ -340,6 +392,10 @@ namespace UiLab
             return;
 
         Config::ShowConsole = true;
+
+        if (g_observerMode)
+            return;
+
         Config::SkipIntroLogos = true;
         Config::DisableAutoSaveWarning = true;
     }
@@ -349,9 +405,14 @@ namespace UiLab
         return g_isEnabled;
     }
 
+    bool IsObserverMode()
+    {
+        return g_observerMode;
+    }
+
     bool ShouldBypassStartupPromptBlockers()
     {
-        return g_isEnabled;
+        return g_isEnabled && !g_observerMode;
     }
 
     ScreenId GetTarget()
@@ -392,6 +453,14 @@ namespace UiLab
 
     void RequestRouteToCurrentTarget()
     {
+        if (g_observerMode)
+        {
+            g_routePending = false;
+            g_routeStatus = "observer mode";
+            WriteEvidenceEvent("route-disabled-observer");
+            return;
+        }
+
         g_titleIntroAcceptInjected = false;
         g_titleMenuAcceptInjected = false;
         g_stageContextObserved = false;
@@ -615,6 +684,9 @@ namespace UiLab
         if (!g_isEnabled)
             return;
 
+        if (!ShouldDrawOverlay())
+            return;
+
         const auto& target = TargetFor(g_target);
         const std::string targetLabel(target.label);
         const std::string targetToken(target.token);
@@ -636,6 +708,7 @@ namespace UiLab
         {
             ImGui::TextUnformatted("Runtime-backed UI Lab");
             ImGui::Separator();
+            ImGui::Text("Mode: %s", g_observerMode ? "observer mode" : "route forcing");
             ImGui::Text("Target: %s [%s]", targetLabel.c_str(), targetToken.c_str());
             ImGui::Text("CSD scene: %s", targetScene.c_str());
             ImGui::Text("Source family: %s", targetFamily.c_str());

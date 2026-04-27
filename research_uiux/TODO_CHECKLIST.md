@@ -752,6 +752,16 @@
 - [x] Capture-check a longer loading route and verify CSD/loading/frame evidence.
 - [x] Guard the context-observation and long-observation contract with regression tests.
 
+## Phase 100 - Runtime UI Lab Manual Observer
+
+- [x] Add a passive `--ui-lab-observer` mode for real-runtime evidence capture without forcing a target route.
+- [x] Keep observer mode from applying lab-only startup prompt/intro/autosave bypasses so manual navigation follows the installed runtime's normal flow.
+- [x] Add overlay hiding for clean real-screen screenshots during operator-guided sessions.
+- [x] Add `-Observer` / `-HideOverlay` capture helper arguments and a `manual-observer` evidence target.
+- [x] Build the generated UnleashedRecomp UI Lab after the observer-mode changes.
+- [x] Launch-check an observer capture and verify it writes screenshots/events without the harness killing the process.
+- [x] Guard observer mode and helper routing with regression tests.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.

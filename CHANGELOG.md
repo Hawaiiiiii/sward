@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 100 Runtime UI Lab manual observer
+
+- added `--ui-lab-observer` so the generated UnleashedRecomp UI Lab can run as a passive real-runtime evidence recorder without forcing title/loading/stage routes
+- kept observer mode from applying lab-only startup prompt bypasses or intro/autosave skips, preserving the normal game flow while still logging real CSD/loading/frame evidence
+- added `--ui-lab-overlay off` / `--ui-lab-hide-overlay` for clean manual screenshots when the operator wants to navigate real screens without the ImGui side panel
+- extended the capture helper with `-Observer` and `-HideOverlay` so long `-KeepRunning` sessions can be left alive for manual screen-to-screen exploration
+- extended the UI Lab regression contract around observer mode, route isolation, and helper arguments
+
 ### Phase 99 Runtime UI Lab context observation
 
 - added UI Lab evidence hooks for real loading requests, loading display-type changes, and CSD project creation

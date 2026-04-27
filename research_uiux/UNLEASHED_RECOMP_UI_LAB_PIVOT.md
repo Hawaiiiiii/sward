@@ -35,6 +35,10 @@ The module currently provides:
 - `--ui-lab-evidence-dir=<dir>`
 - `--ui-lab-auto-exit <seconds>`
 - `--ui-lab-auto-exit=<seconds>`
+- `--ui-lab-observer`
+- `--ui-lab-overlay off`
+- `--ui-lab-overlay=off`
+- `--ui-lab-hide-overlay`
 - a curated target table for `TitleLoop`, `TitleMenu`, `Loading`, `SonicHud`, `Result`, `Status`, `Tutorial`, and `WorldMap`
 - runtime config overrides that keep the lab path debug-friendly (`ShowConsole`, `SkipIntroLogos`, `DisableAutoSaveWarning`)
 - attachment points in `CTitleStateIntro::Update` and `CTitleStateMenu::Update`
@@ -61,6 +65,8 @@ Implemented now:
 - loading-route evidence from `SWA::Message::MsgRequestStartLoading::Impl` and `SWA::CLoading::Update`, including display-type transitions
 - CSD project creation evidence from the real `CCsdProject::Make` hook path, so target runs now report project names such as `ui_loading`, `ui_title`, `ui_status`, `ui_result`, `ui_worldmap`, and gameplay HUD projects when they load
 - a local capture helper at `research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1` that launches the generated runtime, normalizes the window, prefers `PrintWindow` capture before screen-copy fallback, captures screenshots, supports long observation snapshots, supports a `-KeepRunning` manual-operator mode, and writes a manifest under ignored `out/ui_lab_runtime_evidence/`
+- a passive observer launch path via `--ui-lab-observer` / capture-helper `-Observer`, which records the normal runtime without route forcing or lab-only startup prompt bypasses
+- optional overlay hiding via `--ui-lab-overlay off` / capture-helper `-HideOverlay`, so manual evidence captures can show the real game frame cleanly while JSONL evidence continues in the background
 - generated-clone sync in `build_unleashed_recomp_ui_lab.ps1`, so tracked UI Lab files are copied into `local_build_env/ur103clean` before each build
 - regression tests that guard the runtime-lab contract
 
@@ -93,7 +99,8 @@ The UI Lab now has a basic evidence loop:
 3. Let the real runtime present frames, attach translated title/menu hooks, and route through real state transitions.
 4. Capture early/late screenshots, optional periodic observation screenshots, and `ui_lab_events.jsonl` into `out/ui_lab_runtime_evidence/<timestamp>/<target>/`.
 5. For manual sessions, launch with `-KeepRunning` so the process remains alive while the operator moves screen to screen and evidence continues accumulating.
-6. Use those screenshots and events as the next debugging oracle instead of guessing from the standalone renderer.
+6. For manual observer sessions, prefer `-Observer -HideOverlay -KeepRunning`: this runs the real installed runtime as normally as possible, keeps the lab from forcing routes, hides the side panel, and still records CSD/loading/frame evidence.
+7. Use those screenshots and events as the next debugging oracle instead of guessing from the standalone renderer.
 
 This does not mean every target is deterministic yet. Current stage-family targets can observe a real stage context, but still depend on the installed runtime's current frontend/save/prompt path. The next hard blocker is deterministic stage-context creation or routing, not drawing another clean-room approximation of the HUD.
 

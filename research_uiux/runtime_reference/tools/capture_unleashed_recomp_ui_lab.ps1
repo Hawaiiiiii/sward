@@ -9,6 +9,8 @@ param(
     [int]$ObserveSeconds = 0,
     [int]$SnapshotIntervalSeconds = 10,
     [bool]$NormalizeWindow = $true,
+    [switch]$Observer,
+    [switch]$HideOverlay,
     [switch]$KeepRunning,
     [switch]$NoBuild
 )
@@ -210,8 +212,13 @@ $stageTargets = @("sonic-hud", "tutorial", "result")
 $records = @()
 $expandedTargets = @()
 
-foreach ($target in $Targets) {
-    $expandedTargets += $target -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+if ($Observer) {
+    $expandedTargets = @("manual-observer")
+}
+else {
+    foreach ($target in $Targets) {
+        $expandedTargets += $target -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    }
 }
 
 foreach ($target in $expandedTargets) {
@@ -221,15 +228,25 @@ foreach ($target in $expandedTargets) {
 
     $args = @(
         "--use-cwd",
-        "--ui-lab-screen", $target,
         "--ui-lab-evidence-dir", $targetDir
     )
+
+    if (-not $Observer) {
+        $args += @("--ui-lab-screen", $target)
+    }
+    else {
+        $args += "--ui-lab-observer"
+    }
+
+    if ($HideOverlay) {
+        $args += @("--ui-lab-overlay", "off")
+    }
 
     if (-not $KeepRunning -and $AutoExitSeconds -gt 0) {
         $args += @("--ui-lab-auto-exit", "$AutoExitSeconds")
     }
 
-    if ($stageTargets -contains $target) {
+    if (-not $Observer -and $stageTargets -contains $target) {
         $args += @("--ui-lab-stage", "auto")
     }
 

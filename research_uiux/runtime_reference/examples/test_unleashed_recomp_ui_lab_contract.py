@@ -138,6 +138,28 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("processId", script)
         self.assertIn("if (-not $KeepRunning -and -not $process.HasExited)", script)
 
+    def test_ui_lab_observer_mode_keeps_runtime_manual(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+
+        self.assertIn("bool IsObserverMode()", header)
+        self.assertIn("--ui-lab-observer", ui_lab)
+        self.assertIn("g_observerMode", ui_lab)
+        self.assertIn("observer mode", ui_lab)
+        self.assertIn("if (!g_observerMode)", ui_lab)
+        self.assertIn("return g_isEnabled && !g_observerMode", ui_lab)
+        self.assertIn("if (!g_hideOverlay)", ui_lab)
+
+    def test_ui_lab_capture_helper_launches_observer_without_screen_route(self):
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+
+        self.assertIn("Observer", script)
+        self.assertIn("HideOverlay", script)
+        self.assertIn("--ui-lab-observer", script)
+        self.assertIn("--ui-lab-overlay", script)
+        self.assertIn("manual-observer", script)
+        self.assertIn("if (-not $Observer)", script)
+
     def test_ui_lab_bypasses_startup_prompt_blockers_for_lab_runs(self):
         header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
         intro = self.read("UnleashedRecomp/patches/CTitleStateIntro_patches.cpp")
