@@ -41,7 +41,7 @@ The module currently provides:
 - `--ui-lab-hide-overlay`
 - `--ui-lab-route-policy input`
 - `--ui-lab-route-policy direct-context`
-- a curated target table for `TitleLoop`, `TitleMenu`, `Loading`, `SonicHud`, `Result`, `Status`, `Tutorial`, and `WorldMap`
+- a curated target table for `TitleLoop`, `TitleMenu`, `Loading`, `SonicHud`, `ExtraStageHud`, `Result`, `Status`, `Tutorial`, and `WorldMap`
 - runtime config overrides that keep the lab path debug-friendly (`ShowConsole`, `SkipIntroLogos`, `DisableAutoSaveWarning`)
 - attachment points in `CTitleStateIntro::Update` and `CTitleStateMenu::Update`
 
@@ -66,6 +66,9 @@ Implemented now:
 - runtime evidence logging to local JSONL, including route requests, first presented frame, periodic presented frames, title/menu hook attachment, accept injection, stage-context observation, manual evidence markers, and auto-exit
 - loading-route evidence from `SWA::Message::MsgRequestStartLoading::Impl` and `SWA::CLoading::Update`, including display-type transitions
 - CSD project creation evidence from the real `CCsdProject::Make` hook path, so target runs now report project names such as `ui_loading`, `ui_title`, `ui_status`, `ui_result`, `ui_worldmap`, and gameplay HUD projects when they load
+- corrected gameplay HUD target separation: normal Sonic HUD now targets the real runtime `ui_playscreen` project, while `ui_prov_playscreen` is tracked as an `ExtraStageHud` / Extra-Tornado-family target instead of being treated as Sonic's regular stage HUD
+- target-CSD observation state in the UI Lab overlay and JSONL evidence, including `target-csd-project-made` and `stage-target-csd-bound` events when the selected CSD project is created after a real stage context is observed
+- `CGameModeStage::ExitLoading` evidence now records the guest stage context address plus selected target, requested stage token, target CSD name, and whether the target CSD has already been observed
 - a local capture helper at `research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1` that launches the generated runtime, normalizes the window, prefers `PrintWindow` capture before screen-copy fallback, captures screenshots, supports long observation snapshots, supports a `-KeepRunning` manual-operator mode, and writes a manifest under ignored `out/ui_lab_runtime_evidence/`
 - a passive observer launch path via `--ui-lab-observer` / capture-helper `-Observer`, which records the normal runtime without route forcing or lab-only startup prompt bypasses
 - optional overlay hiding via `--ui-lab-overlay off` / capture-helper `-HideOverlay`, so manual evidence captures can show the real game frame cleanly while JSONL evidence continues in the background
@@ -91,12 +94,15 @@ Verification note:
 - The direct-context policy is now available for focused captures through `capture_unleashed_recomp_ui_lab.ps1 -RoutePolicy direct-context`.
 - A `title-menu` direct-context capture under `out/ui_lab_runtime_evidence/20260427_061744/` proved the corrected route: `title-intro-direct-state-applied requested_state=1 dirty=1 transition_armed=1 output_armed=0 csd_complete_armed=1`, followed by `title-menu-attached`, `title-menu-context`, and `title-menu-reached`.
 - A `loading` direct-context capture under `out/ui_lab_runtime_evidence/20260427_062209/` proved the loading route still uses the owner-output bridge intentionally: `output_armed=1`, followed by `loading-requested display_type=8`.
-- A `sonic-hud` direct-context probe under `out/ui_lab_runtime_evidence/20260427_062408/` observed `CGameModeStage::ExitLoading`, but did not yet bind the Sonic HUD CSD target. The next blocker is deterministic stage/HUD owner selection, not title intro/menu routing.
+- A `sonic-hud` / `extra-stage-hud` direct-context capture under `out/ui_lab_runtime_evidence/20260427_074626/` corrected the gameplay-HUD split:
+  - `sonic-hud` targets `ui_playscreen`, observed `CGameModeStage::ExitLoading`, then produced `target-csd-project-made detail="ui_playscreen"` and `stage-target-csd-bound detail="target_csd=ui_playscreen stage_context=1"`.
+  - `extra-stage-hud` targets `ui_prov_playscreen`, observed `CGameModeStage::ExitLoading`, but the current direct-context route still produced `ui_playscreen` instead of `ui_prov_playscreen`.
+- Therefore the normal Sonic HUD route is now real-runtime CSD-bound, while the remaining `ui_prov_playscreen` blocker is deterministic Extra/Tornado stage owner selection rather than generic stage-context observation.
 
 Still ahead:
 
-- CSD-project host creation for non-title screens
-- deterministic direct stage boot/routing for Sonic HUD/tutorial/result targets after the stage harness observes or creates the correct owner context
+- deterministic direct stage boot/routing for Extra/Tornado, tutorial, and result targets after the stage harness observes or creates the correct owner context
+- CSD-project host creation for non-title screens that do not require a full gameplay owner
 - backbuffer/native capture so evidence screenshots do not depend on desktop/window focus or include editor/window chrome
 - route cleanup for startup prompts, save-state prompts, and DLC/install confirmation flows that can appear in front of requested UI targets
 - demotion of the clean renderer in docs to diagnostic/evidence-only status everywhere it is still described too strongly
@@ -113,7 +119,7 @@ The UI Lab now has a basic evidence loop:
 6. For manual observer sessions, prefer `-Observer -HideOverlay -KeepRunning`: this runs the real installed runtime as normally as possible, keeps the lab from forcing routes, hides the side panel, and still records CSD/loading/frame evidence.
 7. Use those screenshots and events as the next debugging oracle instead of guessing from the standalone renderer.
 
-This does not mean every target is deterministic yet. Current stage-family targets can observe a real stage context, but still do not deterministically select/create the gameplay HUD owner and `ui_prov_playscreen` path. The next hard blocker is stage/HUD owner selection or stage boot routing, not drawing another clean-room approximation of the HUD.
+This does not mean every target is deterministic yet. The normal Sonic HUD can now reach and bind the real `ui_playscreen` project through the runtime, but the `ui_prov_playscreen` path is a different Extra/Tornado-family owner. The next hard blocker is selecting that owner deterministically instead of drawing another clean-room approximation of the HUD.
 
 ## Immediate Product Direction
 
@@ -121,7 +127,7 @@ The next beats should build on `UiLab` in this order:
 
 1. Replace desktop screenshot capture with backbuffer/native frame capture so AI review sees the exact rendered frame.
 2. Promote the proven title/menu/loading direct-context path into a stable default once more route captures confirm it against normal saves and prompt variants.
-3. Add deterministic stage-context creation or stage boot routing for Sonic HUD and tutorial overlays, starting from the now-observed `CGameModeStage::ExitLoading` boundary.
+3. Add deterministic stage-context creation or stage boot routing for Extra/Tornado HUD, tutorial overlays, and result/status routes, starting from the now-observed `CGameModeStage::ExitLoading` boundary and the confirmed `ui_playscreen` Sonic HUD bind.
 4. Add CSD-project host creation for non-title screens that can be displayed without a full gameplay owner.
 5. Add result/status/world-map only after their owner contexts can be created or routed without corrupting save/progression state.
 

@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <unordered_set>
 
@@ -18,12 +19,13 @@ namespace UiLab
         DirectContext
     };
 
-    static constexpr std::array<RuntimeTarget, 8> kRuntimeTargets =
+    static constexpr std::array<RuntimeTarget, 9> kRuntimeTargets =
     {{
         { ScreenId::TitleLoop, "title-loop", "Title Loop", "ui_title", "System/GameMode/Title/TitleStateIntro.cpp", false },
         { ScreenId::TitleMenu, "title-menu", "Title Menu", "ui_title", "System/GameMode/Title/TitleMenu.cpp", false },
         { ScreenId::Loading, "loading", "Loading / Miles Electric", "ui_loading", "System/Loading.cpp", false },
-        { ScreenId::SonicHud, "sonic-hud", "Sonic Stage HUD", "ui_prov_playscreen", "Player/Character/Sonic/Hud/SonicMainDisplay.cpp", true },
+        { ScreenId::SonicHud, "sonic-hud", "Sonic Stage HUD", "ui_playscreen", "Player/Character/Sonic/Hud/SonicMainDisplay.cpp", true },
+        { ScreenId::ExtraStageHud, "extra-stage-hud", "Extra Stage / Tornado HUD", "ui_prov_playscreen", "ExtraStage/Tails/Hud/HudExQte.cpp", true },
         { ScreenId::Result, "result", "Stage Result", "ui_result", "HUD/Result/Result.cpp", true },
         { ScreenId::Status, "status", "Status / Skill Upgrade", "ui_status", "HUD/Status/Status.cpp", false },
         { ScreenId::Tutorial, "tutorial", "Tutorial / Control Guide", "ui_loading", "Player/Character/Sonic/Hud/SonicHudGuide.cpp", true },
@@ -39,6 +41,7 @@ namespace UiLab
     static bool g_titleIntroAcceptInjected = false;
     static bool g_titleMenuAcceptInjected = false;
     static bool g_stageContextObserved = false;
+    static bool g_targetCsdObserved = false;
     static std::string_view g_routeStatus = "idle";
     static std::string g_requestedStageHarness = "auto";
     static std::filesystem::path g_evidenceDirectory;
@@ -49,6 +52,8 @@ namespace UiLab
     static bool g_loggedIntroHook = false;
     static bool g_loggedMenuHook = false;
     static bool g_loggedStageHarness = false;
+    static bool g_loggedTargetCsdProjectLive = false;
+    static bool g_loggedStageTargetCsdBound = false;
     static uint64_t g_titleIntroContextSampleCount = 0;
     static uint64_t g_stageTitleContextSampleCount = 0;
     static uint32_t g_lastLoadingDisplayType = UINT32_MAX;
@@ -56,11 +61,13 @@ namespace UiLab
     static std::string g_lastTitleIntroContextDetail;
     static std::string g_lastStageTitleContextDetail;
     static std::string g_lastTitleMenuContextDetail;
+    static std::string g_lastStageContextDetail;
     static std::unordered_set<std::string> g_loggedCsdProjects;
 
     static const RuntimeTarget& TargetFor(ScreenId id);
     static bool TargetNeedsStageHarness(ScreenId id);
     static bool TargetShouldRouteThroughLoading(ScreenId id);
+    static void RefreshTargetCsdProjectStatus();
 
     static std::string_view RoutePolicyLabel()
     {
@@ -142,6 +149,13 @@ namespace UiLab
     {
         const auto elapsed = std::chrono::steady_clock::now() - g_startedAt;
         return std::chrono::duration<double>(elapsed).count();
+    }
+
+    static std::string HexU32(uint32_t value)
+    {
+        std::ostringstream out;
+        out << "0x" << std::hex << std::uppercase << value;
+        return out.str();
     }
 
     static void WriteEvidenceEvent(std::string_view event, std::string_view detail = {})
@@ -234,6 +248,47 @@ namespace UiLab
         return id == ScreenId::Loading || TargetNeedsStageHarness(id);
     }
 
+    static bool HasObservedCsdProject(std::string_view projectName)
+    {
+        return g_loggedCsdProjects.find(std::string(projectName)) != g_loggedCsdProjects.end();
+    }
+
+    static void MarkTargetCsdProjectLive(std::string_view projectName)
+    {
+        if (projectName != TargetFor(g_target).primaryCsdScene)
+            return;
+
+        g_targetCsdObserved = true;
+
+        if (TargetNeedsStageHarness(g_target) && g_stageContextObserved)
+            g_routeStatus = "stage target csd bound";
+        else
+            g_routeStatus = "target csd project live";
+
+        if (!g_loggedTargetCsdProjectLive)
+        {
+            WriteEvidenceEvent("target-csd-project-made", projectName);
+            g_loggedTargetCsdProjectLive = true;
+        }
+
+        if (TargetNeedsStageHarness(g_target) && g_stageContextObserved && !g_loggedStageTargetCsdBound)
+        {
+            WriteEvidenceEvent(
+                "stage-target-csd-bound",
+                "target_csd=" + std::string(projectName) +
+                " stage_context=1");
+            g_loggedStageTargetCsdBound = true;
+        }
+    }
+
+    static void RefreshTargetCsdProjectStatus()
+    {
+        const auto& target = TargetFor(g_target);
+
+        if (HasObservedCsdProject(target.primaryCsdScene))
+            MarkTargetCsdProjectLive(target.primaryCsdScene);
+    }
+
     static bool TrySetTarget(std::string_view token)
     {
         if (token == "title")
@@ -242,6 +297,8 @@ namespace UiLab
             token = "title-menu";
         else if (token == "hud")
             token = "sonic-hud";
+        else if (token == "prov-hud" || token == "tornado-hud")
+            token = "extra-stage-hud";
         else if (token == "worldmap")
             token = "world-map";
 
@@ -514,7 +571,15 @@ namespace UiLab
         return g_requestedStageHarness;
     }
 
-    const std::array<RuntimeTarget, 8>& GetRuntimeTargets()
+    std::string_view GetTargetCsdStatusLabel()
+    {
+        if (g_targetCsdObserved)
+            return "observed";
+
+        return "waiting";
+    }
+
+    const std::array<RuntimeTarget, 9>& GetRuntimeTargets()
     {
         return kRuntimeTargets;
     }
@@ -532,7 +597,11 @@ namespace UiLab
         g_titleIntroAcceptInjected = false;
         g_titleMenuAcceptInjected = false;
         g_stageContextObserved = false;
+        g_targetCsdObserved = false;
         g_loggedStageHarness = false;
+        g_loggedTargetCsdProjectLive = false;
+        g_loggedStageTargetCsdBound = false;
+        g_lastStageContextDetail.clear();
 
         if (g_target == ScreenId::TitleLoop)
         {
@@ -547,6 +616,7 @@ namespace UiLab
             ? "stage harness armed"
             : "route pending";
         WriteEvidenceEvent("route-requested");
+        RefreshTargetCsdProjectStatus();
     }
 
     void SelectPreviousTarget()
@@ -707,7 +777,7 @@ namespace UiLab
         WriteEvidenceEvent("title-menu-context", detail);
     }
 
-    void OnStageExitLoading()
+    void OnStageExitLoading(uint32_t gameModeStageAddress)
     {
         if (!g_isEnabled || !TargetNeedsStageHarness(g_target))
             return;
@@ -715,17 +785,33 @@ namespace UiLab
         g_stageContextObserved = true;
         g_routeStatus = "stage context live";
 
+        const auto& target = TargetFor(g_target);
+        const auto detail =
+            "CGameModeStage::ExitLoading" +
+            std::string(" stage_address=") + HexU32(gameModeStageAddress) +
+            " target=" + std::string(target.token) +
+            " requested_stage=" + g_requestedStageHarness +
+            " target_csd=" + std::string(target.primaryCsdScene) +
+            " target_csd_observed=" + std::to_string(g_targetCsdObserved ? 1 : 0);
+
         if (!g_loggedStageHarness)
         {
-            const auto& target = TargetFor(g_target);
             LOGFN(
-                "SWARD UI Lab stage harness observed CGameModeStage::ExitLoading: target={} requested_stage={} csd={}",
+                "SWARD UI Lab stage harness observed CGameModeStage::ExitLoading: target={} requested_stage={} csd={} stage={}",
                 target.token,
                 g_requestedStageHarness,
-                target.primaryCsdScene);
-            WriteEvidenceEvent("stage-context-observed", "CGameModeStage::ExitLoading");
+                target.primaryCsdScene,
+                HexU32(gameModeStageAddress));
+            WriteEvidenceEvent("stage-context-observed", detail);
             g_loggedStageHarness = true;
         }
+        else if (detail != g_lastStageContextDetail)
+        {
+            WriteEvidenceEvent("stage-context-sample", detail);
+        }
+
+        g_lastStageContextDetail = detail;
+        RefreshTargetCsdProjectStatus();
     }
 
     void OnPresentedFrame()
@@ -793,11 +879,7 @@ namespace UiLab
 
         WriteEvidenceEvent("csd-project-made", project);
 
-        if (projectName == TargetFor(g_target).primaryCsdScene)
-        {
-            g_routeStatus = "target csd project live";
-            WriteEvidenceEvent("target-csd-project-made", project);
-        }
+        MarkTargetCsdProjectLive(projectName);
     }
 
     bool ApplyTitleIntroStateForcing(float elapsedSeconds, bool& directState)
@@ -937,6 +1019,7 @@ namespace UiLab
             ImGui::Text("Source family: %s", targetFamily.c_str());
             ImGui::Text("Stage context: %s", target.requiresStageContext ? "required" : "not required");
             ImGui::Text("Stage harness: %s", std::string(GetStageHarnessLabel()).c_str());
+            ImGui::Text("Target CSD: %s", std::string(GetTargetCsdStatusLabel()).c_str());
             ImGui::Text("Title intro hook: %s", g_loggedIntroHook ? "attached" : "waiting");
             ImGui::Text("Title menu hook: %s", g_loggedMenuHook ? "attached" : "waiting");
             ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());

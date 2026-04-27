@@ -28,12 +28,34 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "TitleMenu",
             "Loading",
             "SonicHud",
+            "ExtraStageHud",
             "Result",
             "Status",
             "Tutorial",
             "WorldMap",
         ]:
             self.assertIn(screen_id, header)
+
+    def test_ui_lab_separates_sonic_and_extra_stage_hud_targets(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        workbench = self.read("research_uiux/runtime_reference/include/sward/ui_runtime/debug_workbench_data.hpp")
+        aspect = self.read("UnleashedRecomp/patches/aspect_ratio_patches.cpp")
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+
+        self.assertIn("const std::array<RuntimeTarget, 9>& GetRuntimeTargets()", header)
+        self.assertIn("static constexpr std::array<RuntimeTarget, 9> kRuntimeTargets", ui_lab)
+        self.assertIn('{ ScreenId::SonicHud, "sonic-hud", "Sonic Stage HUD", "ui_playscreen"', ui_lab)
+        self.assertIn('{ ScreenId::ExtraStageHud, "extra-stage-hud", "Extra Stage / Tornado HUD", "ui_prov_playscreen"', ui_lab)
+        self.assertIn('token == "prov-hud"', ui_lab)
+        self.assertIn('token == "tornado-hud"', ui_lab)
+        self.assertIn("Sonic Stage HUD|sonic_stage_hud", workbench)
+        self.assertIn("sonic_stage_hud_reference|ui_playscreen|GameModeStageForwardTest.cpp", workbench)
+        self.assertIn("Extra Stage / Tornado Defense HUD|extra_stage_hud", workbench)
+        self.assertIn("extra_stage_hud_reference|ui_prov_playscreen|ui_qte|GameModeStageMotionTest.cpp", workbench)
+        self.assertIn('HashStr("ui_playscreen/so_speed_gauge")', aspect)
+        self.assertIn('HashStr("ui_prov_playscreen/so_speed_gauge")', aspect)
+        self.assertIn('"extra-stage-hud"', script)
 
     def test_ui_lab_hooks_existing_title_runtime_states(self):
         intro = self.read("UnleashedRecomp/patches/CTitleStateIntro_patches.cpp")
@@ -135,12 +157,27 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         video = self.read("UnleashedRecomp/gpu/video.cpp")
 
-        self.assertIn("void OnStageExitLoading()", header)
+        self.assertIn("void OnStageExitLoading(uint32_t gameModeStageAddress = 0)", header)
         self.assertIn("GetStageHarnessLabel", header)
         self.assertIn("--ui-lab-stage", ui_lab)
         self.assertIn("stage harness armed", ui_lab)
         self.assertIn("CGameModeStage::ExitLoading", ui_lab)
-        self.assertIn("UiLab::OnStageExitLoading()", video)
+        self.assertIn("const uint32_t stageGameModeAddress = ctx.r3.u32", video)
+        self.assertIn("UiLab::OnStageExitLoading(stageGameModeAddress)", video)
+
+    def test_ui_lab_binds_stage_targets_to_observed_real_csd_project(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+
+        self.assertIn("GetTargetCsdStatusLabel", header)
+        self.assertIn("g_targetCsdObserved", ui_lab)
+        self.assertIn("g_loggedStageTargetCsdBound", ui_lab)
+        self.assertIn("RefreshTargetCsdProjectStatus", ui_lab)
+        self.assertIn("stage_address=", ui_lab)
+        self.assertIn("target_csd_observed=", ui_lab)
+        self.assertIn("stage-target-csd-bound", ui_lab)
+        self.assertIn("target-csd-project-made", ui_lab)
+        self.assertIn("Target CSD:", ui_lab)
 
     def test_ui_lab_stage_targets_route_through_real_loading_path(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")

@@ -783,6 +783,17 @@
 - [x] Update the UI Lab pivot and whole-game gap reports with the new route boundary.
 - [x] Guard CSD completion arming, owner-output gating, and direct-context evidence fields with regression tests.
 
+## Phase 103 - Runtime UI Lab Stage HUD Target Binding
+
+- [x] Split normal Sonic HUD from the Extra/Tornado-family `ui_prov_playscreen` target in the UI Lab target table.
+- [x] Route `sonic-hud` to the real runtime `ui_playscreen` CSD project and add `extra-stage-hud` / `prov-hud` / `tornado-hud` aliases for `ui_prov_playscreen`.
+- [x] Record target-CSD observation state from the real `CCsdProject::Make` path and expose it through JSONL evidence plus the overlay.
+- [x] Carry the `CGameModeStage::ExitLoading` guest stage context address into UI Lab evidence for deterministic owner selection.
+- [x] Capture-check `sonic-hud` direct-context routing and verify `target-csd-project-made detail="ui_playscreen"` plus `stage-target-csd-bound`.
+- [x] Capture-check `extra-stage-hud` direct-context routing and verify the current route still lands on `ui_playscreen`, proving `ui_prov_playscreen` needs the Extra/Tornado owner path.
+- [x] Update the UI Lab pivot and whole-game gap reports with the corrected HUD-family split.
+- [x] Guard the target-table split, helper target list, stage-address hook, and target-CSD binding evidence with regression tests.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.

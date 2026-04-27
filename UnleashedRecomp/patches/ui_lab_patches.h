@@ -12,6 +12,7 @@ namespace UiLab
         TitleMenu,
         Loading,
         SonicHud,
+        ExtraStageHud,
         Result,
         Status,
         Tutorial,
@@ -39,7 +40,8 @@ namespace UiLab
     std::string_view GetTargetLabel();
     std::string_view GetRouteStatusLabel();
     std::string_view GetStageHarnessLabel();
-    const std::array<RuntimeTarget, 8>& GetRuntimeTargets();
+    std::string_view GetTargetCsdStatusLabel();
+    const std::array<RuntimeTarget, 9>& GetRuntimeTargets();
     void RequestRouteToCurrentTarget();
     void SelectPreviousTarget();
     void SelectNextTarget();
@@ -81,7 +83,7 @@ namespace UiLab
         bool menuField3C,
         bool menuField54,
         bool menuField9A);
-    void OnStageExitLoading();
+    void OnStageExitLoading(uint32_t gameModeStageAddress = 0);
     void OnPresentedFrame();
     void OnLoadingRequest(uint32_t displayType);
     void OnLoadingUpdate(uint32_t displayType);

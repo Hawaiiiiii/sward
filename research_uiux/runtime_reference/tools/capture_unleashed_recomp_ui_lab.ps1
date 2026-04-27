@@ -210,7 +210,7 @@ if (-not (Test-Path -LiteralPath $install)) {
 $sessionDir = Join-Path $output (Get-Date -Format "yyyyMMdd_HHmmss")
 New-Item -ItemType Directory -Force -Path $sessionDir | Out-Null
 
-$stageTargets = @("sonic-hud", "tutorial", "result")
+$stageTargets = @("sonic-hud", "extra-stage-hud", "tutorial", "result")
 $records = @()
 $expandedTargets = @()
 

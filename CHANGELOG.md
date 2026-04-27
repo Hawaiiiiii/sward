@@ -11,6 +11,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 103 Runtime UI Lab stage HUD target binding
+
+- split normal Sonic HUD from the Extra/Tornado-family HUD target in the UI Lab target table: `sonic-hud` now targets real runtime `ui_playscreen`, while `extra-stage-hud` / `prov-hud` / `tornado-hud` target `ui_prov_playscreen`
+- added target-CSD observation state from the real `CCsdProject::Make` path, with `target-csd-project-made` and `stage-target-csd-bound` evidence when the selected project appears after a real stage context
+- carried the `CGameModeStage::ExitLoading` guest stage context address into JSONL evidence for deterministic owner-selection work
+- capture-checked `sonic-hud` under direct-context routing and verified the real `ui_playscreen` bind after stage context
+- capture-checked `extra-stage-hud` and proved the current route still lands on the normal `ui_playscreen` owner, making Extra/Tornado owner selection the next hard blocker for `ui_prov_playscreen`
+- extended the UI Lab regression contract around target-table split, capture-helper targets, stage-address hook wiring, and target-CSD binding evidence
+
 ### Phase 102 Runtime UI Lab title/menu direct-context evidence
 
 - split direct title-intro forcing into two evidence-backed paths: CSD completion byte arming for `title-menu`, and owner-output arming only for loading/stage routes

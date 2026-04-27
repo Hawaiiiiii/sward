@@ -6963,8 +6963,9 @@ PPC_FUNC(sub_825369A0)
         g_compilingPipelineTaskCount.wait(value);
     }
 
+    const uint32_t stageGameModeAddress = ctx.r3.u32;
     __imp__sub_825369A0(ctx, base);
-    UiLab::OnStageExitLoading();
+    UiLab::OnStageExitLoading(stageGameModeAddress);
 }
 
 // CModelData::CheckMadeAll
