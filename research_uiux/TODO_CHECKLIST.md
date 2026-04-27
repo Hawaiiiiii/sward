@@ -857,6 +857,14 @@
 - [x] Verify a no-build native `title-loop` run records nonblack frame evidence in the manifest.
 - [x] Guard native signal-manifest fields with regression tests.
 
+## Phase 111 - Runtime UI Lab Native RGB Evidence Gate
+
+- [x] Add `-RequireNativeRgbSignal` to the capture helper.
+- [x] Fail required native-signal runs when captured BMPs are all black or missing.
+- [x] Record `nativeSignalRequired` and `nativeSignalPassed` in the manifest.
+- [x] Verify required-signal native `title-loop` capture passes with a nonblack best frame.
+- [x] Guard the required native-signal gate with regression tests.
+
 ## Completion Audit
 
 - [x] Re-checked `MASTER.txt` and `research_uiux/TODO_CHECKLIST.md`.
@@ -1021,3 +1029,4 @@
 - [x] Follow-on phase audit on `2026-04-27`: split capture-helper window preparation from screenshot capture, made native BMP capture opt-in while readback is black/stall-prone, and comparison-verified title-loop screenshots/events remain stable through auto-exit without native readback.
 - [x] Follow-on phase audit on `2026-04-27`: fixed native UI Lab readback to copy from the intermediary backbuffer, guarded already-waited capture fences from frame-reuse stalls, and verified real nonblack native BMPs for `title-loop` plus `sonic-hud`.
 - [x] Follow-on phase audit on `2026-04-27`: added native BMP signal stats and manifest summaries so title-loop captures now self-report black/nonblack frame usefulness and strongest RGB frame metadata.
+- [x] Follow-on phase audit on `2026-04-27`: added the required native RGB signal gate so future captures can fail explicitly when runtime events pass but native visual evidence is all black or missing.

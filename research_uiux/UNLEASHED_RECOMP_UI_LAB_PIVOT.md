@@ -77,6 +77,7 @@ Implemented now:
 - native backbuffer capture via `--ui-lab-native-capture` and `--ui-lab-native-capture-dir`, writing local-only 32-bit BMP frames from the runtime GPU readback path so evidence can use the actual rendered frame instead of relying only on Windows window capture
 - native frame-series capture controls via `--ui-lab-native-capture-count` and `--ui-lab-native-capture-interval-frames`, with capture-helper manifest reporting for every `native-frame-captured` BMP entry. Native BMP readback remains opt-in in the helper while it is expanded target-by-target, but the title-loop and normal Sonic HUD paths now write real nonblack backbuffer BMPs and exit cleanly.
 - capture-helper native BMP signal summaries, including per-frame RGB/alpha signal stats plus a `nativeFrameSignalSummary` block that identifies all-black runs and the strongest RGB frame without opening the images manually
+- optional `-RequireNativeRgbSignal` capture-helper gating, so native-evidence runs can fail explicitly when target runtime events pass but the captured BMP series is still all black or missing
 - passive capture/evidence safety: `--ui-lab-evidence-dir` and `--ui-lab-native-capture` no longer force the default title route by themselves. A launch becomes `capture/evidence observer mode` unless `--ui-lab-screen` / `--ui-lab=<target>` explicitly selects a routed screen target.
 - capture-helper `-SkipWindowScreenshots` mode for native-only runs, avoiding `PrintWindow`/desktop screenshot hangs while still preparing/focusing the real runtime window
 - direct title-intro state requests from the translated `sub_825811C8` field contract (`context+0x180` requested state and `context+0x181` dirty flag), used by the experimental direct-context policy instead of synthetic Start at the first route gate
@@ -115,6 +116,7 @@ Verification note:
 - A native title-loop capture under `out/ui_lab_runtime_evidence/20260427_142813/` proved the corrected readback path: required events passed, `auto-exit` fired, `3` native BMPs were written, and the final frame shows the real rendered Sonic Unleashed title screen.
 - A native normal Sonic HUD capture under `out/ui_lab_runtime_evidence/20260427_143208/` proved the same path across the stage harness: `stage-context-observed`, `target-csd-project-made`, and `stage-target-csd-bound` all passed, `4` native BMPs were written, and the first frame shows the real Miles Electric / Sonic tutorial loading screen.
 - A native title-loop capture under `out/ui_lab_runtime_evidence/20260427_145527/` proved the manifest signal layer: `3` BMPs were written, `2` were RGB-nonblack, `allBlack=false`, and `bestIndex=3` selected the strongest title-frame capture.
+- A required-signal native title-loop capture under `out/ui_lab_runtime_evidence/20260427_150814/` proved the new gate: `nativeSignalRequired=true`, `nativeSignalPassed=true`, and `bestIndex=3`.
 - Therefore the normal Sonic HUD route is now real-runtime CSD-bound, while the remaining `ui_prov_playscreen` blocker is deterministic Extra/Tornado stage owner selection rather than generic stage-context observation.
 
 Current alpha focus:

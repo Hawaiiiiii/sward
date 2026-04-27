@@ -17,6 +17,7 @@ param(
     [bool]$NativeCapture = $false,
     [int]$NativeCaptureCount = 1,
     [int]$NativeCaptureIntervalFrames = 120,
+    [switch]$RequireNativeRgbSignal,
     [bool]$NormalizeWindow = $true,
     [switch]$Observer,
     [switch]$HideOverlay,
@@ -527,6 +528,7 @@ New-Item -ItemType Directory -Force -Path $sessionDir | Out-Null
 $stageTargets = @("sonic-hud", "extra-stage-hud", "tutorial", "result")
 $records = @()
 $expandedTargets = @()
+$requiredNativeSignalFailed = $false
 
 if ($Observer) {
     $expandedTargets = @("manual-observer")
@@ -693,6 +695,12 @@ foreach ($target in $expandedTargets) {
     $evidenceChecks = Test-UiLabEvidenceEvents $target $eventsPath
     $nativeFrameCaptures = @(Get-UiLabNativeFrameCaptures $eventsPath)
     $nativeFrameSignalSummary = Get-UiLabNativeFrameSignalSummary $nativeFrameCaptures
+    $nativeSignalRequired = $NativeCapture -and [bool]$RequireNativeRgbSignal
+    $nativeSignalPassed = -not $nativeSignalRequired -or ([int]$nativeFrameSignalSummary.rgbNonBlack -gt 0)
+    if (-not $nativeSignalPassed) {
+        $requiredNativeSignalFailed = $true
+    }
+
     if ($null -eq $nativeFrameCapture) {
         if ($nativeFrameCaptures.Count -gt 0) {
             $nativeFrameCapture = $nativeFrameCaptures[$nativeFrameCaptures.Count - 1]
@@ -718,13 +726,21 @@ foreach ($target in $expandedTargets) {
         nativeFrameCapture = $nativeFrameCapture
         nativeFrameCaptures = $nativeFrameCaptures
         nativeFrameSignalSummary = $nativeFrameSignalSummary
+        nativeSignalRequired = $nativeSignalRequired
+        nativeSignalPassed = $nativeSignalPassed
     }
 
-    if ($evidenceChecks.passed) {
+    if ($evidenceChecks.passed -and $nativeSignalPassed) {
         Write-Host "[$target] evidence PASS"
     }
     else {
-        Write-Warning "[$target] evidence missing: $($evidenceChecks.missingEvents -join ', ')"
+        if (-not $evidenceChecks.passed) {
+            Write-Warning "[$target] evidence missing: $($evidenceChecks.missingEvents -join ', ')"
+        }
+
+        if (-not $nativeSignalPassed) {
+            Write-Warning "[$target] native BMP RGB signal missing"
+        }
     }
 }
 
@@ -732,3 +748,7 @@ $manifest = Join-Path $sessionDir "capture_manifest.json"
 $records | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifest -Encoding UTF8
 
 Write-Host "UI Lab runtime evidence: $sessionDir"
+
+if ($requiredNativeSignalFailed) {
+    throw "One or more UI Lab native captures did not produce RGB-nonblack BMP evidence."
+}

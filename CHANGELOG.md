@@ -11,6 +11,13 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 111 UI Lab native RGB evidence gate
+
+- added `-RequireNativeRgbSignal` to `capture_unleashed_recomp_ui_lab.ps1`, making native BMP evidence optionally fail-fast when no captured BMP contains RGB signal
+- recorded `nativeSignalRequired` and `nativeSignalPassed` per manifest entry so automated runs can separate "runtime evidence passed" from "visual native evidence is usable"
+- regression-guarded the new native signal gate and warning text
+- verified a required-signal no-build native `title-loop` capture under `out/ui_lab_runtime_evidence/20260427_150814/`: evidence passed, `nativeSignalPassed=true`, and the best RGB frame was index `3`
+
 ### Phase 110 UI Lab native capture signal manifest
 
 - added BMP signal analysis to `capture_unleashed_recomp_ui_lab.ps1` for every native UI Lab frame, including dimensions, byte count, RGB sum, alpha sum, nonzero byte counts, and an `rgbNonBlack` flag
