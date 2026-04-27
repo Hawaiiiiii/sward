@@ -35,6 +35,7 @@ namespace UiLab
 
     static bool g_isEnabled = false;
     static bool g_observerMode = false;
+    static bool g_routeTargetExplicit = false;
     static bool g_hideOverlay = false;
     static RoutePolicy g_routePolicy = RoutePolicy::InputInjection;
     static ScreenId g_target = ScreenId::TitleLoop;
@@ -46,9 +47,14 @@ namespace UiLab
     static std::string_view g_routeStatus = "idle";
     static std::string g_requestedStageHarness = "auto";
     static std::filesystem::path g_evidenceDirectory;
+    static std::filesystem::path g_nativeFrameCaptureDirectory;
     static double g_autoExitSeconds = 0.0;
     static uint64_t g_presentedFrameCount = 0;
     static bool g_autoExitRequested = false;
+    static bool g_nativeFrameCaptureEnabled = false;
+    static bool g_nativeFrameCaptureReserved = false;
+    static bool g_nativeFrameCaptureWritten = false;
+    static uint32_t g_nativeFrameCaptureIndex = 0;
     static const std::chrono::steady_clock::time_point g_startedAt = std::chrono::steady_clock::now();
     static bool g_loggedIntroHook = false;
     static bool g_loggedMenuHook = false;
@@ -70,6 +76,7 @@ namespace UiLab
     static bool TargetShouldRouteThroughLoading(ScreenId id);
     static bool TargetRoutesThroughTitleMenu(ScreenId id);
     static void RefreshTargetCsdProjectStatus();
+    static bool IsNativeFrameCaptureReady();
 
     static std::string_view RoutePolicyLabel()
     {
@@ -99,6 +106,16 @@ namespace UiLab
         }
 
         return false;
+    }
+
+    static bool IsTruthy(std::string_view value)
+    {
+        return value == "1" || value == "true" || value == "on" || value == "yes" || value == "capture";
+    }
+
+    static bool IsFalsy(std::string_view value)
+    {
+        return value == "0" || value == "false" || value == "off" || value == "no" || value == "none";
     }
 
     static bool ShouldDrawOverlay()
@@ -230,6 +247,8 @@ namespace UiLab
             index = 0;
 
         g_target = kRuntimeTargets[index].id;
+        g_routeTargetExplicit = true;
+        g_observerMode = false;
         RequestRouteToCurrentTarget();
         const auto& target = TargetFor(g_target);
         LOGFN("SWARD UI Lab target selected: {} ({})", target.token, target.label);
@@ -296,6 +315,36 @@ namespace UiLab
 
         if (HasObservedCsdProject(target.primaryCsdScene))
             MarkTargetCsdProjectLive(target.primaryCsdScene);
+    }
+
+    static bool IsNativeFrameCaptureReady()
+    {
+        if (!g_isEnabled || !g_nativeFrameCaptureEnabled || g_nativeFrameCaptureReserved || g_nativeFrameCaptureWritten)
+            return false;
+
+        if (g_presentedFrameCount < 2)
+            return false;
+
+        if (TargetNeedsStageHarness(g_target))
+            return g_stageContextObserved && g_targetCsdObserved;
+
+        switch (g_target)
+        {
+            case ScreenId::TitleLoop:
+            case ScreenId::Loading:
+            case ScreenId::Status:
+            case ScreenId::WorldMap:
+                return g_targetCsdObserved;
+
+            case ScreenId::TitleMenu:
+                return !g_routePending && g_loggedMenuHook;
+
+            case ScreenId::TitleOptions:
+                return g_titleMenuAcceptInjected;
+
+            default:
+                return g_targetCsdObserved;
+        }
     }
 
     static bool TrySetTarget(std::string_view token)
@@ -403,7 +452,10 @@ namespace UiLab
                 g_isEnabled = true;
 
                 if ((i + 1) < argc && TrySetTarget(argv[i + 1]))
+                {
                     ++i;
+                    g_routeTargetExplicit = true;
+                }
                 else
                     LOGN_WARNING("SWARD UI Lab: --ui-lab-screen was provided without a known target.");
 
@@ -418,6 +470,8 @@ namespace UiLab
 
                 if (!TrySetTarget(token))
                     LOGFN_WARNING("SWARD UI Lab: unknown screen target '{}'.", std::string(token));
+                else
+                    g_routeTargetExplicit = true;
 
                 continue;
             }
@@ -430,6 +484,8 @@ namespace UiLab
 
                 if (!TrySetTarget(token))
                     LOGFN_WARNING("SWARD UI Lab: unknown screen target '{}'.", std::string(token));
+                else
+                    g_routeTargetExplicit = true;
 
                 continue;
             }
@@ -474,6 +530,51 @@ namespace UiLab
                 continue;
             }
 
+            if (arg == "--ui-lab-native-capture")
+            {
+                g_isEnabled = true;
+                g_nativeFrameCaptureEnabled = true;
+                continue;
+            }
+
+            constexpr std::string_view nativeCapturePrefix = "--ui-lab-native-capture=";
+            if (arg.starts_with(nativeCapturePrefix))
+            {
+                g_isEnabled = true;
+                const auto value = arg.substr(nativeCapturePrefix.size());
+
+                if (IsTruthy(value))
+                    g_nativeFrameCaptureEnabled = true;
+                else if (IsFalsy(value))
+                    g_nativeFrameCaptureEnabled = false;
+                else
+                    LOGFN_WARNING("SWARD UI Lab: unknown native capture value '{}'.", std::string(value));
+
+                continue;
+            }
+
+            if (arg == "--ui-lab-native-capture-dir")
+            {
+                g_isEnabled = true;
+                g_nativeFrameCaptureEnabled = true;
+
+                if ((i + 1) < argc)
+                    g_nativeFrameCaptureDirectory = argv[++i];
+                else
+                    LOGN_WARNING("SWARD UI Lab: --ui-lab-native-capture-dir was provided without a directory.");
+
+                continue;
+            }
+
+            constexpr std::string_view nativeCaptureDirPrefix = "--ui-lab-native-capture-dir=";
+            if (arg.starts_with(nativeCaptureDirPrefix))
+            {
+                g_isEnabled = true;
+                g_nativeFrameCaptureEnabled = true;
+                g_nativeFrameCaptureDirectory = std::string(arg.substr(nativeCaptureDirPrefix.size()));
+                continue;
+            }
+
             if (arg == "--ui-lab-auto-exit")
             {
                 if ((i + 1) < argc)
@@ -494,6 +595,16 @@ namespace UiLab
 
         if (g_isEnabled)
         {
+            if (g_nativeFrameCaptureEnabled && g_nativeFrameCaptureDirectory.empty())
+                g_nativeFrameCaptureDirectory = g_evidenceDirectory;
+
+            if (!g_observerMode && !g_routeTargetExplicit)
+            {
+                g_observerMode = true;
+                g_routeStatus = "capture/evidence observer mode";
+                WriteEvidenceEvent("capture-evidence-observer-mode");
+            }
+
             if (!g_observerMode)
                 RequestRouteToCurrentTarget();
             else
@@ -518,6 +629,12 @@ namespace UiLab
             {
                 LOGFN("SWARD UI Lab evidence directory: {}", g_evidenceDirectory.string());
                 WriteEvidenceEvent("configured");
+            }
+
+            if (g_nativeFrameCaptureEnabled)
+            {
+                LOGFN("SWARD UI Lab native frame capture directory: {}", g_nativeFrameCaptureDirectory.string());
+                WriteEvidenceEvent("native-frame-capture-armed", g_nativeFrameCaptureDirectory.string());
             }
         }
     }
@@ -612,6 +729,8 @@ namespace UiLab
         g_loggedStageHarness = false;
         g_loggedTargetCsdProjectLive = false;
         g_loggedStageTargetCsdBound = false;
+        g_nativeFrameCaptureReserved = false;
+        g_nativeFrameCaptureWritten = false;
         g_lastStageContextDetail.clear();
 
         if (g_target == ScreenId::TitleLoop)
@@ -845,6 +964,67 @@ namespace UiLab
         }
     }
 
+    std::string ConsumeNativeFrameCapturePath(uint32_t width, uint32_t height)
+    {
+        if (!IsNativeFrameCaptureReady())
+            return {};
+
+        if (g_nativeFrameCaptureDirectory.empty())
+        {
+            OnNativeFrameCaptureFailed("native capture directory is empty");
+            return {};
+        }
+
+        g_nativeFrameCaptureReserved = true;
+        ++g_nativeFrameCaptureIndex;
+
+        std::error_code ec;
+        std::filesystem::create_directories(g_nativeFrameCaptureDirectory, ec);
+
+        if (ec)
+        {
+            OnNativeFrameCaptureFailed("failed to create native capture directory: " + ec.message());
+            return {};
+        }
+
+        const auto& target = TargetFor(g_target);
+        std::ostringstream fileName;
+        fileName
+            << "native_frame_"
+            << target.token
+            << "_"
+            << g_nativeFrameCaptureIndex
+            << "_"
+            << width
+            << "x"
+            << height
+            << ".bmp";
+
+        return (g_nativeFrameCaptureDirectory / fileName.str()).string();
+    }
+
+    void OnNativeFrameCaptured(std::string_view path, uint32_t width, uint32_t height)
+    {
+        if (!g_isEnabled)
+            return;
+
+        g_nativeFrameCaptureWritten = true;
+        WriteEvidenceEvent(
+            "native-frame-captured",
+            "path=" + std::string(path) +
+            " width=" + std::to_string(width) +
+            " height=" + std::to_string(height) +
+            " format=B8G8R8A8 bmp=1");
+    }
+
+    void OnNativeFrameCaptureFailed(std::string_view reason)
+    {
+        if (!g_isEnabled)
+            return;
+
+        WriteEvidenceEvent("native-frame-capture-failed", reason);
+    }
+
     void OnLoadingRequest(uint32_t displayType)
     {
         if (!g_isEnabled)
@@ -897,7 +1077,7 @@ namespace UiLab
     {
         directState = false;
 
-        if (!g_isEnabled || !g_routePending || g_titleIntroAcceptInjected)
+        if (!g_isEnabled || g_observerMode || !g_routePending || g_titleIntroAcceptInjected)
             return false;
 
         if (!TargetCanRouteFromTitleIntro(g_target))
@@ -926,6 +1106,7 @@ namespace UiLab
     bool ShouldArmTitleIntroOwnerOutput()
     {
         return g_isEnabled &&
+            !g_observerMode &&
             g_routePolicy == RoutePolicy::DirectContext &&
             TargetShouldRouteThroughLoading(g_target);
     }
@@ -933,6 +1114,7 @@ namespace UiLab
     bool ShouldArmTitleIntroCsdCompletion()
     {
         return g_isEnabled &&
+            !g_observerMode &&
             g_routePolicy == RoutePolicy::DirectContext &&
             (g_target == ScreenId::TitleMenu || g_target == ScreenId::TitleOptions);
     }
@@ -943,7 +1125,7 @@ namespace UiLab
         suppressAccept = false;
         directContext = false;
 
-        if (!g_isEnabled)
+        if (!g_isEnabled || g_observerMode)
             return false;
 
         if (g_target == ScreenId::TitleMenu)
@@ -1058,6 +1240,12 @@ namespace UiLab
             ImGui::Text("Route policy: %s", std::string(RoutePolicyLabel()).c_str());
             ImGui::Text("Presented frames: %llu", static_cast<unsigned long long>(g_presentedFrameCount));
             ImGui::Text("Evidence: %s", g_evidenceDirectory.empty() ? "off" : g_evidenceDirectory.string().c_str());
+            ImGui::Text(
+                "Native capture: %s",
+                !g_nativeFrameCaptureEnabled ? "off" :
+                g_nativeFrameCaptureWritten ? "written" :
+                g_nativeFrameCaptureReserved ? "reserved" :
+                IsNativeFrameCaptureReady() ? "ready" : "waiting");
             ImGui::Text("Startup prompt blockers: %s", ShouldBypassStartupPromptBlockers() ? "bypassed" : "normal");
             ImGui::Separator();
 

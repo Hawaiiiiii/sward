@@ -33,6 +33,8 @@
 #include <sdl_listener.h>
 #include <xxHashMap.h>
 #include <os/process.h>
+#include <filesystem>
+#include <fstream>
 
 #if defined(ASYNC_PSO_DEBUG) || defined(PSO_CACHING)
 #include <magic_enum/magic_enum.hpp>
@@ -2765,6 +2767,132 @@ static void ProcDrawImGui(const RenderCommand& cmd)
     }
 }
 
+struct UiLabNativeFrameCapture
+{
+    std::unique_ptr<RenderBuffer> readbackBuffer;
+    std::string path;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t rowPitch = 0;
+};
+
+static bool WriteUiLabNativeFrameBmp(const UiLabNativeFrameCapture& capture)
+{
+    if (!capture.readbackBuffer || capture.path.empty() || capture.width == 0 || capture.height == 0)
+        return false;
+
+    const auto path = std::filesystem::path(capture.path);
+    std::error_code ec;
+    std::filesystem::create_directories(path.parent_path(), ec);
+
+    if (ec)
+        return false;
+
+    auto* pixels = reinterpret_cast<const uint8_t*>(capture.readbackBuffer->map());
+
+    if (pixels == nullptr)
+        return false;
+
+    constexpr uint32_t fileHeaderSize = 14;
+    constexpr uint32_t dibHeaderSize = 40;
+    const uint32_t tightRowPitch = capture.width * 4;
+    const uint32_t pixelDataSize = tightRowPitch * capture.height;
+    const uint32_t fileSize = fileHeaderSize + dibHeaderSize + pixelDataSize;
+    const int32_t topDownHeight = -static_cast<int32_t>(capture.height);
+
+    std::ofstream out(path, std::ios::binary);
+
+    if (!out)
+    {
+        capture.readbackBuffer->unmap();
+        return false;
+    }
+
+    const uint8_t fileHeader[fileHeaderSize] =
+    {
+        'B', 'M',
+        static_cast<uint8_t>(fileSize),
+        static_cast<uint8_t>(fileSize >> 8),
+        static_cast<uint8_t>(fileSize >> 16),
+        static_cast<uint8_t>(fileSize >> 24),
+        0, 0, 0, 0,
+        static_cast<uint8_t>(fileHeaderSize + dibHeaderSize),
+        0, 0, 0
+    };
+
+    out.write(reinterpret_cast<const char*>(fileHeader), sizeof(fileHeader));
+
+    auto writeU16 = [&](uint16_t value)
+    {
+        out.put(static_cast<char>(value));
+        out.put(static_cast<char>(value >> 8));
+    };
+
+    auto writeU32 = [&](uint32_t value)
+    {
+        out.put(static_cast<char>(value));
+        out.put(static_cast<char>(value >> 8));
+        out.put(static_cast<char>(value >> 16));
+        out.put(static_cast<char>(value >> 24));
+    };
+
+    auto writeI32 = [&](int32_t value)
+    {
+        writeU32(static_cast<uint32_t>(value));
+    };
+
+    writeU32(dibHeaderSize);
+    writeI32(static_cast<int32_t>(capture.width));
+    writeI32(topDownHeight);
+    writeU16(1);
+    writeU16(32);
+    writeU32(0);
+    writeU32(pixelDataSize);
+    writeI32(2835);
+    writeI32(2835);
+    writeU32(0);
+    writeU32(0);
+
+    for (uint32_t y = 0; y < capture.height; ++y)
+        out.write(reinterpret_cast<const char*>(pixels + y * capture.rowPitch), tightRowPitch);
+
+    capture.readbackBuffer->unmap();
+    return out.good();
+}
+
+static bool QueueUiLabNativeFrameCapture(
+    RenderCommandList* commandList,
+    RenderTexture* texture,
+    uint32_t width,
+    uint32_t height,
+    RenderTextureLayout restoreLayout,
+    UiLabNativeFrameCapture& capture)
+{
+    const auto path = UiLab::ConsumeNativeFrameCapturePath(width, height);
+
+    if (path.empty())
+        return false;
+
+    capture.path = path;
+    capture.width = width;
+    capture.height = height;
+    capture.rowPitch = (width * 4 + PITCH_ALIGNMENT - 1) & ~(PITCH_ALIGNMENT - 1);
+    const uint32_t slicePitch = capture.rowPitch * height;
+    capture.readbackBuffer = g_device->createBuffer(RenderBufferDesc::ReadbackBuffer(slicePitch));
+
+    commandList->barriers(
+        RenderBarrierStage::GRAPHICS | RenderBarrierStage::COPY,
+        RenderTextureBarrier(texture, RenderTextureLayout::COPY_SOURCE));
+    commandList->copyTextureRegion(
+        RenderTextureCopyLocation::PlacedFootprint(capture.readbackBuffer.get(), BACKBUFFER_FORMAT, width, height, 1, capture.rowPitch / 4, 0),
+        RenderTextureCopyLocation::Subresource(texture, 0));
+    commandList->barriers(
+        RenderBarrierStage::GRAPHICS | RenderBarrierStage::COPY,
+        RenderTextureBarrier(texture, restoreLayout));
+
+    return true;
+}
+
 // We have to check for this to properly handle the following situation:
 // 1. Wait on swap chain.
 // 2. Create loading thread.
@@ -2901,6 +3029,8 @@ static void SetRootDescriptor(const UploadAllocation& allocation, size_t index)
 
 static void ProcExecuteCommandList(const RenderCommand& cmd)
 {    
+    UiLabNativeFrameCapture uiLabNativeFrameCapture;
+
     if (g_swapChainValid)
     {
         auto swapChainTexture = g_swapChain->getTexture(g_backBufferIndex);
@@ -2969,12 +3099,33 @@ static void ProcExecuteCommandList(const RenderCommand& cmd)
             commandList->setViewports(RenderViewport(0.0f, 0.0f, g_swapChain->getWidth(), g_swapChain->getHeight()));
             commandList->setScissors(RenderRect(0, 0, g_swapChain->getWidth(), g_swapChain->getHeight()));
             commandList->drawInstanced(6, 1, 0, 0);
-            commandList->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(swapChainTexture, RenderTextureLayout::PRESENT));
+
+            if (!QueueUiLabNativeFrameCapture(
+                commandList.get(),
+                swapChainTexture,
+                g_swapChain->getWidth(),
+                g_swapChain->getHeight(),
+                RenderTextureLayout::PRESENT,
+                uiLabNativeFrameCapture))
+            {
+                commandList->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(swapChainTexture, RenderTextureLayout::PRESENT));
+            }
         }
         else
         {
-            AddBarrier(g_backBuffer, RenderTextureLayout::PRESENT);
-            FlushBarriers();
+            const bool queuedNativeFrameCapture = QueueUiLabNativeFrameCapture(
+                g_commandLists[g_frame].get(),
+                g_backBuffer->texture,
+                g_swapChain->getWidth(),
+                g_swapChain->getHeight(),
+                RenderTextureLayout::PRESENT,
+                uiLabNativeFrameCapture);
+
+            if (!queuedNativeFrameCapture)
+            {
+                AddBarrier(g_backBuffer, RenderTextureLayout::PRESENT);
+                FlushBarriers();
+            }
         }
     }
 
@@ -2997,6 +3148,23 @@ static void ProcExecuteCommandList(const RenderCommand& cmd)
     else
     {
         g_queue->executeCommandLists(commandList.get(), g_commandFences[g_frame].get());
+    }
+
+    if (uiLabNativeFrameCapture.readbackBuffer)
+    {
+        g_queue->waitForCommandFence(g_commandFences[g_frame].get());
+
+        if (WriteUiLabNativeFrameBmp(uiLabNativeFrameCapture))
+        {
+            UiLab::OnNativeFrameCaptured(
+                uiLabNativeFrameCapture.path,
+                uiLabNativeFrameCapture.width,
+                uiLabNativeFrameCapture.height);
+        }
+        else
+        {
+            UiLab::OnNativeFrameCaptureFailed("failed to write native backbuffer BMP");
+        }
     }
 
     g_commandListStates[g_frame] = true;

@@ -14,6 +14,7 @@ param(
     [int]$SnapshotIntervalSeconds = 10,
     [ValidateSet("input", "direct-context")]
     [string]$RoutePolicy = "direct-context",
+    [bool]$NativeCapture = $true,
     [bool]$NormalizeWindow = $true,
     [switch]$Observer,
     [switch]$HideOverlay,
@@ -306,6 +307,79 @@ function Wait-UiLabEvidenceEvents([string]$Target, [string]$EventsPath, [int]$Ti
     return $checks
 }
 
+function Get-UiLabNativeFrameCapture([string]$EventsPath) {
+    if (-not (Test-Path -LiteralPath $EventsPath)) {
+        return $null
+    }
+
+    $nativeCapture = $null
+
+    foreach ($line in Get-Content -LiteralPath $EventsPath) {
+        if ([string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+
+        try {
+            $event = $line | ConvertFrom-Json
+        }
+        catch {
+            continue
+        }
+
+        if ($event.event -ne "native-frame-captured") {
+            continue
+        }
+
+        $detail = [string]$event.detail
+        $path = $null
+        $width = $null
+        $height = $null
+
+        if ($detail -match "path=(.*?) width=") {
+            $path = $Matches[1]
+        }
+
+        if ($detail -match "width=([0-9]+)") {
+            $width = [int]$Matches[1]
+        }
+
+        if ($detail -match "height=([0-9]+)") {
+            $height = [int]$Matches[1]
+        }
+
+        $nativeCapture = [ordered]@{
+            path = $path
+            width = $width
+            height = $height
+            exists = if ($path) { Test-Path -LiteralPath $path } else { $false }
+            detail = $detail
+        }
+    }
+
+    return $nativeCapture
+}
+
+function Wait-UiLabNativeFrameCapture([string]$EventsPath, [int]$TimeoutSeconds, [System.Diagnostics.Process]$Process = $null) {
+    $timeout = [Math]::Max(0, $TimeoutSeconds)
+    $deadline = (Get-Date).AddSeconds($timeout)
+    $nativeCapture = Get-UiLabNativeFrameCapture $EventsPath
+
+    while (($null -eq $nativeCapture -or -not $nativeCapture.exists) -and (Get-Date) -lt $deadline) {
+        if ($null -ne $Process) {
+            $Process.Refresh()
+
+            if ($Process.HasExited) {
+                break
+            }
+        }
+
+        Start-Sleep -Milliseconds 500
+        $nativeCapture = Get-UiLabNativeFrameCapture $EventsPath
+    }
+
+    return $nativeCapture
+}
+
 $exe = Resolve-InRepo $ExePath
 $install = Resolve-InRepo $InstallRoot
 $output = Resolve-InRepo $OutputRoot
@@ -369,6 +443,11 @@ foreach ($target in $expandedTargets) {
         $args += @("--ui-lab-overlay", "off")
     }
 
+    if ($NativeCapture) {
+        $args += @("--ui-lab-native-capture")
+        $args += @("--ui-lab-native-capture-dir", $targetDir)
+    }
+
     if (-not $KeepRunning -and $AutoExitSeconds -gt 0) {
         $args += @("--ui-lab-auto-exit", "$AutoExitSeconds")
     }
@@ -388,6 +467,8 @@ foreach ($target in $expandedTargets) {
     $captureError = $null
     $evidenceReady = $false
     $lateCaptureReason = "fixed-delay"
+    $nativeFrameCapture = $null
+    $skipLateWindowCapture = $false
 
     try {
         if (-not $process.HasExited) {
@@ -435,7 +516,17 @@ foreach ($target in $expandedTargets) {
             }
         }
 
-        if (-not $process.HasExited) {
+        if ($NativeCapture) {
+            $nativeWaitSeconds = if ($evidenceReady) { [Math]::Max(1, $PostEvidenceDelaySeconds) } else { [Math]::Max(1, $SecondCaptureDelaySeconds) }
+            $nativeFrameCapture = Wait-UiLabNativeFrameCapture $eventsPath $nativeWaitSeconds $process
+
+            if ($null -ne $nativeFrameCapture -and $nativeFrameCapture.exists) {
+                $lateCaptureReason = "native-frame-captured"
+                $skipLateWindowCapture = $true
+            }
+        }
+
+        if (-not $skipLateWindowCapture -and -not $process.HasExited) {
             Capture-Window $handle $lateShot $process.Id
         }
     }
@@ -458,6 +549,9 @@ foreach ($target in $expandedTargets) {
     }
 
     $evidenceChecks = Test-UiLabEvidenceEvents $target $eventsPath
+    if ($null -eq $nativeFrameCapture) {
+        $nativeFrameCapture = Get-UiLabNativeFrameCapture $eventsPath
+    }
     $records += [ordered]@{
         target = $target
         args = $args
@@ -474,6 +568,7 @@ foreach ($target in $expandedTargets) {
         evidenceReady = $evidenceReady
         lateCaptureReason = $lateCaptureReason
         evidenceChecks = $evidenceChecks
+        nativeFrameCapture = $nativeFrameCapture
     }
 
     if ($evidenceChecks.passed) {

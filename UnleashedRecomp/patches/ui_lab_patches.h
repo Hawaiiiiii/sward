@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace UiLab
@@ -86,6 +87,9 @@ namespace UiLab
         bool menuField9A);
     void OnStageExitLoading(uint32_t gameModeStageAddress = 0);
     void OnPresentedFrame();
+    std::string ConsumeNativeFrameCapturePath(uint32_t width, uint32_t height);
+    void OnNativeFrameCaptured(std::string_view path, uint32_t width, uint32_t height);
+    void OnNativeFrameCaptureFailed(std::string_view reason);
     void OnLoadingRequest(uint32_t displayType);
     void OnLoadingUpdate(uint32_t displayType);
     void OnCsdProjectMade(std::string_view projectName);

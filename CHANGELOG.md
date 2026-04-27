@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 106 Native UI Lab capture and passive evidence safety
+
+- added real-runtime native backbuffer capture for the UI Lab, writing local-only top-down 32-bit BMP frames from the GPU readback path instead of relying only on Windows window screenshots
+- added `--ui-lab-native-capture` and `--ui-lab-native-capture-dir` plus capture-helper manifest reporting for native frame evidence
+- fixed D3D12/Vulkan placed-footprint readback handling used by native capture, including Vulkan image-to-buffer copies and D3D12 sample-position handling when the copy destination is a buffer
+- made capture/evidence-only UI Lab launches passive by default: `--ui-lab-evidence-dir` and `--ui-lab-native-capture` no longer route-force the default title target unless a screen target is explicitly requested
+- verified a passive capture-only launch logs `capture/evidence observer mode` with no `route-requested` event, and re-verified an explicit `sonic-hud` route still captures a real Miles Electric loading/tutorial frame through the generated UnleashedRecomp runtime
+
 ### Phase 105 Runtime UI Lab evidence-gated capture
 
 - changed `capture_unleashed_recomp_ui_lab.ps1` to default to direct-context routing and a long-enough early-game auto-exit window for normal Sonic HUD captures
