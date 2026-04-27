@@ -7,11 +7,13 @@ param(
     [string]$OutputRoot = "out\ui_lab_runtime_evidence",
     [int]$InitialWaitSeconds = 8,
     [int]$SecondCaptureDelaySeconds = 3,
-    [int]$AutoExitSeconds = 16,
+    [int]$AutoExitSeconds = 45,
+    [int]$PostEvidenceDelaySeconds = 1,
+    [int]$StagePostEvidenceDelaySeconds = 8,
     [int]$ObserveSeconds = 0,
     [int]$SnapshotIntervalSeconds = 10,
     [ValidateSet("input", "direct-context")]
-    [string]$RoutePolicy = "input",
+    [string]$RoutePolicy = "direct-context",
     [bool]$NormalizeWindow = $true,
     [switch]$Observer,
     [switch]$HideOverlay,
@@ -52,6 +54,12 @@ public static class UiLabNative
 
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -105,7 +113,19 @@ function Test-BitmapHasSignal([System.Drawing.Bitmap]$Bitmap) {
     return $unique.Count -gt 4 -or $nonDark -gt 2
 }
 
-function Capture-Window([IntPtr]$Handle, [string]$Path) {
+function Test-ForegroundBelongsToProcess([int]$ProcessId) {
+    $foregroundHandle = [UiLabNative]::GetForegroundWindow()
+
+    if ($foregroundHandle -eq [IntPtr]::Zero) {
+        return $false
+    }
+
+    $foregroundProcessId = 0
+    [UiLabNative]::GetWindowThreadProcessId($foregroundHandle, [ref]$foregroundProcessId) | Out-Null
+    return $foregroundProcessId -eq $ProcessId
+}
+
+function Capture-Window([IntPtr]$Handle, [string]$Path, [int]$ProcessId) {
     if ($Handle -eq [IntPtr]::Zero) {
         throw "Cannot capture screenshot because the process has no window handle."
     }
@@ -146,6 +166,10 @@ function Capture-Window([IntPtr]$Handle, [string]$Path) {
         }
 
         if (-not $printed -or -not (Test-BitmapHasSignal $bitmap)) {
+            if (-not (Test-ForegroundBelongsToProcess $ProcessId)) {
+                throw "PrintWindow did not produce a usable frame and the UI Lab window is not foreground; refusing desktop fallback."
+            }
+
             $graphics.Clear([System.Drawing.Color]::Black)
             $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bitmap.Size)
         }
@@ -206,6 +230,82 @@ function Get-UiLabTargetSet([string]$Name) {
     }
 }
 
+function Get-UiLabRequiredEvents([string]$Target) {
+    switch ($Target) {
+        "title-loop" {
+            return @("target-csd-project-made")
+        }
+        "title-menu" {
+            return @("target-csd-project-made", "title-menu-reached")
+        }
+        "title-options" {
+            return @("target-csd-project-made", "title-options-accept-injected")
+        }
+        "loading" {
+            return @("target-csd-project-made", "loading-requested", "loading-display-active")
+        }
+        "sonic-hud" {
+            return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound")
+        }
+        default {
+            return @("first-presented-frame")
+        }
+    }
+}
+
+function Test-UiLabEvidenceEvents([string]$Target, [string]$EventsPath) {
+    $requiredEvents = @(Get-UiLabRequiredEvents $Target)
+    $observedEvents = New-Object "System.Collections.Generic.HashSet[string]"
+
+    if (Test-Path -LiteralPath $EventsPath) {
+        foreach ($line in Get-Content -LiteralPath $EventsPath) {
+            if ([string]::IsNullOrWhiteSpace($line)) {
+                continue
+            }
+
+            try {
+                $event = $line | ConvertFrom-Json
+                if ($event.event) {
+                    [void]$observedEvents.Add([string]$event.event)
+                }
+            }
+            catch {
+                [void]$observedEvents.Add("unparseable-jsonl-line")
+            }
+        }
+    }
+
+    $missingEvents = @($requiredEvents | Where-Object { -not $observedEvents.Contains($_) })
+
+    return [ordered]@{
+        requiredEvents = $requiredEvents
+        observedEvents = @($observedEvents | Sort-Object)
+        missingEvents = $missingEvents
+        passed = $missingEvents.Count -eq 0
+    }
+}
+
+function Wait-UiLabEvidenceEvents([string]$Target, [string]$EventsPath, [int]$TimeoutSeconds, [System.Diagnostics.Process]$Process = $null) {
+    $timeout = [Math]::Max(0, $TimeoutSeconds)
+    $deadline = (Get-Date).AddSeconds($timeout)
+    $checks = Test-UiLabEvidenceEvents $Target $EventsPath
+
+    while (-not $checks.passed -and (Get-Date) -lt $deadline) {
+        if ($null -ne $Process) {
+            $Process.Refresh()
+
+            if ($Process.HasExited) {
+                break
+            }
+        }
+
+        Start-Sleep -Milliseconds 500
+        $checks = Test-UiLabEvidenceEvents $Target $EventsPath
+    }
+
+    return $checks
+}
+
 $exe = Resolve-InRepo $ExePath
 $install = Resolve-InRepo $InstallRoot
 $output = Resolve-InRepo $OutputRoot
@@ -250,6 +350,7 @@ foreach ($target in $expandedTargets) {
     $safeTarget = $target -replace "[^A-Za-z0-9_.-]", "_"
     $targetDir = Join-Path $sessionDir $safeTarget
     New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+    $eventsPath = Join-Path $targetDir "ui_lab_events.jsonl"
 
     $args = @(
         "--use-cwd",
@@ -285,10 +386,12 @@ foreach ($target in $expandedTargets) {
     $lateShot = Join-Path $targetDir "screen_late.png"
     $snapshots = @()
     $captureError = $null
+    $evidenceReady = $false
+    $lateCaptureReason = "fixed-delay"
 
     try {
         if (-not $process.HasExited) {
-            Capture-Window $handle $earlyShot
+            Capture-Window $handle $earlyShot $process.Id
         }
 
         if ($ObserveSeconds -gt 0) {
@@ -299,16 +402,41 @@ foreach ($target in $expandedTargets) {
                 Start-Sleep -Seconds ([Math]::Max(1, $SnapshotIntervalSeconds))
                 $snapshotIndex += 1
                 $snapshotPath = Join-Path $targetDir ("screen_observe_{0:D3}.png" -f $snapshotIndex)
-                Capture-Window $handle $snapshotPath
+                Capture-Window $handle $snapshotPath $process.Id
                 $snapshots += $snapshotPath
             }
         }
         else {
-            Start-Sleep -Seconds $SecondCaptureDelaySeconds
+            if (-not $Observer) {
+                $maxEvidenceWaitSeconds = [Math]::Max(0, $SecondCaptureDelaySeconds)
+
+                if ($AutoExitSeconds -gt 0) {
+                    $remainingWindowSeconds = $AutoExitSeconds - $InitialWaitSeconds - 2
+                    $maxEvidenceWaitSeconds = [Math]::Max($maxEvidenceWaitSeconds, $remainingWindowSeconds)
+                }
+
+                $waitedEvidence = Wait-UiLabEvidenceEvents $target $eventsPath $maxEvidenceWaitSeconds $process
+                $evidenceReady = $waitedEvidence.passed
+
+                if ($evidenceReady) {
+                    $lateCaptureReason = "required-events-observed"
+                    $settleSeconds = if ($stageTargets -contains $target) { $StagePostEvidenceDelaySeconds } else { $PostEvidenceDelaySeconds }
+
+                    if ($settleSeconds -gt 0) {
+                        Start-Sleep -Seconds $settleSeconds
+                    }
+                }
+                else {
+                    $lateCaptureReason = "required-events-timeout"
+                }
+            }
+            else {
+                Start-Sleep -Seconds $SecondCaptureDelaySeconds
+            }
         }
 
         if (-not $process.HasExited) {
-            Capture-Window $handle $lateShot
+            Capture-Window $handle $lateShot $process.Id
         }
     }
     catch {
@@ -329,7 +457,7 @@ foreach ($target in $expandedTargets) {
         $stopped = $true
     }
 
-    $eventsPath = Join-Path $targetDir "ui_lab_events.jsonl"
+    $evidenceChecks = Test-UiLabEvidenceEvents $target $eventsPath
     $records += [ordered]@{
         target = $target
         args = $args
@@ -343,6 +471,16 @@ foreach ($target in $expandedTargets) {
         processId = $process.Id
         exitCode = if ($process.HasExited) { $process.ExitCode } else { $null }
         captureError = $captureError
+        evidenceReady = $evidenceReady
+        lateCaptureReason = $lateCaptureReason
+        evidenceChecks = $evidenceChecks
+    }
+
+    if ($evidenceChecks.passed) {
+        Write-Host "[$target] evidence PASS"
+    }
+    else {
+        Write-Warning "[$target] evidence missing: $($evidenceChecks.missingEvents -join ', ')"
     }
 }
 

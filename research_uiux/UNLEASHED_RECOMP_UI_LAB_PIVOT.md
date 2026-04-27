@@ -71,13 +71,14 @@ Implemented now:
 - target-CSD observation state in the UI Lab overlay and JSONL evidence, including `target-csd-project-made` and `stage-target-csd-bound` events when the selected CSD project is created after a real stage context is observed
 - `CGameModeStage::ExitLoading` evidence now records the guest stage context address plus selected target, requested stage token, target CSD name, and whether the target CSD has already been observed
 - a local capture helper at `research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1` that launches the generated runtime, normalizes the window, prefers `PrintWindow` capture before screen-copy fallback, captures screenshots, supports long observation snapshots, supports a `-KeepRunning` manual-operator mode, defaults to an `early-game` target set (`title-loop`, `title-menu`, `title-options`, `loading`, `sonic-hud`), and writes a manifest under ignored `out/ui_lab_runtime_evidence/`
+- the capture helper now defaults to `direct-context` routing for early-game alpha captures, validates required target evidence before reporting success, refuses desktop screenshot fallback when the foreground window is not the UI Lab process, and waits for required runtime events before taking late screenshots
 - a passive observer launch path via `--ui-lab-observer` / capture-helper `-Observer`, which records the normal runtime without route forcing or lab-only startup prompt bypasses
 - optional overlay hiding via `--ui-lab-overlay off` / capture-helper `-HideOverlay`, so manual evidence captures can show the real game frame cleanly while JSONL evidence continues in the background
 - direct title-intro state requests from the translated `sub_825811C8` field contract (`context+0x180` requested state and `context+0x181` dirty flag), used by the experimental direct-context policy instead of synthetic Start at the first route gate
 - direct title-menu entry via the real title CSD completion byte (`CSD scene +84`) while keeping the title owner-output bridge (`title context +0x1D1`) off for menu-only routes
 - owner-output arming remains enabled for loading/stage-required targets, where the intended behavior is to leave the title owner and enter the real loading path
 - title-menu context evidence from the translated runtime state, including context owner/pointer fields, phase/flag fields, and title-menu cursor/transition/select booleans
-- an experimental direct-context route policy that latches `CTitleMenu` cursor/selection/transition fields for title-menu-to-loading routing without synthetic A/Start input; the default remains `input` until captures prove the direct path across more screens
+- an experimental direct-context route policy that latches `CTitleMenu` cursor/selection/transition fields for title-menu-to-loading routing without synthetic A/Start input; the capture helper now uses this policy by default for the early-game alpha while the runtime still accepts the older `input` policy for comparison captures
 - generated-clone sync in `build_unleashed_recomp_ui_lab.ps1`, so tracked UI Lab files are copied into `local_build_env/ur103clean` before each build
 - regression tests that guard the runtime-lab contract
 
@@ -98,6 +99,7 @@ Verification note:
 - A `sonic-hud` / `extra-stage-hud` direct-context capture under `out/ui_lab_runtime_evidence/20260427_074626/` corrected the gameplay-HUD split:
   - `sonic-hud` targets `ui_playscreen`, observed `CGameModeStage::ExitLoading`, then produced `target-csd-project-made detail="ui_playscreen"` and `stage-target-csd-bound detail="target_csd=ui_playscreen stage_context=1"`.
   - `extra-stage-hud` targets `ui_prov_playscreen`, observed `CGameModeStage::ExitLoading`, but the current direct-context route still produced `ui_playscreen` instead of `ui_prov_playscreen`.
+- A focused `sonic-hud` capture under `out/ui_lab_runtime_evidence/20260427_104240/` proved the evidence-gated late-capture path: `evidenceReady=true`, `lateCaptureReason="required-events-observed"`, required events `stage-context-observed`, `target-csd-project-made`, and `stage-target-csd-bound` all passed, and the late screenshot showed the real runtime Sonic HUD over the stage after the `ui_playscreen` bind.
 - Therefore the normal Sonic HUD route is now real-runtime CSD-bound, while the remaining `ui_prov_playscreen` blocker is deterministic Extra/Tornado stage owner selection rather than generic stage-context observation.
 
 Current alpha focus:
@@ -121,10 +123,10 @@ The UI Lab now has a basic evidence loop:
 1. Launch the real generated UnleashedRecomp runtime with `--ui-lab-screen <target>`.
 2. Enable JSONL evidence with `--ui-lab-evidence-dir <ignored local dir>`.
 3. Let the real runtime present frames, attach translated title/menu hooks, and route through real state transitions.
-4. Capture early/late screenshots, optional periodic observation screenshots, and `ui_lab_events.jsonl` into `out/ui_lab_runtime_evidence/<timestamp>/<target>/`.
+4. Capture an early screenshot, wait for the target's required JSONL evidence events, then capture the late screenshot after a short settle delay.
 5. For manual sessions, launch with `-KeepRunning` so the process remains alive while the operator moves screen to screen and evidence continues accumulating.
 6. For manual observer sessions, prefer `-Observer -HideOverlay -KeepRunning`: this runs the real installed runtime as normally as possible, keeps the lab from forcing routes, hides the side panel, and still records CSD/loading/frame evidence.
-7. Use those screenshots and events as the next debugging oracle instead of guessing from the standalone renderer.
+7. Treat `evidenceChecks.passed`, `evidenceReady`, `lateCaptureReason`, screenshots, and events as the next debugging oracle instead of guessing from the standalone renderer.
 
 This does not mean every target is deterministic yet. The normal Sonic HUD can now reach and bind the real `ui_playscreen` project through the runtime, but the `ui_prov_playscreen` path is a different Extra/Tornado-family owner. The next hard blocker is selecting that owner deterministically instead of drawing another clean-room approximation of the HUD.
 

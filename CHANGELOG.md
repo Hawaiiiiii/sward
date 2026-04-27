@@ -11,6 +11,14 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 
 ## 2026-04-27
 
+### Phase 105 Runtime UI Lab evidence-gated capture
+
+- changed `capture_unleashed_recomp_ui_lab.ps1` to default to direct-context routing and a long-enough early-game auto-exit window for normal Sonic HUD captures
+- added per-target required-event validation for the early-game alpha targets, including `title-options-accept-injected`, `target-csd-project-made`, and `stage-target-csd-bound`
+- replaced blind late screenshot timing with an evidence-gated wait plus a stage settle delay so `sonic-hud` captures wait for the real `ui_playscreen` bind before taking the late frame
+- hardened screenshot capture by refusing desktop fallback when the foreground window does not belong to the UI Lab process
+- capture-checked `sonic-hud` and verified the late frame shows the real runtime Sonic HUD over the stage after evidence passes
+
 ### Phase 104 Runtime UI Lab early-game alpha scope
 
 - added a first-class `title-options` UI Lab target for the visible title-menu options path

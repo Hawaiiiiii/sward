@@ -77,6 +77,23 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn('@("title-loop", "title-menu", "title-options", "loading", "sonic-hud")', script)
         self.assertIn('"all"', script)
 
+    def test_ui_lab_capture_helper_validates_early_game_alpha_routes(self):
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+
+        self.assertIn('[string]$RoutePolicy = "direct-context"', script)
+        self.assertIn("Get-UiLabRequiredEvents", script)
+        self.assertIn("Test-UiLabEvidenceEvents", script)
+        self.assertIn("Wait-UiLabEvidenceEvents", script)
+        self.assertIn("StagePostEvidenceDelaySeconds", script)
+        self.assertIn('"title-options-accept-injected"', script)
+        self.assertIn('"stage-target-csd-bound"', script)
+        self.assertIn('"target-csd-project-made"', script)
+        self.assertIn("evidenceChecks =", script)
+        self.assertIn("evidenceReady =", script)
+        self.assertIn("lateCaptureReason =", script)
+        self.assertIn("missingEvents =", script)
+        self.assertIn("passed =", script)
+
     def test_ui_lab_hooks_existing_title_runtime_states(self):
         intro = self.read("UnleashedRecomp/patches/CTitleStateIntro_patches.cpp")
         menu = self.read("UnleashedRecomp/patches/CTitleStateMenu_patches.cpp")
@@ -241,6 +258,9 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("PrintWindow", script)
         self.assertIn("CopyFromScreen", script)
+        self.assertIn("GetForegroundWindow", script)
+        self.assertIn("GetWindowThreadProcessId", script)
+        self.assertIn("Test-ForegroundBelongsToProcess", script)
         self.assertIn("GetWindowRect", script)
         self.assertIn("Test-BitmapHasSignal", script)
         self.assertIn("ProcessStartInfo", script)
