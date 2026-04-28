@@ -61,6 +61,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - a Phase 122 SGFX template catalog that packages real-runtime evidence into reusable title/loading/HUD/tutorial state-machine recipes with Sonic placeholder assets now and custom SGFX art later, without shipping extracted Sonic assets
 - a Phase 123 SGFX template-driven placeholder renderer path where those recipes select Sonic placeholder screens, bind local asset slots, and expose first timing hooks for `title-menu`, `loading`, `sonic-hud`, and `tutorial`
 - a Phase 132 CSD compare renderer path where ignored local layout evidence preserves packed RGBA keyframes, Color/Gradient channels sample into real RGBA values, offscreen CSD frames render through a software ARGB quad compositor, and native BMP comparison writes full-frame plus UI-layer coverage diff BMPs
+- a Phase 133 Sonic HUD archaeology path where the compare renderer reads the latest live-bridge `sonic-hud` state, proves runtime `ui_playscreen` scene coverage, labels the local `ui_prov_playscreen.yncp` HUD renderer as a proxy while exact `ui_playscreen.yncp` remains unrecovered, and emits scene/cast coverage diagnostics beside the native BMP oracle
 
 Contents:
 

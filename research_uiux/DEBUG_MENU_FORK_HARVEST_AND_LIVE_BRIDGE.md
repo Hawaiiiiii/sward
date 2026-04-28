@@ -303,6 +303,12 @@ Local-only evidence, not committed:
   - `title-menu`, `title-options`, and `sonic-hud` used foreground-verified scan-code control automation with `sendInputFailureCount=0`
   - best native routes were `title menu visual ready`, `title options accept injected`, `loading display active`, and `stage target ready`, all with RGB-nonblack BMP evidence
 
+- `out/ui_lab_runtime_evidence/20260428_115131/`
+  - Phase 133 Sonic HUD archaeology read the latest `sonic-hud/ui_lab_live_state.json` through the sidecar compare lane
+  - live bridge evidence reported runtime `ui_playscreen`, `13` scenes, `2` nodes, `209` layers, and `stageReadyFrame=721`
+  - owner-path evidence stayed consistent with Phase 121: raw `CHudSonicStage` owner is live, fork-header owner slots are still pending, and resolved scene ownership comes from `CCsdProject::Make`
+  - local renderer diagnostics now mark `ui_prov_playscreen.yncp` as a proxy and list missing local runtime scenes instead of treating the current Sonic HUD sidecar frame as exact
+
 - `out/ui_lab_runtime_evidence/20260428_011255/`
   - focused Phase 120 `sonic-hud` live-bridge/native capture passed on the final raw-owner hook build
   - JSONL emitted `sonic-hud-owner-hooked` with `owner_fields_ready=0`, proving the raw `CHudSonicStage` owner pointer while keeping embedded CSD owner fields marked pending

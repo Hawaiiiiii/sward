@@ -390,6 +390,63 @@ struct CsdMaterialParityTriage
     double sampledVsFullFrameGap = 0.0;
 };
 
+struct CsdHudRuntimeSceneEntry
+{
+    std::string path;
+    std::string sceneName;
+    int castCount = 0;
+    int frame = 0;
+};
+
+struct CsdHudRuntimeSceneEvidence
+{
+    bool found = false;
+    std::filesystem::path liveStatePath;
+    std::string runtimeProject;
+    std::string localLayoutFileName;
+    std::string localProject;
+    std::string localSceneName;
+    std::string layoutStatus = "missing-live-state";
+    std::string ownerPathStatus = "unknown";
+    std::string ownerFieldMaturationStatus = "unknown";
+    bool rawOwnerKnown = false;
+    bool rawOwnerFieldsReady = false;
+    bool resolvedFromCsdProjectTree = false;
+    int stageReadyFrame = 0;
+    int runtimeSceneCount = 0;
+    int runtimeNodeCount = 0;
+    int runtimeLayerCount = 0;
+    std::vector<CsdHudRuntimeSceneEntry> runtimeScenes;
+};
+
+struct CsdHudSceneCoverageDiagnostic
+{
+    std::string sceneName;
+    std::string runtimePath;
+    std::string sgfxSlotLabel;
+    int runtimeCastCount = 0;
+    int localCommandCount = 0;
+    int localCoveredPixels = 0;
+    double localCoverageRatio = 0.0;
+    bool runtimeSceneMatched = false;
+    bool locallyRendered = false;
+};
+
+struct CsdHudCastCoverageDiagnostic
+{
+    std::string sceneName;
+    std::string castName;
+    std::string textureName;
+    std::string sgfxSlotLabel;
+    int destinationX = 0;
+    int destinationY = 0;
+    int destinationWidth = 0;
+    int destinationHeight = 0;
+    int localCoveredPixels = 0;
+    int nativeNonBlackPixels = 0;
+    double nativeOverlapRatio = 0.0;
+};
+
 struct CsdRenderedFrameComparison
 {
     std::string templateId;
@@ -428,6 +485,9 @@ struct CsdRenderedFrameComparison
     std::vector<std::string> sgfxSlots;
     BitmapComparisonStats visualDelta;
     CsdMaterialParityTriage materialTriage;
+    CsdHudRuntimeSceneEvidence sonicHudRuntimeScene;
+    std::vector<CsdHudSceneCoverageDiagnostic> sonicHudSceneCoverage;
+    std::vector<CsdHudCastCoverageDiagnostic> sonicHudCastCoverage;
 };
 
 struct CsdSamplerStats
@@ -1092,6 +1152,19 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     {
         return std::nullopt;
     }
+}
+
+[[nodiscard]] std::optional<bool> jsonBoolField(std::string_view text, std::string_view fieldName)
+{
+    const auto valueOffset = findJsonFieldValueOffset(text, fieldName);
+    if (!valueOffset)
+        return std::nullopt;
+
+    if (text.substr(*valueOffset, 4) == "true")
+        return true;
+    if (text.substr(*valueOffset, 5) == "false")
+        return false;
+    return std::nullopt;
 }
 
 [[nodiscard]] std::optional<std::string_view> jsonArrayFieldSpan(std::string_view text, std::string_view fieldName)
@@ -5289,6 +5362,361 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return renderCsdOffscreenFrameWithCoverageMask(scene, playback, renderer, sampledCommandCount, renderStats, coverageMask);
 }
 
+[[nodiscard]] std::string projectNameFromLayoutFileName(std::string_view layoutFileName)
+{
+    std::string project(layoutFileName);
+    const auto slash = project.find_last_of("/\\");
+    if (slash != std::string::npos)
+        project = project.substr(slash + 1);
+    const auto dot = project.find_last_of('.');
+    if (dot != std::string::npos)
+        project = project.substr(0, dot);
+    return project;
+}
+
+[[nodiscard]] std::string sceneLeafNameFromRuntimePath(std::string_view runtimePath, std::string_view runtimeProject)
+{
+    const std::string path(runtimePath);
+    const std::string projectPrefix = std::string(runtimeProject) + "/";
+    if (path.starts_with(projectPrefix))
+        return path.substr(projectPrefix.size());
+    const auto slash = path.find('/');
+    return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+[[nodiscard]] bool layoutEvidenceContainsFile(std::string_view layoutFileName)
+{
+    return loadCsdPipelineEvidence(layoutFileName).has_value();
+}
+
+[[nodiscard]] std::string sonicHudSlotLabelForScene(std::string_view sceneName)
+{
+    if (sceneName.find("so_speed_gauge") != std::string_view::npos)
+        return "speed_gauge";
+    if (sceneName.find("so_ringenagy_gauge") != std::string_view::npos)
+        return "energy_gauge";
+    if (sceneName.find("ring_count") != std::string_view::npos || sceneName.find("ring_get") != std::string_view::npos)
+        return "ring_counter";
+    if (sceneName.find("gauge_frame") != std::string_view::npos)
+        return "side_panel";
+    if (sceneName.find("u_info") != std::string_view::npos)
+        return "prompt_strip";
+    if (sceneName.find("player_count") != std::string_view::npos)
+        return "life_icon";
+    if (sceneName.find("time_count") != std::string_view::npos)
+        return "timer";
+    if (sceneName.find("score_count") != std::string_view::npos)
+        return "score_counter";
+    if (sceneName.find("exp_count") != std::string_view::npos)
+        return "experience_counter";
+    if (sceneName.find("medal_get") != std::string_view::npos)
+        return "medal_counter";
+    if (sceneName.find("speed_count") != std::string_view::npos)
+        return "speed_readout";
+    return "unmapped_runtime_scene";
+}
+
+[[nodiscard]] std::optional<std::filesystem::path> latestLiveStatePathForTarget(std::string_view target)
+{
+    std::optional<std::filesystem::path> bestPath;
+    std::filesystem::file_time_type bestWriteTime{};
+    bool hasBestWriteTime = false;
+
+    for (const auto& root : repoRootCandidates())
+    {
+        std::error_code error;
+        const auto evidenceRoot = root / "out" / "ui_lab_runtime_evidence";
+        if (!std::filesystem::is_directory(evidenceRoot, error))
+            continue;
+
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(evidenceRoot, error))
+        {
+            if (error)
+                break;
+            if (!entry.is_regular_file(error) || entry.path().filename() != "ui_lab_live_state.json")
+                continue;
+            if (entry.path().parent_path().filename().string() != target)
+                continue;
+
+            const auto writeTime = std::filesystem::last_write_time(entry.path(), error);
+            if (!bestPath || !hasBestWriteTime || (!error && writeTime > bestWriteTime))
+            {
+                bestPath = entry.path();
+                if (!error)
+                {
+                    bestWriteTime = writeTime;
+                    hasBestWriteTime = true;
+                }
+            }
+        }
+    }
+
+    return bestPath;
+}
+
+[[nodiscard]] std::string sonicHudLayoutStatus(std::string_view runtimeProject, std::string_view localProject)
+{
+    const bool exactLayoutAvailable = layoutEvidenceContainsFile(std::string(runtimeProject) + ".yncp");
+    if (runtimeProject == localProject && exactLayoutAvailable)
+        return "exact-runtime-layout";
+    if (runtimeProject == "ui_playscreen" && !exactLayoutAvailable)
+        return "exact-ui-playscreen-layout-unrecovered;local-proxy-layout-ui_prov_playscreen";
+    if (runtimeProject != localProject)
+        return "runtime-local-layout-mismatch";
+    return "layout-evidence-present";
+}
+
+[[nodiscard]] CsdHudRuntimeSceneEvidence loadLatestSonicHudLiveStateEvidence(const CsdPipelineTemplateBinding& csdBinding)
+{
+    CsdHudRuntimeSceneEvidence evidence;
+    evidence.localLayoutFileName = std::string(csdBinding.layoutFileName);
+    evidence.localProject = projectNameFromLayoutFileName(csdBinding.layoutFileName);
+    evidence.localSceneName = std::string(csdBinding.primarySceneName);
+
+    const auto liveStatePath = latestLiveStatePathForTarget("sonic-hud");
+    if (!liveStatePath)
+    {
+        evidence.layoutStatus = "missing-live-state";
+        return evidence;
+    }
+
+    const std::string text = readTextFile(*liveStatePath);
+    if (text.empty())
+        return evidence;
+
+    evidence.found = true;
+    evidence.liveStatePath = *liveStatePath;
+    evidence.runtimeProject = jsonStringField(text, "targetCsd").value_or("");
+    evidence.stageReadyFrame = static_cast<int>(jsonNumberField(text, "stageReadyFrame").value_or(0.0));
+
+    if (const auto tree = jsonObjectFieldSpan(text, "csdProjectTree"))
+    {
+        const auto activeProject = jsonStringField(*tree, "activeProject");
+        if (activeProject && !activeProject->empty())
+            evidence.runtimeProject = *activeProject;
+        evidence.runtimeSceneCount = static_cast<int>(jsonNumberField(*tree, "sceneCount").value_or(0.0));
+        evidence.runtimeNodeCount = static_cast<int>(jsonNumberField(*tree, "nodeCount").value_or(0.0));
+        evidence.runtimeLayerCount = static_cast<int>(jsonNumberField(*tree, "layerCount").value_or(0.0));
+
+        if (const auto scenes = jsonArrayFieldSpan(*tree, "scenes"))
+        {
+            for (const auto sceneObject : jsonObjectSpansInArray(*scenes))
+            {
+                CsdHudRuntimeSceneEntry scene;
+                scene.path = jsonStringField(sceneObject, "path").value_or("");
+                scene.sceneName = sceneLeafNameFromRuntimePath(scene.path, evidence.runtimeProject);
+                scene.castCount = static_cast<int>(jsonNumberField(sceneObject, "castCount").value_or(0.0));
+                scene.frame = static_cast<int>(jsonNumberField(sceneObject, "frame").value_or(0.0));
+                if (!scene.path.empty())
+                    evidence.runtimeScenes.push_back(std::move(scene));
+            }
+        }
+    }
+
+    if (evidence.runtimeProject.empty())
+        evidence.runtimeProject = "unknown";
+
+    if (const auto sonicHud = jsonObjectFieldSpan(text, "sonicHud"))
+    {
+        evidence.rawOwnerKnown = jsonBoolField(*sonicHud, "rawOwnerKnown").value_or(false);
+        evidence.rawOwnerFieldsReady = jsonBoolField(*sonicHud, "rawOwnerFieldsReady").value_or(false);
+        if (const auto ownerPath = jsonObjectFieldSpan(*sonicHud, "ownerPath"))
+        {
+            evidence.ownerPathStatus = jsonStringField(*ownerPath, "ownerPointerStatus").value_or(evidence.ownerPathStatus);
+            evidence.ownerFieldMaturationStatus = jsonStringField(*ownerPath, "ownerFieldMaturationStatus").value_or(evidence.ownerFieldMaturationStatus);
+            evidence.resolvedFromCsdProjectTree = jsonBoolField(*ownerPath, "resolvedFromCsdProjectTree").value_or(false);
+        }
+    }
+
+    evidence.layoutStatus = sonicHudLayoutStatus(evidence.runtimeProject, evidence.localProject);
+    return evidence;
+}
+
+[[nodiscard]] std::vector<CsdHudSceneCoverageDiagnostic> buildSonicHudSceneCoverageDiagnostics(
+    const CsdHudRuntimeSceneEvidence& evidence,
+    const CsdDrawableScene& localScene,
+    const std::vector<std::uint8_t>& coverageMask)
+{
+    std::vector<CsdHudSceneCoverageDiagnostic> diagnostics;
+    int localCoveredPixels = 0;
+    for (const auto value : coverageMask)
+    {
+        if (value != 0)
+            ++localCoveredPixels;
+    }
+
+    for (const auto& runtimeScene : evidence.runtimeScenes)
+    {
+        CsdHudSceneCoverageDiagnostic diagnostic;
+        diagnostic.sceneName = runtimeScene.sceneName;
+        diagnostic.runtimePath = runtimeScene.path;
+        diagnostic.sgfxSlotLabel = sonicHudSlotLabelForScene(runtimeScene.sceneName);
+        diagnostic.runtimeCastCount = runtimeScene.castCount;
+        diagnostic.runtimeSceneMatched = runtimeScene.sceneName == localScene.sceneName;
+        diagnostic.locallyRendered = diagnostic.runtimeSceneMatched;
+        if (diagnostic.locallyRendered)
+        {
+            diagnostic.localCommandCount = static_cast<int>(localScene.commands.size());
+            diagnostic.localCoveredPixels = localCoveredPixels;
+            diagnostic.localCoverageRatio = static_cast<double>(localCoveredPixels)
+                / static_cast<double>(std::max(1, kDesignWidth * kDesignHeight));
+        }
+        diagnostics.push_back(std::move(diagnostic));
+    }
+
+    if (diagnostics.empty())
+    {
+        CsdHudSceneCoverageDiagnostic diagnostic;
+        diagnostic.sceneName = localScene.sceneName;
+        diagnostic.sgfxSlotLabel = sonicHudSlotLabelForScene(localScene.sceneName);
+        diagnostic.localCommandCount = static_cast<int>(localScene.commands.size());
+        diagnostic.localCoveredPixels = localCoveredPixels;
+        diagnostic.localCoverageRatio = static_cast<double>(localCoveredPixels)
+            / static_cast<double>(std::max(1, kDesignWidth * kDesignHeight));
+        diagnostic.locallyRendered = true;
+        diagnostics.push_back(std::move(diagnostic));
+    }
+
+    return diagnostics;
+}
+
+[[nodiscard]] std::pair<int, int> commandCoverageBounds(const CsdDrawableCommand& command, int& startX, int& startY, int& endX, int& endY)
+{
+    if (command.hidden || command.destinationWidth <= 0 || command.destinationHeight <= 0)
+    {
+        startX = startY = 0;
+        endX = endY = -1;
+        return { 0, 0 };
+    }
+
+    const double dstX = static_cast<double>(command.destinationX);
+    const double dstY = static_cast<double>(command.destinationY);
+    const double dstW = static_cast<double>(std::max(1, command.destinationWidth));
+    const double dstH = static_cast<double>(std::max(1, command.destinationHeight));
+    const double centerX = dstX + (dstW * 0.5);
+    const double centerY = dstY + (dstH * 0.5);
+    const double radians = command.rotation * kPi / 180.0;
+    const double cosTheta = std::cos(radians);
+    const double sinTheta = std::sin(radians);
+
+    std::array<std::pair<double, double>, 4> corners{{
+        { -dstW * 0.5, -dstH * 0.5 },
+        { dstW * 0.5, -dstH * 0.5 },
+        { -dstW * 0.5, dstH * 0.5 },
+        { dstW * 0.5, dstH * 0.5 },
+    }};
+
+    double minX = static_cast<double>(kDesignWidth);
+    double minY = static_cast<double>(kDesignHeight);
+    double maxX = 0.0;
+    double maxY = 0.0;
+    for (const auto& [cornerX, cornerY] : corners)
+    {
+        const double rotatedX = centerX + (cornerX * cosTheta) - (cornerY * sinTheta);
+        const double rotatedY = centerY + (cornerX * sinTheta) + (cornerY * cosTheta);
+        minX = std::min(minX, rotatedX);
+        minY = std::min(minY, rotatedY);
+        maxX = std::max(maxX, rotatedX);
+        maxY = std::max(maxY, rotatedY);
+    }
+
+    startX = std::clamp(static_cast<int>(std::floor(minX)), 0, kDesignWidth - 1);
+    startY = std::clamp(static_cast<int>(std::floor(minY)), 0, kDesignHeight - 1);
+    endX = std::clamp(static_cast<int>(std::ceil(maxX)), 0, kDesignWidth - 1);
+    endY = std::clamp(static_cast<int>(std::ceil(maxY)), 0, kDesignHeight - 1);
+    if (endX < startX || endY < startY)
+        return { 0, 0 };
+    return { (endX - startX) + 1, (endY - startY) + 1 };
+}
+
+[[nodiscard]] int countNativeNonBlackPixelsInCommandBounds(
+    Gdiplus::Bitmap& native,
+    const BitmapComparisonStats& alignmentStats,
+    const CsdDrawableCommand& command,
+    int& localCoveredPixels)
+{
+    int startX = 0;
+    int startY = 0;
+    int endX = -1;
+    int endY = -1;
+    const auto [width, height] = commandCoverageBounds(command, startX, startY, endX, endY);
+    localCoveredPixels = width * height;
+    if (localCoveredPixels == 0)
+        return 0;
+
+    int nativeNonBlack = 0;
+    for (int y = startY; y <= endY; ++y)
+    {
+        for (int x = startX; x <= endX; ++x)
+        {
+            const auto nativePixel = bitmapPixelNearest(
+                native,
+                x,
+                y,
+                kDesignWidth,
+                kDesignHeight,
+                alignmentStats.nativeAlignmentCropX,
+                alignmentStats.nativeAlignmentCropY,
+                alignmentStats.nativeAlignmentCropWidth,
+                alignmentStats.nativeAlignmentCropHeight);
+            if (nativePixel.GetR() != 0 || nativePixel.GetG() != 0 || nativePixel.GetB() != 0)
+                ++nativeNonBlack;
+        }
+    }
+    return nativeNonBlack;
+}
+
+[[nodiscard]] std::vector<CsdHudCastCoverageDiagnostic> buildSonicHudCastCoverageDiagnostics(
+    const std::vector<CsdDrawableCommand>& commands,
+    const std::optional<std::filesystem::path>& nativeBestPath,
+    const BitmapComparisonStats& alignmentStats)
+{
+    std::vector<CsdHudCastCoverageDiagnostic> diagnostics;
+    std::unique_ptr<Gdiplus::Bitmap> native;
+    if (nativeBestPath)
+        native = std::unique_ptr<Gdiplus::Bitmap>(Gdiplus::Bitmap::FromFile(nativeBestPath->wstring().c_str(), FALSE));
+    const bool nativeReady = native && native->GetLastStatus() == Gdiplus::Ok;
+
+    for (const auto& command : commands)
+    {
+        CsdHudCastCoverageDiagnostic diagnostic;
+        diagnostic.sceneName = command.sceneName;
+        diagnostic.castName = command.castName;
+        diagnostic.textureName = command.textureName;
+        diagnostic.sgfxSlotLabel = sonicHudSlotLabelForScene(command.sceneName);
+        int startX = 0;
+        int startY = 0;
+        int endX = -1;
+        int endY = -1;
+        const auto [width, height] = commandCoverageBounds(command, startX, startY, endX, endY);
+        diagnostic.destinationX = startX;
+        diagnostic.destinationY = startY;
+        diagnostic.destinationWidth = width;
+        diagnostic.destinationHeight = height;
+        diagnostic.localCoveredPixels = width * height;
+        if (nativeReady)
+        {
+            int coveredPixels = 0;
+            diagnostic.nativeNonBlackPixels = countNativeNonBlackPixelsInCommandBounds(*native, alignmentStats, command, coveredPixels);
+            diagnostic.localCoveredPixels = coveredPixels;
+            diagnostic.nativeOverlapRatio = coveredPixels == 0 ? 0.0 : static_cast<double>(diagnostic.nativeNonBlackPixels) / static_cast<double>(coveredPixels);
+        }
+        diagnostics.push_back(std::move(diagnostic));
+    }
+
+    std::sort(
+        diagnostics.begin(),
+        diagnostics.end(),
+        [](const CsdHudCastCoverageDiagnostic& left, const CsdHudCastCoverageDiagnostic& right)
+        {
+            if (left.nativeNonBlackPixels != right.nativeNonBlackPixels)
+                return left.nativeNonBlackPixels > right.nativeNonBlackPixels;
+            return left.localCoveredPixels > right.localCoveredPixels;
+        });
+
+    return diagnostics;
+}
+
 [[nodiscard]] std::size_t countUniqueTextures(const std::vector<CsdDrawableCommand>& commands)
 {
     std::vector<std::string> textures;
@@ -5437,6 +5865,14 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
         ? computeBitmapComparisonStats(*bitmap, comparison.nativeBestPath, comparison.diffFramePath, coverageMask, comparison.uiLayerDiffFramePath)
         : BitmapComparisonStats{};
     comparison.materialTriage = materialParityTriageForComparison(comparison);
+    if (comparison.templateId == "sonic-hud")
+    {
+        comparison.sonicHudRuntimeScene = loadLatestSonicHudLiveStateEvidence(csdBinding);
+        comparison.sonicHudSceneCoverage = buildSonicHudSceneCoverageDiagnostics(comparison.sonicHudRuntimeScene, *scene, coverageMask);
+        std::size_t diagnosticSampledCommandCount = 0;
+        const auto sampledCommands = timelineSampledCommands(*scene, playback ? &*playback : nullptr, diagnosticSampledCommandCount);
+        comparison.sonicHudCastCoverage = buildSonicHudCastCoverageDiagnostics(sampledCommands, comparison.nativeBestPath, comparison.visualDelta);
+    }
     if (!saved)
         comparison.renderedFramePath.clear();
     return comparison;
@@ -5453,7 +5889,7 @@ void writeCsdRenderCompareManifest(
         return;
 
     out << "{\n";
-    out << "  \"phase\": 132,\n";
+    out << "  \"phase\": 133,\n";
     out << "  \"canvas\": { \"width\": " << kDesignWidth << ", \"height\": " << kDesignHeight << " },\n";
     out << "  \"records\": [\n";
     for (std::size_t index = 0; index < comparisons.size(); ++index)
@@ -5540,6 +5976,66 @@ void writeCsdRenderCompareManifest(
             out << "\"" << jsonEscape(comparison.materialTriage.riskFlags[flagIndex]) << "\"";
         }
         out << "] },\n";
+        if (comparison.templateId == "sonic-hud")
+        {
+            const auto& hud = comparison.sonicHudRuntimeScene;
+            out << "      \"sonicHudRuntime\": { \"found\": " << (hud.found ? "true" : "false")
+                << ", \"liveStatePath\": \"" << jsonEscape(portablePath(hud.liveStatePath)) << "\""
+                << ", \"runtimeProject\": \"" << jsonEscape(hud.runtimeProject) << "\""
+                << ", \"localLayout\": \"" << jsonEscape(hud.localLayoutFileName) << "\""
+                << ", \"localProject\": \"" << jsonEscape(hud.localProject) << "\""
+                << ", \"localScene\": \"" << jsonEscape(hud.localSceneName) << "\""
+                << ", \"layoutStatus\": \"" << jsonEscape(hud.layoutStatus) << "\""
+                << ", \"ownerPathStatus\": \"" << jsonEscape(hud.ownerPathStatus) << "\""
+                << ", \"ownerFieldMaturationStatus\": \"" << jsonEscape(hud.ownerFieldMaturationStatus) << "\""
+                << ", \"rawOwnerKnown\": " << (hud.rawOwnerKnown ? "true" : "false")
+                << ", \"rawOwnerFieldsReady\": " << (hud.rawOwnerFieldsReady ? "true" : "false")
+                << ", \"resolvedFromCsdProjectTree\": " << (hud.resolvedFromCsdProjectTree ? "true" : "false")
+                << ", \"stageReadyFrame\": " << hud.stageReadyFrame
+                << ", \"runtimeSceneCount\": " << hud.runtimeSceneCount
+                << ", \"runtimeNodeCount\": " << hud.runtimeNodeCount
+                << ", \"runtimeLayerCount\": " << hud.runtimeLayerCount
+                << " },\n";
+            out << "      \"sonicHudSceneCoverage\": [";
+            for (std::size_t sceneIndex = 0; sceneIndex < comparison.sonicHudSceneCoverage.size(); ++sceneIndex)
+            {
+                const auto& diagnostic = comparison.sonicHudSceneCoverage[sceneIndex];
+                if (sceneIndex != 0)
+                    out << ", ";
+                out << "{ \"scene\": \"" << jsonEscape(diagnostic.sceneName)
+                    << "\", \"runtimePath\": \"" << jsonEscape(diagnostic.runtimePath)
+                    << "\", \"sgfxSlot\": \"" << jsonEscape(diagnostic.sgfxSlotLabel)
+                    << "\", \"runtimeCastCount\": " << diagnostic.runtimeCastCount
+                    << ", \"localCommandCount\": " << diagnostic.localCommandCount
+                    << ", \"localCoveredPixels\": " << diagnostic.localCoveredPixels
+                    << ", \"localCoverageRatio\": " << std::fixed << std::setprecision(6) << diagnostic.localCoverageRatio
+                    << ", \"runtimeSceneMatched\": " << (diagnostic.runtimeSceneMatched ? "true" : "false")
+                    << ", \"locallyRendered\": " << (diagnostic.locallyRendered ? "true" : "false")
+                    << " }";
+            }
+            out << "],\n";
+            out << "      \"sonicHudCastCoverage\": [";
+            const std::size_t castLimit = std::min<std::size_t>(comparison.sonicHudCastCoverage.size(), 16);
+            for (std::size_t castIndex = 0; castIndex < castLimit; ++castIndex)
+            {
+                const auto& diagnostic = comparison.sonicHudCastCoverage[castIndex];
+                if (castIndex != 0)
+                    out << ", ";
+                out << "{ \"scene\": \"" << jsonEscape(diagnostic.sceneName)
+                    << "\", \"cast\": \"" << jsonEscape(diagnostic.castName)
+                    << "\", \"texture\": \"" << jsonEscape(diagnostic.textureName)
+                    << "\", \"sgfxSlot\": \"" << jsonEscape(diagnostic.sgfxSlotLabel)
+                    << "\", \"destination\": { \"x\": " << diagnostic.destinationX
+                    << ", \"y\": " << diagnostic.destinationY
+                    << ", \"width\": " << diagnostic.destinationWidth
+                    << ", \"height\": " << diagnostic.destinationHeight
+                    << " }, \"localCoveredPixels\": " << diagnostic.localCoveredPixels
+                    << ", \"nativeNonBlackPixels\": " << diagnostic.nativeNonBlackPixels
+                    << ", \"nativeOverlapRatio\": " << std::fixed << std::setprecision(6) << diagnostic.nativeOverlapRatio
+                    << " }";
+            }
+            out << "],\n";
+        }
         out << "      \"sgfxSlots\": [";
         for (std::size_t slotIndex = 0; slotIndex < comparison.sgfxSlots.size(); ++slotIndex)
         {
@@ -5586,7 +6082,7 @@ void writeCsdRenderCompareManifest(
     std::size_t templateCount = 0;
     bool failed = false;
     std::vector<CsdRenderedFrameComparison> comparisons;
-    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase132";
+    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase133";
     const auto manifestPath = outputRoot / "csd_render_compare_manifest.json";
 
     Gdiplus::GdiplusStartupInput gdiplusInput{};
@@ -5800,6 +6296,93 @@ void writeCsdRenderCompareManifest(
             << ":"
             << (comparison.nativeBestPath ? portablePath(*comparison.nativeBestPath) : std::string("missing"))
             << '\n';
+        if (comparison.templateId == "sonic-hud")
+        {
+            const auto& hud = comparison.sonicHudRuntimeScene;
+            std::cout
+                << "sonic_hud_runtime_scene=sonic-hud"
+                << ":runtime_project="
+                << hud.runtimeProject
+                << ":local_layout="
+                << hud.localLayoutFileName
+                << ":local_project="
+                << hud.localProject
+                << ":local_scene="
+                << hud.localSceneName
+                << ":layout_status="
+                << hud.layoutStatus
+                << ":stage_ready_frame="
+                << hud.stageReadyFrame
+                << ":runtime_scenes="
+                << hud.runtimeSceneCount
+                << ":runtime_layers="
+                << hud.runtimeLayerCount
+                << ":owner_path_status="
+                << hud.ownerPathStatus
+                << ":owner_fields_ready="
+                << (hud.rawOwnerFieldsReady ? 1 : 0)
+                << ":resolved_from_csd_tree="
+                << (hud.resolvedFromCsdProjectTree ? 1 : 0)
+                << ":live_state="
+                << (hud.found ? portablePath(hud.liveStatePath) : std::string("missing"))
+                << '\n';
+            for (const auto& diagnostic : comparison.sonicHudSceneCoverage)
+            {
+                std::cout
+                    << "sonic_hud_scene_coverage=sonic-hud"
+                    << ":scene="
+                    << diagnostic.sceneName
+                    << ":runtime_casts="
+                    << diagnostic.runtimeCastCount
+                    << ":local_commands="
+                    << diagnostic.localCommandCount
+                    << ":covered_pixels="
+                    << diagnostic.localCoveredPixels
+                    << ":coverage="
+                    << std::fixed
+                    << std::setprecision(6)
+                    << diagnostic.localCoverageRatio
+                    << ":sgfx_slot="
+                    << diagnostic.sgfxSlotLabel
+                    << ":runtime_scene_matched="
+                    << (diagnostic.runtimeSceneMatched ? 1 : 0)
+                    << ":locally_rendered="
+                    << (diagnostic.locallyRendered ? 1 : 0)
+                    << '\n';
+            }
+            const std::size_t castLimit = std::min<std::size_t>(comparison.sonicHudCastCoverage.size(), 12);
+            for (std::size_t castIndex = 0; castIndex < castLimit; ++castIndex)
+            {
+                const auto& diagnostic = comparison.sonicHudCastCoverage[castIndex];
+                std::cout
+                    << "sonic_hud_cast_coverage=sonic-hud"
+                    << ":scene="
+                    << diagnostic.sceneName
+                    << ":cast="
+                    << diagnostic.castName
+                    << ":texture="
+                    << diagnostic.textureName
+                    << ":sgfx_slot="
+                    << diagnostic.sgfxSlotLabel
+                    << ":dst="
+                    << diagnostic.destinationX
+                    << ","
+                    << diagnostic.destinationY
+                    << ","
+                    << diagnostic.destinationWidth
+                    << "x"
+                    << diagnostic.destinationHeight
+                    << ":local_pixels="
+                    << diagnostic.localCoveredPixels
+                    << ":native_nonblack_pixels="
+                    << diagnostic.nativeNonBlackPixels
+                    << ":native_overlap="
+                    << std::fixed
+                    << std::setprecision(6)
+                    << diagnostic.nativeOverlapRatio
+                    << '\n';
+            }
+        }
         std::cout
             << "render_frame_source="
             << comparison.templateId

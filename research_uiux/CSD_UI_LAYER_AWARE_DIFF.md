@@ -47,6 +47,18 @@ The important split:
 
 This is not UI-only native capture yet. The native side of the masked comparison still comes from the full backbuffer, sampled only where the local CSD renderer drew pixels. A true runtime UI-layer capture would be stronger if we can expose it through UnleashedRecomp.
 
+## Phase 133 Follow-Up
+
+Phase 133 explains the stubborn `sonic-hud` masked delta. The real runtime live bridge reports normal Sonic HUD as `ui_playscreen` with `13` scenes and `209` layers, but the local drawable sidecar still has only the recovered `ui_prov_playscreen.yncp` proxy package for the HUD draw path. The new `sonic_hud_runtime_scene=`, `sonic_hud_scene_coverage=`, and `sonic_hud_cast_coverage=` lines make that explicit:
+
+- runtime project: `ui_playscreen`
+- local drawable layout: `ui_prov_playscreen.yncp`
+- status: `exact-ui-playscreen-layout-unrecovered;local-proxy-layout-ui_prov_playscreen`
+- locally rendered scene: `so_speed_gauge`
+- missing local runtime scenes include `so_ringenagy_gauge`, `gauge_frame`, `exp_count`, `time_count`, `score_count`, and `add/u_info`
+
+So the next Sonic HUD blocker is exact `ui_playscreen` coverage or runtime UI-only export, not another global sampler tweak.
+
 ## Verification
 
 Fresh verification for this beat used:
