@@ -6,6 +6,7 @@
 #include <objidl.h>
 #include <gdiplus.h>
 
+#include <sward/ui_runtime/frontend_screen_reference.hpp>
 #include <sward/ui_runtime/sgfx_templates.hpp>
 #include <sward/ui_runtime/sonic_hud_reference.hpp>
 
@@ -33,7 +34,10 @@ namespace
 {
 using sward::ui_runtime::SgfxScreenTemplate;
 using sward::ui_runtime::SonicHudScenePolicy;
+using sward::ui_runtime::defaultFrontendRuntimeAlignment;
 using sward::ui_runtime::findSgfxScreenTemplate;
+using sward::ui_runtime::formatFrontendRuntimeAlignment;
+using sward::ui_runtime::frontendScreenPolicies;
 using sward::ui_runtime::sgfxScreenTemplates;
 using sward::ui_runtime::sampleSonicHudTimeline;
 using sward::ui_runtime::sonicHudOwnerReference;
@@ -158,17 +162,18 @@ struct CsdPipelineTemplateBinding
 
 struct CsdReferenceViewerLane
 {
-    std::string_view laneId;
-    std::string_view rendererScreenId;
-    std::string_view contractFileName;
-    std::string_view nativeTargetId;
-    const CsdPipelineTemplateBinding* scenes = nullptr;
-    std::size_t sceneCount = 0;
-    const SgfxPlaceholderAssetSlot* slots = nullptr;
-    std::size_t slotCount = 0;
-    std::string_view requiredEventId;
-    std::string_view timelineBandId;
-    std::string_view timelineEventLabel;
+    std::string laneId;
+    std::string rendererScreenId;
+    std::string contractFileName;
+    std::string nativeTargetId;
+    std::vector<CsdPipelineTemplateBinding> scenes;
+    std::vector<SgfxPlaceholderAssetSlot> slots;
+    std::string requiredEventId;
+    std::string timelineBandId;
+    std::string timelineEventLabel;
+    std::string runtimeAlignment;
+    std::string materialSemantics;
+    std::string policySource;
 };
 
 struct CsdColorRgba
@@ -840,87 +845,77 @@ inline constexpr std::array<CsdPipelineTemplateBinding, 4> kCsdPipelineTemplateB
     },
 }};
 
-inline constexpr std::array<CsdPipelineTemplateBinding, 3> kTitleMenuReferenceViewerScenes{{
-    { "title-menu", "ui_mainmenu.yncp", "mm_bg_usual", "mm_donut_move", "DefaultAnim" },
-    { "title-menu", "ui_mainmenu.yncp", "mm_donut_move", "mm_donut_move", "DefaultAnim" },
-    { "title-menu", "ui_mainmenu.yncp", "mm_contentsitem_select", "mm_contentsitem_select", "DefaultAnim" },
-}};
+[[nodiscard]] std::pair<std::string, std::string> splitTransitionBand(std::string_view transitionBand)
+{
+    const auto arrow = transitionBand.find("->");
+    if (arrow == std::string_view::npos)
+        return { std::string(transitionBand), std::string(transitionBand) };
+    return {
+        std::string(transitionBand.substr(0, arrow)),
+        std::string(transitionBand.substr(arrow + 2)),
+    };
+}
 
-inline constexpr std::array<CsdPipelineTemplateBinding, 2> kLoadingReferenceViewerScenes{{
-    { "loading", "ui_loading.yncp", "pda", "pda_txt", "Usual_Anim_3" },
-    { "loading", "ui_loading.yncp", "pda_txt", "pda_txt", "Usual_Anim_3" },
-}};
+[[nodiscard]] std::string frontendMaterialSemanticsDescriptor(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    std::ostringstream out;
+    out << policy.screenId
+        << ":blend=" << policy.materialSemantics.blendModel
+        << ":alpha=" << policy.materialSemantics.alphaModel
+        << ":color=" << policy.materialSemantics.colorModel
+        << ":filter=" << policy.materialSemantics.filteringModel
+        << ":offset=" << policy.materialSemantics.pixelOffsetModel
+        << ":oracle=" << policy.materialSemantics.oraclePolicy;
+    return out.str();
+}
 
-inline constexpr std::array<CsdPipelineTemplateBinding, 2> kTitleOptionsReferenceViewerScenes{{
-    { "title-options", "ui_mainmenu.yncp", "mm_bg_usual", "mm_donut_move", "DefaultAnim" },
-    { "title-options", "ui_mainmenu.yncp", "mm_contentsitem_select", "mm_contentsitem_select", "DefaultAnim" },
-}};
+[[nodiscard]] CsdReferenceViewerLane referenceViewerLaneFromTrackedPolicy(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    const auto [transitionBandId, transitionReadyLabel] = splitTransitionBand(policy.transitionBand);
+    CsdReferenceViewerLane lane;
+    lane.laneId = policy.screenId;
+    lane.rendererScreenId = policy.screenName;
+    lane.contractFileName = policy.referenceContract;
+    lane.nativeTargetId = policy.screenId;
+    lane.requiredEventId = policy.activationEvent;
+    lane.timelineBandId = transitionBandId;
+    lane.timelineEventLabel = transitionReadyLabel;
+    lane.runtimeAlignment = formatFrontendRuntimeAlignment(defaultFrontendRuntimeAlignment(policy));
+    lane.materialSemantics = frontendMaterialSemanticsDescriptor(policy);
+    lane.policySource = "frontend_screen_reference";
 
-inline constexpr std::array<CsdPipelineTemplateBinding, 8> kPauseReferenceViewerScenes{{
-    { "pause", "ui_pause.yncp", "bg", "bg", "Intro_Anim" },
-    { "pause", "ui_pause.yncp", "bg_1", "bg_1", "Intro_Anim" },
-    { "pause", "ui_pause.yncp", "bg_1_select", "bg_1_select", "Intro_Anim" },
-    { "pause", "ui_pause.yncp", "bg_2", "bg_2", "Intro_Anim" },
-    { "pause", "ui_pause.yncp", "text_area", "text_area", "Intro_Anim" },
-    { "pause", "ui_pause.yncp", "skill_select", "skill_select", "Intro_Anim" },
-    { "pause", "ui_pause.yncp", "arrow", "arrow", "Intro_Anim" },
-    { "pause", "ui_pause.yncp", "skill_scroll_bar_bg", "skill_scroll_bar_bg", "Intro_Anim" },
-}};
+    for (const auto& scene : policy.scenes)
+    {
+        lane.scenes.push_back({
+            policy.screenId,
+            policy.layoutName,
+            scene.sceneName,
+            scene.sceneName,
+            scene.timeline.animationName,
+        });
+    }
 
-inline constexpr std::array<CsdReferenceViewerLane, 4> kCsdReferenceViewerLanes{{
+    for (const auto& slot : policy.materialSlots)
     {
-        "title-menu",
-        "MainMenuComposite",
-        "title_menu_reference.json",
-        "title-menu",
-        kTitleMenuReferenceViewerScenes.data(),
-        kTitleMenuReferenceViewerScenes.size(),
-        kTitleMenuTemplateSlots.data(),
-        kTitleMenuTemplateSlots.size(),
-        "title-menu-visible",
-        "select_travel",
-        "title menu visual ready",
-    },
-    {
-        "loading",
-        "LoadingComposite",
-        "loading_transition_reference.json",
-        "loading",
-        kLoadingReferenceViewerScenes.data(),
-        kLoadingReferenceViewerScenes.size(),
-        kLoadingTemplateSlots.data(),
-        kLoadingTemplateSlots.size(),
-        "loading-display-active",
-        "pda_intro",
-        "loading display active",
-    },
-    {
-        "title-options",
-        "TitleOptionsReference",
-        "title_menu_reference.json",
-        "title-options",
-        kTitleOptionsReferenceViewerScenes.data(),
-        kTitleOptionsReferenceViewerScenes.size(),
-        kTitleOptionsTemplateSlots.data(),
-        kTitleOptionsTemplateSlots.size(),
-        "title-options-ready",
-        "select_travel",
-        "title options visual ready",
-    },
-    {
-        "pause",
-        "PauseMenuReference",
-        "pause_menu_reference.json",
-        "pause",
-        kPauseReferenceViewerScenes.data(),
-        kPauseReferenceViewerScenes.size(),
-        kPauseTemplateSlots.data(),
-        kPauseTemplateSlots.size(),
-        "pause-ready",
-        "intro_medium",
-        "pause menu visual ready",
-    },
-}};
+        lane.slots.push_back({
+            slot.slotId,
+            slot.textureName,
+            slot.placeholderFamily,
+        });
+    }
+
+    return lane;
+}
+
+[[nodiscard]] std::vector<CsdReferenceViewerLane> buildReferenceViewerLanesFromTrackedPolicy()
+{
+    std::vector<CsdReferenceViewerLane> lanes;
+    for (const auto& policy : frontendScreenPolicies())
+        lanes.push_back(referenceViewerLaneFromTrackedPolicy(policy));
+    return lanes;
+}
 
 inline const std::array<SuUiRendererScreen, 10> kRendererScreens{{
     {
@@ -1046,28 +1041,30 @@ inline const std::array<SuUiRendererScreen, 10> kRendererScreens{{
     return found == kCsdPipelineTemplateBindings.end() ? nullptr : &*found;
 }
 
-[[nodiscard]] const CsdReferenceViewerLane* findCsdReferenceViewerLaneById(std::string_view laneId)
+[[nodiscard]] std::optional<CsdReferenceViewerLane> findCsdReferenceViewerLaneById(std::string_view laneId)
 {
+    const auto lanes = buildReferenceViewerLanesFromTrackedPolicy();
     const auto found = std::find_if(
-        kCsdReferenceViewerLanes.begin(),
-        kCsdReferenceViewerLanes.end(),
+        lanes.begin(),
+        lanes.end(),
         [laneId](const CsdReferenceViewerLane& lane)
         {
             return lane.laneId == laneId;
         });
-    return found == kCsdReferenceViewerLanes.end() ? nullptr : &*found;
+    return found == lanes.end() ? std::nullopt : std::optional<CsdReferenceViewerLane>(*found);
 }
 
-[[nodiscard]] const CsdReferenceViewerLane* findCsdReferenceViewerLaneByScreenId(std::string_view screenId)
+[[nodiscard]] std::optional<CsdReferenceViewerLane> findCsdReferenceViewerLaneByScreenId(std::string_view screenId)
 {
+    const auto lanes = buildReferenceViewerLanesFromTrackedPolicy();
     const auto found = std::find_if(
-        kCsdReferenceViewerLanes.begin(),
-        kCsdReferenceViewerLanes.end(),
+        lanes.begin(),
+        lanes.end(),
         [screenId](const CsdReferenceViewerLane& lane)
         {
             return lane.rendererScreenId == screenId;
         });
-    return found == kCsdReferenceViewerLanes.end() ? nullptr : &*found;
+    return found == lanes.end() ? std::nullopt : std::optional<CsdReferenceViewerLane>(*found);
 }
 
 [[nodiscard]] const SuUiRendererScreen* rendererScreenById(std::string_view id)
@@ -4330,10 +4327,10 @@ void appendUniqueTextureName(std::vector<std::string>& names, std::string_view t
     const CsdReferenceViewerLane& lane)
 {
     CsdReferenceViewerStats stats;
-    stats.sceneCount = lane.sceneCount;
+    stats.sceneCount = lane.scenes.size();
     std::vector<std::string> laneTextures;
 
-    for (std::size_t sceneIndex = 0; sceneIndex < lane.sceneCount; ++sceneIndex)
+    for (std::size_t sceneIndex = 0; sceneIndex < lane.scenes.size(); ++sceneIndex)
     {
         const auto& sceneBinding = lane.scenes[sceneIndex];
         CsdReferenceViewerSceneStats sceneStats;
@@ -4384,10 +4381,10 @@ void renderCsdReferenceViewerOverlay(
     graphics.FillRectangle(&panelFill, panel);
     graphics.DrawRectangle(&panelEdge, panel);
 
-    const std::string_view firstLayout = lane.sceneCount == 0 ? std::string_view("none") : lane.scenes[0].layoutFileName;
+    const std::string_view firstLayout = lane.scenes.empty() ? std::string_view("none") : lane.scenes[0].layoutFileName;
     std::ostringstream title;
     title
-        << "phase140-reference-playback | lane=" << lane.laneId
+        << "phase142-tracked-policy-playback | lane=" << lane.laneId
         << " | screen=" << lane.rendererScreenId;
 
     std::ostringstream source;
@@ -4395,7 +4392,8 @@ void renderCsdReferenceViewerOverlay(
         << "layout=" << firstLayout
         << ":event=" << lane.requiredEventId
         << ":timeline=" << lane.timelineBandId
-        << " -> " << lane.timelineEventLabel;
+        << " -> " << lane.timelineEventLabel
+        << ":policy=" << lane.policySource;
 
     std::ostringstream counts;
     counts
@@ -4669,11 +4667,13 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     const bool useSonicHudReferenceViewer =
         screen.kind == RendererScreenKind::SonicHudReferencePipeline
         || (binding && isSonicHudReferenceViewerBinding(*binding));
-    const auto* referenceLane = !useSonicHudReferenceViewer
-        ? (binding
+    std::optional<CsdReferenceViewerLane> referenceLane;
+    if (!useSonicHudReferenceViewer)
+    {
+        referenceLane = binding
             ? findCsdReferenceViewerLaneById(binding->templateId)
-            : findCsdReferenceViewerLaneByScreenId(screen.id))
-        : nullptr;
+            : findCsdReferenceViewerLaneByScreenId(screen.id);
+    }
     const auto sonicHudReferenceStats = useSonicHudReferenceViewer
         ? std::optional<SonicHudReferenceViewerStats>(renderSonicHudReferencePolicyStack(graphics, canvas, renderer, binding))
         : std::nullopt;
@@ -4690,7 +4690,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     }
     else if (referenceLane)
     {
-        // Phase 140 exact viewer lanes render recovered CSD scene stacks with timeline sampling.
+        // Phase 142 viewer lanes are driven by the tracked frontend_screen_reference policy.
     }
     else if (renderedCsdDrawableScene)
     {
@@ -5133,13 +5133,14 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 {
     bool failed = false;
     std::vector<std::pair<std::string, CsdReferenceViewerStats>> laneStats;
+    const auto lanes = buildReferenceViewerLanesFromTrackedPolicy();
 
     Gdiplus::GdiplusStartupInput gdiplusInput{};
     ULONG_PTR gdiplusToken = 0;
     if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr) != Gdiplus::Ok)
         return 1;
 
-    for (const auto& lane : kCsdReferenceViewerLanes)
+    for (const auto& lane : lanes)
     {
         CsdReferenceViewerStats stats;
         const auto bitmap = renderCsdReferenceViewerBitmap(lane, false, stats);
@@ -5150,15 +5151,16 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 
     std::cout
         << "sward_su_ui_asset_renderer reference lanes smoke ok "
-        << "mode=phase140-reference-playback"
-        << " lanes=" << kCsdReferenceViewerLanes.size()
+        << "mode=phase142-tracked-policy-playback"
+        << " reference_policy_source=frontend_screen_reference"
+        << " lanes=" << lanes.size()
         << '\n';
 
-    for (std::size_t laneIndex = 0; laneIndex < kCsdReferenceViewerLanes.size(); ++laneIndex)
+    for (std::size_t laneIndex = 0; laneIndex < lanes.size(); ++laneIndex)
     {
-        const auto& lane = kCsdReferenceViewerLanes[laneIndex];
+        const auto& lane = lanes[laneIndex];
         const auto& stats = laneStats[laneIndex].second;
-        const auto layout = lane.sceneCount == 0 ? std::string_view("none") : lane.scenes[0].layoutFileName;
+        const auto layout = lane.scenes.empty() ? std::string_view("none") : lane.scenes[0].layoutFileName;
         std::cout
             << "reference_lane=" << lane.laneId
             << ":screen=" << lane.rendererScreenId
@@ -5173,8 +5175,11 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
             << ":structural=" << stats.structuralCommandCount
             << ":source_free=" << stats.sourceFreeStructuralCommandCount
             << ":event=" << lane.requiredEventId
+            << ":policy_source=" << lane.policySource
             << ":overlay=compact-reference-status:no-template-card=1"
             << '\n';
+        std::cout << "runtime_alignment=" << lane.runtimeAlignment << '\n';
+        std::cout << "material_semantics=" << lane.materialSemantics << '\n';
 
         for (const auto& scene : stats.scenes)
         {
@@ -5238,12 +5243,12 @@ struct CsdReusableReferenceScreenModel
     model.laneId = std::string(lane.laneId);
     model.rendererScreenId = std::string(lane.rendererScreenId);
     model.contractFileName = std::string(lane.contractFileName);
-    model.layoutFileName = lane.sceneCount == 0 ? std::string("none") : std::string(lane.scenes[0].layoutFileName);
+    model.layoutFileName = lane.scenes.empty() ? std::string("none") : std::string(lane.scenes[0].layoutFileName);
     model.activationEvent = std::string(lane.requiredEventId);
     model.transitionBandId = std::string(lane.timelineBandId);
     model.transitionReadyLabel = std::string(lane.timelineEventLabel);
-    model.materialSlotCount = lane.slotCount;
-    model.sgfxSlotCount = lane.slotCount;
+    model.materialSlotCount = lane.slots.size();
+    model.sgfxSlotCount = lane.slots.size();
     model.renderOrderSceneCount = stats.sceneCount;
     model.commandCount = stats.commandCount;
     model.sampledTrackCount = stats.sampledTrackCount;
@@ -5343,6 +5348,7 @@ struct CsdReusableReferenceScreenModel
 {
     bool failed = false;
     std::vector<CsdReusableReferenceScreenModel> models;
+    const auto lanes = buildReferenceViewerLanesFromTrackedPolicy();
     const auto outputRoot = repoRootForOutput() / "out" / "csd_runtime_exports" / "phase140";
     const auto exportPath = outputRoot / "title_loading_options_pause_reference.hpp";
 
@@ -5351,7 +5357,7 @@ struct CsdReusableReferenceScreenModel
     if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr) != Gdiplus::Ok)
         return 1;
 
-    for (const auto& lane : kCsdReferenceViewerLanes)
+    for (const auto& lane : lanes)
     {
         CsdReferenceViewerStats stats;
         const auto bitmap = renderCsdReferenceViewerBitmap(lane, false, stats);
@@ -8017,6 +8023,7 @@ void writeViewerRenderCompareManifest(
 {
     bool failed = false;
     std::vector<CsdReferenceViewerFrameComparison> comparisons;
+    const auto lanes = buildReferenceViewerLanesFromTrackedPolicy();
     const auto outputRoot = repoRootForOutput() / "out" / "viewer_render_compare" / "phase139";
     const auto manifestPath = outputRoot / "viewer_render_compare_manifest.json";
 
@@ -8025,7 +8032,7 @@ void writeViewerRenderCompareManifest(
     if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr) != Gdiplus::Ok)
         return 1;
 
-    for (const auto& lane : kCsdReferenceViewerLanes)
+    for (const auto& lane : lanes)
     {
         auto comparison = renderCsdReferenceViewerFrameComparison(lane, outputRoot);
         if (comparison.viewerFramePath.empty() || comparison.stats.commandCount == 0)

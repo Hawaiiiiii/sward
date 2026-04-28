@@ -241,16 +241,20 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
 
         for token in [
             "struct FrontendScreenMaterialSlot",
+            "struct FrontendScreenMaterialSemantics",
             "struct FrontendScreenTimelineChannel",
             "struct FrontendScreenScenePolicy",
             "struct FrontendScreenPolicy",
+            "struct FrontendRuntimeAlignment",
             "struct FrontendScreenTimelineSample",
             "frontendScreenPolicies",
             "findFrontendScreenPolicy",
             "findFrontendScreenScenePolicy",
+            "defaultFrontendRuntimeAlignment",
             "sampleFrontendScreenTimeline",
             "formatFrontendScreenReferenceCatalog",
             "formatFrontendScreenReferenceDetail",
+            "formatFrontendRuntimeAlignment",
         ]:
             self.assertIn(token, header)
 
@@ -271,6 +275,11 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
             "intro_medium",
             "input lock",
             "source-free structural",
+            "runtime CSD/UI layer preferred",
+            "blend=source-over/additive",
+            "sampler=csd-point-seam",
+            "transitionBand",
+            "inputLockState",
             "SGFX slot",
             "Sonic assets are local placeholders",
         ]:
@@ -307,6 +316,8 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("screen=pause:name=PauseMenuReference:layout=ui_pause.yncp:activation=pause-ready:transition=intro_medium->pause menu visual ready:input_lock=until:pause-ready:scenes=8", completed.stdout)
         self.assertIn("scene=pause/bg:slot=pause_backdrop:activation=pause-ready:order=10:timeline=Intro_Anim:commands=1:structural=1:source_free=1", completed.stdout)
         self.assertIn("scene=pause/text_area:slot=pause_text_area:activation=pause-ready:order=50:timeline=Usual_Anim:commands=3:structural=3:source_free=3", completed.stdout)
+        self.assertIn("material_semantics=pause:blend=source-over/additive:alpha=straight-alpha:color=packed-rgba-gradient:filter=csd-point-seam:offset=half-pixel:oracle=runtime CSD/UI layer preferred", completed.stdout)
+        self.assertIn("runtime_alignment=pause:active_screen=pause:active_scenes=bg,bg_1,bg_1_select,bg_2,text_area,skill_select,arrow,skill_scroll_bar_bg:motion=intro_medium:frame=15:cursor_owner=CHudPause:transition=intro_medium->pause menu visual ready:input_lock=until:pause-ready", completed.stdout)
         self.assertIn("timeline_sample=pause/text_area:Usual_Anim:frame=50/200:progress=0.250", completed.stdout)
         self.assertIn("material_slot=title-menu:backdrop:ui_mm_base.dds:placeholder=frontend-title-menu", completed.stdout)
 

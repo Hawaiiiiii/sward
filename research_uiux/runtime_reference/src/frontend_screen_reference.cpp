@@ -38,6 +38,19 @@ FrontendScreenMaterialSlot materialSlot(
     };
 }
 
+FrontendScreenMaterialSemantics defaultMaterialSemantics()
+{
+    // Phase 142 material parity shorthand: blend=source-over/additive, sampler=csd-point-seam.
+    return {
+        "source-over/additive",
+        "straight-alpha",
+        "packed-rgba-gradient",
+        "csd-point-seam",
+        "half-pixel",
+        "runtime CSD/UI layer preferred",
+    };
+}
+
 FrontendScreenTimelineChannel timeline(
     std::string animationName,
     int sampleFrame,
@@ -125,6 +138,7 @@ const std::vector<FrontendScreenPolicy> kFrontendScreenPolicies{
         "select_travel->title menu visual ready",
         "until:title-menu-visible",
         "scene-stack:background->motion-donut->selection/content",
+        defaultMaterialSemantics(),
         {
             materialSlot("backdrop", "ui_mm_base.dds", "frontend-title-menu", "background_layer"),
             materialSlot("content", "ui_mm_contentstext.dds", "frontend-title-menu", "menu_copy"),
@@ -182,6 +196,7 @@ const std::vector<FrontendScreenPolicy> kFrontendScreenPolicies{
         "pda_intro->loading display active",
         "until:loading-display-active",
         "scene-stack:pda-device->localized-copy",
+        defaultMaterialSemantics(),
         {
             materialSlot("device_frame", "mat_load_comon_001.dds", "frontend-loading", "loading_device_frame"),
             materialSlot("backdrop", "mat_load_comon_001.dds", "frontend-loading", "loading_backdrop"),
@@ -226,6 +241,7 @@ const std::vector<FrontendScreenPolicy> kFrontendScreenPolicies{
         "select_travel->title options visual ready",
         "until:title-options-ready",
         "scene-stack:background->options-selection",
+        defaultMaterialSemantics(),
         {
             materialSlot("backdrop", "ui_mm_base.dds", "frontend-title-options", "background_layer"),
             materialSlot("option_carousel", "ui_mm_contentstext.dds", "frontend-title-options", "option_copy"),
@@ -270,6 +286,7 @@ const std::vector<FrontendScreenPolicy> kFrontendScreenPolicies{
         "intro_medium->pause menu visual ready",
         "until:pause-ready",
         "scene-stack:source-free-bg->panels->selection->scrollbar",
+        defaultMaterialSemantics(),
         {
             materialSlot("pause_backdrop", "mat_pause_en_001.dds", "frontend-pause", "pause_backdrop"),
             materialSlot("pause_chrome", "mat_pause_en_002.dds", "frontend-pause", "pause_chrome"),
@@ -420,6 +437,50 @@ const FrontendScreenScenePolicy* findFrontendScreenScenePolicy(
     return found == screen.scenes.end() ? nullptr : &*found;
 }
 
+FrontendRuntimeAlignment defaultFrontendRuntimeAlignment(const FrontendScreenPolicy& screen)
+{
+    FrontendRuntimeAlignment alignment;
+    alignment.screenId = screen.screenId;
+    alignment.transitionBand = screen.transitionBand;
+    alignment.inputLockState = screen.inputLockTiming;
+    alignment.source = "frontend_screen_reference";
+    for (const auto& scene : screen.scenes)
+        alignment.activeScenes.push_back(scene.sceneName);
+
+    if (screen.screenId == "title-menu")
+    {
+        alignment.activeMotionName = "select_travel";
+        alignment.activeFrame = 10;
+        alignment.cursorOwner = "CTitleStateMenu";
+    }
+    else if (screen.screenId == "loading")
+    {
+        alignment.activeMotionName = "pda_intro";
+        alignment.activeFrame = 75;
+        alignment.cursorOwner = "LoadingDisplay";
+    }
+    else if (screen.screenId == "title-options")
+    {
+        alignment.activeMotionName = "select_travel";
+        alignment.activeFrame = 15;
+        alignment.cursorOwner = "CTitleStateMenu/options";
+    }
+    else if (screen.screenId == "pause")
+    {
+        alignment.activeMotionName = "intro_medium";
+        alignment.activeFrame = 15;
+        alignment.cursorOwner = "CHudPause";
+    }
+    else
+    {
+        alignment.activeMotionName = screen.transitionBand;
+        alignment.activeFrame = screen.scenes.empty() ? 0 : screen.scenes.front().timeline.sampleFrame;
+        alignment.cursorOwner = "unknown";
+    }
+
+    return alignment;
+}
+
 FrontendScreenTimelineSample sampleFrontendScreenTimeline(
     const FrontendScreenPolicy& screen,
     const FrontendScreenScenePolicy& scene,
@@ -465,6 +526,15 @@ std::string formatFrontendScreenReferenceCatalog()
             << ":structural=" << totalStructuralCommands(policy)
             << ":source_free=" << totalSourceFreeStructuralCommands(policy)
             << '\n';
+        out << "material_semantics=" << policy.screenId
+            << ":blend=" << policy.materialSemantics.blendModel
+            << ":alpha=" << policy.materialSemantics.alphaModel
+            << ":color=" << policy.materialSemantics.colorModel
+            << ":filter=" << policy.materialSemantics.filteringModel
+            << ":offset=" << policy.materialSemantics.pixelOffsetModel
+            << ":oracle=" << policy.materialSemantics.oraclePolicy
+            << '\n';
+        out << "runtime_alignment=" << formatFrontendRuntimeAlignment(defaultFrontendRuntimeAlignment(policy)) << '\n';
         for (const auto& scene : policy.scenes)
         {
             out << "scene=" << policy.screenId << '/' << scene.sceneName
@@ -492,6 +562,14 @@ std::string formatFrontendScreenReferenceDetail(const FrontendScreenPolicy& scre
     out << "transition=" << screen.transitionBand << '\n';
     out << "input_lock=" << screen.inputLockTiming << '\n';
     out << "render_order=" << screen.renderOrderPolicy << '\n';
+    out << "material_semantics=blend=" << screen.materialSemantics.blendModel
+        << ":alpha=" << screen.materialSemantics.alphaModel
+        << ":color=" << screen.materialSemantics.colorModel
+        << ":filter=" << screen.materialSemantics.filteringModel
+        << ":offset=" << screen.materialSemantics.pixelOffsetModel
+        << ":oracle=" << screen.materialSemantics.oraclePolicy
+        << '\n';
+    out << "runtime_alignment=" << formatFrontendRuntimeAlignment(defaultFrontendRuntimeAlignment(screen)) << '\n';
     out << "scene_count=" << screen.scenes.size() << '\n';
     out << "command_count=" << totalDrawableCommands(screen) << '\n';
     out << "structural_command_count=" << totalStructuralCommands(screen) << '\n';
@@ -538,6 +616,20 @@ std::string formatFrontendScreenSceneDetail(
         << '\n';
     out << "timeline_roles=" << joinStrings(scene.timeline.channelRoles, ",") << '\n';
     out << "state_policy=" << joinStrings(scene.statePolicy, " | ") << '\n';
+    return out.str();
+}
+
+std::string formatFrontendRuntimeAlignment(const FrontendRuntimeAlignment& alignment)
+{
+    std::ostringstream out;
+    out << alignment.screenId
+        << ":active_screen=" << alignment.screenId
+        << ":active_scenes=" << joinStrings(alignment.activeScenes, ",")
+        << ":motion=" << alignment.activeMotionName
+        << ":frame=" << alignment.activeFrame
+        << ":cursor_owner=" << alignment.cursorOwner
+        << ":transition=" << alignment.transitionBand
+        << ":input_lock=" << alignment.inputLockState;
     return out.str();
 }
 } // namespace sward::ui_runtime

@@ -15,6 +15,16 @@ struct FrontendScreenMaterialSlot
     bool swappable = true;
 };
 
+struct FrontendScreenMaterialSemantics
+{
+    std::string blendModel;
+    std::string alphaModel;
+    std::string colorModel;
+    std::string filteringModel;
+    std::string pixelOffsetModel;
+    std::string oraclePolicy;
+};
+
 struct FrontendScreenTimelineChannel
 {
     std::string animationName;
@@ -48,8 +58,21 @@ struct FrontendScreenPolicy
     std::string transitionBand;
     std::string inputLockTiming;
     std::string renderOrderPolicy;
+    FrontendScreenMaterialSemantics materialSemantics;
     std::vector<FrontendScreenMaterialSlot> materialSlots;
     std::vector<FrontendScreenScenePolicy> scenes;
+};
+
+struct FrontendRuntimeAlignment
+{
+    std::string screenId;
+    std::vector<std::string> activeScenes;
+    std::string activeMotionName;
+    int activeFrame = 0;
+    std::string cursorOwner;
+    std::string transitionBand;
+    std::string inputLockState;
+    std::string source;
 };
 
 struct FrontendScreenTimelineSample
@@ -68,6 +91,7 @@ struct FrontendScreenTimelineSample
 [[nodiscard]] const FrontendScreenScenePolicy* findFrontendScreenScenePolicy(
     const FrontendScreenPolicy& screen,
     std::string_view sceneNameOrPath);
+[[nodiscard]] FrontendRuntimeAlignment defaultFrontendRuntimeAlignment(const FrontendScreenPolicy& screen);
 [[nodiscard]] FrontendScreenTimelineSample sampleFrontendScreenTimeline(
     const FrontendScreenPolicy& screen,
     const FrontendScreenScenePolicy& scene,
@@ -77,4 +101,5 @@ struct FrontendScreenTimelineSample
 [[nodiscard]] std::string formatFrontendScreenSceneDetail(
     const FrontendScreenPolicy& screen,
     const FrontendScreenScenePolicy& scene);
+[[nodiscard]] std::string formatFrontendRuntimeAlignment(const FrontendRuntimeAlignment& alignment);
 } // namespace sward::ui_runtime
