@@ -833,6 +833,17 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("phase143-live-state-alignment", source_text)
         self.assertIn("runtime_alignment_source=ui_lab_live_state", source_text)
 
+    def test_renderer_source_wires_phase144_direct_live_bridge_alignment_probe(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendLiveBridgeProbeResult", source_text)
+        self.assertIn("discoverFrontendLiveBridgeName", source_text)
+        self.assertIn("queryUiLabLiveBridgeState", source_text)
+        self.assertIn("loadFrontendRuntimeAlignmentFromLiveBridge", source_text)
+        self.assertIn("runRendererLiveBridgeAlignmentSmoke", source_text)
+        self.assertIn("--renderer-live-bridge-alignment-smoke", source_text)
+        self.assertIn("phase144-live-bridge-alignment", source_text)
+        self.assertIn("runtime_alignment_probe=direct-live-bridge", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -917,6 +928,27 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertRegex(completed.stdout, r"runtime_alignment=pause:active_screen=pause:.*motion=pause target ready:frame=[1-9]\d*:cursor_owner=CHudPause/menu=.*status=.*transition=.*")
         self.assertRegex(completed.stdout, r"live_state_path=title-menu:out/ui_lab_runtime_evidence/.*/title-menu/ui_lab_live_state.json")
         self.assertIn("alignment_field_status=title-menu:active_screen=live:active_scenes=policy:motion=live-route:frame=live-frame:cursor_owner=live-title-menu:transition=policy:input_lock=live-readiness", completed.stdout)
+
+    def test_renderer_live_bridge_alignment_smoke_reports_direct_probe_or_snapshot_fallback(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-live-bridge-alignment-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer live bridge alignment smoke ok", completed.stdout)
+        self.assertIn("mode=phase144-live-bridge-alignment", completed.stdout)
+        self.assertRegex(completed.stdout, r"runtime_alignment_probe=(direct-live-bridge|snapshot-fallback)")
+        self.assertRegex(completed.stdout, r"bridge_probe=title-menu:pipe=[^:]+:connected=[01]:fallback=(ui_lab_live_state|none)")
+        self.assertIn("alignment_lane=title-menu:", completed.stdout)
+        self.assertIn("runtime_alignment=title-menu:active_screen=title-menu", completed.stdout)
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

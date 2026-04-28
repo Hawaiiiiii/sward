@@ -334,6 +334,8 @@ Local-only evidence, not committed:
   - Phase 143 lets the tracked frontend reference viewer consume the latest UI Lab `ui_lab_live_state.json` snapshots directly for title-menu, loading, title-options, and pause alignment
   - the viewer now labels live-read fields separately from policy fallback fields: active screen, route/motion, frame, title cursor, loading display type, pause owner status, transition band, input-lock release, live-state path, and per-field provenance
   - `--renderer-runtime-alignment-smoke` is the bounded operator check for this path; native BMPs remain the visual proof, while live-state/bridge evidence becomes the state driver
+  - Phase 144 adds a read-only direct live-bridge probe for the same viewer lanes: `queryUiLabLiveBridgeState` sends `state` to the Windows named pipe when a running UI Lab is present, accepts the result only when the response target matches the lane, and reports `direct-live-bridge` vs `snapshot-fallback` through `--renderer-live-bridge-alignment-smoke`
+  - missing, stale, or target-mismatched pipes now fall back to latest `ui_lab_live_state.json` snapshots without mutating routes or SGlobals, so native BMPs stay visual proof while the bridge becomes the preferred state read path
 
 - `research_uiux/runtime_reference/include/sward/ui_runtime/sonic_hud_reference.hpp` and `src/sonic_hud_reference.cpp`
   - Phase 137 promotes the generated Phase 136 reference into hand-written repo-safe source

@@ -176,8 +176,24 @@ struct CsdReferenceViewerLane
     std::string runtimeAlignmentEvidence;
     std::string runtimeAlignmentLiveStatePath;
     std::string runtimeAlignmentFieldStatus;
+    std::string runtimeAlignmentProbe;
+    std::string runtimeAlignmentBridgePipe;
+    bool runtimeAlignmentBridgeConnected = false;
+    std::string runtimeAlignmentBridgeFallback;
+    std::string runtimeAlignmentBridgeError;
     std::string materialSemantics;
     std::string policySource;
+};
+
+struct FrontendLiveBridgeProbeResult
+{
+    bool attempted = false;
+    bool connected = false;
+    std::string pipeName = "sward_ui_lab_live";
+    std::string command = "state";
+    std::string responseJson;
+    std::string error;
+    std::string fallbackSource;
 };
 
 struct FrontendLiveStateAlignmentEvidence
@@ -188,6 +204,8 @@ struct FrontendLiveStateAlignmentEvidence
     std::string fieldStatus;
     std::string route;
     std::string nativeCaptureStatus;
+    std::string fallbackSource;
+    FrontendLiveBridgeProbeResult bridgeProbe;
 };
 
 struct CsdColorRgba
@@ -651,7 +669,13 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] std::string jsonEscape(std::string_view text);
 [[nodiscard]] std::filesystem::path repoRootForOutput();
 [[nodiscard]] std::optional<std::filesystem::path> findLatestFrontendLiveStatePath(std::string_view target);
+[[nodiscard]] std::string discoverFrontendLiveBridgeName(std::string_view target);
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeState(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds = 150);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveState(
+    const sward::ui_runtime::FrontendScreenPolicy& policy);
+[[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveBridge(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] std::string formatFrontendRuntimeAlignmentEvidence(const FrontendLiveStateAlignmentEvidence& evidence);
 
@@ -900,12 +924,23 @@ inline constexpr std::array<CsdPipelineTemplateBinding, 4> kCsdPipelineTemplateB
     lane.requiredEventId = policy.activationEvent;
     lane.timelineBandId = transitionBandId;
     lane.timelineEventLabel = transitionReadyLabel;
-    const auto alignmentEvidence = loadFrontendRuntimeAlignmentFromLiveState(policy);
+    const auto alignmentEvidence = loadFrontendRuntimeAlignmentFromLiveBridge(policy);
     lane.runtimeAlignment = formatFrontendRuntimeAlignment(alignmentEvidence.alignment);
     lane.runtimeAlignmentSource = alignmentEvidence.alignment.source;
     lane.runtimeAlignmentEvidence = formatFrontendRuntimeAlignmentEvidence(alignmentEvidence);
-    lane.runtimeAlignmentLiveStatePath = alignmentEvidence.found ? portablePath(alignmentEvidence.liveStatePath) : "missing";
+    lane.runtimeAlignmentLiveStatePath = !alignmentEvidence.liveStatePath.empty()
+        ? portablePath(alignmentEvidence.liveStatePath)
+        : (alignmentEvidence.alignment.source == "ui_lab_live_bridge" ? "direct-live-bridge" : "missing");
     lane.runtimeAlignmentFieldStatus = alignmentEvidence.fieldStatus;
+    lane.runtimeAlignmentProbe = alignmentEvidence.alignment.source == "ui_lab_live_bridge"
+        ? "direct-live-bridge"
+        : "snapshot-fallback";
+    lane.runtimeAlignmentBridgePipe = alignmentEvidence.bridgeProbe.pipeName;
+    lane.runtimeAlignmentBridgeConnected = alignmentEvidence.bridgeProbe.connected;
+    lane.runtimeAlignmentBridgeFallback = alignmentEvidence.fallbackSource.empty()
+        ? (alignmentEvidence.alignment.source == "ui_lab_live_bridge" ? "none" : "ui_lab_live_state")
+        : alignmentEvidence.fallbackSource;
+    lane.runtimeAlignmentBridgeError = alignmentEvidence.bridgeProbe.error;
     lane.materialSemantics = frontendMaterialSemanticsDescriptor(policy);
     lane.policySource = "frontend_screen_reference";
 
@@ -5261,6 +5296,46 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return lanes.empty() ? 1 : 0;
 }
 
+[[nodiscard]] int runRendererLiveBridgeAlignmentSmoke()
+{
+    constexpr std::string_view directProbeToken = "runtime_alignment_probe=direct-live-bridge";
+    constexpr std::string_view fallbackProbeToken = "runtime_alignment_probe=snapshot-fallback";
+    const auto lanes = buildReferenceViewerLanesFromTrackedPolicy();
+    const bool anyDirect = std::any_of(
+        lanes.begin(),
+        lanes.end(),
+        [](const CsdReferenceViewerLane& lane)
+        {
+            return lane.runtimeAlignmentProbe == "direct-live-bridge";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer live bridge alignment smoke ok "
+        << "mode=phase144-live-bridge-alignment"
+        << " " << (anyDirect ? directProbeToken : fallbackProbeToken)
+        << " lanes=" << lanes.size()
+        << '\n';
+
+    for (const auto& lane : lanes)
+    {
+        std::cout
+            << "bridge_probe=" << lane.laneId
+            << ":pipe=" << (lane.runtimeAlignmentBridgePipe.empty() ? std::string("sward_ui_lab_live") : lane.runtimeAlignmentBridgePipe)
+            << ":connected=" << (lane.runtimeAlignmentBridgeConnected ? 1 : 0)
+            << ":fallback=" << (lane.runtimeAlignmentBridgeFallback.empty() ? std::string("none") : lane.runtimeAlignmentBridgeFallback);
+        if (!lane.runtimeAlignmentBridgeError.empty())
+            std::cout << ":error=" << lane.runtimeAlignmentBridgeError;
+        std::cout << '\n';
+
+        std::cout << "runtime_alignment=" << lane.runtimeAlignment << '\n';
+        std::cout << "alignment_lane=" << lane.runtimeAlignmentEvidence << '\n';
+        std::cout << "live_state_path=" << lane.laneId << ":" << lane.runtimeAlignmentLiveStatePath << '\n';
+        std::cout << "alignment_field_status=" << lane.runtimeAlignmentFieldStatus << '\n';
+    }
+
+    return lanes.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -7300,6 +7375,66 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return latestLiveStatePathForTarget(target);
 }
 
+[[nodiscard]] std::string discoverFrontendLiveBridgeName(std::string_view target)
+{
+    constexpr std::string_view defaultPipeName = "sward_ui_lab_live";
+    const auto liveStatePath = findLatestFrontendLiveStatePath(target);
+    if (!liveStatePath)
+        return std::string(defaultPipeName);
+
+    const std::string text = readTextFile(*liveStatePath);
+    if (text.empty())
+        return std::string(defaultPipeName);
+
+    if (const auto liveBridge = jsonObjectFieldSpan(text, "liveBridge"))
+    {
+        const auto name = jsonStringField(*liveBridge, "name");
+        if (name && !name->empty())
+            return *name;
+    }
+
+    return std::string(defaultPipeName);
+}
+
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeState(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds)
+{
+    FrontendLiveBridgeProbeResult result;
+    result.attempted = true;
+    result.pipeName = pipeName.empty() ? "sward_ui_lab_live" : std::string(pipeName);
+
+    const std::string pipePath = "\\\\.\\pipe\\" + result.pipeName;
+    std::vector<char> response(1024 * 1024, '\0');
+    DWORD bytesRead = 0;
+    char command[] = "state";
+    const BOOL ok = CallNamedPipeA(
+        pipePath.c_str(),
+        command,
+        static_cast<DWORD>(std::strlen(command)),
+        response.data(),
+        static_cast<DWORD>(response.size() - 1),
+        &bytesRead,
+        timeoutMilliseconds);
+
+    if (!ok)
+    {
+        const DWORD errorCode = GetLastError();
+        std::ostringstream error;
+        error << "call-failed-" << errorCode;
+        result.error = error.str();
+        return result;
+    }
+
+    result.connected = true;
+    response[std::min<std::size_t>(bytesRead, response.size() - 1)] = '\0';
+    result.responseJson.assign(response.data(), bytesRead);
+    if (result.responseJson.empty())
+        result.error = "empty-response";
+
+    return result;
+}
+
 [[nodiscard]] std::string frontendAlignmentCursorOwnerFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy,
     std::string_view text)
@@ -7387,7 +7522,7 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return targetObserved && nativeComplete;
 }
 
-[[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveState(
+[[nodiscard]] FrontendLiveStateAlignmentEvidence makeDefaultFrontendRuntimeAlignmentEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy)
 {
     FrontendLiveStateAlignmentEvidence evidence;
@@ -7396,17 +7531,16 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     evidence.fieldStatus =
         policy.screenId
         + ":active_screen=policy:active_scenes=policy:motion=policy:frame=policy:cursor_owner=policy:transition=policy:input_lock=policy";
+    return evidence;
+}
 
-    const auto liveStatePath = findLatestFrontendLiveStatePath(policy.screenId);
-    if (!liveStatePath)
-        return evidence;
-
-    const std::string text = readTextFile(*liveStatePath);
-    if (text.empty())
-        return evidence;
-
+void applyFrontendRuntimeAlignmentFromLiveStateJson(
+    FrontendLiveStateAlignmentEvidence& evidence,
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    std::string_view text,
+    std::string_view source)
+{
     evidence.found = true;
-    evidence.liveStatePath = *liveStatePath;
     evidence.alignment.screenId = jsonStringField(text, "target").value_or(policy.screenId);
     evidence.alignment.activeScenes.clear();
     for (const auto& scene : policy.scenes)
@@ -7420,7 +7554,7 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     evidence.alignment.inputLockState = frontendAlignmentReadyFromLiveState(policy, text)
         ? ("released:" + policy.activationEvent)
         : policy.inputLockTiming;
-    evidence.alignment.source = "ui_lab_live_state";
+    evidence.alignment.source = std::string(source);
     evidence.fieldStatus =
         policy.screenId
         + ":active_screen=live:active_scenes=policy:motion=live-route:frame=live-frame:cursor_owner=live-"
@@ -7430,16 +7564,74 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
                 ? "title-options"
                 : (policy.screenId == "loading" ? "loading" : (policy.screenId == "pause" ? "pause" : "generic"))))
         + ":transition=policy:input_lock=live-readiness";
+}
+
+[[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveState(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendLiveStateAlignmentEvidence evidence = makeDefaultFrontendRuntimeAlignmentEvidence(policy);
+
+    const auto liveStatePath = findLatestFrontendLiveStatePath(policy.screenId);
+    if (!liveStatePath)
+        return evidence;
+
+    const std::string text = readTextFile(*liveStatePath);
+    if (text.empty())
+        return evidence;
+
+    evidence.found = true;
+    evidence.liveStatePath = *liveStatePath;
+    applyFrontendRuntimeAlignmentFromLiveStateJson(evidence, policy, text, "ui_lab_live_state");
 
     return evidence;
 }
 
+[[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveBridge(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    constexpr std::string_view defaultPipeName = "sward_ui_lab_live";
+    const auto discoveredPipeName = discoverFrontendLiveBridgeName(policy.screenId);
+    auto probe = queryUiLabLiveBridgeState(discoveredPipeName);
+    if (!probe.connected && discoveredPipeName != defaultPipeName)
+        probe = queryUiLabLiveBridgeState(defaultPipeName);
+
+    const auto responseTarget = probe.connected && !probe.responseJson.empty()
+        ? jsonStringField(probe.responseJson, "target")
+        : std::optional<std::string>{};
+
+    if (probe.connected && !probe.responseJson.empty() && responseTarget && *responseTarget == policy.screenId)
+    {
+        FrontendLiveStateAlignmentEvidence evidence = makeDefaultFrontendRuntimeAlignmentEvidence(policy);
+        applyFrontendRuntimeAlignmentFromLiveStateJson(
+            evidence,
+            policy,
+            probe.responseJson,
+            "ui_lab_live_bridge");
+        evidence.fallbackSource = "none";
+        evidence.bridgeProbe = probe;
+        evidence.bridgeProbe.fallbackSource = "none";
+        return evidence;
+    }
+
+    auto fallback = loadFrontendRuntimeAlignmentFromLiveState(policy);
+    fallback.fallbackSource = fallback.alignment.source == "ui_lab_live_state" ? "ui_lab_live_state" : "none";
+    if (probe.connected && responseTarget && *responseTarget != policy.screenId)
+        probe.error = "target-mismatch-" + *responseTarget;
+    probe.fallbackSource = fallback.fallbackSource;
+    fallback.bridgeProbe = probe;
+    return fallback;
+}
+
 [[nodiscard]] std::string formatFrontendRuntimeAlignmentEvidence(const FrontendLiveStateAlignmentEvidence& evidence)
 {
+    const std::string liveStateLabel = !evidence.liveStatePath.empty()
+        ? portablePath(evidence.liveStatePath)
+        : (evidence.alignment.source == "ui_lab_live_bridge" ? std::string("direct-live-bridge") : std::string("missing"));
+
     std::ostringstream out;
     out << evidence.alignment.screenId
         << ":source=" << evidence.alignment.source
-        << ":live_state=" << (evidence.found ? portablePath(evidence.liveStatePath) : std::string("missing"))
+        << ":live_state=" << liveStateLabel
         << ":native_capture=" << (evidence.nativeCaptureStatus.empty() ? std::string("unknown") : evidence.nativeCaptureStatus)
         << ":field_status=" << evidence.fieldStatus;
     return out.str();
@@ -9168,6 +9360,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererReferenceLanesSmoke();
     if (commandLineHasFlag("--renderer-runtime-alignment-smoke"))
         return runRendererRuntimeAlignmentSmoke();
+    if (commandLineHasFlag("--renderer-live-bridge-alignment-smoke"))
+        return runRendererLiveBridgeAlignmentSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 
