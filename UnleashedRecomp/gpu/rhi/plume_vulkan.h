@@ -177,6 +177,17 @@ namespace plume {
     struct VulkanGraphicsPipeline : VulkanPipeline {
         VkPipeline vk = VK_NULL_HANDLE;
         VkRenderPass renderPass = VK_NULL_HANDLE;
+        RenderBlendDesc uiLabBlend0;
+        RenderFormat uiLabRenderTargetFormat0 = RenderFormat::UNKNOWN;
+        RenderFormat uiLabDepthTargetFormat = RenderFormat::UNKNOWN;
+        RenderPrimitiveTopology uiLabPrimitiveTopology = RenderPrimitiveTopology::UNKNOWN;
+        uint32_t uiLabRenderTargetCount = 0;
+        uint32_t uiLabInputSlotCount = 0;
+        uint32_t uiLabInputElementCount = 0;
+        uint32_t uiLabSampleCount = 0;
+        bool uiLabDepthEnabled = false;
+        bool uiLabDepthWriteEnabled = false;
+        bool uiLabAlphaToCoverageEnabled = false;
 
         VulkanGraphicsPipeline(VulkanDevice *device, const RenderGraphicsPipelineDesc &desc);
         ~VulkanGraphicsPipeline() override;
@@ -291,6 +302,7 @@ namespace plume {
         const VulkanFramebuffer *targetFramebuffer = nullptr;
         const VulkanPipelineLayout *activeComputePipelineLayout = nullptr;
         const VulkanPipelineLayout *activeGraphicsPipelineLayout = nullptr;
+        const VulkanGraphicsPipeline *activeGraphicsPipeline = nullptr;
         const VulkanPipelineLayout *activeRaytracingPipelineLayout = nullptr;
         VkRenderPass activeRenderPass = VK_NULL_HANDLE;
 

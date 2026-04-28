@@ -395,9 +395,11 @@ struct FrontendMaterialCorrelationEvidence
     std::string probe = "missing";
     std::string correlationStatus = "missing";
     std::string rawBackendCommandStatus = "missing";
+    std::string resolvedBackendStatus = "missing";
     int runtimeFrame = 0;
     std::size_t drawCallCount = 0;
     std::size_t backendSubmitCount = 0;
+    std::size_t backendResolvedSubmitCount = 0;
     std::vector<FrontendMaterialCorrelationPair> pairs;
     FrontendLiveBridgeProbeResult bridgeProbe;
 };
@@ -418,6 +420,54 @@ struct FrontendMaterialCorrelationTriage
     std::size_t additivePairCount = 0;
     std::size_t filterLinearPairCount = 0;
     std::size_t filterPointPairCount = 0;
+    std::size_t localCommandCount = 0;
+};
+
+struct FrontendBackendResolvedSubmit
+{
+    std::string backend;
+    std::string nativeCommand;
+    bool indexed = false;
+    bool resolvedPipelineKnown = false;
+    bool activeFramebufferKnown = false;
+    bool blendEnabled = false;
+    int vertexCount = 0;
+    int indexCount = 0;
+    int instanceCount = 0;
+    int renderTargetFormat0 = 0;
+    int depthTargetFormat = 0;
+    int primitiveTopology = 0;
+    int renderTargetCount = 0;
+};
+
+struct FrontendBackendResolvedEvidence
+{
+    bool found = false;
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string resolvedBackendStatus = "missing";
+    int runtimeFrame = 0;
+    std::size_t materialPairCount = 0;
+    std::vector<FrontendBackendResolvedSubmit> submits;
+    FrontendLiveBridgeProbeResult bridgeProbe;
+};
+
+struct FrontendBackendResolvedTriage
+{
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string backendResolvedSource = "ui-backend-resolved";
+    std::string materialCorrelationBackendResolved = "joined";
+    std::string resolvedPsoBlendFramebuffer = "runtime-backend";
+    std::string resolvedBackendStatus = "missing";
+    std::size_t backendResolvedSubmitCount = 0;
+    std::size_t resolvedPipelineSubmitCount = 0;
+    std::size_t blendEnabledSubmitCount = 0;
+    std::size_t renderTargetFormatKnownCount = 0;
+    std::size_t framebufferKnownCount = 0;
+    std::size_t materialPairCount = 0;
     std::size_t localCommandCount = 0;
 };
 
@@ -903,6 +953,9 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeMaterialCorrelation(
     std::string_view pipeName,
     DWORD timeoutMilliseconds = 150);
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeBackendResolved(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds = 150);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveBridge(
@@ -916,6 +969,8 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] FrontendGpuSubmitEvidence loadFrontendGpuSubmitEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendMaterialCorrelationEvidence loadFrontendMaterialCorrelationEvidence(
+    const sward::ui_runtime::FrontendScreenPolicy& policy);
+[[nodiscard]] FrontendBackendResolvedEvidence loadFrontendBackendResolvedEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] std::string formatFrontendRuntimeAlignmentEvidence(const FrontendLiveStateAlignmentEvidence& evidence);
 
@@ -6417,6 +6472,144 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return records.empty() ? 1 : 0;
 }
 
+[[nodiscard]] FrontendBackendResolvedTriage buildFrontendBackendResolvedTriage(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendBackendResolvedTriage triage;
+    triage.screenId = policy.screenId;
+
+    const auto resolved = loadFrontendBackendResolvedEvidence(policy);
+    triage.source = resolved.source;
+    triage.probe = resolved.probe;
+    triage.resolvedBackendStatus = resolved.resolvedBackendStatus;
+    triage.backendResolvedSubmitCount = resolved.submits.size();
+    triage.materialPairCount = resolved.materialPairCount;
+    triage.resolvedPipelineSubmitCount = static_cast<std::size_t>(std::count_if(
+        resolved.submits.begin(),
+        resolved.submits.end(),
+        [](const FrontendBackendResolvedSubmit& submit)
+        {
+            return submit.resolvedPipelineKnown;
+        }));
+    triage.blendEnabledSubmitCount = static_cast<std::size_t>(std::count_if(
+        resolved.submits.begin(),
+        resolved.submits.end(),
+        [](const FrontendBackendResolvedSubmit& submit)
+        {
+            return submit.blendEnabled;
+        }));
+    triage.renderTargetFormatKnownCount = static_cast<std::size_t>(std::count_if(
+        resolved.submits.begin(),
+        resolved.submits.end(),
+        [](const FrontendBackendResolvedSubmit& submit)
+        {
+            return submit.renderTargetFormat0 != 0;
+        }));
+    triage.framebufferKnownCount = static_cast<std::size_t>(std::count_if(
+        resolved.submits.begin(),
+        resolved.submits.end(),
+        [](const FrontendBackendResolvedSubmit& submit)
+        {
+            return submit.activeFramebufferKnown;
+        }));
+
+    if (triage.materialPairCount == 0)
+    {
+        const auto material = loadFrontendMaterialCorrelationEvidence(policy);
+        triage.materialPairCount = material.pairs.size();
+    }
+
+    const auto clock = loadFrontendUiOraclePlaybackClock(policy);
+    for (const auto& scenePolicy : policy.scenes)
+    {
+        const int sceneFrame = uiOracleTimelineFrameForScene(clock, scenePolicy);
+        const CsdPipelineTemplateBinding sceneBinding{
+            policy.screenId,
+            policy.layoutName,
+            scenePolicy.sceneName,
+            scenePolicy.sceneName,
+            scenePolicy.timeline.animationName,
+        };
+
+        const auto* drawableScene = cachedCsdDrawableScene(sceneBinding);
+        if (!drawableScene)
+            continue;
+
+        auto playback = loadCsdTimelinePlayback(sceneBinding, sceneFrame);
+        if (!playback)
+            playback = loadTimelinePlaybackForScene(policy.screenId, policy.layoutName, scenePolicy.sceneName, sceneFrame);
+
+        std::size_t sampledTrackCount = 0;
+        const auto commands = timelineSampledCommands(
+            *drawableScene,
+            playback ? &*playback : nullptr,
+            sampledTrackCount);
+        triage.localCommandCount += static_cast<std::size_t>(std::count_if(
+            commands.begin(),
+            commands.end(),
+            csdCommandIsDrawable));
+    }
+
+    return triage;
+}
+
+[[nodiscard]] int runRendererBackendResolvedTriageSmoke()
+{
+    constexpr std::string_view directProbeToken = "backend_resolved_probe=direct-ui-backend-resolved";
+    constexpr std::string_view materialFallbackToken = "backend_resolved_probe=material-correlation-fallback";
+    constexpr std::string_view missingProbeToken = "backend_resolved_probe=missing";
+    constexpr std::string_view backendResolvedSourceToken = "backend_resolved_source=ui-backend-resolved";
+    constexpr std::string_view materialCorrelationToken = "material_correlation_backend_resolved=joined";
+    constexpr std::string_view resolvedPsoToken = "resolved_pso_blend_framebuffer=runtime-backend";
+
+    std::vector<FrontendBackendResolvedTriage> records;
+    for (const auto& policy : frontendScreenPolicies())
+        records.push_back(buildFrontendBackendResolvedTriage(policy));
+
+    const bool anyDirect = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendBackendResolvedTriage& record)
+        {
+            return record.probe == "direct-ui-backend-resolved";
+        });
+    const bool anyFallback = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendBackendResolvedTriage& record)
+        {
+            return record.probe == "material-correlation-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer backend resolved triage smoke ok "
+        << "mode=phase152-backend-resolved-submit"
+        << " " << (anyDirect ? directProbeToken : (anyFallback ? materialFallbackToken : missingProbeToken))
+        << " " << backendResolvedSourceToken
+        << " " << materialCorrelationToken
+        << " " << resolvedPsoToken
+        << " lanes=" << records.size()
+        << '\n';
+
+    for (const auto& record : records)
+    {
+        std::cout
+            << "backend_resolved=" << record.screenId
+            << ":source=" << record.source
+            << ":backend_resolved_submits=" << record.backendResolvedSubmitCount
+            << ":resolved_pipeline_submits=" << record.resolvedPipelineSubmitCount
+            << ":blend_enabled_submits=" << record.blendEnabledSubmitCount
+            << ":rt0_format_known=" << record.renderTargetFormatKnownCount
+            << ":framebuffer_known=" << record.framebufferKnownCount
+            << ":material_pairs=" << record.materialPairCount
+            << ":local_commands=" << record.localCommandCount
+            << ":resolved_backend_status=" << record.resolvedBackendStatus
+            << '\n';
+    }
+
+    return records.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -8561,6 +8754,13 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return queryUiLabLiveBridgeCommand(pipeName, "ui-material-correlation", timeoutMilliseconds);
 }
 
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeBackendResolved(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds)
+{
+    return queryUiLabLiveBridgeCommand(pipeName, "ui-backend-resolved", timeoutMilliseconds);
+}
+
 [[nodiscard]] std::string frontendAlignmentCursorOwnerFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy,
     std::string_view text)
@@ -9135,17 +9335,23 @@ void applyFrontendMaterialCorrelationFromJson(
     evidence.runtimeFrame = static_cast<int>(jsonNumberField(text, "frame").value_or(0.0));
     evidence.correlationStatus = jsonStringField(text, "correlationStatus").value_or("missing");
     evidence.rawBackendCommandStatus = jsonStringField(text, "rawBackendCommandStatus").value_or("missing");
+    evidence.resolvedBackendStatus = jsonStringField(text, "resolvedBackendStatus").value_or("missing");
     evidence.drawCallCount = static_cast<std::size_t>(jsonNumberField(text, "uiDrawCallCount").value_or(0.0));
     evidence.backendSubmitCount = static_cast<std::size_t>(jsonNumberField(text, "backendSubmitCallCount").value_or(0.0));
+    evidence.backendResolvedSubmitCount = static_cast<std::size_t>(jsonNumberField(text, "backendResolvedSubmitCount").value_or(0.0));
 
     const auto oracle = jsonObjectFieldSpan(text, "materialCorrelationOracle");
     const std::string_view oracleSpan = oracle ? *oracle : text;
     if (evidence.rawBackendCommandStatus == "missing")
         evidence.rawBackendCommandStatus = jsonStringField(oracleSpan, "rawBackendCommandStatus").value_or("missing");
+    if (evidence.resolvedBackendStatus == "missing")
+        evidence.resolvedBackendStatus = jsonStringField(oracleSpan, "resolvedBackendStatus").value_or("missing");
     if (evidence.drawCallCount == 0)
         evidence.drawCallCount = static_cast<std::size_t>(jsonNumberField(oracleSpan, "uiDrawCallCount").value_or(0.0));
     if (evidence.backendSubmitCount == 0)
         evidence.backendSubmitCount = static_cast<std::size_t>(jsonNumberField(oracleSpan, "backendSubmitCallCount").value_or(0.0));
+    if (evidence.backendResolvedSubmitCount == 0)
+        evidence.backendResolvedSubmitCount = static_cast<std::size_t>(jsonNumberField(oracleSpan, "backendResolvedSubmitCount").value_or(0.0));
 
     if (const auto pairs = jsonArrayFieldSpan(oracleSpan, "pairs"))
     {
@@ -9188,6 +9394,92 @@ void applyFrontendMaterialCorrelationFromJson(
     fallback.rawBackendCommandStatus = submit.backendSubmitStatus;
     fallback.backendSubmitCount = submit.calls.size();
     fallback.bridgeProbe = materialProbe;
+    return fallback;
+}
+
+[[nodiscard]] FrontendBackendResolvedSubmit parseFrontendBackendResolvedSubmit(std::string_view objectSpan)
+{
+    FrontendBackendResolvedSubmit submit;
+    submit.backend = jsonStringField(objectSpan, "backend").value_or("");
+    submit.nativeCommand = jsonStringField(objectSpan, "nativeCommand").value_or("");
+    submit.indexed = jsonBoolField(objectSpan, "indexed").value_or(false);
+    submit.resolvedPipelineKnown = jsonBoolField(objectSpan, "resolvedPipelineKnown").value_or(false);
+    submit.activeFramebufferKnown = jsonBoolField(objectSpan, "activeFramebufferKnown").value_or(false);
+    submit.vertexCount = static_cast<int>(jsonNumberField(objectSpan, "vertexCount").value_or(0.0));
+    submit.indexCount = static_cast<int>(jsonNumberField(objectSpan, "indexCount").value_or(0.0));
+    submit.instanceCount = static_cast<int>(jsonNumberField(objectSpan, "instanceCount").value_or(0.0));
+    submit.renderTargetFormat0 = static_cast<int>(jsonNumberField(objectSpan, "renderTargetFormat0").value_or(0.0));
+    submit.depthTargetFormat = static_cast<int>(jsonNumberField(objectSpan, "depthTargetFormat").value_or(0.0));
+    submit.primitiveTopology = static_cast<int>(jsonNumberField(objectSpan, "primitiveTopology").value_or(0.0));
+    submit.renderTargetCount = static_cast<int>(jsonNumberField(objectSpan, "renderTargetCount").value_or(0.0));
+    if (const auto blendState = jsonObjectFieldSpan(objectSpan, "pipelineBlendState"))
+        submit.blendEnabled = jsonBoolField(*blendState, "blendEnabled").value_or(false);
+    return submit;
+}
+
+void applyFrontendBackendResolvedFromJson(
+    FrontendBackendResolvedEvidence& evidence,
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    std::string_view text,
+    std::string_view source,
+    std::string_view probe)
+{
+    evidence.found = true;
+    evidence.screenId = jsonStringField(text, "target").value_or(policy.screenId);
+    evidence.source = std::string(source);
+    evidence.probe = std::string(probe);
+    evidence.runtimeFrame = static_cast<int>(jsonNumberField(text, "frame").value_or(0.0));
+    evidence.resolvedBackendStatus = jsonStringField(text, "resolvedBackendStatus").value_or("missing");
+    evidence.materialPairCount = static_cast<std::size_t>(jsonNumberField(text, "materialPairCount").value_or(0.0));
+
+    const auto oracle = jsonObjectFieldSpan(text, "backendResolvedSubmitOracle");
+    const std::string_view oracleSpan = oracle ? *oracle : text;
+    if (evidence.resolvedBackendStatus == "missing")
+        evidence.resolvedBackendStatus = jsonStringField(oracleSpan, "resolvedBackendStatus").value_or("missing");
+    if (evidence.materialPairCount == 0)
+        evidence.materialPairCount = static_cast<std::size_t>(jsonNumberField(oracleSpan, "materialPairCount").value_or(0.0));
+
+    if (const auto submits = jsonArrayFieldSpan(oracleSpan, "submits"))
+    {
+        for (const auto submitSpan : jsonObjectSpansInArray(*submits))
+            evidence.submits.push_back(parseFrontendBackendResolvedSubmit(submitSpan));
+    }
+}
+
+[[nodiscard]] FrontendBackendResolvedEvidence loadFrontendBackendResolvedEvidence(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    constexpr std::string_view defaultPipeName = "sward_ui_lab_live";
+    const auto discoveredPipeName = discoverFrontendLiveBridgeName(policy.screenId);
+
+    auto backendProbe = queryUiLabLiveBridgeBackendResolved(discoveredPipeName);
+    if (!backendProbe.connected && discoveredPipeName != defaultPipeName)
+        backendProbe = queryUiLabLiveBridgeBackendResolved(defaultPipeName);
+
+    const auto backendTarget = backendProbe.connected && !backendProbe.responseJson.empty()
+        ? jsonStringField(backendProbe.responseJson, "target")
+        : std::optional<std::string>{};
+    if (backendProbe.connected && backendTarget && *backendTarget == policy.screenId)
+    {
+        FrontendBackendResolvedEvidence evidence;
+        evidence.bridgeProbe = backendProbe;
+        applyFrontendBackendResolvedFromJson(
+            evidence,
+            policy,
+            backendProbe.responseJson,
+            "ui_lab_live_bridge_backend_resolved",
+            "direct-ui-backend-resolved");
+        return evidence;
+    }
+
+    const auto material = loadFrontendMaterialCorrelationEvidence(policy);
+    FrontendBackendResolvedEvidence fallback;
+    fallback.screenId = policy.screenId;
+    fallback.source = material.found ? "ui_lab_live_bridge_material_correlation" : "missing";
+    fallback.probe = material.found ? "material-correlation-fallback" : "missing";
+    fallback.resolvedBackendStatus = material.resolvedBackendStatus;
+    fallback.materialPairCount = material.pairs.size();
+    fallback.bridgeProbe = backendProbe;
     return fallback;
 }
 
@@ -10964,6 +11256,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererGpuSubmitTriageSmoke();
     if (commandLineHasFlag("--renderer-material-correlation-smoke"))
         return runRendererMaterialCorrelationSmoke();
+    if (commandLineHasFlag("--renderer-backend-resolved-triage-smoke"))
+        return runRendererBackendResolvedTriageSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 

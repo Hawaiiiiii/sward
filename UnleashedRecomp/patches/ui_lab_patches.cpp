@@ -185,6 +185,42 @@ namespace UiLab
         uint32_t instanceCount = 0;
     };
 
+    struct RuntimeBackendResolvedSubmit
+    {
+        uint64_t frame = 0;
+        uint32_t sequence = 0;
+        std::string backend;
+        std::string nativeCommand;
+        bool indexed = false;
+        uint32_t vertexCount = 0;
+        uint32_t indexCount = 0;
+        uint32_t instanceCount = 0;
+        uint64_t nativePipelineHandle = 0;
+        uint64_t nativePipelineLayoutHandle = 0;
+        bool resolvedPipelineKnown = false;
+        bool activeFramebufferKnown = false;
+        uint32_t framebufferWidth = 0;
+        uint32_t framebufferHeight = 0;
+        uint32_t renderTargetCount = 0;
+        uint32_t renderTargetFormat0 = 0;
+        uint32_t depthTargetFormat = 0;
+        uint32_t sampleCount = 0;
+        uint32_t primitiveTopology = 0;
+        bool blendEnabled = false;
+        uint32_t srcBlend = 0;
+        uint32_t destBlend = 0;
+        uint32_t blendOp = 0;
+        uint32_t srcBlendAlpha = 0;
+        uint32_t destBlendAlpha = 0;
+        uint32_t blendOpAlpha = 0;
+        uint32_t renderTargetWriteMask = 0;
+        uint32_t inputSlotCount = 0;
+        uint32_t inputElementCount = 0;
+        bool depthEnabled = false;
+        bool depthWriteEnabled = false;
+        bool alphaToCoverageEnabled = false;
+    };
+
     struct RuntimeMaterialCorrelation
     {
         uint64_t frame = 0;
@@ -646,6 +682,11 @@ namespace UiLab
     static uint64_t g_runtimeRawBackendCommandFrame = UINT64_MAX;
     static uint32_t g_runtimeRawBackendCommandSequence = 0;
     static uint32_t g_runtimeRawBackendCommandDroppedCount = 0;
+    static constexpr size_t kRuntimeBackendResolvedSubmitSampleLimit = 192;
+    static std::vector<RuntimeBackendResolvedSubmit> g_runtimeBackendResolvedSubmits;
+    static uint64_t g_runtimeBackendResolvedFrame = UINT64_MAX;
+    static uint32_t g_runtimeBackendResolvedSequence = 0;
+    static uint32_t g_runtimeBackendResolvedDroppedCount = 0;
     static PauseGeneralSaveLiveInspectorSnapshot g_pauseGeneralSaveInspector;
 
     static const RuntimeTarget& TargetFor(ScreenId id);
@@ -694,6 +735,7 @@ namespace UiLab
     static std::string BuildRuntimeUiDrawListJson();
     static std::string BuildRuntimeGpuSubmitJson();
     static std::string BuildRuntimeMaterialCorrelationJson();
+    static std::string BuildRuntimeBackendResolvedJson();
     static std::vector<RuntimeMaterialCorrelation> BuildRuntimeMaterialCorrelationPairs(
         const std::vector<RuntimeUiDrawCall>& drawCalls,
         const std::vector<RuntimeGpuSubmitCall>& submitCalls);
@@ -854,6 +896,13 @@ namespace UiLab
     }
 
     static std::string HexU32(uint32_t value)
+    {
+        std::ostringstream out;
+        out << "0x" << std::hex << std::uppercase << value;
+        return out.str();
+    }
+
+    static std::string HexU64(uint64_t value)
     {
         std::ostringstream out;
         out << "0x" << std::hex << std::uppercase << value;
@@ -1461,14 +1510,25 @@ namespace UiLab
         R"("uiDrawListOracle")",
         R"("gpuSubmitOracle")",
         R"("materialCorrelationOracle")",
+        R"("backendResolvedSubmitOracle")",
         R"("uiDrawSequence")",
         R"("gpuSubmitSequence")",
         R"("correlationMethod": "same-frame-order-window")",
+        R"("backendResolvedJoinMethod": "same-frame-order-window")",
         R"("blendSemantic")",
         R"("blendOperationSemantic")",
         R"("samplerSemantic")",
         R"("addressSemantic")",
         R"("halfPixelOffset")",
+        R"("resolvedBackendStatus")",
+        R"("nativeCommand")",
+        R"("nativePipelineHandle")",
+        R"("nativePipelineLayoutHandle")",
+        R"("pipelineBlendState")",
+        R"("renderTargetFormat0")",
+        R"("depthTargetFormat")",
+        R"("framebufferSize")",
+        R"("resolvedPipelineKnown")",
         R"("rawBackendCommandStatus")",
         R"("runtimeDrawListStatus")",
         R"("runtime CSD platform draw hook; GPU backend submit pending")",
@@ -2270,6 +2330,13 @@ namespace UiLab
             : "RHI command-list boundary hook armed; raw D3D12/Vulkan command capture pending";
     }
 
+    static std::string RuntimeBackendResolvedStatus(uint32_t capturedSubmits)
+    {
+        return capturedSubmits > 0
+            ? "backend-resolved command-list submit hook active"
+            : "backend-resolved command-list submit hook armed; waiting for D3D12/Vulkan draws";
+    }
+
     static std::string RenderBlendName(uint32_t value)
     {
         switch (value)
@@ -2564,6 +2631,83 @@ namespace UiLab
         out << "]";
     }
 
+    static RuntimeGpuSubmitCall BackendResolvedAsGpuSubmitSemantic(const RuntimeBackendResolvedSubmit& submit)
+    {
+        RuntimeGpuSubmitCall call;
+        call.alphaBlendEnable = submit.blendEnabled;
+        call.srcBlend = submit.srcBlend;
+        call.destBlend = submit.destBlend;
+        call.blendOp = submit.blendOp;
+        call.srcBlendAlpha = submit.srcBlendAlpha;
+        call.destBlendAlpha = submit.destBlendAlpha;
+        call.blendOpAlpha = submit.blendOpAlpha;
+        call.colorWriteEnable = submit.renderTargetWriteMask;
+        return call;
+    }
+
+    static void AppendRuntimeBackendResolvedSubmits(
+        std::ostringstream& out,
+        const std::vector<RuntimeBackendResolvedSubmit>& submits)
+    {
+        out << "[";
+        for (size_t i = 0; i < submits.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            const auto& submit = submits[i];
+            const RuntimeGpuSubmitCall semantic = BackendResolvedAsGpuSubmitSemantic(submit);
+            out
+                << "{"
+                << "\"sequence\":" << submit.sequence
+                << ",\"frame\":" << submit.frame
+                << ",\"backend\":\"" << JsonEscape(submit.backend) << "\""
+                << ",\"nativeCommand\":\"" << JsonEscape(submit.nativeCommand) << "\""
+                << ",\"indexed\":" << (submit.indexed ? "true" : "false")
+                << ",\"vertexCount\":" << submit.vertexCount
+                << ",\"indexCount\":" << submit.indexCount
+                << ",\"instanceCount\":" << submit.instanceCount
+                << ",\"nativePipelineHandle\":\"" << JsonEscape(HexU64(submit.nativePipelineHandle)) << "\""
+                << ",\"nativePipelineLayoutHandle\":\"" << JsonEscape(HexU64(submit.nativePipelineLayoutHandle)) << "\""
+                << ",\"resolvedPipelineKnown\":" << (submit.resolvedPipelineKnown ? "true" : "false")
+                << ",\"activeFramebufferKnown\":" << (submit.activeFramebufferKnown ? "true" : "false")
+                << ",\"framebufferSize\":{"
+                << "\"width\":" << submit.framebufferWidth
+                << ",\"height\":" << submit.framebufferHeight
+                << "}"
+                << ",\"renderTargetCount\":" << submit.renderTargetCount
+                << ",\"renderTargetFormat0\":" << submit.renderTargetFormat0
+                << ",\"depthTargetFormat\":" << submit.depthTargetFormat
+                << ",\"sampleCount\":" << submit.sampleCount
+                << ",\"primitiveTopology\":" << submit.primitiveTopology
+                << ",\"pipelineBlendState\":{"
+                << "\"blendEnabled\":" << (submit.blendEnabled ? "true" : "false")
+                << ",\"srcBlend\":" << submit.srcBlend
+                << ",\"destBlend\":" << submit.destBlend
+                << ",\"blendOp\":" << submit.blendOp
+                << ",\"srcBlendAlpha\":" << submit.srcBlendAlpha
+                << ",\"destBlendAlpha\":" << submit.destBlendAlpha
+                << ",\"blendOpAlpha\":" << submit.blendOpAlpha
+                << ",\"renderTargetWriteMask\":" << submit.renderTargetWriteMask
+                << ",\"blendSemantic\":\"" << JsonEscape(RuntimeBlendSemantic(semantic)) << "\""
+                << ",\"blendOperationSemantic\":\"" << JsonEscape(RuntimeBlendOperationSemantic(semantic)) << "\""
+                << ",\"additiveBlend\":" << (RuntimeBlendIsAdditive(semantic) ? "true" : "false")
+                << ",\"colorWriteSemantic\":\"" << JsonEscape(RuntimeColorWriteSemantic(semantic)) << "\""
+                << "}"
+                << ",\"depthState\":{"
+                << "\"depthEnabled\":" << (submit.depthEnabled ? "true" : "false")
+                << ",\"depthWriteEnabled\":" << (submit.depthWriteEnabled ? "true" : "false")
+                << "}"
+                << ",\"inputLayout\":{"
+                << "\"inputSlotCount\":" << submit.inputSlotCount
+                << ",\"inputElementCount\":" << submit.inputElementCount
+                << "}"
+                << ",\"alphaToCoverageEnabled\":" << (submit.alphaToCoverageEnabled ? "true" : "false")
+                << "}";
+        }
+        out << "]";
+    }
+
     static void AppendRuntimeMaterialCorrelationPairs(
         std::ostringstream& out,
         const std::vector<RuntimeMaterialCorrelation>& pairs)
@@ -2608,6 +2752,94 @@ namespace UiLab
                 << "}";
         }
         out << "]";
+    }
+
+    static std::string BuildRuntimeBackendResolvedJson()
+    {
+        const auto& target = TargetFor(g_target);
+
+        std::vector<RuntimeBackendResolvedSubmit> submits;
+        std::vector<RuntimeUiDrawCall> drawCalls;
+        std::vector<RuntimeGpuSubmitCall> gpuSubmitCalls;
+        uint64_t frame = g_presentedFrameCount;
+        uint32_t droppedCount = 0;
+        uint32_t sequence = 0;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            submits = g_runtimeBackendResolvedSubmits;
+            drawCalls = g_runtimeUiDrawCalls;
+            gpuSubmitCalls = g_runtimeGpuSubmitCalls;
+            if (g_runtimeBackendResolvedFrame != UINT64_MAX)
+                frame = g_runtimeBackendResolvedFrame;
+            else if (g_runtimeGpuSubmitFrame != UINT64_MAX)
+                frame = g_runtimeGpuSubmitFrame;
+            droppedCount = g_runtimeBackendResolvedDroppedCount;
+            sequence = g_runtimeBackendResolvedSequence;
+        }
+
+        uint32_t resolvedPipelineCount = 0;
+        uint32_t blendEnabledCount = 0;
+        uint32_t rt0KnownCount = 0;
+        uint32_t framebufferKnownCount = 0;
+        uint32_t indexedCount = 0;
+        for (const auto& submit : submits)
+        {
+            if (submit.resolvedPipelineKnown)
+                ++resolvedPipelineCount;
+            if (submit.blendEnabled)
+                ++blendEnabledCount;
+            if (submit.renderTargetFormat0 != 0)
+                ++rt0KnownCount;
+            if (submit.activeFramebufferKnown)
+                ++framebufferKnownCount;
+            if (submit.indexed)
+                ++indexedCount;
+        }
+
+        const auto materialPairs = BuildRuntimeMaterialCorrelationPairs(drawCalls, gpuSubmitCalls);
+        const std::string status = RuntimeBackendResolvedStatus(static_cast<uint32_t>(submits.size()));
+
+        std::ostringstream out;
+        out
+            << "{\n"
+            << "  \"ok\": true,\n"
+            << "  \"source\": \"backend-resolved D3D12/Vulkan command-list submit hook\",\n"
+            << "  \"version\": 1,\n"
+            << "  \"frame\": " << frame << ",\n"
+            << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
+            << "  \"resolvedBackendStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "  \"backendResolvedSubmitCount\": " << submits.size() << ",\n"
+            << "  \"capturedBackendResolvedSubmitCount\": " << submits.size() << ",\n"
+            << "  \"droppedBackendResolvedSubmitCount\": " << droppedCount << ",\n"
+            << "  \"backendResolvedSubmitSequence\": " << sequence << ",\n"
+            << "  \"resolvedPipelineSubmitCount\": " << resolvedPipelineCount << ",\n"
+            << "  \"blendEnabledSubmitCount\": " << blendEnabledCount << ",\n"
+            << "  \"renderTargetFormat0KnownCount\": " << rt0KnownCount << ",\n"
+            << "  \"framebufferKnownSubmitCount\": " << framebufferKnownCount << ",\n"
+            << "  \"indexedSubmitCount\": " << indexedCount << ",\n"
+            << "  \"materialPairCount\": " << materialPairs.size() << ",\n"
+            << "  \"backendResolvedJoinMethod\": \"same-frame-order-window\",\n"
+            << "  \"sampleLimit\": " << kRuntimeBackendResolvedSubmitSampleLimit << ",\n"
+            << "  \"backendResolvedSubmitOracle\": {\n"
+            << "    \"source\": \"D3D12/Vulkan command-list draw hooks\",\n"
+            << "    \"resolvedBackendStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "    \"backendResolvedJoinMethod\": \"same-frame-order-window\",\n"
+            << "    \"backendResolvedSubmitCount\": " << submits.size() << ",\n"
+            << "    \"resolvedPipelineSubmitCount\": " << resolvedPipelineCount << ",\n"
+            << "    \"blendEnabledSubmitCount\": " << blendEnabledCount << ",\n"
+            << "    \"renderTargetFormat0KnownCount\": " << rt0KnownCount << ",\n"
+            << "    \"framebufferKnownSubmitCount\": " << framebufferKnownCount << ",\n"
+            << "    \"materialPairCount\": " << materialPairs.size() << ",\n"
+            << "    \"submits\": ";
+        AppendRuntimeBackendResolvedSubmits(out, submits);
+        out
+            << "\n"
+            << "  }\n"
+            << "}\n";
+
+        return out.str();
     }
 
     static std::string BuildRuntimeGpuSubmitJson()
@@ -2685,15 +2917,18 @@ namespace UiLab
         std::vector<RuntimeUiDrawCall> drawCalls;
         std::vector<RuntimeGpuSubmitCall> submitCalls;
         std::vector<RuntimeRawBackendCommand> rawBackendCommands;
+        std::vector<RuntimeBackendResolvedSubmit> backendResolvedSubmits;
         uint64_t frame = g_presentedFrameCount;
         uint32_t runtimeUiDrawDroppedCount = 0;
         uint32_t runtimeGpuSubmitDroppedCount = 0;
         uint32_t runtimeRawBackendDroppedCount = 0;
+        uint32_t runtimeBackendResolvedDroppedCount = 0;
         {
             std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
             drawCalls = g_runtimeUiDrawCalls;
             submitCalls = g_runtimeGpuSubmitCalls;
             rawBackendCommands = g_runtimeRawBackendCommands;
+            backendResolvedSubmits = g_runtimeBackendResolvedSubmits;
             if (g_runtimeGpuSubmitFrame != UINT64_MAX)
                 frame = g_runtimeGpuSubmitFrame;
             else if (g_runtimeUiDrawListFrame != UINT64_MAX)
@@ -2701,6 +2936,7 @@ namespace UiLab
             runtimeUiDrawDroppedCount = g_runtimeUiDrawCallDroppedCount;
             runtimeGpuSubmitDroppedCount = g_runtimeGpuSubmitDroppedCount;
             runtimeRawBackendDroppedCount = g_runtimeRawBackendCommandDroppedCount;
+            runtimeBackendResolvedDroppedCount = g_runtimeBackendResolvedDroppedCount;
         }
 
         const auto pairs = BuildRuntimeMaterialCorrelationPairs(drawCalls, submitCalls);
@@ -2722,6 +2958,7 @@ namespace UiLab
 
         const std::string backendSubmitStatus = RuntimeGpuSubmitStatus(static_cast<uint32_t>(submitCalls.size()));
         const std::string rawBackendCommandStatus = RuntimeRawBackendCommandStatus(static_cast<uint32_t>(rawBackendCommands.size()));
+        const std::string resolvedBackendStatus = RuntimeBackendResolvedStatus(static_cast<uint32_t>(backendResolvedSubmits.size()));
 
         std::ostringstream out;
         out
@@ -2736,9 +2973,11 @@ namespace UiLab
             << "  \"correlationStatus\": \"same-frame-order-window active; raw D3D12/Vulkan command capture pending\",\n"
             << "  \"backendSubmitStatus\": \"" << JsonEscape(backendSubmitStatus) << "\",\n"
             << "  \"rawBackendCommandStatus\": \"" << JsonEscape(rawBackendCommandStatus) << "\",\n"
+            << "  \"resolvedBackendStatus\": \"" << JsonEscape(resolvedBackendStatus) << "\",\n"
             << "  \"uiDrawCallCount\": " << drawCalls.size() << ",\n"
             << "  \"backendSubmitCallCount\": " << submitCalls.size() << ",\n"
             << "  \"rawBackendCommandCount\": " << rawBackendCommands.size() << ",\n"
+            << "  \"backendResolvedSubmitCount\": " << backendResolvedSubmits.size() << ",\n"
             << "  \"correlatedPairCount\": " << pairs.size() << ",\n"
             << "  \"alphaBlendPairCount\": " << alphaBlendPairCount << ",\n"
             << "  \"additivePairCount\": " << additivePairCount << ",\n"
@@ -2747,14 +2986,18 @@ namespace UiLab
             << "  \"droppedDrawCallCount\": " << runtimeUiDrawDroppedCount << ",\n"
             << "  \"droppedSubmitCallCount\": " << runtimeGpuSubmitDroppedCount << ",\n"
             << "  \"droppedRawBackendCommandCount\": " << runtimeRawBackendDroppedCount << ",\n"
+            << "  \"droppedBackendResolvedSubmitCount\": " << runtimeBackendResolvedDroppedCount << ",\n"
             << "  \"materialCorrelationOracle\": {\n"
             << "    \"source\": \"ui-draw-list + ui-gpu-submit\",\n"
             << "    \"correlationMethod\": \"same-frame-order-window\",\n"
+            << "    \"backendResolvedJoinMethod\": \"same-frame-order-window\",\n"
             << "    \"blendSemantics\": \"named Xenos/D3D-ish material semantics\",\n"
             << "    \"samplerSemantics\": \"named Xenos/D3D-ish material semantics\",\n"
             << "    \"rawBackendCommandStatus\": \"" << JsonEscape(rawBackendCommandStatus) << "\",\n"
+            << "    \"resolvedBackendStatus\": \"" << JsonEscape(resolvedBackendStatus) << "\",\n"
             << "    \"uiDrawCallCount\": " << drawCalls.size() << ",\n"
             << "    \"backendSubmitCallCount\": " << submitCalls.size() << ",\n"
+            << "    \"backendResolvedSubmitCount\": " << backendResolvedSubmits.size() << ",\n"
             << "    \"correlatedPairCount\": " << pairs.size() << ",\n"
             << "    \"pairs\": ";
         AppendRuntimeMaterialCorrelationPairs(out, pairs);
@@ -3024,7 +3267,7 @@ namespace UiLab
             << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
             << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
             << "    \"commands\": ";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out
             << "\n"
             << "  },\n"
@@ -4786,6 +5029,95 @@ namespace UiLab
         g_runtimeRawBackendCommands.push_back(std::move(rawCommand));
     }
 
+    void OnResolvedBackendSubmit(
+        std::string_view backend,
+        std::string_view nativeCommand,
+        bool indexed,
+        uint32_t vertexCount,
+        uint32_t indexCount,
+        uint32_t instanceCount,
+        uint64_t nativePipelineHandle,
+        uint64_t nativePipelineLayoutHandle,
+        bool resolvedPipelineKnown,
+        bool activeFramebufferKnown,
+        uint32_t framebufferWidth,
+        uint32_t framebufferHeight,
+        uint32_t renderTargetCount,
+        uint32_t renderTargetFormat0,
+        uint32_t depthTargetFormat,
+        uint32_t sampleCount,
+        uint32_t primitiveTopology,
+        bool blendEnabled,
+        uint32_t srcBlend,
+        uint32_t destBlend,
+        uint32_t blendOp,
+        uint32_t srcBlendAlpha,
+        uint32_t destBlendAlpha,
+        uint32_t blendOpAlpha,
+        uint32_t renderTargetWriteMask,
+        uint32_t inputSlotCount,
+        uint32_t inputElementCount,
+        bool depthEnabled,
+        bool depthWriteEnabled,
+        bool alphaToCoverageEnabled)
+    {
+        if (!g_isEnabled)
+            return;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+
+        if (g_runtimeBackendResolvedFrame != g_presentedFrameCount)
+        {
+            g_runtimeBackendResolvedFrame = g_presentedFrameCount;
+            g_runtimeBackendResolvedSubmits.clear();
+            g_runtimeBackendResolvedSequence = 0;
+            g_runtimeBackendResolvedDroppedCount = 0;
+        }
+
+        ++g_runtimeBackendResolvedSequence;
+        if (g_runtimeBackendResolvedSubmits.size() >= kRuntimeBackendResolvedSubmitSampleLimit)
+        {
+            ++g_runtimeBackendResolvedDroppedCount;
+            return;
+        }
+
+        RuntimeBackendResolvedSubmit submit;
+        submit.frame = g_presentedFrameCount;
+        submit.sequence = g_runtimeBackendResolvedSequence;
+        submit.backend = backend.empty() ? std::string("unknown") : std::string(backend);
+        submit.nativeCommand = nativeCommand.empty() ? std::string("unknown") : std::string(nativeCommand);
+        submit.indexed = indexed;
+        submit.vertexCount = vertexCount;
+        submit.indexCount = indexCount;
+        submit.instanceCount = instanceCount;
+        submit.nativePipelineHandle = nativePipelineHandle;
+        submit.nativePipelineLayoutHandle = nativePipelineLayoutHandle;
+        submit.resolvedPipelineKnown = resolvedPipelineKnown;
+        submit.activeFramebufferKnown = activeFramebufferKnown;
+        submit.framebufferWidth = framebufferWidth;
+        submit.framebufferHeight = framebufferHeight;
+        submit.renderTargetCount = renderTargetCount;
+        submit.renderTargetFormat0 = renderTargetFormat0;
+        submit.depthTargetFormat = depthTargetFormat;
+        submit.sampleCount = sampleCount;
+        submit.primitiveTopology = primitiveTopology;
+        submit.blendEnabled = blendEnabled;
+        submit.srcBlend = srcBlend;
+        submit.destBlend = destBlend;
+        submit.blendOp = blendOp;
+        submit.srcBlendAlpha = srcBlendAlpha;
+        submit.destBlendAlpha = destBlendAlpha;
+        submit.blendOpAlpha = blendOpAlpha;
+        submit.renderTargetWriteMask = renderTargetWriteMask;
+        submit.inputSlotCount = inputSlotCount;
+        submit.inputElementCount = inputElementCount;
+        submit.depthEnabled = depthEnabled;
+        submit.depthWriteEnabled = depthWriteEnabled;
+        submit.alphaToCoverageEnabled = alphaToCoverageEnabled;
+
+        g_runtimeBackendResolvedSubmits.push_back(std::move(submit));
+    }
+
     void OnHudSonicStageUpdate(
         uint32_t ownerAddress,
         uint32_t playScreenProjectAddress,
@@ -5308,7 +5640,7 @@ namespace UiLab
     {
         std::ostringstream out;
         out << "{\"ok\":true,\"commands\":";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out << "}\n";
         return out.str();
     }
@@ -5353,6 +5685,9 @@ namespace UiLab
 
         if (verb == "ui-material-correlation" || verb == "material-correlation" || verb == "ui-material-map")
             return BuildRuntimeMaterialCorrelationJson();
+
+        if (verb == "ui-backend-resolved" || verb == "backend-resolved" || verb == "ui-backend-submit")
+            return BuildRuntimeBackendResolvedJson();
 
         if (verb == "help" || verb == "commands")
             return BuildHelpJson();
@@ -5985,7 +6320,7 @@ namespace UiLab
             ImGui::Separator();
             ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
-            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, route, reset, set-global, capture, help");
+            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, ui-backend-resolved, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
 
             if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))

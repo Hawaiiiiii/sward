@@ -384,6 +384,17 @@ namespace plume {
         ID3D12PipelineState *d3d = nullptr;
         std::vector<RenderInputSlot> inputSlots;
         D3D12_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
+        RenderBlendDesc uiLabBlend0;
+        RenderFormat uiLabRenderTargetFormat0 = RenderFormat::UNKNOWN;
+        RenderFormat uiLabDepthTargetFormat = RenderFormat::UNKNOWN;
+        RenderPrimitiveTopology uiLabPrimitiveTopology = RenderPrimitiveTopology::UNKNOWN;
+        uint32_t uiLabRenderTargetCount = 0;
+        uint32_t uiLabInputSlotCount = 0;
+        uint32_t uiLabInputElementCount = 0;
+        uint32_t uiLabSampleCount = 0;
+        bool uiLabDepthEnabled = false;
+        bool uiLabDepthWriteEnabled = false;
+        bool uiLabAlphaToCoverageEnabled = false;
 
         D3D12GraphicsPipeline(D3D12Device *device, const RenderGraphicsPipelineDesc &desc);
         ~D3D12GraphicsPipeline() override;

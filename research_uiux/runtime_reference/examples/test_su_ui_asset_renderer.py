@@ -919,6 +919,20 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("sampler_semantics=runtime-submit-named", source_text)
         self.assertIn("raw_backend_command_status=", source_text)
 
+    def test_renderer_source_wires_phase152_backend_resolved_submit_oracle(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendBackendResolvedEvidence", source_text)
+        self.assertIn("FrontendBackendResolvedSubmit", source_text)
+        self.assertIn("queryUiLabLiveBridgeBackendResolved", source_text)
+        self.assertIn("loadFrontendBackendResolvedEvidence", source_text)
+        self.assertIn("buildFrontendBackendResolvedTriage", source_text)
+        self.assertIn("runRendererBackendResolvedTriageSmoke", source_text)
+        self.assertIn("--renderer-backend-resolved-triage-smoke", source_text)
+        self.assertIn("phase152-backend-resolved-submit", source_text)
+        self.assertIn("backend_resolved_source=ui-backend-resolved", source_text)
+        self.assertIn("material_correlation_backend_resolved=joined", source_text)
+        self.assertIn("resolved_pso_blend_framebuffer=runtime-backend", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -1160,6 +1174,29 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("sampler_semantics=runtime-submit-named", completed.stdout)
         self.assertRegex(completed.stdout, r"material_correlation=title-menu:source=(ui_lab_live_bridge_material_correlation|ui_lab_live_bridge_gpu_submit|missing):pairs=[0-9]+:draw_calls=[0-9]+:backend_submits=[0-9]+:alpha_blend_pairs=[0-9]+:additive_pairs=[0-9]+:filter_linear_pairs=[0-9]+:filter_point_pairs=[0-9]+:local_commands=[1-9]\d*:raw_backend_command_status=[^\r\n]+")
         self.assertRegex(completed.stdout, r"material_correlation=loading:source=(ui_lab_live_bridge_material_correlation|ui_lab_live_bridge_gpu_submit|missing):pairs=[0-9]+:draw_calls=[0-9]+:backend_submits=[0-9]+:alpha_blend_pairs=[0-9]+:additive_pairs=[0-9]+:filter_linear_pairs=[0-9]+:filter_point_pairs=[0-9]+:local_commands=[1-9]\d*:raw_backend_command_status=[^\r\n]+")
+
+    def test_renderer_backend_resolved_triage_smoke_reports_resolved_submit_state(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-backend-resolved-triage-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer backend resolved triage smoke ok", completed.stdout)
+        self.assertIn("mode=phase152-backend-resolved-submit", completed.stdout)
+        self.assertRegex(completed.stdout, r"backend_resolved_probe=(direct-ui-backend-resolved|material-correlation-fallback|missing)")
+        self.assertIn("backend_resolved_source=ui-backend-resolved", completed.stdout)
+        self.assertIn("material_correlation_backend_resolved=joined", completed.stdout)
+        self.assertIn("resolved_pso_blend_framebuffer=runtime-backend", completed.stdout)
+        self.assertRegex(completed.stdout, r"backend_resolved=title-menu:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):backend_resolved_submits=[0-9]+:resolved_pipeline_submits=[0-9]+:blend_enabled_submits=[0-9]+:rt0_format_known=[0-9]+:framebuffer_known=[0-9]+:material_pairs=[0-9]+:local_commands=[1-9]\d*:resolved_backend_status=[^\r\n]+")
+        self.assertRegex(completed.stdout, r"backend_resolved=loading:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):backend_resolved_submits=[0-9]+:resolved_pipeline_submits=[0-9]+:blend_enabled_submits=[0-9]+:rt0_format_known=[0-9]+:framebuffer_known=[0-9]+:material_pairs=[0-9]+:local_commands=[1-9]\d*:resolved_backend_status=[^\r\n]+")
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

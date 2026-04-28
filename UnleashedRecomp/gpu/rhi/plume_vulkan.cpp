@@ -10,9 +10,12 @@
 
 #include "plume_vulkan.h"
 
+#include <patches/ui_lab_patches.h>
+
 #include <algorithm>
 #include <cmath>
 #include <climits>
+#include <cstring>
 #include <unordered_map>
 
 #if DLSS_ENABLED
@@ -29,6 +32,63 @@
 
 namespace plume {
     // Backend constants.
+
+    template <typename T>
+    static uint64_t NativeVkHandleToU64(T handle)
+    {
+        uint64_t value = 0;
+        static_assert(sizeof(handle) <= sizeof(value));
+        std::memcpy(&value, &handle, sizeof(handle));
+        return value;
+    }
+
+    static void RecordUiLabVulkanResolvedSubmit(
+        const VulkanCommandList& commandList,
+        const char* nativeCommand,
+        bool indexed,
+        uint32_t vertexCount,
+        uint32_t indexCount,
+        uint32_t instanceCount)
+    {
+        const VulkanGraphicsPipeline* pipeline = commandList.activeGraphicsPipeline;
+        const VulkanPipelineLayout* pipelineLayout = commandList.activeGraphicsPipelineLayout;
+        const VulkanFramebuffer* framebuffer = commandList.targetFramebuffer;
+        const bool pipelineKnown = pipeline != nullptr;
+        const bool framebufferKnown = framebuffer != nullptr;
+        const RenderBlendDesc blend0 = pipelineKnown ? pipeline->uiLabBlend0 : RenderBlendDesc{};
+
+        UiLab::OnResolvedBackendSubmit(
+            "Vulkan",
+            nativeCommand,
+            indexed,
+            vertexCount,
+            indexCount,
+            instanceCount,
+            pipelineKnown ? NativeVkHandleToU64(pipeline->vk) : 0,
+            pipelineLayout != nullptr ? NativeVkHandleToU64(pipelineLayout->vk) : 0,
+            pipelineKnown,
+            framebufferKnown,
+            framebufferKnown ? framebuffer->width : 0,
+            framebufferKnown ? framebuffer->height : 0,
+            pipelineKnown ? pipeline->uiLabRenderTargetCount : 0,
+            pipelineKnown ? static_cast<uint32_t>(pipeline->uiLabRenderTargetFormat0) : 0,
+            pipelineKnown ? static_cast<uint32_t>(pipeline->uiLabDepthTargetFormat) : 0,
+            pipelineKnown ? pipeline->uiLabSampleCount : 0,
+            pipelineKnown ? static_cast<uint32_t>(pipeline->uiLabPrimitiveTopology) : 0,
+            blend0.blendEnabled,
+            static_cast<uint32_t>(blend0.srcBlend),
+            static_cast<uint32_t>(blend0.dstBlend),
+            static_cast<uint32_t>(blend0.blendOp),
+            static_cast<uint32_t>(blend0.srcBlendAlpha),
+            static_cast<uint32_t>(blend0.dstBlendAlpha),
+            static_cast<uint32_t>(blend0.blendOpAlpha),
+            blend0.renderTargetWriteMask,
+            pipelineKnown ? pipeline->uiLabInputSlotCount : 0,
+            pipelineKnown ? pipeline->uiLabInputElementCount : 0,
+            pipelineKnown ? pipeline->uiLabDepthEnabled : false,
+            pipelineKnown ? pipeline->uiLabDepthWriteEnabled : false,
+            pipelineKnown ? pipeline->uiLabAlphaToCoverageEnabled : false);
+    }
 
     // Required buffer alignment for acceleration structures.
     static const uint64_t AccelerationStructureBufferAlignment = 256;
@@ -1353,6 +1413,18 @@ namespace plume {
 
     VulkanGraphicsPipeline::VulkanGraphicsPipeline(VulkanDevice *device, const RenderGraphicsPipelineDesc &desc) : VulkanPipeline(device, Type::Graphics) {
         assert(desc.pipelineLayout != nullptr);
+
+        uiLabBlend0 = desc.renderTargetBlend[0];
+        uiLabRenderTargetFormat0 = desc.renderTargetFormat[0];
+        uiLabDepthTargetFormat = desc.depthTargetFormat;
+        uiLabPrimitiveTopology = desc.primitiveTopology;
+        uiLabRenderTargetCount = desc.renderTargetCount;
+        uiLabInputSlotCount = desc.inputSlotsCount;
+        uiLabInputElementCount = desc.inputElementsCount;
+        uiLabSampleCount = static_cast<uint32_t>(desc.multisampling.sampleCount);
+        uiLabDepthEnabled = desc.depthEnabled;
+        uiLabDepthWriteEnabled = desc.depthWriteEnabled;
+        uiLabAlphaToCoverageEnabled = desc.alphaToCoverageEnabled;
 
         thread_local std::vector<VkPipelineShaderStageCreateInfo> stages;
         stages.clear();
@@ -2776,12 +2848,26 @@ namespace plume {
     void VulkanCommandList::drawInstanced(uint32_t vertexCountPerInstance, uint32_t instanceCount, uint32_t startVertexLocation, uint32_t startInstanceLocation) {
         checkActiveRenderPass();
 
+        RecordUiLabVulkanResolvedSubmit(
+            *this,
+            "vkCmdDraw",
+            false,
+            vertexCountPerInstance,
+            0,
+            instanceCount);
         vkCmdDraw(vk, vertexCountPerInstance, instanceCount, startVertexLocation, startInstanceLocation);
     }
     
     void VulkanCommandList::drawIndexedInstanced(uint32_t indexCountPerInstance, uint32_t instanceCount, uint32_t startIndexLocation, int32_t baseVertexLocation, uint32_t startInstanceLocation) {
         checkActiveRenderPass();
 
+        RecordUiLabVulkanResolvedSubmit(
+            *this,
+            "vkCmdDrawIndexed",
+            true,
+            0,
+            indexCountPerInstance,
+            instanceCount);
         vkCmdDrawIndexed(vk, indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
     }
 
@@ -2793,16 +2879,19 @@ namespace plume {
         case VulkanPipeline::Type::Compute: {
             const VulkanComputePipeline *computePipeline = static_cast<const VulkanComputePipeline *>(interfacePipeline);
             vkCmdBindPipeline(vk, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline->vk);
+            activeGraphicsPipeline = nullptr;
             break;
         }
         case VulkanPipeline::Type::Graphics: {
             const VulkanGraphicsPipeline *graphicsPipeline = static_cast<const VulkanGraphicsPipeline *>(interfacePipeline);
             vkCmdBindPipeline(vk, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline->vk);
+            activeGraphicsPipeline = graphicsPipeline;
             break;
         }
         case VulkanPipeline::Type::Raytracing: {
             const VulkanRaytracingPipeline *raytracingPipeline = static_cast<const VulkanRaytracingPipeline *>(interfacePipeline);
             vkCmdBindPipeline(vk, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytracingPipeline->vk);
+            activeGraphicsPipeline = nullptr;
             break;
         }
         default:

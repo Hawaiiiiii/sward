@@ -7,6 +7,9 @@
 
 #include "plume_d3d12.h"
 
+#include <patches/ui_lab_patches.h>
+
+#include <cstdint>
 #include <unordered_set>
 
 #ifdef __clang__
@@ -43,6 +46,54 @@ namespace plume {
     static const uint32_t ShaderDescriptorHeapSize = 65536;
     static const uint32_t SamplerDescriptorHeapSize = 1024;
     static const uint32_t TargetDescriptorHeapSize = 16384;
+
+    static void RecordUiLabD3D12ResolvedSubmit(
+        const D3D12CommandList& commandList,
+        const char* nativeCommand,
+        bool indexed,
+        uint32_t vertexCount,
+        uint32_t indexCount,
+        uint32_t instanceCount)
+    {
+        const D3D12GraphicsPipeline* pipeline = commandList.activeGraphicsPipeline;
+        const D3D12PipelineLayout* pipelineLayout = commandList.activeGraphicsPipelineLayout;
+        const D3D12Framebuffer* framebuffer = commandList.targetFramebuffer;
+        const bool pipelineKnown = pipeline != nullptr;
+        const bool framebufferKnown = framebuffer != nullptr;
+        const RenderBlendDesc blend0 = pipelineKnown ? pipeline->uiLabBlend0 : RenderBlendDesc{};
+
+        UiLab::OnResolvedBackendSubmit(
+            "D3D12",
+            nativeCommand,
+            indexed,
+            vertexCount,
+            indexCount,
+            instanceCount,
+            pipelineKnown ? static_cast<uint64_t>(reinterpret_cast<std::uintptr_t>(pipeline->d3d)) : 0,
+            pipelineLayout != nullptr ? static_cast<uint64_t>(reinterpret_cast<std::uintptr_t>(pipelineLayout->rootSignature)) : 0,
+            pipelineKnown,
+            framebufferKnown,
+            framebufferKnown ? framebuffer->width : 0,
+            framebufferKnown ? framebuffer->height : 0,
+            pipelineKnown ? pipeline->uiLabRenderTargetCount : 0,
+            pipelineKnown ? static_cast<uint32_t>(pipeline->uiLabRenderTargetFormat0) : 0,
+            pipelineKnown ? static_cast<uint32_t>(pipeline->uiLabDepthTargetFormat) : 0,
+            pipelineKnown ? pipeline->uiLabSampleCount : 0,
+            pipelineKnown ? static_cast<uint32_t>(pipeline->uiLabPrimitiveTopology) : 0,
+            blend0.blendEnabled,
+            static_cast<uint32_t>(blend0.srcBlend),
+            static_cast<uint32_t>(blend0.dstBlend),
+            static_cast<uint32_t>(blend0.blendOp),
+            static_cast<uint32_t>(blend0.srcBlendAlpha),
+            static_cast<uint32_t>(blend0.dstBlendAlpha),
+            static_cast<uint32_t>(blend0.blendOpAlpha),
+            blend0.renderTargetWriteMask,
+            pipelineKnown ? pipeline->uiLabInputSlotCount : 0,
+            pipelineKnown ? pipeline->uiLabInputElementCount : 0,
+            pipelineKnown ? pipeline->uiLabDepthEnabled : false,
+            pipelineKnown ? pipeline->uiLabDepthWriteEnabled : false,
+            pipelineKnown ? pipeline->uiLabAlphaToCoverageEnabled : false);
+    }
 
     // Common functions.
 
@@ -1667,12 +1718,26 @@ namespace plume {
     void D3D12CommandList::drawInstanced(uint32_t vertexCountPerInstance, uint32_t instanceCount, uint32_t startVertexLocation, uint32_t startInstanceLocation) {
         checkTopology();
         checkFramebufferSamplePositions();
+        RecordUiLabD3D12ResolvedSubmit(
+            *this,
+            "D3D12.DrawInstanced",
+            false,
+            vertexCountPerInstance,
+            0,
+            instanceCount);
         d3d->DrawInstanced(vertexCountPerInstance, instanceCount, startVertexLocation, startInstanceLocation);
     }
 
     void D3D12CommandList::drawIndexedInstanced(uint32_t indexCountPerInstance, uint32_t instanceCount, uint32_t startIndexLocation, int32_t baseVertexLocation, uint32_t startInstanceLocation) {
         checkTopology();
         checkFramebufferSamplePositions();
+        RecordUiLabD3D12ResolvedSubmit(
+            *this,
+            "D3D12.DrawIndexedInstanced",
+            true,
+            0,
+            indexCountPerInstance,
+            instanceCount);
         d3d->DrawIndexedInstanced(indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
     }
 
@@ -1684,6 +1749,7 @@ namespace plume {
         case D3D12Pipeline::Type::Compute: {
             const D3D12ComputePipeline *computePipeline = static_cast<const D3D12ComputePipeline *>(interfacePipeline);
             d3d->SetPipelineState(computePipeline->d3d);
+            activeGraphicsPipeline = nullptr;
             break;
         }
         case D3D12Pipeline::Type::Graphics: {
@@ -1695,6 +1761,7 @@ namespace plume {
         case D3D12Pipeline::Type::Raytracing: {
             const D3D12RaytracingPipeline *raytracingPipeline = static_cast<const D3D12RaytracingPipeline *>(interfacePipeline);
             d3d->SetPipelineState1(raytracingPipeline->stateObject);
+            activeGraphicsPipeline = nullptr;
             break;
         }
         default:
@@ -2789,6 +2856,17 @@ namespace plume {
         assert(desc.pipelineLayout != nullptr);
 
         topology = toD3D12(desc.primitiveTopology);
+        uiLabBlend0 = desc.renderTargetBlend[0];
+        uiLabRenderTargetFormat0 = desc.renderTargetFormat[0];
+        uiLabDepthTargetFormat = desc.depthTargetFormat;
+        uiLabPrimitiveTopology = desc.primitiveTopology;
+        uiLabRenderTargetCount = desc.renderTargetCount;
+        uiLabInputSlotCount = desc.inputSlotsCount;
+        uiLabInputElementCount = desc.inputElementsCount;
+        uiLabSampleCount = static_cast<uint32_t>(desc.multisampling.sampleCount);
+        uiLabDepthEnabled = desc.depthEnabled;
+        uiLabDepthWriteEnabled = desc.depthWriteEnabled;
+        uiLabAlphaToCoverageEnabled = desc.alphaToCoverageEnabled;
 
         const D3D12PipelineLayout *pipelineLayout = static_cast<const D3D12PipelineLayout *>(desc.pipelineLayout);
         const D3D12Shader *vertexShader = static_cast<const D3D12Shader *>(desc.vertexShader);
