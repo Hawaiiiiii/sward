@@ -6,6 +6,9 @@
 
 Phase 129 moves the CSD rendered-frame comparison from material reporting into a more faithful local draw path.
 
+> [!NOTE]
+> Phase 130 keeps the software ARGB quad path but moves the active compare lane to `out/csd_render_compare/phase130/`, adds the local `csd-point-seam` sampler approximation, and registers native BMP crops before scoring. See `CSD_SAMPLER_REGISTRATION_PARITY.md`.
+
 The smoke command is:
 
 ```powershell
@@ -41,9 +44,9 @@ After regenerating ignored local `research_uiux/data/layout_deep_analysis.json` 
 
 ## Still Not Shader-Perfect
 
-- The software rasterizer approximates the CSD filter shader and sampler state; it is not yet a byte-for-byte Xenos/D3D shader clone.
+- Phase 130 adds a named `csd-point-seam` sampler approximation, but it is still not a byte-for-byte Xenos/D3D shader clone.
 - Current selected title/loading/HUD/tutorial scenes do not exercise additive CSD commands after regenerated field decoding, but the software `src-alpha/one` path is now present for scenes that do.
-- Native BMP comparison is still a sampled-grid delta, not a full perceptual or exact frame-registration diff.
+- Native BMP comparison now performs a small centered registration search, but it is still a sampled-grid delta, not a full perceptual or exact frame diff.
 - The real UnleashedRecomp runtime remains the visual oracle.
 
 ## Verification

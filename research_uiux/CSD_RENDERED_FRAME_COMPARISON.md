@@ -10,6 +10,8 @@ Phase 127 adds the first hard pixel-output loop to the local SU UI pipeline view
 > Phase 128 keeps this command but upgrades the active output lane to `out/csd_render_compare/phase128/` with RGBA color order, cast-flag material semantics, packed channel blockers, and 16:9 native-crop alignment. See `CSD_MATERIAL_CHANNEL_ALIGNMENT.md`.
 >
 > Phase 129 moves the active output lane to `out/csd_render_compare/phase129/`, preserves raw packed keyframe payloads in the local extractor, decodes Color/Gradient timeline samples as RGBA, and renders compare frames through a software ARGB quad path with per-vertex gradient color and additive blend support. See `CSD_PACKED_CHANNEL_SOFTWARE_QUADS.md`.
+>
+> Phase 130 moves the active output lane to `out/csd_render_compare/phase130/`, adds a named `csd-point-seam` sampler path, and scores native BMPs with searched centered 16:9 crop registration. See `CSD_SAMPLER_REGISTRATION_PARITY.md`.
 
 The new command is:
 

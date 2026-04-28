@@ -317,15 +317,33 @@ struct BitmapComparisonStats
     int sampleGridWidth = 64;
     int sampleGridHeight = 36;
     int sampleCount = 0;
-    std::string alignmentMode = "center-crop-16x9";
+    std::string alignmentMode = "search-center-crop-16x9";
     int nativeAlignmentCropX = 0;
     int nativeAlignmentCropY = 0;
     int nativeAlignmentCropWidth = 0;
     int nativeAlignmentCropHeight = 0;
+    int registrationOffsetX = 0;
+    int registrationOffsetY = 0;
+    int registrationCandidateCount = 0;
+    double registrationBaseMeanAbsRgb = 0.0;
     double meanAbsRgb = 0.0;
     int maxAbsRgb = 0;
     BitmapSignalStats rendered;
     BitmapSignalStats native;
+};
+
+struct CsdNativeFrameRegistration
+{
+    int cropX = 0;
+    int cropY = 0;
+    int cropWidth = 0;
+    int cropHeight = 0;
+    int offsetX = 0;
+    int offsetY = 0;
+    int candidateCount = 0;
+    double baseMeanAbsRgb = 0.0;
+    double bestMeanAbsRgb = 0.0;
+    int bestMaxAbsRgb = 0;
 };
 
 struct CsdRenderedFrameComparison
@@ -351,6 +369,9 @@ struct CsdRenderedFrameComparison
     std::size_t normalBlendCommandCount = 0;
     std::size_t linearFilteringCommandCount = 0;
     std::size_t softwareQuadCommandCount = 0;
+    std::size_t csdPointFilterSampleCount = 0;
+    std::size_t bilinearSampleCount = 0;
+    std::size_t nearestSampleCount = 0;
     std::size_t gradientTrackSampleCount = 0;
     std::size_t packedColorTrackCount = 0;
     std::size_t packedGradientTrackCount = 0;
@@ -362,11 +383,19 @@ struct CsdRenderedFrameComparison
     BitmapComparisonStats visualDelta;
 };
 
+struct CsdSamplerStats
+{
+    std::size_t csdPointFilterSampleCount = 0;
+    std::size_t bilinearSampleCount = 0;
+    std::size_t nearestSampleCount = 0;
+};
+
 struct CsdSoftwareRenderStats
 {
     std::size_t softwareQuadCommandCount = 0;
     std::size_t gradientVertexColorCommandCount = 0;
     std::size_t additiveSoftwareCommandCount = 0;
+    CsdSamplerStats samplerStats;
 };
 
 inline constexpr std::array<TextureSourceCandidate, 15> kTextureSourceCandidates{{
@@ -2970,6 +2999,26 @@ void drawOutlinedText(
     };
 }
 
+[[nodiscard]] double csdFilterCoordinate(double coordinate, double footprint)
+{
+    const double safeFootprint = std::max(std::abs(footprint), 0.000001);
+    const double seam = std::floor(coordinate + 0.5);
+    const double filtered = ((coordinate - seam) / safeFootprint) + seam;
+    return std::clamp(filtered, seam - 0.5, seam + 0.5);
+}
+
+[[nodiscard]] CsdColorRgba sampleTextureArgbCsdFilter(
+    const DdsTextureImage& image,
+    double x,
+    double y,
+    double footprintX,
+    double footprintY)
+{
+    const double filteredX = csdFilterCoordinate(x, footprintX);
+    const double filteredY = csdFilterCoordinate(y, footprintY);
+    return sampleTextureArgbBilinear(image, filteredX, filteredY);
+}
+
 [[nodiscard]] CsdColorRgba gradientVertexColor(const CsdDrawableCommand& command, double u, double v)
 {
     if (!command.gradientKnown)
@@ -3087,9 +3136,19 @@ void blendCsdPixelSrcAlphaOne(std::uint32_t& destinationArgb, const CsdColorRgba
             const double v = localY / dstH;
             const double sourceX = static_cast<double>(command.sourceX) + (u * static_cast<double>(command.sourceWidth));
             const double sourceY = static_cast<double>(command.sourceY) + (v * static_cast<double>(command.sourceHeight));
-            const auto textureColor = command.linearFiltering
-                ? sampleTextureArgbBilinear(*texture->image, sourceX, sourceY)
-                : sampleTextureArgbNearest(*texture->image, sourceX, sourceY);
+            CsdColorRgba textureColor;
+            if (command.linearFiltering)
+            {
+                textureColor = sampleTextureArgbBilinear(*texture->image, sourceX, sourceY);
+                ++stats.samplerStats.bilinearSampleCount;
+            }
+            else
+            {
+                const double footprintX = static_cast<double>(std::max(1, command.sourceWidth)) / dstW;
+                const double footprintY = static_cast<double>(std::max(1, command.sourceHeight)) / dstH;
+                textureColor = sampleTextureArgbCsdFilter(*texture->image, sourceX, sourceY, footprintX, footprintY);
+                ++stats.samplerStats.csdPointFilterSampleCount;
+            }
             const auto vertexColor = multiplyCsdRgba(command.colorRgba, gradientVertexColor(command, u, v));
             const auto shaded = multiplyCsdRgba(textureColor, vertexColor);
             if (shaded.a == 0)
@@ -4818,6 +4877,108 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     }
 }
 
+[[nodiscard]] std::pair<double, int> computeNativeCropDelta(
+    Gdiplus::Bitmap& rendered,
+    Gdiplus::Bitmap& native,
+    const BitmapComparisonStats& stats,
+    int cropX,
+    int cropY,
+    int cropWidth,
+    int cropHeight)
+{
+    std::uint64_t totalAbs = 0;
+    int maxAbs = 0;
+    int sampleCount = 0;
+    for (int y = 0; y < stats.sampleGridHeight; ++y)
+    {
+        for (int x = 0; x < stats.sampleGridWidth; ++x)
+        {
+            const auto left = bitmapPixelNearest(rendered, x, y, stats.sampleGridWidth, stats.sampleGridHeight);
+            const auto right = bitmapPixelNearest(
+                native,
+                x,
+                y,
+                stats.sampleGridWidth,
+                stats.sampleGridHeight,
+                cropX,
+                cropY,
+                cropWidth,
+                cropHeight);
+            const int dr = std::abs(static_cast<int>(left.GetR()) - static_cast<int>(right.GetR()));
+            const int dg = std::abs(static_cast<int>(left.GetG()) - static_cast<int>(right.GetG()));
+            const int db = std::abs(static_cast<int>(left.GetB()) - static_cast<int>(right.GetB()));
+            totalAbs += static_cast<std::uint64_t>(dr + dg + db);
+            maxAbs = std::max(maxAbs, std::max({ dr, dg, db }));
+            ++sampleCount;
+        }
+    }
+
+    const double meanAbsRgb = sampleCount == 0 ? 0.0 : static_cast<double>(totalAbs) / static_cast<double>(sampleCount * 3);
+    return { meanAbsRgb, maxAbs };
+}
+
+[[nodiscard]] CsdNativeFrameRegistration findBestNativeFrameRegistration(
+    Gdiplus::Bitmap& rendered,
+    Gdiplus::Bitmap& native,
+    const BitmapComparisonStats& stats)
+{
+    CsdNativeFrameRegistration registration;
+    registration.cropX = stats.nativeAlignmentCropX;
+    registration.cropY = stats.nativeAlignmentCropY;
+    registration.cropWidth = stats.nativeAlignmentCropWidth;
+    registration.cropHeight = stats.nativeAlignmentCropHeight;
+
+    const auto baseDelta = computeNativeCropDelta(
+        rendered,
+        native,
+        stats,
+        registration.cropX,
+        registration.cropY,
+        registration.cropWidth,
+        registration.cropHeight);
+    registration.baseMeanAbsRgb = baseDelta.first;
+    registration.bestMeanAbsRgb = baseDelta.first;
+    registration.bestMaxAbsRgb = baseDelta.second;
+
+    const int nativeWidth = static_cast<int>(native.GetWidth());
+    const int nativeHeight = static_cast<int>(native.GetHeight());
+    const int maxShiftX = std::min(32, std::max(0, (nativeWidth - registration.cropWidth) / 2));
+    const int maxShiftY = std::min(32, std::max(0, (nativeHeight - registration.cropHeight) / 2));
+    const int stepX = std::max(1, maxShiftX / 2);
+    const int stepY = std::max(1, maxShiftY / 2);
+    const int baseCropX = registration.cropX;
+    const int baseCropY = registration.cropY;
+
+    for (int yOffset = -maxShiftY; yOffset <= maxShiftY; yOffset += stepY)
+    {
+        for (int xOffset = -maxShiftX; xOffset <= maxShiftX; xOffset += stepX)
+        {
+            const int candidateX = std::clamp(baseCropX + xOffset, 0, std::max(0, nativeWidth - registration.cropWidth));
+            const int candidateY = std::clamp(baseCropY + yOffset, 0, std::max(0, nativeHeight - registration.cropHeight));
+            ++registration.candidateCount;
+            const auto delta = computeNativeCropDelta(
+                rendered,
+                native,
+                stats,
+                candidateX,
+                candidateY,
+                registration.cropWidth,
+                registration.cropHeight);
+            if (delta.first < registration.bestMeanAbsRgb)
+            {
+                registration.bestMeanAbsRgb = delta.first;
+                registration.bestMaxAbsRgb = delta.second;
+                registration.offsetX = candidateX - baseCropX;
+                registration.offsetY = candidateY - baseCropY;
+                registration.cropX = candidateX;
+                registration.cropY = candidateY;
+            }
+        }
+    }
+
+    return registration;
+}
+
 [[nodiscard]] BitmapSignalStats computeBitmapSignalStats(Gdiplus::Bitmap& bitmap)
 {
     BitmapSignalStats stats;
@@ -4860,34 +5021,18 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     stats.nativeFound = true;
     stats.native = computeBitmapSignalStats(*native);
     nativeAlignmentCrop(*native, stats);
-    std::uint64_t totalAbs = 0;
-    int maxAbs = 0;
-    for (int y = 0; y < stats.sampleGridHeight; ++y)
-    {
-        for (int x = 0; x < stats.sampleGridWidth; ++x)
-        {
-            const auto left = bitmapPixelNearest(rendered, x, y, stats.sampleGridWidth, stats.sampleGridHeight);
-            const auto right = bitmapPixelNearest(
-                *native,
-                x,
-                y,
-                stats.sampleGridWidth,
-                stats.sampleGridHeight,
-                stats.nativeAlignmentCropX,
-                stats.nativeAlignmentCropY,
-                stats.nativeAlignmentCropWidth,
-                stats.nativeAlignmentCropHeight);
-            const int dr = std::abs(static_cast<int>(left.GetR()) - static_cast<int>(right.GetR()));
-            const int dg = std::abs(static_cast<int>(left.GetG()) - static_cast<int>(right.GetG()));
-            const int db = std::abs(static_cast<int>(left.GetB()) - static_cast<int>(right.GetB()));
-            totalAbs += static_cast<std::uint64_t>(dr + dg + db);
-            maxAbs = std::max(maxAbs, std::max({ dr, dg, db }));
-            ++stats.sampleCount;
-        }
-    }
-
-    stats.meanAbsRgb = stats.sampleCount == 0 ? 0.0 : static_cast<double>(totalAbs) / static_cast<double>(stats.sampleCount * 3);
-    stats.maxAbsRgb = maxAbs;
+    const auto registration = findBestNativeFrameRegistration(rendered, *native, stats);
+    stats.nativeAlignmentCropX = registration.cropX;
+    stats.nativeAlignmentCropY = registration.cropY;
+    stats.nativeAlignmentCropWidth = registration.cropWidth;
+    stats.nativeAlignmentCropHeight = registration.cropHeight;
+    stats.registrationOffsetX = registration.offsetX;
+    stats.registrationOffsetY = registration.offsetY;
+    stats.registrationCandidateCount = registration.candidateCount;
+    stats.registrationBaseMeanAbsRgb = registration.baseMeanAbsRgb;
+    stats.meanAbsRgb = registration.bestMeanAbsRgb;
+    stats.maxAbsRgb = registration.bestMaxAbsRgb;
+    stats.sampleCount = stats.sampleGridWidth * stats.sampleGridHeight;
     return stats;
 }
 
@@ -5019,6 +5164,9 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     comparison.softwareQuadCommandCount = renderStats.softwareQuadCommandCount;
     comparison.gradientVertexColorCommandCount = renderStats.gradientVertexColorCommandCount;
     comparison.additiveSoftwareCommandCount = renderStats.additiveSoftwareCommandCount;
+    comparison.csdPointFilterSampleCount = renderStats.samplerStats.csdPointFilterSampleCount;
+    comparison.bilinearSampleCount = renderStats.samplerStats.bilinearSampleCount;
+    comparison.nearestSampleCount = renderStats.samplerStats.nearestSampleCount;
     const bool saved = bitmap && saveBitmapAsBmp(*bitmap, comparison.renderedFramePath);
     comparison.nativeBestPath = findNativeBestBmpPathForTarget(csdBinding.templateId);
     comparison.visualDelta = bitmap
@@ -5040,7 +5188,7 @@ void writeCsdRenderCompareManifest(
         return;
 
     out << "{\n";
-    out << "  \"phase\": 129,\n";
+    out << "  \"phase\": 130,\n";
     out << "  \"canvas\": { \"width\": " << kDesignWidth << ", \"height\": " << kDesignHeight << " },\n";
     out << "  \"records\": [\n";
     for (std::size_t index = 0; index < comparisons.size(); ++index)
@@ -5058,7 +5206,7 @@ void writeCsdRenderCompareManifest(
         out << "      \"drawCommandCount\": " << comparison.drawCommandCount << ",\n";
         out << "      \"sampledCommandCount\": " << comparison.sampledCommandCount << ",\n";
         out << "      \"textureBindingCount\": " << comparison.textureBindingCount << ",\n";
-        out << "      \"materialSemantics\": { \"quadRenderer\": \"software-argb\", \"colorOrder\": \"rgba\", \"blend\": \"src-alpha/inv-src-alpha\", \"additiveBlend\": \"src-alpha/one\", \"colorCommands\": " << comparison.colorCommandCount
+        out << "      \"materialSemantics\": { \"quadRenderer\": \"software-argb\", \"samplerFilter\": \"csd-point-seam\", \"colorOrder\": \"rgba\", \"blend\": \"src-alpha/inv-src-alpha\", \"additiveBlend\": \"src-alpha/one\", \"colorCommands\": " << comparison.colorCommandCount
             << ", \"alphaModulatedCommands\": " << comparison.alphaModulatedCommandCount
             << ", \"gradientCommands\": " << comparison.gradientCommandCount
             << ", \"gradientApproxCommands\": " << comparison.gradientApproxCommandCount
@@ -5068,6 +5216,9 @@ void writeCsdRenderCompareManifest(
             << ", \"additiveSoftwareCommands\": " << comparison.additiveSoftwareCommandCount
             << ", \"linearFilteringCommands\": " << comparison.linearFilteringCommandCount
             << ", \"softwareQuadCommands\": " << comparison.softwareQuadCommandCount
+            << ", \"csdPointFilterSamples\": " << comparison.csdPointFilterSampleCount
+            << ", \"bilinearSamples\": " << comparison.bilinearSampleCount
+            << ", \"nearestSamples\": " << comparison.nearestSampleCount
             << ", \"gradientTrackSamples\": " << comparison.gradientTrackSampleCount << " },\n";
         out << "      \"channelSemantics\": { \"packedColorTracks\": " << comparison.packedColorTrackCount
             << ", \"packedGradientTracks\": " << comparison.packedGradientTrackCount
@@ -5080,7 +5231,11 @@ void writeCsdRenderCompareManifest(
             << "\", \"crop\": { \"x\": " << comparison.visualDelta.nativeAlignmentCropX
             << ", \"y\": " << comparison.visualDelta.nativeAlignmentCropY
             << ", \"width\": " << comparison.visualDelta.nativeAlignmentCropWidth
-            << ", \"height\": " << comparison.visualDelta.nativeAlignmentCropHeight << " } },\n";
+            << ", \"height\": " << comparison.visualDelta.nativeAlignmentCropHeight
+            << " }, \"registration\": { \"offsetX\": " << comparison.visualDelta.registrationOffsetX
+            << ", \"offsetY\": " << comparison.visualDelta.registrationOffsetY
+            << ", \"candidateCount\": " << comparison.visualDelta.registrationCandidateCount
+            << ", \"baseMeanAbsRgb\": " << std::fixed << std::setprecision(3) << comparison.visualDelta.registrationBaseMeanAbsRgb << " } },\n";
         out << "      \"visualDelta\": { \"nativeFound\": " << (comparison.visualDelta.nativeFound ? "true" : "false")
             << ", \"sampleGrid\": \"64x36\", \"alignment\": \"" << jsonEscape(comparison.visualDelta.alignmentMode)
             << "\", \"sampleCount\": " << comparison.visualDelta.sampleCount
@@ -5134,7 +5289,7 @@ void writeCsdRenderCompareManifest(
     std::size_t templateCount = 0;
     bool failed = false;
     std::vector<CsdRenderedFrameComparison> comparisons;
-    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase129";
+    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase130";
     const auto manifestPath = outputRoot / "csd_render_compare_manifest.json";
 
     Gdiplus::GdiplusStartupInput gdiplusInput{};
@@ -5186,6 +5341,7 @@ void writeCsdRenderCompareManifest(
             << "material_semantics="
             << comparison.templateId
             << ":quad_renderer=software-argb"
+            << ":sampler_filter=csd-point-seam"
             << ":color_order=rgba"
             << ":blend=src-alpha/inv-src-alpha"
             << ":additive_blend=src-alpha/one"
@@ -5207,6 +5363,12 @@ void writeCsdRenderCompareManifest(
             << comparison.linearFilteringCommandCount
             << ":software_quads="
             << comparison.softwareQuadCommandCount
+            << ":csd_point_samples="
+            << comparison.csdPointFilterSampleCount
+            << ":bilinear_samples="
+            << comparison.bilinearSampleCount
+            << ":nearest_samples="
+            << comparison.nearestSampleCount
             << ":gradient_samples="
             << comparison.gradientTrackSampleCount
             << '\n';
@@ -5239,6 +5401,24 @@ void writeCsdRenderCompareManifest(
             << comparison.visualDelta.nativeAlignmentCropWidth
             << "x"
             << comparison.visualDelta.nativeAlignmentCropHeight
+            << '\n';
+        std::cout
+            << "native_frame_registration="
+            << comparison.templateId
+            << ":mode="
+            << comparison.visualDelta.alignmentMode
+            << ":registration_offset="
+            << comparison.visualDelta.registrationOffsetX
+            << ","
+            << comparison.visualDelta.registrationOffsetY
+            << ":registration_candidates="
+            << comparison.visualDelta.registrationCandidateCount
+            << ":base_mean_abs_rgb="
+            << std::fixed
+            << std::setprecision(3)
+            << comparison.visualDelta.registrationBaseMeanAbsRgb
+            << ":best_mean_abs_rgb="
+            << comparison.visualDelta.meanAbsRgb
             << '\n';
         std::cout << formatVisualDeltaLine(comparison) << '\n';
         std::cout
