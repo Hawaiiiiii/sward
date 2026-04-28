@@ -890,6 +890,20 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("material_triage=runtime-rectangles-vs-local-csd", source_text)
         self.assertIn("backend_submit_status=pending", source_text)
 
+    def test_renderer_source_wires_phase150_backend_submit_material_triage(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendGpuSubmitEvidence", source_text)
+        self.assertIn("FrontendGpuSubmitCall", source_text)
+        self.assertIn("queryUiLabLiveBridgeGpuSubmit", source_text)
+        self.assertIn("loadFrontendGpuSubmitEvidence", source_text)
+        self.assertIn("buildFrontendGpuSubmitMaterialTriage", source_text)
+        self.assertIn("runRendererGpuSubmitTriageSmoke", source_text)
+        self.assertIn("--renderer-gpu-submit-triage-smoke", source_text)
+        self.assertIn("phase150-backend-submit-material-triage", source_text)
+        self.assertIn("gpu_submit_source=ui-gpu-submit", source_text)
+        self.assertIn("material_triage=backend-submit-vs-runtime-rectangles", source_text)
+        self.assertIn("backend_submit_status=render-thread-material-submit", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -1085,6 +1099,29 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertRegex(completed.stdout, r"draw_list_triage=loading:source=(ui_lab_live_bridge_ui_draw_list|ui_lab_live_bridge_ui_oracle|missing):runtime_calls=[0-9]+:runtime_rects=[0-9]+:local_commands=[1-9]\d*:local_textures=[1-9]\d*:rect_match_candidates=[0-9]+:backend_submit_status=pending")
         self.assertRegex(completed.stdout, r"draw_list_scene=title-menu:mm_bg_usual:local_commands=[1-9]\d*:runtime_rects=[0-9]+:material_triage=runtime-rectangles-vs-local-csd")
         self.assertRegex(completed.stdout, r"draw_list_scene=loading:pda:local_commands=[1-9]\d*:runtime_rects=[0-9]+:material_triage=runtime-rectangles-vs-local-csd")
+
+    def test_renderer_gpu_submit_triage_smoke_reports_backend_material_state(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-gpu-submit-triage-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer gpu submit triage smoke ok", completed.stdout)
+        self.assertIn("mode=phase150-backend-submit-material-triage", completed.stdout)
+        self.assertRegex(completed.stdout, r"gpu_submit_probe=(direct-ui-gpu-submit|ui-draw-list-fallback|missing)")
+        self.assertIn("gpu_submit_source=ui-gpu-submit", completed.stdout)
+        self.assertIn("material_triage=backend-submit-vs-runtime-rectangles", completed.stdout)
+        self.assertIn("backend_submit_status=render-thread-material-submit", completed.stdout)
+        self.assertRegex(completed.stdout, r"gpu_submit_triage=title-menu:source=(ui_lab_live_bridge_gpu_submit|ui_lab_live_bridge_ui_draw_list|missing):backend_submits=[0-9]+:textured_submits=[0-9]+:alpha_blend_submits=[0-9]+:draw_rects=[0-9]+:local_commands=[1-9]\d*:material_triage=backend-submit-vs-runtime-rectangles")
+        self.assertRegex(completed.stdout, r"gpu_submit_triage=loading:source=(ui_lab_live_bridge_gpu_submit|ui_lab_live_bridge_ui_draw_list|missing):backend_submits=[0-9]+:textured_submits=[0-9]+:alpha_blend_submits=[0-9]+:draw_rects=[0-9]+:local_commands=[1-9]\d*:material_triage=backend-submit-vs-runtime-rectangles")
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

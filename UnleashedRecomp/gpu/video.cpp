@@ -4759,6 +4759,64 @@ static void SetPrimitiveType(uint32_t primitiveType)
     SetDirtyValue(g_dirtyStates.pipelineState, g_pipelineState.primitiveTopology, ConvertPrimitiveType(primitiveType));
 }
 
+static void RecordUiLabBackendMaterialSubmit(
+    const char* source,
+    uint32_t primitiveType,
+    bool indexed,
+    bool inlineVertexStream,
+    uint32_t vertexCount,
+    uint32_t indexCount,
+    uint32_t instanceCount,
+    uint32_t startVertex,
+    uint32_t startIndex,
+    int32_t baseVertex,
+    uint32_t vertexStride)
+{
+    if (!UiLab::IsEnabled())
+        return;
+
+    const auto& samplerDesc = g_samplerDescs[0];
+    const bool alphaTestEnable =
+        (g_pipelineState.specConstants & (SPEC_CONSTANT_ALPHA_TEST | SPEC_CONSTANT_ALPHA_TO_COVERAGE)) != 0;
+
+    UiLab::OnBackendMaterialSubmit(
+        source,
+        primitiveType,
+        static_cast<uint32_t>(g_pipelineState.primitiveTopology),
+        indexed,
+        inlineVertexStream,
+        vertexCount,
+        indexCount,
+        instanceCount,
+        startVertex,
+        startIndex,
+        baseVertex,
+        vertexStride,
+        g_sharedConstants.texture2DIndices[0],
+        g_sharedConstants.samplerIndices[0],
+        g_pipelineState.alphaBlendEnable,
+        static_cast<uint32_t>(g_pipelineState.srcBlend),
+        static_cast<uint32_t>(g_pipelineState.destBlend),
+        static_cast<uint32_t>(g_pipelineState.blendOp),
+        static_cast<uint32_t>(g_pipelineState.srcBlendAlpha),
+        static_cast<uint32_t>(g_pipelineState.destBlendAlpha),
+        static_cast<uint32_t>(g_pipelineState.blendOpAlpha),
+        g_pipelineState.colorWriteEnable,
+        alphaTestEnable,
+        g_sharedConstants.alphaThreshold,
+        g_scissorTestEnable,
+        g_scissorRect.left,
+        g_scissorRect.top,
+        g_scissorRect.right,
+        g_scissorRect.bottom,
+        static_cast<uint32_t>(samplerDesc.minFilter),
+        static_cast<uint32_t>(samplerDesc.magFilter),
+        static_cast<uint32_t>(samplerDesc.mipmapMode),
+        static_cast<uint32_t>(samplerDesc.addressU),
+        static_cast<uint32_t>(samplerDesc.addressV),
+        static_cast<uint32_t>(samplerDesc.addressW));
+}
+
 static uint32_t CheckInstancing()
 {
     uint32_t indexCount = 0;
@@ -4824,9 +4882,22 @@ static void ProcDrawPrimitive(const RenderCommand& cmd)
     FlushRenderStateForRenderThread();
 
     auto& commandList = g_commandLists[g_frame];
+    const uint32_t instanceCount = indexCount > 0 ? (args.primitiveCount / indexCount) : 1;
+    RecordUiLabBackendMaterialSubmit(
+        "ProcDrawPrimitive",
+        args.primitiveType,
+        indexCount > 0,
+        false,
+        args.primitiveCount,
+        indexCount,
+        instanceCount,
+        args.startVertex,
+        0,
+        0,
+        g_pipelineState.vertexStrides[0]);
 
     if (indexCount > 0)
-        commandList->drawIndexedInstanced(indexCount, args.primitiveCount / indexCount, 0, 0, 0);
+        commandList->drawIndexedInstanced(indexCount, instanceCount, 0, 0, 0);
     else
         commandList->drawInstanced(args.primitiveCount, 1, args.startVertex, 0);
 }
@@ -4856,6 +4927,18 @@ static void ProcDrawIndexedPrimitive(const RenderCommand& cmd)
 
     SetPrimitiveType(args.primitiveType);
     FlushRenderStateForRenderThread();
+    RecordUiLabBackendMaterialSubmit(
+        "ProcDrawIndexedPrimitive",
+        args.primitiveType,
+        true,
+        false,
+        0,
+        args.primCount,
+        1,
+        0,
+        args.startIndex,
+        args.baseVertexIndex,
+        g_pipelineState.vertexStrides[0]);
 
     g_commandLists[g_frame]->drawIndexedInstanced(args.primCount, 1, args.startIndex, args.baseVertexIndex, 0);
 }
@@ -4911,6 +4994,18 @@ static void ProcDrawPrimitiveUP(const RenderCommand& cmd)
     }
 
     FlushRenderStateForRenderThread();
+    RecordUiLabBackendMaterialSubmit(
+        "ProcDrawPrimitiveUP",
+        args.primitiveType,
+        indexCount != 0,
+        true,
+        args.primitiveCount,
+        indexCount,
+        1,
+        0,
+        0,
+        0,
+        args.vertexStreamZeroStride);
 
     if (indexCount != 0)
         g_commandLists[g_frame]->drawIndexedInstanced(indexCount, 1, 0, 0, 0);

@@ -129,6 +129,47 @@ namespace UiLab
         uint32_t colorSample = 0;
     };
 
+    struct RuntimeGpuSubmitCall
+    {
+        uint64_t frame = 0;
+        uint32_t sequence = 0;
+        std::string source;
+        uint32_t primitiveType = 0;
+        uint32_t primitiveTopology = 0;
+        bool indexed = false;
+        bool inlineVertexStream = false;
+        uint32_t vertexCount = 0;
+        uint32_t indexCount = 0;
+        uint32_t instanceCount = 0;
+        uint32_t startVertex = 0;
+        uint32_t startIndex = 0;
+        int32_t baseVertex = 0;
+        uint32_t vertexStride = 0;
+        uint32_t texture2DDescriptorIndex = 0;
+        uint32_t samplerDescriptorIndex = 0;
+        bool alphaBlendEnable = false;
+        uint32_t srcBlend = 0;
+        uint32_t destBlend = 0;
+        uint32_t blendOp = 0;
+        uint32_t srcBlendAlpha = 0;
+        uint32_t destBlendAlpha = 0;
+        uint32_t blendOpAlpha = 0;
+        uint32_t colorWriteEnable = 0;
+        bool alphaTestEnable = false;
+        float alphaThreshold = 0.0f;
+        bool scissorEnable = false;
+        int32_t scissorLeft = 0;
+        int32_t scissorTop = 0;
+        int32_t scissorRight = 0;
+        int32_t scissorBottom = 0;
+        uint32_t samplerMinFilter = 0;
+        uint32_t samplerMagFilter = 0;
+        uint32_t samplerMipMode = 0;
+        uint32_t samplerAddressU = 0;
+        uint32_t samplerAddressV = 0;
+        uint32_t samplerAddressW = 0;
+    };
+
     struct CsdProjectTreeRecord
     {
         std::string projectName;
@@ -552,6 +593,11 @@ namespace UiLab
     static uint64_t g_runtimeUiDrawListFrame = UINT64_MAX;
     static uint32_t g_runtimeUiDrawCallSequence = 0;
     static uint32_t g_runtimeUiDrawCallDroppedCount = 0;
+    static constexpr size_t kRuntimeGpuSubmitCallSampleLimit = 160;
+    static std::vector<RuntimeGpuSubmitCall> g_runtimeGpuSubmitCalls;
+    static uint64_t g_runtimeGpuSubmitFrame = UINT64_MAX;
+    static uint32_t g_runtimeGpuSubmitSequence = 0;
+    static uint32_t g_runtimeGpuSubmitDroppedCount = 0;
     static PauseGeneralSaveLiveInspectorSnapshot g_pauseGeneralSaveInspector;
 
     static const RuntimeTarget& TargetFor(ScreenId id);
@@ -598,6 +644,7 @@ namespace UiLab
         std::string_view firstMetricName,
         std::string_view secondMetricName);
     static std::string BuildRuntimeUiDrawListJson();
+    static std::string BuildRuntimeGpuSubmitJson();
     static void AppendSonicHudOwnerFieldSamples(std::ostringstream& out, const std::vector<SonicHudOwnerFieldSample>& samples);
     static void AppendTypedInspectors(std::ostringstream& out);
 
@@ -1360,10 +1407,18 @@ namespace UiLab
     {
         R"("uiLayerOracle")",
         R"("uiDrawListOracle")",
+        R"("gpuSubmitOracle")",
         R"("runtimeDrawListStatus")",
         R"("runtime CSD platform draw hook; GPU backend submit pending")",
+        R"("render-thread material submit hook")",
         R"("drawCalls")",
         R"("gpuDrawListStatus")",
+        R"("backendSubmitStatus")",
+        R"("pipelineState")",
+        R"("alphaBlendEnable")",
+        R"("texture2DDescriptorIndex")",
+        R"("samplerDescriptorIndex")",
+        R"("samplerState")",
         R"("primitive": "quad")",
         R"("screenRect")",
         R"("layerPath")",
@@ -2139,6 +2194,13 @@ namespace UiLab
             : "runtime CSD platform draw hook armed; waiting for draw calls";
     }
 
+    static std::string RuntimeGpuSubmitStatus(uint32_t capturedSubmitCalls)
+    {
+        return capturedSubmitCalls > 0
+            ? "render-thread material submit hook active; raw D3D12/Vulkan backend capture pending"
+            : "render-thread material submit hook armed; waiting for submits";
+    }
+
     static void AppendRuntimeUiDrawCalls(std::ostringstream& out, const std::vector<RuntimeUiDrawCall>& calls)
     {
         out << "[";
@@ -2171,6 +2233,133 @@ namespace UiLab
                 << "}";
         }
         out << "]";
+    }
+
+    static void AppendRuntimeGpuSubmitCalls(std::ostringstream& out, const std::vector<RuntimeGpuSubmitCall>& calls)
+    {
+        out << "[";
+        for (size_t i = 0; i < calls.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            const auto& call = calls[i];
+            out
+                << "{"
+                << "\"sequence\":" << call.sequence
+                << ",\"frame\":" << call.frame
+                << ",\"source\":\"" << JsonEscape(call.source) << "\""
+                << ",\"primitiveType\":" << call.primitiveType
+                << ",\"primitiveTopology\":" << call.primitiveTopology
+                << ",\"indexed\":" << (call.indexed ? "true" : "false")
+                << ",\"inlineVertexStream\":" << (call.inlineVertexStream ? "true" : "false")
+                << ",\"vertexCount\":" << call.vertexCount
+                << ",\"indexCount\":" << call.indexCount
+                << ",\"instanceCount\":" << call.instanceCount
+                << ",\"startVertex\":" << call.startVertex
+                << ",\"startIndex\":" << call.startIndex
+                << ",\"baseVertex\":" << call.baseVertex
+                << ",\"vertexStride\":" << call.vertexStride
+                << ",\"texture2DDescriptorIndex\":" << call.texture2DDescriptorIndex
+                << ",\"samplerDescriptorIndex\":" << call.samplerDescriptorIndex
+                << ",\"pipelineState\":{"
+                << "\"alphaBlendEnable\":" << (call.alphaBlendEnable ? "true" : "false")
+                << ",\"srcBlend\":" << call.srcBlend
+                << ",\"destBlend\":" << call.destBlend
+                << ",\"blendOp\":" << call.blendOp
+                << ",\"srcBlendAlpha\":" << call.srcBlendAlpha
+                << ",\"destBlendAlpha\":" << call.destBlendAlpha
+                << ",\"blendOpAlpha\":" << call.blendOpAlpha
+                << ",\"colorWriteEnable\":" << call.colorWriteEnable
+                << ",\"alphaTestEnable\":" << (call.alphaTestEnable ? "true" : "false")
+                << ",\"alphaThreshold\":" << call.alphaThreshold
+                << ",\"scissorEnable\":" << (call.scissorEnable ? "true" : "false")
+                << "}"
+                << ",\"scissorRect\":{"
+                << "\"left\":" << call.scissorLeft
+                << ",\"top\":" << call.scissorTop
+                << ",\"right\":" << call.scissorRight
+                << ",\"bottom\":" << call.scissorBottom
+                << "}"
+                << ",\"samplerState\":{"
+                << "\"minFilter\":" << call.samplerMinFilter
+                << ",\"magFilter\":" << call.samplerMagFilter
+                << ",\"mipMode\":" << call.samplerMipMode
+                << ",\"addressU\":" << call.samplerAddressU
+                << ",\"addressV\":" << call.samplerAddressV
+                << ",\"addressW\":" << call.samplerAddressW
+                << "}"
+                << "}";
+        }
+        out << "]";
+    }
+
+    static std::string BuildRuntimeGpuSubmitJson()
+    {
+        const auto& target = TargetFor(g_target);
+
+        std::vector<RuntimeGpuSubmitCall> calls;
+        uint64_t frame = 0;
+        uint32_t droppedCount = 0;
+        uint32_t sequence = 0;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            calls = g_runtimeGpuSubmitCalls;
+            frame = g_runtimeGpuSubmitFrame == UINT64_MAX ? g_presentedFrameCount : g_runtimeGpuSubmitFrame;
+            droppedCount = g_runtimeGpuSubmitDroppedCount;
+            sequence = g_runtimeGpuSubmitSequence;
+        }
+
+        uint32_t texturedCount = 0;
+        uint32_t alphaBlendCount = 0;
+        uint32_t indexedCount = 0;
+        for (const auto& call : calls)
+        {
+            if (call.texture2DDescriptorIndex != 0)
+                ++texturedCount;
+            if (call.alphaBlendEnable)
+                ++alphaBlendCount;
+            if (call.indexed)
+                ++indexedCount;
+        }
+
+        const std::string status = RuntimeGpuSubmitStatus(static_cast<uint32_t>(calls.size()));
+
+        std::ostringstream out;
+        out
+            << "{\n"
+            << "  \"ok\": true,\n"
+            << "  \"source\": \"render-thread material submit hook\",\n"
+            << "  \"version\": 1,\n"
+            << "  \"frame\": " << frame << ",\n"
+            << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
+            << "  \"backendSubmitStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "  \"backendSubmitCallCount\": " << calls.size() << ",\n"
+            << "  \"capturedSubmitCallCount\": " << calls.size() << ",\n"
+            << "  \"droppedSubmitCallCount\": " << droppedCount << ",\n"
+            << "  \"submitCallSequence\": " << sequence << ",\n"
+            << "  \"texturedSubmitCallCount\": " << texturedCount << ",\n"
+            << "  \"alphaBlendSubmitCallCount\": " << alphaBlendCount << ",\n"
+            << "  \"indexedSubmitCallCount\": " << indexedCount << ",\n"
+            << "  \"sampleLimit\": " << kRuntimeGpuSubmitCallSampleLimit << ",\n"
+            << "  \"gpuSubmitOracle\": {\n"
+            << "    \"source\": \"render-thread material submit hook\",\n"
+            << "    \"backendSubmitStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "    \"rawBackendStatus\": \"raw D3D12/Vulkan backend capture pending\",\n"
+            << "    \"backendSubmitCallCount\": " << calls.size() << ",\n"
+            << "    \"droppedSubmitCallCount\": " << droppedCount << ",\n"
+            << "    \"texturedSubmitCallCount\": " << texturedCount << ",\n"
+            << "    \"alphaBlendSubmitCallCount\": " << alphaBlendCount << ",\n"
+            << "    \"submitCalls\": ";
+        AppendRuntimeGpuSubmitCalls(out, calls);
+        out
+            << "\n"
+            << "  }\n"
+            << "}\n";
+
+        return out.str();
     }
 
     static std::string BuildRuntimeUiDrawListJson()
@@ -2250,13 +2439,18 @@ namespace UiLab
         const bool ready = UiOracleTargetReady(target.id);
         const std::string inputLockState = std::string(ready ? "released:" : "until:") + activationEvent;
         std::vector<RuntimeUiDrawCall> drawCalls;
+        std::vector<RuntimeGpuSubmitCall> gpuSubmitCalls;
         uint32_t runtimeUiDrawDroppedCount = 0;
+        uint32_t runtimeGpuSubmitDroppedCount = 0;
         {
             std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
             drawCalls = g_runtimeUiDrawCalls;
+            gpuSubmitCalls = g_runtimeGpuSubmitCalls;
             runtimeUiDrawDroppedCount = g_runtimeUiDrawCallDroppedCount;
+            runtimeGpuSubmitDroppedCount = g_runtimeGpuSubmitDroppedCount;
         }
         const std::string runtimeDrawListStatus = RuntimeUiDrawListStatus(static_cast<uint32_t>(drawCalls.size()));
+        const std::string backendSubmitStatus = RuntimeGpuSubmitStatus(static_cast<uint32_t>(gpuSubmitCalls.size()));
 
         std::ostringstream out;
         out
@@ -2316,6 +2510,17 @@ namespace UiLab
             << "    \"droppedDrawCallCount\": " << runtimeUiDrawDroppedCount << ",\n"
             << "    \"drawCalls\": ";
         AppendRuntimeUiDrawCalls(out, drawCalls);
+        out
+            << "\n"
+            << "  },\n"
+            << "  \"gpuSubmitOracle\": {\n"
+            << "    \"source\": \"render-thread material submit hook\",\n"
+            << "    \"backendSubmitStatus\": \"" << JsonEscape(backendSubmitStatus) << "\",\n"
+            << "    \"rawBackendStatus\": \"raw D3D12/Vulkan backend capture pending\",\n"
+            << "    \"backendSubmitCallCount\": " << gpuSubmitCalls.size() << ",\n"
+            << "    \"droppedSubmitCallCount\": " << runtimeGpuSubmitDroppedCount << ",\n"
+            << "    \"submitCalls\": ";
+        AppendRuntimeGpuSubmitCalls(out, gpuSubmitCalls);
         out
             << "\n"
             << "  },\n"
@@ -2415,7 +2620,7 @@ namespace UiLab
             << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
             << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
             << "    \"commands\": ";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out
             << "\n"
             << "  },\n"
@@ -4032,6 +4237,105 @@ namespace UiLab
         g_runtimeUiDrawCalls.push_back(std::move(call));
     }
 
+    void OnBackendMaterialSubmit(
+        std::string_view source,
+        uint32_t primitiveType,
+        uint32_t primitiveTopology,
+        bool indexed,
+        bool inlineVertexStream,
+        uint32_t vertexCount,
+        uint32_t indexCount,
+        uint32_t instanceCount,
+        uint32_t startVertex,
+        uint32_t startIndex,
+        int32_t baseVertex,
+        uint32_t vertexStride,
+        uint32_t texture2DDescriptorIndex,
+        uint32_t samplerDescriptorIndex,
+        bool alphaBlendEnable,
+        uint32_t srcBlend,
+        uint32_t destBlend,
+        uint32_t blendOp,
+        uint32_t srcBlendAlpha,
+        uint32_t destBlendAlpha,
+        uint32_t blendOpAlpha,
+        uint32_t colorWriteEnable,
+        bool alphaTestEnable,
+        float alphaThreshold,
+        bool scissorEnable,
+        int32_t scissorLeft,
+        int32_t scissorTop,
+        int32_t scissorRight,
+        int32_t scissorBottom,
+        uint32_t samplerMinFilter,
+        uint32_t samplerMagFilter,
+        uint32_t samplerMipMode,
+        uint32_t samplerAddressU,
+        uint32_t samplerAddressV,
+        uint32_t samplerAddressW)
+    {
+        if (!g_isEnabled)
+            return;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+
+        if (g_runtimeGpuSubmitFrame != g_presentedFrameCount)
+        {
+            g_runtimeGpuSubmitFrame = g_presentedFrameCount;
+            g_runtimeGpuSubmitCalls.clear();
+            g_runtimeGpuSubmitSequence = 0;
+            g_runtimeGpuSubmitDroppedCount = 0;
+        }
+
+        ++g_runtimeGpuSubmitSequence;
+        if (g_runtimeGpuSubmitCalls.size() >= kRuntimeGpuSubmitCallSampleLimit)
+        {
+            ++g_runtimeGpuSubmitDroppedCount;
+            return;
+        }
+
+        RuntimeGpuSubmitCall call;
+        call.frame = g_presentedFrameCount;
+        call.sequence = g_runtimeGpuSubmitSequence;
+        call.source = source.empty() ? std::string("unknown") : std::string(source);
+        call.primitiveType = primitiveType;
+        call.primitiveTopology = primitiveTopology;
+        call.indexed = indexed;
+        call.inlineVertexStream = inlineVertexStream;
+        call.vertexCount = vertexCount;
+        call.indexCount = indexCount;
+        call.instanceCount = instanceCount;
+        call.startVertex = startVertex;
+        call.startIndex = startIndex;
+        call.baseVertex = baseVertex;
+        call.vertexStride = vertexStride;
+        call.texture2DDescriptorIndex = texture2DDescriptorIndex;
+        call.samplerDescriptorIndex = samplerDescriptorIndex;
+        call.alphaBlendEnable = alphaBlendEnable;
+        call.srcBlend = srcBlend;
+        call.destBlend = destBlend;
+        call.blendOp = blendOp;
+        call.srcBlendAlpha = srcBlendAlpha;
+        call.destBlendAlpha = destBlendAlpha;
+        call.blendOpAlpha = blendOpAlpha;
+        call.colorWriteEnable = colorWriteEnable;
+        call.alphaTestEnable = alphaTestEnable;
+        call.alphaThreshold = alphaThreshold;
+        call.scissorEnable = scissorEnable;
+        call.scissorLeft = scissorLeft;
+        call.scissorTop = scissorTop;
+        call.scissorRight = scissorRight;
+        call.scissorBottom = scissorBottom;
+        call.samplerMinFilter = samplerMinFilter;
+        call.samplerMagFilter = samplerMagFilter;
+        call.samplerMipMode = samplerMipMode;
+        call.samplerAddressU = samplerAddressU;
+        call.samplerAddressV = samplerAddressV;
+        call.samplerAddressW = samplerAddressW;
+
+        g_runtimeGpuSubmitCalls.push_back(std::move(call));
+    }
+
     void OnHudSonicStageUpdate(
         uint32_t ownerAddress,
         uint32_t playScreenProjectAddress,
@@ -4554,7 +4858,7 @@ namespace UiLab
     {
         std::ostringstream out;
         out << "{\"ok\":true,\"commands\":";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out << "}\n";
         return out.str();
     }
@@ -4593,6 +4897,9 @@ namespace UiLab
 
         if (verb == "ui-draw-list" || verb == "ui-gpu-draw-list" || verb == "runtime-ui-draw-list")
             return BuildRuntimeUiDrawListJson();
+
+        if (verb == "ui-gpu-submit" || verb == "gpu-submit" || verb == "backend-submit")
+            return BuildRuntimeGpuSubmitJson();
 
         if (verb == "help" || verb == "commands")
             return BuildHelpJson();
@@ -5225,7 +5532,7 @@ namespace UiLab
             ImGui::Separator();
             ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
-            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, route, reset, set-global, capture, help");
+            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, ui-gpu-submit, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
 
             if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))

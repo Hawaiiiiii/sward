@@ -121,6 +121,8 @@ Supported commands:
 - `events`
 - `route-status`
 - `ui-oracle`
+- `ui-draw-list`
+- `ui-gpu-submit`
 - `route <target>`
 - `reset`
 - `set-global <name> <0|1>`
@@ -347,6 +349,8 @@ Local-only evidence, not committed:
   - This is the first real runtime draw-list oracle, but it is still labeled precisely as `runtime CSD platform draw hook; GPU backend submit pending`. It proves what the game-side CSD platform asked to draw before the backend renderer submits it, while a deeper D3D/Xenos backend capture remains future shader-parity work.
   - Phase 149 makes the sidecar viewer consume `ui-draw-list` directly through `--renderer-ui-draw-list-triage-smoke`. When a matching runtime target is live it reports direct runtime CSD platform draw calls and rectangles beside local CSD drawable command counts; when no pipe is attached it reports local coverage with `runtime_calls=0` instead of guessing.
   - Phase 149 triage is explicitly `material_triage=runtime-rectangles-vs-local-csd` with `backend_submit_status=pending`. It is now good enough to identify scene/path/rectangle mismatches before shader work, but shader-perfect parity still needs the backend submit capture or a true UI-only rendered layer.
+  - Phase 150 adds a read-only `ui-gpu-submit` live-bridge command backed by a render-thread material submit hook at the UnleashedRecomp `ProcDrawPrimitive`, `ProcDrawIndexedPrimitive`, and `ProcDrawPrimitiveUP` seams. The hook records sampled backend submit/material state such as primitive topology, indexed/inline-vertex path, texture and sampler descriptor indices, alpha blend state, blend factors, color-write mask, alpha-test threshold, scissor state, and sampler filter/wrap values.
+  - Phase 150 deliberately labels this as a `render-thread material submit hook`: it is below the CSD platform draw hook and strong enough for shader/material triage, with raw D3D12/Vulkan backend capture pending. The sidecar `--renderer-gpu-submit-triage-smoke` consumes this oracle beside the existing runtime CSD rectangles and local CSD commands so material parity can move off full-backbuffer noise.
 
 - `research_uiux/runtime_reference/include/sward/ui_runtime/sonic_hud_reference.hpp` and `src/sonic_hud_reference.cpp`
   - Phase 137 promotes the generated Phase 136 reference into hand-written repo-safe source

@@ -720,7 +720,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, ui_lab)
 
-        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "route", "reset", "set-global", "capture", "help")]', client)
         self.assertIn("ui-oracle", harvest)
 
     def test_ui_lab_phase148_exposes_runtime_csd_platform_draw_list_bridge_command(self):
@@ -751,10 +751,45 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("UiLab::OnCsdPlatformDraw", aspect)
         self.assertIn("SWA::CCsdPlatformMirage::Draw", aspect)
         self.assertIn("SWA::CCsdPlatformMirage::DrawNoTex", aspect)
-        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "route", "reset", "set-global", "capture", "help")]', client)
         self.assertIn("Phase 148", harvest)
         self.assertIn("runtime CSD platform draw hook", harvest)
         self.assertIn("GPU backend submit pending", harvest)
+
+    def test_ui_lab_phase150_exposes_backend_material_submit_bridge_command(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        ui_lab_header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        video = self.read("UnleashedRecomp/gpu/video.cpp")
+        client = self.read("research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1")
+        harvest = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "RuntimeGpuSubmitCall",
+            "g_runtimeGpuSubmitCalls",
+            "OnBackendMaterialSubmit",
+            "BuildRuntimeGpuSubmitJson",
+            '"gpuSubmitOracle"',
+            '"render-thread material submit hook"',
+            '"backendSubmitStatus"',
+            '"pipelineState"',
+            '"alphaBlendEnable"',
+            '"texture2DDescriptorIndex"',
+            '"samplerDescriptorIndex"',
+            '"samplerState"',
+            '"ui-gpu-submit"',
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn("OnBackendMaterialSubmit", ui_lab_header)
+        self.assertIn("RecordUiLabBackendMaterialSubmit", video)
+        self.assertIn("UiLab::OnBackendMaterialSubmit", video)
+        self.assertIn("ProcDrawPrimitive", video)
+        self.assertIn("ProcDrawIndexedPrimitive", video)
+        self.assertIn("ProcDrawPrimitiveUP", video)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn("Phase 150", harvest)
+        self.assertIn("render-thread material submit hook", harvest)
+        self.assertIn("raw D3D12/Vulkan backend capture pending", harvest)
 
     def test_ui_lab_has_repo_safe_live_bridge_client_tool(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1"
@@ -766,7 +801,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "sward_ui_lab_live",
             "Invoke-UiLabBridgeCommand",
             "Read-UiLabBridgeResponse",
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "route", "reset", "set-global", "capture", "help")]',
             "route <target>",
             "set-global <name> <0|1>",
             "Connect($TimeoutMilliseconds)",
@@ -829,7 +864,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, ui_lab)
 
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
 

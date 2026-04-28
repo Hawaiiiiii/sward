@@ -334,6 +334,46 @@ struct FrontendRuntimeDrawListTriage
     std::vector<FrontendRuntimeDrawListTriageScene> scenes;
 };
 
+struct FrontendGpuSubmitCall
+{
+    std::string source;
+    bool indexed = false;
+    bool inlineVertexStream = false;
+    int vertexCount = 0;
+    int indexCount = 0;
+    int instanceCount = 0;
+    int texture2DDescriptorIndex = 0;
+    int samplerDescriptorIndex = 0;
+    bool alphaBlendEnable = false;
+};
+
+struct FrontendGpuSubmitEvidence
+{
+    bool found = false;
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string backendSubmitStatus = "missing";
+    int runtimeFrame = 0;
+    std::vector<FrontendGpuSubmitCall> calls;
+    FrontendLiveBridgeProbeResult bridgeProbe;
+};
+
+struct FrontendGpuSubmitMaterialTriage
+{
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string gpuSubmitSource = "ui-gpu-submit";
+    std::string materialTriage = "backend-submit-vs-runtime-rectangles";
+    std::string backendSubmitStatus = "render-thread-material-submit";
+    std::size_t backendSubmitCount = 0;
+    std::size_t texturedSubmitCount = 0;
+    std::size_t alphaBlendSubmitCount = 0;
+    std::size_t drawRectCount = 0;
+    std::size_t localCommandCount = 0;
+};
+
 struct CsdColorRgba
 {
     std::uint8_t r = 255;
@@ -810,6 +850,9 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeUiDrawList(
     std::string_view pipeName,
     DWORD timeoutMilliseconds = 150);
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeGpuSubmit(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds = 150);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveBridge(
@@ -819,6 +862,8 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] FrontendUiOraclePlaybackClock loadFrontendUiOraclePlaybackClock(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendRuntimeDrawListEvidence loadFrontendRuntimeDrawListEvidence(
+    const sward::ui_runtime::FrontendScreenPolicy& policy);
+[[nodiscard]] FrontendGpuSubmitEvidence loadFrontendGpuSubmitEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] std::string formatFrontendRuntimeAlignmentEvidence(const FrontendLiveStateAlignmentEvidence& evidence);
 
@@ -6054,6 +6099,126 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return records.empty() ? 1 : 0;
 }
 
+[[nodiscard]] FrontendGpuSubmitMaterialTriage buildFrontendGpuSubmitMaterialTriage(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendGpuSubmitMaterialTriage triage;
+    triage.screenId = policy.screenId;
+
+    const auto submit = loadFrontendGpuSubmitEvidence(policy);
+    triage.source = submit.source;
+    triage.probe = submit.probe;
+    triage.backendSubmitCount = submit.calls.size();
+    triage.texturedSubmitCount = static_cast<std::size_t>(std::count_if(
+        submit.calls.begin(),
+        submit.calls.end(),
+        [](const FrontendGpuSubmitCall& call)
+        {
+            return call.texture2DDescriptorIndex != 0;
+        }));
+    triage.alphaBlendSubmitCount = static_cast<std::size_t>(std::count_if(
+        submit.calls.begin(),
+        submit.calls.end(),
+        [](const FrontendGpuSubmitCall& call)
+        {
+            return call.alphaBlendEnable;
+        }));
+
+    const auto drawList = loadFrontendRuntimeDrawListEvidence(policy);
+    triage.drawRectCount = static_cast<std::size_t>(std::count_if(
+        drawList.calls.begin(),
+        drawList.calls.end(),
+        runtimeDrawCallHasRectangle));
+
+    const auto clock = loadFrontendUiOraclePlaybackClock(policy);
+    for (const auto& scenePolicy : policy.scenes)
+    {
+        const int sceneFrame = uiOracleTimelineFrameForScene(clock, scenePolicy);
+        const CsdPipelineTemplateBinding sceneBinding{
+            policy.screenId,
+            policy.layoutName,
+            scenePolicy.sceneName,
+            scenePolicy.sceneName,
+            scenePolicy.timeline.animationName,
+        };
+
+        const auto* drawableScene = cachedCsdDrawableScene(sceneBinding);
+        if (!drawableScene)
+            continue;
+
+        auto playback = loadCsdTimelinePlayback(sceneBinding, sceneFrame);
+        if (!playback)
+            playback = loadTimelinePlaybackForScene(policy.screenId, policy.layoutName, scenePolicy.sceneName, sceneFrame);
+
+        std::size_t sampledTrackCount = 0;
+        const auto commands = timelineSampledCommands(
+            *drawableScene,
+            playback ? &*playback : nullptr,
+            sampledTrackCount);
+        triage.localCommandCount += static_cast<std::size_t>(std::count_if(
+            commands.begin(),
+            commands.end(),
+            csdCommandIsDrawable));
+    }
+
+    return triage;
+}
+
+[[nodiscard]] int runRendererGpuSubmitTriageSmoke()
+{
+    constexpr std::string_view directProbeToken = "gpu_submit_probe=direct-ui-gpu-submit";
+    constexpr std::string_view drawListFallbackToken = "gpu_submit_probe=ui-draw-list-fallback";
+    constexpr std::string_view missingProbeToken = "gpu_submit_probe=missing";
+    constexpr std::string_view gpuSubmitSourceToken = "gpu_submit_source=ui-gpu-submit";
+    constexpr std::string_view materialTriageToken = "material_triage=backend-submit-vs-runtime-rectangles";
+    constexpr std::string_view backendSubmitStatusToken = "backend_submit_status=render-thread-material-submit";
+
+    std::vector<FrontendGpuSubmitMaterialTriage> records;
+    for (const auto& policy : frontendScreenPolicies())
+        records.push_back(buildFrontendGpuSubmitMaterialTriage(policy));
+
+    const bool anyDirect = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendGpuSubmitMaterialTriage& record)
+        {
+            return record.probe == "direct-ui-gpu-submit";
+        });
+    const bool anyFallback = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendGpuSubmitMaterialTriage& record)
+        {
+            return record.probe == "ui-draw-list-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer gpu submit triage smoke ok "
+        << "mode=phase150-backend-submit-material-triage"
+        << " " << (anyDirect ? directProbeToken : (anyFallback ? drawListFallbackToken : missingProbeToken))
+        << " " << gpuSubmitSourceToken
+        << " " << materialTriageToken
+        << " " << backendSubmitStatusToken
+        << " lanes=" << records.size()
+        << '\n';
+
+    for (const auto& record : records)
+    {
+        std::cout
+            << "gpu_submit_triage=" << record.screenId
+            << ":source=" << record.source
+            << ":backend_submits=" << record.backendSubmitCount
+            << ":textured_submits=" << record.texturedSubmitCount
+            << ":alpha_blend_submits=" << record.alphaBlendSubmitCount
+            << ":draw_rects=" << record.drawRectCount
+            << ":local_commands=" << record.localCommandCount
+            << ":material_triage=" << record.materialTriage
+            << '\n';
+    }
+
+    return records.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -8184,6 +8349,13 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return queryUiLabLiveBridgeCommand(pipeName, "ui-draw-list", timeoutMilliseconds);
 }
 
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeGpuSubmit(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds)
+{
+    return queryUiLabLiveBridgeCommand(pipeName, "ui-gpu-submit", timeoutMilliseconds);
+}
+
 [[nodiscard]] std::string frontendAlignmentCursorOwnerFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy,
     std::string_view text)
@@ -8653,6 +8825,80 @@ void applyFrontendRuntimeDrawListFromJson(
     missing.activeProject = frontendRuntimeDrawableProjectName(policy, "");
     missing.bridgeProbe = drawProbe;
     return missing;
+}
+
+[[nodiscard]] FrontendGpuSubmitCall parseFrontendGpuSubmitCall(std::string_view objectSpan)
+{
+    FrontendGpuSubmitCall call;
+    call.source = jsonStringField(objectSpan, "source").value_or("");
+    call.indexed = jsonBoolField(objectSpan, "indexed").value_or(false);
+    call.inlineVertexStream = jsonBoolField(objectSpan, "inlineVertexStream").value_or(false);
+    call.vertexCount = static_cast<int>(jsonNumberField(objectSpan, "vertexCount").value_or(0.0));
+    call.indexCount = static_cast<int>(jsonNumberField(objectSpan, "indexCount").value_or(0.0));
+    call.instanceCount = static_cast<int>(jsonNumberField(objectSpan, "instanceCount").value_or(0.0));
+    call.texture2DDescriptorIndex = static_cast<int>(jsonNumberField(objectSpan, "texture2DDescriptorIndex").value_or(0.0));
+    call.samplerDescriptorIndex = static_cast<int>(jsonNumberField(objectSpan, "samplerDescriptorIndex").value_or(0.0));
+    if (const auto pipelineState = jsonObjectFieldSpan(objectSpan, "pipelineState"))
+        call.alphaBlendEnable = jsonBoolField(*pipelineState, "alphaBlendEnable").value_or(false);
+    return call;
+}
+
+void applyFrontendGpuSubmitFromJson(
+    FrontendGpuSubmitEvidence& evidence,
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    std::string_view text,
+    std::string_view source,
+    std::string_view probe)
+{
+    evidence.found = true;
+    evidence.screenId = jsonStringField(text, "target").value_or(policy.screenId);
+    evidence.source = std::string(source);
+    evidence.probe = std::string(probe);
+    evidence.runtimeFrame = static_cast<int>(jsonNumberField(text, "frame").value_or(0.0));
+    evidence.backendSubmitStatus = jsonStringField(text, "backendSubmitStatus").value_or("missing");
+
+    const auto gpuSubmitOracle = jsonObjectFieldSpan(text, "gpuSubmitOracle");
+    const std::string_view submitSpan = gpuSubmitOracle ? *gpuSubmitOracle : text;
+    if (const auto calls = jsonArrayFieldSpan(submitSpan, "submitCalls"))
+    {
+        for (const auto callSpan : jsonObjectSpansInArray(*calls))
+            evidence.calls.push_back(parseFrontendGpuSubmitCall(callSpan));
+    }
+}
+
+[[nodiscard]] FrontendGpuSubmitEvidence loadFrontendGpuSubmitEvidence(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    constexpr std::string_view defaultPipeName = "sward_ui_lab_live";
+    const auto discoveredPipeName = discoverFrontendLiveBridgeName(policy.screenId);
+
+    auto gpuProbe = queryUiLabLiveBridgeGpuSubmit(discoveredPipeName);
+    if (!gpuProbe.connected && discoveredPipeName != defaultPipeName)
+        gpuProbe = queryUiLabLiveBridgeGpuSubmit(defaultPipeName);
+
+    const auto gpuTarget = gpuProbe.connected && !gpuProbe.responseJson.empty()
+        ? jsonStringField(gpuProbe.responseJson, "target")
+        : std::optional<std::string>{};
+    if (gpuProbe.connected && gpuTarget && *gpuTarget == policy.screenId)
+    {
+        FrontendGpuSubmitEvidence evidence;
+        evidence.bridgeProbe = gpuProbe;
+        applyFrontendGpuSubmitFromJson(
+            evidence,
+            policy,
+            gpuProbe.responseJson,
+            "ui_lab_live_bridge_gpu_submit",
+            "direct-ui-gpu-submit");
+        return evidence;
+    }
+
+    const auto drawList = loadFrontendRuntimeDrawListEvidence(policy);
+    FrontendGpuSubmitEvidence fallback;
+    fallback.screenId = policy.screenId;
+    fallback.source = drawList.found ? "ui_lab_live_bridge_ui_draw_list" : "missing";
+    fallback.probe = drawList.found ? "ui-draw-list-fallback" : "missing";
+    fallback.backendSubmitStatus = drawList.backendSubmitStatus;
+    return fallback;
 }
 
 [[nodiscard]] FrontendUiOraclePlaybackClock loadFrontendUiOraclePlaybackClock(
@@ -10424,6 +10670,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererUiDrawableOracleSmoke();
     if (commandLineHasFlag("--renderer-ui-draw-list-triage-smoke"))
         return runRendererUiDrawListTriageSmoke();
+    if (commandLineHasFlag("--renderer-gpu-submit-triage-smoke"))
+        return runRendererGpuSubmitTriageSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 
