@@ -162,6 +162,8 @@ struct CsdDrawableCommand
     int sourceY = 0;
     int sourceWidth = 0;
     int sourceHeight = 0;
+    int castWidth = 0;
+    int castHeight = 0;
     int destinationX = 0;
     int destinationY = 0;
     int destinationWidth = 0;
@@ -209,6 +211,40 @@ struct DdsTextureInfo
     std::string format;
     int width = 0;
     int height = 0;
+};
+
+struct CsdTimelineKeyframe
+{
+    double frame = 0.0;
+    double value = 0.0;
+    std::string interpolationType;
+};
+
+struct CsdTimelineTrackSample
+{
+    std::string sceneName;
+    std::string castName;
+    std::string trackType;
+    int groupIndex = 0;
+    int castIndex = 0;
+    int sampleFrame = 0;
+    int keyframeCount = 0;
+    double value = 0.0;
+};
+
+struct CsdTimelinePlayback
+{
+    std::filesystem::path sourcePath;
+    std::string layoutFileName;
+    std::string sceneName;
+    std::string animationName;
+    int animationIndex = 0;
+    int sampleFrame = 0;
+    double frameCount = 0.0;
+    int trackCount = 0;
+    int numericTrackCount = 0;
+    int keyframeCount = 0;
+    std::vector<CsdTimelineTrackSample> samples;
 };
 
 inline constexpr std::array<TextureSourceCandidate, 15> kTextureSourceCandidates{{
@@ -1223,6 +1259,32 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     return std::nullopt;
 }
 
+[[nodiscard]] std::optional<int> csdSceneIndexForName(std::string_view rootObject, std::string_view sceneName);
+
+[[nodiscard]] std::optional<std::string_view> findCsdSceneObjectSpan(
+    std::string_view document,
+    std::string_view layoutFileName,
+    std::string_view sceneName)
+{
+    const auto parsedFile = findParsedCsdFileObjectSpan(document, layoutFileName);
+    if (!parsedFile)
+        return std::nullopt;
+
+    const auto resource = firstJsonObjectInArrayField(*parsedFile, "resources");
+    const auto content = resource ? jsonObjectFieldSpan(*resource, "content") : std::optional<std::string_view>{};
+    const auto project = content ? jsonObjectFieldSpan(*content, "csdm_project") : std::optional<std::string_view>{};
+    const auto root = project ? jsonObjectFieldSpan(*project, "root") : std::optional<std::string_view>{};
+    if (!root)
+        return std::nullopt;
+
+    const auto sceneIndex = csdSceneIndexForName(*root, sceneName);
+    const auto scenes = jsonArrayFieldSpan(*root, "scenes");
+    if (!sceneIndex || *sceneIndex < 0 || !scenes)
+        return std::nullopt;
+
+    return jsonObjectInArrayAt(*scenes, static_cast<std::size_t>(*sceneIndex));
+}
+
 [[nodiscard]] std::optional<int> csdSceneIndexForName(std::string_view rootObject, std::string_view sceneName)
 {
     const auto sceneIds = jsonArrayFieldSpan(rootObject, "scene_ids");
@@ -1408,6 +1470,8 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
             command.subimageIndex = *subimageIndex;
             command.textureIndex = subimage.textureIndex;
             command.textureName = textureNames[static_cast<std::size_t>(subimage.textureIndex)];
+            command.castWidth = castWidth;
+            command.castHeight = castHeight;
             command.translationX = translationX;
             command.translationY = translationY;
             command.scaleX = scaleX;
@@ -1497,6 +1561,219 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     scene.textureNames = pipelineEvidence->textureNames;
     scene.commands = buildCsdDrawableCommands(*sceneObject, scene.sceneName, scene.textureNames);
     return scene;
+}
+
+[[nodiscard]] int csdTimelineSampleFrameForTemplate(std::string_view templateId)
+{
+    if (templateId == "title-menu")
+        return 10;
+    if (templateId == "loading")
+        return 75;
+    if (templateId == "sonic-hud")
+        return 99;
+    return 50;
+}
+
+[[nodiscard]] std::optional<int> csdAnimationIndexForName(
+    std::string_view sceneObject,
+    std::string_view animationName)
+{
+    const auto dictionaries = jsonArrayFieldSpan(sceneObject, "animation_dictionaries");
+    if (!dictionaries)
+        return std::nullopt;
+
+    for (const auto objectSpan : jsonObjectSpansInArray(*dictionaries))
+    {
+        if (jsonStringField(objectSpan, "name").value_or("") == animationName)
+            return static_cast<int>(jsonNumberField(objectSpan, "index").value_or(-1.0));
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::vector<CsdTimelineKeyframe> parseCsdTimelineKeyframes(std::string_view trackObject)
+{
+    std::vector<CsdTimelineKeyframe> keyframes;
+    const auto keyframeArray = jsonArrayFieldSpan(trackObject, "keyframes");
+    if (!keyframeArray)
+        return keyframes;
+
+    for (const auto keyframeObject : jsonObjectSpansInArray(*keyframeArray))
+    {
+        const auto frame = jsonNumberField(keyframeObject, "frame");
+        const auto value = jsonNumberField(keyframeObject, "value");
+        if (!frame || !value || !std::isfinite(*value))
+            continue;
+
+        CsdTimelineKeyframe keyframe;
+        keyframe.frame = *frame;
+        keyframe.value = *value;
+        keyframe.interpolationType = jsonStringField(keyframeObject, "type").value_or("Linear");
+        keyframes.push_back(std::move(keyframe));
+    }
+
+    std::sort(
+        keyframes.begin(),
+        keyframes.end(),
+        [](const CsdTimelineKeyframe& left, const CsdTimelineKeyframe& right)
+        {
+            return left.frame < right.frame;
+        });
+    return keyframes;
+}
+
+[[nodiscard]] std::optional<double> sampleCsdTimelineTrack(
+    const std::vector<CsdTimelineKeyframe>& keyframes,
+    double frame)
+{
+    if (keyframes.empty())
+        return std::nullopt;
+
+    if (frame <= keyframes.front().frame)
+        return keyframes.front().value;
+
+    for (std::size_t index = 1; index < keyframes.size(); ++index)
+    {
+        const auto& previous = keyframes[index - 1];
+        const auto& next = keyframes[index];
+        if (frame > next.frame)
+            continue;
+
+        if (std::fabs(next.frame - previous.frame) < 0.000001 || previous.interpolationType == "Const")
+            return previous.value;
+
+        const double t = std::clamp((frame - previous.frame) / (next.frame - previous.frame), 0.0, 1.0);
+        return previous.value + ((next.value - previous.value) * t);
+    }
+
+    return keyframes.back().value;
+}
+
+[[nodiscard]] std::optional<CsdTimelinePlayback> loadCsdTimelinePlayback(const CsdPipelineTemplateBinding& binding)
+{
+    const auto evidencePath = layoutEvidencePath();
+    if (!evidencePath)
+        return std::nullopt;
+
+    const std::string document = readTextFile(*evidencePath);
+    if (document.empty())
+        return std::nullopt;
+
+    const auto sceneObject = findCsdSceneObjectSpan(document, binding.layoutFileName, binding.timelineSceneName);
+    if (!sceneObject)
+        return std::nullopt;
+
+    const auto animationIndex = csdAnimationIndexForName(*sceneObject, binding.timelineAnimationName);
+    const auto frameDataArray = jsonArrayFieldSpan(*sceneObject, "animation_frame_data_list");
+    const auto keyframeDataArray = jsonArrayFieldSpan(*sceneObject, "animation_keyframe_data_list");
+    if (!animationIndex || *animationIndex < 0 || !frameDataArray || !keyframeDataArray)
+        return std::nullopt;
+
+    const auto frameData = jsonObjectInArrayAt(*frameDataArray, static_cast<std::size_t>(*animationIndex));
+    const auto keyframeData = jsonObjectInArrayAt(*keyframeDataArray, static_cast<std::size_t>(*animationIndex));
+    if (!frameData || !keyframeData)
+        return std::nullopt;
+
+    CsdTimelinePlayback playback;
+    playback.sourcePath = *evidencePath;
+    playback.layoutFileName = std::string(binding.layoutFileName);
+    playback.sceneName = std::string(binding.timelineSceneName);
+    playback.animationName = std::string(binding.timelineAnimationName);
+    playback.animationIndex = *animationIndex;
+    playback.frameCount = jsonNumberField(*frameData, "frame_count").value_or(0.0);
+    playback.sampleFrame = std::clamp(
+        csdTimelineSampleFrameForTemplate(binding.templateId),
+        0,
+        std::max(0, static_cast<int>(std::llround(playback.frameCount))));
+
+    const auto dictionary = parseCsdCastDictionary(*sceneObject);
+    const auto groups = jsonArrayFieldSpan(*keyframeData, "groups");
+    if (!groups)
+        return playback;
+
+    const auto groupObjects = jsonObjectSpansInArray(*groups);
+    for (std::size_t groupIndex = 0; groupIndex < groupObjects.size(); ++groupIndex)
+    {
+        const auto casts = jsonArrayFieldSpan(groupObjects[groupIndex], "casts");
+        if (!casts)
+            continue;
+
+        const auto castObjects = jsonObjectSpansInArray(*casts);
+        for (std::size_t castIndex = 0; castIndex < castObjects.size(); ++castIndex)
+        {
+            const auto subData = jsonArrayFieldSpan(castObjects[castIndex], "sub_data");
+            if (!subData)
+                continue;
+
+            for (const auto trackObject : jsonObjectSpansInArray(*subData))
+            {
+                ++playback.trackCount;
+                const auto keyframeObjects = jsonArrayFieldSpan(trackObject, "keyframes");
+                if (keyframeObjects)
+                    playback.keyframeCount += static_cast<int>(jsonObjectSpansInArray(*keyframeObjects).size());
+
+                const auto keyframes = parseCsdTimelineKeyframes(trackObject);
+                const auto sample = sampleCsdTimelineTrack(keyframes, static_cast<double>(playback.sampleFrame));
+                if (!sample)
+                    continue;
+
+                ++playback.numericTrackCount;
+                CsdTimelineTrackSample trackSample;
+                trackSample.sceneName = playback.sceneName;
+                trackSample.groupIndex = static_cast<int>(groupIndex);
+                trackSample.castIndex = static_cast<int>(castIndex);
+                trackSample.castName = csdCastNameFor(dictionary, trackSample.groupIndex, trackSample.castIndex);
+                trackSample.trackType = jsonStringField(trackObject, "track_type").value_or("Unknown");
+                trackSample.sampleFrame = playback.sampleFrame;
+                trackSample.keyframeCount = static_cast<int>(keyframes.size());
+                trackSample.value = *sample;
+                playback.samples.push_back(std::move(trackSample));
+            }
+        }
+    }
+
+    return playback;
+}
+
+[[nodiscard]] std::optional<CsdDrawableCommand> applyCsdTimelineToDrawableCommand(
+    const CsdDrawableCommand& command,
+    const CsdTimelineTrackSample& sample)
+{
+    if (command.sceneName != sample.sceneName || command.castName != sample.castName)
+        return std::nullopt;
+
+    CsdDrawableCommand sampled = command;
+    if (sample.trackType == "XPosition")
+        sampled.translationX = sample.value;
+    else if (sample.trackType == "YPosition")
+        sampled.translationY = sample.value;
+    else if (sample.trackType == "XScale")
+        sampled.scaleX = sample.value;
+    else if (sample.trackType == "YScale")
+        sampled.scaleY = sample.value;
+    else if (sample.trackType == "Rotation")
+        sampled.rotation = sample.value;
+    else
+        return std::nullopt;
+
+    const double castWidth = command.castWidth > 0
+        ? static_cast<double>(command.castWidth)
+        : (std::fabs(command.scaleX) > 0.000001
+            ? static_cast<double>(command.destinationWidth) / std::fabs(command.scaleX)
+            : static_cast<double>(command.destinationWidth));
+    const double castHeight = command.castHeight > 0
+        ? static_cast<double>(command.castHeight)
+        : (std::fabs(command.scaleY) > 0.000001
+            ? static_cast<double>(command.destinationHeight) / std::fabs(command.scaleY)
+            : static_cast<double>(command.destinationHeight));
+
+    sampled.destinationWidth = std::max(1, static_cast<int>(std::llround(std::fabs(castWidth * sampled.scaleX))));
+    sampled.destinationHeight = std::max(1, static_cast<int>(std::llround(std::fabs(castHeight * sampled.scaleY))));
+    sampled.destinationX = static_cast<int>(std::llround(
+        ((0.5 + sampled.translationX) * static_cast<double>(kDesignWidth)) - (static_cast<double>(sampled.destinationWidth) * 0.5)));
+    sampled.destinationY = static_cast<int>(std::llround(
+        ((0.5 + sampled.translationY) * static_cast<double>(kDesignHeight)) - (static_cast<double>(sampled.destinationHeight) * 0.5)));
+    return sampled;
 }
 
 [[nodiscard]] std::optional<std::filesystem::path> findRuntimeEvidenceManifestForTarget(std::string_view target)
@@ -3333,6 +3610,189 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return failed || templateCount == 0 ? 1 : 0;
 }
 
+[[nodiscard]] std::string csdTimelineSampleDescriptor(
+    std::string_view templateId,
+    const CsdTimelineTrackSample& sample)
+{
+    std::ostringstream descriptor;
+    descriptor
+        << "timeline_sample="
+        << templateId
+        << ":"
+        << sample.sceneName
+        << "/"
+        << sample.castName
+        << ":track="
+        << sample.trackType
+        << ":frame="
+        << sample.sampleFrame
+        << ":value="
+        << formatCsdNumber(sample.value);
+    return descriptor.str();
+}
+
+[[nodiscard]] std::string csdTimelineDrawCommandDescriptor(
+    std::string_view templateId,
+    const CsdTimelineTrackSample& sample,
+    const CsdDrawableCommand& sampledCommand)
+{
+    std::ostringstream descriptor;
+    descriptor
+        << "timeline_draw_command="
+        << templateId
+        << ":"
+        << sample.sceneName
+        << "/"
+        << sample.castName
+        << ":frame="
+        << sample.sampleFrame
+        << ":track="
+        << sample.trackType
+        << ":value="
+        << formatCsdNumber(sample.value)
+        << ":dst="
+        << sampledCommand.destinationX
+        << ","
+        << sampledCommand.destinationY
+        << ","
+        << sampledCommand.destinationWidth
+        << "x"
+        << sampledCommand.destinationHeight;
+    return descriptor.str();
+}
+
+[[nodiscard]] int runCsdTimelineSmoke(const std::optional<std::string>& templateFilter)
+{
+    std::size_t templateCount = 0;
+    bool failed = false;
+    std::vector<std::string> uniquePackages;
+    std::vector<std::pair<std::string, std::optional<CsdTimelinePlayback>>> loadedTimelines;
+    std::vector<std::pair<std::string, std::optional<CsdDrawableScene>>> loadedScenes;
+    std::vector<std::string> descriptors;
+
+    auto timelineFor = [&loadedTimelines](const CsdPipelineTemplateBinding& binding) -> const CsdTimelinePlayback*
+    {
+        const std::string key = std::string(binding.layoutFileName) + ":" + std::string(binding.timelineSceneName) + ":" + std::string(binding.timelineAnimationName);
+        const auto found = std::find_if(
+            loadedTimelines.begin(),
+            loadedTimelines.end(),
+            [&key](const std::pair<std::string, std::optional<CsdTimelinePlayback>>& entry)
+            {
+                return entry.first == key;
+            });
+        if (found != loadedTimelines.end())
+            return found->second ? &*found->second : nullptr;
+
+        loadedTimelines.emplace_back(key, loadCsdTimelinePlayback(binding));
+        return loadedTimelines.back().second ? &*loadedTimelines.back().second : nullptr;
+    };
+
+    auto drawableFor = [&loadedScenes](const CsdPipelineTemplateBinding& binding) -> const CsdDrawableScene*
+    {
+        const std::string key = std::string(binding.layoutFileName) + ":" + std::string(binding.primarySceneName);
+        const auto found = std::find_if(
+            loadedScenes.begin(),
+            loadedScenes.end(),
+            [&key](const std::pair<std::string, std::optional<CsdDrawableScene>>& entry)
+            {
+                return entry.first == key;
+            });
+        if (found != loadedScenes.end())
+            return found->second ? &*found->second : nullptr;
+
+        loadedScenes.emplace_back(key, loadCsdDrawableScene(binding));
+        return loadedScenes.back().second ? &*loadedScenes.back().second : nullptr;
+    };
+
+    for (const auto& csdBinding : kCsdPipelineTemplateBindings)
+    {
+        if (templateFilter && csdBinding.templateId != *templateFilter)
+            continue;
+
+        ++templateCount;
+        if (std::find(uniquePackages.begin(), uniquePackages.end(), csdBinding.layoutFileName) == uniquePackages.end())
+            uniquePackages.emplace_back(csdBinding.layoutFileName);
+
+        const auto* playback = timelineFor(csdBinding);
+        const auto* sgfxBinding = findSgfxTemplateRenderBinding(csdBinding.templateId);
+        if (!playback || !sgfxBinding)
+        {
+            failed = true;
+            continue;
+        }
+
+        std::ostringstream timelineDescriptor;
+        timelineDescriptor
+            << "csd_timeline="
+            << csdBinding.templateId
+            << ":layout="
+            << csdBinding.layoutFileName
+            << ":scene="
+            << playback->sceneName
+            << ":animation="
+            << playback->animationName
+            << ":frame="
+            << playback->sampleFrame
+            << "/"
+            << formatCsdNumber(playback->frameCount)
+            << ":tracks="
+            << playback->trackCount
+            << ":numeric="
+            << playback->numericTrackCount
+            << ":keyframes="
+            << playback->keyframeCount;
+        descriptors.push_back(timelineDescriptor.str());
+
+        for (const auto& sample : playback->samples)
+            descriptors.push_back(csdTimelineSampleDescriptor(csdBinding.templateId, sample));
+
+        if (const auto* drawable = drawableFor(csdBinding))
+        {
+            for (const auto& sample : playback->samples)
+            {
+                for (const auto& command : drawable->commands)
+                {
+                    const auto sampled = applyCsdTimelineToDrawableCommand(command, sample);
+                    if (!sampled)
+                        continue;
+
+                    descriptors.push_back(csdTimelineDrawCommandDescriptor(csdBinding.templateId, sample, *sampled));
+                }
+            }
+        }
+
+        const auto manifest = findRuntimeEvidenceManifestForTarget(csdBinding.templateId);
+        std::ostringstream comparisonDescriptor;
+        comparisonDescriptor
+            << "rendered_frame_compare="
+            << csdBinding.templateId
+            << ":target="
+            << csdBinding.templateId
+            << ":event="
+            << sgfxBinding->requiredEventId
+            << ":frame="
+            << playback->sampleFrame
+            << ":native="
+            << (manifest ? "found" : "missing");
+        descriptors.push_back(comparisonDescriptor.str());
+    }
+
+    if (templateFilter && templateCount == 0)
+        failed = true;
+
+    std::cout
+        << "sward_su_ui_asset_renderer csd timeline smoke ok "
+        << "layout_source=research_uiux/data/layout_deep_analysis.json "
+        << "templates=" << templateCount
+        << " packages=" << uniquePackages.size()
+        << '\n';
+
+    for (const auto& descriptor : descriptors)
+        std::cout << descriptor << '\n';
+
+    return failed || templateCount == 0 ? 1 : 0;
+}
+
 [[nodiscard]] int runCsdPipelineSmoke(const std::optional<std::string>& templateFilter)
 {
     std::size_t templateCount = 0;
@@ -3557,6 +4017,8 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
 {
     const auto templateFilter = commandLineValueAfter("--template");
+    if (commandLineHasFlag("--csd-timeline-smoke"))
+        return runCsdTimelineSmoke(templateFilter);
     if (commandLineHasFlag("--csd-drawable-smoke"))
         return runCsdDrawableSmoke(templateFilter);
     if (commandLineHasFlag("--csd-pipeline-smoke"))

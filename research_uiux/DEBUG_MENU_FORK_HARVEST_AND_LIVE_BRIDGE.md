@@ -217,6 +217,14 @@ The new `--csd-drawable-smoke` command exports the four current template scenes 
 
 Interactive `--template ...` preview now attempts to render from the recovered CSD drawable command stream first. The older hand-placed placeholder casts remain as fallback and diagnostics, but the template lane is now CSD draw-command driven wherever local evidence and local Sonic placeholder textures exist. This is still a sidecar pipeline viewer, not a replacement for the real UnleashedRecomp runtime lane.
 
+## Phase 126 CSD Timeline Playback
+
+Phase 126 adds deterministic CSD keyframe sampling to the local SU UI pipeline viewer. The renderer now resolves a template's timeline scene and animation bank, reads `animation_dictionaries`, `animation_frame_data_list`, `animation_keyframe_data_list`, groups, casts, tracks, and finite numeric keyframes, then evaluates linear/const samples for the first reusable title/loading/HUD/tutorial timing anchors.
+
+The new `--csd-timeline-smoke` command reports sampled motion at explicit frame anchors: title `mm_donut_move/DefaultAnim` at frame `10`, loading `pda_txt/Usual_Anim_3` at frame `75`, Sonic HUD `so_speed_gauge/Size_Anim` at frame `99`, and tutorial `info_1/Count_Anim` at frame `50`. It exports `csd_timeline=`, `timeline_sample=`, and, when the timeline scene matches a drawable scene, `timeline_draw_command=` lines that apply sampled transform channels back onto CSD-derived draw commands.
+
+This phase also adds `rendered_frame_compare=` lines for each template so the sampled sidecar frame stays tied to the latest available native BMP evidence. That comparison is metadata-level for this beat: it proves the local sampled frame has a native evidence target and durable event anchor, while full pixel diffing remains a follow-on step. Fresh UnleashedRecomp runs are still required whenever we need to refresh the native oracle or prove a newly routed screen, but they are not required for every local parser/sampler iteration.
+
 ## Verification
 
 Local-only evidence, not committed:

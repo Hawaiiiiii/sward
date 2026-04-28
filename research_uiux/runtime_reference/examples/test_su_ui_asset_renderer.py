@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RENDERER_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "su_ui_asset_renderer.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr125" / "sward_su_ui_asset_renderer.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr126" / "sward_su_ui_asset_renderer.exe"
 
 
 class SuUiAssetRendererTests(unittest.TestCase):
@@ -147,6 +147,19 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("texture_binding=", source_text)
         self.assertIn("sampled_transform=", source_text)
         self.assertIn("native_bmp_compare=", source_text)
+
+    def test_renderer_source_exposes_csd_timeline_playback(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("CsdTimelineKeyframe", source_text)
+        self.assertIn("CsdTimelineTrackSample", source_text)
+        self.assertIn("loadCsdTimelinePlayback", source_text)
+        self.assertIn("sampleCsdTimelineTrack", source_text)
+        self.assertIn("applyCsdTimelineToDrawableCommand", source_text)
+        self.assertIn("--csd-timeline-smoke", source_text)
+        self.assertIn("csd_timeline=", source_text)
+        self.assertIn("timeline_sample=", source_text)
+        self.assertIn("timeline_draw_command=", source_text)
+        self.assertIn("rendered_frame_compare=", source_text)
 
     def test_renderer_source_exposes_title_loop_reconstruction_screen(self) -> None:
         source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
@@ -426,6 +439,59 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("csd_draw_command=loading:pda/bg->bg:texture=mat_load_comon_001.dds", completed.stdout)
         self.assertNotIn("csd_drawable=title-menu:", completed.stdout)
         self.assertNotIn("csd_drawable=sonic-hud:", completed.stdout)
+
+    def test_renderer_csd_timeline_smoke_reports_sampled_motion_and_native_compare(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--csd-timeline-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer csd timeline smoke ok", completed.stdout)
+        self.assertIn("layout_source=research_uiux/data/layout_deep_analysis.json", completed.stdout)
+        self.assertIn("templates=4", completed.stdout)
+        self.assertIn("packages=3", completed.stdout)
+        self.assertIn("csd_timeline=title-menu:layout=ui_mainmenu.yncp:scene=mm_donut_move:animation=DefaultAnim:frame=10/220:tracks=4:numeric=4:keyframes=12", completed.stdout)
+        self.assertIn("csd_timeline=loading:layout=ui_loading.yncp:scene=pda_txt:animation=Usual_Anim_3:frame=75/240:tracks=18:numeric=6:keyframes=92", completed.stdout)
+        self.assertIn("csd_timeline=sonic-hud:layout=ui_prov_playscreen.yncp:scene=so_speed_gauge:animation=Size_Anim:frame=99/100:tracks=174:numeric=14:keyframes=360", completed.stdout)
+        self.assertIn("csd_timeline=tutorial:layout=ui_prov_playscreen.yncp:scene=info_1:animation=Count_Anim:frame=50/100:tracks=19:numeric=19:keyframes=19", completed.stdout)
+        self.assertIn("timeline_sample=title-menu:mm_donut_move/compass:track=Rotation:frame=10:value=-16", completed.stdout)
+        self.assertIn("timeline_sample=loading:pda_txt/txt_cursor:track=XScale:frame=75:value=0.75", completed.stdout)
+        self.assertIn("timeline_sample=sonic-hud:so_speed_gauge/Cast_0641:track=YScale:frame=99:value=2", completed.stdout)
+        self.assertIn("timeline_sample=tutorial:info_1/bg_1:track=GradientTL:frame=50:value=0", completed.stdout)
+        self.assertIn("timeline_draw_command=sonic-hud:so_speed_gauge/Cast_0641:frame=99:track=YScale:value=2:dst=1000,317,17x22", completed.stdout)
+        self.assertIn("rendered_frame_compare=title-menu:target=title-menu:event=title-menu-visible:frame=10:native=found", completed.stdout)
+        self.assertIn("rendered_frame_compare=loading:target=loading:event=loading-display-active:frame=75:native=found", completed.stdout)
+        self.assertIn("rendered_frame_compare=sonic-hud:target=sonic-hud:event=sonic-hud-ready:frame=99:native=found", completed.stdout)
+
+    def test_renderer_csd_timeline_template_filter_reports_one_timeline(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--template", "sonic-hud", "--csd-timeline-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer csd timeline smoke ok", completed.stdout)
+        self.assertIn("templates=1", completed.stdout)
+        self.assertIn("packages=1", completed.stdout)
+        self.assertIn("csd_timeline=sonic-hud:layout=ui_prov_playscreen.yncp:scene=so_speed_gauge:animation=Size_Anim", completed.stdout)
+        self.assertIn("timeline_draw_command=sonic-hud:so_speed_gauge/Cast_0641:frame=99", completed.stdout)
+        self.assertNotIn("csd_timeline=title-menu:", completed.stdout)
+        self.assertNotIn("csd_timeline=loading:", completed.stdout)
 
     def test_renderer_navigation_smoke_reports_interactive_catalog(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
