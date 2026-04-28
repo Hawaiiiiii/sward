@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RENDERER_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "su_ui_asset_renderer.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr93" / "sward_su_ui_asset_renderer.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr123" / "sward_su_ui_asset_renderer.exe"
 
 
 class SuUiAssetRendererTests(unittest.TestCase):
@@ -94,6 +94,26 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("mat_playscreen_en_001.dds", source_text)
         self.assertIn("mat_comon_num_001.dds", source_text)
         self.assertIn("--renderer-reconstructed-screen-smoke", source_text)
+
+    def test_renderer_source_exposes_sgfx_template_placeholder_driver(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("sgfx_templates.hpp", source_text)
+        self.assertIn("SgfxTemplateRenderBinding", source_text)
+        self.assertIn("findSgfxTemplateRenderBinding", source_text)
+        self.assertIn("renderSgfxTemplatePlaceholderScreen", source_text)
+        self.assertIn("selectSgfxTemplate", source_text)
+        self.assertIn("--template", source_text)
+        self.assertIn("--sgfx-template-smoke", source_text)
+        self.assertIn("title-menu", source_text)
+        self.assertIn("loading", source_text)
+        self.assertIn("sonic-hud", source_text)
+        self.assertIn("tutorial", source_text)
+        self.assertIn("title-menu-visible", source_text)
+        self.assertIn("loading-display-active", source_text)
+        self.assertIn("sonic-hud-ready", source_text)
+        self.assertIn("tutorial-hud-owner-path-ready", source_text)
+        self.assertIn("placeholder_slot=", source_text)
+        self.assertIn("timeline_hook=", source_text)
 
     def test_renderer_source_exposes_title_loop_reconstruction_screen(self) -> None:
         source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
@@ -207,6 +227,57 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("so_ring_energy_body:ui_ps1_gauge1.dds:src=0,64,192x48:dst=40,636,320x80", completed.stdout)
         self.assertIn("ring_energy_label:mat_playscreen_en_001.dds", completed.stdout)
         self.assertIn("ring_digits_zeroes:mat_comon_num_001.dds", completed.stdout)
+
+    def test_renderer_sgfx_template_smoke_reports_placeholder_screen_recipes(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--sgfx-template-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer sgfx template smoke ok", completed.stdout)
+        self.assertIn("templates=4", completed.stdout)
+        self.assertIn("bindings=4", completed.stdout)
+        self.assertIn("template=title-menu:screen=MainMenuComposite:contract=title_menu_reference.json:event=title-menu-visible", completed.stdout)
+        self.assertIn("template=loading:screen=LoadingComposite:contract=loading_transition_reference.json:event=loading-display-active", completed.stdout)
+        self.assertIn("template=sonic-hud:screen=SonicHudReconstruction:contract=sonic_stage_hud_reference.json:event=sonic-hud-ready", completed.stdout)
+        self.assertIn("template=tutorial:screen=SonicHudReconstruction:contract=sonic_stage_hud_reference.json:event=tutorial-hud-owner-path-ready", completed.stdout)
+        self.assertIn("placeholder_slot=title-menu:logo->OPmovie_titlelogo_EN.decompressed.dds", completed.stdout)
+        self.assertIn("placeholder_slot=loading:device_frame->mat_load_comon_001.dds", completed.stdout)
+        self.assertIn("placeholder_slot=sonic-hud:speed_gauge->ui_ps1_gauge1.dds", completed.stdout)
+        self.assertIn("placeholder_slot=tutorial:prompt_row->mat_start_en_001.dds", completed.stdout)
+        self.assertIn("timeline_hook=title-menu:select_travel=0.333333:title menu visual ready", completed.stdout)
+        self.assertIn("timeline_hook=loading:pda_intro=4.5:loading display active", completed.stdout)
+        self.assertIn("timeline_hook=sonic-hud:hud_in=0.35:sonic-hud-ready", completed.stdout)
+        self.assertIn("timeline_hook=tutorial:hud_in=0.35:tutorial-ready", completed.stdout)
+
+    def test_renderer_template_argument_launches_specific_placeholder_recipe(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--template", "loading", "--sgfx-template-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer sgfx template smoke ok", completed.stdout)
+        self.assertIn("templates=1", completed.stdout)
+        self.assertIn("bindings=1", completed.stdout)
+        self.assertIn("template=loading:screen=LoadingComposite:contract=loading_transition_reference.json:event=loading-display-active", completed.stdout)
+        self.assertNotIn("template=title-menu:", completed.stdout)
+        self.assertNotIn("template=sonic-hud:", completed.stdout)
 
     def test_renderer_navigation_smoke_reports_interactive_catalog(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

@@ -6,6 +6,8 @@
 #include <objidl.h>
 #include <gdiplus.h>
 
+#include <sward/ui_runtime/sgfx_templates.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -24,6 +26,10 @@
 
 namespace
 {
+using sward::ui_runtime::SgfxScreenTemplate;
+using sward::ui_runtime::findSgfxScreenTemplate;
+using sward::ui_runtime::sgfxScreenTemplates;
+
 inline constexpr int kDesignWidth = 1280;
 inline constexpr int kDesignHeight = 720;
 inline constexpr int kRendererChromeHeight = 44;
@@ -83,6 +89,24 @@ struct SuUiRendererScreen
     RendererScreenKind kind = RendererScreenKind::CastCatalog;
 };
 
+struct SgfxPlaceholderAssetSlot
+{
+    std::string_view slotName;
+    std::string_view textureName;
+    std::string_view sourceFamily;
+};
+
+struct SgfxTemplateRenderBinding
+{
+    std::string_view templateId;
+    std::string_view rendererScreenId;
+    const SgfxPlaceholderAssetSlot* slots = nullptr;
+    std::size_t slotCount = 0;
+    std::string_view requiredEventId;
+    std::string_view timelineBandId;
+    std::string_view timelineEventLabel;
+};
+
 inline constexpr std::array<TextureSourceCandidate, 13> kTextureSourceCandidates{{
     { "mat_load_comon_001.dds", "ui_extended_archives/Loading/mat_load_comon_001.dds" },
     { "OPmovie_titlelogo_EN.decompressed.dds", "runtime_previews/title/decompressed/OPmovie_titlelogo_EN.decompressed.dds" },
@@ -139,6 +163,74 @@ inline constexpr std::array<SuUiRenderCast, 2> kTitleLogoSheetCasts{{
 
 inline constexpr std::array<SuUiRenderCast, 1> kSonicStageHudCasts{{
     { "so_speed_gauge", "position_hd", "ui_ps1_gauge1.dds", 4, 64, 16, 20, 752, 357, 16, 20 },
+}};
+
+inline constexpr std::array<SgfxPlaceholderAssetSlot, 4> kTitleMenuTemplateSlots{{
+    { "backdrop", "ui_mm_base.dds", "ui_title/ui_mainmenu Sonic title/menu CSD" },
+    { "content", "ui_mm_contentstext.dds", "ui_title/ui_mainmenu Sonic title/menu CSD" },
+    { "logo", "OPmovie_titlelogo_EN.decompressed.dds", "ui_title/ui_mainmenu Sonic title/menu CSD" },
+    { "prompt_glyphs", "mat_start_en_001.dds", "ui_title/ui_mainmenu Sonic title/menu CSD" },
+}};
+
+inline constexpr std::array<SgfxPlaceholderAssetSlot, 4> kLoadingTemplateSlots{{
+    { "device_frame", "mat_load_comon_001.dds", "ui_loading Sonic loading CSD" },
+    { "backdrop", "mat_load_comon_001.dds", "ui_loading Sonic loading CSD" },
+    { "loading_copy", "mat_load_comon_001.dds", "ui_loading Sonic loading CSD" },
+    { "controller_variant", "mat_load_comon_001.dds", "ui_loading Sonic loading CSD" },
+}};
+
+inline constexpr std::array<SgfxPlaceholderAssetSlot, 5> kSonicHudTemplateSlots{{
+    { "speed_gauge", "ui_ps1_gauge1.dds", "ui_playscreen Sonic HUD CSD tree" },
+    { "energy_gauge", "ui_ps1_gauge1.dds", "ui_playscreen Sonic HUD CSD tree" },
+    { "ring_counter", "mat_comon_num_001.dds", "ui_playscreen Sonic HUD CSD tree" },
+    { "side_panel", "mat_playscreen_001.dds", "ui_playscreen Sonic HUD CSD tree" },
+    { "prompt_strip", "mat_playscreen_en_001.dds", "ui_playscreen Sonic HUD CSD tree" },
+}};
+
+inline constexpr std::array<SgfxPlaceholderAssetSlot, 4> kTutorialTemplateSlots{{
+    { "prompt_row", "mat_start_en_001.dds", "SonicHudGuide/ui_playscreen prompt CSD" },
+    { "tutorial_panel", "mat_playscreen_001.dds", "SonicHudGuide/ui_playscreen prompt CSD" },
+    { "control_glyphs", "mat_start_en_001.dds", "SonicHudGuide/ui_playscreen prompt CSD" },
+    { "host_context_readout", "mat_comon_num_001.dds", "SonicHudGuide/ui_playscreen prompt CSD" },
+}};
+
+inline constexpr std::array<SgfxTemplateRenderBinding, 4> kSgfxTemplateRenderBindings{{
+    {
+        "title-menu",
+        "MainMenuComposite",
+        kTitleMenuTemplateSlots.data(),
+        kTitleMenuTemplateSlots.size(),
+        "title-menu-visible",
+        "select_travel",
+        "title menu visual ready",
+    },
+    {
+        "loading",
+        "LoadingComposite",
+        kLoadingTemplateSlots.data(),
+        kLoadingTemplateSlots.size(),
+        "loading-display-active",
+        "pda_intro",
+        "loading display active",
+    },
+    {
+        "sonic-hud",
+        "SonicHudReconstruction",
+        kSonicHudTemplateSlots.data(),
+        kSonicHudTemplateSlots.size(),
+        "sonic-hud-ready",
+        "hud_in",
+        "sonic-hud-ready",
+    },
+    {
+        "tutorial",
+        "SonicHudReconstruction",
+        kTutorialTemplateSlots.data(),
+        kTutorialTemplateSlots.size(),
+        "tutorial-hud-owner-path-ready",
+        "hud_in",
+        "tutorial-ready",
+    },
 }};
 
 inline const std::array<SuUiRendererScreen, 8> kRendererScreens{{
@@ -219,6 +311,41 @@ inline const std::array<SuUiRendererScreen, 8> kRendererScreens{{
             return index;
     }
     return 0;
+}
+
+[[nodiscard]] const SgfxTemplateRenderBinding* findSgfxTemplateRenderBinding(std::string_view templateId)
+{
+    const auto found = std::find_if(
+        kSgfxTemplateRenderBindings.begin(),
+        kSgfxTemplateRenderBindings.end(),
+        [templateId](const SgfxTemplateRenderBinding& binding)
+        {
+            return binding.templateId == templateId;
+        });
+    return found == kSgfxTemplateRenderBindings.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] const SuUiRendererScreen* rendererScreenById(std::string_view id)
+{
+    const auto found = std::find_if(
+        kRendererScreens.begin(),
+        kRendererScreens.end(),
+        [id](const SuUiRendererScreen& screen)
+        {
+            return screen.id == id;
+        });
+    return found == kRendererScreens.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] std::optional<std::size_t> rendererScreenIndexById(std::string_view id)
+{
+    for (std::size_t index = 0; index < kRendererScreens.size(); ++index)
+    {
+        if (kRendererScreens[index].id == id)
+            return index;
+    }
+
+    return std::nullopt;
 }
 
 [[nodiscard]] std::filesystem::path executableDirectory()
@@ -593,11 +720,33 @@ public:
     void selectNext()
     {
         selectedScreenIndex_ = (selectedScreenIndex_ + 1) % kRendererScreens.size();
+        selectedSgfxTemplateId_.reset();
     }
 
     void selectPrevious()
     {
         selectedScreenIndex_ = (selectedScreenIndex_ + kRendererScreens.size() - 1) % kRendererScreens.size();
+        selectedSgfxTemplateId_.reset();
+    }
+
+    [[nodiscard]] bool selectScreenById(std::string_view id)
+    {
+        const auto index = rendererScreenIndexById(id);
+        if (!index)
+            return false;
+
+        selectedScreenIndex_ = *index;
+        return true;
+    }
+
+    [[nodiscard]] bool selectSgfxTemplate(std::string_view templateId)
+    {
+        const auto* binding = findSgfxTemplateRenderBinding(templateId);
+        if (!binding || !selectScreenById(binding->rendererScreenId))
+            return false;
+
+        selectedSgfxTemplateId_ = std::string(binding->templateId);
+        return true;
     }
 
     void selectNextAtlas()
@@ -605,6 +754,7 @@ public:
         if (atlasSheets_.empty())
             return;
         selectedScreenIndex_ = atlasGalleryScreenIndex();
+        selectedSgfxTemplateId_.reset();
         selectedAtlasIndex_ = (selectedAtlasIndex_ + 1) % atlasSheets_.size();
         atlasBitmap_.reset();
     }
@@ -614,8 +764,17 @@ public:
         if (atlasSheets_.empty())
             return;
         selectedScreenIndex_ = atlasGalleryScreenIndex();
+        selectedSgfxTemplateId_.reset();
         selectedAtlasIndex_ = (selectedAtlasIndex_ + atlasSheets_.size() - 1) % atlasSheets_.size();
         atlasBitmap_.reset();
+    }
+
+    [[nodiscard]] const SgfxTemplateRenderBinding* selectedSgfxTemplateBinding() const
+    {
+        if (!selectedSgfxTemplateId_)
+            return nullptr;
+
+        return findSgfxTemplateRenderBinding(*selectedSgfxTemplateId_);
     }
 
     [[nodiscard]] std::size_t atlasSheetCount() const
@@ -659,6 +818,8 @@ public:
                     << selectedAtlasFileName();
             }
         }
+        if (selectedSgfxTemplateId_)
+            text << " | template " << *selectedSgfxTemplateId_;
         return text.str();
     }
 
@@ -743,6 +904,7 @@ public:
 private:
     std::size_t selectedScreenIndex_ = 0;
     std::size_t selectedAtlasIndex_ = 0;
+    std::optional<std::string> selectedSgfxTemplateId_;
     std::vector<std::filesystem::path> atlasSheets_;
     std::filesystem::path atlasBitmapPath_;
     std::unique_ptr<Gdiplus::Bitmap> atlasBitmap_;
@@ -1217,6 +1379,49 @@ void renderSonicHudReconstructionScreen(Gdiplus::Graphics& graphics, const Gdipl
     drawGaugeSegments(graphics, canvas, 278, 696, 12, 8, Gdiplus::Color(255, 95, 220, 82), Gdiplus::Color(120, 174, 176, 178));
 }
 
+void renderSgfxTemplatePlaceholderScreen(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    SwardSuUiAssetRenderer& renderer,
+    const SgfxTemplateRenderBinding& binding)
+{
+    const auto* screenTemplate = findSgfxScreenTemplate(binding.templateId);
+    const auto panel = designRectToCanvas(canvas, 24, 24, 650, 190);
+    Gdiplus::SolidBrush panelFill(Gdiplus::Color(205, 6, 11, 18));
+    Gdiplus::Pen panelEdge(Gdiplus::Color(230, 110, 190, 255), std::max(1.0F, 2.0F * (canvas.Width / static_cast<float>(kDesignWidth))));
+    graphics.FillRectangle(&panelFill, panel);
+    graphics.DrawRectangle(&panelEdge, panel);
+
+    const std::string title = std::string("SGFX template: ") + std::string(binding.templateId);
+    const std::string event = std::string("ready: ")
+        + std::string(!binding.requiredEventId.empty()
+            ? binding.requiredEventId
+            : (screenTemplate && !screenTemplate->evidence.requiredEvents.empty() ? std::string_view(screenTemplate->evidence.requiredEvents.front()) : std::string_view("unknown")));
+    const std::string timing = std::string("timeline: ") + std::string(binding.timelineBandId)
+        + " -> " + std::string(binding.timelineEventLabel);
+
+    drawOutlinedText(graphics, canvas, title, 42, 36, 24, Gdiplus::Color(255, 250, 252, 255), Gdiplus::Color(255, 0, 0, 0));
+    drawOutlinedText(graphics, canvas, event, 42, 68, 17, Gdiplus::Color(255, 210, 232, 255), Gdiplus::Color(255, 0, 0, 0));
+    drawOutlinedText(graphics, canvas, timing, 42, 94, 17, Gdiplus::Color(255, 220, 255, 205), Gdiplus::Color(255, 0, 0, 0));
+
+    for (std::size_t index = 0; index < binding.slotCount && index < 4; ++index)
+    {
+        const auto& slot = binding.slots[index];
+        const auto* texture = renderer.textureFor(slot.textureName);
+        const bool available = texture && texture->image && texture->bitmap;
+        const int y = 122 + static_cast<int>(index) * 18;
+        const auto marker = designRectToCanvas(canvas, 46, y + 4, 10, 10);
+        Gdiplus::SolidBrush markerBrush(available ? Gdiplus::Color(255, 86, 214, 120) : Gdiplus::Color(255, 220, 80, 72));
+        graphics.FillRectangle(&markerBrush, marker);
+
+        const std::string slotText = std::string("placeholder_slot=")
+            + std::string(slot.slotName)
+            + "->"
+            + std::string(slot.textureName);
+        drawOutlinedText(graphics, canvas, slotText, 64, static_cast<float>(y), 14, Gdiplus::Color(255, 238, 238, 238), Gdiplus::Color(255, 0, 0, 0));
+    }
+}
+
 void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 {
     RECT client{};
@@ -1242,24 +1447,26 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     if (screen.kind == RendererScreenKind::TitleLoopReconstruction)
     {
         renderTitleLoopReconstructionScreen(graphics, canvas, renderer);
-        return;
     }
-
-    if (screen.kind == RendererScreenKind::SonicHudReconstruction)
+    else if (screen.kind == RendererScreenKind::SonicHudReconstruction)
     {
         renderSonicHudReconstructionScreen(graphics, canvas);
-        return;
     }
-
-    if (screen.kind == RendererScreenKind::AtlasGallery)
+    else if (screen.kind == RendererScreenKind::AtlasGallery)
     {
         renderAtlasGalleryScreen(graphics, canvas, renderer);
-        return;
+    }
+    else
+    {
+        for (std::size_t index = 0; index < screen.castCount; ++index)
+        {
+            (void)drawRenderCastTexture(graphics, canvas, renderer, screen.casts[index]);
+        }
     }
 
-    for (std::size_t index = 0; index < screen.castCount; ++index)
+    if (const auto* binding = renderer.selectedSgfxTemplateBinding())
     {
-        (void)drawRenderCastTexture(graphics, canvas, renderer, screen.casts[index]);
+        renderSgfxTemplatePlaceholderScreen(graphics, canvas, renderer, *binding);
     }
 }
 
@@ -1476,18 +1683,6 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return sheets.empty() || loading == "missing" || mainMenu == "missing" || status == "missing" ? 1 : 0;
 }
 
-[[nodiscard]] const SuUiRendererScreen* rendererScreenById(std::string_view id)
-{
-    const auto found = std::find_if(
-        kRendererScreens.begin(),
-        kRendererScreens.end(),
-        [id](const SuUiRendererScreen& screen)
-        {
-            return screen.id == id;
-        });
-    return found == kRendererScreens.end() ? nullptr : &*found;
-}
-
 [[nodiscard]] int runRendererTitleScreenSmoke()
 {
     const auto& screen = kRendererScreens.front();
@@ -1612,13 +1807,138 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
         : 1;
 }
 
-[[nodiscard]] bool commandLineHasFlag(std::string_view flag)
+[[nodiscard]] const sward::ui_runtime::SgfxTimelineBand* findTimelineBand(
+    const SgfxScreenTemplate& screenTemplate,
+    std::string_view bandId)
 {
-    const std::string commandLine = GetCommandLineA();
-    return commandLine.find(flag) != std::string::npos;
+    const auto found = std::find_if(
+        screenTemplate.timelineBands.begin(),
+        screenTemplate.timelineBands.end(),
+        [bandId](const sward::ui_runtime::SgfxTimelineBand& band)
+        {
+            return band.id == bandId;
+        });
+    return found == screenTemplate.timelineBands.end() ? nullptr : &*found;
 }
 
-[[nodiscard]] int runRendererWindow(HINSTANCE instance, int showCommand)
+[[nodiscard]] std::string firstRequiredEvent(const SgfxScreenTemplate& screenTemplate)
+{
+    return screenTemplate.evidence.requiredEvents.empty() ? std::string("none") : screenTemplate.evidence.requiredEvents.front();
+}
+
+[[nodiscard]] int runSgfxTemplateSmoke(const std::optional<std::string>& templateFilter)
+{
+    std::size_t templateCount = 0;
+    std::size_t bindingCount = 0;
+    bool failed = false;
+    std::vector<std::string> descriptors;
+
+    for (const auto& screenTemplate : sgfxScreenTemplates())
+    {
+        if (templateFilter && screenTemplate.id != *templateFilter)
+            continue;
+
+        ++templateCount;
+        const auto* binding = findSgfxTemplateRenderBinding(screenTemplate.id);
+        const auto* screen = binding ? rendererScreenById(binding->rendererScreenId) : nullptr;
+        if (!binding || !screen)
+        {
+            failed = true;
+            continue;
+        }
+
+        ++bindingCount;
+        std::ostringstream descriptor;
+        descriptor
+            << "template=" << screenTemplate.id
+            << ":screen=" << screen->id
+            << ":contract=" << screenTemplate.contractFileName
+            << ":event=" << (!binding->requiredEventId.empty() ? std::string(binding->requiredEventId) : firstRequiredEvent(screenTemplate));
+        descriptors.push_back(descriptor.str());
+
+        for (std::size_t index = 0; index < binding->slotCount; ++index)
+        {
+            const auto& slot = binding->slots[index];
+            std::ostringstream slotDescriptor;
+            slotDescriptor
+                << "placeholder_slot="
+                << screenTemplate.id
+                << ":"
+                << slot.slotName
+                << "->"
+                << slot.textureName;
+            descriptors.push_back(slotDescriptor.str());
+        }
+
+        const auto* band = findTimelineBand(screenTemplate, binding->timelineBandId);
+        if (!band)
+        {
+            failed = true;
+            continue;
+        }
+
+        std::ostringstream timingDescriptor;
+        timingDescriptor
+            << "timeline_hook="
+            << screenTemplate.id
+            << ":"
+            << band->id
+            << "="
+            << band->seconds
+            << ":"
+            << binding->timelineEventLabel;
+        descriptors.push_back(timingDescriptor.str());
+    }
+
+    if (templateFilter && templateCount == 0)
+        failed = true;
+
+    std::cout
+        << "sward_su_ui_asset_renderer sgfx template smoke ok "
+        << "templates=" << templateCount
+        << " bindings=" << bindingCount
+        << '\n';
+
+    for (const auto& descriptor : descriptors)
+        std::cout << descriptor << '\n';
+
+    return failed || templateCount == 0 || templateCount != bindingCount ? 1 : 0;
+}
+
+[[nodiscard]] std::vector<std::string> commandLineTokens()
+{
+    std::vector<std::string> tokens;
+    std::istringstream stream(GetCommandLineA());
+    std::string token;
+    while (stream >> token)
+        tokens.push_back(token);
+    return tokens;
+}
+
+[[nodiscard]] bool commandLineHasFlag(std::string_view flag)
+{
+    const auto tokens = commandLineTokens();
+    const std::string flagText(flag);
+    return std::find(tokens.begin(), tokens.end(), flagText) != tokens.end();
+}
+
+[[nodiscard]] std::optional<std::string> commandLineValueAfter(std::string_view flag)
+{
+    const auto tokens = commandLineTokens();
+    const std::string flagText(flag);
+    const std::string prefix = flagText + "=";
+    for (std::size_t index = 0; index < tokens.size(); ++index)
+    {
+        if (tokens[index] == flagText && index + 1 < tokens.size())
+            return tokens[index + 1];
+        if (tokens[index].starts_with(prefix))
+            return tokens[index].substr(prefix.size());
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] int runRendererWindow(HINSTANCE instance, int showCommand, const std::optional<std::string>& initialTemplate)
 {
     Gdiplus::GdiplusStartupInput gdiplusInput{};
     ULONG_PTR gdiplusToken = 0;
@@ -1635,6 +1955,13 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     RegisterClassW(&windowClass);
 
     SwardSuUiAssetRenderer renderer;
+    if (initialTemplate && !renderer.selectSgfxTemplate(*initialTemplate))
+    {
+        std::cerr << "Unknown SGFX template: " << *initialTemplate << '\n';
+        Gdiplus::GdiplusShutdown(gdiplusToken);
+        return 2;
+    }
+
     HWND window = CreateWindowExW(
         0,
         className,
@@ -1672,6 +1999,9 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
 {
+    const auto templateFilter = commandLineValueAfter("--template");
+    if (commandLineHasFlag("--sgfx-template-smoke"))
+        return runSgfxTemplateSmoke(templateFilter);
     if (commandLineHasFlag("--renderer-smoke"))
         return runRendererSmoke();
     if (commandLineHasFlag("--renderer-navigation-smoke"))
@@ -1683,5 +2013,5 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
     if (commandLineHasFlag("--renderer-reconstructed-screen-smoke"))
         return runRendererReconstructedScreenSmoke();
 
-    return runRendererWindow(instance, showCommand);
+    return runRendererWindow(instance, showCommand, templateFilter);
 }

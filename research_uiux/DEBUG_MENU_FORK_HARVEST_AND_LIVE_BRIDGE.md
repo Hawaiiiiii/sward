@@ -195,6 +195,12 @@ The new `sward_sgfx_template_catalog` target emits portable screen recipes from 
 
 About "mostly harvested": the remaining debug-menu fork deltas are useful, but they are not all immediate UI-target-routing wins. The high-value UI inspector surfaces are already harvested or mapped: CSD Manager, SWA CSD wrappers, SWA HUD owners, System/GameMode/title/input fields, Reddog operator windows, debug draw, live state, and bridge commands. Remaining debug-menu fork deltas worth future passes are `Inspire/Movie` metadata for texture/movie overlays, renderer/shader metadata for how CSD/movie passes are filtered/composited, audio/camera/system support headers, and non-Sonic HUD families. Those should feed later typed inspectors or SGFX template refinements, not be blindly enabled as mutating runtime toggles.
 
+## Phase 123 SGFX Template-Driven Placeholder Renderer
+
+Phase 123 wires the SGFX template catalog into the existing clean SU UI asset renderer. The renderer now accepts `--template title-menu`, `--template loading`, `--template sonic-hud`, and `--template tutorial`, selects the matching Sonic placeholder-backed screen, and overlays the active template, readiness event, and timing hook while keeping the underlying Sonic assets local-only.
+
+The new `--sgfx-template-smoke` command proves the bridge without opening a window. It reports every template-to-renderer binding, the portable contract file, the durable readiness event, the local Sonic placeholder slots, and the first animation/timing hook from the recovered runtime template data. This is the first point where the SGFX recipes are not only described: they drive a renderer path that can show Sonic placeholders today and swap to custom SGFX art later through the same named slots.
+
 ## Verification
 
 Local-only evidence, not committed:

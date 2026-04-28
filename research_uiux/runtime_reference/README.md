@@ -59,6 +59,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - selected CSD DDS blit previews that decode local DXT5 source textures for first real source-rect drawing
 - a separate clean SU UI asset renderer with local DDS-backed screen samples, visible `Prev` / `Next` navigation, and local visual-atlas gallery browsing
 - a Phase 122 SGFX template catalog that packages real-runtime evidence into reusable title/loading/HUD/tutorial state-machine recipes with Sonic placeholder assets now and custom SGFX art later, without shipping extracted Sonic assets
+- a Phase 123 SGFX template-driven placeholder renderer path where those recipes select Sonic placeholder screens, bind local asset slots, and expose first timing hooks for `title-menu`, `loading`, `sonic-hud`, and `tutorial`
 
 Contents:
 
@@ -216,6 +217,9 @@ b/rr91/sward_su_ui_asset_renderer.exe
 b/rr91/sward_su_ui_asset_renderer.exe --renderer-smoke
 b/rr91/sward_su_ui_asset_renderer.exe --renderer-navigation-smoke
 b/rr91/sward_su_ui_asset_renderer.exe --renderer-atlas-gallery-smoke
+b/rr91/sward_su_ui_asset_renderer.exe --sgfx-template-smoke
+b/rr91/sward_su_ui_asset_renderer.exe --template title-menu
+b/rr91/sward_su_ui_asset_renderer.exe --template loading --sgfx-template-smoke
 ```
 
 The SGFX template catalog is real-runtime evidence-backed architecture, not a visual parity renderer. It emits portable screen recipes for `title-menu`, `loading`, `sonic-hud`, and `tutorial` with contract names, required JSONL/live-bridge events, layer roles, timing bands, input-lock policy, and SGFX adaptation notes. The recipes are asset-aware: local Sonic placeholder assets can be rendered in the lab, but the stable output is explicit slot bindings for custom SGFX art.
@@ -308,6 +312,9 @@ GUI workbench notes:
 Clean asset renderer notes:
 
 - `sward_su_ui_asset_renderer.exe` is the separate clean viewer path for asset-backed SU UI rendering experiments
+- `--template <title-menu|loading|sonic-hud|tutorial>` starts the renderer from the SGFX recipe's Sonic placeholder-backed screen
+- `--sgfx-template-smoke` verifies the SGFX template-to-renderer bridge without opening a window
+- the Phase 123 bridge reports `placeholder_slot=` bindings and `timeline_hook=` values so custom SGFX art can replace Sonic placeholders without losing recovered timing/state evidence
 - it opens a native `1280x720` design canvas below `Prev` / `Next` / `Atlas Prev` / `Atlas Next` / screen-label navigation controls
 - it starts on `VisualAtlasGallery`, which discovers ignored local `extracted_assets/visual_atlas/sheets/*.png` files at runtime
 - `Left`, `Right`, and `Space` cycle the current seed screen samples; `Esc` exits
