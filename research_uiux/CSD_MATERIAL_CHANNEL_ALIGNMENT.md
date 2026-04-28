@@ -6,6 +6,9 @@
 
 Phase 128 tightens the local CSD rendered-frame comparison loop toward shader parity.
 
+> [!NOTE]
+> Phase 129 supersedes the active compare output lane with packed RGBA timeline decoding and a software ARGB quad rasterizer under `out/csd_render_compare/phase129/`. See `CSD_PACKED_CHANNEL_SOFTWARE_QUADS.md`.
+
 The same smoke command is used:
 
 ```powershell

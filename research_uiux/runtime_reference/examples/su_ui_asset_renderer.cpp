@@ -37,6 +37,7 @@ using sward::ui_runtime::sgfxScreenTemplates;
 inline constexpr int kDesignWidth = 1280;
 inline constexpr int kDesignHeight = 720;
 inline constexpr int kRendererChromeHeight = 44;
+inline constexpr double kPi = 3.14159265358979323846;
 inline constexpr int kPrevButtonId = 1001;
 inline constexpr int kNextButtonId = 1002;
 inline constexpr int kScreenLabelId = 1003;
@@ -243,6 +244,14 @@ struct CsdTimelineKeyframe
     std::string interpolationType;
 };
 
+struct CsdTimelinePackedRgbaKeyframe
+{
+    double frame = 0.0;
+    std::uint32_t packedRgba = 0xFFFFFFFF;
+    CsdColorRgba color{};
+    std::string interpolationType;
+};
+
 struct CsdTimelineTrackSample
 {
     std::string sceneName;
@@ -253,6 +262,19 @@ struct CsdTimelineTrackSample
     int sampleFrame = 0;
     int keyframeCount = 0;
     double value = 0.0;
+};
+
+struct CsdTimelinePackedRgbaTrackSample
+{
+    std::string sceneName;
+    std::string castName;
+    std::string trackType;
+    int groupIndex = 0;
+    int castIndex = 0;
+    int sampleFrame = 0;
+    int keyframeCount = 0;
+    std::uint32_t packedRgba = 0xFFFFFFFF;
+    CsdColorRgba color{};
 };
 
 struct CsdTimelinePlayback
@@ -271,8 +293,12 @@ struct CsdTimelinePlayback
     int gradientTrackCount = 0;
     int packedColorTrackCount = 0;
     int packedGradientTrackCount = 0;
+    int decodedPackedColorTrackCount = 0;
+    int decodedPackedGradientTrackCount = 0;
+    int decodedPackedKeyframeCount = 0;
     int unresolvedPackedKeyframeCount = 0;
     std::vector<CsdTimelineTrackSample> samples;
+    std::vector<CsdTimelinePackedRgbaTrackSample> packedRgbaSamples;
 };
 
 struct BitmapSignalStats
@@ -319,15 +345,28 @@ struct CsdRenderedFrameComparison
     std::size_t alphaModulatedCommandCount = 0;
     std::size_t gradientCommandCount = 0;
     std::size_t gradientApproxCommandCount = 0;
+    std::size_t gradientVertexColorCommandCount = 0;
     std::size_t additiveCommandCount = 0;
+    std::size_t additiveSoftwareCommandCount = 0;
     std::size_t normalBlendCommandCount = 0;
     std::size_t linearFilteringCommandCount = 0;
+    std::size_t softwareQuadCommandCount = 0;
     std::size_t gradientTrackSampleCount = 0;
     std::size_t packedColorTrackCount = 0;
     std::size_t packedGradientTrackCount = 0;
+    std::size_t decodedPackedColorTrackCount = 0;
+    std::size_t decodedPackedGradientTrackCount = 0;
+    std::size_t decodedPackedKeyframeCount = 0;
     std::size_t unresolvedPackedKeyframeCount = 0;
     std::vector<std::string> sgfxSlots;
     BitmapComparisonStats visualDelta;
+};
+
+struct CsdSoftwareRenderStats
+{
+    std::size_t softwareQuadCommandCount = 0;
+    std::size_t gradientVertexColorCommandCount = 0;
+    std::size_t additiveSoftwareCommandCount = 0;
 };
 
 inline constexpr std::array<TextureSourceCandidate, 15> kTextureSourceCandidates{{
@@ -1520,6 +1559,16 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     return left.r == right.r && left.g == right.g && left.b == right.b && left.a == right.a;
 }
 
+void refreshCsdGradientState(CsdDrawableCommand& command)
+{
+    command.gradientVarying =
+        command.gradientKnown
+        && (!sameRgba(command.gradientTopLeftRgba, command.gradientBottomLeftRgba)
+            || !sameRgba(command.gradientTopLeftRgba, command.gradientTopRightRgba)
+            || !sameRgba(command.gradientTopLeftRgba, command.gradientBottomRightRgba)
+            || !isDefaultWhiteRgba(command.gradientTopLeftRgba));
+}
+
 [[nodiscard]] CsdColorRgba averageGradientRgba(const CsdDrawableCommand& command)
 {
     auto average = [](std::uint8_t a, std::uint8_t b, std::uint8_t c, std::uint8_t d)
@@ -1560,6 +1609,32 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     if (!packed)
         return std::nullopt;
     return decodeCsdPackedRgba(*packed);
+}
+
+[[nodiscard]] std::uint8_t interpolateCsdByte(std::uint8_t previous, std::uint8_t next, double t)
+{
+    return static_cast<std::uint8_t>(std::clamp(
+        static_cast<int>(std::llround(static_cast<double>(previous) + ((static_cast<double>(next) - static_cast<double>(previous)) * t))),
+        0,
+        255));
+}
+
+[[nodiscard]] CsdColorRgba interpolateCsdRgba(const CsdColorRgba& previous, const CsdColorRgba& next, double t)
+{
+    return CsdColorRgba{
+        interpolateCsdByte(previous.r, next.r, t),
+        interpolateCsdByte(previous.g, next.g, t),
+        interpolateCsdByte(previous.b, next.b, t),
+        interpolateCsdByte(previous.a, next.a, t),
+    };
+}
+
+[[nodiscard]] std::uint32_t packCsdRgba(const CsdColorRgba& color)
+{
+    return (static_cast<std::uint32_t>(color.r) << 24)
+        | (static_cast<std::uint32_t>(color.g) << 16)
+        | (static_cast<std::uint32_t>(color.b) << 8)
+        | static_cast<std::uint32_t>(color.a);
 }
 
 [[nodiscard]] bool isCsdGradientTrack(std::string_view trackType)
@@ -1678,11 +1753,7 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
                 command.gradientTopRightRgba = *gradientTopRight;
                 command.gradientBottomRightRgba = *gradientBottomRight;
                 command.gradientKnown = true;
-                command.gradientVarying =
-                    !sameRgba(command.gradientTopLeftRgba, command.gradientBottomLeftRgba) ||
-                    !sameRgba(command.gradientTopLeftRgba, command.gradientTopRightRgba) ||
-                    !sameRgba(command.gradientTopLeftRgba, command.gradientBottomRightRgba) ||
-                    !isDefaultWhiteRgba(command.gradientTopLeftRgba);
+                refreshCsdGradientState(command);
             }
 
             command.additiveBlend = (command.castFlags & 0x1) != 0;
@@ -1832,6 +1903,56 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     return keyframes;
 }
 
+[[nodiscard]] std::optional<std::uint32_t> parseCsdPackedRgbaKeyframeValue(std::string_view keyframeObject)
+{
+    for (const std::string_view fieldName : { "packed_rgba", "value_packed_rgba", "value_raw_bits" })
+    {
+        if (const auto text = jsonStringField(keyframeObject, fieldName))
+        {
+            if (const auto packed = parseCsdHexColor(*text))
+                return *packed;
+        }
+    }
+
+    const auto value = jsonNumberField(keyframeObject, "value");
+    if (!value || !std::isfinite(*value) || *value < 0.0 || *value > 4294967295.0)
+        return std::nullopt;
+
+    return static_cast<std::uint32_t>(std::llround(*value));
+}
+
+[[nodiscard]] std::vector<CsdTimelinePackedRgbaKeyframe> parseCsdTimelinePackedRgbaKeyframes(std::string_view trackObject)
+{
+    std::vector<CsdTimelinePackedRgbaKeyframe> keyframes;
+    const auto keyframeArray = jsonArrayFieldSpan(trackObject, "keyframes");
+    if (!keyframeArray)
+        return keyframes;
+
+    for (const auto keyframeObject : jsonObjectSpansInArray(*keyframeArray))
+    {
+        const auto frame = jsonNumberField(keyframeObject, "frame");
+        const auto packed = parseCsdPackedRgbaKeyframeValue(keyframeObject);
+        if (!frame || !packed)
+            continue;
+
+        CsdTimelinePackedRgbaKeyframe keyframe;
+        keyframe.frame = *frame;
+        keyframe.packedRgba = *packed;
+        keyframe.color = decodeCsdPackedRgba(*packed);
+        keyframe.interpolationType = jsonStringField(keyframeObject, "type").value_or("Linear");
+        keyframes.push_back(std::move(keyframe));
+    }
+
+    std::sort(
+        keyframes.begin(),
+        keyframes.end(),
+        [](const CsdTimelinePackedRgbaKeyframe& left, const CsdTimelinePackedRgbaKeyframe& right)
+        {
+            return left.frame < right.frame;
+        });
+    return keyframes;
+}
+
 [[nodiscard]] std::optional<double> sampleCsdTimelineTrack(
     const std::vector<CsdTimelineKeyframe>& keyframes,
     double frame)
@@ -1857,6 +1978,33 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     }
 
     return keyframes.back().value;
+}
+
+[[nodiscard]] std::optional<CsdColorRgba> sampleCsdPackedRgbaTimelineTrack(
+    const std::vector<CsdTimelinePackedRgbaKeyframe>& keyframes,
+    double frame)
+{
+    if (keyframes.empty())
+        return std::nullopt;
+
+    if (frame <= keyframes.front().frame)
+        return keyframes.front().color;
+
+    for (std::size_t index = 1; index < keyframes.size(); ++index)
+    {
+        const auto& previous = keyframes[index - 1];
+        const auto& next = keyframes[index];
+        if (frame > next.frame)
+            continue;
+
+        if (std::fabs(next.frame - previous.frame) < 0.000001 || previous.interpolationType == "Const")
+            return previous.color;
+
+        const double t = std::clamp((frame - previous.frame) / (next.frame - previous.frame), 0.0, 1.0);
+        return interpolateCsdRgba(previous.color, next.color, t);
+    }
+
+    return keyframes.back().color;
 }
 
 [[nodiscard]] std::optional<CsdTimelinePlayback> loadCsdTimelinePlayback(const CsdPipelineTemplateBinding& binding)
@@ -1926,21 +2074,47 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
                 playback.keyframeCount += rawKeyframeCount;
 
                 const auto keyframes = parseCsdTimelineKeyframes(trackObject);
-                const int unresolvedKeyframes = std::max(0, rawKeyframeCount - static_cast<int>(keyframes.size()));
+                const auto packedKeyframes = isCsdPackedChannelTrack(trackType)
+                    ? parseCsdTimelinePackedRgbaKeyframes(trackObject)
+                    : std::vector<CsdTimelinePackedRgbaKeyframe>{};
+                const int decodedPackedKeyframes = static_cast<int>(packedKeyframes.size());
+                int unresolvedKeyframes = std::max(0, rawKeyframeCount - static_cast<int>(keyframes.size()));
+                if (isCsdPackedChannelTrack(trackType))
+                    unresolvedKeyframes = std::max(0, rawKeyframeCount - decodedPackedKeyframes);
                 if (trackType == "Color")
                 {
                     ++playback.colorTrackCount;
-                    if (unresolvedKeyframes > 0)
+                    if (rawKeyframeCount > 0)
                         ++playback.packedColorTrackCount;
+                    if (decodedPackedKeyframes > 0)
+                        ++playback.decodedPackedColorTrackCount;
                 }
                 if (isCsdGradientTrack(trackType))
                 {
                     ++playback.gradientTrackCount;
-                    if (unresolvedKeyframes > 0)
+                    if (rawKeyframeCount > 0)
                         ++playback.packedGradientTrackCount;
+                    if (decodedPackedKeyframes > 0)
+                        ++playback.decodedPackedGradientTrackCount;
                 }
+                playback.decodedPackedKeyframeCount += decodedPackedKeyframes;
                 if (isCsdPackedChannelTrack(trackType))
                     playback.unresolvedPackedKeyframeCount += unresolvedKeyframes;
+
+                if (const auto packedSample = sampleCsdPackedRgbaTimelineTrack(packedKeyframes, static_cast<double>(playback.sampleFrame)))
+                {
+                    CsdTimelinePackedRgbaTrackSample trackSample;
+                    trackSample.sceneName = playback.sceneName;
+                    trackSample.groupIndex = static_cast<int>(groupIndex);
+                    trackSample.castIndex = static_cast<int>(castIndex);
+                    trackSample.castName = csdCastNameFor(dictionary, trackSample.groupIndex, trackSample.castIndex);
+                    trackSample.trackType = trackType;
+                    trackSample.sampleFrame = playback.sampleFrame;
+                    trackSample.keyframeCount = decodedPackedKeyframes;
+                    trackSample.color = *packedSample;
+                    trackSample.packedRgba = packCsdRgba(*packedSample);
+                    playback.packedRgbaSamples.push_back(std::move(trackSample));
+                }
 
                 const auto sample = sampleCsdTimelineTrack(keyframes, static_cast<double>(playback.sampleFrame));
                 if (!sample)
@@ -2002,6 +2176,49 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
         ((0.5 + sampled.translationX) * static_cast<double>(kDesignWidth)) - (static_cast<double>(sampled.destinationWidth) * 0.5)));
     sampled.destinationY = static_cast<int>(std::llround(
         ((0.5 + sampled.translationY) * static_cast<double>(kDesignHeight)) - (static_cast<double>(sampled.destinationHeight) * 0.5)));
+    return sampled;
+}
+
+[[nodiscard]] std::optional<CsdDrawableCommand> applyCsdPackedRgbaTimelineToDrawableCommand(
+    const CsdDrawableCommand& command,
+    const CsdTimelinePackedRgbaTrackSample& sample)
+{
+    if (command.sceneName != sample.sceneName || command.castName != sample.castName)
+        return std::nullopt;
+
+    CsdDrawableCommand sampled = command;
+    if (sample.trackType == "Color")
+    {
+        sampled.colorPackedRgba = sample.packedRgba;
+        sampled.colorRgba = sample.color;
+        sampled.colorKnown = true;
+    }
+    else if (sample.trackType == "GradientTL")
+    {
+        sampled.gradientTopLeftRgba = sample.color;
+        sampled.gradientKnown = true;
+    }
+    else if (sample.trackType == "GradientBL")
+    {
+        sampled.gradientBottomLeftRgba = sample.color;
+        sampled.gradientKnown = true;
+    }
+    else if (sample.trackType == "GradientTR")
+    {
+        sampled.gradientTopRightRgba = sample.color;
+        sampled.gradientKnown = true;
+    }
+    else if (sample.trackType == "GradientBR")
+    {
+        sampled.gradientBottomRightRgba = sample.color;
+        sampled.gradientKnown = true;
+    }
+    else
+    {
+        return std::nullopt;
+    }
+
+    refreshCsdGradientState(sampled);
     return sampled;
 }
 
@@ -2237,6 +2454,31 @@ void decodeDxt5Block(const std::uint8_t* block, int blockX, int blockY, int widt
         auto* destination = static_cast<std::uint8_t*>(bitmapData.Scan0) + (static_cast<std::ptrdiff_t>(bitmapData.Stride) * y);
         const auto* source = image.argbPixels.data() + (static_cast<std::size_t>(y) * static_cast<std::size_t>(image.width));
         std::memcpy(destination, source, static_cast<std::size_t>(image.width) * sizeof(std::uint32_t));
+    }
+
+    bitmap->UnlockBits(&bitmapData);
+    return bitmap;
+}
+
+[[nodiscard]] std::unique_ptr<Gdiplus::Bitmap> bitmapFromArgbPixels(
+    int width,
+    int height,
+    const std::vector<std::uint32_t>& pixels)
+{
+    if (width <= 0 || height <= 0 || pixels.size() < static_cast<std::size_t>(width) * static_cast<std::size_t>(height))
+        return nullptr;
+
+    auto bitmap = std::make_unique<Gdiplus::Bitmap>(width, height, PixelFormat32bppARGB);
+    Gdiplus::BitmapData bitmapData{};
+    Gdiplus::Rect lockRect(0, 0, width, height);
+    if (bitmap->LockBits(&lockRect, Gdiplus::ImageLockModeWrite, PixelFormat32bppARGB, &bitmapData) != Gdiplus::Ok)
+        return nullptr;
+
+    for (int y = 0; y < height; ++y)
+    {
+        auto* destination = static_cast<std::uint8_t*>(bitmapData.Scan0) + (static_cast<std::ptrdiff_t>(bitmapData.Stride) * y);
+        const auto* source = pixels.data() + (static_cast<std::size_t>(y) * static_cast<std::size_t>(width));
+        std::memcpy(destination, source, static_cast<std::size_t>(width) * sizeof(std::uint32_t));
     }
 
     bitmap->UnlockBits(&bitmapData);
@@ -2645,6 +2887,222 @@ void drawOutlinedText(
         static_cast<float>(cast.sourceWidth),
         static_cast<float>(cast.sourceHeight),
         Gdiplus::UnitPixel);
+    return true;
+}
+
+[[nodiscard]] std::uint8_t clampCsdByte(double value)
+{
+    return static_cast<std::uint8_t>(std::clamp(static_cast<int>(std::llround(value)), 0, 255));
+}
+
+[[nodiscard]] CsdColorRgba unpackArgbPixel(std::uint32_t argb)
+{
+    return CsdColorRgba{
+        static_cast<std::uint8_t>((argb >> 16) & 0xFF),
+        static_cast<std::uint8_t>((argb >> 8) & 0xFF),
+        static_cast<std::uint8_t>(argb & 0xFF),
+        static_cast<std::uint8_t>((argb >> 24) & 0xFF),
+    };
+}
+
+[[nodiscard]] std::uint32_t packArgbPixel(const CsdColorRgba& color)
+{
+    return (static_cast<std::uint32_t>(color.a) << 24)
+        | (static_cast<std::uint32_t>(color.r) << 16)
+        | (static_cast<std::uint32_t>(color.g) << 8)
+        | static_cast<std::uint32_t>(color.b);
+}
+
+[[nodiscard]] CsdColorRgba multiplyCsdRgba(const CsdColorRgba& left, const CsdColorRgba& right)
+{
+    auto multiply = [](std::uint8_t a, std::uint8_t b)
+    {
+        return static_cast<std::uint8_t>((static_cast<int>(a) * static_cast<int>(b) + 127) / 255);
+    };
+
+    return CsdColorRgba{
+        multiply(left.r, right.r),
+        multiply(left.g, right.g),
+        multiply(left.b, right.b),
+        multiply(left.a, right.a),
+    };
+}
+
+[[nodiscard]] CsdColorRgba sampleTextureArgbNearest(const DdsTextureImage& image, double x, double y)
+{
+    const int ix = std::clamp(static_cast<int>(std::floor(x)), 0, image.width - 1);
+    const int iy = std::clamp(static_cast<int>(std::floor(y)), 0, image.height - 1);
+    return unpackArgbPixel(image.argbPixels[static_cast<std::size_t>(iy) * static_cast<std::size_t>(image.width) + static_cast<std::size_t>(ix)]);
+}
+
+[[nodiscard]] CsdColorRgba sampleTextureArgbBilinear(const DdsTextureImage& image, double x, double y)
+{
+    x = std::clamp(x, 0.0, static_cast<double>(image.width - 1));
+    y = std::clamp(y, 0.0, static_cast<double>(image.height - 1));
+    const int x0 = std::clamp(static_cast<int>(std::floor(x)), 0, image.width - 1);
+    const int y0 = std::clamp(static_cast<int>(std::floor(y)), 0, image.height - 1);
+    const int x1 = std::min(x0 + 1, image.width - 1);
+    const int y1 = std::min(y0 + 1, image.height - 1);
+    const double tx = x - static_cast<double>(x0);
+    const double ty = y - static_cast<double>(y0);
+
+    auto pixelAt = [&image](int px, int py)
+    {
+        return unpackArgbPixel(image.argbPixels[static_cast<std::size_t>(py) * static_cast<std::size_t>(image.width) + static_cast<std::size_t>(px)]);
+    };
+
+    const auto c00 = pixelAt(x0, y0);
+    const auto c10 = pixelAt(x1, y0);
+    const auto c01 = pixelAt(x0, y1);
+    const auto c11 = pixelAt(x1, y1);
+    auto channel = [tx, ty](std::uint8_t v00, std::uint8_t v10, std::uint8_t v01, std::uint8_t v11)
+    {
+        const double top = static_cast<double>(v00) + ((static_cast<double>(v10) - static_cast<double>(v00)) * tx);
+        const double bottom = static_cast<double>(v01) + ((static_cast<double>(v11) - static_cast<double>(v01)) * tx);
+        return clampCsdByte(top + ((bottom - top) * ty));
+    };
+
+    return CsdColorRgba{
+        channel(c00.r, c10.r, c01.r, c11.r),
+        channel(c00.g, c10.g, c01.g, c11.g),
+        channel(c00.b, c10.b, c01.b, c11.b),
+        channel(c00.a, c10.a, c01.a, c11.a),
+    };
+}
+
+[[nodiscard]] CsdColorRgba gradientVertexColor(const CsdDrawableCommand& command, double u, double v)
+{
+    if (!command.gradientKnown)
+        return CsdColorRgba{};
+
+    const auto top = interpolateCsdRgba(command.gradientTopLeftRgba, command.gradientTopRightRgba, std::clamp(u, 0.0, 1.0));
+    const auto bottom = interpolateCsdRgba(command.gradientBottomLeftRgba, command.gradientBottomRightRgba, std::clamp(u, 0.0, 1.0));
+    return interpolateCsdRgba(top, bottom, std::clamp(v, 0.0, 1.0));
+}
+
+void blendCsdPixelSrcAlphaOver(std::uint32_t& destinationArgb, const CsdColorRgba& source)
+{
+    const auto destination = unpackArgbPixel(destinationArgb);
+    const double sourceAlpha = static_cast<double>(source.a) / 255.0;
+    const double invAlpha = 1.0 - sourceAlpha;
+    const CsdColorRgba blended{
+        clampCsdByte((static_cast<double>(source.r) * sourceAlpha) + (static_cast<double>(destination.r) * invAlpha)),
+        clampCsdByte((static_cast<double>(source.g) * sourceAlpha) + (static_cast<double>(destination.g) * invAlpha)),
+        clampCsdByte((static_cast<double>(source.b) * sourceAlpha) + (static_cast<double>(destination.b) * invAlpha)),
+        clampCsdByte(static_cast<double>(source.a) + (static_cast<double>(destination.a) * invAlpha)),
+    };
+    destinationArgb = packArgbPixel(blended);
+}
+
+void blendCsdPixelSrcAlphaOne(std::uint32_t& destinationArgb, const CsdColorRgba& source)
+{
+    const auto destination = unpackArgbPixel(destinationArgb);
+    const double sourceAlpha = static_cast<double>(source.a) / 255.0;
+    const CsdColorRgba blended{
+        clampCsdByte((static_cast<double>(source.r) * sourceAlpha) + static_cast<double>(destination.r)),
+        clampCsdByte((static_cast<double>(source.g) * sourceAlpha) + static_cast<double>(destination.g)),
+        clampCsdByte((static_cast<double>(source.b) * sourceAlpha) + static_cast<double>(destination.b)),
+        clampCsdByte(static_cast<double>(source.a) + static_cast<double>(destination.a)),
+    };
+    destinationArgb = packArgbPixel(blended);
+}
+
+[[nodiscard]] bool drawCsdDrawableCommandSoftware(
+    std::vector<std::uint32_t>& canvasPixels,
+    int canvasWidth,
+    int canvasHeight,
+    SwardSuUiAssetRenderer& renderer,
+    const CsdDrawableCommand& command,
+    CsdSoftwareRenderStats& stats)
+{
+    if (command.hidden)
+        return true;
+
+    const auto* texture = renderer.textureFor(command.textureName);
+    if (!texture || !texture->image || !command.sourceFits || canvasWidth <= 0 || canvasHeight <= 0)
+        return false;
+
+    const double dstX = static_cast<double>(command.destinationX);
+    const double dstY = static_cast<double>(command.destinationY);
+    const double dstW = static_cast<double>(std::max(1, command.destinationWidth));
+    const double dstH = static_cast<double>(std::max(1, command.destinationHeight));
+    const double centerX = dstX + (dstW * 0.5);
+    const double centerY = dstY + (dstH * 0.5);
+    const double radians = command.rotation * kPi / 180.0;
+    const double cosTheta = std::cos(radians);
+    const double sinTheta = std::sin(radians);
+
+    std::array<std::pair<double, double>, 4> corners{{
+        { -dstW * 0.5, -dstH * 0.5 },
+        { dstW * 0.5, -dstH * 0.5 },
+        { -dstW * 0.5, dstH * 0.5 },
+        { dstW * 0.5, dstH * 0.5 },
+    }};
+
+    double minX = static_cast<double>(canvasWidth);
+    double minY = static_cast<double>(canvasHeight);
+    double maxX = 0.0;
+    double maxY = 0.0;
+    for (const auto& [cornerX, cornerY] : corners)
+    {
+        const double rotatedX = centerX + (cornerX * cosTheta) - (cornerY * sinTheta);
+        const double rotatedY = centerY + (cornerX * sinTheta) + (cornerY * cosTheta);
+        minX = std::min(minX, rotatedX);
+        minY = std::min(minY, rotatedY);
+        maxX = std::max(maxX, rotatedX);
+        maxY = std::max(maxY, rotatedY);
+    }
+
+    const int startX = std::clamp(static_cast<int>(std::floor(minX)), 0, canvasWidth - 1);
+    const int startY = std::clamp(static_cast<int>(std::floor(minY)), 0, canvasHeight - 1);
+    const int endX = std::clamp(static_cast<int>(std::ceil(maxX)), 0, canvasWidth - 1);
+    const int endY = std::clamp(static_cast<int>(std::ceil(maxY)), 0, canvasHeight - 1);
+    if (endX < startX || endY < startY)
+        return true;
+
+    ++stats.softwareQuadCommandCount;
+    if (command.gradientKnown)
+        ++stats.gradientVertexColorCommandCount;
+    if (command.additiveBlend)
+        ++stats.additiveSoftwareCommandCount;
+
+    for (int y = startY; y <= endY; ++y)
+    {
+        for (int x = startX; x <= endX; ++x)
+        {
+            const double px = static_cast<double>(x) + 0.5;
+            const double py = static_cast<double>(y) + 0.5;
+            const double dx = px - centerX;
+            const double dy = py - centerY;
+            double localX = (dx * cosTheta) + (dy * sinTheta) + (dstW * 0.5);
+            double localY = (-dx * sinTheta) + (dy * cosTheta) + (dstH * 0.5);
+            if (command.flipX)
+                localX = dstW - localX;
+            if (command.flipY)
+                localY = dstH - localY;
+            if (localX < 0.0 || localY < 0.0 || localX >= dstW || localY >= dstH)
+                continue;
+
+            const double u = localX / dstW;
+            const double v = localY / dstH;
+            const double sourceX = static_cast<double>(command.sourceX) + (u * static_cast<double>(command.sourceWidth));
+            const double sourceY = static_cast<double>(command.sourceY) + (v * static_cast<double>(command.sourceHeight));
+            const auto textureColor = command.linearFiltering
+                ? sampleTextureArgbBilinear(*texture->image, sourceX, sourceY)
+                : sampleTextureArgbNearest(*texture->image, sourceX, sourceY);
+            const auto vertexColor = multiplyCsdRgba(command.colorRgba, gradientVertexColor(command, u, v));
+            const auto shaded = multiplyCsdRgba(textureColor, vertexColor);
+            if (shaded.a == 0)
+                continue;
+
+            auto& destination = canvasPixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(canvasWidth) + static_cast<std::size_t>(x)];
+            if (command.additiveBlend)
+                blendCsdPixelSrcAlphaOne(destination, shaded);
+            else
+                blendCsdPixelSrcAlphaOver(destination, shaded);
+        }
+    }
+
     return true;
 }
 
@@ -3909,6 +4367,48 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return descriptor.str();
 }
 
+[[nodiscard]] std::string formatPackedRgbaHex(std::uint32_t packed)
+{
+    std::ostringstream descriptor;
+    descriptor
+        << "0x"
+        << std::uppercase
+        << std::hex
+        << std::setw(8)
+        << std::setfill('0')
+        << packed;
+    return descriptor.str();
+}
+
+[[nodiscard]] std::string csdPackedRgbaTimelineSampleDescriptor(
+    std::string_view templateId,
+    const CsdTimelinePackedRgbaTrackSample& sample)
+{
+    std::ostringstream descriptor;
+    descriptor
+        << "timeline_rgba_sample="
+        << templateId
+        << ":"
+        << sample.sceneName
+        << "/"
+        << sample.castName
+        << ":track="
+        << sample.trackType
+        << ":frame="
+        << sample.sampleFrame
+        << ":rgba="
+        << formatPackedRgbaHex(sample.packedRgba)
+        << ":components="
+        << static_cast<int>(sample.color.r)
+        << ","
+        << static_cast<int>(sample.color.g)
+        << ","
+        << static_cast<int>(sample.color.b)
+        << ","
+        << static_cast<int>(sample.color.a);
+    return descriptor.str();
+}
+
 [[nodiscard]] std::string csdTimelineDrawCommandDescriptor(
     std::string_view templateId,
     const CsdTimelineTrackSample& sample,
@@ -4023,6 +4523,8 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 
         for (const auto& sample : playback->samples)
             descriptors.push_back(csdTimelineSampleDescriptor(csdBinding.templateId, sample));
+        for (const auto& sample : playback->packedRgbaSamples)
+            descriptors.push_back(csdPackedRgbaTimelineSampleDescriptor(csdBinding.templateId, sample));
 
         if (const auto* drawable = drawableFor(csdBinding))
         {
@@ -4410,6 +4912,15 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
             command = *sampled;
             ++sampledCommandCount;
         }
+        for (const auto& sample : playback->packedRgbaSamples)
+        {
+            const auto sampled = applyCsdPackedRgbaTimelineToDrawableCommand(command, sample);
+            if (!sampled)
+                continue;
+
+            command = *sampled;
+            ++sampledCommandCount;
+        }
     }
 
     return commands;
@@ -4419,22 +4930,15 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     const CsdDrawableScene& scene,
     const CsdTimelinePlayback* playback,
     SwardSuUiAssetRenderer& renderer,
-    std::size_t& sampledCommandCount)
+    std::size_t& sampledCommandCount,
+    CsdSoftwareRenderStats& renderStats)
 {
-    auto bitmap = std::make_unique<Gdiplus::Bitmap>(kDesignWidth, kDesignHeight, PixelFormat32bppARGB);
-    Gdiplus::Graphics graphics(bitmap.get());
-    graphics.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
-    graphics.SetCompositingQuality(Gdiplus::CompositingQualityHighQuality);
-    graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
-    graphics.Clear(Gdiplus::Color(255, 0, 0, 0));
-
-    const Gdiplus::RectF canvas(0.0F, 0.0F, static_cast<Gdiplus::REAL>(kDesignWidth), static_cast<Gdiplus::REAL>(kDesignHeight));
+    std::vector<std::uint32_t> canvasPixels(static_cast<std::size_t>(kDesignWidth) * static_cast<std::size_t>(kDesignHeight), 0xFF000000);
     const auto commands = timelineSampledCommands(scene, playback, sampledCommandCount);
     for (const auto& command : commands)
-        (void)drawCsdDrawableCommand(graphics, canvas, renderer, command);
+        (void)drawCsdDrawableCommandSoftware(canvasPixels, kDesignWidth, kDesignHeight, renderer, command, renderStats);
 
-    return bitmap;
+    return bitmapFromArgbPixels(kDesignWidth, kDesignHeight, canvasPixels);
 }
 
 [[nodiscard]] std::size_t countUniqueTextures(const std::vector<CsdDrawableCommand>& commands)
@@ -4480,8 +4984,6 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
             ++comparison.alphaModulatedCommandCount;
         if (command.gradientKnown)
             ++comparison.gradientCommandCount;
-        if (command.gradientVarying)
-            ++comparison.gradientApproxCommandCount;
         if (command.additiveBlend)
             ++comparison.additiveCommandCount;
         else
@@ -4493,8 +4995,16 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     {
         comparison.packedColorTrackCount = static_cast<std::size_t>(std::max(0, playback->packedColorTrackCount));
         comparison.packedGradientTrackCount = static_cast<std::size_t>(std::max(0, playback->packedGradientTrackCount));
+        comparison.decodedPackedColorTrackCount = static_cast<std::size_t>(std::max(0, playback->decodedPackedColorTrackCount));
+        comparison.decodedPackedGradientTrackCount = static_cast<std::size_t>(std::max(0, playback->decodedPackedGradientTrackCount));
+        comparison.decodedPackedKeyframeCount = static_cast<std::size_t>(std::max(0, playback->decodedPackedKeyframeCount));
         comparison.unresolvedPackedKeyframeCount = static_cast<std::size_t>(std::max(0, playback->unresolvedPackedKeyframeCount));
         for (const auto& sample : playback->samples)
+        {
+            if (isCsdGradientTrack(sample.trackType))
+                ++comparison.gradientTrackSampleCount;
+        }
+        for (const auto& sample : playback->packedRgbaSamples)
         {
             if (isCsdGradientTrack(sample.trackType))
                 ++comparison.gradientTrackSampleCount;
@@ -4503,8 +5013,12 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
 
     SwardSuUiAssetRenderer renderer;
     std::size_t sampledCommandCount = 0;
-    auto bitmap = renderCsdOffscreenFrame(*scene, playback ? &*playback : nullptr, renderer, sampledCommandCount);
+    CsdSoftwareRenderStats renderStats;
+    auto bitmap = renderCsdOffscreenFrame(*scene, playback ? &*playback : nullptr, renderer, sampledCommandCount, renderStats);
     comparison.sampledCommandCount = sampledCommandCount;
+    comparison.softwareQuadCommandCount = renderStats.softwareQuadCommandCount;
+    comparison.gradientVertexColorCommandCount = renderStats.gradientVertexColorCommandCount;
+    comparison.additiveSoftwareCommandCount = renderStats.additiveSoftwareCommandCount;
     const bool saved = bitmap && saveBitmapAsBmp(*bitmap, comparison.renderedFramePath);
     comparison.nativeBestPath = findNativeBestBmpPathForTarget(csdBinding.templateId);
     comparison.visualDelta = bitmap
@@ -4526,7 +5040,7 @@ void writeCsdRenderCompareManifest(
         return;
 
     out << "{\n";
-    out << "  \"phase\": 128,\n";
+    out << "  \"phase\": 129,\n";
     out << "  \"canvas\": { \"width\": " << kDesignWidth << ", \"height\": " << kDesignHeight << " },\n";
     out << "  \"records\": [\n";
     for (std::size_t index = 0; index < comparisons.size(); ++index)
@@ -4544,18 +5058,24 @@ void writeCsdRenderCompareManifest(
         out << "      \"drawCommandCount\": " << comparison.drawCommandCount << ",\n";
         out << "      \"sampledCommandCount\": " << comparison.sampledCommandCount << ",\n";
         out << "      \"textureBindingCount\": " << comparison.textureBindingCount << ",\n";
-        out << "      \"materialSemantics\": { \"colorOrder\": \"rgba\", \"blend\": \"src-alpha/inv-src-alpha\", \"additiveBlend\": \"src-alpha/one\", \"colorCommands\": " << comparison.colorCommandCount
+        out << "      \"materialSemantics\": { \"quadRenderer\": \"software-argb\", \"colorOrder\": \"rgba\", \"blend\": \"src-alpha/inv-src-alpha\", \"additiveBlend\": \"src-alpha/one\", \"colorCommands\": " << comparison.colorCommandCount
             << ", \"alphaModulatedCommands\": " << comparison.alphaModulatedCommandCount
             << ", \"gradientCommands\": " << comparison.gradientCommandCount
             << ", \"gradientApproxCommands\": " << comparison.gradientApproxCommandCount
+            << ", \"gradientVertexColorCommands\": " << comparison.gradientVertexColorCommandCount
             << ", \"normalBlendCommands\": " << comparison.normalBlendCommandCount
             << ", \"additiveCommands\": " << comparison.additiveCommandCount
+            << ", \"additiveSoftwareCommands\": " << comparison.additiveSoftwareCommandCount
             << ", \"linearFilteringCommands\": " << comparison.linearFilteringCommandCount
+            << ", \"softwareQuadCommands\": " << comparison.softwareQuadCommandCount
             << ", \"gradientTrackSamples\": " << comparison.gradientTrackSampleCount << " },\n";
         out << "      \"channelSemantics\": { \"packedColorTracks\": " << comparison.packedColorTrackCount
             << ", \"packedGradientTracks\": " << comparison.packedGradientTrackCount
+            << ", \"decodedPackedColorTracks\": " << comparison.decodedPackedColorTrackCount
+            << ", \"decodedPackedGradientTracks\": " << comparison.decodedPackedGradientTrackCount
+            << ", \"decodedPackedKeyframes\": " << comparison.decodedPackedKeyframeCount
             << ", \"unresolvedPackedKeyframes\": " << comparison.unresolvedPackedKeyframeCount
-            << ", \"status\": \"packed color/gradient keyframes require raw RGBA extraction before shader-perfect parity\" },\n";
+            << ", \"status\": \"packed color/gradient keyframes decoded when raw RGBA payload fields are present\" },\n";
         out << "      \"nativeAlignment\": { \"mode\": \"" << jsonEscape(comparison.visualDelta.alignmentMode)
             << "\", \"crop\": { \"x\": " << comparison.visualDelta.nativeAlignmentCropX
             << ", \"y\": " << comparison.visualDelta.nativeAlignmentCropY
@@ -4614,7 +5134,7 @@ void writeCsdRenderCompareManifest(
     std::size_t templateCount = 0;
     bool failed = false;
     std::vector<CsdRenderedFrameComparison> comparisons;
-    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase128";
+    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase129";
     const auto manifestPath = outputRoot / "csd_render_compare_manifest.json";
 
     Gdiplus::GdiplusStartupInput gdiplusInput{};
@@ -4665,6 +5185,7 @@ void writeCsdRenderCompareManifest(
         std::cout
             << "material_semantics="
             << comparison.templateId
+            << ":quad_renderer=software-argb"
             << ":color_order=rgba"
             << ":blend=src-alpha/inv-src-alpha"
             << ":additive_blend=src-alpha/one"
@@ -4676,10 +5197,16 @@ void writeCsdRenderCompareManifest(
             << comparison.gradientCommandCount
             << ":gradient_average_approx="
             << comparison.gradientApproxCommandCount
+            << ":gradient_vertex_color="
+            << comparison.gradientVertexColorCommandCount
             << ":additive_commands="
             << comparison.additiveCommandCount
+            << ":additive_software="
+            << comparison.additiveSoftwareCommandCount
             << ":linear_filter_commands="
             << comparison.linearFilteringCommandCount
+            << ":software_quads="
+            << comparison.softwareQuadCommandCount
             << ":gradient_samples="
             << comparison.gradientTrackSampleCount
             << '\n';
@@ -4690,6 +5217,12 @@ void writeCsdRenderCompareManifest(
             << comparison.packedColorTrackCount
             << ":packed_gradient_tracks="
             << comparison.packedGradientTrackCount
+            << ":decoded_packed_color_tracks="
+            << comparison.decodedPackedColorTrackCount
+            << ":decoded_packed_gradient_tracks="
+            << comparison.decodedPackedGradientTrackCount
+            << ":decoded_packed_keyframes="
+            << comparison.decodedPackedKeyframeCount
             << ":unresolved_packed_keyframes="
             << comparison.unresolvedPackedKeyframeCount
             << '\n';

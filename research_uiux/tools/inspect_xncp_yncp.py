@@ -274,9 +274,11 @@ def decode_animation_flags(flags: int) -> list[str]:
 
 def parse_keyframe(view: BinaryView, offset: int, endian: str) -> dict[str, Any]:
     keyframe_type = view.u32(offset + 8, endian)
+    value_raw_bits = view.u32(offset + 4, endian)
     return {
         "frame": view.u32(offset, endian),
         "value": round_float(view.f32(offset + 4, endian)),
+        "value_raw_bits": f"0x{value_raw_bits:08X}",
         "type": KEYFRAME_TYPE_NAMES.get(keyframe_type, f"Unknown_{keyframe_type}"),
         "in_tangent": round_float(view.f32(offset + 12, endian)),
         "out_tangent": round_float(view.f32(offset + 16, endian)),
@@ -291,6 +293,9 @@ def parse_cast_animation_subdata(view: BinaryView, offset: int, origin: int, end
         parse_keyframe(view, origin + data_offset + (24 * index), endian)
         for index in range(keyframe_count)
     ] if data_offset else []
+    if track_type == "Color" or track_type.startswith("Gradient"):
+        for keyframe in keyframes:
+            keyframe["packed_rgba"] = keyframe["value_raw_bits"]
     return {
         "field00": view.u32(offset, endian),
         "track_type": track_type,

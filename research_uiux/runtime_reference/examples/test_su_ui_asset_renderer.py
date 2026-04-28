@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RENDERER_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "su_ui_asset_renderer.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr128" / "sward_su_ui_asset_renderer.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr129" / "Release" / "sward_su_ui_asset_renderer.exe"
 
 
 class SuUiAssetRendererTests(unittest.TestCase):
@@ -192,6 +192,22 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("blend=src-alpha/one", source_text)
         self.assertIn("channel_semantics=", source_text)
         self.assertIn("native_alignment=", source_text)
+
+    def test_renderer_source_exposes_phase129_packed_rgba_and_software_quad_semantics(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("CsdTimelinePackedRgbaKeyframe", source_text)
+        self.assertIn("CsdTimelinePackedRgbaTrackSample", source_text)
+        self.assertIn("parseCsdTimelinePackedRgbaKeyframes", source_text)
+        self.assertIn("sampleCsdPackedRgbaTimelineTrack", source_text)
+        self.assertIn("applyCsdPackedRgbaTimelineToDrawableCommand", source_text)
+        self.assertIn("drawCsdDrawableCommandSoftware", source_text)
+        self.assertIn("blendCsdPixelSrcAlphaOne", source_text)
+        self.assertIn("sampleTextureArgbBilinear", source_text)
+        self.assertIn("gradient_vertex_color", source_text)
+        self.assertIn("quad_renderer=software-argb", source_text)
+        self.assertIn("decoded_packed_keyframes=", source_text)
+        self.assertIn("additive_software=", source_text)
+        self.assertIn("out\" / \"csd_render_compare\" / \"phase129", source_text)
 
     def test_renderer_source_exposes_title_loop_reconstruction_screen(self) -> None:
         source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
@@ -541,18 +557,21 @@ class SuUiAssetRendererTests(unittest.TestCase):
 
         self.assertIn("sward_su_ui_asset_renderer csd render compare smoke ok", completed.stdout)
         self.assertIn("templates=4", completed.stdout)
-        self.assertIn("rendered_frame_path=title-menu:out/csd_render_compare/phase128/title-menu_frame10.bmp", completed.stdout)
-        self.assertIn("rendered_frame_path=loading:out/csd_render_compare/phase128/loading_frame75.bmp", completed.stdout)
-        self.assertIn("rendered_frame_path=sonic-hud:out/csd_render_compare/phase128/sonic-hud_frame99.bmp", completed.stdout)
-        self.assertIn("rendered_frame_path=tutorial:out/csd_render_compare/phase128/tutorial_frame50.bmp", completed.stdout)
-        self.assertIn("render_compare_manifest=out/csd_render_compare/phase128/csd_render_compare_manifest.json", completed.stdout)
+        self.assertIn("rendered_frame_path=title-menu:out/csd_render_compare/phase129/title-menu_frame10.bmp", completed.stdout)
+        self.assertIn("rendered_frame_path=loading:out/csd_render_compare/phase129/loading_frame75.bmp", completed.stdout)
+        self.assertIn("rendered_frame_path=sonic-hud:out/csd_render_compare/phase129/sonic-hud_frame99.bmp", completed.stdout)
+        self.assertIn("rendered_frame_path=tutorial:out/csd_render_compare/phase129/tutorial_frame50.bmp", completed.stdout)
+        self.assertIn("render_compare_manifest=out/csd_render_compare/phase129/csd_render_compare_manifest.json", completed.stdout)
         self.assertIn("visual_delta=title-menu:native=found:sample_grid=64x36:alignment=center-crop-16x9", completed.stdout)
         self.assertIn("visual_delta=loading:native=found:sample_grid=64x36:alignment=center-crop-16x9", completed.stdout)
         self.assertIn("visual_delta=sonic-hud:native=found:sample_grid=64x36:alignment=center-crop-16x9", completed.stdout)
-        self.assertIn("material_semantics=title-menu:color_order=rgba:blend=src-alpha/inv-src-alpha", completed.stdout)
-        self.assertIn("material_semantics=loading:color_order=rgba:blend=src-alpha/inv-src-alpha", completed.stdout)
+        self.assertIn("material_semantics=title-menu:quad_renderer=software-argb:color_order=rgba:blend=src-alpha/inv-src-alpha", completed.stdout)
+        self.assertIn("material_semantics=loading:quad_renderer=software-argb:color_order=rgba:blend=src-alpha/inv-src-alpha", completed.stdout)
+        self.assertIn(":gradient_vertex_color=", completed.stdout)
+        self.assertIn(":additive_software=", completed.stdout)
         self.assertIn("channel_semantics=sonic-hud:packed_color_tracks=", completed.stdout)
         self.assertIn("channel_semantics=tutorial:packed_color_tracks=", completed.stdout)
+        self.assertIn(":decoded_packed_keyframes=", completed.stdout)
         self.assertIn("native_alignment=title-menu:mode=center-crop-16x9:crop=", completed.stdout)
         self.assertIn("native_alignment=sonic-hud:mode=center-crop-16x9:crop=", completed.stdout)
         self.assertIn("native_best_path=sonic-hud:", completed.stdout)

@@ -60,6 +60,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - a separate clean SU UI asset renderer with local DDS-backed screen samples, visible `Prev` / `Next` navigation, and local visual-atlas gallery browsing
 - a Phase 122 SGFX template catalog that packages real-runtime evidence into reusable title/loading/HUD/tutorial state-machine recipes with Sonic placeholder assets now and custom SGFX art later, without shipping extracted Sonic assets
 - a Phase 123 SGFX template-driven placeholder renderer path where those recipes select Sonic placeholder screens, bind local asset slots, and expose first timing hooks for `title-menu`, `loading`, `sonic-hud`, and `tutorial`
+- a Phase 129 CSD compare renderer path where ignored local layout evidence preserves packed RGBA keyframes, Color/Gradient channels sample into real RGBA values, and offscreen CSD frames render through a software ARGB quad compositor with per-vertex gradient color and additive blend support
 
 Contents:
 
