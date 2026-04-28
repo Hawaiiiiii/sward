@@ -15,10 +15,14 @@ EXAMPLE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "sgfx
 SONIC_HUD_HEADER = REPO_ROOT / "research_uiux" / "runtime_reference" / "include" / "sward" / "ui_runtime" / "sonic_hud_reference.hpp"
 SONIC_HUD_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "src" / "sonic_hud_reference.cpp"
 SONIC_HUD_EXAMPLE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "sonic_hud_reference_catalog.cpp"
+FRONTEND_SCREEN_HEADER = REPO_ROOT / "research_uiux" / "runtime_reference" / "include" / "sward" / "ui_runtime" / "frontend_screen_reference.hpp"
+FRONTEND_SCREEN_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "src" / "frontend_screen_reference.cpp"
+FRONTEND_SCREEN_EXAMPLE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "frontend_screen_reference_catalog.cpp"
 REPORT = REPO_ROOT / "research_uiux" / "DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md"
 README = REPO_ROOT / "research_uiux" / "runtime_reference" / "README.md"
 DEFAULT_EXE = REPO_ROOT / "b" / "rr122" / "sward_sgfx_template_catalog.exe"
 DEFAULT_SONIC_HUD_EXE = REPO_ROOT / "b" / "rr134" / "Release" / "sward_sonic_hud_reference_catalog.exe"
+DEFAULT_FRONTEND_SCREEN_EXE = REPO_ROOT / "b" / "rr134" / "Release" / "sward_frontend_screen_reference_catalog.exe"
 
 
 class SgfxTemplateCatalogTests(unittest.TestCase):
@@ -221,6 +225,90 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("scene=add/u_info:slot=prompt_strip:activation=tutorial-hud-owner-path-ready:order=120:timeline=Intro_Anim", completed.stdout)
         self.assertIn("timeline_sample=so_speed_gauge:DefaultAnim:frame=99/100:progress=0.990", completed.stdout)
         self.assertIn("material_slot=so_speed_gauge:speed_gauge:ui_ps1_gauge1.dds:placeholder=normal-sonic-hud", completed.stdout)
+
+    def test_phase141_declares_reusable_frontend_screen_reference_source(self) -> None:
+        cmake = self.read(CMAKE_FILE)
+        self.assertTrue(FRONTEND_SCREEN_HEADER.exists(), "Phase 141 frontend screen reference header is missing")
+        self.assertTrue(FRONTEND_SCREEN_SOURCE.exists(), "Phase 141 frontend screen reference source is missing")
+        self.assertTrue(FRONTEND_SCREEN_EXAMPLE.exists(), "Phase 141 frontend screen reference example is missing")
+        header = self.read(FRONTEND_SCREEN_HEADER)
+        source = self.read(FRONTEND_SCREEN_SOURCE)
+        example = self.read(FRONTEND_SCREEN_EXAMPLE)
+
+        self.assertIn("src/frontend_screen_reference.cpp", cmake)
+        self.assertIn("add_executable(sward_frontend_screen_reference_catalog", cmake)
+        self.assertIn("examples/frontend_screen_reference_catalog.cpp", cmake)
+
+        for token in [
+            "struct FrontendScreenMaterialSlot",
+            "struct FrontendScreenTimelineChannel",
+            "struct FrontendScreenScenePolicy",
+            "struct FrontendScreenPolicy",
+            "struct FrontendScreenTimelineSample",
+            "frontendScreenPolicies",
+            "findFrontendScreenPolicy",
+            "findFrontendScreenScenePolicy",
+            "sampleFrontendScreenTimeline",
+            "formatFrontendScreenReferenceCatalog",
+            "formatFrontendScreenReferenceDetail",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "MainMenuComposite",
+            "LoadingComposite",
+            "TitleOptionsReference",
+            "PauseMenuReference",
+            "ui_mainmenu.yncp",
+            "ui_loading.yncp",
+            "ui_pause.yncp",
+            "title-menu-visible",
+            "loading-display-active",
+            "title-options-ready",
+            "pause-ready",
+            "select_travel",
+            "pda_intro",
+            "intro_medium",
+            "input lock",
+            "source-free structural",
+            "SGFX slot",
+            "Sonic assets are local placeholders",
+        ]:
+            self.assertIn(token, source)
+
+        for token in [
+            "--catalog",
+            "--screen",
+            "--scene",
+            "--sample",
+            "--phase141-smoke",
+            "Phase 141 frontend screen reference",
+        ]:
+            self.assertIn(token, example)
+
+    def test_phase141_frontend_screen_reference_smoke_reports_policy_and_timeline(self) -> None:
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_REFERENCE_CATALOG_EXE", DEFAULT_FRONTEND_SCREEN_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen reference catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase141-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_reference_catalog phase141 smoke ok", completed.stdout)
+        self.assertIn("screens=4", completed.stdout)
+        self.assertIn("screen=title-menu:name=MainMenuComposite:layout=ui_mainmenu.yncp:activation=title-menu-visible:transition=select_travel->title menu visual ready:input_lock=until:title-menu-visible:scenes=3", completed.stdout)
+        self.assertIn("screen=loading:name=LoadingComposite:layout=ui_loading.yncp:activation=loading-display-active:transition=pda_intro->loading display active:input_lock=until:loading-display-active:scenes=2", completed.stdout)
+        self.assertIn("screen=title-options:name=TitleOptionsReference:layout=ui_mainmenu.yncp:activation=title-options-ready:transition=select_travel->title options visual ready:input_lock=until:title-options-ready:scenes=2", completed.stdout)
+        self.assertIn("screen=pause:name=PauseMenuReference:layout=ui_pause.yncp:activation=pause-ready:transition=intro_medium->pause menu visual ready:input_lock=until:pause-ready:scenes=8", completed.stdout)
+        self.assertIn("scene=pause/bg:slot=pause_backdrop:activation=pause-ready:order=10:timeline=Intro_Anim:commands=1:structural=1:source_free=1", completed.stdout)
+        self.assertIn("scene=pause/text_area:slot=pause_text_area:activation=pause-ready:order=50:timeline=Usual_Anim:commands=3:structural=3:source_free=3", completed.stdout)
+        self.assertIn("timeline_sample=pause/text_area:Usual_Anim:frame=50/200:progress=0.250", completed.stdout)
+        self.assertIn("material_slot=title-menu:backdrop:ui_mm_base.dds:placeholder=frontend-title-menu", completed.stdout)
 
 
 if __name__ == "__main__":
