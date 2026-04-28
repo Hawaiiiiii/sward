@@ -330,6 +330,11 @@ Local-only evidence, not committed:
   - the export also writes ignored local `ui_playscreen_hud_reference.hpp`, a readable C++-style reference skeleton for `CHudSonicStage`, hook `sub_824D9308`, project `ui_playscreen`, and the scene table needed for portable source reconstruction
   - this is now a full runtime-scene compositor model; shader/palette/render-order parity still needs native comparison before claiming pixel-perfect HUD recreation
 
+- `research_uiux/runtime_reference/examples/su_ui_asset_renderer.cpp`
+  - Phase 143 lets the tracked frontend reference viewer consume the latest UI Lab `ui_lab_live_state.json` snapshots directly for title-menu, loading, title-options, and pause alignment
+  - the viewer now labels live-read fields separately from policy fallback fields: active screen, route/motion, frame, title cursor, loading display type, pause owner status, transition band, input-lock release, live-state path, and per-field provenance
+  - `--renderer-runtime-alignment-smoke` is the bounded operator check for this path; native BMPs remain the visual proof, while live-state/bridge evidence becomes the state driver
+
 - `research_uiux/runtime_reference/include/sward/ui_runtime/sonic_hud_reference.hpp` and `src/sonic_hud_reference.cpp`
   - Phase 137 promotes the generated Phase 136 reference into hand-written repo-safe source
   - the module keeps the live-bridge provenance (`CHudSonicStage`, `sub_824D9308`, `ui_playscreen`) while exposing reusable scene activation policy, render ordering, SGFX slots, material slot descriptors, and timeline sampling

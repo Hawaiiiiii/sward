@@ -172,8 +172,22 @@ struct CsdReferenceViewerLane
     std::string timelineBandId;
     std::string timelineEventLabel;
     std::string runtimeAlignment;
+    std::string runtimeAlignmentSource;
+    std::string runtimeAlignmentEvidence;
+    std::string runtimeAlignmentLiveStatePath;
+    std::string runtimeAlignmentFieldStatus;
     std::string materialSemantics;
     std::string policySource;
+};
+
+struct FrontendLiveStateAlignmentEvidence
+{
+    bool found = false;
+    std::filesystem::path liveStatePath;
+    sward::ui_runtime::FrontendRuntimeAlignment alignment;
+    std::string fieldStatus;
+    std::string route;
+    std::string nativeCaptureStatus;
 };
 
 struct CsdColorRgba
@@ -636,6 +650,10 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] std::string portablePath(const std::filesystem::path& path);
 [[nodiscard]] std::string jsonEscape(std::string_view text);
 [[nodiscard]] std::filesystem::path repoRootForOutput();
+[[nodiscard]] std::optional<std::filesystem::path> findLatestFrontendLiveStatePath(std::string_view target);
+[[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveState(
+    const sward::ui_runtime::FrontendScreenPolicy& policy);
+[[nodiscard]] std::string formatFrontendRuntimeAlignmentEvidence(const FrontendLiveStateAlignmentEvidence& evidence);
 
 inline constexpr std::array<TextureSourceCandidate, 32> kTextureSourceCandidates{{
     { "mat_load_comon_001.dds", "ui_extended_archives/Loading/mat_load_comon_001.dds" },
@@ -882,7 +900,12 @@ inline constexpr std::array<CsdPipelineTemplateBinding, 4> kCsdPipelineTemplateB
     lane.requiredEventId = policy.activationEvent;
     lane.timelineBandId = transitionBandId;
     lane.timelineEventLabel = transitionReadyLabel;
-    lane.runtimeAlignment = formatFrontendRuntimeAlignment(defaultFrontendRuntimeAlignment(policy));
+    const auto alignmentEvidence = loadFrontendRuntimeAlignmentFromLiveState(policy);
+    lane.runtimeAlignment = formatFrontendRuntimeAlignment(alignmentEvidence.alignment);
+    lane.runtimeAlignmentSource = alignmentEvidence.alignment.source;
+    lane.runtimeAlignmentEvidence = formatFrontendRuntimeAlignmentEvidence(alignmentEvidence);
+    lane.runtimeAlignmentLiveStatePath = alignmentEvidence.found ? portablePath(alignmentEvidence.liveStatePath) : "missing";
+    lane.runtimeAlignmentFieldStatus = alignmentEvidence.fieldStatus;
     lane.materialSemantics = frontendMaterialSemanticsDescriptor(policy);
     lane.policySource = "frontend_screen_reference";
 
@@ -5153,6 +5176,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
         << "sward_su_ui_asset_renderer reference lanes smoke ok "
         << "mode=phase142-tracked-policy-playback"
         << " reference_policy_source=frontend_screen_reference"
+        << " runtime_alignment_source=ui_lab_live_state"
         << " lanes=" << lanes.size()
         << '\n';
 
@@ -5179,6 +5203,9 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
             << ":overlay=compact-reference-status:no-template-card=1"
             << '\n';
         std::cout << "runtime_alignment=" << lane.runtimeAlignment << '\n';
+        std::cout << "alignment_lane=" << lane.runtimeAlignmentEvidence << '\n';
+        std::cout << "live_state_path=" << lane.laneId << ":" << lane.runtimeAlignmentLiveStatePath << '\n';
+        std::cout << "alignment_field_status=" << lane.runtimeAlignmentFieldStatus << '\n';
         std::cout << "material_semantics=" << lane.materialSemantics << '\n';
 
         for (const auto& scene : stats.scenes)
@@ -5203,6 +5230,35 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     std::cout << "reference_overlay=compact-reference-status:no-template-card=1\n";
     Gdiplus::GdiplusShutdown(gdiplusToken);
     return failed ? 1 : 0;
+}
+
+[[nodiscard]] int runRendererRuntimeAlignmentSmoke()
+{
+    const auto lanes = buildReferenceViewerLanesFromTrackedPolicy();
+    const bool anyLive = std::any_of(
+        lanes.begin(),
+        lanes.end(),
+        [](const CsdReferenceViewerLane& lane)
+        {
+            return lane.runtimeAlignmentSource == "ui_lab_live_state";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer runtime alignment smoke ok "
+        << "mode=phase143-live-state-alignment"
+        << " runtime_alignment_source=" << (anyLive ? "ui_lab_live_state" : "frontend_screen_reference")
+        << " lanes=" << lanes.size()
+        << '\n';
+
+    for (const auto& lane : lanes)
+    {
+        std::cout << "runtime_alignment=" << lane.runtimeAlignment << '\n';
+        std::cout << "alignment_lane=" << lane.runtimeAlignmentEvidence << '\n';
+        std::cout << "live_state_path=" << lane.laneId << ":" << lane.runtimeAlignmentLiveStatePath << '\n';
+        std::cout << "alignment_field_status=" << lane.runtimeAlignmentFieldStatus << '\n';
+    }
+
+    return lanes.empty() ? 1 : 0;
 }
 
 struct CsdReusableReferenceSceneModel
@@ -7239,6 +7295,156 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return bestPath;
 }
 
+[[nodiscard]] std::optional<std::filesystem::path> findLatestFrontendLiveStatePath(std::string_view target)
+{
+    return latestLiveStatePathForTarget(target);
+}
+
+[[nodiscard]] std::string frontendAlignmentCursorOwnerFromLiveState(
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    std::string_view text)
+{
+    if (policy.screenId == "title-menu" || policy.screenId == "title-options")
+    {
+        const auto title = jsonObjectFieldSpan(text, "title");
+        const int cursor = static_cast<int>(title ? jsonNumberField(*title, "menuCursor").value_or(0.0) : 0.0);
+        std::ostringstream out;
+        out << (policy.screenId == "title-options" ? "CTitleStateMenu/options" : "CTitleStateMenu")
+            << "/menu_cursor=" << cursor;
+        return out.str();
+    }
+
+    if (policy.screenId == "loading")
+    {
+        std::string label;
+        int displayType = static_cast<int>(jsonNumberField(text, "loadingDisplayType").value_or(0.0));
+        if (const auto typedInspectors = jsonObjectFieldSpan(text, "typedInspectors"))
+        {
+            if (const auto loading = jsonObjectFieldSpan(*typedInspectors, "loading"))
+            {
+                displayType = static_cast<int>(jsonNumberField(*loading, "loadingDisplayType").value_or(displayType));
+                label = jsonStringField(*loading, "loadingDisplayTypeLabel").value_or("");
+            }
+        }
+
+        std::ostringstream out;
+        out << "LoadingDisplay/display_type=" << displayType;
+        if (!label.empty())
+            out << "/label=" << label;
+        return out.str();
+    }
+
+    if (policy.screenId == "pause")
+    {
+        std::string menu = "unknown";
+        std::string status = "unknown";
+        std::string transition = "unknown";
+        bool visible = false;
+        if (const auto typedInspectors = jsonObjectFieldSpan(text, "typedInspectors"))
+        {
+            if (const auto pauseGeneralSave = jsonObjectFieldSpan(*typedInspectors, "pauseGeneralSave"))
+            {
+                if (const auto pause = jsonObjectFieldSpan(*pauseGeneralSave, "pause"))
+                {
+                    menu = jsonStringField(*pause, "pauseMenuLabel").value_or(menu);
+                    status = jsonStringField(*pause, "pauseStatusLabel").value_or(status);
+                    transition = jsonStringField(*pause, "pauseTransitionLabel").value_or(transition);
+                    visible = jsonBoolField(*pause, "pauseVisible").value_or(false);
+                }
+            }
+        }
+
+        std::ostringstream out;
+        out << "CHudPause/menu=" << menu
+            << "/status=" << status
+            << "/transition=" << transition
+            << "/visible=" << (visible ? 1 : 0);
+        return out.str();
+    }
+
+    return defaultFrontendRuntimeAlignment(policy).cursorOwner;
+}
+
+[[nodiscard]] bool frontendAlignmentReadyFromLiveState(
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    std::string_view text)
+{
+    const std::string nativeStatus = jsonStringField(text, "nativeCaptureStatus").value_or("");
+    const bool nativeComplete = nativeStatus == "complete";
+    const bool targetObserved = jsonBoolField(text, "targetCsdObserved").value_or(false);
+    const std::string route = jsonStringField(text, "route").value_or("");
+    const std::string stageReadyEvent = jsonStringField(text, "stageReadyEvent").value_or("");
+
+    if (policy.screenId == "title-menu")
+        return jsonBoolField(text, "titleMenuVisualReady").value_or(false) && nativeComplete;
+    if (policy.screenId == "loading")
+        return jsonBoolField(text, "loadingDisplayActive").value_or(false) && nativeComplete;
+    if (policy.screenId == "title-options")
+        return targetObserved && nativeComplete;
+    if (policy.screenId == "pause")
+        return nativeComplete && (stageReadyEvent == "pause-ready" || route.find("pause target ready") != std::string::npos);
+
+    return targetObserved && nativeComplete;
+}
+
+[[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveState(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendLiveStateAlignmentEvidence evidence;
+    evidence.alignment = defaultFrontendRuntimeAlignment(policy);
+    evidence.alignment.source = "frontend_screen_reference";
+    evidence.fieldStatus =
+        policy.screenId
+        + ":active_screen=policy:active_scenes=policy:motion=policy:frame=policy:cursor_owner=policy:transition=policy:input_lock=policy";
+
+    const auto liveStatePath = findLatestFrontendLiveStatePath(policy.screenId);
+    if (!liveStatePath)
+        return evidence;
+
+    const std::string text = readTextFile(*liveStatePath);
+    if (text.empty())
+        return evidence;
+
+    evidence.found = true;
+    evidence.liveStatePath = *liveStatePath;
+    evidence.alignment.screenId = jsonStringField(text, "target").value_or(policy.screenId);
+    evidence.alignment.activeScenes.clear();
+    for (const auto& scene : policy.scenes)
+        evidence.alignment.activeScenes.push_back(scene.sceneName);
+    evidence.route = jsonStringField(text, "route").value_or(evidence.alignment.activeMotionName);
+    evidence.nativeCaptureStatus = jsonStringField(text, "nativeCaptureStatus").value_or("");
+    evidence.alignment.activeMotionName = evidence.route.empty() ? evidence.alignment.activeMotionName : evidence.route;
+    evidence.alignment.activeFrame = static_cast<int>(jsonNumberField(text, "frame").value_or(evidence.alignment.activeFrame));
+    evidence.alignment.cursorOwner = frontendAlignmentCursorOwnerFromLiveState(policy, text);
+    evidence.alignment.transitionBand = policy.transitionBand;
+    evidence.alignment.inputLockState = frontendAlignmentReadyFromLiveState(policy, text)
+        ? ("released:" + policy.activationEvent)
+        : policy.inputLockTiming;
+    evidence.alignment.source = "ui_lab_live_state";
+    evidence.fieldStatus =
+        policy.screenId
+        + ":active_screen=live:active_scenes=policy:motion=live-route:frame=live-frame:cursor_owner=live-"
+        + (policy.screenId == "title-menu"
+            ? "title-menu"
+            : (policy.screenId == "title-options"
+                ? "title-options"
+                : (policy.screenId == "loading" ? "loading" : (policy.screenId == "pause" ? "pause" : "generic"))))
+        + ":transition=policy:input_lock=live-readiness";
+
+    return evidence;
+}
+
+[[nodiscard]] std::string formatFrontendRuntimeAlignmentEvidence(const FrontendLiveStateAlignmentEvidence& evidence)
+{
+    std::ostringstream out;
+    out << evidence.alignment.screenId
+        << ":source=" << evidence.alignment.source
+        << ":live_state=" << (evidence.found ? portablePath(evidence.liveStatePath) : std::string("missing"))
+        << ":native_capture=" << (evidence.nativeCaptureStatus.empty() ? std::string("unknown") : evidence.nativeCaptureStatus)
+        << ":field_status=" << evidence.fieldStatus;
+    return out.str();
+}
+
 [[nodiscard]] std::string sonicHudLayoutStatus(std::string_view runtimeProject, std::string_view localProject)
 {
     const bool exactLayoutAvailable = layoutEvidenceContainsFile(std::string(runtimeProject) + ".yncp");
@@ -8960,6 +9166,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererSonicHudReferencePolicySmoke();
     if (commandLineHasFlag("--renderer-reference-lanes-smoke"))
         return runRendererReferenceLanesSmoke();
+    if (commandLineHasFlag("--renderer-runtime-alignment-smoke"))
+        return runRendererRuntimeAlignmentSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 

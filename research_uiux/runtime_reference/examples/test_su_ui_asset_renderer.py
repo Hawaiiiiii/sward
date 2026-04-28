@@ -822,6 +822,17 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertNotIn("kPauseReferenceViewerScenes", source_text)
         self.assertNotIn("kCsdReferenceViewerLanes{{", source_text)
 
+    def test_renderer_source_wires_phase143_live_state_runtime_alignment(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendLiveStateAlignmentEvidence", source_text)
+        self.assertIn("findLatestFrontendLiveStatePath", source_text)
+        self.assertIn("loadFrontendRuntimeAlignmentFromLiveState", source_text)
+        self.assertIn("formatFrontendRuntimeAlignmentEvidence", source_text)
+        self.assertIn("runRendererRuntimeAlignmentSmoke", source_text)
+        self.assertIn("--renderer-runtime-alignment-smoke", source_text)
+        self.assertIn("phase143-live-state-alignment", source_text)
+        self.assertIn("runtime_alignment_source=ui_lab_live_state", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -866,7 +877,8 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("reference_lane=loading:screen=LoadingComposite:layout=ui_loading.yncp:scenes=2", completed.stdout)
         self.assertIn("reference_lane=title-options:screen=TitleOptionsReference:layout=ui_mainmenu.yncp:scenes=2", completed.stdout)
         self.assertIn("reference_lane=pause:screen=PauseMenuReference:layout=ui_pause.yncp:scenes=8", completed.stdout)
-        self.assertIn("runtime_alignment=pause:active_screen=pause:active_scenes=bg,bg_1,bg_1_select,bg_2,text_area,skill_select,arrow,skill_scroll_bar_bg:motion=intro_medium:frame=15:cursor_owner=CHudPause:transition=intro_medium->pause menu visual ready:input_lock=until:pause-ready", completed.stdout)
+        self.assertRegex(completed.stdout, r"runtime_alignment=pause:active_screen=pause:active_scenes=bg,bg_1,bg_1_select,bg_2,text_area,skill_select,arrow,skill_scroll_bar_bg:motion=pause target ready:frame=[1-9]\d*:cursor_owner=CHudPause/menu=.*status=.*transition=.*:transition=intro_medium->pause menu visual ready:input_lock=released:pause-ready")
+        self.assertIn("alignment_lane=pause:source=ui_lab_live_state", completed.stdout)
         self.assertIn("material_semantics=loading:blend=source-over/additive:alpha=straight-alpha:color=packed-rgba-gradient:filter=csd-point-seam:offset=half-pixel:oracle=runtime CSD/UI layer preferred", completed.stdout)
         self.assertRegex(completed.stdout, r"reference_lane=title-menu:.*timeline_resolved=[1-9]\d*:.*sampled_tracks=[1-9]\d*")
         self.assertRegex(completed.stdout, r"reference_lane=pause:.*structural=[1-9]\d*:source_free=[1-9]\d*")
@@ -878,6 +890,33 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertRegex(completed.stdout, r"reference_scene=pause:bg_1:commands=[1-9]\d*")
         self.assertRegex(completed.stdout, r"reference_scene=pause:bg_1:.*timeline=Intro_Anim@[0-9]+/[0-9]+:sampled_tracks=[1-9]\d*")
         self.assertIn("reference_overlay=compact-reference-status:no-template-card=1", completed.stdout)
+
+    def test_renderer_runtime_alignment_smoke_reads_live_state_when_available(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-runtime-alignment-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer runtime alignment smoke ok", completed.stdout)
+        self.assertIn("mode=phase143-live-state-alignment", completed.stdout)
+        self.assertIn("runtime_alignment_source=ui_lab_live_state", completed.stdout)
+        self.assertIn("alignment_lane=title-menu:source=ui_lab_live_state", completed.stdout)
+        self.assertIn("alignment_lane=loading:source=ui_lab_live_state", completed.stdout)
+        self.assertIn("alignment_lane=title-options:source=ui_lab_live_state", completed.stdout)
+        self.assertIn("alignment_lane=pause:source=ui_lab_live_state", completed.stdout)
+        self.assertRegex(completed.stdout, r"runtime_alignment=title-menu:active_screen=title-menu:.*motion=title menu visual ready:frame=[1-9]\d*:cursor_owner=CTitleStateMenu/menu_cursor=[0-9]+")
+        self.assertRegex(completed.stdout, r"runtime_alignment=loading:active_screen=loading:.*motion=.*loading.*:frame=[1-9]\d*:cursor_owner=LoadingDisplay/display_type=[0-9]+")
+        self.assertRegex(completed.stdout, r"runtime_alignment=pause:active_screen=pause:.*motion=pause target ready:frame=[1-9]\d*:cursor_owner=CHudPause/menu=.*status=.*transition=.*")
+        self.assertRegex(completed.stdout, r"live_state_path=title-menu:out/ui_lab_runtime_evidence/.*/title-menu/ui_lab_live_state.json")
+        self.assertIn("alignment_field_status=title-menu:active_screen=live:active_scenes=policy:motion=live-route:frame=live-frame:cursor_owner=live-title-menu:transition=policy:input_lock=live-readiness", completed.stdout)
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
