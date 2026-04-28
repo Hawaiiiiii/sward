@@ -148,6 +148,14 @@ struct CsdPipelineTemplateBinding
     std::string_view timelineAnimationName;
 };
 
+struct CsdColorRgba
+{
+    std::uint8_t r = 255;
+    std::uint8_t g = 255;
+    std::uint8_t b = 255;
+    std::uint8_t a = 255;
+};
+
 struct CsdDrawableCommand
 {
     std::string sceneName;
@@ -174,8 +182,19 @@ struct CsdDrawableCommand
     double scaleX = 1.0;
     double scaleY = 1.0;
     double rotation = 0.0;
-    std::uint32_t colorArgb = 0xFFFFFFFF;
+    int drawType = 1;
+    std::uint32_t castFlags = 0;
+    std::uint32_t colorPackedRgba = 0xFFFFFFFF;
+    CsdColorRgba colorRgba{};
+    CsdColorRgba gradientTopLeftRgba{};
+    CsdColorRgba gradientBottomLeftRgba{};
+    CsdColorRgba gradientTopRightRgba{};
+    CsdColorRgba gradientBottomRightRgba{};
     bool colorKnown = false;
+    bool gradientKnown = false;
+    bool gradientVarying = false;
+    bool additiveBlend = false;
+    bool linearFiltering = false;
     bool hidden = false;
     bool flipX = false;
     bool flipY = false;
@@ -248,6 +267,11 @@ struct CsdTimelinePlayback
     int trackCount = 0;
     int numericTrackCount = 0;
     int keyframeCount = 0;
+    int colorTrackCount = 0;
+    int gradientTrackCount = 0;
+    int packedColorTrackCount = 0;
+    int packedGradientTrackCount = 0;
+    int unresolvedPackedKeyframeCount = 0;
     std::vector<CsdTimelineTrackSample> samples;
 };
 
@@ -267,6 +291,11 @@ struct BitmapComparisonStats
     int sampleGridWidth = 64;
     int sampleGridHeight = 36;
     int sampleCount = 0;
+    std::string alignmentMode = "center-crop-16x9";
+    int nativeAlignmentCropX = 0;
+    int nativeAlignmentCropY = 0;
+    int nativeAlignmentCropWidth = 0;
+    int nativeAlignmentCropHeight = 0;
     double meanAbsRgb = 0.0;
     int maxAbsRgb = 0;
     BitmapSignalStats rendered;
@@ -288,7 +317,15 @@ struct CsdRenderedFrameComparison
     std::size_t textureBindingCount = 0;
     std::size_t colorCommandCount = 0;
     std::size_t alphaModulatedCommandCount = 0;
+    std::size_t gradientCommandCount = 0;
+    std::size_t gradientApproxCommandCount = 0;
+    std::size_t additiveCommandCount = 0;
+    std::size_t normalBlendCommandCount = 0;
+    std::size_t linearFilteringCommandCount = 0;
     std::size_t gradientTrackSampleCount = 0;
+    std::size_t packedColorTrackCount = 0;
+    std::size_t packedGradientTrackCount = 0;
+    std::size_t unresolvedPackedKeyframeCount = 0;
     std::vector<std::string> sgfxSlots;
     BitmapComparisonStats visualDelta;
 };
@@ -1463,6 +1500,78 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     }
 }
 
+[[nodiscard]] CsdColorRgba decodeCsdPackedRgba(std::uint32_t packed)
+{
+    return CsdColorRgba{
+        static_cast<std::uint8_t>((packed >> 24) & 0xFF),
+        static_cast<std::uint8_t>((packed >> 16) & 0xFF),
+        static_cast<std::uint8_t>((packed >> 8) & 0xFF),
+        static_cast<std::uint8_t>(packed & 0xFF),
+    };
+}
+
+[[nodiscard]] bool isDefaultWhiteRgba(const CsdColorRgba& color)
+{
+    return color.r == 255 && color.g == 255 && color.b == 255 && color.a == 255;
+}
+
+[[nodiscard]] bool sameRgba(const CsdColorRgba& left, const CsdColorRgba& right)
+{
+    return left.r == right.r && left.g == right.g && left.b == right.b && left.a == right.a;
+}
+
+[[nodiscard]] CsdColorRgba averageGradientRgba(const CsdDrawableCommand& command)
+{
+    auto average = [](std::uint8_t a, std::uint8_t b, std::uint8_t c, std::uint8_t d)
+    {
+        return static_cast<std::uint8_t>((static_cast<int>(a) + b + c + d + 2) / 4);
+    };
+
+    return CsdColorRgba{
+        average(command.gradientTopLeftRgba.r, command.gradientBottomLeftRgba.r, command.gradientTopRightRgba.r, command.gradientBottomRightRgba.r),
+        average(command.gradientTopLeftRgba.g, command.gradientBottomLeftRgba.g, command.gradientTopRightRgba.g, command.gradientBottomRightRgba.g),
+        average(command.gradientTopLeftRgba.b, command.gradientBottomLeftRgba.b, command.gradientTopRightRgba.b, command.gradientBottomRightRgba.b),
+        average(command.gradientTopLeftRgba.a, command.gradientBottomLeftRgba.a, command.gradientTopRightRgba.a, command.gradientBottomRightRgba.a),
+    };
+}
+
+[[nodiscard]] CsdColorRgba effectiveCsdDrawRgba(const CsdDrawableCommand& command)
+{
+    const auto gradient = averageGradientRgba(command);
+    auto multiply = [](std::uint8_t left, std::uint8_t right)
+    {
+        return static_cast<std::uint8_t>((static_cast<int>(left) * static_cast<int>(right) + 127) / 255);
+    };
+
+    return CsdColorRgba{
+        multiply(command.colorRgba.r, gradient.r),
+        multiply(command.colorRgba.g, gradient.g),
+        multiply(command.colorRgba.b, gradient.b),
+        multiply(command.colorRgba.a, gradient.a),
+    };
+}
+
+[[nodiscard]] std::optional<CsdColorRgba> parseCsdRgbaField(std::string_view object, std::string_view fieldName)
+{
+    const auto text = jsonStringField(object, fieldName);
+    if (!text)
+        return std::nullopt;
+    const auto packed = parseCsdHexColor(*text);
+    if (!packed)
+        return std::nullopt;
+    return decodeCsdPackedRgba(*packed);
+}
+
+[[nodiscard]] bool isCsdGradientTrack(std::string_view trackType)
+{
+    return trackType.starts_with("Gradient");
+}
+
+[[nodiscard]] bool isCsdPackedChannelTrack(std::string_view trackType)
+{
+    return trackType == "Color" || isCsdGradientTrack(trackType);
+}
+
 [[nodiscard]] std::vector<CsdDrawableCommand> buildCsdDrawableCommands(
     std::string_view sceneObject,
     std::string_view sceneName,
@@ -1535,6 +1644,8 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
             command.groupIndex = static_cast<int>(groupIndex);
             command.castIndex = static_cast<int>(castIndex);
             command.castName = csdCastNameFor(dictionary, command.groupIndex, command.castIndex);
+            command.drawType = static_cast<int>(jsonNumberField(castObject, "field04").value_or(1.0));
+            command.castFlags = static_cast<std::uint32_t>(jsonNumberField(castObject, "field38").value_or(0.0));
             command.subimageIndex = *subimageIndex;
             command.textureIndex = subimage.textureIndex;
             command.textureName = textureNames[static_cast<std::size_t>(subimage.textureIndex)];
@@ -1550,12 +1661,34 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
             {
                 if (const auto color = parseCsdHexColor(*colorText))
                 {
-                    command.colorArgb = *color;
+                    command.colorPackedRgba = *color;
+                    command.colorRgba = decodeCsdPackedRgba(*color);
                     command.colorKnown = true;
                 }
             }
-            command.flipX = scaleX < 0.0;
-            command.flipY = scaleY < 0.0;
+
+            const auto gradientTopLeft = parseCsdRgbaField(*castInfo, "gradient_top_left");
+            const auto gradientBottomLeft = parseCsdRgbaField(*castInfo, "gradient_bottom_left");
+            const auto gradientTopRight = parseCsdRgbaField(*castInfo, "gradient_top_right");
+            const auto gradientBottomRight = parseCsdRgbaField(*castInfo, "gradient_bottom_right");
+            if (gradientTopLeft && gradientBottomLeft && gradientTopRight && gradientBottomRight)
+            {
+                command.gradientTopLeftRgba = *gradientTopLeft;
+                command.gradientBottomLeftRgba = *gradientBottomLeft;
+                command.gradientTopRightRgba = *gradientTopRight;
+                command.gradientBottomRightRgba = *gradientBottomRight;
+                command.gradientKnown = true;
+                command.gradientVarying =
+                    !sameRgba(command.gradientTopLeftRgba, command.gradientBottomLeftRgba) ||
+                    !sameRgba(command.gradientTopLeftRgba, command.gradientTopRightRgba) ||
+                    !sameRgba(command.gradientTopLeftRgba, command.gradientBottomRightRgba) ||
+                    !isDefaultWhiteRgba(command.gradientTopLeftRgba);
+            }
+
+            command.additiveBlend = (command.castFlags & 0x1) != 0;
+            command.linearFiltering = (command.castFlags & 0x1000) != 0;
+            command.flipX = scaleX < 0.0 || (command.castFlags & 0x400) != 0;
+            command.flipY = scaleY < 0.0 || (command.castFlags & 0x800) != 0;
             command.destinationWidth = std::max(1, static_cast<int>(std::llround(std::fabs(static_cast<double>(castWidth) * scaleX))));
             command.destinationHeight = std::max(1, static_cast<int>(std::llround(std::fabs(static_cast<double>(castHeight) * scaleY))));
             command.destinationX = static_cast<int>(std::llround(
@@ -1785,11 +1918,30 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
             for (const auto trackObject : jsonObjectSpansInArray(*subData))
             {
                 ++playback.trackCount;
+                const auto trackType = jsonStringField(trackObject, "track_type").value_or("Unknown");
                 const auto keyframeObjects = jsonArrayFieldSpan(trackObject, "keyframes");
-                if (keyframeObjects)
-                    playback.keyframeCount += static_cast<int>(jsonObjectSpansInArray(*keyframeObjects).size());
+                const int rawKeyframeCount = keyframeObjects
+                    ? static_cast<int>(jsonObjectSpansInArray(*keyframeObjects).size())
+                    : 0;
+                playback.keyframeCount += rawKeyframeCount;
 
                 const auto keyframes = parseCsdTimelineKeyframes(trackObject);
+                const int unresolvedKeyframes = std::max(0, rawKeyframeCount - static_cast<int>(keyframes.size()));
+                if (trackType == "Color")
+                {
+                    ++playback.colorTrackCount;
+                    if (unresolvedKeyframes > 0)
+                        ++playback.packedColorTrackCount;
+                }
+                if (isCsdGradientTrack(trackType))
+                {
+                    ++playback.gradientTrackCount;
+                    if (unresolvedKeyframes > 0)
+                        ++playback.packedGradientTrackCount;
+                }
+                if (isCsdPackedChannelTrack(trackType))
+                    playback.unresolvedPackedKeyframeCount += unresolvedKeyframes;
+
                 const auto sample = sampleCsdTimelineTrack(keyframes, static_cast<double>(playback.sampleFrame));
                 if (!sample)
                     continue;
@@ -1800,7 +1952,7 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
                 trackSample.groupIndex = static_cast<int>(groupIndex);
                 trackSample.castIndex = static_cast<int>(castIndex);
                 trackSample.castName = csdCastNameFor(dictionary, trackSample.groupIndex, trackSample.castIndex);
-                trackSample.trackType = jsonStringField(trackObject, "track_type").value_or("Unknown");
+                trackSample.trackType = trackType;
                 trackSample.sampleFrame = playback.sampleFrame;
                 trackSample.keyframeCount = static_cast<int>(keyframes.size());
                 trackSample.value = *sample;
@@ -2513,10 +2665,15 @@ void drawOutlinedText(
         return false;
     }
 
-    const auto r = static_cast<float>((command.colorArgb >> 16) & 0xFF) / 255.0F;
-    const auto g = static_cast<float>((command.colorArgb >> 8) & 0xFF) / 255.0F;
-    const auto b = static_cast<float>(command.colorArgb & 0xFF) / 255.0F;
-    const auto a = static_cast<float>((command.colorArgb >> 24) & 0xFF) / 255.0F;
+    // Shuriken's CSD reference path treats packed colors as RGBA and multiplies
+    // cast color by per-corner gradients before sampling the texture. GDI+ has
+    // no textured-quad vertex color path, so gradients are averaged here and
+    // reported as an approximation in the Phase 128 manifest.
+    const auto effectiveColor = effectiveCsdDrawRgba(command);
+    const auto r = static_cast<float>(effectiveColor.r) / 255.0F;
+    const auto g = static_cast<float>(effectiveColor.g) / 255.0F;
+    const auto b = static_cast<float>(effectiveColor.b) / 255.0F;
+    const auto a = static_cast<float>(effectiveColor.a) / 255.0F;
     Gdiplus::ColorMatrix matrix = {{
         { r, 0.0F, 0.0F, 0.0F, 0.0F },
         { 0.0F, g, 0.0F, 0.0F, 0.0F },
@@ -2528,6 +2685,12 @@ void drawOutlinedText(
     attributes.SetColorMatrix(&matrix, Gdiplus::ColorMatrixFlagsDefault, Gdiplus::ColorAdjustTypeBitmap);
 
     const auto state = graphics.Save();
+    if (command.flipX || command.flipY)
+    {
+        graphics.TranslateTransform(destination.X + (destination.Width * 0.5F), destination.Y + (destination.Height * 0.5F));
+        graphics.ScaleTransform(command.flipX ? -1.0F : 1.0F, command.flipY ? -1.0F : 1.0F);
+        graphics.TranslateTransform(-(destination.X + (destination.Width * 0.5F)), -(destination.Y + (destination.Height * 0.5F)));
+    }
     if (std::fabs(command.rotation) > 0.000001)
     {
         graphics.TranslateTransform(destination.X + (destination.Width * 0.5F), destination.Y + (destination.Height * 0.5F));
@@ -4100,6 +4263,59 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return color;
 }
 
+[[nodiscard]] Gdiplus::Color bitmapPixelNearest(
+    Gdiplus::Bitmap& bitmap,
+    int sampleX,
+    int sampleY,
+    int gridWidth,
+    int gridHeight,
+    int cropX,
+    int cropY,
+    int cropWidth,
+    int cropHeight)
+{
+    const int safeCropWidth = std::max(1, cropWidth);
+    const int safeCropHeight = std::max(1, cropHeight);
+    const int x = std::clamp(
+        cropX + static_cast<int>(std::llround((static_cast<double>(sampleX) + 0.5) * static_cast<double>(safeCropWidth) / static_cast<double>(gridWidth))),
+        0,
+        std::max(0, static_cast<int>(bitmap.GetWidth()) - 1));
+    const int y = std::clamp(
+        cropY + static_cast<int>(std::llround((static_cast<double>(sampleY) + 0.5) * static_cast<double>(safeCropHeight) / static_cast<double>(gridHeight))),
+        0,
+        std::max(0, static_cast<int>(bitmap.GetHeight()) - 1));
+
+    Gdiplus::Color color;
+    bitmap.GetPixel(x, y, &color);
+    return color;
+}
+
+void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
+{
+    const int nativeWidth = static_cast<int>(native.GetWidth());
+    const int nativeHeight = static_cast<int>(native.GetHeight());
+    stats.nativeAlignmentCropX = 0;
+    stats.nativeAlignmentCropY = 0;
+    stats.nativeAlignmentCropWidth = nativeWidth;
+    stats.nativeAlignmentCropHeight = nativeHeight;
+
+    if (nativeWidth <= 0 || nativeHeight <= 0)
+        return;
+
+    constexpr double kDesignAspect = static_cast<double>(kDesignWidth) / static_cast<double>(kDesignHeight);
+    const double nativeAspect = static_cast<double>(nativeWidth) / static_cast<double>(nativeHeight);
+    if (nativeAspect > kDesignAspect)
+    {
+        stats.nativeAlignmentCropWidth = std::max(1, static_cast<int>(std::llround(static_cast<double>(nativeHeight) * kDesignAspect)));
+        stats.nativeAlignmentCropX = std::max(0, (nativeWidth - stats.nativeAlignmentCropWidth) / 2);
+    }
+    else if (nativeAspect < kDesignAspect)
+    {
+        stats.nativeAlignmentCropHeight = std::max(1, static_cast<int>(std::llround(static_cast<double>(nativeWidth) / kDesignAspect)));
+        stats.nativeAlignmentCropY = std::max(0, (nativeHeight - stats.nativeAlignmentCropHeight) / 2);
+    }
+}
+
 [[nodiscard]] BitmapSignalStats computeBitmapSignalStats(Gdiplus::Bitmap& bitmap)
 {
     BitmapSignalStats stats;
@@ -4141,6 +4357,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 
     stats.nativeFound = true;
     stats.native = computeBitmapSignalStats(*native);
+    nativeAlignmentCrop(*native, stats);
     std::uint64_t totalAbs = 0;
     int maxAbs = 0;
     for (int y = 0; y < stats.sampleGridHeight; ++y)
@@ -4148,7 +4365,16 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
         for (int x = 0; x < stats.sampleGridWidth; ++x)
         {
             const auto left = bitmapPixelNearest(rendered, x, y, stats.sampleGridWidth, stats.sampleGridHeight);
-            const auto right = bitmapPixelNearest(*native, x, y, stats.sampleGridWidth, stats.sampleGridHeight);
+            const auto right = bitmapPixelNearest(
+                *native,
+                x,
+                y,
+                stats.sampleGridWidth,
+                stats.sampleGridHeight,
+                stats.nativeAlignmentCropX,
+                stats.nativeAlignmentCropY,
+                stats.nativeAlignmentCropWidth,
+                stats.nativeAlignmentCropHeight);
             const int dr = std::abs(static_cast<int>(left.GetR()) - static_cast<int>(right.GetR()));
             const int dg = std::abs(static_cast<int>(left.GetG()) - static_cast<int>(right.GetG()));
             const int db = std::abs(static_cast<int>(left.GetB()) - static_cast<int>(right.GetB()));
@@ -4250,14 +4476,27 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     {
         if (command.colorKnown)
             ++comparison.colorCommandCount;
-        if (((command.colorArgb >> 24) & 0xFF) != 0xFF)
+        if (command.colorRgba.a != 0xFF)
             ++comparison.alphaModulatedCommandCount;
+        if (command.gradientKnown)
+            ++comparison.gradientCommandCount;
+        if (command.gradientVarying)
+            ++comparison.gradientApproxCommandCount;
+        if (command.additiveBlend)
+            ++comparison.additiveCommandCount;
+        else
+            ++comparison.normalBlendCommandCount;
+        if (command.linearFiltering)
+            ++comparison.linearFilteringCommandCount;
     }
     if (playback)
     {
+        comparison.packedColorTrackCount = static_cast<std::size_t>(std::max(0, playback->packedColorTrackCount));
+        comparison.packedGradientTrackCount = static_cast<std::size_t>(std::max(0, playback->packedGradientTrackCount));
+        comparison.unresolvedPackedKeyframeCount = static_cast<std::size_t>(std::max(0, playback->unresolvedPackedKeyframeCount));
         for (const auto& sample : playback->samples)
         {
-            if (sample.trackType.starts_with("Gradient"))
+            if (isCsdGradientTrack(sample.trackType))
                 ++comparison.gradientTrackSampleCount;
         }
     }
@@ -4287,7 +4526,7 @@ void writeCsdRenderCompareManifest(
         return;
 
     out << "{\n";
-    out << "  \"phase\": 127,\n";
+    out << "  \"phase\": 128,\n";
     out << "  \"canvas\": { \"width\": " << kDesignWidth << ", \"height\": " << kDesignHeight << " },\n";
     out << "  \"records\": [\n";
     for (std::size_t index = 0; index < comparisons.size(); ++index)
@@ -4305,11 +4544,26 @@ void writeCsdRenderCompareManifest(
         out << "      \"drawCommandCount\": " << comparison.drawCommandCount << ",\n";
         out << "      \"sampledCommandCount\": " << comparison.sampledCommandCount << ",\n";
         out << "      \"textureBindingCount\": " << comparison.textureBindingCount << ",\n";
-        out << "      \"materialSemantics\": { \"blend\": \"source-over\", \"colorCommands\": " << comparison.colorCommandCount
+        out << "      \"materialSemantics\": { \"colorOrder\": \"rgba\", \"blend\": \"src-alpha/inv-src-alpha\", \"additiveBlend\": \"src-alpha/one\", \"colorCommands\": " << comparison.colorCommandCount
             << ", \"alphaModulatedCommands\": " << comparison.alphaModulatedCommandCount
+            << ", \"gradientCommands\": " << comparison.gradientCommandCount
+            << ", \"gradientApproxCommands\": " << comparison.gradientApproxCommandCount
+            << ", \"normalBlendCommands\": " << comparison.normalBlendCommandCount
+            << ", \"additiveCommands\": " << comparison.additiveCommandCount
+            << ", \"linearFilteringCommands\": " << comparison.linearFilteringCommandCount
             << ", \"gradientTrackSamples\": " << comparison.gradientTrackSampleCount << " },\n";
+        out << "      \"channelSemantics\": { \"packedColorTracks\": " << comparison.packedColorTrackCount
+            << ", \"packedGradientTracks\": " << comparison.packedGradientTrackCount
+            << ", \"unresolvedPackedKeyframes\": " << comparison.unresolvedPackedKeyframeCount
+            << ", \"status\": \"packed color/gradient keyframes require raw RGBA extraction before shader-perfect parity\" },\n";
+        out << "      \"nativeAlignment\": { \"mode\": \"" << jsonEscape(comparison.visualDelta.alignmentMode)
+            << "\", \"crop\": { \"x\": " << comparison.visualDelta.nativeAlignmentCropX
+            << ", \"y\": " << comparison.visualDelta.nativeAlignmentCropY
+            << ", \"width\": " << comparison.visualDelta.nativeAlignmentCropWidth
+            << ", \"height\": " << comparison.visualDelta.nativeAlignmentCropHeight << " } },\n";
         out << "      \"visualDelta\": { \"nativeFound\": " << (comparison.visualDelta.nativeFound ? "true" : "false")
-            << ", \"sampleGrid\": \"64x36\", \"sampleCount\": " << comparison.visualDelta.sampleCount
+            << ", \"sampleGrid\": \"64x36\", \"alignment\": \"" << jsonEscape(comparison.visualDelta.alignmentMode)
+            << "\", \"sampleCount\": " << comparison.visualDelta.sampleCount
             << ", \"meanAbsRgb\": " << std::fixed << std::setprecision(3) << comparison.visualDelta.meanAbsRgb
             << ", \"maxAbsRgb\": " << comparison.visualDelta.maxAbsRgb
             << ", \"renderRgbSum\": " << comparison.visualDelta.rendered.rgbSum
@@ -4340,6 +4594,8 @@ void writeCsdRenderCompareManifest(
         << comparison.visualDelta.sampleGridWidth
         << "x"
         << comparison.visualDelta.sampleGridHeight
+        << ":alignment="
+        << comparison.visualDelta.alignmentMode
         << ":mean_abs_rgb="
         << std::fixed
         << std::setprecision(3)
@@ -4358,7 +4614,7 @@ void writeCsdRenderCompareManifest(
     std::size_t templateCount = 0;
     bool failed = false;
     std::vector<CsdRenderedFrameComparison> comparisons;
-    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase127";
+    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase128";
     const auto manifestPath = outputRoot / "csd_render_compare_manifest.json";
 
     Gdiplus::GdiplusStartupInput gdiplusInput{};
@@ -4409,13 +4665,47 @@ void writeCsdRenderCompareManifest(
         std::cout
             << "material_semantics="
             << comparison.templateId
-            << ":blend=source-over"
+            << ":color_order=rgba"
+            << ":blend=src-alpha/inv-src-alpha"
+            << ":additive_blend=src-alpha/one"
             << ":color_commands="
             << comparison.colorCommandCount
             << ":alpha_modulated="
             << comparison.alphaModulatedCommandCount
+            << ":gradients="
+            << comparison.gradientCommandCount
+            << ":gradient_average_approx="
+            << comparison.gradientApproxCommandCount
+            << ":additive_commands="
+            << comparison.additiveCommandCount
+            << ":linear_filter_commands="
+            << comparison.linearFilteringCommandCount
             << ":gradient_samples="
             << comparison.gradientTrackSampleCount
+            << '\n';
+        std::cout
+            << "channel_semantics="
+            << comparison.templateId
+            << ":packed_color_tracks="
+            << comparison.packedColorTrackCount
+            << ":packed_gradient_tracks="
+            << comparison.packedGradientTrackCount
+            << ":unresolved_packed_keyframes="
+            << comparison.unresolvedPackedKeyframeCount
+            << '\n';
+        std::cout
+            << "native_alignment="
+            << comparison.templateId
+            << ":mode="
+            << comparison.visualDelta.alignmentMode
+            << ":crop="
+            << comparison.visualDelta.nativeAlignmentCropX
+            << ","
+            << comparison.visualDelta.nativeAlignmentCropY
+            << ","
+            << comparison.visualDelta.nativeAlignmentCropWidth
+            << "x"
+            << comparison.visualDelta.nativeAlignmentCropHeight
             << '\n';
         std::cout << formatVisualDeltaLine(comparison) << '\n';
         std::cout

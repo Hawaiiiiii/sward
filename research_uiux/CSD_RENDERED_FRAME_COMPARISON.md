@@ -6,6 +6,9 @@
 
 Phase 127 adds the first hard pixel-output loop to the local SU UI pipeline viewer.
 
+> [!NOTE]
+> Phase 128 keeps this command but upgrades the active output lane to `out/csd_render_compare/phase128/` with RGBA color order, cast-flag material semantics, packed channel blockers, and 16:9 native-crop alignment. See `CSD_MATERIAL_CHANNEL_ALIGNMENT.md`.
+
 The new command is:
 
 ```powershell

@@ -145,6 +145,13 @@ def parse_cast_info(view: BinaryView, offset: int, endian: str) -> dict[str, Any
         ],
         "subimage": round_float(view.f32(offset + 24, endian)),
         "color": f"0x{view.u32(offset + 28, endian):08X}",
+        "gradient_top_left": f"0x{view.u32(offset + 32, endian):08X}",
+        "gradient_bottom_left": f"0x{view.u32(offset + 36, endian):08X}",
+        "gradient_top_right": f"0x{view.u32(offset + 40, endian):08X}",
+        "gradient_bottom_right": f"0x{view.u32(offset + 44, endian):08X}",
+        "field30": view.u32(offset + 48, endian),
+        "field34": view.u32(offset + 52, endian),
+        "field38": view.u32(offset + 56, endian),
     }
 
 
