@@ -351,7 +351,7 @@ class SuUiAssetRendererTests(unittest.TestCase):
         )
 
         self.assertIn("sward_su_ui_asset_renderer smoke ok", completed.stdout)
-        self.assertIn("screens=8", completed.stdout)
+        self.assertIn("screens=10", completed.stdout)
         self.assertIn("casts=20", completed.stdout)
         self.assertIn("textures=20", completed.stdout)
         self.assertIn("full_screen_casts=1", completed.stdout)
@@ -779,6 +779,24 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("phase137-ui_playscreen-policy", source_text)
         self.assertIn("compact-reference-status", source_text)
 
+    def test_renderer_source_wires_phase139_reference_viewer_lanes_and_compare(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("RendererScreenKind::CsdReferencePipeline", source_text)
+        self.assertIn("CsdReferenceViewerLane", source_text)
+        self.assertIn("renderCsdReferenceViewerLane", source_text)
+        self.assertIn("renderCsdReferenceViewerOverlay", source_text)
+        self.assertIn("runRendererReferenceLanesSmoke", source_text)
+        self.assertIn("runViewerRenderCompareSmoke", source_text)
+        self.assertIn("--renderer-reference-lanes-smoke", source_text)
+        self.assertIn("--viewer-render-compare-smoke", source_text)
+        self.assertIn("phase139-reference-viewer", source_text)
+        self.assertIn("viewer_render_compare", source_text)
+        self.assertIn("TitleOptionsReference", source_text)
+        self.assertIn("PauseMenuReference", source_text)
+        self.assertIn("ui_pause.yncp", source_text)
+        self.assertIn("title-options", source_text)
+        self.assertIn("compact-reference-status:no-template-card=1", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -802,6 +820,60 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("render_scene=add/u_info:local_scene=u_info:slot=prompt_strip:order=120:commands=5", completed.stdout)
         self.assertIn("viewer_overlay=compact-reference-status:no-template-card=1", completed.stdout)
 
+    def test_renderer_reference_lanes_smoke_reports_no_proxy_card_viewers(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-reference-lanes-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer reference lanes smoke ok", completed.stdout)
+        self.assertIn("reference_lane=title-menu:screen=MainMenuComposite:layout=ui_mainmenu.yncp:scenes=3", completed.stdout)
+        self.assertIn("reference_lane=loading:screen=LoadingComposite:layout=ui_loading.yncp:scenes=2", completed.stdout)
+        self.assertIn("reference_lane=title-options:screen=TitleOptionsReference:layout=ui_mainmenu.yncp:scenes=2", completed.stdout)
+        self.assertIn("reference_lane=pause:screen=PauseMenuReference:layout=ui_pause.yncp:scenes=8", completed.stdout)
+        self.assertIn("reference_scene=title-menu:mm_bg_usual:commands=36", completed.stdout)
+        self.assertIn("reference_scene=loading:pda:commands=28", completed.stdout)
+        self.assertIn("reference_scene=title-options:mm_contentsitem_select", completed.stdout)
+        self.assertIn("reference_scene=pause:bg:commands=0", completed.stdout)
+        self.assertIn("reference_scene=pause:bg_1:commands=9", completed.stdout)
+        self.assertIn("reference_overlay=compact-reference-status:no-template-card=1", completed.stdout)
+
+    def test_renderer_viewer_compare_smoke_writes_offscreen_viewer_frames(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--viewer-render-compare-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer viewer render compare smoke ok", completed.stdout)
+        self.assertIn("viewer_compare_manifest=out/viewer_render_compare/phase139/viewer_render_compare_manifest.json", completed.stdout)
+        self.assertIn("viewer_frame_path=title-menu:out/viewer_render_compare/phase139/title-menu_viewer.bmp", completed.stdout)
+        self.assertIn("viewer_frame_path=loading:out/viewer_render_compare/phase139/loading_viewer.bmp", completed.stdout)
+        self.assertIn("viewer_frame_path=title-options:out/viewer_render_compare/phase139/title-options_viewer.bmp", completed.stdout)
+        self.assertIn("viewer_frame_path=pause:out/viewer_render_compare/phase139/pause_viewer.bmp", completed.stdout)
+        self.assertIn("viewer_visual_delta=title-menu:native=found:sample_grid=64x36", completed.stdout)
+        self.assertIn("viewer_visual_delta=loading:native=found:sample_grid=64x36", completed.stdout)
+        self.assertRegex(completed.stdout, r"viewer_visual_delta=title-options:native=(found|missing):sample_grid=64x36")
+        self.assertRegex(completed.stdout, r"viewer_visual_delta=pause:native=(found|missing):sample_grid=64x36")
+        self.assertIn("viewer_render_source=title-menu:screen=MainMenuComposite:scenes=3", completed.stdout)
+        self.assertIn("viewer_render_source=pause:screen=PauseMenuReference:scenes=8", completed.stdout)
+        self.assertIn("operator_overlay=compact-reference-status:excluded_from_native_compare=1", completed.stdout)
+
     def test_renderer_navigation_smoke_reports_interactive_catalog(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -816,13 +888,15 @@ class SuUiAssetRendererTests(unittest.TestCase):
         )
 
         self.assertIn("sward_su_ui_asset_renderer navigation smoke ok", completed.stdout)
-        self.assertIn("screens=8", completed.stdout)
+        self.assertIn("screens=10", completed.stdout)
         self.assertIn("controls=5", completed.stdout)
         self.assertIn("first=TitleLoopReconstruction", completed.stdout)
         self.assertIn("last=SonicStageHud", completed.stdout)
-        self.assertIn("label=1/8 TitleLoopReconstruction - Title Loop Reconstructed", completed.stdout)
+        self.assertIn("label=1/10 TitleLoopReconstruction - Title Loop Reconstructed", completed.stdout)
         self.assertIn("screen=TitleLoopReconstruction:casts=4:contract=title_menu_reference.json", completed.stdout)
         self.assertIn("screen=MainMenuComposite:casts=3:contract=title_menu_reference.json", completed.stdout)
+        self.assertIn("screen=TitleOptionsReference:casts=0:contract=title_menu_reference.json", completed.stdout)
+        self.assertIn("screen=PauseMenuReference:casts=0:contract=pause_menu_reference.json", completed.stdout)
         self.assertIn("screen=VisualAtlasGallery:casts=0:contract=visual_atlas/atlas_index.json", completed.stdout)
 
     def test_renderer_atlas_gallery_smoke_reports_local_sheet_inventory(self) -> None:

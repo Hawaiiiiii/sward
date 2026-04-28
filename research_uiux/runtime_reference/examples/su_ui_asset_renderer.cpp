@@ -86,6 +86,7 @@ enum class RendererScreenKind
     AtlasGallery,
     TitleLoopReconstruction,
     SonicHudReconstruction,
+    CsdReferencePipeline,
     SonicHudReferencePipeline,
 };
 
@@ -153,6 +154,21 @@ struct CsdPipelineTemplateBinding
     std::string_view primarySceneName;
     std::string_view timelineSceneName;
     std::string_view timelineAnimationName;
+};
+
+struct CsdReferenceViewerLane
+{
+    std::string_view laneId;
+    std::string_view rendererScreenId;
+    std::string_view contractFileName;
+    std::string_view nativeTargetId;
+    const CsdPipelineTemplateBinding* scenes = nullptr;
+    std::size_t sceneCount = 0;
+    const SgfxPlaceholderAssetSlot* slots = nullptr;
+    std::size_t slotCount = 0;
+    std::string_view requiredEventId;
+    std::string_view timelineBandId;
+    std::string_view timelineEventLabel;
 };
 
 struct CsdColorRgba
@@ -601,9 +617,10 @@ struct CsdSoftwareRenderStats
     CsdSamplerStats samplerStats;
 };
 
-inline constexpr std::array<TextureSourceCandidate, 25> kTextureSourceCandidates{{
+inline constexpr std::array<TextureSourceCandidate, 32> kTextureSourceCandidates{{
     { "mat_load_comon_001.dds", "ui_extended_archives/Loading/mat_load_comon_001.dds" },
     { "mat_load_en_001.dds", "ui_broader_archives/Languages/English/Loading/mat_load_en_001.dds" },
+    { "mat_load_en_002.dds", "ui_broader_archives/Languages/English/Loading/mat_load_en_002.dds" },
     { "mat_comon_txt_001.dds", "ui_extended_archives/Loading/mat_comon_txt_001.dds" },
     { "OPmovie_titlelogo_EN.decompressed.dds", "runtime_previews/title/decompressed/OPmovie_titlelogo_EN.decompressed.dds" },
     { "ui_mm_base.dds", "ui_frontend_archives/MainMenu/ui_mm_base.dds" },
@@ -621,9 +638,15 @@ inline constexpr std::array<TextureSourceCandidate, 25> kTextureSourceCandidates
     { "mat_hit_001.dds", "phase135_ui_playscreen_probe/Sonic/mat_hit_001.dds" },
     { "mat_comon_num_001.dds", "ui_extended_archives/SystemCommonCore/mat_comon_num_001.dds" },
     { "mat_comon_001.dds", "ui_extended_archives/SystemCommonCore/mat_comon_001.dds" },
+    { "mat_comon_x360_001.dds", "ui_extended_archives/SystemCommonCore/mat_comon_x360_001.dds" },
+    { "mat_comon_en_001.dds", "ui_broader_archives/Languages/English/SystemCommonCore/mat_comon_en_001.dds" },
     { "mat_comon_002.dds", "phase135_ui_playscreen_probe/SystemCommonCore/mat_comon_002.dds" },
     { "mat_comon_003.dds", "phase135_ui_playscreen_probe/SystemCommonCore/mat_comon_003.dds" },
     { "mat_comon_004.dds", "phase135_ui_playscreen_probe/SystemCommonCore/mat_comon_004.dds" },
+    { "mat_result_comon_001.dds", "ui_extended_archives/SystemCommonCore/mat_result_comon_001.dds" },
+    { "mat_pause_en_001.dds", "ui_broader_archives/Languages/English/SystemCommonCore/mat_pause_en_001.dds" },
+    { "mat_pause_en_002.dds", "ui_broader_archives/Languages/English/SystemCommonCore/mat_pause_en_002.dds" },
+    { "mat_ex_common_002.dds", "ui_extended_archives/SystemCommonCore/mat_ex_common_002.dds" },
     { "ui_ps1_gauge1.dds", "phase16_support_archives/ExStageTails_Common/ui_ps1_gauge1.dds" },
     { "mat_playscreen_001.dds", "phase16_support_archives/ExStageTails_Common/mat_playscreen_001.dds" },
     { "mat_playscreen_en_001.dds", "phase25_commonflow_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds" },
@@ -700,7 +723,21 @@ inline constexpr std::array<SgfxPlaceholderAssetSlot, 4> kTutorialTemplateSlots{
     { "host_context_readout", "mat_comon_num_001.dds", "SonicHudGuide/ui_playscreen prompt CSD" },
 }};
 
-inline constexpr std::array<SgfxTemplateRenderBinding, 4> kSgfxTemplateRenderBindings{{
+inline constexpr std::array<SgfxPlaceholderAssetSlot, 4> kTitleOptionsTemplateSlots{{
+    { "backdrop", "ui_mm_base.dds", "ui_mainmenu title/options CSD" },
+    { "option_carousel", "ui_mm_contentstext.dds", "ui_mainmenu title/options CSD" },
+    { "option_cursor", "ui_mm_parts1.dds", "ui_mainmenu title/options CSD" },
+    { "prompt_glyphs", "mat_start_en_001.dds", "ui_mainmenu title/options prompt CSD" },
+}};
+
+inline constexpr std::array<SgfxPlaceholderAssetSlot, 4> kPauseTemplateSlots{{
+    { "pause_backdrop", "mat_pause_en_001.dds", "ui_pause pause CSD" },
+    { "pause_chrome", "mat_pause_en_002.dds", "ui_pause pause CSD" },
+    { "pause_content", "mat_comon_001.dds", "ui_pause pause CSD" },
+    { "prompt_strip", "mat_ex_common_002.dds", "ui_pause pause CSD" },
+}};
+
+inline constexpr std::array<SgfxTemplateRenderBinding, 6> kSgfxTemplateRenderBindings{{
     {
         "title-menu",
         "MainMenuComposite",
@@ -737,6 +774,24 @@ inline constexpr std::array<SgfxTemplateRenderBinding, 4> kSgfxTemplateRenderBin
         "hud_in",
         "tutorial-ready",
     },
+    {
+        "title-options",
+        "TitleOptionsReference",
+        kTitleOptionsTemplateSlots.data(),
+        kTitleOptionsTemplateSlots.size(),
+        "title-options-ready",
+        "select_travel",
+        "title options visual ready",
+    },
+    {
+        "pause",
+        "PauseMenuReference",
+        kPauseTemplateSlots.data(),
+        kPauseTemplateSlots.size(),
+        "pause-ready",
+        "intro_medium",
+        "pause menu visual ready",
+    },
 }};
 
 inline constexpr std::array<CsdPipelineTemplateBinding, 4> kCsdPipelineTemplateBindings{{
@@ -770,7 +825,89 @@ inline constexpr std::array<CsdPipelineTemplateBinding, 4> kCsdPipelineTemplateB
     },
 }};
 
-inline const std::array<SuUiRendererScreen, 8> kRendererScreens{{
+inline constexpr std::array<CsdPipelineTemplateBinding, 3> kTitleMenuReferenceViewerScenes{{
+    { "title-menu", "ui_mainmenu.yncp", "mm_bg_usual", "mm_donut_move", "DefaultAnim" },
+    { "title-menu", "ui_mainmenu.yncp", "mm_donut_move", "mm_donut_move", "DefaultAnim" },
+    { "title-menu", "ui_mainmenu.yncp", "mm_contentsitem_select", "mm_contentsitem_select", "DefaultAnim" },
+}};
+
+inline constexpr std::array<CsdPipelineTemplateBinding, 2> kLoadingReferenceViewerScenes{{
+    { "loading", "ui_loading.yncp", "pda", "pda_txt", "Usual_Anim_3" },
+    { "loading", "ui_loading.yncp", "pda_txt", "pda_txt", "Usual_Anim_3" },
+}};
+
+inline constexpr std::array<CsdPipelineTemplateBinding, 2> kTitleOptionsReferenceViewerScenes{{
+    { "title-options", "ui_mainmenu.yncp", "mm_bg_usual", "mm_donut_move", "DefaultAnim" },
+    { "title-options", "ui_mainmenu.yncp", "mm_contentsitem_select", "mm_contentsitem_select", "DefaultAnim" },
+}};
+
+inline constexpr std::array<CsdPipelineTemplateBinding, 8> kPauseReferenceViewerScenes{{
+    { "pause", "ui_pause.yncp", "bg", "bg", "Intro_Anim" },
+    { "pause", "ui_pause.yncp", "bg_1", "bg_1", "Intro_Anim" },
+    { "pause", "ui_pause.yncp", "bg_1_select", "bg_1_select", "Intro_Anim" },
+    { "pause", "ui_pause.yncp", "bg_2", "bg_2", "Intro_Anim" },
+    { "pause", "ui_pause.yncp", "text_area", "text_area", "Intro_Anim" },
+    { "pause", "ui_pause.yncp", "skill_select", "skill_select", "Intro_Anim" },
+    { "pause", "ui_pause.yncp", "arrow", "arrow", "Intro_Anim" },
+    { "pause", "ui_pause.yncp", "skill_scroll_bar_bg", "skill_scroll_bar_bg", "Intro_Anim" },
+}};
+
+inline constexpr std::array<CsdReferenceViewerLane, 4> kCsdReferenceViewerLanes{{
+    {
+        "title-menu",
+        "MainMenuComposite",
+        "title_menu_reference.json",
+        "title-menu",
+        kTitleMenuReferenceViewerScenes.data(),
+        kTitleMenuReferenceViewerScenes.size(),
+        kTitleMenuTemplateSlots.data(),
+        kTitleMenuTemplateSlots.size(),
+        "title-menu-visible",
+        "select_travel",
+        "title menu visual ready",
+    },
+    {
+        "loading",
+        "LoadingComposite",
+        "loading_transition_reference.json",
+        "loading",
+        kLoadingReferenceViewerScenes.data(),
+        kLoadingReferenceViewerScenes.size(),
+        kLoadingTemplateSlots.data(),
+        kLoadingTemplateSlots.size(),
+        "loading-display-active",
+        "pda_intro",
+        "loading display active",
+    },
+    {
+        "title-options",
+        "TitleOptionsReference",
+        "title_menu_reference.json",
+        "title-options",
+        kTitleOptionsReferenceViewerScenes.data(),
+        kTitleOptionsReferenceViewerScenes.size(),
+        kTitleOptionsTemplateSlots.data(),
+        kTitleOptionsTemplateSlots.size(),
+        "title-options-ready",
+        "select_travel",
+        "title options visual ready",
+    },
+    {
+        "pause",
+        "PauseMenuReference",
+        "pause_menu_reference.json",
+        "pause",
+        kPauseReferenceViewerScenes.data(),
+        kPauseReferenceViewerScenes.size(),
+        kPauseTemplateSlots.data(),
+        kPauseTemplateSlots.size(),
+        "pause-ready",
+        "intro_medium",
+        "pause menu visual ready",
+    },
+}};
+
+inline const std::array<SuUiRendererScreen, 10> kRendererScreens{{
     {
         "TitleLoopReconstruction",
         "Title Loop Reconstructed",
@@ -805,6 +942,7 @@ inline const std::array<SuUiRendererScreen, 8> kRendererScreens{{
         kLoadingCompositeCasts.data(),
         kLoadingCompositeCasts.size(),
         Gdiplus::Color(255, 0, 0, 0),
+        RendererScreenKind::CsdReferencePipeline,
     },
     {
         "MainMenuComposite",
@@ -813,6 +951,25 @@ inline const std::array<SuUiRendererScreen, 8> kRendererScreens{{
         kMainMenuCompositeCasts.data(),
         kMainMenuCompositeCasts.size(),
         Gdiplus::Color(255, 0, 0, 0),
+        RendererScreenKind::CsdReferencePipeline,
+    },
+    {
+        "TitleOptionsReference",
+        "Title Options CSD Reference",
+        "title_menu_reference.json",
+        nullptr,
+        0,
+        Gdiplus::Color(255, 0, 0, 0),
+        RendererScreenKind::CsdReferencePipeline,
+    },
+    {
+        "PauseMenuReference",
+        "Pause Menu CSD Reference",
+        "pause_menu_reference.json",
+        nullptr,
+        0,
+        Gdiplus::Color(255, 0, 0, 0),
+        RendererScreenKind::CsdReferencePipeline,
     },
     {
         "SonicTitleMenu",
@@ -872,6 +1029,30 @@ inline const std::array<SuUiRendererScreen, 8> kRendererScreens{{
             return binding.templateId == templateId;
         });
     return found == kCsdPipelineTemplateBindings.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] const CsdReferenceViewerLane* findCsdReferenceViewerLaneById(std::string_view laneId)
+{
+    const auto found = std::find_if(
+        kCsdReferenceViewerLanes.begin(),
+        kCsdReferenceViewerLanes.end(),
+        [laneId](const CsdReferenceViewerLane& lane)
+        {
+            return lane.laneId == laneId;
+        });
+    return found == kCsdReferenceViewerLanes.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] const CsdReferenceViewerLane* findCsdReferenceViewerLaneByScreenId(std::string_view screenId)
+{
+    const auto found = std::find_if(
+        kCsdReferenceViewerLanes.begin(),
+        kCsdReferenceViewerLanes.end(),
+        [screenId](const CsdReferenceViewerLane& lane)
+        {
+            return lane.rendererScreenId == screenId;
+        });
+    return found == kCsdReferenceViewerLanes.end() ? nullptr : &*found;
 }
 
 [[nodiscard]] const SuUiRendererScreen* rendererScreenById(std::string_view id)
@@ -4022,6 +4203,136 @@ void renderSgfxTemplatePlaceholderScreen(
     return true;
 }
 
+struct CsdReferenceViewerSceneStats
+{
+    std::string layoutFileName;
+    std::string sceneName;
+    std::size_t commandCount = 0;
+    std::size_t drawnCommandCount = 0;
+    std::size_t textureCount = 0;
+    std::vector<std::string> textureNames;
+};
+
+struct CsdReferenceViewerStats
+{
+    std::size_t sceneCount = 0;
+    std::size_t commandCount = 0;
+    std::size_t drawnCommandCount = 0;
+    std::size_t textureCount = 0;
+    std::vector<CsdReferenceViewerSceneStats> scenes;
+};
+
+void appendUniqueTextureName(std::vector<std::string>& names, std::string_view textureName)
+{
+    if (textureName.empty())
+        return;
+    if (std::find(names.begin(), names.end(), textureName) == names.end())
+        names.emplace_back(textureName);
+}
+
+[[nodiscard]] CsdReferenceViewerStats renderCsdReferenceViewerLane(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    SwardSuUiAssetRenderer& renderer,
+    const CsdReferenceViewerLane& lane)
+{
+    CsdReferenceViewerStats stats;
+    stats.sceneCount = lane.sceneCount;
+    std::vector<std::string> laneTextures;
+
+    for (std::size_t sceneIndex = 0; sceneIndex < lane.sceneCount; ++sceneIndex)
+    {
+        const auto& sceneBinding = lane.scenes[sceneIndex];
+        CsdReferenceViewerSceneStats sceneStats;
+        sceneStats.layoutFileName = std::string(sceneBinding.layoutFileName);
+        sceneStats.sceneName = std::string(sceneBinding.primarySceneName);
+
+        const auto* scene = cachedCsdDrawableScene(sceneBinding);
+        if (scene)
+        {
+            sceneStats.commandCount = scene->commands.size();
+            std::vector<std::string> sceneTextures;
+            for (const auto& command : scene->commands)
+            {
+                appendUniqueTextureName(sceneTextures, command.textureName);
+                appendUniqueTextureName(laneTextures, command.textureName);
+                if (drawCsdDrawableCommand(graphics, canvas, renderer, command))
+                    ++sceneStats.drawnCommandCount;
+            }
+            sceneStats.textureCount = sceneTextures.size();
+            sceneStats.textureNames = std::move(sceneTextures);
+        }
+
+        stats.commandCount += sceneStats.commandCount;
+        stats.drawnCommandCount += sceneStats.drawnCommandCount;
+        stats.scenes.push_back(std::move(sceneStats));
+    }
+
+    stats.textureCount = laneTextures.size();
+    return stats;
+}
+
+void renderCsdReferenceViewerOverlay(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    const CsdReferenceViewerLane& lane,
+    const CsdReferenceViewerStats& stats)
+{
+    const auto panel = designRectToCanvas(canvas, 20, 20, 710, 94);
+    Gdiplus::SolidBrush panelFill(Gdiplus::Color(172, 4, 8, 12));
+    Gdiplus::Pen panelEdge(Gdiplus::Color(210, 120, 230, 140), std::max(1.0F, 2.0F * (canvas.Width / static_cast<float>(kDesignWidth))));
+    graphics.FillRectangle(&panelFill, panel);
+    graphics.DrawRectangle(&panelEdge, panel);
+
+    const std::string_view firstLayout = lane.sceneCount == 0 ? std::string_view("none") : lane.scenes[0].layoutFileName;
+    std::ostringstream title;
+    title
+        << "phase139-reference-viewer | lane=" << lane.laneId
+        << " | screen=" << lane.rendererScreenId;
+
+    std::ostringstream source;
+    source
+        << "layout=" << firstLayout
+        << ":event=" << lane.requiredEventId
+        << ":timeline=" << lane.timelineBandId
+        << " -> " << lane.timelineEventLabel;
+
+    std::ostringstream counts;
+    counts
+        << "compact-reference-status scenes=" << stats.sceneCount
+        << " commands=" << stats.commandCount
+        << " drawn=" << stats.drawnCommandCount
+        << " textures=" << stats.textureCount
+        << " no-template-card=1";
+
+    drawOutlinedText(graphics, canvas, title.str(), 34, 30, 16, Gdiplus::Color(255, 245, 250, 255), Gdiplus::Color(255, 0, 0, 0));
+    drawOutlinedText(graphics, canvas, source.str(), 34, 54, 14, Gdiplus::Color(255, 220, 255, 205), Gdiplus::Color(255, 0, 0, 0));
+    drawOutlinedText(graphics, canvas, counts.str(), 34, 78, 14, Gdiplus::Color(255, 224, 236, 255), Gdiplus::Color(255, 0, 0, 0));
+}
+
+[[nodiscard]] std::unique_ptr<Gdiplus::Bitmap> renderCsdReferenceViewerBitmap(
+    const CsdReferenceViewerLane& lane,
+    bool includeOperatorOverlay,
+    CsdReferenceViewerStats& stats)
+{
+    auto bitmap = std::make_unique<Gdiplus::Bitmap>(kDesignWidth, kDesignHeight, PixelFormat32bppARGB);
+    if (!bitmap || bitmap->GetLastStatus() != Gdiplus::Ok)
+        return nullptr;
+
+    Gdiplus::Graphics graphics(bitmap.get());
+    graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+    Gdiplus::SolidBrush clearBrush(Gdiplus::Color(255, 0, 0, 0));
+    graphics.FillRectangle(&clearBrush, 0, 0, kDesignWidth, kDesignHeight);
+
+    SwardSuUiAssetRenderer renderer;
+    const Gdiplus::RectF canvas(0.0F, 0.0F, static_cast<Gdiplus::REAL>(kDesignWidth), static_cast<Gdiplus::REAL>(kDesignHeight));
+    stats = renderCsdReferenceViewerLane(graphics, canvas, renderer, lane);
+    if (includeOperatorOverlay)
+        renderCsdReferenceViewerOverlay(graphics, canvas, lane, stats);
+    return bitmap;
+}
+
 [[nodiscard]] bool isSonicHudReferenceViewerBinding(const SgfxTemplateRenderBinding& binding)
 {
     return binding.templateId == "sonic-hud" || binding.templateId == "tutorial";
@@ -4256,16 +4567,28 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     const bool useSonicHudReferenceViewer =
         screen.kind == RendererScreenKind::SonicHudReferencePipeline
         || (binding && isSonicHudReferenceViewerBinding(*binding));
+    const auto* referenceLane = !useSonicHudReferenceViewer
+        ? (binding
+            ? findCsdReferenceViewerLaneById(binding->templateId)
+            : findCsdReferenceViewerLaneByScreenId(screen.id))
+        : nullptr;
     const auto sonicHudReferenceStats = useSonicHudReferenceViewer
         ? std::optional<SonicHudReferenceViewerStats>(renderSonicHudReferencePolicyStack(graphics, canvas, renderer, binding))
         : std::nullopt;
-    const bool renderedCsdDrawableScene = !useSonicHudReferenceViewer && binding
+    const auto referenceLaneStats = referenceLane
+        ? std::optional<CsdReferenceViewerStats>(renderCsdReferenceViewerLane(graphics, canvas, renderer, *referenceLane))
+        : std::nullopt;
+    const bool renderedCsdDrawableScene = !useSonicHudReferenceViewer && !referenceLane && binding
         ? renderCsdDrawableScene(graphics, canvas, renderer, *binding)
         : false;
 
     if (useSonicHudReferenceViewer)
     {
         // The Sonic HUD lane is now driven by the Phase 137 ui_playscreen scene policy stack.
+    }
+    else if (referenceLane)
+    {
+        // Phase 139 exact viewer lanes render recovered CSD scene stacks directly.
     }
     else if (renderedCsdDrawableScene)
     {
@@ -4294,6 +4617,10 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     if (useSonicHudReferenceViewer && sonicHudReferenceStats)
     {
         renderSonicHudReferenceViewerOverlay(graphics, canvas, binding, *sonicHudReferenceStats);
+    }
+    else if (referenceLane && referenceLaneStats)
+    {
+        renderCsdReferenceViewerOverlay(graphics, canvas, *referenceLane, *referenceLaneStats);
     }
     else if (binding)
     {
@@ -4698,6 +5025,66 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 
     std::cout << "viewer_overlay=compact-reference-status:no-template-card=1\n";
     return failed || resolvedScenes != static_cast<int>(policies.size()) ? 1 : 0;
+}
+
+[[nodiscard]] int runRendererReferenceLanesSmoke()
+{
+    bool failed = false;
+    std::vector<std::pair<std::string, CsdReferenceViewerStats>> laneStats;
+
+    Gdiplus::GdiplusStartupInput gdiplusInput{};
+    ULONG_PTR gdiplusToken = 0;
+    if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr) != Gdiplus::Ok)
+        return 1;
+
+    for (const auto& lane : kCsdReferenceViewerLanes)
+    {
+        CsdReferenceViewerStats stats;
+        const auto bitmap = renderCsdReferenceViewerBitmap(lane, false, stats);
+        if (!bitmap || stats.commandCount == 0)
+            failed = true;
+        laneStats.emplace_back(std::string(lane.laneId), std::move(stats));
+    }
+
+    std::cout
+        << "sward_su_ui_asset_renderer reference lanes smoke ok "
+        << "mode=phase139-reference-viewer"
+        << " lanes=" << kCsdReferenceViewerLanes.size()
+        << '\n';
+
+    for (std::size_t laneIndex = 0; laneIndex < kCsdReferenceViewerLanes.size(); ++laneIndex)
+    {
+        const auto& lane = kCsdReferenceViewerLanes[laneIndex];
+        const auto& stats = laneStats[laneIndex].second;
+        const auto layout = lane.sceneCount == 0 ? std::string_view("none") : lane.scenes[0].layoutFileName;
+        std::cout
+            << "reference_lane=" << lane.laneId
+            << ":screen=" << lane.rendererScreenId
+            << ":layout=" << layout
+            << ":scenes=" << stats.sceneCount
+            << ":commands=" << stats.commandCount
+            << ":drawn=" << stats.drawnCommandCount
+            << ":textures=" << stats.textureCount
+            << ":event=" << lane.requiredEventId
+            << ":overlay=compact-reference-status:no-template-card=1"
+            << '\n';
+
+        for (const auto& scene : stats.scenes)
+        {
+            std::cout
+                << "reference_scene=" << lane.laneId
+                << ":" << scene.sceneName
+                << ":commands=" << scene.commandCount
+                << ":drawn=" << scene.drawnCommandCount
+                << ":textures=" << scene.textureCount
+                << ":texture_names=" << joinStrings(scene.textureNames)
+                << '\n';
+        }
+    }
+
+    std::cout << "reference_overlay=compact-reference-status:no-template-card=1\n";
+    Gdiplus::GdiplusShutdown(gdiplusToken);
+    return failed ? 1 : 0;
 }
 
 [[nodiscard]] const sward::ui_runtime::SgfxTimelineBand* findTimelineBand(
@@ -7167,6 +7554,186 @@ void writeCsdRenderCompareManifest(
     return descriptor.str();
 }
 
+struct CsdReferenceViewerFrameComparison
+{
+    std::string laneId;
+    std::string rendererScreenId;
+    std::string contractFileName;
+    std::filesystem::path viewerFramePath;
+    std::filesystem::path diffFramePath;
+    std::optional<std::filesystem::path> nativeBestPath;
+    CsdReferenceViewerStats stats;
+    BitmapComparisonStats visualDelta;
+};
+
+[[nodiscard]] CsdReferenceViewerFrameComparison renderCsdReferenceViewerFrameComparison(
+    const CsdReferenceViewerLane& lane,
+    const std::filesystem::path& outputRoot)
+{
+    CsdReferenceViewerFrameComparison comparison;
+    comparison.laneId = std::string(lane.laneId);
+    comparison.rendererScreenId = std::string(lane.rendererScreenId);
+    comparison.contractFileName = std::string(lane.contractFileName);
+    comparison.viewerFramePath = outputRoot / (std::string(lane.laneId) + "_viewer.bmp");
+    comparison.diffFramePath = outputRoot / (std::string(lane.laneId) + "_viewer_diff.bmp");
+
+    CsdReferenceViewerStats stats;
+    auto bitmap = renderCsdReferenceViewerBitmap(lane, false, stats);
+    comparison.stats = std::move(stats);
+    comparison.nativeBestPath = findNativeBestBmpPathForTarget(lane.nativeTargetId);
+    if (bitmap)
+    {
+        const std::vector<std::uint8_t> emptyCoverageMask;
+        const auto uiLayerDiffPath = outputRoot / (std::string(lane.laneId) + "_viewer_ui_layer_diff.bmp");
+        comparison.visualDelta = computeBitmapComparisonStats(
+            *bitmap,
+            comparison.nativeBestPath,
+            comparison.diffFramePath,
+            emptyCoverageMask,
+            uiLayerDiffPath);
+        if (!saveBitmapAsBmp(*bitmap, comparison.viewerFramePath))
+            comparison.viewerFramePath.clear();
+    }
+
+    return comparison;
+}
+
+void writeViewerRenderCompareManifest(
+    const std::filesystem::path& manifestPath,
+    const std::vector<CsdReferenceViewerFrameComparison>& comparisons)
+{
+    std::error_code error;
+    std::filesystem::create_directories(manifestPath.parent_path(), error);
+    std::ofstream out(manifestPath, std::ios::binary);
+    if (!out)
+        return;
+
+    out << "{\n";
+    out << "  \"phase\": 139,\n";
+    out << "  \"mode\": \"phase139-reference-viewer\",\n";
+    out << "  \"operatorOverlay\": { \"mode\": \"compact-reference-status\", \"excludedFromNativeCompare\": true },\n";
+    out << "  \"canvas\": { \"width\": " << kDesignWidth << ", \"height\": " << kDesignHeight << " },\n";
+    out << "  \"records\": [\n";
+    for (std::size_t index = 0; index < comparisons.size(); ++index)
+    {
+        const auto& comparison = comparisons[index];
+        out << "    {\n";
+        out << "      \"lane\": \"" << jsonEscape(comparison.laneId) << "\",\n";
+        out << "      \"screen\": \"" << jsonEscape(comparison.rendererScreenId) << "\",\n";
+        out << "      \"contract\": \"" << jsonEscape(comparison.contractFileName) << "\",\n";
+        out << "      \"viewerFramePath\": \"" << jsonEscape(portablePath(comparison.viewerFramePath)) << "\",\n";
+        out << "      \"diffFramePath\": \"" << jsonEscape(portablePath(comparison.diffFramePath)) << "\",\n";
+        out << "      \"nativeBestPath\": \"" << jsonEscape(comparison.nativeBestPath ? portablePath(*comparison.nativeBestPath) : std::string("")) << "\",\n";
+        out << "      \"counts\": { \"scenes\": " << comparison.stats.sceneCount
+            << ", \"commands\": " << comparison.stats.commandCount
+            << ", \"drawn\": " << comparison.stats.drawnCommandCount
+            << ", \"textures\": " << comparison.stats.textureCount << " },\n";
+        out << "      \"visualDelta\": { \"nativeFound\": " << (comparison.visualDelta.nativeFound ? "true" : "false")
+            << ", \"sampleGrid\": \"64x36\", \"meanAbsRgb\": " << std::fixed << std::setprecision(3) << comparison.visualDelta.meanAbsRgb
+            << ", \"maxAbsRgb\": " << comparison.visualDelta.maxAbsRgb
+            << ", \"renderRgbSum\": " << comparison.visualDelta.rendered.rgbSum
+            << ", \"nativeRgbSum\": " << comparison.visualDelta.native.rgbSum << " },\n";
+        out << "      \"scenes\": [";
+        for (std::size_t sceneIndex = 0; sceneIndex < comparison.stats.scenes.size(); ++sceneIndex)
+        {
+            const auto& scene = comparison.stats.scenes[sceneIndex];
+            if (sceneIndex != 0)
+                out << ", ";
+            out << "{ \"layout\": \"" << jsonEscape(scene.layoutFileName)
+                << "\", \"scene\": \"" << jsonEscape(scene.sceneName)
+                << "\", \"commands\": " << scene.commandCount
+                << ", \"drawn\": " << scene.drawnCommandCount
+                << ", \"textures\": " << scene.textureCount << " }";
+        }
+        out << "]\n";
+        out << "    }" << (index + 1 == comparisons.size() ? "\n" : ",\n");
+    }
+    out << "  ]\n";
+    out << "}\n";
+}
+
+[[nodiscard]] std::string formatViewerVisualDeltaLine(const CsdReferenceViewerFrameComparison& comparison)
+{
+    std::ostringstream descriptor;
+    descriptor
+        << "viewer_visual_delta="
+        << comparison.laneId
+        << ":native="
+        << (comparison.visualDelta.nativeFound ? "found" : "missing")
+        << ":sample_grid="
+        << comparison.visualDelta.sampleGridWidth
+        << "x"
+        << comparison.visualDelta.sampleGridHeight
+        << ":mean_abs_rgb="
+        << std::fixed
+        << std::setprecision(3)
+        << comparison.visualDelta.meanAbsRgb
+        << ":max_abs_rgb="
+        << comparison.visualDelta.maxAbsRgb
+        << ":render_rgb_sum="
+        << comparison.visualDelta.rendered.rgbSum
+        << ":native_rgb_sum="
+        << comparison.visualDelta.native.rgbSum;
+    return descriptor.str();
+}
+
+[[nodiscard]] int runViewerRenderCompareSmoke()
+{
+    bool failed = false;
+    std::vector<CsdReferenceViewerFrameComparison> comparisons;
+    const auto outputRoot = repoRootForOutput() / "out" / "viewer_render_compare" / "phase139";
+    const auto manifestPath = outputRoot / "viewer_render_compare_manifest.json";
+
+    Gdiplus::GdiplusStartupInput gdiplusInput{};
+    ULONG_PTR gdiplusToken = 0;
+    if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr) != Gdiplus::Ok)
+        return 1;
+
+    for (const auto& lane : kCsdReferenceViewerLanes)
+    {
+        auto comparison = renderCsdReferenceViewerFrameComparison(lane, outputRoot);
+        if (comparison.viewerFramePath.empty() || comparison.stats.commandCount == 0)
+            failed = true;
+        comparisons.push_back(std::move(comparison));
+    }
+
+    writeViewerRenderCompareManifest(manifestPath, comparisons);
+
+    std::cout
+        << "sward_su_ui_asset_renderer viewer render compare smoke ok "
+        << "mode=phase139-reference-viewer"
+        << " lanes=" << comparisons.size()
+        << " manifest=" << portablePath(manifestPath)
+        << '\n';
+    std::cout << "viewer_compare_manifest=" << portablePath(manifestPath) << '\n';
+
+    for (const auto& comparison : comparisons)
+    {
+        std::cout
+            << "viewer_frame_path=" << comparison.laneId
+            << ":" << portablePath(comparison.viewerFramePath)
+            << '\n';
+        std::cout
+            << "viewer_diff_frame_path=" << comparison.laneId
+            << ":" << portablePath(comparison.diffFramePath)
+            << '\n';
+        std::cout << formatViewerVisualDeltaLine(comparison) << '\n';
+        std::cout
+            << "viewer_render_source=" << comparison.laneId
+            << ":screen=" << comparison.rendererScreenId
+            << ":scenes=" << comparison.stats.sceneCount
+            << ":commands=" << comparison.stats.commandCount
+            << ":drawn=" << comparison.stats.drawnCommandCount
+            << ":textures=" << comparison.stats.textureCount
+            << ":operator_overlay=compact-reference-status:excluded_from_native_compare=1"
+            << '\n';
+    }
+
+    std::cout << "operator_overlay=compact-reference-status:excluded_from_native_compare=1\n";
+    Gdiplus::GdiplusShutdown(gdiplusToken);
+    return failed ? 1 : 0;
+}
+
 [[nodiscard]] int runRuntimeCsdTreeExportSmoke(const std::optional<std::string>& templateFilter)
 {
     const std::string target = templateFilter.value_or("sonic-hud");
@@ -8024,6 +8591,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runSonicHudCompositorExportSmoke(templateFilter);
     if (commandLineHasFlag("--csd-render-compare-smoke"))
         return runCsdRenderCompareSmoke(templateFilter);
+    if (commandLineHasFlag("--viewer-render-compare-smoke"))
+        return runViewerRenderCompareSmoke();
     if (commandLineHasFlag("--csd-timeline-smoke"))
         return runCsdTimelineSmoke(templateFilter);
     if (commandLineHasFlag("--csd-drawable-smoke"))
@@ -8044,6 +8613,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererReconstructedScreenSmoke();
     if (commandLineHasFlag("--renderer-sonic-hud-reference-smoke"))
         return runRendererSonicHudReferencePolicySmoke();
+    if (commandLineHasFlag("--renderer-reference-lanes-smoke"))
+        return runRendererReferenceLanesSmoke();
 
     return runRendererWindow(instance, showCommand, templateFilter);
 }
