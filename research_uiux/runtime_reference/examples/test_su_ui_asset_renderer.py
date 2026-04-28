@@ -904,6 +904,21 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("material_triage=backend-submit-vs-runtime-rectangles", source_text)
         self.assertIn("backend_submit_status=render-thread-material-submit", source_text)
 
+    def test_renderer_source_wires_phase151_material_correlation_oracle(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendMaterialCorrelationEvidence", source_text)
+        self.assertIn("FrontendMaterialCorrelationPair", source_text)
+        self.assertIn("queryUiLabLiveBridgeMaterialCorrelation", source_text)
+        self.assertIn("loadFrontendMaterialCorrelationEvidence", source_text)
+        self.assertIn("buildFrontendMaterialCorrelationTriage", source_text)
+        self.assertIn("runRendererMaterialCorrelationSmoke", source_text)
+        self.assertIn("--renderer-material-correlation-smoke", source_text)
+        self.assertIn("phase151-material-correlation", source_text)
+        self.assertIn("material_correlation_source=ui-material-correlation", source_text)
+        self.assertIn("blend_semantics=runtime-submit-named", source_text)
+        self.assertIn("sampler_semantics=runtime-submit-named", source_text)
+        self.assertIn("raw_backend_command_status=", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -1122,6 +1137,29 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("backend_submit_status=render-thread-material-submit", completed.stdout)
         self.assertRegex(completed.stdout, r"gpu_submit_triage=title-menu:source=(ui_lab_live_bridge_gpu_submit|ui_lab_live_bridge_ui_draw_list|missing):backend_submits=[0-9]+:textured_submits=[0-9]+:alpha_blend_submits=[0-9]+:draw_rects=[0-9]+:local_commands=[1-9]\d*:material_triage=backend-submit-vs-runtime-rectangles")
         self.assertRegex(completed.stdout, r"gpu_submit_triage=loading:source=(ui_lab_live_bridge_gpu_submit|ui_lab_live_bridge_ui_draw_list|missing):backend_submits=[0-9]+:textured_submits=[0-9]+:alpha_blend_submits=[0-9]+:draw_rects=[0-9]+:local_commands=[1-9]\d*:material_triage=backend-submit-vs-runtime-rectangles")
+
+    def test_renderer_material_correlation_smoke_reports_named_backend_semantics(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-material-correlation-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer material correlation smoke ok", completed.stdout)
+        self.assertIn("mode=phase151-material-correlation", completed.stdout)
+        self.assertRegex(completed.stdout, r"material_correlation_probe=(direct-ui-material-correlation|gpu-submit-fallback|missing)")
+        self.assertIn("material_correlation_source=ui-material-correlation", completed.stdout)
+        self.assertIn("blend_semantics=runtime-submit-named", completed.stdout)
+        self.assertIn("sampler_semantics=runtime-submit-named", completed.stdout)
+        self.assertRegex(completed.stdout, r"material_correlation=title-menu:source=(ui_lab_live_bridge_material_correlation|ui_lab_live_bridge_gpu_submit|missing):pairs=[0-9]+:draw_calls=[0-9]+:backend_submits=[0-9]+:alpha_blend_pairs=[0-9]+:additive_pairs=[0-9]+:filter_linear_pairs=[0-9]+:filter_point_pairs=[0-9]+:local_commands=[1-9]\d*:raw_backend_command_status=[^\r\n]+")
+        self.assertRegex(completed.stdout, r"material_correlation=loading:source=(ui_lab_live_bridge_material_correlation|ui_lab_live_bridge_gpu_submit|missing):pairs=[0-9]+:draw_calls=[0-9]+:backend_submits=[0-9]+:alpha_blend_pairs=[0-9]+:additive_pairs=[0-9]+:filter_linear_pairs=[0-9]+:filter_point_pairs=[0-9]+:local_commands=[1-9]\d*:raw_backend_command_status=[^\r\n]+")
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

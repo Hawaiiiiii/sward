@@ -4814,7 +4814,9 @@ static void RecordUiLabBackendMaterialSubmit(
         static_cast<uint32_t>(samplerDesc.mipmapMode),
         static_cast<uint32_t>(samplerDesc.addressU),
         static_cast<uint32_t>(samplerDesc.addressV),
-        static_cast<uint32_t>(samplerDesc.addressW));
+        static_cast<uint32_t>(samplerDesc.addressW),
+        g_sharedConstants.halfPixelOffsetX,
+        g_sharedConstants.halfPixelOffsetY);
 }
 
 static uint32_t CheckInstancing()
@@ -4897,9 +4899,29 @@ static void ProcDrawPrimitive(const RenderCommand& cmd)
         g_pipelineState.vertexStrides[0]);
 
     if (indexCount > 0)
+    {
+        UiLab::OnRawBackendCommand(
+            g_vulkan ? "Vulkan" : "D3D12",
+            "RHI command-list boundary",
+            "ProcDrawPrimitive",
+            true,
+            args.primitiveCount,
+            indexCount,
+            instanceCount);
         commandList->drawIndexedInstanced(indexCount, instanceCount, 0, 0, 0);
+    }
     else
+    {
+        UiLab::OnRawBackendCommand(
+            g_vulkan ? "Vulkan" : "D3D12",
+            "RHI command-list boundary",
+            "ProcDrawPrimitive",
+            false,
+            args.primitiveCount,
+            0,
+            1);
         commandList->drawInstanced(args.primitiveCount, 1, args.startVertex, 0);
+    }
 }
 
 static void DrawIndexedPrimitive(GuestDevice* device, uint32_t primitiveType, int32_t baseVertexIndex, uint32_t startIndex, uint32_t primCount)
@@ -4940,6 +4962,14 @@ static void ProcDrawIndexedPrimitive(const RenderCommand& cmd)
         args.baseVertexIndex,
         g_pipelineState.vertexStrides[0]);
 
+    UiLab::OnRawBackendCommand(
+        g_vulkan ? "Vulkan" : "D3D12",
+        "RHI command-list boundary",
+        "ProcDrawIndexedPrimitive",
+        true,
+        0,
+        args.primCount,
+        1);
     g_commandLists[g_frame]->drawIndexedInstanced(args.primCount, 1, args.startIndex, args.baseVertexIndex, 0);
 }
 
@@ -5008,9 +5038,29 @@ static void ProcDrawPrimitiveUP(const RenderCommand& cmd)
         args.vertexStreamZeroStride);
 
     if (indexCount != 0)
+    {
+        UiLab::OnRawBackendCommand(
+            g_vulkan ? "Vulkan" : "D3D12",
+            "RHI command-list boundary",
+            "ProcDrawPrimitiveUP",
+            true,
+            args.primitiveCount,
+            indexCount,
+            1);
         g_commandLists[g_frame]->drawIndexedInstanced(indexCount, 1, 0, 0, 0);
+    }
     else
+    {
+        UiLab::OnRawBackendCommand(
+            g_vulkan ? "Vulkan" : "D3D12",
+            "RHI command-list boundary",
+            "ProcDrawPrimitiveUP",
+            false,
+            args.primitiveCount,
+            0,
+            1);
         g_commandLists[g_frame]->drawInstanced(args.primitiveCount, 1, 0, 0);
+    }
 }
 
 static const char* ConvertDeclUsage(uint32_t usage)

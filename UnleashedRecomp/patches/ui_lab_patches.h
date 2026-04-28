@@ -194,7 +194,17 @@ namespace UiLab
         uint32_t samplerMipMode,
         uint32_t samplerAddressU,
         uint32_t samplerAddressV,
-        uint32_t samplerAddressW);
+        uint32_t samplerAddressW,
+        float halfPixelOffsetX,
+        float halfPixelOffsetY);
+    void OnRawBackendCommand(
+        std::string_view backend,
+        std::string_view command,
+        std::string_view source,
+        bool indexed,
+        uint32_t vertexCount,
+        uint32_t indexCount,
+        uint32_t instanceCount);
     void OnHudPauseUpdate(
         uint32_t pauseAddress,
         uint32_t pauseProjectAddress,

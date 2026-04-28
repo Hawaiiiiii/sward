@@ -168,6 +168,49 @@ namespace UiLab
         uint32_t samplerAddressU = 0;
         uint32_t samplerAddressV = 0;
         uint32_t samplerAddressW = 0;
+        float halfPixelOffsetX = 0.0f;
+        float halfPixelOffsetY = 0.0f;
+    };
+
+    struct RuntimeRawBackendCommand
+    {
+        uint64_t frame = 0;
+        uint32_t sequence = 0;
+        std::string backend;
+        std::string command;
+        std::string source;
+        bool indexed = false;
+        uint32_t vertexCount = 0;
+        uint32_t indexCount = 0;
+        uint32_t instanceCount = 0;
+    };
+
+    struct RuntimeMaterialCorrelation
+    {
+        uint64_t frame = 0;
+        uint32_t uiDrawSequence = 0;
+        uint32_t gpuSubmitSequence = 0;
+        std::string projectName;
+        std::string layerPath;
+        std::string gpuSubmitSource;
+        float minX = 0.0f;
+        float minY = 0.0f;
+        float maxX = 0.0f;
+        float maxY = 0.0f;
+        uint32_t texture2DDescriptorIndex = 0;
+        uint32_t samplerDescriptorIndex = 0;
+        bool alphaBlendEnable = false;
+        bool additiveBlend = false;
+        bool linearFilter = false;
+        bool pointFilter = false;
+        std::string blendSemantic;
+        std::string blendOperationSemantic;
+        std::string samplerSemantic;
+        std::string addressSemantic;
+        std::string alphaSemantic;
+        std::string colorWriteSemantic;
+        float halfPixelOffsetX = 0.0f;
+        float halfPixelOffsetY = 0.0f;
     };
 
     struct CsdProjectTreeRecord
@@ -598,6 +641,11 @@ namespace UiLab
     static uint64_t g_runtimeGpuSubmitFrame = UINT64_MAX;
     static uint32_t g_runtimeGpuSubmitSequence = 0;
     static uint32_t g_runtimeGpuSubmitDroppedCount = 0;
+    static constexpr size_t kRuntimeRawBackendCommandSampleLimit = 160;
+    static std::vector<RuntimeRawBackendCommand> g_runtimeRawBackendCommands;
+    static uint64_t g_runtimeRawBackendCommandFrame = UINT64_MAX;
+    static uint32_t g_runtimeRawBackendCommandSequence = 0;
+    static uint32_t g_runtimeRawBackendCommandDroppedCount = 0;
     static PauseGeneralSaveLiveInspectorSnapshot g_pauseGeneralSaveInspector;
 
     static const RuntimeTarget& TargetFor(ScreenId id);
@@ -645,6 +693,10 @@ namespace UiLab
         std::string_view secondMetricName);
     static std::string BuildRuntimeUiDrawListJson();
     static std::string BuildRuntimeGpuSubmitJson();
+    static std::string BuildRuntimeMaterialCorrelationJson();
+    static std::vector<RuntimeMaterialCorrelation> BuildRuntimeMaterialCorrelationPairs(
+        const std::vector<RuntimeUiDrawCall>& drawCalls,
+        const std::vector<RuntimeGpuSubmitCall>& submitCalls);
     static void AppendSonicHudOwnerFieldSamples(std::ostringstream& out, const std::vector<SonicHudOwnerFieldSample>& samples);
     static void AppendTypedInspectors(std::ostringstream& out);
 
@@ -1408,6 +1460,16 @@ namespace UiLab
         R"("uiLayerOracle")",
         R"("uiDrawListOracle")",
         R"("gpuSubmitOracle")",
+        R"("materialCorrelationOracle")",
+        R"("uiDrawSequence")",
+        R"("gpuSubmitSequence")",
+        R"("correlationMethod": "same-frame-order-window")",
+        R"("blendSemantic")",
+        R"("blendOperationSemantic")",
+        R"("samplerSemantic")",
+        R"("addressSemantic")",
+        R"("halfPixelOffset")",
+        R"("rawBackendCommandStatus")",
         R"("runtimeDrawListStatus")",
         R"("runtime CSD platform draw hook; GPU backend submit pending")",
         R"("render-thread material submit hook")",
@@ -2201,6 +2263,210 @@ namespace UiLab
             : "render-thread material submit hook armed; waiting for submits";
     }
 
+    static std::string RuntimeRawBackendCommandStatus(uint32_t capturedCommands)
+    {
+        return capturedCommands > 0
+            ? "RHI command-list boundary captured; raw D3D12/Vulkan command capture pending"
+            : "RHI command-list boundary hook armed; raw D3D12/Vulkan command capture pending";
+    }
+
+    static std::string RenderBlendName(uint32_t value)
+    {
+        switch (value)
+        {
+            case 1: return "D3DBLEND_ZERO";
+            case 2: return "D3DBLEND_ONE";
+            case 3: return "D3DBLEND_SRCCOLOR";
+            case 4: return "D3DBLEND_INVSRCCOLOR";
+            case 5: return "D3DBLEND_SRCALPHA";
+            case 6: return "D3DBLEND_INVSRCALPHA";
+            case 7: return "D3DBLEND_DESTALPHA";
+            case 8: return "D3DBLEND_INVDESTALPHA";
+            case 9: return "D3DBLEND_DESTCOLOR";
+            case 10: return "D3DBLEND_INVDESTCOLOR";
+            case 11: return "D3DBLEND_SRCALPHASAT";
+            case 12: return "D3DBLEND_BLENDFACTOR";
+            case 13: return "D3DBLEND_INVBLENDFACTOR";
+            case 14: return "D3DBLEND_SRC1COLOR";
+            case 15: return "D3DBLEND_INVSRC1COLOR";
+            case 16: return "D3DBLEND_SRC1ALPHA";
+            case 17: return "D3DBLEND_INVSRC1ALPHA";
+            default: return "D3DBLEND_UNKNOWN";
+        }
+    }
+
+    static std::string RenderBlendOperationName(uint32_t value)
+    {
+        switch (value)
+        {
+            case 1: return "D3DBLENDOP_ADD";
+            case 2: return "D3DBLENDOP_SUBTRACT";
+            case 3: return "D3DBLENDOP_REVSUBTRACT";
+            case 4: return "D3DBLENDOP_MIN";
+            case 5: return "D3DBLENDOP_MAX";
+            default: return "D3DBLENDOP_UNKNOWN";
+        }
+    }
+
+    static std::string RenderTextureFilterName(uint32_t value)
+    {
+        switch (value)
+        {
+            case 1: return "D3DTEXF_POINT";
+            case 2: return "D3DTEXF_LINEAR";
+            default: return "D3DTEXF_UNKNOWN";
+        }
+    }
+
+    static std::string RenderMipmapModeName(uint32_t value)
+    {
+        switch (value)
+        {
+            case 1: return "D3DTEXF_POINT";
+            case 2: return "D3DTEXF_LINEAR";
+            default: return "D3DTEXF_UNKNOWN";
+        }
+    }
+
+    static std::string RenderTextureAddressName(uint32_t value)
+    {
+        switch (value)
+        {
+            case 1: return "D3DTADDRESS_WRAP";
+            case 2: return "D3DTADDRESS_MIRROR";
+            case 3: return "D3DTADDRESS_CLAMP";
+            case 4: return "D3DTADDRESS_BORDER";
+            case 5: return "D3DTADDRESS_MIRRORONCE";
+            default: return "D3DTADDRESS_UNKNOWN";
+        }
+    }
+
+    static std::string RuntimeBlendSemantic(const RuntimeGpuSubmitCall& call)
+    {
+        if (!call.alphaBlendEnable)
+            return "opaque/no-alpha-blend";
+
+        if (call.srcBlend == 5 && call.destBlend == 6 && call.blendOp == 1)
+            return "src-alpha/inv-src-alpha";
+
+        if (call.srcBlend == 5 && call.destBlend == 2 && call.blendOp == 1)
+            return "src-alpha/one additive";
+
+        if (call.srcBlend == 2 && call.destBlend == 2 && call.blendOp == 1)
+            return "one/one additive";
+
+        return RenderBlendName(call.srcBlend) + "/" + RenderBlendName(call.destBlend);
+    }
+
+    static bool RuntimeBlendIsAdditive(const RuntimeGpuSubmitCall& call)
+    {
+        return call.alphaBlendEnable &&
+            call.blendOp == 1 &&
+            (call.destBlend == 2 || (call.srcBlend == 2 && call.destBlend == 2));
+    }
+
+    static std::string RuntimeBlendOperationSemantic(const RuntimeGpuSubmitCall& call)
+    {
+        return "rgb=" + RenderBlendOperationName(call.blendOp) +
+            ";alpha=" + RenderBlendOperationName(call.blendOpAlpha);
+    }
+
+    static std::string RuntimeSamplerSemantic(const RuntimeGpuSubmitCall& call)
+    {
+        const std::string minFilter = RenderTextureFilterName(call.samplerMinFilter);
+        const std::string magFilter = RenderTextureFilterName(call.samplerMagFilter);
+        const std::string mipMode = RenderMipmapModeName(call.samplerMipMode);
+
+        std::string family = "mixed";
+        if (call.samplerMinFilter == 2 && call.samplerMagFilter == 2)
+            family = "linear";
+        else if (call.samplerMinFilter == 1 && call.samplerMagFilter == 1)
+            family = "point";
+
+        return family + "(" + minFilter + "," + magFilter + "," + mipMode + ")";
+    }
+
+    static std::string RuntimeAddressSemantic(const RuntimeGpuSubmitCall& call)
+    {
+        return RenderTextureAddressName(call.samplerAddressU) + "/" +
+            RenderTextureAddressName(call.samplerAddressV) + "/" +
+            RenderTextureAddressName(call.samplerAddressW);
+    }
+
+    static std::string RuntimeAlphaSemantic(const RuntimeGpuSubmitCall& call)
+    {
+        if (call.alphaTestEnable)
+        {
+            std::ostringstream out;
+            out << "alpha-test-threshold=" << call.alphaThreshold;
+            return out.str();
+        }
+
+        return call.alphaBlendEnable ? "straight-alpha-blend" : "opaque";
+    }
+
+    static std::string RuntimeColorWriteSemantic(const RuntimeGpuSubmitCall& call)
+    {
+        if (call.colorWriteEnable == 15)
+            return "rgba";
+
+        std::string channels;
+        if ((call.colorWriteEnable & 1) != 0)
+            channels += "r";
+        if ((call.colorWriteEnable & 2) != 0)
+            channels += "g";
+        if ((call.colorWriteEnable & 4) != 0)
+            channels += "b";
+        if ((call.colorWriteEnable & 8) != 0)
+            channels += "a";
+
+        return channels.empty() ? "none" : channels;
+    }
+
+    static std::vector<RuntimeMaterialCorrelation> BuildRuntimeMaterialCorrelationPairs(
+        const std::vector<RuntimeUiDrawCall>& drawCalls,
+        const std::vector<RuntimeGpuSubmitCall>& submitCalls)
+    {
+        std::vector<RuntimeMaterialCorrelation> pairs;
+        const size_t pairCount = std::min(drawCalls.size(), submitCalls.size());
+        pairs.reserve(pairCount);
+
+        for (size_t i = 0; i < pairCount; ++i)
+        {
+            const auto& draw = drawCalls[i];
+            const auto& submit = submitCalls[i];
+
+            RuntimeMaterialCorrelation pair;
+            pair.frame = submit.frame != 0 ? submit.frame : draw.frame;
+            pair.uiDrawSequence = draw.sequence;
+            pair.gpuSubmitSequence = submit.sequence;
+            pair.projectName = draw.projectName;
+            pair.layerPath = draw.layerPath;
+            pair.gpuSubmitSource = submit.source;
+            pair.minX = draw.minX;
+            pair.minY = draw.minY;
+            pair.maxX = draw.maxX;
+            pair.maxY = draw.maxY;
+            pair.texture2DDescriptorIndex = submit.texture2DDescriptorIndex;
+            pair.samplerDescriptorIndex = submit.samplerDescriptorIndex;
+            pair.alphaBlendEnable = submit.alphaBlendEnable;
+            pair.additiveBlend = RuntimeBlendIsAdditive(submit);
+            pair.linearFilter = submit.samplerMinFilter == 2 || submit.samplerMagFilter == 2;
+            pair.pointFilter = submit.samplerMinFilter == 1 && submit.samplerMagFilter == 1;
+            pair.blendSemantic = RuntimeBlendSemantic(submit);
+            pair.blendOperationSemantic = RuntimeBlendOperationSemantic(submit);
+            pair.samplerSemantic = RuntimeSamplerSemantic(submit);
+            pair.addressSemantic = RuntimeAddressSemantic(submit);
+            pair.alphaSemantic = RuntimeAlphaSemantic(submit);
+            pair.colorWriteSemantic = RuntimeColorWriteSemantic(submit);
+            pair.halfPixelOffsetX = submit.halfPixelOffsetX;
+            pair.halfPixelOffsetY = submit.halfPixelOffsetY;
+            pairs.push_back(std::move(pair));
+        }
+
+        return pairs;
+    }
+
     static void AppendRuntimeUiDrawCalls(std::ostringstream& out, const std::vector<RuntimeUiDrawCall>& calls)
     {
         out << "[";
@@ -2289,6 +2555,56 @@ namespace UiLab
                 << ",\"addressV\":" << call.samplerAddressV
                 << ",\"addressW\":" << call.samplerAddressW
                 << "}"
+                << ",\"halfPixelOffset\":{"
+                << "\"x\":" << call.halfPixelOffsetX
+                << ",\"y\":" << call.halfPixelOffsetY
+                << "}"
+                << "}";
+        }
+        out << "]";
+    }
+
+    static void AppendRuntimeMaterialCorrelationPairs(
+        std::ostringstream& out,
+        const std::vector<RuntimeMaterialCorrelation>& pairs)
+    {
+        out << "[";
+        for (size_t i = 0; i < pairs.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            const auto& pair = pairs[i];
+            out
+                << "{"
+                << "\"frame\":" << pair.frame
+                << ",\"uiDrawSequence\":" << pair.uiDrawSequence
+                << ",\"gpuSubmitSequence\":" << pair.gpuSubmitSequence
+                << ",\"project\":\"" << JsonEscape(pair.projectName) << "\""
+                << ",\"layerPath\":\"" << JsonEscape(pair.layerPath) << "\""
+                << ",\"gpuSubmitSource\":\"" << JsonEscape(pair.gpuSubmitSource) << "\""
+                << ",\"screenRect\":{"
+                << "\"minX\":" << pair.minX
+                << ",\"minY\":" << pair.minY
+                << ",\"maxX\":" << pair.maxX
+                << ",\"maxY\":" << pair.maxY
+                << "}"
+                << ",\"texture2DDescriptorIndex\":" << pair.texture2DDescriptorIndex
+                << ",\"samplerDescriptorIndex\":" << pair.samplerDescriptorIndex
+                << ",\"alphaBlendEnable\":" << (pair.alphaBlendEnable ? "true" : "false")
+                << ",\"additiveBlend\":" << (pair.additiveBlend ? "true" : "false")
+                << ",\"linearFilter\":" << (pair.linearFilter ? "true" : "false")
+                << ",\"pointFilter\":" << (pair.pointFilter ? "true" : "false")
+                << ",\"blendSemantic\":\"" << JsonEscape(pair.blendSemantic) << "\""
+                << ",\"blendOperationSemantic\":\"" << JsonEscape(pair.blendOperationSemantic) << "\""
+                << ",\"samplerSemantic\":\"" << JsonEscape(pair.samplerSemantic) << "\""
+                << ",\"addressSemantic\":\"" << JsonEscape(pair.addressSemantic) << "\""
+                << ",\"alphaSemantic\":\"" << JsonEscape(pair.alphaSemantic) << "\""
+                << ",\"colorWriteSemantic\":\"" << JsonEscape(pair.colorWriteSemantic) << "\""
+                << ",\"halfPixelOffset\":{"
+                << "\"x\":" << pair.halfPixelOffsetX
+                << ",\"y\":" << pair.halfPixelOffsetY
+                << "}"
                 << "}";
         }
         out << "]";
@@ -2354,6 +2670,94 @@ namespace UiLab
             << "    \"alphaBlendSubmitCallCount\": " << alphaBlendCount << ",\n"
             << "    \"submitCalls\": ";
         AppendRuntimeGpuSubmitCalls(out, calls);
+        out
+            << "\n"
+            << "  }\n"
+            << "}\n";
+
+        return out.str();
+    }
+
+    static std::string BuildRuntimeMaterialCorrelationJson()
+    {
+        const auto& target = TargetFor(g_target);
+
+        std::vector<RuntimeUiDrawCall> drawCalls;
+        std::vector<RuntimeGpuSubmitCall> submitCalls;
+        std::vector<RuntimeRawBackendCommand> rawBackendCommands;
+        uint64_t frame = g_presentedFrameCount;
+        uint32_t runtimeUiDrawDroppedCount = 0;
+        uint32_t runtimeGpuSubmitDroppedCount = 0;
+        uint32_t runtimeRawBackendDroppedCount = 0;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            drawCalls = g_runtimeUiDrawCalls;
+            submitCalls = g_runtimeGpuSubmitCalls;
+            rawBackendCommands = g_runtimeRawBackendCommands;
+            if (g_runtimeGpuSubmitFrame != UINT64_MAX)
+                frame = g_runtimeGpuSubmitFrame;
+            else if (g_runtimeUiDrawListFrame != UINT64_MAX)
+                frame = g_runtimeUiDrawListFrame;
+            runtimeUiDrawDroppedCount = g_runtimeUiDrawCallDroppedCount;
+            runtimeGpuSubmitDroppedCount = g_runtimeGpuSubmitDroppedCount;
+            runtimeRawBackendDroppedCount = g_runtimeRawBackendCommandDroppedCount;
+        }
+
+        const auto pairs = BuildRuntimeMaterialCorrelationPairs(drawCalls, submitCalls);
+        uint32_t alphaBlendPairCount = 0;
+        uint32_t additivePairCount = 0;
+        uint32_t linearFilterPairCount = 0;
+        uint32_t pointFilterPairCount = 0;
+        for (const auto& pair : pairs)
+        {
+            if (pair.alphaBlendEnable)
+                ++alphaBlendPairCount;
+            if (pair.additiveBlend)
+                ++additivePairCount;
+            if (pair.linearFilter)
+                ++linearFilterPairCount;
+            if (pair.pointFilter)
+                ++pointFilterPairCount;
+        }
+
+        const std::string backendSubmitStatus = RuntimeGpuSubmitStatus(static_cast<uint32_t>(submitCalls.size()));
+        const std::string rawBackendCommandStatus = RuntimeRawBackendCommandStatus(static_cast<uint32_t>(rawBackendCommands.size()));
+
+        std::ostringstream out;
+        out
+            << "{\n"
+            << "  \"ok\": true,\n"
+            << "  \"source\": \"runtime CSD draw-list + render-thread material submit correlation\",\n"
+            << "  \"version\": 1,\n"
+            << "  \"frame\": " << frame << ",\n"
+            << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
+            << "  \"correlationStatus\": \"same-frame-order-window active; raw D3D12/Vulkan command capture pending\",\n"
+            << "  \"backendSubmitStatus\": \"" << JsonEscape(backendSubmitStatus) << "\",\n"
+            << "  \"rawBackendCommandStatus\": \"" << JsonEscape(rawBackendCommandStatus) << "\",\n"
+            << "  \"uiDrawCallCount\": " << drawCalls.size() << ",\n"
+            << "  \"backendSubmitCallCount\": " << submitCalls.size() << ",\n"
+            << "  \"rawBackendCommandCount\": " << rawBackendCommands.size() << ",\n"
+            << "  \"correlatedPairCount\": " << pairs.size() << ",\n"
+            << "  \"alphaBlendPairCount\": " << alphaBlendPairCount << ",\n"
+            << "  \"additivePairCount\": " << additivePairCount << ",\n"
+            << "  \"linearFilterPairCount\": " << linearFilterPairCount << ",\n"
+            << "  \"pointFilterPairCount\": " << pointFilterPairCount << ",\n"
+            << "  \"droppedDrawCallCount\": " << runtimeUiDrawDroppedCount << ",\n"
+            << "  \"droppedSubmitCallCount\": " << runtimeGpuSubmitDroppedCount << ",\n"
+            << "  \"droppedRawBackendCommandCount\": " << runtimeRawBackendDroppedCount << ",\n"
+            << "  \"materialCorrelationOracle\": {\n"
+            << "    \"source\": \"ui-draw-list + ui-gpu-submit\",\n"
+            << "    \"correlationMethod\": \"same-frame-order-window\",\n"
+            << "    \"blendSemantics\": \"named Xenos/D3D-ish material semantics\",\n"
+            << "    \"samplerSemantics\": \"named Xenos/D3D-ish material semantics\",\n"
+            << "    \"rawBackendCommandStatus\": \"" << JsonEscape(rawBackendCommandStatus) << "\",\n"
+            << "    \"uiDrawCallCount\": " << drawCalls.size() << ",\n"
+            << "    \"backendSubmitCallCount\": " << submitCalls.size() << ",\n"
+            << "    \"correlatedPairCount\": " << pairs.size() << ",\n"
+            << "    \"pairs\": ";
+        AppendRuntimeMaterialCorrelationPairs(out, pairs);
         out
             << "\n"
             << "  }\n"
@@ -2620,7 +3024,7 @@ namespace UiLab
             << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
             << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
             << "    \"commands\": ";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out
             << "\n"
             << "  },\n"
@@ -4272,7 +4676,9 @@ namespace UiLab
         uint32_t samplerMipMode,
         uint32_t samplerAddressU,
         uint32_t samplerAddressV,
-        uint32_t samplerAddressW)
+        uint32_t samplerAddressW,
+        float halfPixelOffsetX,
+        float halfPixelOffsetY)
     {
         if (!g_isEnabled)
             return;
@@ -4332,8 +4738,52 @@ namespace UiLab
         call.samplerAddressU = samplerAddressU;
         call.samplerAddressV = samplerAddressV;
         call.samplerAddressW = samplerAddressW;
+        call.halfPixelOffsetX = halfPixelOffsetX;
+        call.halfPixelOffsetY = halfPixelOffsetY;
 
         g_runtimeGpuSubmitCalls.push_back(std::move(call));
+    }
+
+    void OnRawBackendCommand(
+        std::string_view backend,
+        std::string_view command,
+        std::string_view source,
+        bool indexed,
+        uint32_t vertexCount,
+        uint32_t indexCount,
+        uint32_t instanceCount)
+    {
+        if (!g_isEnabled)
+            return;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+
+        if (g_runtimeRawBackendCommandFrame != g_presentedFrameCount)
+        {
+            g_runtimeRawBackendCommandFrame = g_presentedFrameCount;
+            g_runtimeRawBackendCommands.clear();
+            g_runtimeRawBackendCommandSequence = 0;
+            g_runtimeRawBackendCommandDroppedCount = 0;
+        }
+
+        ++g_runtimeRawBackendCommandSequence;
+        if (g_runtimeRawBackendCommands.size() >= kRuntimeRawBackendCommandSampleLimit)
+        {
+            ++g_runtimeRawBackendCommandDroppedCount;
+            return;
+        }
+
+        RuntimeRawBackendCommand rawCommand;
+        rawCommand.frame = g_presentedFrameCount;
+        rawCommand.sequence = g_runtimeRawBackendCommandSequence;
+        rawCommand.backend = backend.empty() ? std::string("unknown") : std::string(backend);
+        rawCommand.command = command.empty() ? std::string("RHI command-list boundary") : std::string(command);
+        rawCommand.source = source.empty() ? std::string("unknown") : std::string(source);
+        rawCommand.indexed = indexed;
+        rawCommand.vertexCount = vertexCount;
+        rawCommand.indexCount = indexCount;
+        rawCommand.instanceCount = instanceCount;
+        g_runtimeRawBackendCommands.push_back(std::move(rawCommand));
     }
 
     void OnHudSonicStageUpdate(
@@ -4858,7 +5308,7 @@ namespace UiLab
     {
         std::ostringstream out;
         out << "{\"ok\":true,\"commands\":";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out << "}\n";
         return out.str();
     }
@@ -4900,6 +5350,9 @@ namespace UiLab
 
         if (verb == "ui-gpu-submit" || verb == "gpu-submit" || verb == "backend-submit")
             return BuildRuntimeGpuSubmitJson();
+
+        if (verb == "ui-material-correlation" || verb == "material-correlation" || verb == "ui-material-map")
+            return BuildRuntimeMaterialCorrelationJson();
 
         if (verb == "help" || verb == "commands")
             return BuildHelpJson();
@@ -5532,7 +5985,7 @@ namespace UiLab
             ImGui::Separator();
             ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
-            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, ui-gpu-submit, route, reset, set-global, capture, help");
+            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
 
             if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))

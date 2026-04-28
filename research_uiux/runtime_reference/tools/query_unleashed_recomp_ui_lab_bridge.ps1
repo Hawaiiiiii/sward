@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "route", "reset", "set-global", "capture", "help")]
+    [ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "route", "reset", "set-global", "capture", "help")]
     [string]$Command = "state",
     [string]$Target = "",
     [string]$GlobalName = "",
