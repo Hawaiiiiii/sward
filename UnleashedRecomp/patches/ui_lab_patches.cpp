@@ -1468,7 +1468,9 @@ namespace UiLab
         uint32_t firstMetric,
         uint32_t secondMetric)
     {
-        static constexpr size_t kMaxCsdTreeEntrySamples = 48;
+        // Phase 134: ui_playscreen runtime tree export keeps so_speed_gauge layer samples
+        // and other later Sonic HUD scenes instead of truncating after the first entries.
+        static constexpr size_t kMaxCsdTreeEntrySamples = 512;
 
         for (auto& entry : entries)
         {

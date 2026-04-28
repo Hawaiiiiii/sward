@@ -326,6 +326,9 @@ Clean asset renderer notes:
 - Phase 130 now writes `out/csd_render_compare/phase130/`, reports `sampler_filter=csd-point-seam`, sampler counts, and `native_frame_registration=` offsets against refreshed real runtime BMP captures
 - Phase 131 now writes `out/csd_render_compare/phase131/`, reports `diff_frame_path=`, `full_frame_delta=`, and `material_parity_triage=` so HUD/tutorial stage-backbuffer mismatch is separated from real CSD material work
 - Phase 132 now writes `out/csd_render_compare/phase132/`, reports `ui_layer_diff_frame_path=` and `ui_layer_delta=`, and masks native comparison to pixels actually touched by the rendered CSD command stream
+- `--export-runtime-csd-tree --template sonic-hud` verifies the Phase 134 exact `ui_playscreen` runtime tree export, reading the latest live-bridge Sonic HUD state and writing ignored local `out/csd_runtime_exports/phase134/ui_playscreen_runtime_tree.json`
+- Phase 134 exports the runtime `ui_playscreen` project as `13` scenes / `2` nodes / `209` runtime layers with SGFX slot labels, while keeping `drawable_status=runtime-scene-layer-tree-exported-no-material-rects` because exact loose `ui_playscreen.yncp` material/subimage data is still unrecovered
+- when you want to drive the running game manually during capture, pass `-DisableControlAutomation` to `capture_unleashed_recomp_ui_lab.ps1`; the live bridge and native BMP capture still work without SendInput pulses
 - current CSD-driven mappings use `ui_mainmenu.yncp/mm_bg_usual`, `ui_loading.yncp/pda`, and the local HUD proxy `ui_prov_playscreen.yncp/so_speed_gauge` plus `info_1`; real runtime/native evidence remains the comparison oracle
 - it opens a native `1280x720` design canvas below `Prev` / `Next` / `Atlas Prev` / `Atlas Next` / screen-label navigation controls
 - it starts on `VisualAtlasGallery`, which discovers ignored local `extracted_assets/visual_atlas/sheets/*.png` files at runtime

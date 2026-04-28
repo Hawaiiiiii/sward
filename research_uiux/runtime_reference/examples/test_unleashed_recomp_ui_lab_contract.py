@@ -902,6 +902,17 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, report)
 
+    def test_ui_lab_phase134_widens_csd_tree_layer_export_samples(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+
+        for token in [
+            "kMaxCsdTreeEntrySamples = 512",
+            "Phase 134",
+            "ui_playscreen runtime tree export",
+            "so_speed_gauge layer samples",
+        ]:
+            self.assertIn(token, ui_lab)
+
     def test_ui_lab_phase119_promotes_pause_general_save_inspectors(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")

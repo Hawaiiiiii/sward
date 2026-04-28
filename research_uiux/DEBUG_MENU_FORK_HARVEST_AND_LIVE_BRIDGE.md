@@ -309,6 +309,14 @@ Local-only evidence, not committed:
   - owner-path evidence stayed consistent with Phase 121: raw `CHudSonicStage` owner is live, fork-header owner slots are still pending, and resolved scene ownership comes from `CCsdProject::Make`
   - local renderer diagnostics now mark `ui_prov_playscreen.yncp` as a proxy and list missing local runtime scenes instead of treating the current Sonic HUD sidecar frame as exact
 
+- `out/ui_lab_runtime_evidence/20260428_132410/`
+  - Phase 134 refreshed focused `sonic-hud` live-bridge/native evidence after widening CSD tree sample storage for exact `ui_playscreen` export
+  - manifest reported `readinessSource=live-bridge`, `exitCode=0`, `6` native BMP captures, and best route `stage target ready`
+  - live state reported runtime `ui_playscreen`, `13` scenes, `2` nodes, `209` runtime layers, and `203` stored layer samples
+  - later Sonic HUD scene samples now survive in `typedInspectors.csdProjectTree.layers`, including `ui_playscreen/so_speed_gauge/position`
+  - the sidecar export writes ignored local `out/csd_runtime_exports/phase134/ui_playscreen_runtime_tree.json`
+  - note for manual operation: this capture used control automation and sent `ENTER` pulses; future manual sessions should pass `-DisableControlAutomation` so the bridge observes while the operator drives
+
 - `out/ui_lab_runtime_evidence/20260428_011255/`
   - focused Phase 120 `sonic-hud` live-bridge/native capture passed on the final raw-owner hook build
   - JSONL emitted `sonic-hud-owner-hooked` with `owner_fields_ready=0`, proving the raw `CHudSonicStage` owner pointer while keeping embedded CSD owner fields marked pending

@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RENDERER_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "su_ui_asset_renderer.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr133" / "Release" / "sward_su_ui_asset_renderer.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr134" / "Release" / "sward_su_ui_asset_renderer.exe"
 
 
 class SuUiAssetRendererTests(unittest.TestCase):
@@ -264,6 +264,20 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("exact-ui-playscreen-layout-unrecovered", source_text)
         self.assertIn("local-proxy-layout-ui_prov_playscreen", source_text)
         self.assertIn("out\" / \"csd_render_compare\" / \"phase133", source_text)
+
+    def test_renderer_source_exposes_phase134_runtime_csd_tree_export(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("CsdHudRuntimeNodeEntry", source_text)
+        self.assertIn("CsdHudRuntimeLayerEntry", source_text)
+        self.assertIn("writeSonicHudRuntimeCsdTreeExport", source_text)
+        self.assertIn("runRuntimeCsdTreeExportSmoke", source_text)
+        self.assertIn("--export-runtime-csd-tree", source_text)
+        self.assertIn("runtime_csd_export=", source_text)
+        self.assertIn("runtime_csd_scene=", source_text)
+        self.assertIn("runtime_csd_layer_sample=", source_text)
+        self.assertIn("runtime-scene-layer-tree-exported-no-material-rects", source_text)
+        self.assertIn("exact-ui-playscreen-layout-unrecovered", source_text)
+        self.assertIn("out\" / \"csd_runtime_exports\" / \"phase134", source_text)
 
     def test_renderer_source_exposes_title_loop_reconstruction_screen(self) -> None:
         source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
@@ -652,6 +666,29 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn(":locally_rendered=0", completed.stdout)
         self.assertIn("sonic_hud_cast_coverage=sonic-hud:scene=so_speed_gauge", completed.stdout)
         self.assertIn(":native_nonblack_pixels=", completed.stdout)
+
+    def test_renderer_runtime_csd_tree_export_smoke_writes_ui_playscreen_tree(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--export-runtime-csd-tree", "--template", "sonic-hud"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer runtime csd export ok", completed.stdout)
+        self.assertIn("runtime_csd_export=sonic-hud:source=live-bridge:project=ui_playscreen", completed.stdout)
+        self.assertIn(":scenes=13:nodes=2:layers=209", completed.stdout)
+        self.assertIn(":layout_status=exact-ui-playscreen-layout-unrecovered", completed.stdout)
+        self.assertIn(":drawable_status=runtime-scene-layer-tree-exported-no-material-rects", completed.stdout)
+        self.assertIn("runtime_csd_scene=sonic-hud:ui_playscreen/so_speed_gauge:casts=47", completed.stdout)
+        self.assertIn("runtime_csd_layer_sample=sonic-hud:ui_playscreen/so_speed_gauge", completed.stdout)
+        self.assertIn("runtime_csd_export_path=out/csd_runtime_exports/phase134/ui_playscreen_runtime_tree.json", completed.stdout)
 
     def test_renderer_navigation_smoke_reports_interactive_catalog(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

@@ -73,3 +73,48 @@ Native BMP capture remains the visual proof path. The Phase 133 diagnostics expl
 2. Extend the live bridge or patch layer toward a runtime UI-only capture/export path, because full backbuffer screenshots include the stage world.
 3. Once exact `ui_playscreen` data is locally drawable, render all `13` runtime scenes together and compare against native BMP evidence.
 4. Convert the proven state/motion/scene ownership into readable, portable HUD reference code only after the exact scene coverage is present.
+
+## Phase 134 Runtime Tree Export
+
+Phase 134 did not find a loose local `ui_playscreen.yncp` payload in the current extracted layout evidence. Instead, it promoted the runtime path:
+
+```powershell
+b\rr134\Release\sward_su_ui_asset_renderer.exe --export-runtime-csd-tree --template sonic-hud
+```
+
+That command reads the latest live-bridge `sonic-hud` state and writes ignored local evidence:
+
+```text
+out/csd_runtime_exports/phase134/ui_playscreen_runtime_tree.json
+```
+
+The refreshed runtime proof is:
+
+- live evidence: `out/ui_lab_runtime_evidence/20260428_132410/sonic-hud/ui_lab_live_state.json`
+- runtime project: `ui_playscreen`
+- runtime scenes: `13`
+- runtime nodes: `2`
+- runtime layers: `209`
+- exported layer samples: `203`
+- sample cap widened in the UI Lab patch layer from `48` to `512`
+- later normal Sonic HUD scenes now survive export, including `ui_playscreen/so_speed_gauge`
+
+The export names SGFX-replaceable slots beside each runtime scene:
+
+| Runtime scene | Casts | Exported layers | SGFX slot |
+|---|---:|---:|---|
+| `exp_count` | `22` | `22` | `experience_counter` |
+| `gauge_frame` | `20` | `20` | `side_panel` |
+| `player_count` | `3` | `3` | `life_icon` |
+| `ring_count` | `1` | `1` | `ring_counter` |
+| `ring_get` | `3` | `3` | `ring_counter` |
+| `score_count` | `12` | `12` | `score_counter` |
+| `so_ringenagy_gauge` | `43` | `43` | `energy_gauge` |
+| `so_speed_gauge` | `47` | `47` | `speed_gauge` |
+| `time_count` | `16` | `16` | `timer` |
+| `add/medal_get_m` | `5` | `5` | `medal_counter` |
+| `add/medal_get_s` | `5` | `5` | `medal_counter` |
+| `add/speed_count` | `16` | `16` | `speed_readout` |
+| `add/u_info` | `16` | `10` | `prompt_strip` |
+
+This is still not full drawable HUD parity. The export has scene/node/layer paths, cast indices, runtime addresses, frame anchors, and slot labels; it does not yet carry material rectangles, subimage payloads, or exact timeline channels for every layer. The next hard beat is to use this runtime tree to pull enough material/cast data for a full `ui_playscreen` compositor, or to recover the loose layout payload locally.

@@ -59,6 +59,18 @@ Phase 133 explains the stubborn `sonic-hud` masked delta. The real runtime live 
 
 So the next Sonic HUD blocker is exact `ui_playscreen` coverage or runtime UI-only export, not another global sampler tweak.
 
+## Phase 134 Follow-Up
+
+Phase 134 moved the Sonic HUD blocker from a scene-name guess to a concrete runtime export:
+
+- exact loose local layout is still missing: `ui_playscreen.yncp` was not found in the current extracted layout evidence;
+- runtime `CCsdProject::Make` traversal is now exported by the sidecar with `--export-runtime-csd-tree --template sonic-hud`;
+- the refreshed live bridge state reports `ui_playscreen`, `13` scenes, `2` nodes, and `209` runtime layers;
+- the UI Lab CSD tree sample cap was widened so later scenes such as `so_speed_gauge` are no longer truncated from the live-state layer sample array;
+- ignored local export lands at `out/csd_runtime_exports/phase134/ui_playscreen_runtime_tree.json`.
+
+This gives the next compositor pass a stable scene/node/layer skeleton for the real normal Sonic HUD. It still needs material rectangles, subimage bindings, and timeline channels before the local renderer can claim full `ui_playscreen` drawable parity.
+
 ## Verification
 
 Fresh verification for this beat used:

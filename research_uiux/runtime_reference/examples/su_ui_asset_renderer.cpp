@@ -398,6 +398,28 @@ struct CsdHudRuntimeSceneEntry
     int frame = 0;
 };
 
+struct CsdHudRuntimeNodeEntry
+{
+    std::string path;
+    std::string nodeAddress;
+    std::string projectAddress;
+    int sceneCount = 0;
+    int childNodeCount = 0;
+    int frame = 0;
+};
+
+struct CsdHudRuntimeLayerEntry
+{
+    std::string path;
+    std::string sceneName;
+    std::string layerName;
+    std::string layerAddress;
+    std::string castNodeAddress;
+    int castNodeIndex = 0;
+    int castIndex = 0;
+    int frame = 0;
+};
+
 struct CsdHudRuntimeSceneEvidence
 {
     bool found = false;
@@ -417,6 +439,8 @@ struct CsdHudRuntimeSceneEvidence
     int runtimeNodeCount = 0;
     int runtimeLayerCount = 0;
     std::vector<CsdHudRuntimeSceneEntry> runtimeScenes;
+    std::vector<CsdHudRuntimeNodeEntry> runtimeNodes;
+    std::vector<CsdHudRuntimeLayerEntry> runtimeLayers;
 };
 
 struct CsdHudSceneCoverageDiagnostic
@@ -4795,6 +4819,94 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return escaped.str();
 }
 
+[[nodiscard]] bool layoutEvidenceContainsFile(std::string_view layoutFileName);
+[[nodiscard]] std::string sonicHudSlotLabelForScene(std::string_view sceneName);
+[[nodiscard]] int runtimeLayerCountForScene(
+    const CsdHudRuntimeSceneEvidence& evidence,
+    std::string_view sceneName);
+
+[[nodiscard]] bool writeSonicHudRuntimeCsdTreeExport(
+    const CsdHudRuntimeSceneEvidence& evidence,
+    const std::filesystem::path& exportPath)
+{
+    std::error_code error;
+    std::filesystem::create_directories(exportPath.parent_path(), error);
+    if (error)
+        return false;
+
+    std::ofstream out(exportPath, std::ios::binary);
+    if (!out)
+        return false;
+
+    out << "{\n";
+    out << "  \"phase\": 134,\n";
+    out << "  \"target\": \"sonic-hud\",\n";
+    out << "  \"source\": \"live-bridge CCsdProject::Make runtime tree\",\n";
+    out << "  \"drawableStatus\": \"runtime-scene-layer-tree-exported-no-material-rects\",\n";
+    out << "  \"runtimeProject\": \"" << jsonEscape(evidence.runtimeProject) << "\",\n";
+    out << "  \"localLayout\": \"" << jsonEscape(evidence.localLayoutFileName) << "\",\n";
+    out << "  \"localProject\": \"" << jsonEscape(evidence.localProject) << "\",\n";
+    out << "  \"layoutStatus\": \"" << jsonEscape(evidence.layoutStatus) << "\",\n";
+    out << "  \"exactLayoutFound\": " << (layoutEvidenceContainsFile(evidence.runtimeProject + ".yncp") ? "true" : "false") << ",\n";
+    out << "  \"liveStatePath\": \"" << jsonEscape(portablePath(evidence.liveStatePath)) << "\",\n";
+    out << "  \"stageReadyFrame\": " << evidence.stageReadyFrame << ",\n";
+    out << "  \"ownerPathStatus\": \"" << jsonEscape(evidence.ownerPathStatus) << "\",\n";
+    out << "  \"ownerFieldMaturationStatus\": \"" << jsonEscape(evidence.ownerFieldMaturationStatus) << "\",\n";
+    out << "  \"counts\": { \"scenes\": " << evidence.runtimeSceneCount
+        << ", \"nodes\": " << evidence.runtimeNodeCount
+        << ", \"layers\": " << evidence.runtimeLayerCount
+        << ", \"exportedScenes\": " << evidence.runtimeScenes.size()
+        << ", \"exportedNodes\": " << evidence.runtimeNodes.size()
+        << ", \"exportedLayers\": " << evidence.runtimeLayers.size() << " },\n";
+
+    out << "  \"scenes\": [\n";
+    for (std::size_t index = 0; index < evidence.runtimeScenes.size(); ++index)
+    {
+        const auto& scene = evidence.runtimeScenes[index];
+        out << "    { \"path\": \"" << jsonEscape(scene.path)
+            << "\", \"scene\": \"" << jsonEscape(scene.sceneName)
+            << "\", \"castCount\": " << scene.castCount
+            << ", \"layerCount\": " << runtimeLayerCountForScene(evidence, scene.sceneName)
+            << ", \"frame\": " << scene.frame
+            << ", \"sgfxSlot\": \"" << jsonEscape(sonicHudSlotLabelForScene(scene.sceneName))
+            << "\", \"drawableStatus\": \"runtime-scene-layer-tree-exported-no-material-rects\" }"
+            << (index + 1 == evidence.runtimeScenes.size() ? "\n" : ",\n");
+    }
+    out << "  ],\n";
+
+    out << "  \"nodes\": [\n";
+    for (std::size_t index = 0; index < evidence.runtimeNodes.size(); ++index)
+    {
+        const auto& node = evidence.runtimeNodes[index];
+        out << "    { \"path\": \"" << jsonEscape(node.path)
+            << "\", \"nodeAddress\": \"" << jsonEscape(node.nodeAddress)
+            << "\", \"projectAddress\": \"" << jsonEscape(node.projectAddress)
+            << "\", \"sceneCount\": " << node.sceneCount
+            << ", \"childNodeCount\": " << node.childNodeCount
+            << ", \"frame\": " << node.frame << " }"
+            << (index + 1 == evidence.runtimeNodes.size() ? "\n" : ",\n");
+    }
+    out << "  ],\n";
+
+    out << "  \"layers\": [\n";
+    for (std::size_t index = 0; index < evidence.runtimeLayers.size(); ++index)
+    {
+        const auto& layer = evidence.runtimeLayers[index];
+        out << "    { \"path\": \"" << jsonEscape(layer.path)
+            << "\", \"scene\": \"" << jsonEscape(layer.sceneName)
+            << "\", \"layer\": \"" << jsonEscape(layer.layerName)
+            << "\", \"layerAddress\": \"" << jsonEscape(layer.layerAddress)
+            << "\", \"castNodeAddress\": \"" << jsonEscape(layer.castNodeAddress)
+            << "\", \"castNodeIndex\": " << layer.castNodeIndex
+            << ", \"castIndex\": " << layer.castIndex
+            << ", \"frame\": " << layer.frame << " }"
+            << (index + 1 == evidence.runtimeLayers.size() ? "\n" : ",\n");
+    }
+    out << "  ]\n";
+    out << "}\n";
+    return true;
+}
+
 [[nodiscard]] std::optional<CLSID> imageEncoderClsid(const wchar_t* mimeType)
 {
     UINT encoderCount = 0;
@@ -5384,6 +5496,45 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return slash == std::string::npos ? path : path.substr(slash + 1);
 }
 
+[[nodiscard]] std::string layerLeafNameFromRuntimePath(std::string_view runtimePath)
+{
+    const std::string path(runtimePath);
+    const auto slash = path.find_last_of('/');
+    return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+[[nodiscard]] std::string runtimeSceneNameForLayerPath(
+    std::string_view layerPath,
+    const std::vector<CsdHudRuntimeSceneEntry>& runtimeScenes)
+{
+    std::string bestScene;
+    std::size_t bestLength = 0;
+    const std::string path(layerPath);
+    for (const auto& scene : runtimeScenes)
+    {
+        const std::string prefix = scene.path + "/";
+        if ((path == scene.path || path.starts_with(prefix)) && scene.path.size() > bestLength)
+        {
+            bestScene = scene.sceneName;
+            bestLength = scene.path.size();
+        }
+    }
+    return bestScene;
+}
+
+[[nodiscard]] int runtimeLayerCountForScene(
+    const CsdHudRuntimeSceneEvidence& evidence,
+    std::string_view sceneName)
+{
+    int count = 0;
+    for (const auto& layer : evidence.runtimeLayers)
+    {
+        if (layer.sceneName == sceneName)
+            ++count;
+    }
+    return count;
+}
+
 [[nodiscard]] bool layoutEvidenceContainsFile(std::string_view layoutFileName)
 {
     return loadCsdPipelineEvidence(layoutFileName).has_value();
@@ -5509,6 +5660,40 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
                 scene.frame = static_cast<int>(jsonNumberField(sceneObject, "frame").value_or(0.0));
                 if (!scene.path.empty())
                     evidence.runtimeScenes.push_back(std::move(scene));
+            }
+        }
+
+        if (const auto nodes = jsonArrayFieldSpan(*tree, "nodes"))
+        {
+            for (const auto nodeObject : jsonObjectSpansInArray(*nodes))
+            {
+                CsdHudRuntimeNodeEntry node;
+                node.path = jsonStringField(nodeObject, "path").value_or("");
+                node.nodeAddress = jsonStringField(nodeObject, "nodeAddress").value_or("");
+                node.projectAddress = jsonStringField(nodeObject, "projectAddress").value_or("");
+                node.sceneCount = static_cast<int>(jsonNumberField(nodeObject, "sceneCount").value_or(0.0));
+                node.childNodeCount = static_cast<int>(jsonNumberField(nodeObject, "childNodeCount").value_or(0.0));
+                node.frame = static_cast<int>(jsonNumberField(nodeObject, "frame").value_or(0.0));
+                if (!node.path.empty())
+                    evidence.runtimeNodes.push_back(std::move(node));
+            }
+        }
+
+        if (const auto layers = jsonArrayFieldSpan(*tree, "layers"))
+        {
+            for (const auto layerObject : jsonObjectSpansInArray(*layers))
+            {
+                CsdHudRuntimeLayerEntry layer;
+                layer.path = jsonStringField(layerObject, "path").value_or("");
+                layer.sceneName = runtimeSceneNameForLayerPath(layer.path, evidence.runtimeScenes);
+                layer.layerName = layerLeafNameFromRuntimePath(layer.path);
+                layer.layerAddress = jsonStringField(layerObject, "layerAddress").value_or("");
+                layer.castNodeAddress = jsonStringField(layerObject, "castNodeAddress").value_or("");
+                layer.castNodeIndex = static_cast<int>(jsonNumberField(layerObject, "castNodeIndex").value_or(0.0));
+                layer.castIndex = static_cast<int>(jsonNumberField(layerObject, "castIndex").value_or(0.0));
+                layer.frame = static_cast<int>(jsonNumberField(layerObject, "frame").value_or(0.0));
+                if (!layer.path.empty())
+                    evidence.runtimeLayers.push_back(std::move(layer));
             }
         }
     }
@@ -6077,6 +6262,94 @@ void writeCsdRenderCompareManifest(
     return descriptor.str();
 }
 
+[[nodiscard]] int runRuntimeCsdTreeExportSmoke(const std::optional<std::string>& templateFilter)
+{
+    const std::string target = templateFilter.value_or("sonic-hud");
+    if (target != "sonic-hud")
+    {
+        std::cerr << "Runtime CSD tree export currently supports sonic-hud only.\n";
+        return 2;
+    }
+
+    const auto* csdBinding = findCsdPipelineTemplateBinding("sonic-hud");
+    if (!csdBinding)
+        return 1;
+
+    const auto evidence = loadLatestSonicHudLiveStateEvidence(*csdBinding);
+    if (!evidence.found || evidence.runtimeProject.empty())
+        return 1;
+
+    const auto outputRoot = repoRootForOutput() / "out" / "csd_runtime_exports" / "phase134";
+    const auto outputPath = outputRoot / (evidence.runtimeProject + "_runtime_tree.json");
+    const bool wrote = writeSonicHudRuntimeCsdTreeExport(evidence, outputPath);
+    if (!wrote)
+        return 1;
+
+    constexpr std::string_view kDrawableStatus = "runtime-scene-layer-tree-exported-no-material-rects";
+    std::cout
+        << "sward_su_ui_asset_renderer runtime csd export ok "
+        << "target=sonic-hud"
+        << " project=" << evidence.runtimeProject
+        << " scenes=" << evidence.runtimeSceneCount
+        << " nodes=" << evidence.runtimeNodeCount
+        << " layers=" << evidence.runtimeLayerCount
+        << " output=" << portablePath(outputPath)
+        << '\n';
+    std::cout
+        << "runtime_csd_export=sonic-hud"
+        << ":source=live-bridge"
+        << ":project=" << evidence.runtimeProject
+        << ":scenes=" << evidence.runtimeSceneCount
+        << ":nodes=" << evidence.runtimeNodeCount
+        << ":layers=" << evidence.runtimeLayerCount
+        << ":layout_status=" << evidence.layoutStatus
+        << ":owner_path_status=" << evidence.ownerPathStatus
+        << ":drawable_status=" << kDrawableStatus
+        << '\n';
+
+    for (const auto& scene : evidence.runtimeScenes)
+    {
+        std::cout
+            << "runtime_csd_scene=sonic-hud:"
+            << scene.path
+            << ":casts="
+            << scene.castCount
+            << ":layers="
+            << runtimeLayerCountForScene(evidence, scene.sceneName)
+            << ":sgfx_slot="
+            << sonicHudSlotLabelForScene(scene.sceneName)
+            << ":drawable_status="
+            << kDrawableStatus
+            << '\n';
+
+        const auto layer = std::find_if(
+            evidence.runtimeLayers.begin(),
+            evidence.runtimeLayers.end(),
+            [&scene](const CsdHudRuntimeLayerEntry& candidate)
+            {
+                return candidate.sceneName == scene.sceneName;
+            });
+        if (layer != evidence.runtimeLayers.end())
+        {
+            std::cout
+                << "runtime_csd_layer_sample=sonic-hud:"
+                << layer->path
+                << ":scene="
+                << layer->sceneName
+                << ":layer="
+                << layer->layerName
+                << ":cast_index="
+                << layer->castIndex
+                << ":layer_address="
+                << layer->layerAddress
+                << '\n';
+        }
+    }
+
+    std::cout << "runtime_csd_export_path=" << portablePath(outputPath) << '\n';
+    return 0;
+}
+
 [[nodiscard]] int runCsdRenderCompareSmoke(const std::optional<std::string>& templateFilter)
 {
     std::size_t templateCount = 0;
@@ -6633,6 +6906,8 @@ void writeCsdRenderCompareManifest(
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
 {
     const auto templateFilter = commandLineValueAfter("--template");
+    if (commandLineHasFlag("--export-runtime-csd-tree"))
+        return runRuntimeCsdTreeExportSmoke(templateFilter);
     if (commandLineHasFlag("--csd-render-compare-smoke"))
         return runCsdRenderCompareSmoke(templateFilter);
     if (commandLineHasFlag("--csd-timeline-smoke"))
