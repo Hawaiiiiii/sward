@@ -110,6 +110,25 @@ namespace UiLab
         uint64_t frame = 0;
     };
 
+    struct RuntimeUiDrawCall
+    {
+        uint64_t frame = 0;
+        uint32_t sequence = 0;
+        std::string projectName;
+        std::string layerPath;
+        uint32_t layerAddress = 0;
+        uint32_t castNodeAddress = 0;
+        uint32_t vertexBufferAddress = 0;
+        uint32_t vertexCount = 0;
+        uint32_t vertexStride = 0;
+        bool textured = false;
+        float minX = 0.0f;
+        float minY = 0.0f;
+        float maxX = 0.0f;
+        float maxY = 0.0f;
+        uint32_t colorSample = 0;
+    };
+
     struct CsdProjectTreeRecord
     {
         std::string projectName;
@@ -528,6 +547,11 @@ namespace UiLab
     static std::unordered_set<std::string> g_loggedCsdProjects;
     static std::vector<std::string> g_observedCsdProjectOrder;
     static std::vector<CsdProjectTreeRecord> g_csdProjectTrees;
+    static constexpr size_t kRuntimeUiDrawCallSampleLimit = 96;
+    static std::vector<RuntimeUiDrawCall> g_runtimeUiDrawCalls;
+    static uint64_t g_runtimeUiDrawListFrame = UINT64_MAX;
+    static uint32_t g_runtimeUiDrawCallSequence = 0;
+    static uint32_t g_runtimeUiDrawCallDroppedCount = 0;
     static PauseGeneralSaveLiveInspectorSnapshot g_pauseGeneralSaveInspector;
 
     static const RuntimeTarget& TargetFor(ScreenId id);
@@ -573,6 +597,7 @@ namespace UiLab
         std::string_view relatedAddressFieldName,
         std::string_view firstMetricName,
         std::string_view secondMetricName);
+    static std::string BuildRuntimeUiDrawListJson();
     static void AppendSonicHudOwnerFieldSamples(std::ostringstream& out, const std::vector<SonicHudOwnerFieldSample>& samples);
     static void AppendTypedInspectors(std::ostringstream& out);
 
@@ -1334,7 +1359,14 @@ namespace UiLab
     static constexpr std::string_view kUiOracleJsonFields[] =
     {
         R"("uiLayerOracle")",
+        R"("uiDrawListOracle")",
         R"("runtimeDrawListStatus")",
+        R"("runtime CSD platform draw hook; GPU backend submit pending")",
+        R"("drawCalls")",
+        R"("gpuDrawListStatus")",
+        R"("primitive": "quad")",
+        R"("screenRect")",
+        R"("layerPath")",
         R"("activeScreen")",
         R"("activeScenes")",
         R"("activeMotionName")",
@@ -2100,6 +2132,112 @@ namespace UiLab
         out << "]";
     }
 
+    static std::string RuntimeUiDrawListStatus(uint32_t capturedDrawCalls)
+    {
+        return capturedDrawCalls > 0
+            ? "runtime CSD platform draw hook; GPU backend submit pending"
+            : "runtime CSD platform draw hook armed; waiting for draw calls";
+    }
+
+    static void AppendRuntimeUiDrawCalls(std::ostringstream& out, const std::vector<RuntimeUiDrawCall>& calls)
+    {
+        out << "[";
+        for (size_t i = 0; i < calls.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            const auto& call = calls[i];
+            out
+                << "{"
+                << "\"sequence\":" << call.sequence
+                << ",\"frame\":" << call.frame
+                << ",\"project\":\"" << JsonEscape(call.projectName) << "\""
+                << ",\"layerPath\":\"" << JsonEscape(call.layerPath) << "\""
+                << ",\"layerAddress\":\"" << JsonEscape(HexU32(call.layerAddress)) << "\""
+                << ",\"castNodeAddress\":\"" << JsonEscape(HexU32(call.castNodeAddress)) << "\""
+                << ",\"vertexBufferAddress\":\"" << JsonEscape(HexU32(call.vertexBufferAddress)) << "\""
+                << ",\"primitive\": \"quad\""
+                << ",\"vertexCount\":" << call.vertexCount
+                << ",\"vertexStride\":" << call.vertexStride
+                << ",\"textured\":" << (call.textured ? "true" : "false")
+                << ",\"colorSample\":\"" << JsonEscape(HexU32(call.colorSample)) << "\""
+                << ",\"screenRect\":{"
+                << "\"minX\":" << call.minX
+                << ",\"minY\":" << call.minY
+                << ",\"maxX\":" << call.maxX
+                << ",\"maxY\":" << call.maxY
+                << "}"
+                << "}";
+        }
+        out << "]";
+    }
+
+    static std::string BuildRuntimeUiDrawListJson()
+    {
+        const auto& target = TargetFor(g_target);
+
+        std::vector<RuntimeUiDrawCall> calls;
+        uint64_t frame = 0;
+        uint32_t droppedCount = 0;
+        uint32_t sequence = 0;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            calls = g_runtimeUiDrawCalls;
+            frame = g_runtimeUiDrawListFrame == UINT64_MAX ? g_presentedFrameCount : g_runtimeUiDrawListFrame;
+            droppedCount = g_runtimeUiDrawCallDroppedCount;
+            sequence = g_runtimeUiDrawCallSequence;
+        }
+
+        uint32_t texturedCount = 0;
+        uint32_t noTextureCount = 0;
+        for (const auto& call : calls)
+        {
+            if (call.textured)
+                ++texturedCount;
+            else
+                ++noTextureCount;
+        }
+
+        const std::string status = RuntimeUiDrawListStatus(static_cast<uint32_t>(calls.size()));
+
+        std::ostringstream out;
+        out
+            << "{\n"
+            << "  \"ok\": true,\n"
+            << "  \"source\": \"runtime CSD platform draw hook\",\n"
+            << "  \"version\": 1,\n"
+            << "  \"frame\": " << frame << ",\n"
+            << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
+            << "  \"runtimeDrawListStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "  \"gpuDrawListStatus\": \"GPU backend submit pending\",\n"
+            << "  \"drawCallCount\": " << calls.size() << ",\n"
+            << "  \"capturedDrawCallCount\": " << calls.size() << ",\n"
+            << "  \"droppedDrawCallCount\": " << droppedCount << ",\n"
+            << "  \"drawCallSequence\": " << sequence << ",\n"
+            << "  \"texturedDrawCallCount\": " << texturedCount << ",\n"
+            << "  \"noTextureDrawCallCount\": " << noTextureCount << ",\n"
+            << "  \"sampleLimit\": " << kRuntimeUiDrawCallSampleLimit << ",\n"
+            << "  \"uiDrawListOracle\": {\n"
+            << "    \"source\": \"SWA::CCsdPlatformMirage::Draw/DrawNoTex hook\",\n"
+            << "    \"runtimeDrawListStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "    \"gpuDrawListStatus\": \"GPU backend submit pending\",\n"
+            << "    \"drawCallCount\": " << calls.size() << ",\n"
+            << "    \"droppedDrawCallCount\": " << droppedCount << ",\n"
+            << "    \"texturedDrawCallCount\": " << texturedCount << ",\n"
+            << "    \"noTextureDrawCallCount\": " << noTextureCount << ",\n"
+            << "    \"drawCalls\": ";
+        AppendRuntimeUiDrawCalls(out, calls);
+        out
+            << "\n"
+            << "  }\n"
+            << "}\n";
+
+        return out.str();
+    }
+
     static std::string BuildUiOracleJson()
     {
         const auto& target = TargetFor(g_target);
@@ -2111,6 +2249,14 @@ namespace UiLab
         const std::string activationEvent = UiOracleActivationEventName(target.id);
         const bool ready = UiOracleTargetReady(target.id);
         const std::string inputLockState = std::string(ready ? "released:" : "until:") + activationEvent;
+        std::vector<RuntimeUiDrawCall> drawCalls;
+        uint32_t runtimeUiDrawDroppedCount = 0;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            drawCalls = g_runtimeUiDrawCalls;
+            runtimeUiDrawDroppedCount = g_runtimeUiDrawCallDroppedCount;
+        }
+        const std::string runtimeDrawListStatus = RuntimeUiDrawListStatus(static_cast<uint32_t>(drawCalls.size()));
 
         std::ostringstream out;
         out
@@ -2133,7 +2279,7 @@ namespace UiLab
             << "  \"transitionBand\": \"" << JsonEscape(UiOracleTransitionBand(target.id)) << "\",\n"
             << "  \"inputLockState\": \"" << JsonEscape(inputLockState) << "\",\n"
             << "  \"activationEvent\": \"" << JsonEscape(activationEvent) << "\",\n"
-            << "  \"runtimeDrawListStatus\": \"runtime CSD tree; GPU draw-list pending\",\n"
+            << "  \"runtimeDrawListStatus\": \"" << JsonEscape(runtimeDrawListStatus) << "\",\n"
             << "  \"uiLayerOracle\": {\n"
             << "    \"source\": \"" << JsonEscape(csdProjectTree.source) << "\",\n"
             << "    \"activeProject\": \"" << JsonEscape(csdProjectTree.activeProject) << "\",\n"
@@ -2152,13 +2298,24 @@ namespace UiLab
         out
             << ",\n"
             << "    \"runtimeSceneMotionRepeatTypeLabel\": \"" << JsonEscape(MotionRepeatTypeLabel(csd.sceneMotionRepeatType)) << "\",\n"
-            << "    \"runtimeDrawListStatus\": \"runtime CSD tree; GPU draw-list pending\",\n"
+            << "    \"runtimeDrawListStatus\": \"" << JsonEscape(runtimeDrawListStatus) << "\",\n"
             << "    \"scenes\": ";
         AppendCsdTreeEntries(out, csdProjectTree.scenes, "sceneAddress", "projectAddress", "castNodeCount", "castCount");
         out
             << ",\n"
             << "    \"layers\": ";
         AppendCsdTreeEntries(out, csdProjectTree.layers, "layerAddress", "castNodeAddress", "castNodeIndex", "castIndex");
+        out
+            << "\n"
+            << "  },\n"
+            << "  \"uiDrawListOracle\": {\n"
+            << "    \"source\": \"SWA::CCsdPlatformMirage::Draw/DrawNoTex hook\",\n"
+            << "    \"runtimeDrawListStatus\": \"" << JsonEscape(runtimeDrawListStatus) << "\",\n"
+            << "    \"gpuDrawListStatus\": \"GPU backend submit pending\",\n"
+            << "    \"drawCallCount\": " << drawCalls.size() << ",\n"
+            << "    \"droppedDrawCallCount\": " << runtimeUiDrawDroppedCount << ",\n"
+            << "    \"drawCalls\": ";
+        AppendRuntimeUiDrawCalls(out, drawCalls);
         out
             << "\n"
             << "  },\n"
@@ -2258,7 +2415,7 @@ namespace UiLab
             << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
             << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
             << "    \"commands\": ";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out
             << "\n"
             << "  },\n"
@@ -3803,6 +3960,78 @@ namespace UiLab
             castIndex);
     }
 
+    void OnCsdPlatformDraw(
+        uint32_t layerAddress,
+        uint32_t castNodeAddress,
+        uint32_t vertexBufferAddress,
+        uint32_t vertexCount,
+        uint32_t vertexStride,
+        bool textured,
+        float minX,
+        float minY,
+        float maxX,
+        float maxY,
+        uint32_t colorSample)
+    {
+        if (!g_isEnabled)
+            return;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+
+        if (g_runtimeUiDrawListFrame != g_presentedFrameCount)
+        {
+            g_runtimeUiDrawListFrame = g_presentedFrameCount;
+            g_runtimeUiDrawCalls.clear();
+            g_runtimeUiDrawCallSequence = 0;
+            g_runtimeUiDrawCallDroppedCount = 0;
+        }
+
+        ++g_runtimeUiDrawCallSequence;
+        if (g_runtimeUiDrawCalls.size() >= kRuntimeUiDrawCallSampleLimit)
+        {
+            ++g_runtimeUiDrawCallDroppedCount;
+            return;
+        }
+
+        RuntimeUiDrawCall call;
+        call.frame = g_presentedFrameCount;
+        call.sequence = g_runtimeUiDrawCallSequence;
+        call.layerAddress = layerAddress;
+        call.castNodeAddress = castNodeAddress;
+        call.vertexBufferAddress = vertexBufferAddress;
+        call.vertexCount = vertexCount;
+        call.vertexStride = vertexStride;
+        call.textured = textured;
+        call.minX = minX;
+        call.minY = minY;
+        call.maxX = maxX;
+        call.maxY = maxY;
+        call.colorSample = colorSample;
+        call.layerPath = "unresolved";
+
+        for (const auto& record : g_csdProjectTrees)
+        {
+            const auto found = std::find_if(
+                record.layers.begin(),
+                record.layers.end(),
+                [layerAddress](const CsdTreeEntry& entry)
+                {
+                    return entry.address == layerAddress;
+                });
+            if (found == record.layers.end())
+                continue;
+
+            call.projectName = record.projectName;
+            call.layerPath = found->path;
+            break;
+        }
+
+        if (call.projectName.empty())
+            call.projectName = g_lastCsdProjectName.empty() ? std::string("unknown") : g_lastCsdProjectName;
+
+        g_runtimeUiDrawCalls.push_back(std::move(call));
+    }
+
     void OnHudSonicStageUpdate(
         uint32_t ownerAddress,
         uint32_t playScreenProjectAddress,
@@ -4325,7 +4554,7 @@ namespace UiLab
     {
         std::ostringstream out;
         out << "{\"ok\":true,\"commands\":";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out << "}\n";
         return out.str();
     }
@@ -4361,6 +4590,9 @@ namespace UiLab
 
         if (verb == "ui-oracle" || verb == "ui-layer-oracle" || verb == "csd-ui-oracle")
             return BuildUiOracleJson();
+
+        if (verb == "ui-draw-list" || verb == "ui-gpu-draw-list" || verb == "runtime-ui-draw-list")
+            return BuildRuntimeUiDrawListJson();
 
         if (verb == "help" || verb == "commands")
             return BuildHelpJson();
@@ -4993,7 +5225,7 @@ namespace UiLab
             ImGui::Separator();
             ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
-            ImGui::Text("commands: state, events, route-status, ui-oracle, route, reset, set-global, capture, help");
+            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
 
             if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))

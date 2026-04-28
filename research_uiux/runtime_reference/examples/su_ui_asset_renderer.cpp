@@ -7824,6 +7824,14 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
             if (entry.path().parent_path().filename().string() != target)
                 continue;
 
+            const auto manifestPath = entry.path().parent_path().parent_path() / "capture_manifest.json";
+            if (std::filesystem::is_regular_file(manifestPath, error))
+            {
+                const std::string manifestText = readTextFile(manifestPath);
+                if (const auto evidenceReady = jsonBoolField(manifestText, "evidenceReady"); evidenceReady && !*evidenceReady)
+                    continue;
+            }
+
             const auto writeTime = std::filesystem::last_write_time(entry.path(), error);
             if (!bestPath || !hasBestWriteTime || (!error && writeTime > bestWriteTime))
             {

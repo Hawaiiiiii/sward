@@ -936,17 +936,69 @@ PPC_FUNC(sub_830C6A00)
 }
 
 static std::optional<CsdModifier> g_castNodeModifier;
+static uint32_t g_currentCsdCastNodeAddress;
 
 void RenderCsdCastNodeMidAsmHook(PPCRegister& r10, PPCRegister& r27)
 {
-    g_castNodeModifier = FindModifier(r10.u32 + r27.u32);
+    g_currentCsdCastNodeAddress = r10.u32 + r27.u32;
+    g_castNodeModifier = FindModifier(g_currentCsdCastNodeAddress);
 }
 
 static std::optional<CsdModifier> g_castModifier;
+static uint32_t g_currentCsdCastAddress;
 
 void RenderCsdCastMidAsmHook(PPCRegister& r4)
 {
+    g_currentCsdCastAddress = r4.u32;
     g_castModifier = FindModifier(r4.u32);
+}
+
+static void RecordUiLabCsdPlatformDraw(PPCContext& ctx, uint8_t* base, uint32_t stride)
+{
+    if (ctx.r5.u32 == 0)
+        return;
+
+    float minX = 0.0f;
+    float minY = 0.0f;
+    float maxX = 0.0f;
+    float maxY = 0.0f;
+
+    for (uint32_t i = 0; i < ctx.r5.u32; ++i)
+    {
+        const auto* position = reinterpret_cast<be<float>*>(base + ctx.r4.u32 + i * stride);
+        const float x = position[0];
+        const float y = position[1];
+
+        if (i == 0)
+        {
+            minX = maxX = x;
+            minY = maxY = y;
+        }
+        else
+        {
+            minX = std::min(minX, x);
+            minY = std::min(minY, y);
+            maxX = std::max(maxX, x);
+            maxY = std::max(maxY, y);
+        }
+    }
+
+    uint32_t colorSample = 0;
+    if (stride >= 0xC)
+        colorSample = PPC_LOAD_U32(ctx.r4.u32 + 0x8);
+
+    UiLab::OnCsdPlatformDraw(
+        g_currentCsdCastAddress,
+        g_currentCsdCastNodeAddress,
+        ctx.r4.u32,
+        ctx.r5.u32,
+        stride,
+        stride == 0x14,
+        minX,
+        minY,
+        maxX,
+        maxY,
+        colorSample);
 }
 
 static void Draw(PPCContext& ctx, uint8_t* base, PPCFunc* original, uint32_t stride)
@@ -1187,6 +1239,7 @@ static void Draw(PPCContext& ctx, uint8_t* base, PPCFunc* original, uint32_t str
             ctx.r6 = r6;
             ctx.r7 = r7;
             ctx.r8 = r8;
+            RecordUiLabCsdPlatformDraw(ctx, base, stride);
             original(ctx, base);
 
             for (size_t i = 0; i < ctx.r5.u32; i++)
@@ -1198,6 +1251,7 @@ static void Draw(PPCContext& ctx, uint8_t* base, PPCFunc* original, uint32_t str
     else
     {
         ctx.r4.u32 = ctx.r1.u32;
+        RecordUiLabCsdPlatformDraw(ctx, base, stride);
         original(ctx, base);
         ctx.r1.u32 += size;
     }

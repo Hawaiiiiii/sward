@@ -147,6 +147,18 @@ namespace UiLab
         uint32_t castNodeAddress,
         uint32_t castNodeIndex,
         uint32_t castIndex);
+    void OnCsdPlatformDraw(
+        uint32_t layerAddress,
+        uint32_t castNodeAddress,
+        uint32_t vertexBufferAddress,
+        uint32_t vertexCount,
+        uint32_t vertexStride,
+        bool textured,
+        float minX,
+        float minY,
+        float maxX,
+        float maxY,
+        uint32_t colorSample);
     void OnHudPauseUpdate(
         uint32_t pauseAddress,
         uint32_t pauseProjectAddress,
