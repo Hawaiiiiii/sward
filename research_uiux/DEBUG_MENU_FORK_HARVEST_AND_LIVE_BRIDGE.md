@@ -173,6 +173,20 @@ Phase 120 also adds a deterministic pause route. `pause` is now a stage-harness 
 
 The capture helper now gives `pause` a target-aware effective auto-exit floor. A requested `75s` run records `requestedAutoExitSeconds=75` and `effectiveAutoExitSeconds=95`, which keeps slower stage/loading cycles alive long enough for the late `pause-target-ready` latch without changing non-pause targets. Native-capture sessions also request runtime exit on the next presented frame after the requested BMP set completes, so evidence runs stop at the proof point instead of sitting in the target state until a generic timeout.
 
+## Phase 121 Sonic HUD Owner Maturation And Tutorial Route
+
+Phase 121 adds explicit Sonic HUD owner maturation sampling. The raw `CHudSonicStage` hook was already live, but the fork-header `m_rcPlayScreen/m_rcSpeedGauge/m_rcRingEnergyGauge/m_rcGaugeFrame stayed zero` through the Phase 120 hook points. The live bridge now samples the expected `api/SWA/HUD/Sonic/HudSonicStage.h` RCPtr object slots at offsets `0xE4`, `0xEC`, `0xF4`, and `0xFC`, exposes those raw owner field samples under `typedInspectors.sonicHud.ownerPath.rawOwnerFieldSamples`, and reports an `ownerFieldMaturationStatus` instead of pretending the fork offsets are proven when they are still null.
+
+This makes the current explanation testable: the raw owner is real, while the embedded fork API RCPtr slots are either not mature at `sub_824D89B0`, `sub_824D9308`, and `sub_824D95F8`, or the debug-menu fork layout does not match this translated runtime at those fields. Until raw samples resolve the RCPtr RCObject memory path, the mature CSD project/scene addresses remain the real `CCsdProject::Make` traversal evidence.
+
+Phase 121 also tightens the tutorial/HUD guide route. `tutorial` now targets the `ui_playscreen` project from `Player/Character/Sonic/Hud/SonicHudGuide.cpp`, requires the raw Sonic HUD owner hook plus `tutorial-hud-owner-path-ready`, and emits `tutorial-target-ready` before `tutorial-ready`. The capture helper requires those events, so live bridge plus native BMP proof now has a real owner-path gate instead of treating generic stage/CSD readiness as enough.
+
+Phase 121 also adds a stage-title owner direct-state arming seam for unattended stage targets. Failed long runs showed `CTitleStateIntro` reporting `requested_state=1` while the `CGameModeStageTitle` owner context repeatedly read back `dirty=0`, `transition_armed=0`, `owner_gate568=0`, and `csd_byte84=0`. The new `stage-title-owner-direct-state-requested` / `stage-title-owner-direct-state-applied` events are narrowly gated to direct-context stage-harness routes and write those owner-context bytes at the stage-title boundary, where the real owner is observed. This keeps the diagnostic explicit: it is route stabilization for the real runtime owner path, not a fake HUD renderer.
+
+The stage title owner direct-state fallback waits for the title intro direct-state path to mature before it fires. Focused HUD evidence showed the stable runtime path can spend roughly twenty seconds of presented frames in title intro after `title-intro-direct-state-requested` before the real title-menu hook appears; firing the owner seam immediately can create an early `is_title_state_menu=1` state that never advances past `menu_cursor=0`. The title route now uses a one-shot title intro direct-state request: repeated refreshes were observed to kick the runtime back through loading/title-intro loops instead of letting the state machine mature. The owner seam is now a late fallback, while the title-menu-to-stage handoff still holds the direct-context menu latch once the real title menu is actually observed. The owner direct-state fallback is diagnostic opt-in through `--ui-lab-stage-title-owner-direct-fallback`; default captures wait for the natural title-menu owner path. When that diagnostic fallback is enabled, the direct-context menu handoff injects one accept pulse and records `title-menu-direct-context-accept-injected`, so the synthesized owner-state experiment has the same New Game accept edge that ENTER/A/Start provides during manual operation.
+
+Phase 121 control automation moves unattended routes back to real mapped controls. The capture helper now knows `ENTER/W/A/S/D/Q/E`, focuses the UnleashedRecomp window, and `title-menu`, `title-options`, plus stage targets default to real keyboard input automation unless `-DisableControlAutomation` is supplied. In this mode, input automation is the route driver for pressing through title/menu flow, while the live bridge plus native BMP remain the oracle for readiness and visual proof. This keeps routing honest: the harness presses the same local controls a person would press, and JSONL/native captures still decide whether title menu, Sonic HUD, pause, or tutorial actually became runtime-visible. The sender uses scan-code `SendInput` first, keeps `keybd_event` as a fallback, and records foreground/send results in the manifest so a manual ENTER cannot be mistaken for proven automation.
+
 ## Verification
 
 Local-only evidence, not committed:
@@ -235,6 +249,21 @@ Local-only evidence, not committed:
   - Phase 119 full early-game live-bridge/native sweep passed `title-loop`, `title-menu`, `title-options`, `loading`, and `sonic-hud`
   - all targets used live-bridge readiness and RGB-nonblack native BMP evidence
   - the final `sonic-hud` state again reported `ui_playscreen`, `13` scenes, `209` layers, and resolved gauge scene addresses from the CSD tree
+
+- `out/ui_lab_runtime_evidence/20260428_082902/`
+  - Phase 121 focused `sonic-hud` run passed hands-off with scan-code control automation
+  - manifest recorded `pulseCount=12`, `foregroundFailureCount=0`, `sendInputFailureCount=0`
+  - live bridge emitted `sonic-hud-ready`; native frame summary selected a `stage target ready` RGB-nonblack BMP
+
+- `out/ui_lab_runtime_evidence/20260428_083009/`
+  - Phase 121 focused `tutorial` run passed hands-off with scan-code control automation
+  - manifest recorded `pulseCount=11`, `sendInputFailureCount=0`, `tutorial-hud-owner-path-ready`, `tutorial-target-ready`, and `tutorial-ready`
+  - live state kept `rawOwnerFieldsReady=false` while resolved `ui_playscreen` ownership came from the CSD project tree, matching the owner-maturation finding
+
+- `out/ui_lab_runtime_evidence/20260428_083651/`
+  - Phase 121 combined early-game live-bridge/native sweep passed `title-loop`, `title-menu`, `title-options`, `loading`, and `sonic-hud`
+  - `title-menu`, `title-options`, and `sonic-hud` used foreground-verified scan-code control automation with `sendInputFailureCount=0`
+  - best native routes were `title menu visual ready`, `title options accept injected`, `loading display active`, and `stage target ready`, all with RGB-nonblack BMP evidence
 
 - `out/ui_lab_runtime_evidence/20260428_011255/`
   - focused Phase 120 `sonic-hud` live-bridge/native capture passed on the final raw-owner hook build

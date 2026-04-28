@@ -1134,6 +1134,173 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, script)
 
+    def test_ui_lab_phase121_samples_sonic_hud_owner_maturation(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        sonic = self.read("UnleashedRecomp/patches/CHudSonicStage_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "void OnHudSonicStageOwnerFieldSample",
+            "uint32_t ownerAddress",
+            "std::string_view hookSource",
+            "bool ShouldRefreshStageTitleOwnerDirectState",
+            "void OnStageTitleOwnerDirectStateApplied",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "struct SonicHudOwnerFieldSample",
+            "kChudSonicStageExpectedOwnerFields",
+            "sampleOffset",
+            "rcObjectAddress",
+            "resolvedMemoryAddress",
+            "rawOwnerFieldSamples",
+            "rawOwnerFieldSampleCount",
+            "rawOwnerResolvedMemoryCount",
+            "ownerFieldMaturationStatus",
+            "fork API CHudSonicStage RCPtr slots stayed null",
+            "sonic-hud-owner-field-sample",
+            "stage-title-owner-direct-state-requested",
+            "stage-title-owner-direct-state-applied",
+            "kStageTitleOwnerDirectStateFallbackFrames",
+            "g_titleIntroDirectStateApplied",
+            "if (g_titleIntroDirectStateApplied)",
+            "WriteEvidenceEvent(\"title-intro-direct-state-requested\"",
+            "g_titleIntroDirectStateLastRequestFrame == 0",
+            "g_presentedFrameCount < g_titleIntroDirectStateLastRequestFrame + kStageTitleOwnerDirectStateFallbackFrames",
+            "g_stageTitleOwnerDirectStateFallbackEnabled",
+            "if (!g_stageTitleOwnerDirectStateFallbackEnabled)",
+            "g_titleMenuDirectContextAcceptInjected",
+            "title-menu-direct-context-accept-injected",
+            "shouldHoldDirectContext",
+            "!g_targetCsdObserved",
+            "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0xFC",
+        ]:
+            self.assertIn(token, ui_lab)
+        self.assertNotIn("title-intro-direct-state-refreshed", ui_lab)
+
+        stage_title = self.read("UnleashedRecomp/patches/CGameModeStageTitle_patches.cpp")
+        for token in [
+            "ArmStageTitleOwnerDirectState",
+            "UiLab::ShouldRefreshStageTitleOwnerDirectState",
+            "PPC_STORE_U8(titleContextGuestAddress + 0x181, 1)",
+            "PPC_STORE_U8(titleContextGuestAddress + 0x238, 1)",
+            "PPC_STORE_U8(titleContextGuestAddress + 0x1D1, 1)",
+            "PPC_STORE_U8(titleCsdAddress + 84, 1)",
+            "UiLab::OnStageTitleOwnerDirectStateApplied",
+        ]:
+            self.assertIn(token, stage_title)
+
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+        for token in [
+            "[switch]$EnableStageTitleOwnerDirectFallback",
+            "--ui-lab-stage-title-owner-direct-fallback",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "UiLab::OnHudSonicStageOwnerFieldSample",
+            "raw CHudSonicStage owner hook sub_824D89B0",
+            "raw CHudSonicStage owner hook sub_824D9308",
+            "raw CHudSonicStage owner hook sub_824D95F8",
+        ]:
+            self.assertIn(token, sonic)
+
+        for token in [
+            "Phase 121",
+            "owner maturation",
+            "raw owner field samples",
+            "m_rcPlayScreen/m_rcSpeedGauge/m_rcRingEnergyGauge/m_rcGaugeFrame stayed zero",
+            "stage title owner direct-state fallback waits",
+            "late fallback",
+            "one-shot title intro direct-state request",
+            "direct-context menu handoff injects one accept pulse",
+            "owner direct-state fallback is diagnostic opt-in",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_phase121_routes_tutorial_from_sonic_hud_owner_path(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            '{ ScreenId::Tutorial, "tutorial", "Tutorial / Control Guide", "ui_playscreen", "Player/Character/Sonic/Hud/SonicHudGuide.cpp", true }',
+            "IsTutorialTargetRuntimeReady",
+            "tutorial-hud-owner-path-ready",
+            "tutorial-target-ready",
+            "tutorial ready from SonicHudGuide owner path",
+            'case ScreenId::Tutorial:',
+            'return "tutorial-ready"',
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            '"tutorial" {',
+            '@("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "sonic-hud-owner-hooked", "tutorial-hud-owner-path-ready", "tutorial-target-ready", "tutorial-ready")',
+            '$observedEvents.Contains("tutorial-hud-owner-path-ready")',
+            '$observedEvents.Contains("tutorial-target-ready")',
+            '$stageTargetReadyEvent -eq "tutorial-ready"',
+            '@("sonic-hud", "tutorial")',
+            'return [Math]::Max($RequestedAutoExitSeconds, 220)',
+            '[int]$StageTargetRetries = 2',
+            'retrying fresh runtime session after incomplete live/native evidence',
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "tutorial/HUD guide route",
+            "SonicHudGuide.cpp",
+            "live bridge plus native BMP",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_phase121_capture_helper_drives_real_mapped_controls(self):
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "[switch]$UseControlAutomation",
+            "[switch]$DisableControlAutomation",
+            "[string]$ControlAutomationPlan = \"early-stage-route\"",
+            "public struct UiLabMouseInput",
+            "SendKeyboardInput",
+            "KEYEVENTF_SCANCODE",
+            "function Get-UiLabVirtualKey",
+            "function Send-UiLabKey",
+            "function Invoke-UiLabControlAutomationTick",
+            "function Start-UiLabControlAutomation",
+            "VK_RETURN",
+            "foregroundBefore",
+            "foregroundAfter",
+            "sendInputDown",
+            "sendInputUp",
+            '$controlAutomationTargets = @("title-menu", "title-options") + $stageTargets',
+            "titleMenuVisible",
+            "titleMenuVisualReady",
+            '"ENTER" { return 0x0D }',
+            '"W" { return 0x57 }',
+            '"A" { return 0x41 }',
+            '"S" { return 0x53 }',
+            '"D" { return 0x44 }',
+            '"Q" { return 0x51 }',
+            '"E" { return 0x45 }',
+            "$controlAutomationEnabled = -not $Observer -and -not $DisableControlAutomation -and (($controlAutomationTargets -contains $target) -or $UseControlAutomation)",
+            "Wait-UiLabControlAutomationAwareSleep",
+            "controlAutomation = $controlAutomationRecord",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 121 control automation",
+            "ENTER/W/A/S/D/Q/E",
+            "stage targets default to real keyboard input automation",
+            "input automation is the route driver",
+            "live bridge plus native BMP remain the oracle",
+        ]:
+            self.assertIn(token, report)
+
 
 if __name__ == "__main__":
     unittest.main()

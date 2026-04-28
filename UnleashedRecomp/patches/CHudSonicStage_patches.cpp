@@ -28,6 +28,7 @@ static void RecordHudSonicStageInspector(
         GuestAddressOf(pHudSonicStage->m_rcRingEnergyGauge.Get()),
         GuestAddressOf(pHudSonicStage->m_rcGaugeFrame.Get()),
         hookSource);
+    UiLab::OnHudSonicStageOwnerFieldSample(ownerAddress, hookSource);
 }
 
 static void RecordHudSonicStageInspector(uint32_t ownerAddress, const char* hookSource)

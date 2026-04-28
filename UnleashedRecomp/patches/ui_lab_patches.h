@@ -73,6 +73,16 @@ namespace UiLab
         uint8_t transitionArmed,
         uint8_t outputArmed,
         uint8_t csdCompleteArmed);
+    bool ShouldRefreshStageTitleOwnerDirectState();
+    void OnStageTitleOwnerDirectStateApplied(
+        uint32_t titleContextAddress,
+        uint32_t titleCsdAddress,
+        uint8_t requestedState,
+        uint8_t dirtyFlag,
+        uint8_t transitionArmed,
+        uint8_t outputArmed,
+        uint8_t ownerGateArmed,
+        uint8_t csdCompleteArmed);
     void OnGameModeStageTitleContext(
         uint32_t gameModeAddress,
         uint32_t contextAddress,
@@ -154,6 +164,7 @@ namespace UiLab
         uint32_t ringEnergyGaugeSceneAddress,
         uint32_t gaugeFrameSceneAddress,
         std::string_view hookSource);
+    void OnHudSonicStageOwnerFieldSample(uint32_t ownerAddress, std::string_view hookSource);
     void OnGeneralWindowUpdate(
         uint32_t generalWindowAddress,
         uint32_t generalProjectAddress,

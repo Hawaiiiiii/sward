@@ -167,6 +167,19 @@ namespace UiLab
         std::string source;
     };
 
+    struct SonicHudOwnerFieldSample
+    {
+        std::string field;
+        uint32_t sampleOffset = 0;
+        uint32_t slotValue = 0;
+        uint32_t rcObjectAddress = 0;
+        uint32_t resolvedMemoryAddress = 0;
+        bool rcObjectKnown = false;
+        bool resolvedMemoryKnown = false;
+        uint64_t frame = 0;
+        std::string hookSource;
+    };
+
     struct SonicHudOwnerPathInspectorSnapshot
     {
         uint32_t chudSonicStageOwnerAddress = 0;
@@ -178,10 +191,14 @@ namespace UiLab
         bool rawOwnerKnown = false;
         bool rawOwnerFieldsReady = false;
         uint64_t rawOwnerFrame = 0;
+        uint64_t rawOwnerFieldSampleCount = 0;
+        uint32_t rawOwnerResolvedMemoryCount = 0;
         bool resolvedFromCsdProjectTree = false;
         std::string ownerPointerStatus;
+        std::string ownerFieldMaturationStatus;
         std::string expectedOwnerFieldSource;
         std::string rawHookSource;
+        std::vector<SonicHudOwnerFieldSample> rawOwnerFieldSamples;
     };
 
     struct PauseGeneralSaveLiveInspectorSnapshot
@@ -232,6 +249,13 @@ namespace UiLab
         const char* field;
         const char* usage;
         const char* status;
+    };
+
+    struct ChudSonicStageExpectedOwnerField
+    {
+        const char* field;
+        uint32_t rcPtrOffset;
+        uint32_t rcObjectOffset;
     };
 
     static constexpr std::array<GuestBoolRef, 7> kGuestRenderGlobals =
@@ -365,6 +389,17 @@ namespace UiLab
         },
     }};
 
+    static constexpr std::array<ChudSonicStageExpectedOwnerField, 4> kChudSonicStageExpectedOwnerFields =
+    {{
+        { "m_rcPlayScreen", 0xE0, 0xE4 },
+        { "m_rcSpeedGauge", 0xE8, 0xEC },
+        { "m_rcRingEnergyGauge", 0xF0, 0xF4 },
+        { "m_rcGaugeFrame", 0xF8, 0xFC },
+    }};
+
+    static constexpr std::string_view kChudSonicStageExpectedOwnerFieldSource =
+        "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0xFC";
+
     static constexpr std::array<RuntimeTarget, 11> kRuntimeTargets =
     {{
         { ScreenId::TitleLoop, "title-loop", "Title Loop", "ui_title", "System/GameMode/Title/TitleStateIntro.cpp", false },
@@ -376,7 +411,7 @@ namespace UiLab
         { ScreenId::ExtraStageHud, "extra-stage-hud", "Extra Stage / Tornado HUD", "ui_prov_playscreen", "ExtraStage/Tails/Hud/HudExQte.cpp", true },
         { ScreenId::Result, "result", "Stage Result", "ui_result", "HUD/Result/Result.cpp", true },
         { ScreenId::Status, "status", "Status / Skill Upgrade", "ui_status", "HUD/Status/Status.cpp", false },
-        { ScreenId::Tutorial, "tutorial", "Tutorial / Control Guide", "ui_loading", "Player/Character/Sonic/Hud/SonicHudGuide.cpp", true },
+        { ScreenId::Tutorial, "tutorial", "Tutorial / Control Guide", "ui_playscreen", "Player/Character/Sonic/Hud/SonicHudGuide.cpp", true },
         { ScreenId::WorldMap, "world-map", "World Map", "ui_worldmap", "System/GameMode/WorldMap/WorldMapSelect.cpp", false },
     }};
 
@@ -412,7 +447,12 @@ namespace UiLab
     static uint64_t g_routeGeneration = 0;
     static uint64_t g_routeResetCount = 0;
     static bool g_titleIntroAcceptInjected = false;
+    static bool g_titleIntroDirectStateApplied = false;
+    static uint64_t g_titleIntroDirectStateLastRequestFrame = 0;
+    static uint64_t g_stageTitleOwnerDirectStateLastRequestFrame = 0;
+    static bool g_stageTitleOwnerDirectStateFallbackEnabled = false;
     static bool g_titleMenuAcceptInjected = false;
+    static bool g_titleMenuDirectContextAcceptInjected = false;
     static bool g_stageContextObserved = false;
     static bool g_targetCsdObserved = false;
     static std::string_view g_routeStatus = "idle";
@@ -473,6 +513,10 @@ namespace UiLab
     static uint64_t g_chudSonicStageRawHookFrame = 0;
     static std::string g_chudSonicStageRawHookSource;
     static bool g_loggedChudSonicStageOwnerHook = false;
+    static bool g_loggedChudSonicStageOwnerFieldSample = false;
+    static bool g_loggedTutorialHudOwnerPathReady = false;
+    static uint64_t g_chudSonicStageOwnerFieldSampleCount = 0;
+    static std::vector<SonicHudOwnerFieldSample> g_chudSonicStageOwnerFieldSamples;
     static uint64_t g_lastLiveStateSnapshotFrame = 0;
     static std::string g_lastStageReadyEventName;
     static std::string g_lastCsdProjectName;
@@ -493,8 +537,11 @@ namespace UiLab
     static void RefreshTargetCsdProjectStatus();
     static void ResetRouteLatchState();
     static bool IsPauseTargetRuntimeReady();
+    static bool IsTutorialTargetRuntimeReady();
+    static bool IsStageTargetRuntimeReady();
     static bool IsNativeFrameCaptureReady();
     static std::string_view NativeFrameCaptureStatusLabel();
+    static void EmitTutorialHudOwnerPathReadyIfNeeded();
     static void EmitStageTargetReadyIfNeeded();
     static std::array<OperatorWindowEntry, 8> GetOperatorWindowEntries();
     static void StartLiveBridge();
@@ -526,6 +573,7 @@ namespace UiLab
         std::string_view relatedAddressFieldName,
         std::string_view firstMetricName,
         std::string_view secondMetricName);
+    static void AppendSonicHudOwnerFieldSamples(std::ostringstream& out, const std::vector<SonicHudOwnerFieldSample>& samples);
     static void AppendTypedInspectors(std::ostringstream& out);
 
     static std::string_view RoutePolicyLabel()
@@ -1072,12 +1120,54 @@ namespace UiLab
             (g_pauseGeneralSaveInspector.pauseVisible || g_pauseGeneralSaveInspector.pauseShown);
     }
 
+    static bool IsTutorialTargetRuntimeReady()
+    {
+        if (g_target != ScreenId::Tutorial)
+            return true;
+
+        return
+            g_chudSonicStageOwnerAddress != 0 &&
+            g_stageContextObserved &&
+            g_targetCsdObserved &&
+            HasObservedCsdProject("ui_playscreen");
+    }
+
+    static bool IsStageTargetRuntimeReady()
+    {
+        if (g_target == ScreenId::Pause)
+            return IsPauseTargetRuntimeReady();
+
+        if (g_target == ScreenId::Tutorial)
+            return IsTutorialTargetRuntimeReady();
+
+        return true;
+    }
+
     static bool IsPauseRouteOwnerObserved()
     {
         std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
         return g_pauseGeneralSaveInspector.pauseKnown &&
             g_pauseGeneralSaveInspector.pauseAddress != 0 &&
             g_pauseGeneralSaveInspector.pauseProjectAddress != 0;
+    }
+
+    static void EmitTutorialHudOwnerPathReadyIfNeeded()
+    {
+        if (g_target != ScreenId::Tutorial ||
+            g_loggedTutorialHudOwnerPathReady ||
+            !IsTutorialTargetRuntimeReady())
+        {
+            return;
+        }
+
+        g_loggedTutorialHudOwnerPathReady = true;
+        WriteEvidenceEvent(
+            "tutorial-hud-owner-path-ready",
+            "tutorial ready from SonicHudGuide owner path"
+            " owner=" + HexU32(g_chudSonicStageOwnerAddress) +
+            " stage_address=" + HexU32(g_lastStageGameModeAddress) +
+            " target_csd=ui_playscreen"
+            " source=Player/Character/Sonic/Hud/SonicHudGuide.cpp");
     }
 
     void OnStageTargetReady(std::string_view eventName, std::string_view detail)
@@ -1087,7 +1177,13 @@ namespace UiLab
 
         g_lastStageReadyEventName = std::string(eventName);
         g_lastStageReadyFrame = g_presentedFrameCount;
-        g_routeStatus = g_target == ScreenId::Pause ? "pause target ready" : "stage target ready";
+        g_routePending = false;
+        if (g_target == ScreenId::Pause)
+            g_routeStatus = "pause target ready";
+        else if (g_target == ScreenId::Tutorial)
+            g_routeStatus = "tutorial target ready";
+        else
+            g_routeStatus = "stage target ready";
         WriteEvidenceEvent(eventName, detail);
         WriteLiveStateSnapshot();
     }
@@ -1099,7 +1195,7 @@ namespace UiLab
             g_loggedStageTargetReady ||
             !g_stageContextObserved ||
             !g_targetCsdObserved ||
-            !IsPauseTargetRuntimeReady())
+            !IsStageTargetRuntimeReady())
         {
             return;
         }
@@ -1112,6 +1208,11 @@ namespace UiLab
             " target_csd=" + std::string(target.primaryCsdScene);
 
         g_loggedStageTargetReady = true;
+        if (g_target == ScreenId::Tutorial)
+        {
+            EmitTutorialHudOwnerPathReadyIfNeeded();
+            WriteEvidenceEvent("tutorial-target-ready", detail);
+        }
         const auto readyEvent = StageReadyEventName();
         OnStageTargetReady(readyEvent, detail);
 
@@ -1523,16 +1624,49 @@ namespace UiLab
             g_chudSonicStageGaugeFrameSceneAddress != 0;
         snapshot.rawOwnerFrame = g_chudSonicStageRawHookFrame;
         snapshot.rawHookSource = g_chudSonicStageRawHookSource;
-        snapshot.expectedOwnerFieldSource = "api/SWA/HUD/Sonic/HudSonicStage.h";
+        snapshot.expectedOwnerFieldSource = std::string(kChudSonicStageExpectedOwnerFieldSource);
+
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            snapshot.rawOwnerFieldSamples = g_chudSonicStageOwnerFieldSamples;
+            snapshot.rawOwnerFieldSampleCount = g_chudSonicStageOwnerFieldSampleCount;
+        }
+
+        for (const auto& sample : snapshot.rawOwnerFieldSamples)
+        {
+            if (sample.resolvedMemoryKnown)
+                ++snapshot.rawOwnerResolvedMemoryCount;
+        }
+
         if (snapshot.rawOwnerKnown)
         {
             snapshot.ownerPointerStatus = snapshot.rawOwnerFieldsReady
                 ? "raw CHudSonicStage owner hook live"
                 : "raw CHudSonicStage owner hook live; CSD owner fields pending";
+
+            if (snapshot.rawOwnerFieldsReady)
+            {
+                snapshot.ownerFieldMaturationStatus = "fork API CHudSonicStage RCPtr .Get() resolved embedded CSD fields";
+            }
+            else if (snapshot.rawOwnerResolvedMemoryCount != 0)
+            {
+                snapshot.ownerFieldMaturationStatus =
+                    "raw owner field samples found RCPtr RCObject memory candidates; typed API .Get() fields still pending";
+            }
+            else if (!snapshot.rawOwnerFieldSamples.empty())
+            {
+                snapshot.ownerFieldMaturationStatus =
+                    "fork API CHudSonicStage RCPtr slots stayed null at sampled hooks; CSD tree owner path is the mature source";
+            }
+            else
+            {
+                snapshot.ownerFieldMaturationStatus = "raw owner known; owner field samples pending";
+            }
         }
         else
         {
             snapshot.ownerPointerStatus = "raw CHudSonicStage owner hook pending runtime observation";
+            snapshot.ownerFieldMaturationStatus = "raw owner pending; field maturation not sampled";
         }
 
         if (csdProjectTree.projectKnown && csdProjectTree.activeProject == "ui_playscreen")
@@ -1549,6 +1683,12 @@ namespace UiLab
 
             if (!snapshot.rawOwnerKnown)
                 snapshot.ownerPointerStatus = "resolved CSD ownership; raw CHudSonicStage owner hook pending runtime observation";
+
+            if (snapshot.rawOwnerKnown && !snapshot.rawOwnerFieldsReady && snapshot.rawOwnerResolvedMemoryCount == 0)
+            {
+                snapshot.ownerFieldMaturationStatus =
+                    "fork API CHudSonicStage RCPtr slots stayed null; resolved ui_playscreen project/scene addresses came from CCsdProject::Make traversal";
+            }
         }
 
         return snapshot;
@@ -1580,7 +1720,7 @@ namespace UiLab
         snapshot.rawHookSource = g_chudSonicStageRawHookSource;
         snapshot.source = snapshot.rawOwnerKnown ? "raw CHudSonicStage owner hook" : "stage/CSD latches";
 
-        if (target.id == ScreenId::SonicHud && g_targetCsdObserved)
+        if ((target.id == ScreenId::SonicHud || target.id == ScreenId::Tutorial) && g_targetCsdObserved)
         {
             snapshot.playScreenProject = std::string(target.primaryCsdScene);
             snapshot.speedGaugeScene = "ui_playscreen/so_speed_gauge";
@@ -1614,6 +1754,31 @@ namespace UiLab
                 << "\"" << firstMetricName << "\":" << entry.firstMetric << ","
                 << "\"" << secondMetricName << "\":" << entry.secondMetric << ","
                 << "\"frame\":" << entry.frame
+                << "}";
+        }
+        out << "]";
+    }
+
+    static void AppendSonicHudOwnerFieldSamples(std::ostringstream& out, const std::vector<SonicHudOwnerFieldSample>& samples)
+    {
+        out << "[";
+        for (size_t i = 0; i < samples.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            const auto& sample = samples[i];
+            out
+                << "{"
+                << "\"field\":\"" << JsonEscape(sample.field) << "\","
+                << "\"sampleOffset\":\"" << JsonEscape(HexU32(sample.sampleOffset)) << "\","
+                << "\"slotValue\":\"" << JsonEscape(HexU32(sample.slotValue)) << "\","
+                << "\"rcObjectAddress\":\"" << JsonEscape(HexU32(sample.rcObjectAddress)) << "\","
+                << "\"resolvedMemoryAddress\":\"" << JsonEscape(HexU32(sample.resolvedMemoryAddress)) << "\","
+                << "\"rcObjectKnown\":" << (sample.rcObjectKnown ? "true" : "false") << ","
+                << "\"resolvedMemoryKnown\":" << (sample.resolvedMemoryKnown ? "true" : "false") << ","
+                << "\"frame\":" << sample.frame << ","
+                << "\"hookSource\":\"" << JsonEscape(sample.hookSource) << "\""
                 << "}";
         }
         out << "]";
@@ -1783,9 +1948,12 @@ namespace UiLab
             << "      \"ownerPath\": {\n"
             << "        \"chudSonicStageOwnerAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.chudSonicStageOwnerAddress)) << "\",\n"
             << "        \"ownerPointerStatus\": \"" << JsonEscape(sonicOwnerPath.ownerPointerStatus) << "\",\n"
+            << "        \"ownerFieldMaturationStatus\": \"" << JsonEscape(sonicOwnerPath.ownerFieldMaturationStatus) << "\",\n"
             << "        \"rawOwnerKnown\": " << (sonicOwnerPath.rawOwnerKnown ? "true" : "false") << ",\n"
             << "        \"rawOwnerFieldsReady\": " << (sonicOwnerPath.rawOwnerFieldsReady ? "true" : "false") << ",\n"
             << "        \"rawOwnerFrame\": " << sonicOwnerPath.rawOwnerFrame << ",\n"
+            << "        \"rawOwnerFieldSampleCount\": " << sonicOwnerPath.rawOwnerFieldSampleCount << ",\n"
+            << "        \"rawOwnerResolvedMemoryCount\": " << sonicOwnerPath.rawOwnerResolvedMemoryCount << ",\n"
             << "        \"rawHookSource\": \"" << JsonEscape(sonicOwnerPath.rawHookSource) << "\",\n"
             << "        \"stageGameModeAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.stageGameModeAddress)) << "\",\n"
             << "        \"rcPlayScreenProjectAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcPlayScreenProjectAddress)) << "\",\n"
@@ -1793,7 +1961,12 @@ namespace UiLab
             << "        \"rcRingEnergyGaugeSceneAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcRingEnergyGaugeSceneAddress)) << "\",\n"
             << "        \"rcGaugeFrameSceneAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcGaugeFrameSceneAddress)) << "\",\n"
             << "        \"resolvedFromCsdProjectTree\": " << (sonicOwnerPath.resolvedFromCsdProjectTree ? "true" : "false") << ",\n"
-            << "        \"expectedOwnerFieldSource\": \"" << JsonEscape(sonicOwnerPath.expectedOwnerFieldSource) << "\"\n"
+            << "        \"expectedOwnerFieldSource\": \"" << JsonEscape(sonicOwnerPath.expectedOwnerFieldSource) << "\",\n"
+            << "        \"rawOwnerExpectedFieldOffsets\": \"" << JsonEscape(std::string(kChudSonicStageExpectedOwnerFieldSource)) << "\",\n"
+            << "        \"rawOwnerFieldSamples\": ";
+        AppendSonicHudOwnerFieldSamples(out, sonicOwnerPath.rawOwnerFieldSamples);
+        out
+            << "\n"
             << "      }\n"
             << "    }\n"
             << "  }";
@@ -2103,6 +2276,13 @@ namespace UiLab
                 if (!TrySetRoutePolicy(policy))
                     LOGFN_WARNING("SWARD UI Lab: unknown route policy '{}'.", std::string(policy));
 
+                continue;
+            }
+
+            if (arg == "--ui-lab-stage-title-owner-direct-fallback")
+            {
+                g_isEnabled = true;
+                g_stageTitleOwnerDirectStateFallbackEnabled = true;
                 continue;
             }
 
@@ -2494,7 +2674,11 @@ namespace UiLab
         ++g_routeGeneration;
         ++g_routeResetCount;
         g_titleIntroAcceptInjected = false;
+        g_titleIntroDirectStateApplied = false;
+        g_titleIntroDirectStateLastRequestFrame = 0;
+        g_stageTitleOwnerDirectStateLastRequestFrame = 0;
         g_titleMenuAcceptInjected = false;
+        g_titleMenuDirectContextAcceptInjected = false;
         g_stageContextObserved = false;
         g_targetCsdObserved = false;
         g_loggedIntroHook = false;
@@ -2543,6 +2727,9 @@ namespace UiLab
         g_chudSonicStageRawHookFrame = 0;
         g_chudSonicStageRawHookSource.clear();
         g_loggedChudSonicStageOwnerHook = false;
+        g_loggedChudSonicStageOwnerFieldSample = false;
+        g_loggedTutorialHudOwnerPathReady = false;
+        g_chudSonicStageOwnerFieldSampleCount = 0;
         g_lastCsdProjectName.clear();
         g_lastCsdProjectFrame = 0;
         g_lastTitleIntroContextDetail.clear();
@@ -2555,6 +2742,7 @@ namespace UiLab
             g_observedCsdProjectOrder.clear();
             g_csdProjectTrees.clear();
             g_pauseGeneralSaveInspector = {};
+            g_chudSonicStageOwnerFieldSamples.clear();
         }
 
         {
@@ -2691,7 +2879,73 @@ namespace UiLab
             "requested_state=" + std::to_string(requestedState) +
             " dirty=" + std::to_string(dirtyFlag) +
             " transition_armed=" + std::to_string(transitionArmed) +
+                " output_armed=" + std::to_string(outputArmed) +
+                " csd_complete_armed=" + std::to_string(csdCompleteArmed));
+    }
+
+    bool ShouldRefreshStageTitleOwnerDirectState()
+    {
+        if (!g_stageTitleOwnerDirectStateFallbackEnabled)
+            return false;
+
+        if (!g_isEnabled ||
+            g_observerMode ||
+            !g_routePending ||
+            g_routePolicy != RoutePolicy::DirectContext ||
+            !TargetNeedsStageHarness(g_target) ||
+            g_loggedStageTargetReady ||
+            g_loggedMenuHook ||
+            !g_stageContextObserved ||
+            g_targetCsdObserved)
+        {
+            return false;
+        }
+
+        constexpr uint64_t kStageTitleOwnerDirectStateFallbackFrames = 1260;
+        if (g_titleIntroDirectStateLastRequestFrame == 0 ||
+            g_presentedFrameCount < g_titleIntroDirectStateLastRequestFrame + kStageTitleOwnerDirectStateFallbackFrames)
+        {
+            return false;
+        }
+
+        constexpr uint64_t kStageTitleOwnerDirectStateRefreshFrames = 60;
+        if (g_stageTitleOwnerDirectStateLastRequestFrame != 0 &&
+            g_presentedFrameCount < g_stageTitleOwnerDirectStateLastRequestFrame + kStageTitleOwnerDirectStateRefreshFrames)
+        {
+            return false;
+        }
+
+        const bool refresh = g_stageTitleOwnerDirectStateLastRequestFrame != 0;
+        g_stageTitleOwnerDirectStateLastRequestFrame = g_presentedFrameCount;
+        g_routeStatus = "stage title owner direct state requested";
+        WriteEvidenceEvent(
+            refresh ? "stage-title-owner-direct-state-refreshed" : "stage-title-owner-direct-state-requested",
+            "state=1 dirty=1 transition=1 owner_gate=1 csd_complete=1");
+        return true;
+    }
+
+    void OnStageTitleOwnerDirectStateApplied(
+        uint32_t titleContextAddress,
+        uint32_t titleCsdAddress,
+        uint8_t requestedState,
+        uint8_t dirtyFlag,
+        uint8_t transitionArmed,
+        uint8_t outputArmed,
+        uint8_t ownerGateArmed,
+        uint8_t csdCompleteArmed)
+    {
+        if (!g_isEnabled)
+            return;
+
+        WriteEvidenceEvent(
+            "stage-title-owner-direct-state-applied",
+            "owner_title_context=" + HexU32(titleContextAddress) +
+            " title_csd488=" + HexU32(titleCsdAddress) +
+            " requested_state=" + std::to_string(requestedState) +
+            " dirty=" + std::to_string(dirtyFlag) +
+            " transition_armed=" + std::to_string(transitionArmed) +
             " output_armed=" + std::to_string(outputArmed) +
+            " owner_gate568=" + std::to_string(ownerGateArmed) +
             " csd_complete_armed=" + std::to_string(csdCompleteArmed));
     }
 
@@ -3407,6 +3661,84 @@ namespace UiLab
         }
     }
 
+    void OnHudSonicStageOwnerFieldSample(uint32_t ownerAddress, std::string_view hookSource)
+    {
+        if (!g_isEnabled || !IsPlausibleGuestPointer(ownerAddress))
+            return;
+
+        std::vector<SonicHudOwnerFieldSample> samples;
+        samples.reserve(kChudSonicStageExpectedOwnerFields.size());
+
+        uint32_t resolvedMemoryCount = 0;
+        for (const auto& field : kChudSonicStageExpectedOwnerFields)
+        {
+            SonicHudOwnerFieldSample sample;
+            sample.field = field.field;
+            sample.sampleOffset = field.rcObjectOffset;
+            sample.frame = g_presentedFrameCount;
+            sample.hookSource = std::string(hookSource);
+
+            uint32_t slotValue = 0;
+            if (TryReadGuestU32(ownerAddress + field.rcObjectOffset, slotValue))
+                sample.slotValue = slotValue;
+
+            sample.rcObjectAddress = sample.slotValue;
+            sample.rcObjectKnown = IsPlausibleGuestPointer(sample.rcObjectAddress);
+
+            if (sample.rcObjectKnown)
+            {
+                uint32_t resolvedMemoryAddress = 0;
+                if (TryReadGuestU32(sample.rcObjectAddress + 0x4, resolvedMemoryAddress) &&
+                    IsPlausibleGuestPointer(resolvedMemoryAddress))
+                {
+                    sample.resolvedMemoryAddress = resolvedMemoryAddress;
+                    sample.resolvedMemoryKnown = true;
+                    ++resolvedMemoryCount;
+                }
+            }
+
+            samples.push_back(std::move(sample));
+        }
+
+        bool changed = false;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            changed = g_chudSonicStageOwnerFieldSamples.size() != samples.size();
+            if (!changed)
+            {
+                for (size_t i = 0; i < samples.size(); ++i)
+                {
+                    if (g_chudSonicStageOwnerFieldSamples[i].slotValue != samples[i].slotValue ||
+                        g_chudSonicStageOwnerFieldSamples[i].resolvedMemoryAddress != samples[i].resolvedMemoryAddress ||
+                        g_chudSonicStageOwnerFieldSamples[i].hookSource != samples[i].hookSource)
+                    {
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+
+            g_chudSonicStageOwnerFieldSamples = std::move(samples);
+            g_chudSonicStageOwnerFieldSampleCount += kChudSonicStageExpectedOwnerFields.size();
+        }
+
+        if (!g_loggedChudSonicStageOwnerFieldSample || changed || resolvedMemoryCount != 0)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-owner-field-sample",
+                "owner=" + HexU32(ownerAddress) +
+                " source=" + std::string(hookSource) +
+                " expected=" + std::string(kChudSonicStageExpectedOwnerFieldSource) +
+                " sample_count=" + std::to_string(kChudSonicStageExpectedOwnerFields.size()) +
+                " resolved_memory_count=" + std::to_string(resolvedMemoryCount));
+            g_loggedChudSonicStageOwnerFieldSample = true;
+            EmitTutorialHudOwnerPathReadyIfNeeded();
+            WriteLiveStateSnapshot();
+        }
+
+        EmitStageTargetReadyIfNeeded();
+    }
+
     void OnHudPauseUpdate(
         uint32_t pauseAddress,
         uint32_t pauseProjectAddress,
@@ -3522,7 +3854,7 @@ namespace UiLab
     {
         directState = false;
 
-        if (!g_isEnabled || g_observerMode || !g_routePending || g_titleIntroAcceptInjected)
+        if (!g_isEnabled || g_observerMode || !g_routePending)
             return false;
 
         if (!TargetCanRouteFromTitleIntro(g_target))
@@ -3531,16 +3863,25 @@ namespace UiLab
         if (elapsedSeconds < 0.75f)
             return false;
 
-        g_titleIntroAcceptInjected = true;
+        if (g_titleIntroAcceptInjected && g_routePolicy != RoutePolicy::DirectContext)
+            return false;
 
         if (g_routePolicy == RoutePolicy::DirectContext && g_target != ScreenId::TitleMenu)
         {
+            if (g_titleIntroDirectStateApplied)
+                return false;
+
+            g_titleIntroAcceptInjected = true;
+            g_titleIntroDirectStateApplied = true;
+            g_titleIntroDirectStateLastRequestFrame = g_presentedFrameCount;
             directState = true;
             g_routeStatus = "title intro direct state requested";
             LOGFN("SWARD UI Lab route: requested direct title intro state for target={}", TargetFor(g_target).token);
             WriteEvidenceEvent("title-intro-direct-state-requested", "state=1 dirty=1");
             return false;
         }
+
+        g_titleIntroAcceptInjected = true;
 
         if (g_target == ScreenId::TitleMenu)
         {
@@ -3570,7 +3911,7 @@ namespace UiLab
         return g_isEnabled &&
             !g_observerMode &&
             g_routePolicy == RoutePolicy::DirectContext &&
-            (g_target == ScreenId::TitleMenu || g_target == ScreenId::TitleOptions);
+            TargetRoutesThroughTitleMenu(g_target);
     }
 
     bool ShouldHoldTitleMenuRuntime()
@@ -3640,35 +3981,61 @@ namespace UiLab
             return true;
         }
 
-        if (!TargetShouldRouteThroughLoading(g_target) || !g_routePending)
+        if (!TargetShouldRouteThroughLoading(g_target))
+            return false;
+
+        const bool shouldHoldDirectContext =
+            g_routePolicy == RoutePolicy::DirectContext &&
+            g_titleMenuAcceptInjected &&
+            !g_targetCsdObserved &&
+            !g_loggedStageTargetReady;
+
+        if (!g_routePending && !shouldHoldDirectContext)
             return false;
 
         cursorIndex = 0;
-        g_routeStatus = TargetNeedsStageHarness(g_target)
-            ? "stage route via new game"
-            : "loading route via new game";
+        if (!shouldHoldDirectContext)
+        {
+            g_routeStatus = TargetNeedsStageHarness(g_target)
+                ? "stage route via new game"
+                : "loading route via new game";
+        }
+
+        if (g_routePolicy == RoutePolicy::DirectContext)
+        {
+            directContext = true;
+
+            if (!g_titleMenuAcceptInjected)
+            {
+                g_titleMenuAcceptInjected = true;
+                g_routeStatus = "direct context requested";
+                LOGFN("SWARD UI Lab route: requested direct title menu context latch for target={}", TargetFor(g_target).token);
+                WriteEvidenceEvent("title-menu-direct-context-requested");
+            }
+
+            if (g_stageTitleOwnerDirectStateFallbackEnabled &&
+                g_stageTitleOwnerDirectStateLastRequestFrame != 0 &&
+                !g_titleMenuDirectContextAcceptInjected)
+            {
+                g_titleMenuDirectContextAcceptInjected = true;
+                injectAccept = true;
+                LOGFN("SWARD UI Lab route: injected direct title menu accept for target={}", TargetFor(g_target).token);
+                WriteEvidenceEvent("title-menu-direct-context-accept-injected");
+            }
+
+            return true;
+        }
 
         if (!g_titleMenuAcceptInjected)
         {
             g_titleMenuAcceptInjected = true;
             g_routePending = false;
-
-            if (g_routePolicy == RoutePolicy::DirectContext)
-            {
-                directContext = true;
-                g_routeStatus = "direct context requested";
-                LOGFN("SWARD UI Lab route: requested direct title menu context latch for target={}", TargetFor(g_target).token);
-                WriteEvidenceEvent("title-menu-direct-context-requested");
-            }
-            else
-            {
-                injectAccept = true;
-                g_routeStatus = TargetNeedsStageHarness(g_target)
-                    ? "stage accept injected"
-                    : "loading accept injected";
-                LOGFN("SWARD UI Lab route: forced title menu New Game accept for target={}", TargetFor(g_target).token);
-                WriteEvidenceEvent("title-menu-new-game-accept-injected");
-            }
+            injectAccept = true;
+            g_routeStatus = TargetNeedsStageHarness(g_target)
+                ? "stage accept injected"
+                : "loading accept injected";
+            LOGFN("SWARD UI Lab route: forced title menu New Game accept for target={}", TargetFor(g_target).token);
+            WriteEvidenceEvent("title-menu-new-game-accept-injected");
         }
 
         return true;

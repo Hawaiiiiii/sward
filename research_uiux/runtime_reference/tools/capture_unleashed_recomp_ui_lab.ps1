@@ -22,7 +22,15 @@ param(
     [string]$LiveBridgeName = "sward_ui_lab_live",
     [switch]$UseLiveBridgeReadiness,
     [switch]$UseUniqueLiveBridgeName,
+    [switch]$EnableStageTitleOwnerDirectFallback,
+    [switch]$UseControlAutomation,
+    [switch]$DisableControlAutomation,
+    [string]$ControlAutomationPlan = "early-stage-route",
+    [int]$ControlAutomationDurationSeconds = 90,
+    [int]$ControlAutomationIntervalMilliseconds = 900,
+    [int]$ControlAutomationKeyHoldMilliseconds = 35,
     [int]$LiveBridgeReadinessPollMilliseconds = 250,
+    [int]$StageTargetRetries = 2,
     [bool]$NormalizeWindow = $true,
     [switch]$Observer,
     [switch]$HideOverlay,
@@ -61,8 +69,52 @@ public struct UiLabRect
     public int Bottom;
 }
 
+[StructLayout(LayoutKind.Sequential)]
+public struct UiLabMouseInput
+{
+    public int dx;
+    public int dy;
+    public uint mouseData;
+    public uint dwFlags;
+    public uint time;
+    public IntPtr dwExtraInfo;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct UiLabKeyboardInput
+{
+    public ushort wVk;
+    public ushort wScan;
+    public uint dwFlags;
+    public uint time;
+    public IntPtr dwExtraInfo;
+}
+
+[StructLayout(LayoutKind.Explicit)]
+public struct UiLabInputUnion
+{
+    [FieldOffset(0)]
+    public UiLabMouseInput mi;
+
+    [FieldOffset(0)]
+    public UiLabKeyboardInput ki;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public struct UiLabInput
+{
+    public uint type;
+    public UiLabInputUnion union;
+}
+
 public static class UiLabNative
 {
+    public const byte VK_RETURN = 0x0D;
+    public const uint INPUT_KEYBOARD = 1;
+    public const uint MAPVK_VK_TO_VSC = 0;
+    public const uint KEYEVENTF_SCANCODE = 0x0008;
+    public const uint KEYEVENTF_KEYUP = 0x0002;
+
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hWnd, out UiLabRect rect);
 
@@ -83,8 +135,32 @@ public static class UiLabNative
 
     [DllImport("user32.dll")]
     public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
+
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint SendInput(uint nInputs, UiLabInput[] pInputs, int cbSize);
+
+    [DllImport("user32.dll")]
+    public static extern uint MapVirtualKey(uint uCode, uint uMapType);
+
+    public static uint SendKeyboardInput(ushort virtualKey, bool keyUp)
+    {
+        ushort scanCode = (ushort)MapVirtualKey(virtualKey, MAPVK_VK_TO_VSC);
+        UiLabInput[] inputs = new UiLabInput[1];
+        inputs[0].type = INPUT_KEYBOARD;
+        inputs[0].union.ki.wVk = 0;
+        inputs[0].union.ki.wScan = scanCode;
+        inputs[0].union.ki.dwFlags = KEYEVENTF_SCANCODE | (keyUp ? KEYEVENTF_KEYUP : 0);
+        inputs[0].union.ki.time = 0;
+        inputs[0].union.ki.dwExtraInfo = IntPtr.Zero;
+        return SendInput(1, inputs, Marshal.SizeOf(typeof(UiLabInput)));
+    }
 }
 "@
+
+$script:UiLabControlAutomationState = $null
 
 function Wait-UiLabWindow([System.Diagnostics.Process]$Process, [int]$TimeoutSeconds) {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -152,6 +228,278 @@ function Prepare-UiLabWindow([IntPtr]$Handle) {
 
     [UiLabNative]::SetForegroundWindow($Handle) | Out-Null
     Start-Sleep -Milliseconds 500
+}
+
+function Get-UiLabVirtualKey([string]$Key) {
+    switch ($Key.ToUpperInvariant()) {
+        "ENTER" { return 0x0D }
+        "W" { return 0x57 }
+        "A" { return 0x41 }
+        "S" { return 0x53 }
+        "D" { return 0x44 }
+        "Q" { return 0x51 }
+        "E" { return 0x45 }
+        default {
+            throw "Unsupported UI Lab control key: $Key. Supported keys: ENTER/W/A/S/D/Q/E."
+        }
+    }
+}
+
+function Send-UiLabKey([IntPtr]$Handle, [int]$ProcessId, [string]$Key, [int]$HoldMilliseconds = 35) {
+    if ($Handle -eq [IntPtr]::Zero) {
+        return [ordered]@{
+            sent = $false
+            key = $Key
+            foregroundBefore = $false
+            foregroundAfter = $false
+            sendInputDown = 0
+            sendInputUp = 0
+            fallbackDown = $false
+            fallbackUp = $false
+        }
+    }
+
+    $virtualKey = [byte](Get-UiLabVirtualKey $Key)
+    $foregroundBefore = Test-ForegroundBelongsToProcess $ProcessId
+
+    if (-not $foregroundBefore) {
+        [UiLabNative]::SetForegroundWindow($Handle) | Out-Null
+        Start-Sleep -Milliseconds 40
+    }
+
+    $foregroundAfter = Test-ForegroundBelongsToProcess $ProcessId
+    $sendInputDown = [UiLabNative]::SendKeyboardInput([uint16]$virtualKey, $false)
+    Start-Sleep -Milliseconds ([Math]::Max(10, $HoldMilliseconds))
+    $sendInputUp = [UiLabNative]::SendKeyboardInput([uint16]$virtualKey, $true)
+    $fallbackDown = $false
+    $fallbackUp = $false
+
+    if ($sendInputDown -eq 0 -or $sendInputUp -eq 0) {
+        [UiLabNative]::keybd_event($virtualKey, 0, 0, [UIntPtr]::Zero)
+        $fallbackDown = $true
+        Start-Sleep -Milliseconds ([Math]::Max(10, $HoldMilliseconds))
+        [UiLabNative]::keybd_event($virtualKey, 0, [UiLabNative]::KEYEVENTF_KEYUP, [UIntPtr]::Zero)
+        $fallbackUp = $true
+    }
+
+    return [ordered]@{
+        sent = $true
+        key = $Key
+        foregroundBefore = $foregroundBefore
+        foregroundAfter = $foregroundAfter
+        sendInputDown = [int]$sendInputDown
+        sendInputUp = [int]$sendInputUp
+        fallbackDown = $fallbackDown
+        fallbackUp = $fallbackUp
+    }
+}
+
+function Start-UiLabControlAutomation(
+    [bool]$Enabled,
+    [string]$Target,
+    [string]$Plan,
+    [IntPtr]$Handle,
+    [int]$ProcessId,
+    [int]$DurationSeconds,
+    [int]$IntervalMilliseconds,
+    [int]$KeyHoldMilliseconds
+) {
+    $script:UiLabControlAutomationState = [ordered]@{
+        enabled = $Enabled
+        target = $Target
+        plan = $Plan
+        supportedKeys = @("ENTER", "W", "A", "S", "D", "Q", "E")
+        handle = $Handle
+        processId = $ProcessId
+        durationSeconds = [Math]::Max(0, $DurationSeconds)
+        intervalMilliseconds = [Math]::Max(100, $IntervalMilliseconds)
+        keyHoldMilliseconds = [Math]::Max(10, $KeyHoldMilliseconds)
+        startTime = Get-Date
+        lastPulseTime = [DateTime]::MinValue
+        pulseCount = 0
+        foregroundFailureCount = 0
+        sendInputFailureCount = 0
+        tapLog = @()
+        stopped = -not $Enabled
+        stopReason = if ($Enabled) { $null } else { "disabled" }
+        lastKey = $null
+    }
+
+    return $script:UiLabControlAutomationState
+}
+
+function Stop-UiLabControlAutomation([string]$Reason) {
+    if ($null -eq $script:UiLabControlAutomationState) {
+        return
+    }
+
+    if (-not [bool]$script:UiLabControlAutomationState.stopped) {
+        $script:UiLabControlAutomationState.stopped = $true
+        $script:UiLabControlAutomationState.stopReason = $Reason
+    }
+}
+
+function Test-UiLabControlAutomationTargetReady([object]$RuntimeState) {
+    if ($null -eq $RuntimeState) {
+        return $false
+    }
+
+    $automationTarget = if ($null -ne $script:UiLabControlAutomationState) { [string]$script:UiLabControlAutomationState.target } else { "" }
+    $readiness = $RuntimeState.readiness
+    $titleMenuVisible = $null -ne $readiness -and [bool]$readiness.titleMenuVisible
+    $stageContextObserved = $null -ne $readiness -and [bool]$readiness.stageContextObserved
+    $stageTargetReady = $null -ne $readiness -and [bool]$readiness.stageTargetReady
+    $targetCsdObserved = [bool]$RuntimeState.targetCsdObserved
+    $stageReadyEvent = [string]$RuntimeState.stageReadyEvent
+    $route = [string]$RuntimeState.route
+
+    if ($automationTarget -eq "title-menu") {
+        return $titleMenuVisible -or [bool]$RuntimeState.titleMenuVisualReady -or $route -eq "title menu visual ready"
+    }
+
+    if ($automationTarget -eq "title-options") {
+        return $route -eq "title options accept injected"
+    }
+
+    return (
+        $stageTargetReady -or
+        ($stageContextObserved -and $targetCsdObserved) -or
+        $stageReadyEvent -match "-ready$" -or
+        $route -match "stage target|tutorial target|pause target|result target|extra-stage-hud target"
+    )
+}
+
+function Get-UiLabControlAutomationNextKey([object]$RuntimeState) {
+    if ($null -eq $script:UiLabControlAutomationState) {
+        return $null
+    }
+
+    switch ([string]$script:UiLabControlAutomationState.plan) {
+        "early-stage-route" {
+            return "ENTER"
+        }
+        "menu-confirm" {
+            return "ENTER"
+        }
+        "operator-sweep" {
+            $sequence = @("ENTER", "S", "ENTER", "W", "ENTER", "Q", "E")
+            return $sequence[[int]$script:UiLabControlAutomationState.pulseCount % $sequence.Count]
+        }
+        default {
+            return "ENTER"
+        }
+    }
+}
+
+function Invoke-UiLabControlAutomationTick([object]$RuntimeState = $null, [string]$Phase = "poll") {
+    if ($null -eq $script:UiLabControlAutomationState) {
+        return
+    }
+
+    if (-not [bool]$script:UiLabControlAutomationState.enabled -or [bool]$script:UiLabControlAutomationState.stopped) {
+        return
+    }
+
+    if (Test-UiLabControlAutomationTargetReady $RuntimeState) {
+        Stop-UiLabControlAutomation "target readiness observed"
+        return
+    }
+
+    $now = Get-Date
+    $elapsedSeconds = ($now - $script:UiLabControlAutomationState.startTime).TotalSeconds
+
+    if ($elapsedSeconds -ge [int]$script:UiLabControlAutomationState.durationSeconds) {
+        Stop-UiLabControlAutomation "duration elapsed"
+        return
+    }
+
+    $elapsedSincePulse = ($now - $script:UiLabControlAutomationState.lastPulseTime).TotalMilliseconds
+    if ($script:UiLabControlAutomationState.pulseCount -gt 0 -and
+        $elapsedSincePulse -lt [int]$script:UiLabControlAutomationState.intervalMilliseconds) {
+        return
+    }
+
+    $key = Get-UiLabControlAutomationNextKey $RuntimeState
+    if ([string]::IsNullOrWhiteSpace($key)) {
+        return
+    }
+
+    $sendResult = Send-UiLabKey $script:UiLabControlAutomationState.handle $script:UiLabControlAutomationState.processId $key $script:UiLabControlAutomationState.keyHoldMilliseconds
+    $sent = $null -ne $sendResult -and [bool]$sendResult.sent
+    if (-not $sent) {
+        Stop-UiLabControlAutomation "send failed"
+        return
+    }
+
+    if (-not [bool]$sendResult.foregroundAfter) {
+        $script:UiLabControlAutomationState.foregroundFailureCount = [int]$script:UiLabControlAutomationState.foregroundFailureCount + 1
+    }
+
+    if ([int]$sendResult.sendInputDown -eq 0 -or [int]$sendResult.sendInputUp -eq 0) {
+        $script:UiLabControlAutomationState.sendInputFailureCount = [int]$script:UiLabControlAutomationState.sendInputFailureCount + 1
+    }
+
+    $script:UiLabControlAutomationState.lastPulseTime = $now
+    $script:UiLabControlAutomationState.lastKey = $key
+    $script:UiLabControlAutomationState.pulseCount = [int]$script:UiLabControlAutomationState.pulseCount + 1
+
+    $entry = [ordered]@{
+        time = $now.ToString("o")
+        key = $key
+        phase = $Phase
+        elapsedSeconds = [Math]::Round($elapsedSeconds, 3)
+        foregroundBefore = [bool]$sendResult.foregroundBefore
+        foregroundAfter = [bool]$sendResult.foregroundAfter
+        sendInputDown = [int]$sendResult.sendInputDown
+        sendInputUp = [int]$sendResult.sendInputUp
+        fallbackDown = [bool]$sendResult.fallbackDown
+        fallbackUp = [bool]$sendResult.fallbackUp
+    }
+
+    $script:UiLabControlAutomationState.tapLog = @($script:UiLabControlAutomationState.tapLog + $entry | Select-Object -Last 48)
+}
+
+function Wait-UiLabControlAutomationAwareSleep([int]$Seconds, [System.Diagnostics.Process]$Process = $null, [string]$Phase = "sleep") {
+    $deadline = (Get-Date).AddSeconds([Math]::Max(0, $Seconds))
+
+    while ((Get-Date) -lt $deadline) {
+        if ($null -ne $Process) {
+            $Process.Refresh()
+
+            if ($Process.HasExited) {
+                break
+            }
+        }
+
+        Invoke-UiLabControlAutomationTick $null $Phase
+        Start-Sleep -Milliseconds 250
+    }
+}
+
+function Get-UiLabControlAutomationRecord() {
+    if ($null -eq $script:UiLabControlAutomationState) {
+        return [ordered]@{
+            enabled = $false
+            reason = "not initialized"
+        }
+    }
+
+    return [ordered]@{
+        enabled = [bool]$script:UiLabControlAutomationState.enabled
+        target = [string]$script:UiLabControlAutomationState.target
+        plan = [string]$script:UiLabControlAutomationState.plan
+        supportedKeys = @($script:UiLabControlAutomationState.supportedKeys)
+        durationSeconds = [int]$script:UiLabControlAutomationState.durationSeconds
+        intervalMilliseconds = [int]$script:UiLabControlAutomationState.intervalMilliseconds
+        keyHoldMilliseconds = [int]$script:UiLabControlAutomationState.keyHoldMilliseconds
+        pulseCount = [int]$script:UiLabControlAutomationState.pulseCount
+        lastKey = $script:UiLabControlAutomationState.lastKey
+        foregroundFailureCount = [int]$script:UiLabControlAutomationState.foregroundFailureCount
+        sendInputFailureCount = [int]$script:UiLabControlAutomationState.sendInputFailureCount
+        stopped = [bool]$script:UiLabControlAutomationState.stopped
+        stopReason = $script:UiLabControlAutomationState.stopReason
+        tapLog = @($script:UiLabControlAutomationState.tapLog)
+    }
 }
 
 function Capture-Window([IntPtr]$Handle, [string]$Path, [int]$ProcessId) {
@@ -286,7 +634,7 @@ function Get-UiLabRequiredEvents([string]$Target) {
             return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "pause-owner-observed", "pause-route-start-injected", "pause-target-ready", "pause-ready")
         }
         "tutorial" {
-            return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "tutorial-ready")
+            return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "sonic-hud-owner-hooked", "tutorial-hud-owner-path-ready", "tutorial-target-ready", "tutorial-ready")
         }
         "result" {
             return @("stage-context-observed", "target-csd-project-made", "stage-target-csd-bound", "result-ready")
@@ -341,6 +689,9 @@ function Get-UiLabEffectiveAutoExitSeconds([string]$Target, [int]$RequestedAutoE
     }
 
     switch ($Target) {
+        { $_ -in @("sonic-hud", "tutorial") } {
+            return [Math]::Max($RequestedAutoExitSeconds, 220)
+        }
         "pause" {
             return [Math]::Max($RequestedAutoExitSeconds, 95)
         }
@@ -423,6 +774,7 @@ function Wait-UiLabEvidenceEvents([string]$Target, [string]$EventsPath, [int]$Ti
             }
         }
 
+        Invoke-UiLabControlAutomationTick $null "jsonl-poll"
         Start-Sleep -Milliseconds 500
         $checks = Test-UiLabEvidenceEvents $Target $EventsPath
     }
@@ -537,7 +889,12 @@ function Test-UiLabLiveBridgeReadiness([string]$Target, [object]$State) {
             $passed = (($stageContextObserved -and $targetCsdObserved -and $stageTargetReady) -or $stageTargetReadyEvent -eq "pause-ready" -or $route -eq "pause target ready") -and $observedEvents.Contains("pause-target-ready")
         }
         "tutorial" {
-            $passed = ($stageContextObserved -and $targetCsdObserved -and $stageTargetReady) -or $stageTargetReadyEvent -eq "tutorial-ready"
+            $passed = (
+                (($stageContextObserved -and $targetCsdObserved -and $stageTargetReady) -or
+                    $stageTargetReadyEvent -eq "tutorial-ready" -or
+                    $route -eq "tutorial target ready") -and
+                $observedEvents.Contains("tutorial-hud-owner-path-ready") -and
+                $observedEvents.Contains("tutorial-target-ready"))
         }
         "result" {
             $passed = ($stageContextObserved -and $targetCsdObserved -and $stageTargetReady) -or $stageTargetReadyEvent -eq "result-ready"
@@ -604,6 +961,7 @@ function Wait-UiLabLiveBridgeReadiness(
 
         $stateResponse = Get-UiLabLiveBridgeState $PipeName 1000
         if ($stateResponse.ok) {
+            Invoke-UiLabControlAutomationTick $stateResponse.state "live-bridge-poll"
             $checks = Test-UiLabLiveBridgeReadiness $Target $stateResponse.state
             $checks["durableEvidenceEvent"] = $durableEvidenceEvent
             $checks["durableEvidencePassed"] = Test-UiLabDurableEvidenceEvent $EventsPath $durableEvidenceEvent
@@ -618,6 +976,7 @@ function Wait-UiLabLiveBridgeReadiness(
             }
         }
         else {
+            Invoke-UiLabControlAutomationTick $null "live-bridge-poll"
             $checks = [ordered]@{
                 passed = $false
                 source = "liveBridge"
@@ -918,6 +1277,7 @@ $sessionDir = Join-Path $output (Get-Date -Format "yyyyMMdd_HHmmss")
 New-Item -ItemType Directory -Force -Path $sessionDir | Out-Null
 
 $stageTargets = @("sonic-hud", "extra-stage-hud", "tutorial", "result", "pause")
+$controlAutomationTargets = @("title-menu", "title-options") + $stageTargets
 $records = @()
 $expandedTargets = @()
 $requiredNativeSignalFailed = $false
@@ -936,7 +1296,11 @@ else {
 }
 
 foreach ($target in $expandedTargets) {
-    $safeTarget = $target -replace "[^A-Za-z0-9_.-]", "_"
+    $maxAttempts = if (-not $Observer -and $stageTargets -contains $target) { [Math]::Max(1, $StageTargetRetries + 1) } else { 1 }
+
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+    $safeTargetBase = $target -replace "[^A-Za-z0-9_.-]", "_"
+    $safeTarget = if ($attempt -eq 1) { $safeTargetBase } else { "{0}_retry{1}" -f $safeTargetBase, $attempt }
     $targetDir = Join-Path $sessionDir $safeTarget
     New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
     $eventsPath = Join-Path $targetDir "ui_lab_events.jsonl"
@@ -960,6 +1324,10 @@ foreach ($target in $expandedTargets) {
 
     if ($HideOverlay) {
         $args += @("--ui-lab-overlay", "off")
+    }
+
+    if ($EnableStageTitleOwnerDirectFallback) {
+        $args += "--ui-lab-stage-title-owner-direct-fallback"
     }
 
     if ($LiveBridge) {
@@ -992,7 +1360,14 @@ foreach ($target in $expandedTargets) {
         Prepare-UiLabWindow $handle
     }
 
-    Start-Sleep -Seconds $InitialWaitSeconds
+    $controlAutomationEnabled = -not $Observer -and -not $DisableControlAutomation -and (($controlAutomationTargets -contains $target) -or $UseControlAutomation)
+    [void](Start-UiLabControlAutomation $controlAutomationEnabled $target $ControlAutomationPlan $handle $process.Id $ControlAutomationDurationSeconds $ControlAutomationIntervalMilliseconds $ControlAutomationKeyHoldMilliseconds)
+
+    if ($controlAutomationEnabled) {
+        Write-Host "[$target] control automation enabled ($ControlAutomationPlan): ENTER/W/A/S/D/Q/E"
+    }
+
+    Wait-UiLabControlAutomationAwareSleep $InitialWaitSeconds $process "initial-wait"
 
     $earlyShot = Join-Path $targetDir "screen_early.png"
     $lateShot = Join-Path $targetDir "screen_late.png"
@@ -1079,6 +1454,7 @@ foreach ($target in $expandedTargets) {
                 }
 
                 if ($evidenceReady) {
+                    Stop-UiLabControlAutomation "evidence ready"
                     $settleSeconds = if ($stageTargets -contains $target) { $StagePostEvidenceDelaySeconds } else { $PostEvidenceDelaySeconds }
 
                     if ($settleSeconds -gt 0) {
@@ -1087,7 +1463,7 @@ foreach ($target in $expandedTargets) {
                 }
             }
             else {
-                Start-Sleep -Seconds $SecondCaptureDelaySeconds
+                Wait-UiLabControlAutomationAwareSleep $SecondCaptureDelaySeconds $process "fixed-delay"
             }
         }
 
@@ -1127,20 +1503,25 @@ foreach ($target in $expandedTargets) {
         $stopped = $true
     }
 
+    if ($process.HasExited) {
+        Stop-UiLabControlAutomation "process exited"
+    }
+    else {
+        Stop-UiLabControlAutomation "capture complete"
+    }
+
     $evidenceChecks = Test-UiLabEvidenceEvents $target $eventsPath
     $nativeFrameCaptures = @(Get-UiLabNativeFrameCaptures $eventsPath)
     $nativeFrameSignalSummary = Get-UiLabNativeFrameSignalSummary $nativeFrameCaptures
     $nativeSignalRequired = $NativeCapture -and [bool]$RequireNativeRgbSignal
     $nativeSignalPassed = -not $nativeSignalRequired -or ([int]$nativeFrameSignalSummary.rgbNonBlack -gt 0)
-    if (-not $nativeSignalPassed) {
-        $requiredNativeSignalFailed = $true
-    }
 
     if ($null -eq $nativeFrameCapture) {
         if ($nativeFrameCaptures.Count -gt 0) {
             $nativeFrameCapture = $nativeFrameCaptures[$nativeFrameCaptures.Count - 1]
         }
     }
+    $controlAutomationRecord = Get-UiLabControlAutomationRecord
     $records += [ordered]@{
         target = $target
         args = $args
@@ -1170,21 +1551,37 @@ foreach ($target in $expandedTargets) {
         effectiveAutoExitSeconds = $effectiveAutoExitSeconds
         effectiveLiveBridgeName = if ($LiveBridge) { $effectiveLiveBridgeName } else { $null }
         liveBridgeName = if ($LiveBridge) { $effectiveLiveBridgeName } else { $null }
+        controlAutomation = $controlAutomationRecord
         nativeSignalRequired = $nativeSignalRequired
         nativeSignalPassed = $nativeSignalPassed
     }
 
-    if ($evidenceChecks.passed -and $nativeSignalPassed) {
-        Write-Host "[$target] evidence PASS"
+    $targetPassed = $evidenceChecks.passed -and $nativeSignalPassed
+    if ($targetPassed) {
+        $attemptLabel = if ($attempt -eq 1) { "" } else { " attempt $attempt" }
+        Write-Host "[$target] evidence PASS$attemptLabel"
+        break
     }
     else {
+        $attemptLabel = if ($attempt -eq 1) { "" } else { " attempt $attempt" }
+
         if (-not $evidenceChecks.passed) {
-            Write-Warning "[$target] evidence missing: $($evidenceChecks.missingEvents -join ', ')"
+            Write-Warning "[$target$attemptLabel] evidence missing: $($evidenceChecks.missingEvents -join ', ')"
         }
 
         if (-not $nativeSignalPassed) {
-            Write-Warning "[$target] native BMP RGB signal missing"
+            Write-Warning "[$target$attemptLabel] native BMP RGB signal missing"
         }
+
+        if ($attempt -lt $maxAttempts) {
+            Write-Warning "[$target] retrying fresh runtime session after incomplete live/native evidence (attempt $attempt of $maxAttempts)."
+            continue
+        }
+
+        if (-not $nativeSignalPassed) {
+            $requiredNativeSignalFailed = $true
+        }
+    }
     }
 }
 

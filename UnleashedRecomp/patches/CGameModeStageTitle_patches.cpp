@@ -108,6 +108,39 @@ static void ForwardTitleOwnerContext(
         csdByte160);
 }
 
+static void ArmStageTitleOwnerDirectState(
+    uint8_t* base,
+    uint32_t gameModeGuestAddress,
+    const SWA::CGameModeStageTitle* pGameModeStageTitle)
+{
+    const auto gameModeBase = reinterpret_cast<const uint8_t*>(pGameModeStageTitle);
+    const auto titleContextGuestAddress = ReadGuestU32(gameModeBase + 0x220);
+
+    if (!titleContextGuestAddress || !UiLab::ShouldRefreshStageTitleOwnerDirectState())
+        return;
+
+    const auto titleCsdAddress = PPC_LOAD_U32(titleContextGuestAddress + 0x1E8);
+
+    PPC_STORE_U8(titleContextGuestAddress + 0x180, 1);
+    PPC_STORE_U8(titleContextGuestAddress + 0x181, 1);
+    PPC_STORE_U8(titleContextGuestAddress + 0x1D1, 1);
+    PPC_STORE_U8(titleContextGuestAddress + 0x238, 1);
+    PPC_STORE_U8(gameModeGuestAddress + 0x238, 1);
+
+    if (titleCsdAddress)
+        PPC_STORE_U8(titleCsdAddress + 84, 1);
+
+    UiLab::OnStageTitleOwnerDirectStateApplied(
+        titleContextGuestAddress,
+        titleCsdAddress,
+        PPC_LOAD_U8(titleContextGuestAddress + 0x180),
+        PPC_LOAD_U8(titleContextGuestAddress + 0x181),
+        PPC_LOAD_U8(titleContextGuestAddress + 0x238),
+        PPC_LOAD_U8(titleContextGuestAddress + 0x1D1),
+        PPC_LOAD_U8(gameModeGuestAddress + 0x238),
+        titleCsdAddress ? PPC_LOAD_U8(titleCsdAddress + 84) : 0);
+}
+
 // SWA::CGameModeStageTitle::Update
 PPC_FUNC_IMPL(__imp__sub_825518B8);
 PPC_FUNC(sub_825518B8)
@@ -116,6 +149,8 @@ PPC_FUNC(sub_825518B8)
     auto pGameModeStageTitle = (SWA::CGameModeStageTitle*)g_memory.Translate(ctx.r3.u32);
 
     __imp__sub_825518B8(ctx, base);
+
+    ArmStageTitleOwnerDirectState(base, gameModeGuestAddress, pGameModeStageTitle);
 
     const bool isTitleStateMenu = *SWA::SGlobals::ms_IsTitleStateMenu;
 
