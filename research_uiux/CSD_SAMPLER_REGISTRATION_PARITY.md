@@ -6,6 +6,9 @@
 
 Phase 130 tightens the offscreen CSD rendered-frame comparison after the packed Color/Gradient channel blocker was cleared in Phase 129.
 
+> [!NOTE]
+> Phase 131 keeps the sampler/registration path but moves the active compare lane to `out/csd_render_compare/phase131/`, adds per-target diff BMPs, computes registered full-frame deltas, and classifies material/composition blockers. See `CSD_MATERIAL_SHADER_TRIAGE.md`.
+
 The smoke command is:
 
 ```powershell
@@ -48,6 +51,7 @@ Observed CSD point-seam sample counts in the same manifest:
 
 - `csd-point-seam` is a local software approximation of the CSD/UI shader sampler; it is not yet a byte-for-byte Xenos/D3D shader clone.
 - Registration searches a small centered crop neighborhood and scores a `64x36` sampled grid, not a full-frame exact diff.
+- Phase 131 adds a full-frame design-grid diff, but exact shader parity still needs UI-layer isolation for HUD/tutorial and deeper material validation for full-screen UI scenes.
 - Runtime-native BMPs remain the visual oracle, and the sidecar renderer remains a local portable reconstruction lane.
 
 ## Verification

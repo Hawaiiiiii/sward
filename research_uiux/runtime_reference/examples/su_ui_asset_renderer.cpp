@@ -311,6 +311,23 @@ struct BitmapSignalStats
     std::uint64_t rgbNonBlack = 0;
 };
 
+struct CsdFullFrameDeltaStats
+{
+    bool computed = false;
+    std::string mode = "registered-full-frame-nearest";
+    int width = kDesignWidth;
+    int height = kDesignHeight;
+    int pixelCount = 0;
+    int exactMatchPixels = 0;
+    int significantDeltaPixels = 0;
+    int renderNonBlackPixels = 0;
+    int nativeNonBlackPixels = 0;
+    double meanAbsRgb = 0.0;
+    int maxAbsRgb = 0;
+    double renderNonBlackRatio = 0.0;
+    double nativeNonBlackRatio = 0.0;
+};
+
 struct BitmapComparisonStats
 {
     bool nativeFound = false;
@@ -330,6 +347,7 @@ struct BitmapComparisonStats
     int maxAbsRgb = 0;
     BitmapSignalStats rendered;
     BitmapSignalStats native;
+    CsdFullFrameDeltaStats fullFrame;
 };
 
 struct CsdNativeFrameRegistration
@@ -346,6 +364,14 @@ struct CsdNativeFrameRegistration
     int bestMaxAbsRgb = 0;
 };
 
+struct CsdMaterialParityTriage
+{
+    std::string primaryBlocker = "not-computed";
+    std::vector<std::string> riskFlags;
+    double coverageGap = 0.0;
+    double sampledVsFullFrameGap = 0.0;
+};
+
 struct CsdRenderedFrameComparison
 {
     std::string templateId;
@@ -355,6 +381,7 @@ struct CsdRenderedFrameComparison
     std::string timelineAnimationName;
     int frame = 0;
     std::filesystem::path renderedFramePath;
+    std::filesystem::path diffFramePath;
     std::optional<std::filesystem::path> nativeBestPath;
     std::size_t drawCommandCount = 0;
     std::size_t sampledCommandCount = 0;
@@ -381,6 +408,7 @@ struct CsdRenderedFrameComparison
     std::size_t unresolvedPackedKeyframeCount = 0;
     std::vector<std::string> sgfxSlots;
     BitmapComparisonStats visualDelta;
+    CsdMaterialParityTriage materialTriage;
 };
 
 struct CsdSamplerStats
@@ -4979,6 +5007,67 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return registration;
 }
 
+[[nodiscard]] CsdFullFrameDeltaStats computeFullFrameDeltaStats(
+    Gdiplus::Bitmap& rendered,
+    Gdiplus::Bitmap& native,
+    const BitmapComparisonStats& alignmentStats,
+    const std::filesystem::path& diffFramePath)
+{
+    CsdFullFrameDeltaStats stats;
+    std::uint64_t totalAbs = 0;
+    std::vector<std::uint32_t> diffPixels(static_cast<std::size_t>(kDesignWidth) * static_cast<std::size_t>(kDesignHeight), 0xFF000000);
+
+    for (int y = 0; y < kDesignHeight; ++y)
+    {
+        for (int x = 0; x < kDesignWidth; ++x)
+        {
+            const auto left = bitmapPixelNearest(rendered, x, y, kDesignWidth, kDesignHeight);
+            const auto right = bitmapPixelNearest(
+                native,
+                x,
+                y,
+                kDesignWidth,
+                kDesignHeight,
+                alignmentStats.nativeAlignmentCropX,
+                alignmentStats.nativeAlignmentCropY,
+                alignmentStats.nativeAlignmentCropWidth,
+                alignmentStats.nativeAlignmentCropHeight);
+
+            const int dr = std::abs(static_cast<int>(left.GetR()) - static_cast<int>(right.GetR()));
+            const int dg = std::abs(static_cast<int>(left.GetG()) - static_cast<int>(right.GetG()));
+            const int db = std::abs(static_cast<int>(left.GetB()) - static_cast<int>(right.GetB()));
+            const int channelDelta = dr + dg + db;
+            totalAbs += static_cast<std::uint64_t>(channelDelta);
+            stats.maxAbsRgb = std::max(stats.maxAbsRgb, std::max({ dr, dg, db }));
+            if (channelDelta == 0)
+                ++stats.exactMatchPixels;
+            if (channelDelta > 24)
+                ++stats.significantDeltaPixels;
+            if (left.GetR() != 0 || left.GetG() != 0 || left.GetB() != 0)
+                ++stats.renderNonBlackPixels;
+            if (right.GetR() != 0 || right.GetG() != 0 || right.GetB() != 0)
+                ++stats.nativeNonBlackPixels;
+
+            diffPixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(kDesignWidth) + static_cast<std::size_t>(x)] =
+                packArgbPixel(CsdColorRgba{
+                    static_cast<std::uint8_t>(dr),
+                    static_cast<std::uint8_t>(dg),
+                    static_cast<std::uint8_t>(db),
+                    255,
+                });
+        }
+    }
+
+    stats.pixelCount = kDesignWidth * kDesignHeight;
+    stats.meanAbsRgb = stats.pixelCount == 0 ? 0.0 : static_cast<double>(totalAbs) / static_cast<double>(stats.pixelCount * 3);
+    stats.renderNonBlackRatio = stats.pixelCount == 0 ? 0.0 : static_cast<double>(stats.renderNonBlackPixels) / static_cast<double>(stats.pixelCount);
+    stats.nativeNonBlackRatio = stats.pixelCount == 0 ? 0.0 : static_cast<double>(stats.nativeNonBlackPixels) / static_cast<double>(stats.pixelCount);
+
+    auto diffBitmap = bitmapFromArgbPixels(kDesignWidth, kDesignHeight, diffPixels);
+    stats.computed = diffBitmap && saveBitmapAsBmp(*diffBitmap, diffFramePath);
+    return stats;
+}
+
 [[nodiscard]] BitmapSignalStats computeBitmapSignalStats(Gdiplus::Bitmap& bitmap)
 {
     BitmapSignalStats stats;
@@ -5007,7 +5096,8 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
 
 [[nodiscard]] BitmapComparisonStats computeBitmapComparisonStats(
     Gdiplus::Bitmap& rendered,
-    const std::optional<std::filesystem::path>& nativePath)
+    const std::optional<std::filesystem::path>& nativePath,
+    const std::filesystem::path& diffFramePath)
 {
     BitmapComparisonStats stats;
     stats.rendered = computeBitmapSignalStats(rendered);
@@ -5033,6 +5123,7 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     stats.meanAbsRgb = registration.bestMeanAbsRgb;
     stats.maxAbsRgb = registration.bestMaxAbsRgb;
     stats.sampleCount = stats.sampleGridWidth * stats.sampleGridHeight;
+    stats.fullFrame = computeFullFrameDeltaStats(rendered, *native, stats, diffFramePath);
     return stats;
 }
 
@@ -5097,6 +5188,62 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return textures.size();
 }
 
+[[nodiscard]] CsdMaterialParityTriage materialParityTriageForComparison(const CsdRenderedFrameComparison& comparison)
+{
+    CsdMaterialParityTriage triage;
+    if (!comparison.visualDelta.nativeFound)
+    {
+        triage.primaryBlocker = "missing-native-oracle";
+        triage.riskFlags.push_back("native-bmp-missing");
+        return triage;
+    }
+
+    if (!comparison.visualDelta.fullFrame.computed)
+    {
+        triage.primaryBlocker = "full-frame-diff-missing";
+        triage.riskFlags.push_back("diff-bmp-not-written");
+        return triage;
+    }
+
+    triage.coverageGap = comparison.visualDelta.fullFrame.nativeNonBlackRatio - comparison.visualDelta.fullFrame.renderNonBlackRatio;
+    triage.sampledVsFullFrameGap = comparison.visualDelta.meanAbsRgb - comparison.visualDelta.fullFrame.meanAbsRgb;
+
+    if (triage.coverageGap > 0.35 && comparison.visualDelta.fullFrame.renderNonBlackRatio < 0.25)
+    {
+        const bool stageUiTarget = comparison.templateId == "sonic-hud" || comparison.templateId == "tutorial";
+        triage.primaryBlocker = stageUiTarget ? "stage-background-not-rendered" : "native-background-not-rendered";
+        triage.riskFlags.push_back(triage.primaryBlocker);
+        triage.riskFlags.push_back("native-composite-includes-world-backbuffer");
+    }
+    else if (comparison.visualDelta.fullFrame.meanAbsRgb <= 12.0)
+    {
+        triage.primaryBlocker = "low-full-frame-delta";
+    }
+    else if (comparison.gradientCommandCount != 0 || comparison.gradientTrackSampleCount != 0)
+    {
+        triage.primaryBlocker = "gradient-material-delta";
+        triage.riskFlags.push_back("gradient-material-risk");
+    }
+    else
+    {
+        triage.primaryBlocker = "shader-material-delta";
+        triage.riskFlags.push_back("shader-material-risk");
+    }
+
+    if (comparison.csdPointFilterSampleCount != 0)
+        triage.riskFlags.push_back("csd-point-seam-sampler-risk");
+    if (comparison.linearFilteringCommandCount != 0 || comparison.bilinearSampleCount != 0)
+        triage.riskFlags.push_back("linear-filtering-risk");
+    if (comparison.additiveCommandCount != 0)
+        triage.riskFlags.push_back("additive-blend-risk");
+    if (comparison.decodedPackedKeyframeCount != 0)
+        triage.riskFlags.push_back("packed-rgba-timeline-active");
+    if (comparison.visualDelta.registrationOffsetX != 0 || comparison.visualDelta.registrationOffsetY != 0)
+        triage.riskFlags.push_back("native-frame-registration-shift");
+
+    return triage;
+}
+
 [[nodiscard]] CsdRenderedFrameComparison renderCsdFrameComparison(
     const CsdPipelineTemplateBinding& csdBinding,
     const SgfxTemplateRenderBinding& sgfxBinding,
@@ -5110,6 +5257,7 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     comparison.timelineAnimationName = std::string(csdBinding.timelineAnimationName);
     comparison.frame = csdTimelineSampleFrameForTemplate(csdBinding.templateId);
     comparison.renderedFramePath = outputRoot / (std::string(csdBinding.templateId) + "_frame" + std::to_string(comparison.frame) + ".bmp");
+    comparison.diffFramePath = outputRoot / (std::string(csdBinding.templateId) + "_frame" + std::to_string(comparison.frame) + "_diff.bmp");
 
     for (std::size_t index = 0; index < sgfxBinding.slotCount; ++index)
         comparison.sgfxSlots.emplace_back(sgfxBinding.slots[index].slotName);
@@ -5170,8 +5318,9 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     const bool saved = bitmap && saveBitmapAsBmp(*bitmap, comparison.renderedFramePath);
     comparison.nativeBestPath = findNativeBestBmpPathForTarget(csdBinding.templateId);
     comparison.visualDelta = bitmap
-        ? computeBitmapComparisonStats(*bitmap, comparison.nativeBestPath)
+        ? computeBitmapComparisonStats(*bitmap, comparison.nativeBestPath, comparison.diffFramePath)
         : BitmapComparisonStats{};
+    comparison.materialTriage = materialParityTriageForComparison(comparison);
     if (!saved)
         comparison.renderedFramePath.clear();
     return comparison;
@@ -5188,7 +5337,7 @@ void writeCsdRenderCompareManifest(
         return;
 
     out << "{\n";
-    out << "  \"phase\": 130,\n";
+    out << "  \"phase\": 131,\n";
     out << "  \"canvas\": { \"width\": " << kDesignWidth << ", \"height\": " << kDesignHeight << " },\n";
     out << "  \"records\": [\n";
     for (std::size_t index = 0; index < comparisons.size(); ++index)
@@ -5202,6 +5351,7 @@ void writeCsdRenderCompareManifest(
         out << "      \"animation\": \"" << jsonEscape(comparison.timelineAnimationName) << "\",\n";
         out << "      \"frame\": " << comparison.frame << ",\n";
         out << "      \"renderedFramePath\": \"" << jsonEscape(portablePath(comparison.renderedFramePath)) << "\",\n";
+        out << "      \"diffFramePath\": \"" << jsonEscape(portablePath(comparison.diffFramePath)) << "\",\n";
         out << "      \"nativeBestPath\": \"" << jsonEscape(comparison.nativeBestPath ? portablePath(*comparison.nativeBestPath) : std::string("")) << "\",\n";
         out << "      \"drawCommandCount\": " << comparison.drawCommandCount << ",\n";
         out << "      \"sampledCommandCount\": " << comparison.sampledCommandCount << ",\n";
@@ -5242,7 +5392,27 @@ void writeCsdRenderCompareManifest(
             << ", \"meanAbsRgb\": " << std::fixed << std::setprecision(3) << comparison.visualDelta.meanAbsRgb
             << ", \"maxAbsRgb\": " << comparison.visualDelta.maxAbsRgb
             << ", \"renderRgbSum\": " << comparison.visualDelta.rendered.rgbSum
-            << ", \"nativeRgbSum\": " << comparison.visualDelta.native.rgbSum << " },\n";
+            << ", \"nativeRgbSum\": " << comparison.visualDelta.native.rgbSum
+            << ", \"fullFrame\": { \"mode\": \"" << jsonEscape(comparison.visualDelta.fullFrame.mode)
+            << "\", \"computed\": " << (comparison.visualDelta.fullFrame.computed ? "true" : "false")
+            << ", \"pixels\": " << comparison.visualDelta.fullFrame.pixelCount
+            << ", \"exactMatchPixels\": " << comparison.visualDelta.fullFrame.exactMatchPixels
+            << ", \"significantDeltaPixels\": " << comparison.visualDelta.fullFrame.significantDeltaPixels
+            << ", \"meanAbsRgb\": " << std::fixed << std::setprecision(3) << comparison.visualDelta.fullFrame.meanAbsRgb
+            << ", \"maxAbsRgb\": " << comparison.visualDelta.fullFrame.maxAbsRgb
+            << ", \"renderNonBlackRatio\": " << std::fixed << std::setprecision(6) << comparison.visualDelta.fullFrame.renderNonBlackRatio
+            << ", \"nativeNonBlackRatio\": " << comparison.visualDelta.fullFrame.nativeNonBlackRatio << " } },\n";
+        out << "      \"materialParityTriage\": { \"primaryBlocker\": \"" << jsonEscape(comparison.materialTriage.primaryBlocker)
+            << "\", \"coverageGap\": " << std::fixed << std::setprecision(6) << comparison.materialTriage.coverageGap
+            << ", \"sampledVsFullFrameGap\": " << std::fixed << std::setprecision(3) << comparison.materialTriage.sampledVsFullFrameGap
+            << ", \"riskFlags\": [";
+        for (std::size_t flagIndex = 0; flagIndex < comparison.materialTriage.riskFlags.size(); ++flagIndex)
+        {
+            if (flagIndex != 0)
+                out << ", ";
+            out << "\"" << jsonEscape(comparison.materialTriage.riskFlags[flagIndex]) << "\"";
+        }
+        out << "] },\n";
         out << "      \"sgfxSlots\": [";
         for (std::size_t slotIndex = 0; slotIndex < comparison.sgfxSlots.size(); ++slotIndex)
         {
@@ -5289,7 +5459,7 @@ void writeCsdRenderCompareManifest(
     std::size_t templateCount = 0;
     bool failed = false;
     std::vector<CsdRenderedFrameComparison> comparisons;
-    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase130";
+    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase131";
     const auto manifestPath = outputRoot / "csd_render_compare_manifest.json";
 
     Gdiplus::GdiplusStartupInput gdiplusInput{};
@@ -5336,6 +5506,12 @@ void writeCsdRenderCompareManifest(
             << comparison.templateId
             << ":"
             << portablePath(comparison.renderedFramePath)
+            << '\n';
+        std::cout
+            << "diff_frame_path="
+            << comparison.templateId
+            << ":"
+            << portablePath(comparison.diffFramePath)
             << '\n';
         std::cout
             << "material_semantics="
@@ -5421,6 +5597,46 @@ void writeCsdRenderCompareManifest(
             << comparison.visualDelta.meanAbsRgb
             << '\n';
         std::cout << formatVisualDeltaLine(comparison) << '\n';
+        std::cout
+            << "full_frame_delta="
+            << comparison.templateId
+            << ":mode="
+            << comparison.visualDelta.fullFrame.mode
+            << ":pixels="
+            << comparison.visualDelta.fullFrame.pixelCount
+            << ":exact_match="
+            << comparison.visualDelta.fullFrame.exactMatchPixels
+            << ":significant="
+            << comparison.visualDelta.fullFrame.significantDeltaPixels
+            << ":mean_abs_rgb="
+            << std::fixed
+            << std::setprecision(3)
+            << comparison.visualDelta.fullFrame.meanAbsRgb
+            << ":max_abs_rgb="
+            << comparison.visualDelta.fullFrame.maxAbsRgb
+            << ":render_nonblack_ratio="
+            << std::fixed
+            << std::setprecision(6)
+            << comparison.visualDelta.fullFrame.renderNonBlackRatio
+            << ":native_nonblack_ratio="
+            << comparison.visualDelta.fullFrame.nativeNonBlackRatio
+            << '\n';
+        std::cout
+            << "material_parity_triage="
+            << comparison.templateId
+            << ":primary="
+            << comparison.materialTriage.primaryBlocker
+            << ":flags="
+            << joinStrings(comparison.materialTriage.riskFlags)
+            << ":coverage_gap="
+            << std::fixed
+            << std::setprecision(6)
+            << comparison.materialTriage.coverageGap
+            << ":sampled_vs_full_frame_gap="
+            << std::fixed
+            << std::setprecision(3)
+            << comparison.materialTriage.sampledVsFullFrameGap
+            << '\n';
         std::cout
             << "native_best_path="
             << comparison.templateId
