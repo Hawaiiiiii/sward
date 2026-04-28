@@ -12,9 +12,13 @@ CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt
 HEADER = REPO_ROOT / "research_uiux" / "runtime_reference" / "include" / "sward" / "ui_runtime" / "sgfx_templates.hpp"
 SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "src" / "sgfx_templates.cpp"
 EXAMPLE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "sgfx_template_catalog.cpp"
+SONIC_HUD_HEADER = REPO_ROOT / "research_uiux" / "runtime_reference" / "include" / "sward" / "ui_runtime" / "sonic_hud_reference.hpp"
+SONIC_HUD_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "src" / "sonic_hud_reference.cpp"
+SONIC_HUD_EXAMPLE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "sonic_hud_reference_catalog.cpp"
 REPORT = REPO_ROOT / "research_uiux" / "DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md"
 README = REPO_ROOT / "research_uiux" / "runtime_reference" / "README.md"
 DEFAULT_EXE = REPO_ROOT / "b" / "rr122" / "sward_sgfx_template_catalog.exe"
+DEFAULT_SONIC_HUD_EXE = REPO_ROOT / "b" / "rr134" / "Release" / "sward_sonic_hud_reference_catalog.exe"
 
 
 class SgfxTemplateCatalogTests(unittest.TestCase):
@@ -145,6 +149,78 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("loading:loading_transition_reference.json:loading-display-active", completed.stdout)
         self.assertIn("sonic-hud:sonic_stage_hud_reference.json:sonic-hud-ready", completed.stdout)
         self.assertIn("tutorial:sonic_stage_hud_reference.json:tutorial-hud-owner-path-ready", completed.stdout)
+
+    def test_phase137_declares_reusable_sonic_hud_reference_source(self) -> None:
+        cmake = self.read(CMAKE_FILE)
+        header = self.read(SONIC_HUD_HEADER)
+        source = self.read(SONIC_HUD_SOURCE)
+        example = self.read(SONIC_HUD_EXAMPLE)
+
+        self.assertIn("src/sonic_hud_reference.cpp", cmake)
+        self.assertIn("add_executable(sward_sonic_hud_reference_catalog", cmake)
+        self.assertIn("examples/sonic_hud_reference_catalog.cpp", cmake)
+
+        for token in [
+            "struct SonicHudMaterialSlot",
+            "struct SonicHudTimelineChannel",
+            "struct SonicHudScenePolicy",
+            "struct SonicHudTimelineSample",
+            "sonicHudScenePolicies",
+            "findSonicHudScenePolicy",
+            "sampleSonicHudTimeline",
+            "formatSonicHudReferenceCatalog",
+            "formatSonicHudSceneDetail",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "CHudSonicStage",
+            "sub_824D9308",
+            "ui_playscreen",
+            "stage-hud-ready",
+            "tutorial-hud-owner-path-ready",
+            "so_speed_gauge",
+            "so_ringenagy_gauge",
+            "add/u_info",
+            "DefaultAnim",
+            "total_quantity",
+            "Intro_Anim",
+            "SGFX slot",
+            "Sonic assets are local placeholders",
+        ]:
+            self.assertIn(token, source)
+
+        for token in [
+            "--catalog",
+            "--scene",
+            "--sample",
+            "--phase137-smoke",
+            "Phase 137 Sonic HUD reference",
+        ]:
+            self.assertIn(token, example)
+
+    def test_phase137_sonic_hud_reference_smoke_reports_scene_policy_and_timeline(self) -> None:
+        exe = Path(os.environ.get("SWARD_SONIC_HUD_REFERENCE_CATALOG_EXE", DEFAULT_SONIC_HUD_EXE))
+        if not exe.exists():
+            self.skipTest(f"Sonic HUD reference catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase137-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_sonic_hud_reference_catalog phase137 smoke ok", completed.stdout)
+        self.assertIn("owner=CHudSonicStage:hook=sub_824D9308:project=ui_playscreen", completed.stdout)
+        self.assertIn("scenes=13", completed.stdout)
+        self.assertIn("drawable_layers=167", completed.stdout)
+        self.assertIn("scene=so_speed_gauge:slot=speed_gauge:activation=stage-hud-ready:order=70:timeline=DefaultAnim", completed.stdout)
+        self.assertIn("scene=so_ringenagy_gauge:slot=energy_gauge:activation=stage-hud-ready:order=60:timeline=total_quantity", completed.stdout)
+        self.assertIn("scene=add/u_info:slot=prompt_strip:activation=tutorial-hud-owner-path-ready:order=120:timeline=Intro_Anim", completed.stdout)
+        self.assertIn("timeline_sample=so_speed_gauge:DefaultAnim:frame=99/100:progress=0.990", completed.stdout)
+        self.assertIn("material_slot=so_speed_gauge:speed_gauge:ui_ps1_gauge1.dds:placeholder=normal-sonic-hud", completed.stdout)
 
 
 if __name__ == "__main__":

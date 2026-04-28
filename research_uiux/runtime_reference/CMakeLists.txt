@@ -6,6 +6,7 @@ add_library(sward_ui_runtime STATIC
     src/runtime.cpp
     src/profiles.cpp
     src/sgfx_templates.cpp
+    src/sonic_hud_reference.cpp
 )
 
 target_include_directories(sward_ui_runtime
@@ -97,6 +98,15 @@ add_executable(sward_sgfx_template_catalog
 )
 
 target_link_libraries(sward_sgfx_template_catalog
+    PRIVATE
+        sward_ui_runtime
+)
+
+add_executable(sward_sonic_hud_reference_catalog
+    examples/sonic_hud_reference_catalog.cpp
+)
+
+target_link_libraries(sward_sonic_hud_reference_catalog
     PRIVATE
         sward_ui_runtime
 )

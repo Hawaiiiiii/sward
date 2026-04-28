@@ -96,6 +96,16 @@ Phase 136 turns the exact material join into a full normal Sonic HUD compositor/
 
 This is the first Sonic HUD beat where every active runtime scene is represented in a portable compositor shape. The remaining parity work is per-scene active/hidden state, exact render order/blend validation, and then translating the reference records into hand-written reusable UI source.
 
+## Phase 137 Follow-Up
+
+Phase 137 translates the generated normal Sonic HUD compositor/reference export into hand-written, tracked, reusable source:
+
+- `include/sward/ui_runtime/sonic_hud_reference.hpp` declares repo-safe `SonicHudOwnerReference`, `SonicHudScenePolicy`, `SonicHudMaterialSlot`, `SonicHudTimelineChannel`, and timeline sample APIs;
+- `src/sonic_hud_reference.cpp` carries the `CHudSonicStage` / `sub_824D9308` provenance, `ui_playscreen` owner policy, all `13` runtime scenes, activation events, render ordering, SGFX slot labels, material slot names, and timeline frame domains;
+- `examples/sonic_hud_reference_catalog.cpp` exposes `--catalog`, `--scene`, `--sample`, and `--phase137-smoke` so the recovered architecture can be smoke-tested without loading Sonic assets.
+
+This is source reconstruction, not a visual renderer fix. The old interactive asset window can still look like the legacy proxy overlay until it is wired to this exact compositor/reference policy. The value of this beat is that SGFX can now reuse the HUD scene ownership, ordering, slots, and timeline-player shape without depending on proprietary Sonic payloads.
+
 ## Verification
 
 Fresh verification for this beat used:

@@ -330,6 +330,12 @@ Local-only evidence, not committed:
   - the export also writes ignored local `ui_playscreen_hud_reference.hpp`, a readable C++-style reference skeleton for `CHudSonicStage`, hook `sub_824D9308`, project `ui_playscreen`, and the scene table needed for portable source reconstruction
   - this is now a full runtime-scene compositor model; shader/palette/render-order parity still needs native comparison before claiming pixel-perfect HUD recreation
 
+- `research_uiux/runtime_reference/include/sward/ui_runtime/sonic_hud_reference.hpp` and `src/sonic_hud_reference.cpp`
+  - Phase 137 promotes the generated Phase 136 reference into hand-written repo-safe source
+  - the module keeps the live-bridge provenance (`CHudSonicStage`, `sub_824D9308`, `ui_playscreen`) while exposing reusable scene activation policy, render ordering, SGFX slots, material slot descriptors, and timeline sampling
+  - `sward_sonic_hud_reference_catalog.exe --phase137-smoke` verifies the portable policy table without loading or publishing Sonic CSD/DDS payloads
+  - this is the reusable architecture lane for SGFX; native BMP/runtime captures remain the visual oracle and the legacy asset viewer still needs a follow-on wiring beat to use this exact model
+
 - `out/ui_lab_runtime_evidence/20260428_011255/`
   - focused Phase 120 `sonic-hud` live-bridge/native capture passed on the final raw-owner hook build
   - JSONL emitted `sonic-hud-owner-hooked` with `owner_fields_ready=0`, proving the raw `CHudSonicStage` owner pointer while keeping embedded CSD owner fields marked pending

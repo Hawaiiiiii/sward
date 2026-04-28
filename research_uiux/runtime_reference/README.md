@@ -62,6 +62,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - a Phase 123 SGFX template-driven placeholder renderer path where those recipes select Sonic placeholder screens, bind local asset slots, and expose first timing hooks for `title-menu`, `loading`, `sonic-hud`, and `tutorial`
 - a Phase 132 CSD compare renderer path where ignored local layout evidence preserves packed RGBA keyframes, Color/Gradient channels sample into real RGBA values, offscreen CSD frames render through a software ARGB quad compositor, and native BMP comparison writes full-frame plus UI-layer coverage diff BMPs
 - a Phase 133 Sonic HUD archaeology path where the compare renderer reads the latest live-bridge `sonic-hud` state, proves runtime `ui_playscreen` scene coverage, labels the local `ui_prov_playscreen.yncp` HUD renderer as a proxy while exact `ui_playscreen.yncp` remains unrecovered, and emits scene/cast coverage diagnostics beside the native BMP oracle
+- a Phase 137 hand-written Sonic HUD reference module that turns the generated `ui_playscreen` compositor export into repo-safe scene activation policy, render ordering, SGFX material slots, and timeline-player sampling code without publishing Sonic assets
 
 Contents:
 
@@ -70,17 +71,20 @@ Contents:
 - `include/sward/ui_runtime/contract_loader.hpp`
 - `include/sward/ui_runtime/runtime_c.h`
 - `include/sward/ui_runtime/sgfx_templates.hpp`
+- `include/sward/ui_runtime/sonic_hud_reference.hpp`
 - `contracts/`
 - `src/runtime.cpp`
 - `src/contract_loader.cpp`
 - `src/profiles.cpp`
 - `src/runtime_c.cpp`
 - `src/sgfx_templates.cpp`
+- `src/sonic_hud_reference.cpp`
 - `examples/pause_menu_example.cpp`
 - `examples/title_menu_example.cpp`
 - `examples/toast_overlay_example.cpp`
 - `examples/c_pause_menu_example.c`
 - `examples/sgfx_template_catalog.cpp`
+- `examples/sonic_hud_reference_catalog.cpp`
 - `examples/ui_debug_workbench_gui.cpp`
 - `CMakeLists.txt`
 - `csharp_reference/`
@@ -142,6 +146,7 @@ b/rr91/sward_ui_runtime_debug_workbench.exe
 b/rr91/sward_sgfx_template_catalog.exe
 b/rr91/sward_ui_runtime_debug_gui.exe
 b/rr91/sward_su_ui_asset_renderer.exe
+b/rr91/sward_sonic_hud_reference_catalog.exe
 ```
 
 Run against the bundled contracts:
@@ -179,6 +184,9 @@ b/rr91/sward_ui_runtime_debug_workbench.exe --host XMLManager.cpp
 b/rr91/sward_sgfx_template_catalog.exe --catalog
 b/rr91/sward_sgfx_template_catalog.exe --template title-menu
 b/rr91/sward_sgfx_template_catalog.exe --phase122-smoke
+b/rr91/sward_sonic_hud_reference_catalog.exe --catalog
+b/rr91/sward_sonic_hud_reference_catalog.exe --scene so_speed_gauge --sample 120
+b/rr91/sward_sonic_hud_reference_catalog.exe --phase137-smoke
 b/rr91/sward_ui_runtime_debug_gui.exe
 b/rr91/sward_ui_runtime_debug_gui.exe --smoke
 b/rr91/sward_ui_runtime_debug_gui.exe --asset-view-smoke
@@ -225,6 +233,8 @@ b/rr91/sward_su_ui_asset_renderer.exe --template loading --sgfx-template-smoke
 ```
 
 The SGFX template catalog is real-runtime evidence-backed architecture, not a visual parity renderer. It emits portable screen recipes for `title-menu`, `loading`, `sonic-hud`, and `tutorial` with contract names, required JSONL/live-bridge events, layer roles, timing bands, input-lock policy, and SGFX adaptation notes. The recipes are asset-aware: local Sonic placeholder assets can be rendered in the lab, but the stable output is explicit slot bindings for custom SGFX art.
+
+The Sonic HUD reference catalog is the Phase 137 reusable source layer for normal Sonic HUD architecture. It is built from the exact `ui_playscreen` runtime/material evidence, but it ships only repo-safe C++ structs and policy tables: `CHudSonicStage` owner provenance, scene activation events, render ordering, material-slot names, SGFX slot labels, and timeline sampling. It does not embed Sonic DDS/CSD payloads; local Sonic assets remain placeholders for comparison and future viewer wiring.
 
 Run against an explicit portable contract path:
 
