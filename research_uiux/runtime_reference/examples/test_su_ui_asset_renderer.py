@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RENDERER_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "su_ui_asset_renderer.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr124" / "sward_su_ui_asset_renderer.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr125" / "sward_su_ui_asset_renderer.exe"
 
 
 class SuUiAssetRendererTests(unittest.TestCase):
@@ -133,6 +133,20 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("mm_bg_usual", source_text)
         self.assertIn("pda", source_text)
         self.assertIn("so_speed_gauge", source_text)
+
+    def test_renderer_source_exposes_csd_drawable_traversal(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("CsdDrawableCommand", source_text)
+        self.assertIn("CsdDrawableScene", source_text)
+        self.assertIn("loadCsdDrawableScene", source_text)
+        self.assertIn("buildCsdDrawableCommands", source_text)
+        self.assertIn("renderCsdDrawableScene", source_text)
+        self.assertIn("--csd-drawable-smoke", source_text)
+        self.assertIn("csd_drawable=", source_text)
+        self.assertIn("csd_draw_command=", source_text)
+        self.assertIn("texture_binding=", source_text)
+        self.assertIn("sampled_transform=", source_text)
+        self.assertIn("native_bmp_compare=", source_text)
 
     def test_renderer_source_exposes_title_loop_reconstruction_screen(self) -> None:
         source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
@@ -353,6 +367,65 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("csd_pipeline=sonic-hud:layout=ui_prov_playscreen.yncp:scene=so_speed_gauge", completed.stdout)
         self.assertNotIn("csd_pipeline=title-menu:", completed.stdout)
         self.assertNotIn("csd_pipeline=loading:", completed.stdout)
+
+    def test_renderer_csd_drawable_smoke_reports_scene_draw_commands(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--csd-drawable-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer csd drawable smoke ok", completed.stdout)
+        self.assertIn("layout_source=research_uiux/data/layout_deep_analysis.json", completed.stdout)
+        self.assertIn("templates=4", completed.stdout)
+        self.assertIn("packages=3", completed.stdout)
+        self.assertIn("csd_drawable=title-menu:layout=ui_mainmenu.yncp:scene=mm_bg_usual:commands=36:casts=47:subimages=46", completed.stdout)
+        self.assertIn("csd_drawable=loading:layout=ui_loading.yncp:scene=pda:commands=28:casts=57:subimages=320", completed.stdout)
+        self.assertIn("csd_drawable=sonic-hud:layout=ui_prov_playscreen.yncp:scene=so_speed_gauge:commands=43:casts=47:subimages=109", completed.stdout)
+        self.assertIn("csd_drawable=tutorial:layout=ui_prov_playscreen.yncp:scene=info_1:commands=14:casts=24:subimages=109", completed.stdout)
+        self.assertIn("csd_draw_command=title-menu:mm_bg_usual/black3->black3:texture=ui_mm_parts1.dds:subimage=14:src=896,336,16x16:dst=655,435,368x464", completed.stdout)
+        self.assertIn("csd_draw_command=loading:pda/bg->bg:texture=mat_load_comon_001.dds:subimage=201:src=595,463,10x60:dst=180,146,920x60", completed.stdout)
+        self.assertIn("csd_draw_command=sonic-hud:so_speed_gauge/Cast_0506_bg->Cast_0506_bg:texture=ui_ps1_gauge1.dds:subimage=1:src=4,64,16x20:dst=752,357,16x20", completed.stdout)
+        self.assertIn("csd_draw_command=tutorial:info_1/bg_1->bg_1:texture=mat_playscreen_001.dds:subimage=97:src=56,2,1x30:dst=385,320,250x30", completed.stdout)
+        self.assertIn("texture_binding=title-menu:ui_mm_parts1.dds:resolved=1:size=1280x640", completed.stdout)
+        self.assertIn("texture_binding=loading:mat_load_comon_001.dds:resolved=1:size=1280x720", completed.stdout)
+        self.assertIn("texture_binding=sonic-hud:ui_ps1_gauge1.dds:resolved=1:size=256x128", completed.stdout)
+        self.assertIn("texture_binding=tutorial:mat_playscreen_001.dds:resolved=1:size=128x256", completed.stdout)
+        self.assertIn("sampled_transform=title-menu:mm_bg_usual/black3:translation=0.155469,0.426389:scale=23,29", completed.stdout)
+        self.assertIn("sampled_transform=loading:pda/bg:translation=0,-0.255556:scale=92,1", completed.stdout)
+        self.assertIn("native_bmp_compare=title-menu:target=title-menu:event=title-menu-visible", completed.stdout)
+        self.assertIn("native_bmp_compare=loading:target=loading:event=loading-display-active", completed.stdout)
+        self.assertIn("native_bmp_compare=sonic-hud:target=sonic-hud:event=sonic-hud-ready", completed.stdout)
+        self.assertIn("sgfx_element_map=title-menu:scene=mm_bg_usual:cast=black3:slot=backdrop", completed.stdout)
+
+    def test_renderer_csd_drawable_template_filter_reports_one_scene(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--template", "loading", "--csd-drawable-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer csd drawable smoke ok", completed.stdout)
+        self.assertIn("templates=1", completed.stdout)
+        self.assertIn("packages=1", completed.stdout)
+        self.assertIn("csd_drawable=loading:layout=ui_loading.yncp:scene=pda:commands=28", completed.stdout)
+        self.assertIn("csd_draw_command=loading:pda/bg->bg:texture=mat_load_comon_001.dds", completed.stdout)
+        self.assertNotIn("csd_drawable=title-menu:", completed.stdout)
+        self.assertNotIn("csd_drawable=sonic-hud:", completed.stdout)
 
     def test_renderer_navigation_smoke_reports_interactive_catalog(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

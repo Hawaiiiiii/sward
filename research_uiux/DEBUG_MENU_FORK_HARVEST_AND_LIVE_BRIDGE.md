@@ -209,6 +209,14 @@ The new `--csd-pipeline-smoke` command reports the real recovered layout package
 
 The interactive renderer also overlays `csd_pipeline=`, `sgfx_element_map=`, and `runtime_evidence_compare=` lines when launched with `--template ...`, so the operator can see which visible placeholder elements come from recovered CSD evidence and which runtime event/native BMP set is being used as proof.
 
+## Phase 125 CSD Drawable Traversal
+
+Phase 125 moves the local SU UI pipeline viewer from digest-level CSD facts into actual drawable traversal. The renderer now reads ignored local `layout_deep_analysis.json`, resolves the selected scene through `scene_ids`, walks `cast_groups`, `cast_dictionaries`, `cast_material.used_subimage_indices`, and `subimages`, then emits concrete draw commands with cast name, source texture, subimage index, source rectangle, destination rectangle, sampled translation/scale/rotation, and SGFX slot mapping.
+
+The new `--csd-drawable-smoke` command exports the four current template scenes as drawable command streams: `ui_mainmenu.yncp/mm_bg_usual`, `ui_loading.yncp/pda`, `ui_prov_playscreen.yncp/so_speed_gauge`, and `ui_prov_playscreen.yncp/info_1`. It verifies the first real CSD-derived commands such as title `black3`, loading `bg`, Sonic HUD `Cast_0506_bg`, and tutorial `bg_1`; resolves their local DDS texture dimensions without publishing those assets; and still prints `native_bmp_compare=` lines so runtime/native evidence remains the visual oracle.
+
+Interactive `--template ...` preview now attempts to render from the recovered CSD drawable command stream first. The older hand-placed placeholder casts remain as fallback and diagnostics, but the template lane is now CSD draw-command driven wherever local evidence and local Sonic placeholder textures exist. This is still a sidecar pipeline viewer, not a replacement for the real UnleashedRecomp runtime lane.
+
 ## Verification
 
 Local-only evidence, not committed:

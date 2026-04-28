@@ -147,8 +147,74 @@ struct CsdPipelineTemplateBinding
     std::string_view timelineAnimationName;
 };
 
-inline constexpr std::array<TextureSourceCandidate, 13> kTextureSourceCandidates{{
+struct CsdDrawableCommand
+{
+    std::string sceneName;
+    std::string castName;
+    std::string textureName;
+    int groupIndex = 0;
+    int castIndex = 0;
+    int subimageIndex = -1;
+    int textureIndex = -1;
+    int textureWidth = 0;
+    int textureHeight = 0;
+    int sourceX = 0;
+    int sourceY = 0;
+    int sourceWidth = 0;
+    int sourceHeight = 0;
+    int destinationX = 0;
+    int destinationY = 0;
+    int destinationWidth = 0;
+    int destinationHeight = 0;
+    double translationX = 0.0;
+    double translationY = 0.0;
+    double scaleX = 1.0;
+    double scaleY = 1.0;
+    double rotation = 0.0;
+    bool flipX = false;
+    bool flipY = false;
+    bool textureResolved = false;
+    bool sourceFits = false;
+};
+
+struct CsdDrawableScene
+{
+    std::filesystem::path sourcePath;
+    std::string layoutFileName;
+    std::string sceneName;
+    int castCount = 0;
+    int subimageCount = 0;
+    std::vector<std::string> textureNames;
+    std::vector<CsdDrawableCommand> commands;
+};
+
+struct CsdCastDictionaryEntry
+{
+    int groupIndex = 0;
+    int castIndex = 0;
+    std::string name;
+};
+
+struct CsdSubimageBinding
+{
+    int textureIndex = -1;
+    double left = 0.0;
+    double top = 0.0;
+    double right = 0.0;
+    double bottom = 0.0;
+};
+
+struct DdsTextureInfo
+{
+    std::string format;
+    int width = 0;
+    int height = 0;
+};
+
+inline constexpr std::array<TextureSourceCandidate, 15> kTextureSourceCandidates{{
     { "mat_load_comon_001.dds", "ui_extended_archives/Loading/mat_load_comon_001.dds" },
+    { "mat_load_en_001.dds", "ui_broader_archives/Languages/English/Loading/mat_load_en_001.dds" },
+    { "mat_comon_txt_001.dds", "ui_extended_archives/Loading/mat_comon_txt_001.dds" },
     { "OPmovie_titlelogo_EN.decompressed.dds", "runtime_previews/title/decompressed/OPmovie_titlelogo_EN.decompressed.dds" },
     { "ui_mm_base.dds", "ui_frontend_archives/MainMenu/ui_mm_base.dds" },
     { "ui_mm_parts1.dds", "ui_frontend_archives/MainMenu/ui_mm_parts1.dds" },
@@ -807,6 +873,61 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     return text.substr(*valueOffset, (*endOffset - *valueOffset) + 1);
 }
 
+[[nodiscard]] std::optional<std::string_view> jsonObjectFieldSpan(std::string_view text, std::string_view fieldName)
+{
+    const auto valueOffset = findJsonFieldValueOffset(text, fieldName);
+    if (!valueOffset || *valueOffset >= text.size() || text[*valueOffset] != '{')
+        return std::nullopt;
+
+    const auto endOffset = matchJsonContainer(text, *valueOffset, '{', '}');
+    if (!endOffset)
+        return std::nullopt;
+
+    return text.substr(*valueOffset, (*endOffset - *valueOffset) + 1);
+}
+
+[[nodiscard]] std::vector<double> parseJsonNumberArray(std::string_view arraySpan)
+{
+    std::vector<double> values;
+    std::size_t offset = 0;
+    while (offset < arraySpan.size())
+    {
+        const char ch = arraySpan[offset];
+        if (!(std::isdigit(static_cast<unsigned char>(ch)) || ch == '-' || ch == '+' || ch == '.'))
+        {
+            ++offset;
+            continue;
+        }
+
+        std::size_t endOffset = offset + 1;
+        while (endOffset < arraySpan.size())
+        {
+            const char numberChar = arraySpan[endOffset];
+            if (!(std::isdigit(static_cast<unsigned char>(numberChar)) || numberChar == '-' || numberChar == '+'
+                || numberChar == '.' || numberChar == 'e' || numberChar == 'E'))
+                break;
+            ++endOffset;
+        }
+
+        try
+        {
+            values.push_back(std::stod(std::string(arraySpan.substr(offset, endOffset - offset))));
+        }
+        catch (...)
+        {
+        }
+        offset = endOffset;
+    }
+
+    return values;
+}
+
+[[nodiscard]] std::vector<double> jsonNumberArrayField(std::string_view text, std::string_view fieldName)
+{
+    const auto arraySpan = jsonArrayFieldSpan(text, fieldName);
+    return arraySpan ? parseJsonNumberArray(*arraySpan) : std::vector<double>{};
+}
+
 [[nodiscard]] std::vector<std::string> parseJsonStringArray(std::string_view arraySpan)
 {
     std::vector<std::string> values;
@@ -1020,6 +1141,362 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
         joined << values[index];
     }
     return joined.str();
+}
+
+[[nodiscard]] std::uint32_t readLe32(const std::uint8_t* data);
+[[nodiscard]] std::optional<DdsTextureImage> loadDdsTextureImage(std::string_view textureFileName);
+
+[[nodiscard]] std::optional<DdsTextureInfo> loadDdsTextureInfo(std::string_view textureFileName)
+{
+    const auto path = textureSourcePathForFileName(textureFileName);
+    if (!path)
+        return std::nullopt;
+
+    std::ifstream file(*path, std::ios::binary);
+    if (!file)
+        return std::nullopt;
+
+    std::array<std::uint8_t, 128> header{};
+    file.read(reinterpret_cast<char*>(header.data()), static_cast<std::streamsize>(header.size()));
+    if (!file || std::memcmp(header.data(), "DDS ", 4) != 0)
+        return std::nullopt;
+
+    const std::uint32_t headerSize = readLe32(header.data() + 4);
+    const int height = static_cast<int>(readLe32(header.data() + 12));
+    const int width = static_cast<int>(readLe32(header.data() + 16));
+    const std::uint32_t pixelFormatSize = readLe32(header.data() + 76);
+    const std::string fourCc(reinterpret_cast<const char*>(header.data() + 84), 4);
+    if (headerSize != 124 || pixelFormatSize != 32 || width <= 0 || height <= 0)
+        return std::nullopt;
+
+    DdsTextureInfo info;
+    info.format = fourCc;
+    info.width = width;
+    info.height = height;
+    return info;
+}
+
+[[nodiscard]] std::optional<std::string_view> findParsedCsdFileObjectSpan(
+    std::string_view document,
+    std::string_view layoutFileName)
+{
+    const auto parsedFiles = jsonArrayFieldSpan(document, "parsed_files");
+    if (!parsedFiles)
+        return std::nullopt;
+
+    for (const auto objectSpan : jsonObjectSpansInArray(*parsedFiles))
+    {
+        if (jsonStringField(objectSpan, "file_name").value_or("") == layoutFileName)
+            return objectSpan;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<std::string_view> firstJsonObjectInArrayField(
+    std::string_view text,
+    std::string_view fieldName)
+{
+    const auto arraySpan = jsonArrayFieldSpan(text, fieldName);
+    if (!arraySpan)
+        return std::nullopt;
+
+    const auto objects = jsonObjectSpansInArray(*arraySpan);
+    if (objects.empty())
+        return std::nullopt;
+
+    return objects.front();
+}
+
+[[nodiscard]] std::optional<std::string_view> jsonObjectInArrayAt(
+    std::string_view arraySpan,
+    std::size_t index)
+{
+    std::size_t objectIndex = 0;
+    for (const auto objectSpan : jsonObjectSpansInArray(arraySpan))
+    {
+        if (objectIndex == index)
+            return objectSpan;
+        ++objectIndex;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<int> csdSceneIndexForName(std::string_view rootObject, std::string_view sceneName)
+{
+    const auto sceneIds = jsonArrayFieldSpan(rootObject, "scene_ids");
+    if (!sceneIds)
+        return std::nullopt;
+
+    for (const auto objectSpan : jsonObjectSpansInArray(*sceneIds))
+    {
+        if (jsonStringField(objectSpan, "name").value_or("") == sceneName)
+            return static_cast<int>(jsonNumberField(objectSpan, "index").value_or(-1.0));
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::vector<CsdCastDictionaryEntry> parseCsdCastDictionary(std::string_view sceneObject)
+{
+    std::vector<CsdCastDictionaryEntry> entries;
+    const auto dictionaries = jsonArrayFieldSpan(sceneObject, "cast_dictionaries");
+    if (!dictionaries)
+        return entries;
+
+    for (const auto objectSpan : jsonObjectSpansInArray(*dictionaries))
+    {
+        CsdCastDictionaryEntry entry;
+        entry.groupIndex = static_cast<int>(jsonNumberField(objectSpan, "group_index").value_or(0.0));
+        entry.castIndex = static_cast<int>(jsonNumberField(objectSpan, "cast_index").value_or(0.0));
+        entry.name = jsonStringField(objectSpan, "name").value_or("");
+        entries.push_back(std::move(entry));
+    }
+
+    return entries;
+}
+
+[[nodiscard]] std::string csdCastNameFor(
+    const std::vector<CsdCastDictionaryEntry>& dictionary,
+    int groupIndex,
+    int castIndex)
+{
+    const auto found = std::find_if(
+        dictionary.begin(),
+        dictionary.end(),
+        [groupIndex, castIndex](const CsdCastDictionaryEntry& entry)
+        {
+            return entry.groupIndex == groupIndex && entry.castIndex == castIndex;
+        });
+    if (found != dictionary.end() && !found->name.empty())
+        return found->name;
+
+    std::ostringstream fallback;
+    fallback << "Cast_" << groupIndex << "_" << castIndex;
+    return fallback.str();
+}
+
+[[nodiscard]] std::vector<CsdSubimageBinding> parseCsdSubimages(std::string_view sceneObject)
+{
+    std::vector<CsdSubimageBinding> subimages;
+    const auto subimageArray = jsonArrayFieldSpan(sceneObject, "subimages");
+    if (!subimageArray)
+        return subimages;
+
+    for (const auto objectSpan : jsonObjectSpansInArray(*subimageArray))
+    {
+        CsdSubimageBinding subimage;
+        subimage.textureIndex = static_cast<int>(jsonNumberField(objectSpan, "texture_index").value_or(-1.0));
+
+        const auto topLeft = jsonNumberArrayField(objectSpan, "top_left");
+        const auto bottomRight = jsonNumberArrayField(objectSpan, "bottom_right");
+        if (topLeft.size() >= 2)
+        {
+            subimage.left = topLeft[0];
+            subimage.top = topLeft[1];
+        }
+        if (bottomRight.size() >= 2)
+        {
+            subimage.right = bottomRight[0];
+            subimage.bottom = bottomRight[1];
+        }
+
+        subimages.push_back(subimage);
+    }
+
+    return subimages;
+}
+
+[[nodiscard]] std::optional<int> firstUsedSubimageIndex(std::string_view castObject)
+{
+    const auto material = jsonObjectFieldSpan(castObject, "cast_material");
+    if (!material)
+        return std::nullopt;
+
+    const auto usedSubimages = jsonNumberArrayField(*material, "used_subimage_indices");
+    for (const double value : usedSubimages)
+    {
+        const int index = static_cast<int>(value);
+        if (index >= 0)
+            return index;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] bool csdSourceRectFits(const CsdDrawableCommand& command)
+{
+    return command.textureResolved
+        && command.sourceX >= 0
+        && command.sourceY >= 0
+        && command.sourceWidth > 0
+        && command.sourceHeight > 0
+        && command.sourceX + command.sourceWidth <= command.textureWidth
+        && command.sourceY + command.sourceHeight <= command.textureHeight;
+}
+
+[[nodiscard]] std::vector<CsdDrawableCommand> buildCsdDrawableCommands(
+    std::string_view sceneObject,
+    std::string_view sceneName,
+    const std::vector<std::string>& textureNames)
+{
+    std::vector<CsdDrawableCommand> commands;
+    const auto castGroups = jsonArrayFieldSpan(sceneObject, "cast_groups");
+    if (!castGroups)
+        return commands;
+
+    const auto dictionary = parseCsdCastDictionary(sceneObject);
+    const auto subimages = parseCsdSubimages(sceneObject);
+    const auto groupObjects = jsonObjectSpansInArray(*castGroups);
+    std::vector<std::pair<std::string, std::optional<DdsTextureInfo>>> textureInfoCache;
+    auto textureInfoFor = [&textureInfoCache](std::string_view textureName) -> const DdsTextureInfo*
+    {
+        const auto found = std::find_if(
+            textureInfoCache.begin(),
+            textureInfoCache.end(),
+            [textureName](const std::pair<std::string, std::optional<DdsTextureInfo>>& entry)
+            {
+                return entry.first == textureName;
+            });
+        if (found != textureInfoCache.end())
+            return found->second ? &*found->second : nullptr;
+
+        textureInfoCache.emplace_back(std::string(textureName), loadDdsTextureInfo(textureName));
+        return textureInfoCache.back().second ? &*textureInfoCache.back().second : nullptr;
+    };
+
+    for (std::size_t groupIndex = 0; groupIndex < groupObjects.size(); ++groupIndex)
+    {
+        const auto casts = jsonArrayFieldSpan(groupObjects[groupIndex], "casts");
+        if (!casts)
+            continue;
+
+        const auto castObjects = jsonObjectSpansInArray(*casts);
+        for (std::size_t castIndex = 0; castIndex < castObjects.size(); ++castIndex)
+        {
+            const auto castObject = castObjects[castIndex];
+            if (static_cast<int>(jsonNumberField(castObject, "is_enabled").value_or(0.0)) == 0)
+                continue;
+
+            const auto subimageIndex = firstUsedSubimageIndex(castObject);
+            if (!subimageIndex || *subimageIndex < 0 || static_cast<std::size_t>(*subimageIndex) >= subimages.size())
+                continue;
+
+            const auto& subimage = subimages[static_cast<std::size_t>(*subimageIndex)];
+            if (subimage.textureIndex < 0 || static_cast<std::size_t>(subimage.textureIndex) >= textureNames.size())
+                continue;
+
+            const auto castInfo = jsonObjectFieldSpan(castObject, "cast_info");
+            if (!castInfo)
+                continue;
+
+            const auto translation = jsonNumberArrayField(*castInfo, "translation");
+            const auto scale = jsonNumberArrayField(*castInfo, "scale");
+            const double translationX = translation.size() >= 1 ? translation[0] : 0.0;
+            const double translationY = translation.size() >= 2 ? translation[1] : 0.0;
+            const double scaleX = scale.size() >= 1 ? scale[0] : 1.0;
+            const double scaleY = scale.size() >= 2 ? scale[1] : 1.0;
+            const int castWidth = static_cast<int>(std::llround(jsonNumberField(castObject, "width").value_or(0.0)));
+            const int castHeight = static_cast<int>(std::llround(jsonNumberField(castObject, "height").value_or(0.0)));
+
+            CsdDrawableCommand command;
+            command.sceneName = std::string(sceneName);
+            command.groupIndex = static_cast<int>(groupIndex);
+            command.castIndex = static_cast<int>(castIndex);
+            command.castName = csdCastNameFor(dictionary, command.groupIndex, command.castIndex);
+            command.subimageIndex = *subimageIndex;
+            command.textureIndex = subimage.textureIndex;
+            command.textureName = textureNames[static_cast<std::size_t>(subimage.textureIndex)];
+            command.translationX = translationX;
+            command.translationY = translationY;
+            command.scaleX = scaleX;
+            command.scaleY = scaleY;
+            command.rotation = jsonNumberField(*castInfo, "rotation").value_or(0.0);
+            command.flipX = scaleX < 0.0;
+            command.flipY = scaleY < 0.0;
+            command.destinationWidth = std::max(1, static_cast<int>(std::llround(std::fabs(static_cast<double>(castWidth) * scaleX))));
+            command.destinationHeight = std::max(1, static_cast<int>(std::llround(std::fabs(static_cast<double>(castHeight) * scaleY))));
+            command.destinationX = static_cast<int>(std::llround(
+                ((0.5 + translationX) * static_cast<double>(kDesignWidth)) - (static_cast<double>(command.destinationWidth) * 0.5)));
+            command.destinationY = static_cast<int>(std::llround(
+                ((0.5 + translationY) * static_cast<double>(kDesignHeight)) - (static_cast<double>(command.destinationHeight) * 0.5)));
+
+            const auto* textureInfo = textureInfoFor(command.textureName);
+            if (textureInfo)
+            {
+                command.textureResolved = true;
+                command.textureWidth = textureInfo->width;
+                command.textureHeight = textureInfo->height;
+                const int sourceLeft = static_cast<int>(std::llround(subimage.left * static_cast<double>(textureInfo->width)));
+                const int sourceTop = static_cast<int>(std::llround(subimage.top * static_cast<double>(textureInfo->height)));
+                const int sourceRight = static_cast<int>(std::llround(subimage.right * static_cast<double>(textureInfo->width)));
+                const int sourceBottom = static_cast<int>(std::llround(subimage.bottom * static_cast<double>(textureInfo->height)));
+                command.sourceX = sourceLeft;
+                command.sourceY = sourceTop;
+                command.sourceWidth = std::max(1, sourceRight - sourceLeft);
+                command.sourceHeight = std::max(1, sourceBottom - sourceTop);
+                command.sourceFits = csdSourceRectFits(command);
+            }
+
+            commands.push_back(std::move(command));
+        }
+    }
+
+    return commands;
+}
+
+[[nodiscard]] std::optional<CsdDrawableScene> loadCsdDrawableScene(const CsdPipelineTemplateBinding& binding)
+{
+    const auto evidencePath = layoutEvidencePath();
+    if (!evidencePath)
+        return std::nullopt;
+
+    const std::string document = readTextFile(*evidencePath);
+    if (document.empty())
+        return std::nullopt;
+
+    const auto pipelineEvidence = loadCsdPipelineEvidence(binding.layoutFileName);
+    if (!pipelineEvidence)
+        return std::nullopt;
+
+    const auto parsedFile = findParsedCsdFileObjectSpan(document, binding.layoutFileName);
+    if (!parsedFile)
+        return std::nullopt;
+
+    const auto resource = firstJsonObjectInArrayField(*parsedFile, "resources");
+    const auto content = resource ? jsonObjectFieldSpan(*resource, "content") : std::optional<std::string_view>{};
+    const auto project = content ? jsonObjectFieldSpan(*content, "csdm_project") : std::optional<std::string_view>{};
+    const auto root = project ? jsonObjectFieldSpan(*project, "root") : std::optional<std::string_view>{};
+    if (!root)
+        return std::nullopt;
+
+    const auto sceneIndex = csdSceneIndexForName(*root, binding.primarySceneName);
+    const auto scenes = jsonArrayFieldSpan(*root, "scenes");
+    if (!sceneIndex || *sceneIndex < 0 || !scenes)
+        return std::nullopt;
+
+    const auto sceneObject = jsonObjectInArrayAt(*scenes, static_cast<std::size_t>(*sceneIndex));
+    if (!sceneObject)
+        return std::nullopt;
+
+    CsdDrawableScene scene;
+    scene.sourcePath = *evidencePath;
+    scene.layoutFileName = std::string(binding.layoutFileName);
+    scene.sceneName = std::string(binding.primarySceneName);
+    if (const auto* summary = findCsdPipelineScene(*pipelineEvidence, binding.primarySceneName))
+    {
+        scene.castCount = summary->castCount;
+        scene.subimageCount = summary->subimageCount;
+    }
+    else
+    {
+        scene.castCount = static_cast<int>(jsonNumberField(*sceneObject, "cast_count").value_or(0.0));
+        scene.subimageCount = static_cast<int>(jsonNumberField(*sceneObject, "subimages_count").value_or(0.0));
+    }
+    scene.textureNames = pipelineEvidence->textureNames;
+    scene.commands = buildCsdDrawableCommands(*sceneObject, scene.sceneName, scene.textureNames);
+    return scene;
 }
 
 [[nodiscard]] std::optional<std::filesystem::path> findRuntimeEvidenceManifestForTarget(std::string_view target)
@@ -2014,6 +2491,56 @@ void renderSgfxTemplatePlaceholderScreen(
     return cache.back().second ? &*cache.back().second : nullptr;
 }
 
+[[nodiscard]] const CsdDrawableScene* cachedCsdDrawableScene(const CsdPipelineTemplateBinding& binding)
+{
+    static std::vector<std::pair<std::string, std::optional<CsdDrawableScene>>> cache;
+    const std::string key = std::string(binding.layoutFileName) + ":" + std::string(binding.primarySceneName);
+    const auto found = std::find_if(
+        cache.begin(),
+        cache.end(),
+        [&key](const std::pair<std::string, std::optional<CsdDrawableScene>>& entry)
+        {
+            return entry.first == key;
+        });
+    if (found != cache.end())
+        return found->second ? &*found->second : nullptr;
+
+    cache.emplace_back(key, loadCsdDrawableScene(binding));
+    return cache.back().second ? &*cache.back().second : nullptr;
+}
+
+[[nodiscard]] bool renderCsdDrawableScene(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    SwardSuUiAssetRenderer& renderer,
+    const SgfxTemplateRenderBinding& sgfxBinding)
+{
+    const auto* csdBinding = findCsdPipelineTemplateBinding(sgfxBinding.templateId);
+    const auto* scene = csdBinding ? cachedCsdDrawableScene(*csdBinding) : nullptr;
+    if (!scene || scene->commands.empty())
+        return false;
+
+    for (const auto& command : scene->commands)
+    {
+        const SuUiRenderCast cast{
+            std::string_view(command.sceneName),
+            std::string_view(command.castName),
+            std::string_view(command.textureName),
+            command.sourceX,
+            command.sourceY,
+            command.sourceWidth,
+            command.sourceHeight,
+            command.destinationX,
+            command.destinationY,
+            command.destinationWidth,
+            command.destinationHeight,
+        };
+        (void)drawRenderCastTexture(graphics, canvas, renderer, cast);
+    }
+
+    return true;
+}
+
 void renderCsdPipelineEvidenceOverlay(
     Gdiplus::Graphics& graphics,
     const Gdiplus::RectF& canvas,
@@ -2108,7 +2635,16 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     Gdiplus::SolidBrush canvasBrush(screen.background);
     graphics.FillRectangle(&canvasBrush, canvas);
 
-    if (screen.kind == RendererScreenKind::TitleLoopReconstruction)
+    const auto* binding = renderer.selectedSgfxTemplateBinding();
+    const bool renderedCsdDrawableScene = binding
+        ? renderCsdDrawableScene(graphics, canvas, renderer, *binding)
+        : false;
+
+    if (renderedCsdDrawableScene)
+    {
+        // The template lane is CSD draw-command driven when local scene evidence is available.
+    }
+    else if (screen.kind == RendererScreenKind::TitleLoopReconstruction)
     {
         renderTitleLoopReconstructionScreen(graphics, canvas, renderer);
     }
@@ -2128,7 +2664,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
         }
     }
 
-    if (const auto* binding = renderer.selectedSgfxTemplateBinding())
+    if (binding)
     {
         renderSgfxTemplatePlaceholderScreen(graphics, canvas, renderer, *binding);
         renderCsdPipelineEvidenceOverlay(graphics, canvas, *binding);
@@ -2584,6 +3120,219 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return formatted.str();
 }
 
+[[nodiscard]] std::string_view sgfxSlotNameForDrawableCommand(
+    const SgfxTemplateRenderBinding& binding,
+    const CsdDrawableCommand& command,
+    std::size_t commandIndex)
+{
+    for (std::size_t index = 0; index < binding.slotCount; ++index)
+    {
+        if (binding.slots[index].textureName == std::string_view(command.textureName))
+            return binding.slots[index].slotName;
+    }
+
+    if (binding.slotCount == 0)
+        return "none";
+
+    return binding.slots[std::min(commandIndex, binding.slotCount - 1)].slotName;
+}
+
+[[nodiscard]] std::string csdDrawableCommandDescriptor(
+    std::string_view templateId,
+    const CsdDrawableCommand& command)
+{
+    std::ostringstream descriptor;
+    descriptor
+        << "csd_draw_command="
+        << templateId
+        << ":"
+        << command.sceneName
+        << "/"
+        << command.castName
+        << "->"
+        << command.castName
+        << ":texture="
+        << command.textureName
+        << ":subimage="
+        << command.subimageIndex
+        << ":src="
+        << command.sourceX
+        << ","
+        << command.sourceY
+        << ","
+        << command.sourceWidth
+        << "x"
+        << command.sourceHeight
+        << ":dst="
+        << command.destinationX
+        << ","
+        << command.destinationY
+        << ","
+        << command.destinationWidth
+        << "x"
+        << command.destinationHeight;
+    if (command.flipX)
+        descriptor << ":flipX=1";
+    if (command.flipY)
+        descriptor << ":flipY=1";
+    if (!command.sourceFits)
+        descriptor << ":source-out-of-bounds";
+    return descriptor.str();
+}
+
+[[nodiscard]] std::string csdDrawableTransformDescriptor(
+    std::string_view templateId,
+    const CsdDrawableCommand& command)
+{
+    std::ostringstream descriptor;
+    descriptor
+        << "sampled_transform="
+        << templateId
+        << ":"
+        << command.sceneName
+        << "/"
+        << command.castName
+        << ":translation="
+        << formatCsdNumber(command.translationX)
+        << ","
+        << formatCsdNumber(command.translationY)
+        << ":scale="
+        << formatCsdNumber(command.scaleX)
+        << ","
+        << formatCsdNumber(command.scaleY)
+        << ":rotation="
+        << formatCsdNumber(command.rotation);
+    return descriptor.str();
+}
+
+[[nodiscard]] int runCsdDrawableSmoke(const std::optional<std::string>& templateFilter)
+{
+    std::size_t templateCount = 0;
+    bool failed = false;
+    std::vector<std::string> uniquePackages;
+    std::vector<std::pair<std::string, std::optional<CsdDrawableScene>>> loadedScenes;
+    std::vector<std::string> descriptors;
+
+    auto drawableFor = [&loadedScenes](const CsdPipelineTemplateBinding& binding) -> const CsdDrawableScene*
+    {
+        const std::string key = std::string(binding.layoutFileName) + ":" + std::string(binding.primarySceneName);
+        const auto found = std::find_if(
+            loadedScenes.begin(),
+            loadedScenes.end(),
+            [&key](const std::pair<std::string, std::optional<CsdDrawableScene>>& entry)
+            {
+                return entry.first == key;
+            });
+        if (found != loadedScenes.end())
+            return found->second ? &*found->second : nullptr;
+
+        loadedScenes.emplace_back(key, loadCsdDrawableScene(binding));
+        return loadedScenes.back().second ? &*loadedScenes.back().second : nullptr;
+    };
+
+    for (const auto& csdBinding : kCsdPipelineTemplateBindings)
+    {
+        if (templateFilter && csdBinding.templateId != *templateFilter)
+            continue;
+
+        ++templateCount;
+        if (std::find(uniquePackages.begin(), uniquePackages.end(), csdBinding.layoutFileName) == uniquePackages.end())
+            uniquePackages.emplace_back(csdBinding.layoutFileName);
+
+        const auto* scene = drawableFor(csdBinding);
+        const auto* sgfxBinding = findSgfxTemplateRenderBinding(csdBinding.templateId);
+        if (!scene || !sgfxBinding || scene->commands.empty())
+        {
+            failed = true;
+            continue;
+        }
+
+        std::ostringstream sceneDescriptor;
+        sceneDescriptor
+            << "csd_drawable="
+            << csdBinding.templateId
+            << ":layout="
+            << csdBinding.layoutFileName
+            << ":scene="
+            << scene->sceneName
+            << ":commands="
+            << scene->commands.size()
+            << ":casts="
+            << scene->castCount
+            << ":subimages="
+            << scene->subimageCount;
+        descriptors.push_back(sceneDescriptor.str());
+
+        std::vector<std::string> emittedTextureBindings;
+        for (std::size_t index = 0; index < scene->commands.size(); ++index)
+        {
+            const auto& command = scene->commands[index];
+            descriptors.push_back(csdDrawableCommandDescriptor(csdBinding.templateId, command));
+            descriptors.push_back(csdDrawableTransformDescriptor(csdBinding.templateId, command));
+
+            std::ostringstream slotDescriptor;
+            slotDescriptor
+                << "sgfx_element_map="
+                << csdBinding.templateId
+                << ":scene="
+                << scene->sceneName
+                << ":cast="
+                << command.castName
+                << ":slot="
+                << sgfxSlotNameForDrawableCommand(*sgfxBinding, command, index)
+                << ":texture="
+                << command.textureName;
+            descriptors.push_back(slotDescriptor.str());
+
+            if (std::find(emittedTextureBindings.begin(), emittedTextureBindings.end(), command.textureName) == emittedTextureBindings.end())
+            {
+                emittedTextureBindings.push_back(command.textureName);
+                std::ostringstream textureDescriptor;
+                textureDescriptor
+                    << "texture_binding="
+                    << csdBinding.templateId
+                    << ":"
+                    << command.textureName
+                    << ":resolved="
+                    << (command.textureResolved ? "1" : "0")
+                    << ":size="
+                    << command.textureWidth
+                    << "x"
+                    << command.textureHeight;
+                descriptors.push_back(textureDescriptor.str());
+            }
+        }
+
+        const auto manifest = findRuntimeEvidenceManifestForTarget(csdBinding.templateId);
+        std::ostringstream evidenceDescriptor;
+        evidenceDescriptor
+            << "native_bmp_compare="
+            << csdBinding.templateId
+            << ":target="
+            << csdBinding.templateId
+            << ":event="
+            << sgfxBinding->requiredEventId
+            << ":manifest="
+            << (manifest ? "found" : "missing");
+        descriptors.push_back(evidenceDescriptor.str());
+    }
+
+    if (templateFilter && templateCount == 0)
+        failed = true;
+
+    std::cout
+        << "sward_su_ui_asset_renderer csd drawable smoke ok "
+        << "layout_source=research_uiux/data/layout_deep_analysis.json "
+        << "templates=" << templateCount
+        << " packages=" << uniquePackages.size()
+        << '\n';
+
+    for (const auto& descriptor : descriptors)
+        std::cout << descriptor << '\n';
+
+    return failed || templateCount == 0 ? 1 : 0;
+}
+
 [[nodiscard]] int runCsdPipelineSmoke(const std::optional<std::string>& templateFilter)
 {
     std::size_t templateCount = 0;
@@ -2808,6 +3557,8 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
 {
     const auto templateFilter = commandLineValueAfter("--template");
+    if (commandLineHasFlag("--csd-drawable-smoke"))
+        return runCsdDrawableSmoke(templateFilter);
     if (commandLineHasFlag("--csd-pipeline-smoke"))
         return runCsdPipelineSmoke(templateFilter);
     if (commandLineHasFlag("--sgfx-template-smoke"))

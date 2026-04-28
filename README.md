@@ -173,6 +173,9 @@ Research and Development workspace around Sonic Unleashed HD / Unleashed Recompi
 > [!TIP]
 > For the clean renderer's first title-loop screen that binds the local SFD movie frame and decompressed title-logo evidence, use [`research_uiux/SU_UI_RENDERER_TITLE_LOOP_RECONSTRUCTION.md`](./research_uiux/SU_UI_RENDERER_TITLE_LOOP_RECONSTRUCTION.md).
 
+> [!TIP]
+> For the current CSD-driven SGFX placeholder pipeline, including `--csd-pipeline-smoke` and `--csd-drawable-smoke`, use [`research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md`](./research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md#phase-125-csd-drawable-traversal).
+
 ## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> What This Repository Is
 
 This project keeps a documented, versioned R&D environment for studying:
