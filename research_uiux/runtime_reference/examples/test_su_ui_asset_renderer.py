@@ -865,6 +865,17 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("playback_clock=ui-oracle-runtime-frame", source_text)
         self.assertIn("timeline_frame_source=ui-oracle-mod-frame", source_text)
 
+    def test_renderer_source_wires_phase147_runtime_drawable_oracle(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendRuntimeDrawableOracle", source_text)
+        self.assertIn("buildFrontendRuntimeDrawableOracle", source_text)
+        self.assertIn("runRendererUiDrawableOracleSmoke", source_text)
+        self.assertIn("--renderer-ui-drawable-oracle-smoke", source_text)
+        self.assertIn("phase147-ui-drawable-oracle", source_text)
+        self.assertIn("runtime_drawable_oracle_status=runtime-csd-tree-local-material", source_text)
+        self.assertIn("gpu_draw_list_status=pending", source_text)
+        self.assertIn("drawable_scene_source=ui-oracle-active-scenes", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -1011,6 +1022,30 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertRegex(completed.stdout, r"oracle_playback=title-menu:source=(ui_lab_live_bridge_ui_oracle|ui_lab_live_bridge_state|ui_lab_live_state):runtime_frame=[1-9]\d*:playback_clock=ui-oracle-runtime-frame:playback_frame=[0-9]+:active_motion=")
         self.assertRegex(completed.stdout, r"oracle_scene_playback=title-menu:mm_bg_usual:animation=DefaultAnim:frame=[0-9]+/120:timeline_frame_source=ui-oracle-mod-frame")
         self.assertRegex(completed.stdout, r"oracle_scene_playback=loading:pda:animation=Usual_Anim_3:frame=[0-9]+/240:timeline_frame_source=ui-oracle-mod-frame")
+
+    def test_renderer_ui_drawable_oracle_smoke_reports_scene_draw_commands(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-ui-drawable-oracle-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer ui drawable oracle smoke ok", completed.stdout)
+        self.assertIn("mode=phase147-ui-drawable-oracle", completed.stdout)
+        self.assertIn("runtime_drawable_oracle_status=runtime-csd-tree-local-material", completed.stdout)
+        self.assertIn("gpu_draw_list_status=pending", completed.stdout)
+        self.assertIn("drawable_scene_source=ui-oracle-active-scenes", completed.stdout)
+        self.assertRegex(completed.stdout, r"drawable_oracle=title-menu:source=(ui_lab_live_bridge_ui_oracle|ui_lab_live_bridge_state|ui_lab_live_state):active_project=ui_title:active_scenes=[0-9]+:drawable_scenes=[1-9]\d*:commands=[1-9]\d*")
+        self.assertRegex(completed.stdout, r"drawable_oracle=loading:source=(ui_lab_live_bridge_ui_oracle|ui_lab_live_bridge_state|ui_lab_live_state):active_project=ui_loading:active_scenes=[0-9]+:drawable_scenes=[1-9]\d*:commands=[1-9]\d*")
+        self.assertRegex(completed.stdout, r"drawable_oracle_scene=title-menu:mm_bg_usual:runtime_path=[^:]+:animation=DefaultAnim:frame=[0-9]+/120:commands=[1-9]\d*:sampled_tracks=[0-9]+:textures=[1-9]\d*:drawable_scene_source=ui-oracle-active-scenes")
+        self.assertRegex(completed.stdout, r"drawable_oracle_scene=loading:pda:runtime_path=[^:]+:animation=Usual_Anim_3:frame=[0-9]+/240:commands=[1-9]\d*:sampled_tracks=[0-9]+:textures=[1-9]\d*:drawable_scene_source=ui-oracle-active-scenes")
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

@@ -22,6 +22,7 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -247,6 +248,35 @@ struct FrontendUiOraclePlaybackClock
     int runtimeFrame = 0;
     int playbackFrame = 0;
     FrontendUiOracleEvidence oracle;
+};
+
+struct FrontendRuntimeDrawableOracleScene
+{
+    std::string runtimeScenePath;
+    std::string localSceneName;
+    std::string animationName;
+    int timelineFrame = 0;
+    int timelineFrameCount = 0;
+    std::size_t commandCount = 0;
+    std::size_t drawnCommandCount = 0;
+    std::size_t sampledTrackCount = 0;
+    std::size_t textureCount = 0;
+    std::vector<std::string> textureNames;
+};
+
+struct FrontendRuntimeDrawableOracle
+{
+    bool found = false;
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string activeProject;
+    std::string drawableSceneSource = "ui-oracle-active-scenes";
+    std::string runtimeDrawableOracleStatus = "runtime-csd-tree-local-material";
+    std::string gpuDrawListStatus = "pending";
+    int runtimeFrame = 0;
+    std::size_t activeSceneCount = 0;
+    std::vector<FrontendRuntimeDrawableOracleScene> scenes;
 };
 
 struct CsdColorRgba
@@ -5570,6 +5600,211 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return records.empty() ? 1 : 0;
 }
 
+[[nodiscard]] std::string frontendRuntimeDrawableProjectName(
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    std::string_view oracleProject)
+{
+    if (!oracleProject.empty() && oracleProject.find(".yncp") == std::string_view::npos)
+        return std::string(oracleProject);
+    if (policy.screenId == "title-menu" || policy.screenId == "title-options")
+        return "ui_title";
+    if (policy.screenId == "loading")
+        return "ui_loading";
+    if (policy.screenId == "pause")
+        return "ui_pause";
+
+    std::string project(policy.layoutName);
+    const auto slash = project.find_last_of("/\\");
+    if (slash != std::string::npos)
+        project = project.substr(slash + 1);
+    const auto dot = project.find_last_of('.');
+    if (dot != std::string::npos)
+        project = project.substr(0, dot);
+    return project;
+}
+
+[[nodiscard]] std::string frontendRuntimeDrawableScenePath(
+    const FrontendUiOracleEvidence& evidence,
+    std::string_view activeProject,
+    std::string_view localSceneName)
+{
+    const std::string suffix = "/" + std::string(localSceneName);
+    for (const auto& scenePath : evidence.activeScenes)
+    {
+        if (scenePath == localSceneName || scenePath.ends_with(suffix))
+            return scenePath;
+    }
+
+    if (!activeProject.empty())
+        return std::string(activeProject) + "/" + std::string(localSceneName);
+    return std::string(localSceneName);
+}
+
+[[nodiscard]] FrontendRuntimeDrawableOracle buildFrontendRuntimeDrawableOracle(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendRuntimeDrawableOracle oracle;
+    oracle.screenId = policy.screenId;
+
+    const auto clock = loadFrontendUiOraclePlaybackClock(policy);
+    oracle.found = clock.found;
+    oracle.source = clock.source;
+    oracle.probe = clock.probe;
+    oracle.activeProject = frontendRuntimeDrawableProjectName(policy, clock.oracle.activeProject);
+    oracle.runtimeFrame = clock.runtimeFrame;
+    oracle.activeSceneCount = !clock.oracle.activeScenes.empty()
+        ? clock.oracle.activeScenes.size()
+        : static_cast<std::size_t>(std::max(0, clock.oracle.sceneCount));
+
+    for (const auto& scenePolicy : policy.scenes)
+    {
+        const int sceneFrame = uiOracleTimelineFrameForScene(clock, scenePolicy);
+        const CsdPipelineTemplateBinding sceneBinding{
+            policy.screenId,
+            policy.layoutName,
+            scenePolicy.sceneName,
+            scenePolicy.sceneName,
+            scenePolicy.timeline.animationName,
+        };
+
+        const auto* drawableScene = cachedCsdDrawableScene(sceneBinding);
+        auto playback = loadCsdTimelinePlayback(sceneBinding, sceneFrame);
+        if (!playback)
+            playback = loadTimelinePlaybackForScene(policy.screenId, policy.layoutName, scenePolicy.sceneName, sceneFrame);
+
+        FrontendRuntimeDrawableOracleScene scene;
+        scene.runtimeScenePath = frontendRuntimeDrawableScenePath(
+            clock.oracle,
+            oracle.activeProject,
+            scenePolicy.sceneName);
+        scene.localSceneName = scenePolicy.sceneName;
+        scene.animationName = playback
+            ? playback->animationName
+            : scenePolicy.timeline.animationName;
+        scene.timelineFrame = playback
+            ? playback->sampleFrame
+            : sceneFrame;
+        scene.timelineFrameCount = playback
+            ? static_cast<int>(std::llround(playback->frameCount))
+            : scenePolicy.timeline.frameCount;
+
+        if (drawableScene)
+        {
+            std::size_t sampledTrackCount = 0;
+            const auto commands = timelineSampledCommands(
+                *drawableScene,
+                playback ? &*playback : nullptr,
+                sampledTrackCount);
+            scene.commandCount = commands.size();
+            scene.sampledTrackCount = sampledTrackCount;
+            for (const auto& command : commands)
+            {
+                if (!command.hidden && (command.textureResolved || command.sourceFreeStructural))
+                    ++scene.drawnCommandCount;
+                if (!command.textureName.empty()
+                    && std::find(scene.textureNames.begin(), scene.textureNames.end(), command.textureName) == scene.textureNames.end())
+                {
+                    scene.textureNames.push_back(command.textureName);
+                }
+            }
+            scene.textureCount = scene.textureNames.size();
+        }
+
+        oracle.scenes.push_back(std::move(scene));
+    }
+
+    return oracle;
+}
+
+[[nodiscard]] int runRendererUiDrawableOracleSmoke()
+{
+    constexpr std::string_view directProbeToken = "ui_drawable_oracle_probe=direct-ui-oracle";
+    constexpr std::string_view stateProbeToken = "ui_drawable_oracle_probe=state-fallback";
+    constexpr std::string_view snapshotProbeToken = "ui_drawable_oracle_probe=snapshot-fallback";
+    constexpr std::string_view runtimeStatusToken = "runtime_drawable_oracle_status=runtime-csd-tree-local-material";
+    constexpr std::string_view gpuStatusToken = "gpu_draw_list_status=pending";
+    constexpr std::string_view drawableSceneSourceToken = "drawable_scene_source=ui-oracle-active-scenes";
+
+    std::vector<FrontendRuntimeDrawableOracle> records;
+    for (const auto& policy : frontendScreenPolicies())
+        records.push_back(buildFrontendRuntimeDrawableOracle(policy));
+
+    const bool anyDirect = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendRuntimeDrawableOracle& record)
+        {
+            return record.probe == "direct-ui-oracle";
+        });
+    const bool anyState = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendRuntimeDrawableOracle& record)
+        {
+            return record.probe == "state-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer ui drawable oracle smoke ok "
+        << "mode=phase147-ui-drawable-oracle"
+        << " " << (anyDirect ? directProbeToken : (anyState ? stateProbeToken : snapshotProbeToken))
+        << " " << runtimeStatusToken
+        << " " << gpuStatusToken
+        << " " << drawableSceneSourceToken
+        << " lanes=" << records.size()
+        << '\n';
+
+    for (const auto& record : records)
+    {
+        const std::size_t commandCount = std::accumulate(
+            record.scenes.begin(),
+            record.scenes.end(),
+            static_cast<std::size_t>(0),
+            [](std::size_t total, const FrontendRuntimeDrawableOracleScene& scene)
+            {
+                return total + scene.commandCount;
+            });
+        const std::size_t drawnCommandCount = std::accumulate(
+            record.scenes.begin(),
+            record.scenes.end(),
+            static_cast<std::size_t>(0),
+            [](std::size_t total, const FrontendRuntimeDrawableOracleScene& scene)
+            {
+                return total + scene.drawnCommandCount;
+            });
+
+        std::cout
+            << "drawable_oracle=" << record.screenId
+            << ":source=" << record.source
+            << ":active_project=" << record.activeProject
+            << ":active_scenes=" << record.activeSceneCount
+            << ":drawable_scenes=" << record.scenes.size()
+            << ":commands=" << commandCount
+            << ":drawn_commands=" << drawnCommandCount
+            << ":runtime_drawable_oracle_status=" << record.runtimeDrawableOracleStatus
+            << ":gpu_draw_list_status=" << record.gpuDrawListStatus
+            << '\n';
+
+        for (const auto& scene : record.scenes)
+        {
+            std::cout
+                << "drawable_oracle_scene=" << record.screenId
+                << ":" << scene.localSceneName
+                << ":runtime_path=" << scene.runtimeScenePath
+                << ":animation=" << scene.animationName
+                << ":frame=" << scene.timelineFrame
+                << "/" << scene.timelineFrameCount
+                << ":commands=" << scene.commandCount
+                << ":sampled_tracks=" << scene.sampledTrackCount
+                << ":textures=" << scene.textureCount
+                << ":drawable_scene_source=" << record.drawableSceneSource
+                << '\n';
+        }
+    }
+
+    return records.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -9795,6 +10030,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererUiOracleSmoke();
     if (commandLineHasFlag("--renderer-ui-oracle-playback-smoke"))
         return runRendererUiOraclePlaybackSmoke();
+    if (commandLineHasFlag("--renderer-ui-drawable-oracle-smoke"))
+        return runRendererUiDrawableOracleSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 
