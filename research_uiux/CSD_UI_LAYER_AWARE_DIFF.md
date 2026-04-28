@@ -85,6 +85,17 @@ Phase 135 found the missing exact local HUD package in the installed game archiv
 
 That moves Sonic HUD from "proxy scene archaeology" to a real local `ui_playscreen` compositor/export lane. It still needs shader/palette/per-scene activation validation against native captures before claiming full pixel parity.
 
+## Phase 136 Follow-Up
+
+Phase 136 turns the exact material join into a full normal Sonic HUD compositor/reference export:
+
+- `--export-sonic-hud-compositor --template sonic-hud` reads the live `ui_playscreen` runtime tree plus exact local material/subimage/timeline data;
+- ignored local `out/csd_runtime_exports/phase136/ui_playscreen_hud_compositor.json` records all `13` runtime scenes, `209` runtime layers, `203` stored layer samples, `167` drawable material layers, and `36` structural/group layers;
+- ignored local `out/csd_runtime_exports/phase136/ui_playscreen_hud_reference.hpp` emits readable C++-style reference records for `CHudSonicStage`, hook `sub_824D9308`, SGFX slots, activation events, timelines, and drawable layer counts;
+- this is still reference reconstruction, not original source and not published Sonic asset payload.
+
+This is the first Sonic HUD beat where every active runtime scene is represented in a portable compositor shape. The remaining parity work is per-scene active/hidden state, exact render order/blend validation, and then translating the reference records into hand-written reusable UI source.
+
 ## Verification
 
 Fresh verification for this beat used:

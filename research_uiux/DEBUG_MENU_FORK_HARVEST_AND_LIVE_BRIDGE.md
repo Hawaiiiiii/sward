@@ -324,6 +324,12 @@ Local-only evidence, not committed:
   - `--export-runtime-csd-materials --template sonic-hud` joins the Phase 134 live runtime tree to exact local CSD material/subimage/timeline data and writes ignored `out/csd_runtime_exports/phase135/ui_playscreen_runtime_materials.json`
   - current material export resolves `167 / 203` stored runtime layer samples; the remaining `36` are structural/group layers rather than missing Sonic HUD payload
 
+- `out/csd_runtime_exports/phase136/`
+  - Phase 136 adds `--export-sonic-hud-compositor --template sonic-hud`
+  - the export writes ignored local `ui_playscreen_hud_compositor.json` with all `13` live normal Sonic HUD scenes mapped to activation events, SGFX slots, timelines, unique textures, drawable layer counts, and structural layer counts
+  - the export also writes ignored local `ui_playscreen_hud_reference.hpp`, a readable C++-style reference skeleton for `CHudSonicStage`, hook `sub_824D9308`, project `ui_playscreen`, and the scene table needed for portable source reconstruction
+  - this is now a full runtime-scene compositor model; shader/palette/render-order parity still needs native comparison before claiming pixel-perfect HUD recreation
+
 - `out/ui_lab_runtime_evidence/20260428_011255/`
   - focused Phase 120 `sonic-hud` live-bridge/native capture passed on the final raw-owner hook build
   - JSONL emitted `sonic-hud-owner-hooked` with `owner_fields_ready=0`, proving the raw `CHudSonicStage` owner pointer while keeping embedded CSD owner fields marked pending

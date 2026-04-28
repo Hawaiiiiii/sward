@@ -293,6 +293,21 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("materialSourceStatus", source_text)
         self.assertIn("out\" / \"csd_runtime_exports\" / \"phase135", source_text)
 
+    def test_renderer_source_exposes_phase136_sonic_hud_compositor_reference_export(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("SonicHudCompositorScene", source_text)
+        self.assertIn("SonicHudCompositorModel", source_text)
+        self.assertIn("buildSonicHudCompositorModel", source_text)
+        self.assertIn("writeSonicHudCompositorManifest", source_text)
+        self.assertIn("writeSonicHudReferenceCode", source_text)
+        self.assertIn("runSonicHudCompositorExportSmoke", source_text)
+        self.assertIn("--export-sonic-hud-compositor", source_text)
+        self.assertIn("sonic_hud_compositor=", source_text)
+        self.assertIn("sonic_hud_compositor_scene=", source_text)
+        self.assertIn("sonic_hud_reference_owner=", source_text)
+        self.assertIn("clean-readable-reference-exported", source_text)
+        self.assertIn("out\" / \"csd_runtime_exports\" / \"phase136", source_text)
+
     def test_renderer_source_exposes_title_loop_reconstruction_screen(self) -> None:
         source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
         self.assertIn("TitleLoopReconstruction", source_text)
@@ -727,6 +742,31 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("runtime_csd_material_scene=sonic-hud:ui_playscreen/add/u_info:layers=10:material_resolved=5:subimage_resolved=5:timeline=Intro_Anim@20/20", completed.stdout)
         self.assertIn("runtime_csd_material_sample=sonic-hud:ui_playscreen/so_speed_gauge/position/speed_bg/Cast_0506_bg:cast=Cast_0506_bg:texture=ui_ps1_gauge1.dds:subimage=154:src=4,64,16x20:dst=752,357,16x20:timeline=DefaultAnim@99", completed.stdout)
         self.assertIn("runtime_csd_material_export_path=out/csd_runtime_exports/phase135/ui_playscreen_runtime_materials.json", completed.stdout)
+
+    def test_renderer_sonic_hud_compositor_export_smoke_writes_reference_code(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--export-sonic-hud-compositor", "--template", "sonic-hud"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer sonic hud compositor export ok", completed.stdout)
+        self.assertIn("sonic_hud_compositor=sonic-hud:source=runtime-tree+exact-local-layout:project=ui_playscreen", completed.stdout)
+        self.assertIn(":scenes=13:runtime_layers=209:exported_layers=203:drawable_layers=167:structural_layers=36", completed.stdout)
+        self.assertIn(":owner=CHudSonicStage:state=sonic-hud-ready:reference_status=clean-readable-reference-exported", completed.stdout)
+        self.assertIn("sonic_hud_compositor_scene=sonic-hud:ui_playscreen/so_speed_gauge:activation=stage-hud-ready:slot=speed_gauge:runtime_layers=47:drawable_layers=43:timeline=DefaultAnim@99/100:textures=1", completed.stdout)
+        self.assertIn("sonic_hud_compositor_scene=sonic-hud:ui_playscreen/so_ringenagy_gauge:activation=stage-hud-ready:slot=energy_gauge:runtime_layers=43:drawable_layers=40:timeline=total_quantity@99/100:textures=1", completed.stdout)
+        self.assertIn("sonic_hud_compositor_scene=sonic-hud:ui_playscreen/add/u_info:activation=tutorial-hud-owner-path-ready:slot=prompt_strip:runtime_layers=10:drawable_layers=5:timeline=Intro_Anim@20/20:textures=3", completed.stdout)
+        self.assertIn("sonic_hud_reference_owner=CHudSonicStage:ownerHook=sub_824D9308:project=ui_playscreen:sceneCount=13", completed.stdout)
+        self.assertIn("sonic_hud_reference_code_path=out/csd_runtime_exports/phase136/ui_playscreen_hud_reference.hpp", completed.stdout)
+        self.assertIn("sonic_hud_compositor_manifest_path=out/csd_runtime_exports/phase136/ui_playscreen_hud_compositor.json", completed.stdout)
 
     def test_renderer_navigation_smoke_reports_interactive_catalog(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

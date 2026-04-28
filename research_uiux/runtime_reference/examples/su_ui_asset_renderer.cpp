@@ -474,6 +474,41 @@ struct CsdHudRuntimeMaterialEntry
     bool timelineResolved = false;
 };
 
+struct SonicHudCompositorScene
+{
+    std::string runtimePath;
+    std::string sceneName;
+    std::string localSceneName;
+    std::string sgfxSlotLabel;
+    std::string activationEvent;
+    std::string timelineName;
+    int runtimeLayerCount = 0;
+    int drawableLayerCount = 0;
+    int structuralLayerCount = 0;
+    int timelineFrame = 0;
+    int timelineFrameCount = 0;
+    int castCount = 0;
+    std::vector<std::string> textureNames;
+};
+
+struct SonicHudCompositorModel
+{
+    std::string target = "sonic-hud";
+    std::string source = "runtime-tree+exact-local-layout";
+    std::string project = "ui_playscreen";
+    std::string owner = "CHudSonicStage";
+    std::string ownerHook = "sub_824D9308";
+    std::string stateEvent = "sonic-hud-ready";
+    std::string referenceStatus = "clean-readable-reference-exported";
+    std::filesystem::path liveStatePath;
+    int sceneCount = 0;
+    int runtimeLayerCount = 0;
+    int exportedLayerCount = 0;
+    int drawableLayerCount = 0;
+    int structuralLayerCount = 0;
+    std::vector<SonicHudCompositorScene> scenes;
+};
+
 struct CsdHudSceneCoverageDiagnostic
 {
     std::string sceneName;
@@ -5375,6 +5410,191 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return true;
 }
 
+void appendUniqueString(std::vector<std::string>& values, std::string_view value)
+{
+    if (value.empty())
+        return;
+    if (std::find(values.begin(), values.end(), value) == values.end())
+        values.emplace_back(value);
+}
+
+[[nodiscard]] std::string sonicHudActivationEventForScene(std::string_view sceneName)
+{
+    if (sceneName.find("u_info") != std::string_view::npos)
+        return "tutorial-hud-owner-path-ready";
+    return "stage-hud-ready";
+}
+
+[[nodiscard]] SonicHudCompositorModel buildSonicHudCompositorModel(
+    const CsdHudRuntimeSceneEvidence& evidence,
+    const std::vector<CsdHudRuntimeMaterialEntry>& entries)
+{
+    SonicHudCompositorModel model;
+    model.project = evidence.runtimeProject;
+    model.liveStatePath = evidence.liveStatePath;
+    model.sceneCount = evidence.runtimeSceneCount;
+    model.runtimeLayerCount = evidence.runtimeLayerCount;
+    model.exportedLayerCount = static_cast<int>(evidence.runtimeLayers.size());
+    model.drawableLayerCount = static_cast<int>(entries.size());
+    model.structuralLayerCount = model.exportedLayerCount - model.drawableLayerCount;
+
+    for (const auto& runtimeScene : evidence.runtimeScenes)
+    {
+        SonicHudCompositorScene scene;
+        scene.runtimePath = runtimeScene.path;
+        scene.sceneName = runtimeScene.sceneName;
+        scene.localSceneName = localCsdSceneNameForRuntimeScene(runtimeScene.sceneName);
+        scene.sgfxSlotLabel = sonicHudSlotLabelForScene(runtimeScene.sceneName);
+        scene.activationEvent = sonicHudActivationEventForScene(runtimeScene.sceneName);
+        scene.runtimeLayerCount = runtimeLayerCountForScene(evidence, runtimeScene.sceneName);
+        scene.drawableLayerCount = materialResolvedCountForRuntimeScene(entries, runtimeScene.sceneName);
+        scene.structuralLayerCount = scene.runtimeLayerCount - scene.drawableLayerCount;
+        scene.castCount = runtimeScene.castCount;
+
+        const auto firstEntry = std::find_if(
+            entries.begin(),
+            entries.end(),
+            [&runtimeScene](const CsdHudRuntimeMaterialEntry& entry)
+            {
+                return entry.runtimeSceneName == runtimeScene.sceneName;
+            });
+        if (firstEntry != entries.end())
+        {
+            scene.timelineName = firstEntry->timelineName;
+            scene.timelineFrame = firstEntry->timelineFrame;
+            scene.timelineFrameCount = firstEntry->timelineFrameCount;
+        }
+        else
+        {
+            scene.timelineName = timelineAnimationNameForLocalScene(evidence.localLayoutFileName, scene.localSceneName);
+        }
+
+        for (const auto& entry : entries)
+        {
+            if (entry.runtimeSceneName == runtimeScene.sceneName)
+                appendUniqueString(scene.textureNames, entry.textureName);
+        }
+
+        model.scenes.push_back(std::move(scene));
+    }
+
+    return model;
+}
+
+[[nodiscard]] bool writeSonicHudCompositorManifest(
+    const SonicHudCompositorModel& model,
+    const std::filesystem::path& exportPath)
+{
+    std::error_code error;
+    std::filesystem::create_directories(exportPath.parent_path(), error);
+    if (error)
+        return false;
+
+    std::ofstream out(exportPath, std::ios::binary);
+    if (!out)
+        return false;
+
+    out << "{\n";
+    out << "  \"phase\": 136,\n";
+    out << "  \"target\": \"" << jsonEscape(model.target) << "\",\n";
+    out << "  \"source\": \"" << jsonEscape(model.source) << "\",\n";
+    out << "  \"project\": \"" << jsonEscape(model.project) << "\",\n";
+    out << "  \"owner\": \"" << jsonEscape(model.owner) << "\",\n";
+    out << "  \"ownerHook\": \"" << jsonEscape(model.ownerHook) << "\",\n";
+    out << "  \"stateEvent\": \"" << jsonEscape(model.stateEvent) << "\",\n";
+    out << "  \"referenceStatus\": \"" << jsonEscape(model.referenceStatus) << "\",\n";
+    out << "  \"liveStatePath\": \"" << jsonEscape(portablePath(model.liveStatePath)) << "\",\n";
+    out << "  \"counts\": { \"scenes\": " << model.sceneCount
+        << ", \"runtimeLayers\": " << model.runtimeLayerCount
+        << ", \"exportedLayers\": " << model.exportedLayerCount
+        << ", \"drawableLayers\": " << model.drawableLayerCount
+        << ", \"structuralLayers\": " << model.structuralLayerCount << " },\n";
+
+    out << "  \"scenes\": [\n";
+    for (std::size_t index = 0; index < model.scenes.size(); ++index)
+    {
+        const auto& scene = model.scenes[index];
+        out << "    { \"path\": \"" << jsonEscape(scene.runtimePath)
+            << "\", \"scene\": \"" << jsonEscape(scene.sceneName)
+            << "\", \"localScene\": \"" << jsonEscape(scene.localSceneName)
+            << "\", \"slot\": \"" << jsonEscape(scene.sgfxSlotLabel)
+            << "\", \"activation\": \"" << jsonEscape(scene.activationEvent)
+            << "\", \"runtimeLayers\": " << scene.runtimeLayerCount
+            << ", \"drawableLayers\": " << scene.drawableLayerCount
+            << ", \"structuralLayers\": " << scene.structuralLayerCount
+            << ", \"timeline\": \"" << jsonEscape(scene.timelineName)
+            << "\", \"timelineFrame\": " << scene.timelineFrame
+            << ", \"timelineFrameCount\": " << scene.timelineFrameCount
+            << ", \"textureCount\": " << scene.textureNames.size()
+            << ", \"textures\": [";
+        for (std::size_t textureIndex = 0; textureIndex < scene.textureNames.size(); ++textureIndex)
+        {
+            if (textureIndex != 0)
+                out << ", ";
+            out << "\"" << jsonEscape(scene.textureNames[textureIndex]) << "\"";
+        }
+        out << "] }" << (index + 1 == model.scenes.size() ? "\n" : ",\n");
+    }
+    out << "  ]\n";
+    out << "}\n";
+    return true;
+}
+
+[[nodiscard]] bool writeSonicHudReferenceCode(
+    const SonicHudCompositorModel& model,
+    const std::filesystem::path& exportPath)
+{
+    std::error_code error;
+    std::filesystem::create_directories(exportPath.parent_path(), error);
+    if (error)
+        return false;
+
+    std::ofstream out(exportPath, std::ios::binary);
+    if (!out)
+        return false;
+
+    out << "#pragma once\n";
+    out << "// Generated local-only by SWARD Phase 136 from live bridge + exact ui_playscreen CSD evidence.\n";
+    out << "// This is readable reference architecture, not original SEGA source.\n\n";
+    out << "namespace sward::recovered::sonic_hud\n{\n";
+    out << "struct SonicHudSceneReference\n";
+    out << "{\n";
+    out << "    const char* scenePath;\n";
+    out << "    const char* sgfxSlot;\n";
+    out << "    const char* activationEvent;\n";
+    out << "    const char* timeline;\n";
+    out << "    int runtimeLayers;\n";
+    out << "    int drawableLayers;\n";
+    out << "};\n\n";
+    out << "struct CHudSonicStageOwnerReference\n";
+    out << "{\n";
+    out << "    const char* ownerType;\n";
+    out << "    const char* ownerHook;\n";
+    out << "    const char* project;\n";
+    out << "    int sceneCount;\n";
+    out << "};\n\n";
+    out << "inline constexpr CHudSonicStageOwnerReference kOwnerReference{\n";
+    out << "    \"" << jsonEscape(model.owner) << "\",\n";
+    out << "    \"" << jsonEscape(model.ownerHook) << "\",\n";
+    out << "    \"" << jsonEscape(model.project) << "\",\n";
+    out << "    " << model.sceneCount << ",\n";
+    out << "};\n\n";
+    out << "inline constexpr SonicHudSceneReference kNormalSonicHudScenes[] = {\n";
+    for (const auto& scene : model.scenes)
+    {
+        out << "    { \"" << jsonEscape(scene.runtimePath)
+            << "\", \"" << jsonEscape(scene.sgfxSlotLabel)
+            << "\", \"" << jsonEscape(scene.activationEvent)
+            << "\", \"" << jsonEscape(scene.timelineName)
+            << "\", " << scene.runtimeLayerCount
+            << ", " << scene.drawableLayerCount
+            << " },\n";
+    }
+    out << "};\n";
+    out << "} // namespace sward::recovered::sonic_hud\n";
+    return true;
+}
+
 [[nodiscard]] std::optional<CLSID> imageEncoderClsid(const wchar_t* mimeType)
 {
     UINT encoderCount = 0;
@@ -6945,6 +7165,84 @@ void writeCsdRenderCompareManifest(
     return 0;
 }
 
+[[nodiscard]] int runSonicHudCompositorExportSmoke(const std::optional<std::string>& templateFilter)
+{
+    const std::string target = templateFilter.value_or("sonic-hud");
+    if (target != "sonic-hud")
+    {
+        std::cerr << "Sonic HUD compositor export currently supports sonic-hud only.\n";
+        return 2;
+    }
+
+    const auto* csdBinding = findCsdPipelineTemplateBinding("sonic-hud");
+    if (!csdBinding)
+        return 1;
+
+    const auto evidence = loadLatestSonicHudLiveStateEvidence(*csdBinding);
+    if (!evidence.found || evidence.runtimeProject.empty() || evidence.layoutStatus != "exact-runtime-layout")
+        return 1;
+
+    const auto entries = buildSonicHudRuntimeMaterialEntries(evidence);
+    if (entries.empty())
+        return 1;
+
+    const auto model = buildSonicHudCompositorModel(evidence, entries);
+    const auto outputRoot = repoRootForOutput() / "out" / "csd_runtime_exports" / "phase136";
+    const auto manifestPath = outputRoot / "ui_playscreen_hud_compositor.json";
+    const auto referenceCodePath = outputRoot / "ui_playscreen_hud_reference.hpp";
+    if (!writeSonicHudCompositorManifest(model, manifestPath))
+        return 1;
+    if (!writeSonicHudReferenceCode(model, referenceCodePath))
+        return 1;
+
+    std::cout
+        << "sward_su_ui_asset_renderer sonic hud compositor export ok "
+        << "target=sonic-hud"
+        << " project=" << model.project
+        << " scenes=" << model.sceneCount
+        << " output=" << portablePath(manifestPath)
+        << '\n';
+    std::cout
+        << "sonic_hud_compositor=sonic-hud"
+        << ":source=" << model.source
+        << ":project=" << model.project
+        << ":scenes=" << model.sceneCount
+        << ":runtime_layers=" << model.runtimeLayerCount
+        << ":exported_layers=" << model.exportedLayerCount
+        << ":drawable_layers=" << model.drawableLayerCount
+        << ":structural_layers=" << model.structuralLayerCount
+        << ":owner=" << model.owner
+        << ":state=" << model.stateEvent
+        << ":reference_status=" << model.referenceStatus
+        << '\n';
+
+    for (const auto& scene : model.scenes)
+    {
+        std::cout
+            << "sonic_hud_compositor_scene=sonic-hud:"
+            << scene.runtimePath
+            << ":activation=" << scene.activationEvent
+            << ":slot=" << scene.sgfxSlotLabel
+            << ":runtime_layers=" << scene.runtimeLayerCount
+            << ":drawable_layers=" << scene.drawableLayerCount
+            << ":timeline=" << (scene.timelineName.empty() ? "unresolved" : scene.timelineName)
+            << "@" << scene.timelineFrame
+            << "/" << scene.timelineFrameCount
+            << ":textures=" << scene.textureNames.size()
+            << '\n';
+    }
+
+    std::cout
+        << "sonic_hud_reference_owner=" << model.owner
+        << ":ownerHook=" << model.ownerHook
+        << ":project=" << model.project
+        << ":sceneCount=" << model.sceneCount
+        << '\n';
+    std::cout << "sonic_hud_reference_code_path=" << portablePath(referenceCodePath) << '\n';
+    std::cout << "sonic_hud_compositor_manifest_path=" << portablePath(manifestPath) << '\n';
+    return 0;
+}
+
 [[nodiscard]] int runCsdRenderCompareSmoke(const std::optional<std::string>& templateFilter)
 {
     std::size_t templateCount = 0;
@@ -7505,6 +7803,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRuntimeCsdTreeExportSmoke(templateFilter);
     if (commandLineHasFlag("--export-runtime-csd-materials"))
         return runRuntimeCsdMaterialExportSmoke(templateFilter);
+    if (commandLineHasFlag("--export-sonic-hud-compositor"))
+        return runSonicHudCompositorExportSmoke(templateFilter);
     if (commandLineHasFlag("--csd-render-compare-smoke"))
         return runCsdRenderCompareSmoke(templateFilter);
     if (commandLineHasFlag("--csd-timeline-smoke"))
