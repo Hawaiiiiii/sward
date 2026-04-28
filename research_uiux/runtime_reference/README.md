@@ -58,6 +58,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - selected CSD render-target plan previews that project draw commands into virtual `1280x720` target-space rectangles
 - selected CSD DDS blit previews that decode local DXT5 source textures for first real source-rect drawing
 - a separate clean SU UI asset renderer with local DDS-backed screen samples, visible `Prev` / `Next` navigation, and local visual-atlas gallery browsing
+- a Phase 122 SGFX template catalog that packages real-runtime evidence into reusable title/loading/HUD/tutorial state-machine recipes with Sonic placeholder assets now and custom SGFX art later, without shipping extracted Sonic assets
 
 Contents:
 
@@ -65,15 +66,18 @@ Contents:
 - `include/sward/ui_runtime/profiles.hpp`
 - `include/sward/ui_runtime/contract_loader.hpp`
 - `include/sward/ui_runtime/runtime_c.h`
+- `include/sward/ui_runtime/sgfx_templates.hpp`
 - `contracts/`
 - `src/runtime.cpp`
 - `src/contract_loader.cpp`
 - `src/profiles.cpp`
 - `src/runtime_c.cpp`
+- `src/sgfx_templates.cpp`
 - `examples/pause_menu_example.cpp`
 - `examples/title_menu_example.cpp`
 - `examples/toast_overlay_example.cpp`
 - `examples/c_pause_menu_example.c`
+- `examples/sgfx_template_catalog.cpp`
 - `examples/ui_debug_workbench_gui.cpp`
 - `CMakeLists.txt`
 - `csharp_reference/`
@@ -132,6 +136,7 @@ b/rr91/sward_ui_runtime_toast_example.exe
 b/rr91/sward_ui_runtime_c_example.exe
 b/rr91/sward_ui_runtime_debug_selector.exe
 b/rr91/sward_ui_runtime_debug_workbench.exe
+b/rr91/sward_sgfx_template_catalog.exe
 b/rr91/sward_ui_runtime_debug_gui.exe
 b/rr91/sward_su_ui_asset_renderer.exe
 ```
@@ -168,6 +173,9 @@ b/rr91/sward_ui_runtime_debug_workbench.exe --host SequenceManagerImpl.cpp
 b/rr91/sward_ui_runtime_debug_workbench.exe --host AchievementManager.cpp
 b/rr91/sward_ui_runtime_debug_workbench.exe --host SoundController.cpp
 b/rr91/sward_ui_runtime_debug_workbench.exe --host XMLManager.cpp
+b/rr91/sward_sgfx_template_catalog.exe --catalog
+b/rr91/sward_sgfx_template_catalog.exe --template title-menu
+b/rr91/sward_sgfx_template_catalog.exe --phase122-smoke
 b/rr91/sward_ui_runtime_debug_gui.exe
 b/rr91/sward_ui_runtime_debug_gui.exe --smoke
 b/rr91/sward_ui_runtime_debug_gui.exe --asset-view-smoke
@@ -209,6 +217,8 @@ b/rr91/sward_su_ui_asset_renderer.exe --renderer-smoke
 b/rr91/sward_su_ui_asset_renderer.exe --renderer-navigation-smoke
 b/rr91/sward_su_ui_asset_renderer.exe --renderer-atlas-gallery-smoke
 ```
+
+The SGFX template catalog is real-runtime evidence-backed architecture, not a visual parity renderer. It emits portable screen recipes for `title-menu`, `loading`, `sonic-hud`, and `tutorial` with contract names, required JSONL/live-bridge events, layer roles, timing bands, input-lock policy, and SGFX adaptation notes. The recipes are asset-aware: local Sonic placeholder assets can be rendered in the lab, but the stable output is explicit slot bindings for custom SGFX art.
 
 Run against an explicit portable contract path:
 

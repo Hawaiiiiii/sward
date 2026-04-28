@@ -5,6 +5,7 @@ add_library(sward_ui_runtime STATIC
     src/contract_loader.cpp
     src/runtime.cpp
     src/profiles.cpp
+    src/sgfx_templates.cpp
 )
 
 target_include_directories(sward_ui_runtime
@@ -87,6 +88,15 @@ add_executable(sward_ui_runtime_debug_workbench
 )
 
 target_link_libraries(sward_ui_runtime_debug_workbench
+    PRIVATE
+        sward_ui_runtime
+)
+
+add_executable(sward_sgfx_template_catalog
+    examples/sgfx_template_catalog.cpp
+)
+
+target_link_libraries(sward_sgfx_template_catalog
     PRIVATE
         sward_ui_runtime
 )

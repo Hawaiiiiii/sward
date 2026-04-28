@@ -187,6 +187,14 @@ The stage title owner direct-state fallback waits for the title intro direct-sta
 
 Phase 121 control automation moves unattended routes back to real mapped controls. The capture helper now knows `ENTER/W/A/S/D/Q/E`, focuses the UnleashedRecomp window, and `title-menu`, `title-options`, plus stage targets default to real keyboard input automation unless `-DisableControlAutomation` is supplied. In this mode, input automation is the route driver for pressing through title/menu flow, while the live bridge plus native BMP remain the oracle for readiness and visual proof. This keeps routing honest: the harness presses the same local controls a person would press, and JSONL/native captures still decide whether title menu, Sonic HUD, pause, or tutorial actually became runtime-visible. The sender uses scan-code `SendInput` first, keeps `keybd_event` as a fallback, and records foreground/send results in the manifest so a manual ENTER cannot be mistaken for proven automation.
 
+## Phase 122 SGFX Reusable Templates
+
+Phase 122 starts converting real-runtime evidence into a repo-safe SGFX template catalog. This is not a fake Sonic renderer and does not contain extracted assets; it packages the reusable UI/UX architecture that the runtime evidence has proven: state flow, timing bands, input-lock rules, layer roles, prompt policy, asset slots, and evidence provenance for `title-menu`, `loading`, `sonic-hud`, and `tutorial`.
+
+The new `sward_sgfx_template_catalog` target emits portable screen recipes from `include/sward/ui_runtime/sgfx_templates.hpp` and `src/sgfx_templates.cpp`. Each recipe points back to the existing portable contract file plus live evidence events such as `title-menu-visible`, `loading-display-active`, `sonic-hud-ready`, and `tutorial-hud-owner-path-ready`. SGFX can render Sonic assets as local placeholders during lab work, then swap in custom SGFX assets through explicit slots while keeping the recovered timing and state-machine shape.
+
+About "mostly harvested": the remaining debug-menu fork deltas are useful, but they are not all immediate UI-target-routing wins. The high-value UI inspector surfaces are already harvested or mapped: CSD Manager, SWA CSD wrappers, SWA HUD owners, System/GameMode/title/input fields, Reddog operator windows, debug draw, live state, and bridge commands. Remaining debug-menu fork deltas worth future passes are `Inspire/Movie` metadata for texture/movie overlays, renderer/shader metadata for how CSD/movie passes are filtered/composited, audio/camera/system support headers, and non-Sonic HUD families. Those should feed later typed inspectors or SGFX template refinements, not be blindly enabled as mutating runtime toggles.
+
 ## Verification
 
 Local-only evidence, not committed:
