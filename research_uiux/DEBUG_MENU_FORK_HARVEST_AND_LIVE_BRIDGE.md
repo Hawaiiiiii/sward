@@ -205,7 +205,7 @@ The new `--sgfx-template-smoke` command proves the bridge without opening a wind
 
 Phase 124 moves the clean SU UI asset renderer from hand-placed placeholder-only recipes toward a local CSD-driven pipeline viewer. The renderer now reads the ignored local `research_uiux/data/layout_deep_analysis.json` evidence at runtime, resolves CSD package/scene/timeline facts for `title-menu`, `loading`, `sonic-hud`, and `tutorial`, and exposes those facts beside the SGFX slot mapping. Sonic assets and CSD evidence remain local-only placeholders; the tracked code only contains the loader, mappings, tests, and docs.
 
-The new `--csd-pipeline-smoke` command reports the real recovered layout package, primary scene, cast count, subimage count, texture list, recovered animation timing, SGFX element slots, and available runtime evidence manifest comparison. Current mappings are `ui_mainmenu.yncp/mm_bg_usual`, `ui_loading.yncp/pda`, and the local HUD proxy `ui_prov_playscreen.yncp/so_speed_gauge` plus `info_1` for tutorial. Runtime comparison remains the oracle for real `ui_playscreen` behavior; `ui_prov_playscreen` is explicitly a local extracted HUD proxy until the exact normal Sonic HUD layout package is recovered locally.
+The new `--csd-pipeline-smoke` command reports the real recovered layout package, primary scene, cast count, subimage count, texture list, recovered animation timing, SGFX element slots, and available runtime evidence manifest comparison. Current mappings are `ui_mainmenu.yncp/mm_bg_usual`, `ui_loading.yncp/pda`, and, after Phase 135, exact normal Sonic HUD `ui_playscreen.yncp/so_speed_gauge` plus child scene `u_info` for tutorial. Runtime comparison remains the oracle; the older `ui_prov_playscreen.yncp` path is now only a legacy/proxy reconstruction screen, not the primary HUD compositor lane.
 
 The interactive renderer also overlays `csd_pipeline=`, `sgfx_element_map=`, and `runtime_evidence_compare=` lines when launched with `--template ...`, so the operator can see which visible placeholder elements come from recovered CSD evidence and which runtime event/native BMP set is being used as proof.
 
@@ -213,7 +213,7 @@ The interactive renderer also overlays `csd_pipeline=`, `sgfx_element_map=`, and
 
 Phase 125 moves the local SU UI pipeline viewer from digest-level CSD facts into actual drawable traversal. The renderer now reads ignored local `layout_deep_analysis.json`, resolves the selected scene through `scene_ids`, walks `cast_groups`, `cast_dictionaries`, `cast_material.used_subimage_indices`, and `subimages`, then emits concrete draw commands with cast name, source texture, subimage index, source rectangle, destination rectangle, sampled translation/scale/rotation, and SGFX slot mapping.
 
-The new `--csd-drawable-smoke` command exports the four current template scenes as drawable command streams: `ui_mainmenu.yncp/mm_bg_usual`, `ui_loading.yncp/pda`, `ui_prov_playscreen.yncp/so_speed_gauge`, and `ui_prov_playscreen.yncp/info_1`. It verifies the first real CSD-derived commands such as title `black3`, loading `bg`, Sonic HUD `Cast_0506_bg`, and tutorial `bg_1`; resolves their local DDS texture dimensions without publishing those assets; and still prints `native_bmp_compare=` lines so runtime/native evidence remains the visual oracle.
+The new `--csd-drawable-smoke` command exports the four current template scenes as drawable command streams: `ui_mainmenu.yncp/mm_bg_usual`, `ui_loading.yncp/pda`, exact `ui_playscreen.yncp/so_speed_gauge`, and exact `ui_playscreen.yncp/u_info`. It verifies real CSD-derived commands such as title `black3`, loading `bg`, Sonic HUD `Cast_0506_bg`, and tutorial `bar`; resolves their local DDS texture dimensions without publishing those assets; and still prints `native_bmp_compare=` lines so runtime/native evidence remains the visual oracle.
 
 Interactive `--template ...` preview now attempts to render from the recovered CSD drawable command stream first. The older hand-placed placeholder casts remain as fallback and diagnostics, but the template lane is now CSD draw-command driven wherever local evidence and local Sonic placeholder textures exist. This is still a sidecar pipeline viewer, not a replacement for the real UnleashedRecomp runtime lane.
 
@@ -316,6 +316,13 @@ Local-only evidence, not committed:
   - later Sonic HUD scene samples now survive in `typedInspectors.csdProjectTree.layers`, including `ui_playscreen/so_speed_gauge/position`
   - the sidecar export writes ignored local `out/csd_runtime_exports/phase134/ui_playscreen_runtime_tree.json`
   - note for manual operation: this capture used control automation and sent `ENTER` pulses; future manual sessions should pass `-DisableControlAutomation` so the bridge observes while the operator drives
+
+- `extracted_assets/phase135_ui_playscreen_probe/` and `out/csd_runtime_exports/phase135/`
+  - Phase 135 archive-probed the installed local game files with `HedgeArcPack`, finding exact normal Sonic HUD package `Sonic/ui_playscreen.yncp` in `Sonic.ar.00`
+  - the same probe recovered local-only HUD texture companions such as `Sonic/ui_ps1_gauge1.dds`, `mat_playscreen_001.dds`, language sheets, and `SystemCommonCore` common materials
+  - ignored `research_uiux/data/layout_deep_analysis.json` was regenerated so the sidecar can parse exact `ui_playscreen` scene, subimage, material, and timeline data
+  - `--export-runtime-csd-materials --template sonic-hud` joins the Phase 134 live runtime tree to exact local CSD material/subimage/timeline data and writes ignored `out/csd_runtime_exports/phase135/ui_playscreen_runtime_materials.json`
+  - current material export resolves `167 / 203` stored runtime layer samples; the remaining `36` are structural/group layers rather than missing Sonic HUD payload
 
 - `out/ui_lab_runtime_evidence/20260428_011255/`
   - focused Phase 120 `sonic-hud` live-bridge/native capture passed on the final raw-owner hook build

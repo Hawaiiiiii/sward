@@ -443,6 +443,37 @@ struct CsdHudRuntimeSceneEvidence
     std::vector<CsdHudRuntimeLayerEntry> runtimeLayers;
 };
 
+struct CsdHudRuntimeMaterialEntry
+{
+    std::string runtimePath;
+    std::string runtimeSceneName;
+    std::string localSceneName;
+    std::string layerName;
+    std::string castName;
+    std::string textureName;
+    std::string sgfxSlotLabel;
+    std::string materialSourceStatus;
+    std::string timelineName;
+    int timelineFrame = 0;
+    int timelineFrameCount = 0;
+    int sourceX = 0;
+    int sourceY = 0;
+    int sourceWidth = 0;
+    int sourceHeight = 0;
+    int destinationX = 0;
+    int destinationY = 0;
+    int destinationWidth = 0;
+    int destinationHeight = 0;
+    int textureWidth = 0;
+    int textureHeight = 0;
+    int subimageIndex = -1;
+    int textureIndex = -1;
+    int castIndex = 0;
+    bool textureResolved = false;
+    bool sourceFits = false;
+    bool timelineResolved = false;
+};
+
 struct CsdHudSceneCoverageDiagnostic
 {
     std::string sceneName;
@@ -529,7 +560,7 @@ struct CsdSoftwareRenderStats
     CsdSamplerStats samplerStats;
 };
 
-inline constexpr std::array<TextureSourceCandidate, 15> kTextureSourceCandidates{{
+inline constexpr std::array<TextureSourceCandidate, 25> kTextureSourceCandidates{{
     { "mat_load_comon_001.dds", "ui_extended_archives/Loading/mat_load_comon_001.dds" },
     { "mat_load_en_001.dds", "ui_broader_archives/Languages/English/Loading/mat_load_en_001.dds" },
     { "mat_comon_txt_001.dds", "ui_extended_archives/Loading/mat_comon_txt_001.dds" },
@@ -540,11 +571,21 @@ inline constexpr std::array<TextureSourceCandidate, 15> kTextureSourceCandidates
     { "mat_title_en_001.dds", "ui_broader_archives/Languages/English/Title/mat_title_en_001.dds" },
     { "mat_title_en_002.dds", "ui_broader_archives/Languages/English/Title/mat_title_en_002.dds" },
     { "mat_start_en_001.dds", "phase25_commonflow_archives/Languages/English/ActionCommon/mat_start_en_001.dds" },
+    { "ui_ps1_gauge1.dds", "phase135_ui_playscreen_probe/Sonic/ui_ps1_gauge1.dds" },
+    { "mat_playscreen_001.dds", "phase135_ui_playscreen_probe/Sonic/mat_playscreen_001.dds" },
+    { "mat_playscreen_002.dds", "phase135_ui_playscreen_probe/Sonic/mat_playscreen_002.dds" },
+    { "mat_playscreen_en_001.dds", "phase135_ui_playscreen_probe/Languages/English/Sonic/mat_playscreen_en_001.dds" },
+    { "mat_playscreen_en_002.dds", "phase135_ui_playscreen_probe/Languages/English/Sonic/mat_playscreen_en_002.dds" },
+    { "mat_playscreen_en_003.dds", "phase135_ui_playscreen_probe/Languages/English/Sonic/mat_playscreen_en_003.dds" },
+    { "mat_hit_001.dds", "phase135_ui_playscreen_probe/Sonic/mat_hit_001.dds" },
+    { "mat_comon_num_001.dds", "ui_extended_archives/SystemCommonCore/mat_comon_num_001.dds" },
+    { "mat_comon_001.dds", "ui_extended_archives/SystemCommonCore/mat_comon_001.dds" },
+    { "mat_comon_002.dds", "phase135_ui_playscreen_probe/SystemCommonCore/mat_comon_002.dds" },
+    { "mat_comon_003.dds", "phase135_ui_playscreen_probe/SystemCommonCore/mat_comon_003.dds" },
+    { "mat_comon_004.dds", "phase135_ui_playscreen_probe/SystemCommonCore/mat_comon_004.dds" },
     { "ui_ps1_gauge1.dds", "phase16_support_archives/ExStageTails_Common/ui_ps1_gauge1.dds" },
     { "mat_playscreen_001.dds", "phase16_support_archives/ExStageTails_Common/mat_playscreen_001.dds" },
     { "mat_playscreen_en_001.dds", "phase25_commonflow_archives/Languages/English/ExStageTails_Common/mat_playscreen_en_001.dds" },
-    { "mat_comon_num_001.dds", "ui_extended_archives/SystemCommonCore/mat_comon_num_001.dds" },
-    { "mat_comon_001.dds", "ui_extended_archives/SystemCommonCore/mat_comon_001.dds" },
 }};
 
 inline constexpr std::array<SuUiRenderCast, 4> kTitleLoopReconstructionCasts{{
@@ -674,17 +715,17 @@ inline constexpr std::array<CsdPipelineTemplateBinding, 4> kCsdPipelineTemplateB
     },
     {
         "sonic-hud",
-        "ui_prov_playscreen.yncp",
+        "ui_playscreen.yncp",
         "so_speed_gauge",
         "so_speed_gauge",
-        "Size_Anim",
+        "DefaultAnim",
     },
     {
         "tutorial",
-        "ui_prov_playscreen.yncp",
-        "info_1",
-        "info_1",
-        "Count_Anim",
+        "ui_playscreen.yncp",
+        "u_info",
+        "u_info",
+        "Intro_Anim",
     },
 }};
 
@@ -890,6 +931,21 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     }
 
     return std::nullopt;
+}
+
+[[nodiscard]] int layoutFilePreferenceScore(std::string_view layoutFileName, std::string_view sourcePath)
+{
+    if (layoutFileName == "ui_playscreen.yncp")
+    {
+        if (sourcePath.find("/phase135_ui_playscreen_probe/Sonic/ui_playscreen.yncp") != std::string_view::npos)
+            return 100;
+        if (sourcePath.find("/Sonic/ui_playscreen.yncp") != std::string_view::npos)
+            return 90;
+        if (sourcePath.find("/SuperSonic/ui_playscreen.yncp") != std::string_view::npos)
+            return 80;
+    }
+
+    return 1;
 }
 
 [[nodiscard]] std::vector<std::filesystem::path> discoverAtlasSheetPaths()
@@ -1128,6 +1184,32 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     return std::nullopt;
 }
 
+[[nodiscard]] std::optional<std::size_t> findJsonStringEnd(std::string_view text, std::size_t offset)
+{
+    if (offset >= text.size() || text[offset] != '"')
+        return std::nullopt;
+
+    bool escaped = false;
+    for (std::size_t index = offset + 1; index < text.size(); ++index)
+    {
+        const char ch = text[index];
+        if (escaped)
+        {
+            escaped = false;
+            continue;
+        }
+        if (ch == '\\')
+        {
+            escaped = true;
+            continue;
+        }
+        if (ch == '"')
+            return index;
+    }
+
+    return std::nullopt;
+}
+
 [[nodiscard]] std::optional<std::size_t> findJsonFieldValueOffset(std::string_view text, std::string_view fieldName)
 {
     const std::string needle = "\"" + std::string(fieldName) + "\"";
@@ -1140,6 +1222,77 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
         return std::nullopt;
 
     return skipJsonWhitespace(text, colonOffset + 1);
+}
+
+[[nodiscard]] std::optional<std::size_t> findJsonTopLevelFieldValueOffset(
+    std::string_view text,
+    std::string_view fieldName)
+{
+    bool inString = false;
+    bool escaped = false;
+    int objectDepth = 0;
+    int arrayDepth = 0;
+    for (std::size_t index = 0; index < text.size(); ++index)
+    {
+        const char ch = text[index];
+        if (inString)
+        {
+            if (escaped)
+                escaped = false;
+            else if (ch == '\\')
+                escaped = true;
+            else if (ch == '"')
+                inString = false;
+            continue;
+        }
+
+        if (ch == '"')
+        {
+            if (objectDepth == 1 && arrayDepth == 0)
+            {
+                const auto key = parseJsonStringAt(text, index);
+                const auto stringEnd = findJsonStringEnd(text, index);
+                if (!stringEnd)
+                    return std::nullopt;
+
+                std::size_t colonOffset = skipJsonWhitespace(text, *stringEnd + 1);
+                if (colonOffset < text.size() && text[colonOffset] == ':' && key && *key == fieldName)
+                    return skipJsonWhitespace(text, colonOffset + 1);
+
+                index = *stringEnd;
+                continue;
+            }
+
+            inString = true;
+            continue;
+        }
+
+        if (ch == '{')
+            ++objectDepth;
+        else if (ch == '}')
+            --objectDepth;
+        else if (ch == '[')
+            ++arrayDepth;
+        else if (ch == ']')
+            --arrayDepth;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<std::string_view> jsonTopLevelArrayFieldSpan(
+    std::string_view text,
+    std::string_view fieldName)
+{
+    const auto valueOffset = findJsonTopLevelFieldValueOffset(text, fieldName);
+    if (!valueOffset || *valueOffset >= text.size() || text[*valueOffset] != '[')
+        return std::nullopt;
+
+    const auto endOffset = matchJsonContainer(text, *valueOffset, '[', ']');
+    if (!endOffset)
+        return std::nullopt;
+
+    return text.substr(*valueOffset, (*endOffset - *valueOffset) + 1);
 }
 
 [[nodiscard]] std::optional<std::string> jsonStringField(std::string_view text, std::string_view fieldName)
@@ -1397,12 +1550,17 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
         return std::nullopt;
 
     std::optional<std::string_view> digestObjectSpan;
+    int bestPreferenceScore = -1;
     for (const auto objectSpan : jsonObjectSpansInArray(*digestsSpan))
     {
         if (jsonStringField(objectSpan, "file_name").value_or("") == layoutFileName)
         {
-            digestObjectSpan = objectSpan;
-            break;
+            const int preferenceScore = layoutFilePreferenceScore(layoutFileName, jsonStringField(objectSpan, "path").value_or(""));
+            if (preferenceScore > bestPreferenceScore)
+            {
+                digestObjectSpan = objectSpan;
+                bestPreferenceScore = preferenceScore;
+            }
         }
     }
 
@@ -1515,13 +1673,22 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     if (!parsedFiles)
         return std::nullopt;
 
+    std::optional<std::string_view> bestObjectSpan;
+    int bestPreferenceScore = -1;
     for (const auto objectSpan : jsonObjectSpansInArray(*parsedFiles))
     {
         if (jsonStringField(objectSpan, "file_name").value_or("") == layoutFileName)
-            return objectSpan;
+        {
+            const int preferenceScore = layoutFilePreferenceScore(layoutFileName, jsonStringField(objectSpan, "path").value_or(""));
+            if (preferenceScore > bestPreferenceScore)
+            {
+                bestObjectSpan = objectSpan;
+                bestPreferenceScore = preferenceScore;
+            }
+        }
     }
 
-    return std::nullopt;
+    return bestObjectSpan;
 }
 
 [[nodiscard]] std::optional<std::string_view> firstJsonObjectInArrayField(
@@ -1556,6 +1723,31 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
 
 [[nodiscard]] std::optional<int> csdSceneIndexForName(std::string_view rootObject, std::string_view sceneName);
 
+[[nodiscard]] std::optional<std::string_view> findCsdSceneObjectSpanInNode(
+    std::string_view nodeObject,
+    std::string_view sceneName)
+{
+    const auto sceneIndex = csdSceneIndexForName(nodeObject, sceneName);
+    const auto scenes = jsonTopLevelArrayFieldSpan(nodeObject, "scenes");
+    if (sceneIndex && *sceneIndex >= 0 && scenes)
+    {
+        if (const auto sceneObject = jsonObjectInArrayAt(*scenes, static_cast<std::size_t>(*sceneIndex)))
+            return sceneObject;
+    }
+
+    const auto children = jsonTopLevelArrayFieldSpan(nodeObject, "children");
+    if (!children)
+        return std::nullopt;
+
+    for (const auto childObject : jsonObjectSpansInArray(*children))
+    {
+        if (const auto sceneObject = findCsdSceneObjectSpanInNode(childObject, sceneName))
+            return sceneObject;
+    }
+
+    return std::nullopt;
+}
+
 [[nodiscard]] std::optional<std::string_view> findCsdSceneObjectSpan(
     std::string_view document,
     std::string_view layoutFileName,
@@ -1572,17 +1764,12 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
     if (!root)
         return std::nullopt;
 
-    const auto sceneIndex = csdSceneIndexForName(*root, sceneName);
-    const auto scenes = jsonArrayFieldSpan(*root, "scenes");
-    if (!sceneIndex || *sceneIndex < 0 || !scenes)
-        return std::nullopt;
-
-    return jsonObjectInArrayAt(*scenes, static_cast<std::size_t>(*sceneIndex));
+    return findCsdSceneObjectSpanInNode(*root, sceneName);
 }
 
 [[nodiscard]] std::optional<int> csdSceneIndexForName(std::string_view rootObject, std::string_view sceneName)
 {
-    const auto sceneIds = jsonArrayFieldSpan(rootObject, "scene_ids");
+    const auto sceneIds = jsonTopLevelArrayFieldSpan(rootObject, "scene_ids");
     if (!sceneIds)
         return std::nullopt;
 
@@ -1989,12 +2176,7 @@ void refreshCsdGradientState(CsdDrawableCommand& command)
     if (!root)
         return std::nullopt;
 
-    const auto sceneIndex = csdSceneIndexForName(*root, binding.primarySceneName);
-    const auto scenes = jsonArrayFieldSpan(*root, "scenes");
-    if (!sceneIndex || *sceneIndex < 0 || !scenes)
-        return std::nullopt;
-
-    const auto sceneObject = jsonObjectInArrayAt(*scenes, static_cast<std::size_t>(*sceneIndex));
+    const auto sceneObject = findCsdSceneObjectSpanInNode(*root, binding.primarySceneName);
     if (!sceneObject)
         return std::nullopt;
 
@@ -2573,34 +2755,71 @@ void decodeDxt5Block(const std::uint8_t* block, int blockX, int blockY, int widt
     const int height = static_cast<int>(readLe32(data.data() + 12));
     const int width = static_cast<int>(readLe32(data.data() + 16));
     const std::uint32_t pixelFormatSize = readLe32(data.data() + 76);
+    const std::uint32_t pixelFormatFlags = readLe32(data.data() + 80);
     const std::string fourCc(reinterpret_cast<const char*>(data.data() + 84), 4);
-    if (headerSize != 124 || pixelFormatSize != 32 || fourCc != "DXT5" || width <= 0 || height <= 0)
-        return std::nullopt;
-
-    const int blockCountX = (width + 3) / 4;
-    const int blockCountY = (height + 3) / 4;
-    const std::size_t requiredBytes = 128 + (static_cast<std::size_t>(blockCountX) * static_cast<std::size_t>(blockCountY) * 16);
-    if (data.size() < requiredBytes)
+    const std::uint32_t rgbBitCount = readLe32(data.data() + 88);
+    const std::uint32_t redMask = readLe32(data.data() + 92);
+    const std::uint32_t greenMask = readLe32(data.data() + 96);
+    const std::uint32_t blueMask = readLe32(data.data() + 100);
+    const std::uint32_t alphaMask = readLe32(data.data() + 104);
+    if (headerSize != 124 || pixelFormatSize != 32 || width <= 0 || height <= 0)
         return std::nullopt;
 
     DdsTextureImage image;
     image.path = *path;
     image.fileName = path->filename().string();
-    image.format = fourCc;
     image.width = width;
     image.height = height;
     image.argbPixels.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), 0);
 
-    const std::uint8_t* block = data.data() + 128;
-    for (int blockY = 0; blockY < blockCountY; ++blockY)
+    if (fourCc == "DXT5")
     {
-        for (int blockX = 0; blockX < blockCountX; ++blockX)
+        const int blockCountX = (width + 3) / 4;
+        const int blockCountY = (height + 3) / 4;
+        const std::size_t requiredBytes = 128 + (static_cast<std::size_t>(blockCountX) * static_cast<std::size_t>(blockCountY) * 16);
+        if (data.size() < requiredBytes)
+            return std::nullopt;
+
+        image.format = fourCc;
+        const std::uint8_t* block = data.data() + 128;
+        for (int blockY = 0; blockY < blockCountY; ++blockY)
         {
-            decodeDxt5Block(block, blockX, blockY, width, height, image.argbPixels);
-            block += 16;
+            for (int blockX = 0; blockX < blockCountX; ++blockX)
+            {
+                decodeDxt5Block(block, blockX, blockY, width, height, image.argbPixels);
+                block += 16;
+            }
         }
+
+        return image;
     }
 
+    constexpr std::uint32_t kDdsPixelFormatRgb = 0x40;
+    constexpr std::uint32_t kDdsPixelFormatAlphaPixels = 0x1;
+    const bool isBgra8 = (pixelFormatFlags & kDdsPixelFormatRgb) != 0
+        && (pixelFormatFlags & kDdsPixelFormatAlphaPixels) != 0
+        && rgbBitCount == 32
+        && redMask == 0x00FF0000
+        && greenMask == 0x0000FF00
+        && blueMask == 0x000000FF
+        && alphaMask == 0xFF000000;
+    const std::size_t requiredBytes = 128 + (static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4);
+    if (!isBgra8 || data.size() < requiredBytes)
+        return std::nullopt;
+
+    image.format = "BGRA8";
+    const auto* source = data.data() + 128;
+    for (std::size_t index = 0; index < image.argbPixels.size(); ++index)
+    {
+        const std::uint8_t blue = source[index * 4 + 0];
+        const std::uint8_t green = source[index * 4 + 1];
+        const std::uint8_t red = source[index * 4 + 2];
+        const std::uint8_t alpha = source[index * 4 + 3];
+        image.argbPixels[index] = (static_cast<std::uint32_t>(alpha) << 24)
+            | (static_cast<std::uint32_t>(red) << 16)
+            | (static_cast<std::uint32_t>(green) << 8)
+            | static_cast<std::uint32_t>(blue);
+    }
     return image;
 }
 
@@ -4907,6 +5126,255 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return true;
 }
 
+[[nodiscard]] std::string localCsdSceneNameForRuntimeScene(std::string_view runtimeSceneName)
+{
+    const std::string scene(runtimeSceneName);
+    const auto slash = scene.find_last_of('/');
+    return slash == std::string::npos ? scene : scene.substr(slash + 1);
+}
+
+[[nodiscard]] std::string timelineAnimationNameForLocalScene(
+    std::string_view layoutFileName,
+    std::string_view localSceneName)
+{
+    const auto evidence = loadCsdPipelineEvidence(layoutFileName);
+    if (!evidence)
+        return "DefaultAnim";
+
+    if (localSceneName == "u_info")
+    {
+        const auto intro = std::find_if(
+            evidence->timelines.begin(),
+            evidence->timelines.end(),
+            [localSceneName](const CsdPipelineTimelineHook& hook)
+            {
+                return hook.sceneName == localSceneName && hook.animationName == "Intro_Anim";
+            });
+        if (intro != evidence->timelines.end())
+            return intro->animationName;
+    }
+
+    for (const auto& hook : evidence->timelines)
+    {
+        if (hook.sceneName == localSceneName)
+            return hook.animationName;
+    }
+
+    return "DefaultAnim";
+}
+
+[[nodiscard]] const CsdDrawableCommand* findDrawableCommandForLayer(
+    const CsdDrawableScene& scene,
+    std::string_view layerName)
+{
+    const auto found = std::find_if(
+        scene.commands.begin(),
+        scene.commands.end(),
+        [layerName](const CsdDrawableCommand& command)
+        {
+            return command.castName == layerName;
+        });
+    return found == scene.commands.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] std::optional<CsdTimelinePlayback> loadTimelinePlaybackForScene(
+    std::string_view templateId,
+    std::string_view layoutFileName,
+    std::string_view localSceneName)
+{
+    const std::string animationName = timelineAnimationNameForLocalScene(layoutFileName, localSceneName);
+    const CsdPipelineTemplateBinding binding{
+        templateId,
+        layoutFileName,
+        localSceneName,
+        localSceneName,
+        animationName,
+    };
+    return loadCsdTimelinePlayback(binding);
+}
+
+[[nodiscard]] std::vector<CsdHudRuntimeMaterialEntry> buildSonicHudRuntimeMaterialEntries(
+    const CsdHudRuntimeSceneEvidence& evidence)
+{
+    std::vector<CsdHudRuntimeMaterialEntry> entries;
+    constexpr std::string_view kTemplateId = "sonic-hud";
+    constexpr std::string_view kLayoutFileName = "ui_playscreen.yncp";
+
+    struct LocalSceneCacheEntry
+    {
+        std::string runtimeSceneName;
+        std::string localSceneName;
+        std::optional<CsdDrawableScene> drawableScene;
+        std::optional<CsdTimelinePlayback> timeline;
+    };
+
+    std::vector<LocalSceneCacheEntry> sceneCache;
+    auto sceneCacheFor = [&sceneCache](std::string_view runtimeSceneName) -> LocalSceneCacheEntry*
+    {
+        const auto found = std::find_if(
+            sceneCache.begin(),
+            sceneCache.end(),
+            [runtimeSceneName](const LocalSceneCacheEntry& entry)
+            {
+                return entry.runtimeSceneName == runtimeSceneName;
+            });
+        return found == sceneCache.end() ? nullptr : &*found;
+    };
+
+    for (const auto& runtimeScene : evidence.runtimeScenes)
+    {
+        const std::string localSceneName = localCsdSceneNameForRuntimeScene(runtimeScene.sceneName);
+        const std::string timelineAnimationName = timelineAnimationNameForLocalScene(kLayoutFileName, localSceneName);
+        const CsdPipelineTemplateBinding binding{
+            kTemplateId,
+            kLayoutFileName,
+            localSceneName,
+            localSceneName,
+            timelineAnimationName,
+        };
+
+        sceneCache.push_back({
+            runtimeScene.sceneName,
+            localSceneName,
+            loadCsdDrawableScene(binding),
+            loadCsdTimelinePlayback(binding),
+        });
+    }
+
+    for (const auto& layer : evidence.runtimeLayers)
+    {
+        auto* cache = sceneCacheFor(layer.sceneName);
+        if (!cache || !cache->drawableScene)
+            continue;
+
+        const auto* command = findDrawableCommandForLayer(*cache->drawableScene, layer.layerName);
+        if (!command)
+            continue;
+
+        CsdHudRuntimeMaterialEntry entry;
+        entry.runtimePath = layer.path;
+        entry.runtimeSceneName = layer.sceneName;
+        entry.localSceneName = cache->localSceneName;
+        entry.layerName = layer.layerName;
+        entry.castName = command->castName;
+        entry.textureName = command->textureName;
+        entry.sgfxSlotLabel = sonicHudSlotLabelForScene(layer.sceneName);
+        entry.materialSourceStatus = "exact-local-layout";
+        entry.timelineName = cache->timeline ? cache->timeline->animationName : "";
+        entry.timelineFrame = cache->timeline ? cache->timeline->sampleFrame : 0;
+        entry.timelineFrameCount = cache->timeline ? static_cast<int>(std::llround(cache->timeline->frameCount)) : 0;
+        entry.sourceX = command->sourceX;
+        entry.sourceY = command->sourceY;
+        entry.sourceWidth = command->sourceWidth;
+        entry.sourceHeight = command->sourceHeight;
+        entry.destinationX = command->destinationX;
+        entry.destinationY = command->destinationY;
+        entry.destinationWidth = command->destinationWidth;
+        entry.destinationHeight = command->destinationHeight;
+        entry.textureWidth = command->textureWidth;
+        entry.textureHeight = command->textureHeight;
+        entry.subimageIndex = command->subimageIndex;
+        entry.textureIndex = command->textureIndex;
+        entry.castIndex = layer.castIndex;
+        entry.textureResolved = command->textureResolved;
+        entry.sourceFits = command->sourceFits;
+        entry.timelineResolved = cache->timeline.has_value();
+        entries.push_back(std::move(entry));
+    }
+
+    return entries;
+}
+
+[[nodiscard]] int materialResolvedCountForRuntimeScene(
+    const std::vector<CsdHudRuntimeMaterialEntry>& entries,
+    std::string_view runtimeSceneName)
+{
+    return static_cast<int>(std::count_if(
+        entries.begin(),
+        entries.end(),
+        [runtimeSceneName](const CsdHudRuntimeMaterialEntry& entry)
+        {
+            return entry.runtimeSceneName == runtimeSceneName;
+        }));
+}
+
+[[nodiscard]] bool writeSonicHudRuntimeMaterialExport(
+    const CsdHudRuntimeSceneEvidence& evidence,
+    const std::vector<CsdHudRuntimeMaterialEntry>& entries,
+    const std::filesystem::path& exportPath)
+{
+    std::error_code error;
+    std::filesystem::create_directories(exportPath.parent_path(), error);
+    if (error)
+        return false;
+
+    std::ofstream out(exportPath, std::ios::binary);
+    if (!out)
+        return false;
+
+    const int materialResolved = static_cast<int>(entries.size());
+    const int subimageResolved = static_cast<int>(std::count_if(
+        entries.begin(),
+        entries.end(),
+        [](const CsdHudRuntimeMaterialEntry& entry)
+        {
+            return entry.subimageIndex >= 0 && entry.textureResolved && entry.sourceFits;
+        }));
+    const int timelineResolved = static_cast<int>(std::count_if(
+        entries.begin(),
+        entries.end(),
+        [](const CsdHudRuntimeMaterialEntry& entry)
+        {
+            return entry.timelineResolved;
+        }));
+
+    out << "{\n";
+    out << "  \"phase\": 135,\n";
+    out << "  \"target\": \"sonic-hud\",\n";
+    out << "  \"source\": \"runtime-tree+exact-local-layout\",\n";
+    out << "  \"drawableStatus\": \"runtime-material-exact-local-layout\",\n";
+    out << "  \"runtimeProject\": \"" << jsonEscape(evidence.runtimeProject) << "\",\n";
+    out << "  \"localLayout\": \"" << jsonEscape(evidence.localLayoutFileName) << "\",\n";
+    out << "  \"localProject\": \"" << jsonEscape(evidence.localProject) << "\",\n";
+    out << "  \"layoutStatus\": \"" << jsonEscape(evidence.layoutStatus) << "\",\n";
+    out << "  \"liveStatePath\": \"" << jsonEscape(portablePath(evidence.liveStatePath)) << "\",\n";
+    out << "  \"counts\": { \"runtimeLayers\": " << evidence.runtimeLayerCount
+        << ", \"exportedLayers\": " << evidence.runtimeLayers.size()
+        << ", \"materialResolved\": " << materialResolved
+        << ", \"subimageResolved\": " << subimageResolved
+        << ", \"timelineResolved\": " << timelineResolved
+        << ", \"materialUnresolved\": " << (static_cast<int>(evidence.runtimeLayers.size()) - materialResolved)
+        << " },\n";
+
+    out << "  \"materials\": [\n";
+    for (std::size_t index = 0; index < entries.size(); ++index)
+    {
+        const auto& entry = entries[index];
+        out << "    { \"runtimePath\": \"" << jsonEscape(entry.runtimePath)
+            << "\", \"runtimeScene\": \"" << jsonEscape(entry.runtimeSceneName)
+            << "\", \"localScene\": \"" << jsonEscape(entry.localSceneName)
+            << "\", \"layer\": \"" << jsonEscape(entry.layerName)
+            << "\", \"cast\": \"" << jsonEscape(entry.castName)
+            << "\", \"texture\": \"" << jsonEscape(entry.textureName)
+            << "\", \"subimageIndex\": " << entry.subimageIndex
+            << ", \"textureIndex\": " << entry.textureIndex
+            << ", \"textureSize\": { \"width\": " << entry.textureWidth << ", \"height\": " << entry.textureHeight << " }"
+            << ", \"source\": { \"x\": " << entry.sourceX << ", \"y\": " << entry.sourceY
+            << ", \"width\": " << entry.sourceWidth << ", \"height\": " << entry.sourceHeight << " }"
+            << ", \"destination\": { \"x\": " << entry.destinationX << ", \"y\": " << entry.destinationY
+            << ", \"width\": " << entry.destinationWidth << ", \"height\": " << entry.destinationHeight << " }"
+            << ", \"timeline\": \"" << jsonEscape(entry.timelineName)
+            << "\", \"timelineFrame\": " << entry.timelineFrame
+            << ", \"timelineFrameCount\": " << entry.timelineFrameCount
+            << ", \"sgfxSlot\": \"" << jsonEscape(entry.sgfxSlotLabel)
+            << "\", \"materialSourceStatus\": \"" << jsonEscape(entry.materialSourceStatus) << "\" }"
+            << (index + 1 == entries.size() ? "\n" : ",\n");
+    }
+    out << "  ]\n";
+    out << "}\n";
+    return true;
+}
+
 [[nodiscard]] std::optional<CLSID> imageEncoderClsid(const wchar_t* mimeType)
 {
     UINT encoderCount = 0;
@@ -6350,6 +6818,133 @@ void writeCsdRenderCompareManifest(
     return 0;
 }
 
+[[nodiscard]] int runRuntimeCsdMaterialExportSmoke(const std::optional<std::string>& templateFilter)
+{
+    const std::string target = templateFilter.value_or("sonic-hud");
+    if (target != "sonic-hud")
+    {
+        std::cerr << "Runtime CSD material export currently supports sonic-hud only.\n";
+        return 2;
+    }
+
+    const auto* csdBinding = findCsdPipelineTemplateBinding("sonic-hud");
+    if (!csdBinding)
+        return 1;
+
+    const auto evidence = loadLatestSonicHudLiveStateEvidence(*csdBinding);
+    if (!evidence.found || evidence.runtimeProject.empty() || evidence.layoutStatus != "exact-runtime-layout")
+        return 1;
+
+    const auto entries = buildSonicHudRuntimeMaterialEntries(evidence);
+    if (entries.empty())
+        return 1;
+
+    const int materialResolved = static_cast<int>(entries.size());
+    const int subimageResolved = static_cast<int>(std::count_if(
+        entries.begin(),
+        entries.end(),
+        [](const CsdHudRuntimeMaterialEntry& entry)
+        {
+            return entry.subimageIndex >= 0 && entry.textureResolved && entry.sourceFits;
+        }));
+    const int timelineResolved = static_cast<int>(std::count_if(
+        entries.begin(),
+        entries.end(),
+        [](const CsdHudRuntimeMaterialEntry& entry)
+        {
+            return entry.timelineResolved;
+        }));
+
+    const auto outputRoot = repoRootForOutput() / "out" / "csd_runtime_exports" / "phase135";
+    const auto outputPath = outputRoot / (evidence.runtimeProject + "_runtime_materials.json");
+    const bool wrote = writeSonicHudRuntimeMaterialExport(evidence, entries, outputPath);
+    if (!wrote)
+        return 1;
+
+    constexpr std::string_view kDrawableStatus = "runtime-material-exact-local-layout";
+    std::cout
+        << "sward_su_ui_asset_renderer runtime csd material export ok "
+        << "target=sonic-hud"
+        << " project=" << evidence.runtimeProject
+        << " materials=" << materialResolved
+        << " output=" << portablePath(outputPath)
+        << '\n';
+    std::cout
+        << "runtime_csd_material_export=sonic-hud"
+        << ":source=runtime-tree+exact-local-layout"
+        << ":project=" << evidence.runtimeProject
+        << ":local_layout=" << evidence.localLayoutFileName
+        << ":local_project=" << evidence.localProject
+        << ":runtime_layers=" << evidence.runtimeLayerCount
+        << ":exported_layers=" << evidence.runtimeLayers.size()
+        << ":material_resolved=" << materialResolved
+        << ":subimage_resolved=" << subimageResolved
+        << ":timeline_resolved=" << timelineResolved
+        << ":material_unresolved=" << (static_cast<int>(evidence.runtimeLayers.size()) - materialResolved)
+        << ":drawable_status=" << kDrawableStatus
+        << '\n';
+
+    for (const auto& scene : evidence.runtimeScenes)
+    {
+        const std::string localSceneName = localCsdSceneNameForRuntimeScene(scene.sceneName);
+        const auto timeline = loadTimelinePlaybackForScene("sonic-hud", evidence.localLayoutFileName, localSceneName);
+        const int sceneResolved = materialResolvedCountForRuntimeScene(entries, scene.sceneName);
+        const int sceneSubimageResolved = static_cast<int>(std::count_if(
+            entries.begin(),
+            entries.end(),
+            [&scene](const CsdHudRuntimeMaterialEntry& entry)
+            {
+                return entry.runtimeSceneName == scene.sceneName && entry.subimageIndex >= 0 && entry.textureResolved && entry.sourceFits;
+            }));
+
+        std::cout
+            << "runtime_csd_material_scene=sonic-hud:"
+            << scene.path
+            << ":layers=" << runtimeLayerCountForScene(evidence, scene.sceneName)
+            << ":material_resolved=" << sceneResolved
+            << ":subimage_resolved=" << sceneSubimageResolved;
+        if (timeline)
+        {
+            std::cout
+                << ":timeline=" << timeline->animationName
+                << "@" << timeline->sampleFrame
+                << "/" << static_cast<int>(std::llround(timeline->frameCount));
+        }
+        else
+        {
+            std::cout << ":timeline=unresolved";
+        }
+        std::cout
+            << ":sgfx_slot=" << sonicHudSlotLabelForScene(scene.sceneName)
+            << '\n';
+    }
+
+    const auto sample = std::find_if(
+        entries.begin(),
+        entries.end(),
+        [](const CsdHudRuntimeMaterialEntry& entry)
+        {
+            return entry.castName == "Cast_0506_bg";
+        });
+    const auto& sampleEntry = sample != entries.end() ? *sample : entries.front();
+    std::cout
+        << "runtime_csd_material_sample=sonic-hud:"
+        << sampleEntry.runtimePath
+        << ":cast=" << sampleEntry.castName
+        << ":texture=" << sampleEntry.textureName
+        << ":subimage=" << sampleEntry.subimageIndex
+        << ":src=" << sampleEntry.sourceX << "," << sampleEntry.sourceY << ","
+        << sampleEntry.sourceWidth << "x" << sampleEntry.sourceHeight
+        << ":dst=" << sampleEntry.destinationX << "," << sampleEntry.destinationY << ","
+        << sampleEntry.destinationWidth << "x" << sampleEntry.destinationHeight
+        << ":timeline=" << (sampleEntry.timelineName.empty() ? "unresolved" : sampleEntry.timelineName)
+        << "@" << sampleEntry.timelineFrame
+        << '\n';
+
+    std::cout << "runtime_csd_material_export_path=" << portablePath(outputPath) << '\n';
+    return 0;
+}
+
 [[nodiscard]] int runCsdRenderCompareSmoke(const std::optional<std::string>& templateFilter)
 {
     std::size_t templateCount = 0;
@@ -6908,6 +7503,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
     const auto templateFilter = commandLineValueAfter("--template");
     if (commandLineHasFlag("--export-runtime-csd-tree"))
         return runRuntimeCsdTreeExportSmoke(templateFilter);
+    if (commandLineHasFlag("--export-runtime-csd-materials"))
+        return runRuntimeCsdMaterialExportSmoke(templateFilter);
     if (commandLineHasFlag("--csd-render-compare-smoke"))
         return runCsdRenderCompareSmoke(templateFilter);
     if (commandLineHasFlag("--csd-timeline-smoke"))

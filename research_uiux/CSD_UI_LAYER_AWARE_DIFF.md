@@ -71,6 +71,20 @@ Phase 134 moved the Sonic HUD blocker from a scene-name guess to a concrete runt
 
 This gives the next compositor pass a stable scene/node/layer skeleton for the real normal Sonic HUD. It still needs material rectangles, subimage bindings, and timeline channels before the local renderer can claim full `ui_playscreen` drawable parity.
 
+## Phase 135 Follow-Up
+
+Phase 135 found the missing exact local HUD package in the installed game archives rather than the earlier extracted evidence set:
+
+- `HedgeArcPack` extraction of `Unleashed Recomp - Windows (Complete Installation) 1.0.3/game/Sonic.ar.00` produced ignored local `extracted_assets/phase135_ui_playscreen_probe/Sonic/ui_playscreen.yncp`;
+- the same probe surfaced the normal Sonic HUD sheets (`ui_ps1_gauge1.dds`, `mat_playscreen_001.dds`, `mat_playscreen_002.dds`) plus English `mat_playscreen_en_00*.dds` companions;
+- ignored local `research_uiux/data/layout_deep_analysis.json` was regenerated from `extracted_assets`, so the sidecar can parse exact `ui_playscreen.yncp` without publishing proprietary payloads;
+- the sidecar now binds `sonic-hud` and `tutorial` to exact `ui_playscreen.yncp` instead of proxy `ui_prov_playscreen.yncp`;
+- the exact `ui_ps1_gauge1.dds` sheet uses uncompressed `BGRA8`, so the software renderer now decodes that path in addition to the older `DXT5` DDS path;
+- `--export-runtime-csd-materials --template sonic-hud` writes ignored local `out/csd_runtime_exports/phase135/ui_playscreen_runtime_materials.json`;
+- current material export resolves `167 / 203` exported live layer samples to exact local material/subimage/timeline data, while the remaining `36` are structural/group layers without drawable subimages.
+
+That moves Sonic HUD from "proxy scene archaeology" to a real local `ui_playscreen` compositor/export lane. It still needs shader/palette/per-scene activation validation against native captures before claiming full pixel parity.
+
 ## Verification
 
 Fresh verification for this beat used:
