@@ -106,6 +106,17 @@ Phase 137 translates the generated normal Sonic HUD compositor/reference export 
 
 This is source reconstruction, not a visual renderer fix. The old interactive asset window can still look like the legacy proxy overlay until it is wired to this exact compositor/reference policy. The value of this beat is that SGFX can now reuse the HUD scene ownership, ordering, slots, and timeline-player shape without depending on proprietary Sonic payloads.
 
+## Phase 138 Follow-Up
+
+Phase 138 wires that reference policy back into the interactive sidecar viewer:
+
+- `SonicHudReconstruction` now uses `RendererScreenKind::SonicHudReferencePipeline` and renders from `sonicHudScenePolicies()` instead of the older hand-built proxy HUD card;
+- the viewer loads exact local `ui_playscreen.yncp` CSD drawable scenes for each policy scene, draws them by recovered render order, and caps command counts to the live drawable-layer counts from the compositor reference;
+- Sonic HUD and tutorial template launches suppress the large SGFX/template debug cards and show only a compact `phase137-ui_playscreen-policy` owner/status overlay;
+- `--renderer-sonic-hud-reference-smoke` proves the bounded path, including `13` scenes, `167` drawable layers, `so_speed_gauge` `43` commands, `so_ringenagy_gauge` `40` commands, and `add/u_info` capped to `5` live drawable commands.
+
+This still does not make a pixel-perfect Xenos/D3D compositor claim. It does move the visible viewer from "inspired/proxy HUD cards" to an exact `ui_playscreen` policy-and-draw-command viewer for the normal Sonic HUD lane.
+
 ## Verification
 
 Fresh verification for this beat used:

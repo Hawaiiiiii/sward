@@ -7,6 +7,7 @@
 #include <gdiplus.h>
 
 #include <sward/ui_runtime/sgfx_templates.hpp>
+#include <sward/ui_runtime/sonic_hud_reference.hpp>
 
 #include <algorithm>
 #include <array>
@@ -31,8 +32,12 @@
 namespace
 {
 using sward::ui_runtime::SgfxScreenTemplate;
+using sward::ui_runtime::SonicHudScenePolicy;
 using sward::ui_runtime::findSgfxScreenTemplate;
 using sward::ui_runtime::sgfxScreenTemplates;
+using sward::ui_runtime::sampleSonicHudTimeline;
+using sward::ui_runtime::sonicHudOwnerReference;
+using sward::ui_runtime::sonicHudScenePolicies;
 
 inline constexpr int kDesignWidth = 1280;
 inline constexpr int kDesignHeight = 720;
@@ -81,6 +86,7 @@ enum class RendererScreenKind
     AtlasGallery,
     TitleLoopReconstruction,
     SonicHudReconstruction,
+    SonicHudReferencePipeline,
 };
 
 struct SuUiRendererScreen
@@ -776,12 +782,12 @@ inline const std::array<SuUiRendererScreen, 8> kRendererScreens{{
     },
     {
         "SonicHudReconstruction",
-        "Sonic HUD Reconstructed",
+        "Sonic HUD Reconstructed ui_playscreen Pipeline",
         "sonic_stage_hud_reference.json",
         kSonicHudReconstructionCasts.data(),
         kSonicHudReconstructionCasts.size(),
         Gdiplus::Color(255, 0, 0, 0),
-        RendererScreenKind::SonicHudReconstruction,
+        RendererScreenKind::SonicHudReferencePipeline,
     },
     {
         "VisualAtlasGallery",
@@ -4016,6 +4022,142 @@ void renderSgfxTemplatePlaceholderScreen(
     return true;
 }
 
+[[nodiscard]] bool isSonicHudReferenceViewerBinding(const SgfxTemplateRenderBinding& binding)
+{
+    return binding.templateId == "sonic-hud" || binding.templateId == "tutorial";
+}
+
+[[nodiscard]] std::string sonicHudReferenceLocalSceneName(std::string_view sceneName)
+{
+    const auto slash = sceneName.find_last_of('/');
+    return slash == std::string_view::npos
+        ? std::string(sceneName)
+        : std::string(sceneName.substr(slash + 1));
+}
+
+[[nodiscard]] CsdPipelineTemplateBinding sonicHudReferenceCsdBindingForPolicy(
+    const SonicHudScenePolicy& policy,
+    const std::string& localSceneName)
+{
+    return {
+        "sonic-hud",
+        "ui_playscreen.yncp",
+        localSceneName,
+        localSceneName,
+        policy.timeline.animationName,
+    };
+}
+
+[[nodiscard]] std::optional<CsdDrawableScene> loadSonicHudReferencePolicyScene(
+    const SonicHudScenePolicy& policy,
+    std::string& localSceneName)
+{
+    localSceneName = sonicHudReferenceLocalSceneName(policy.sceneName);
+    const auto binding = sonicHudReferenceCsdBindingForPolicy(policy, localSceneName);
+    return loadCsdDrawableScene(binding);
+}
+
+[[nodiscard]] bool shouldRenderSonicHudReferencePolicy(
+    const SonicHudScenePolicy& policy,
+    const SgfxTemplateRenderBinding* binding)
+{
+    if (binding && binding->templateId == "tutorial")
+        return true;
+    return policy.activationEvent == "stage-hud-ready";
+}
+
+[[nodiscard]] std::size_t renderSonicHudReferencePolicyScene(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    SwardSuUiAssetRenderer& renderer,
+    const SonicHudScenePolicy& policy)
+{
+    std::string localSceneName;
+    const auto scene = loadSonicHudReferencePolicyScene(policy, localSceneName);
+    if (!scene)
+        return 0;
+
+    std::size_t drawnCommands = 0;
+    const std::size_t commandLimit = policy.drawableLayerCount <= 0
+        ? 0
+        : std::min<std::size_t>(scene->commands.size(), static_cast<std::size_t>(policy.drawableLayerCount));
+    for (std::size_t index = 0; index < commandLimit; ++index)
+    {
+        if (drawCsdDrawableCommand(graphics, canvas, renderer, scene->commands[index]))
+            ++drawnCommands;
+    }
+
+    return drawnCommands;
+}
+
+struct SonicHudReferenceViewerStats
+{
+    int sceneCount = 0;
+    int activeSceneCount = 0;
+    int drawableLayerCount = 0;
+    int drawnCommandCount = 0;
+};
+
+[[nodiscard]] SonicHudReferenceViewerStats renderSonicHudReferencePolicyStack(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    SwardSuUiAssetRenderer& renderer,
+    const SgfxTemplateRenderBinding* binding)
+{
+    SonicHudReferenceViewerStats stats;
+    const auto& policies = sonicHudScenePolicies();
+    stats.sceneCount = static_cast<int>(policies.size());
+
+    for (const auto& policy : policies)
+    {
+        stats.drawableLayerCount += policy.drawableLayerCount;
+        if (!shouldRenderSonicHudReferencePolicy(policy, binding))
+            continue;
+
+        ++stats.activeSceneCount;
+        stats.drawnCommandCount += static_cast<int>(renderSonicHudReferencePolicyScene(graphics, canvas, renderer, policy));
+    }
+
+    return stats;
+}
+
+void renderSonicHudReferenceViewerOverlay(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    const SgfxTemplateRenderBinding* binding,
+    const SonicHudReferenceViewerStats& stats)
+{
+    const auto& owner = sonicHudOwnerReference();
+    const auto panel = designRectToCanvas(canvas, 20, 20, 660, 82);
+    Gdiplus::SolidBrush panelFill(Gdiplus::Color(172, 4, 8, 12));
+    Gdiplus::Pen panelEdge(Gdiplus::Color(210, 80, 210, 255), std::max(1.0F, 2.0F * (canvas.Width / static_cast<float>(kDesignWidth))));
+    graphics.FillRectangle(&panelFill, panel);
+    graphics.DrawRectangle(&panelEdge, panel);
+
+    std::ostringstream title;
+    title
+        << "ui_playscreen HUD policy | phase137-ui_playscreen-policy"
+        << " | active=" << (binding ? binding->templateId : std::string_view("stage"));
+
+    std::ostringstream ownerLine;
+    ownerLine
+        << "owner=" << owner.ownerType
+        << ":hook=" << owner.ownerHook
+        << ":project=" << owner.projectName
+        << ":ready=" << owner.readyEvent;
+
+    std::ostringstream sceneLine;
+    sceneLine
+        << "compact-reference-status scenes=" << stats.sceneCount
+        << " active=" << stats.activeSceneCount
+        << " drawable_layers=" << stats.drawableLayerCount
+        << " drawn_commands=" << stats.drawnCommandCount;
+
+    drawOutlinedText(graphics, canvas, title.str(), 34, 30, 16, Gdiplus::Color(255, 245, 250, 255), Gdiplus::Color(255, 0, 0, 0));
+    drawOutlinedText(graphics, canvas, ownerLine.str(), 34, 54, 14, Gdiplus::Color(255, 210, 236, 255), Gdiplus::Color(255, 0, 0, 0));
+    drawOutlinedText(graphics, canvas, sceneLine.str(), 34, 76, 14, Gdiplus::Color(255, 220, 255, 205), Gdiplus::Color(255, 0, 0, 0));
+}
+
 void renderCsdPipelineEvidenceOverlay(
     Gdiplus::Graphics& graphics,
     const Gdiplus::RectF& canvas,
@@ -4111,11 +4253,21 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     graphics.FillRectangle(&canvasBrush, canvas);
 
     const auto* binding = renderer.selectedSgfxTemplateBinding();
-    const bool renderedCsdDrawableScene = binding
+    const bool useSonicHudReferenceViewer =
+        screen.kind == RendererScreenKind::SonicHudReferencePipeline
+        || (binding && isSonicHudReferenceViewerBinding(*binding));
+    const auto sonicHudReferenceStats = useSonicHudReferenceViewer
+        ? std::optional<SonicHudReferenceViewerStats>(renderSonicHudReferencePolicyStack(graphics, canvas, renderer, binding))
+        : std::nullopt;
+    const bool renderedCsdDrawableScene = !useSonicHudReferenceViewer && binding
         ? renderCsdDrawableScene(graphics, canvas, renderer, *binding)
         : false;
 
-    if (renderedCsdDrawableScene)
+    if (useSonicHudReferenceViewer)
+    {
+        // The Sonic HUD lane is now driven by the Phase 137 ui_playscreen scene policy stack.
+    }
+    else if (renderedCsdDrawableScene)
     {
         // The template lane is CSD draw-command driven when local scene evidence is available.
     }
@@ -4139,7 +4291,11 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
         }
     }
 
-    if (binding)
+    if (useSonicHudReferenceViewer && sonicHudReferenceStats)
+    {
+        renderSonicHudReferenceViewerOverlay(graphics, canvas, binding, *sonicHudReferenceStats);
+    }
+    else if (binding)
     {
         renderSgfxTemplatePlaceholderScreen(graphics, canvas, renderer, *binding);
         renderCsdPipelineEvidenceOverlay(graphics, canvas, *binding);
@@ -4481,6 +4637,67 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
         && inBoundsCastCount == screen.castCount
         ? 0
         : 1;
+}
+
+[[nodiscard]] int runRendererSonicHudReferencePolicySmoke()
+{
+    const auto* foundScreen = rendererScreenById("SonicHudReconstruction");
+    if (!foundScreen)
+        return 1;
+
+    const auto& owner = sonicHudOwnerReference();
+    const auto& policies = sonicHudScenePolicies();
+    int drawableLayers = 0;
+    int resolvedScenes = 0;
+    bool failed = false;
+    std::vector<std::string> descriptors;
+
+    for (const auto& policy : policies)
+    {
+        drawableLayers += policy.drawableLayerCount;
+        std::string localSceneName;
+        const auto scene = loadSonicHudReferencePolicyScene(policy, localSceneName);
+        const int commandCount = scene
+            ? static_cast<int>(std::min<std::size_t>(
+                scene->commands.size(),
+                policy.drawableLayerCount <= 0 ? 0 : static_cast<std::size_t>(policy.drawableLayerCount)))
+            : 0;
+        if (scene)
+            ++resolvedScenes;
+        if (!scene || commandCount != policy.drawableLayerCount)
+            failed = true;
+
+        const auto sample = sampleSonicHudTimeline(policy, policy.timeline.sampleFrame);
+        std::ostringstream descriptor;
+        descriptor
+            << "render_scene=" << policy.sceneName
+            << ":local_scene=" << localSceneName
+            << ":slot=" << policy.sgfxSlot
+            << ":order=" << policy.renderOrder
+            << ":commands=" << commandCount
+            << ":timeline=" << sample.animationName
+            << "@" << sample.frame
+            << "/" << sample.frameCount;
+        descriptors.push_back(descriptor.str());
+    }
+
+    std::cout
+        << "sward_su_ui_asset_renderer sonic hud reference viewer smoke ok "
+        << "screen=" << foundScreen->id
+        << ":mode=phase137-ui_playscreen-policy"
+        << " owner=" << owner.ownerType
+        << ":hook=" << owner.ownerHook
+        << ":project=" << owner.projectName
+        << " scenes=" << policies.size()
+        << ":drawable_layers=" << drawableLayers
+        << ":resolved_scenes=" << resolvedScenes
+        << '\n';
+
+    for (const auto& descriptor : descriptors)
+        std::cout << descriptor << '\n';
+
+    std::cout << "viewer_overlay=compact-reference-status:no-template-card=1\n";
+    return failed || resolvedScenes != static_cast<int>(policies.size()) ? 1 : 0;
 }
 
 [[nodiscard]] const sward::ui_runtime::SgfxTimelineBand* findTimelineBand(
@@ -7825,6 +8042,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererTitleScreenSmoke();
     if (commandLineHasFlag("--renderer-reconstructed-screen-smoke"))
         return runRendererReconstructedScreenSmoke();
+    if (commandLineHasFlag("--renderer-sonic-hud-reference-smoke"))
+        return runRendererSonicHudReferencePolicySmoke();
 
     return runRendererWindow(instance, showCommand, templateFilter);
 }

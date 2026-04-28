@@ -63,6 +63,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - a Phase 132 CSD compare renderer path where ignored local layout evidence preserves packed RGBA keyframes, Color/Gradient channels sample into real RGBA values, offscreen CSD frames render through a software ARGB quad compositor, and native BMP comparison writes full-frame plus UI-layer coverage diff BMPs
 - a Phase 133 Sonic HUD archaeology path where the compare renderer reads the latest live-bridge `sonic-hud` state, proves runtime `ui_playscreen` scene coverage, labels the local `ui_prov_playscreen.yncp` HUD renderer as a proxy while exact `ui_playscreen.yncp` remains unrecovered, and emits scene/cast coverage diagnostics beside the native BMP oracle
 - a Phase 137 hand-written Sonic HUD reference module that turns the generated `ui_playscreen` compositor export into repo-safe scene activation policy, render ordering, SGFX material slots, and timeline-player sampling code without publishing Sonic assets
+- a Phase 138 interactive Sonic HUD viewer lane where `SonicHudReconstruction` now renders from the Phase 137 `ui_playscreen` policy stack and exact local CSD draw commands, with the older large debug/template cards suppressed for Sonic HUD/tutorial
 
 Contents:
 
@@ -230,6 +231,7 @@ b/rr91/sward_su_ui_asset_renderer.exe --renderer-atlas-gallery-smoke
 b/rr91/sward_su_ui_asset_renderer.exe --sgfx-template-smoke
 b/rr91/sward_su_ui_asset_renderer.exe --template title-menu
 b/rr91/sward_su_ui_asset_renderer.exe --template loading --sgfx-template-smoke
+b/rr91/sward_su_ui_asset_renderer.exe --renderer-sonic-hud-reference-smoke
 ```
 
 The SGFX template catalog is real-runtime evidence-backed architecture, not a visual parity renderer. It emits portable screen recipes for `title-menu`, `loading`, `sonic-hud`, and `tutorial` with contract names, required JSONL/live-bridge events, layer roles, timing bands, input-lock policy, and SGFX adaptation notes. The recipes are asset-aware: local Sonic placeholder assets can be rendered in the lab, but the stable output is explicit slot bindings for custom SGFX art.
@@ -327,6 +329,8 @@ Clean asset renderer notes:
 - `--template <title-menu|loading|sonic-hud|tutorial>` starts the renderer from the SGFX recipe's Sonic placeholder-backed screen
 - `--sgfx-template-smoke` verifies the SGFX template-to-renderer bridge without opening a window
 - the Phase 123 bridge reports `placeholder_slot=` bindings and `timeline_hook=` values so custom SGFX art can replace Sonic placeholders without losing recovered timing/state evidence
+- `--renderer-sonic-hud-reference-smoke` verifies the Phase 138 interactive Sonic HUD reference viewer path without opening a window
+- Phase 138 changes the interactive `SonicHudReconstruction` lane from the old hand-built/proxy HUD card into a `phase137-ui_playscreen-policy` viewer: it iterates the `sonic_hud_reference` scene policies, loads exact local `ui_playscreen.yncp` CSD draw commands, renders scenes by recovered order, applies SGFX slot labels, suppresses the large SGFX/debug cards for Sonic HUD/tutorial, and keeps a compact owner/status overlay instead
 - `--csd-pipeline-smoke` verifies the Phase 124 local CSD-driven pipeline view without opening a window
 - the Phase 124 pipeline reads ignored local `research_uiux/data/layout_deep_analysis.json`, reports `csd_pipeline=`, `sgfx_element_map=`, and `runtime_evidence_compare=` descriptors, and keeps Sonic assets/layout evidence local-only while exposing SGFX-replaceable slots
 - `--csd-drawable-smoke` verifies the Phase 125 CSD scene/cast/subimage draw-command traversal without opening a window

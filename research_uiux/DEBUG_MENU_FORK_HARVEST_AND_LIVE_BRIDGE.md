@@ -336,6 +336,12 @@ Local-only evidence, not committed:
   - `sward_sonic_hud_reference_catalog.exe --phase137-smoke` verifies the portable policy table without loading or publishing Sonic CSD/DDS payloads
   - this is the reusable architecture lane for SGFX; native BMP/runtime captures remain the visual oracle and the legacy asset viewer still needs a follow-on wiring beat to use this exact model
 
+- `research_uiux/runtime_reference/examples/su_ui_asset_renderer.cpp`
+  - Phase 138 wires the interactive Sonic HUD viewer to the Phase 137 policy table
+  - `SonicHudReconstruction` now renders exact local `ui_playscreen.yncp` CSD scenes according to recovered scene policy/order instead of the old hand-placed proxy HUD card
+  - Sonic HUD/tutorial template launches no longer show the large SGFX placeholder/debug panels over the UI; the viewer uses a compact `phase137-ui_playscreen-policy` status overlay while native BMP/runtime captures remain the oracle
+  - `--renderer-sonic-hud-reference-smoke` verifies the viewer path and keeps the `add/u_info` scene capped to the `5` live drawable layers proven by the compositor export
+
 - `out/ui_lab_runtime_evidence/20260428_011255/`
   - focused Phase 120 `sonic-hud` live-bridge/native capture passed on the final raw-owner hook build
   - JSONL emitted `sonic-hud-owner-hooked` with `owner_fields_ready=0`, proving the raw `CHudSonicStage` owner pointer while keeping embedded CSD owner fields marked pending

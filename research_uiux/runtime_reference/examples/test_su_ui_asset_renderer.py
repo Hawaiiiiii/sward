@@ -768,6 +768,40 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("sonic_hud_reference_code_path=out/csd_runtime_exports/phase136/ui_playscreen_hud_reference.hpp", completed.stdout)
         self.assertIn("sonic_hud_compositor_manifest_path=out/csd_runtime_exports/phase136/ui_playscreen_hud_compositor.json", completed.stdout)
 
+    def test_renderer_source_wires_phase137_sonic_hud_reference_viewer(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("sonic_hud_reference.hpp", source_text)
+        self.assertIn("RendererScreenKind::SonicHudReferencePipeline", source_text)
+        self.assertIn("renderSonicHudReferencePolicyScene", source_text)
+        self.assertIn("renderSonicHudReferenceViewerOverlay", source_text)
+        self.assertIn("runRendererSonicHudReferencePolicySmoke", source_text)
+        self.assertIn("--renderer-sonic-hud-reference-smoke", source_text)
+        self.assertIn("phase137-ui_playscreen-policy", source_text)
+        self.assertIn("compact-reference-status", source_text)
+
+    def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-sonic-hud-reference-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer sonic hud reference viewer smoke ok", completed.stdout)
+        self.assertIn("screen=SonicHudReconstruction:mode=phase137-ui_playscreen-policy", completed.stdout)
+        self.assertIn("owner=CHudSonicStage:hook=sub_824D9308:project=ui_playscreen", completed.stdout)
+        self.assertIn("scenes=13:drawable_layers=167", completed.stdout)
+        self.assertIn("render_scene=so_ringenagy_gauge:local_scene=so_ringenagy_gauge:slot=energy_gauge:order=60:commands=40", completed.stdout)
+        self.assertIn("render_scene=so_speed_gauge:local_scene=so_speed_gauge:slot=speed_gauge:order=70:commands=43", completed.stdout)
+        self.assertIn("render_scene=add/u_info:local_scene=u_info:slot=prompt_strip:order=120:commands=5", completed.stdout)
+        self.assertIn("viewer_overlay=compact-reference-status:no-template-card=1", completed.stdout)
+
     def test_renderer_navigation_smoke_reports_interactive_catalog(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
