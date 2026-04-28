@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RENDERER_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "su_ui_asset_renderer.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr123" / "sward_su_ui_asset_renderer.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr124" / "sward_su_ui_asset_renderer.exe"
 
 
 class SuUiAssetRendererTests(unittest.TestCase):
@@ -114,6 +114,25 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("tutorial-hud-owner-path-ready", source_text)
         self.assertIn("placeholder_slot=", source_text)
         self.assertIn("timeline_hook=", source_text)
+
+    def test_renderer_source_exposes_csd_driven_local_pipeline_viewer(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("CsdPipelineEvidence", source_text)
+        self.assertIn("CsdPipelineSceneSummary", source_text)
+        self.assertIn("loadCsdPipelineEvidence", source_text)
+        self.assertIn("layout_deep_analysis.json", source_text)
+        self.assertIn("findRuntimeEvidenceManifestForTarget", source_text)
+        self.assertIn("renderCsdPipelineEvidenceOverlay", source_text)
+        self.assertIn("--csd-pipeline-smoke", source_text)
+        self.assertIn("csd_pipeline=", source_text)
+        self.assertIn("sgfx_element_map=", source_text)
+        self.assertIn("runtime_evidence_compare=", source_text)
+        self.assertIn("ui_mainmenu.yncp", source_text)
+        self.assertIn("ui_loading.yncp", source_text)
+        self.assertIn("ui_prov_playscreen.yncp", source_text)
+        self.assertIn("mm_bg_usual", source_text)
+        self.assertIn("pda", source_text)
+        self.assertIn("so_speed_gauge", source_text)
 
     def test_renderer_source_exposes_title_loop_reconstruction_screen(self) -> None:
         source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
@@ -278,6 +297,62 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("template=loading:screen=LoadingComposite:contract=loading_transition_reference.json:event=loading-display-active", completed.stdout)
         self.assertNotIn("template=title-menu:", completed.stdout)
         self.assertNotIn("template=sonic-hud:", completed.stdout)
+
+    def test_renderer_csd_pipeline_smoke_reports_layout_driven_screen_recipes(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--csd-pipeline-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer csd pipeline smoke ok", completed.stdout)
+        self.assertIn("layout_source=research_uiux/data/layout_deep_analysis.json", completed.stdout)
+        self.assertIn("templates=4", completed.stdout)
+        self.assertIn("packages=3", completed.stdout)
+        self.assertIn("csd_pipeline=title-menu:layout=ui_mainmenu.yncp:scene=mm_bg_usual:casts=47:subimages=46", completed.stdout)
+        self.assertIn("csd_pipeline=loading:layout=ui_loading.yncp:scene=pda:casts=57:subimages=320", completed.stdout)
+        self.assertIn("csd_pipeline=sonic-hud:layout=ui_prov_playscreen.yncp:scene=so_speed_gauge:casts=47:subimages=109", completed.stdout)
+        self.assertIn("csd_pipeline=tutorial:layout=ui_prov_playscreen.yncp:scene=info_1:casts=24:subimages=109", completed.stdout)
+        self.assertIn("textures=ui_mm_base.dds,ui_mm_parts1.dds,ui_mm_contentstext.dds", completed.stdout)
+        self.assertIn("textures=mat_comon_txt_001.dds,mat_load_comon_001.dds", completed.stdout)
+        self.assertIn("textures=ui_ps1_gauge1.dds,mat_comon_001.dds,mat_comon_num_001.dds", completed.stdout)
+        self.assertIn("timeline=mm_donut_move/DefaultAnim/220/3.666667", completed.stdout)
+        self.assertIn("timeline=pda_txt/Usual_Anim_3/240/4", completed.stdout)
+        self.assertIn("timeline=so_speed_gauge/Size_Anim/100/1.666667", completed.stdout)
+        self.assertIn("sgfx_element_map=title-menu:scene=mm_bg_usual:slot=backdrop:texture=ui_mm_base.dds", completed.stdout)
+        self.assertIn("sgfx_element_map=loading:scene=pda:slot=device_frame:texture=mat_load_comon_001.dds", completed.stdout)
+        self.assertIn("sgfx_element_map=sonic-hud:scene=so_speed_gauge:slot=speed_gauge:texture=ui_ps1_gauge1.dds", completed.stdout)
+        self.assertIn("runtime_evidence_compare=title-menu:target=title-menu:event=title-menu-visible", completed.stdout)
+        self.assertIn("runtime_evidence_compare=loading:target=loading:event=loading-display-active", completed.stdout)
+        self.assertIn("runtime_evidence_compare=sonic-hud:target=sonic-hud:event=sonic-hud-ready", completed.stdout)
+
+    def test_renderer_csd_pipeline_template_filter_reports_one_layout_recipe(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--template", "sonic-hud", "--csd-pipeline-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer csd pipeline smoke ok", completed.stdout)
+        self.assertIn("templates=1", completed.stdout)
+        self.assertIn("packages=1", completed.stdout)
+        self.assertIn("csd_pipeline=sonic-hud:layout=ui_prov_playscreen.yncp:scene=so_speed_gauge", completed.stdout)
+        self.assertNotIn("csd_pipeline=title-menu:", completed.stdout)
+        self.assertNotIn("csd_pipeline=loading:", completed.stdout)
 
     def test_renderer_navigation_smoke_reports_interactive_catalog(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

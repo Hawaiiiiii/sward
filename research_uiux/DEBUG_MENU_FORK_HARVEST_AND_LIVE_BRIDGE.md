@@ -201,6 +201,14 @@ Phase 123 wires the SGFX template catalog into the existing clean SU UI asset re
 
 The new `--sgfx-template-smoke` command proves the bridge without opening a window. It reports every template-to-renderer binding, the portable contract file, the durable readiness event, the local Sonic placeholder slots, and the first animation/timing hook from the recovered runtime template data. This is the first point where the SGFX recipes are not only described: they drive a renderer path that can show Sonic placeholders today and swap to custom SGFX art later through the same named slots.
 
+## Phase 124 CSD-Driven Local SU UI Pipeline Viewer
+
+Phase 124 moves the clean SU UI asset renderer from hand-placed placeholder-only recipes toward a local CSD-driven pipeline viewer. The renderer now reads the ignored local `research_uiux/data/layout_deep_analysis.json` evidence at runtime, resolves CSD package/scene/timeline facts for `title-menu`, `loading`, `sonic-hud`, and `tutorial`, and exposes those facts beside the SGFX slot mapping. Sonic assets and CSD evidence remain local-only placeholders; the tracked code only contains the loader, mappings, tests, and docs.
+
+The new `--csd-pipeline-smoke` command reports the real recovered layout package, primary scene, cast count, subimage count, texture list, recovered animation timing, SGFX element slots, and available runtime evidence manifest comparison. Current mappings are `ui_mainmenu.yncp/mm_bg_usual`, `ui_loading.yncp/pda`, and the local HUD proxy `ui_prov_playscreen.yncp/so_speed_gauge` plus `info_1` for tutorial. Runtime comparison remains the oracle for real `ui_playscreen` behavior; `ui_prov_playscreen` is explicitly a local extracted HUD proxy until the exact normal Sonic HUD layout package is recovered locally.
+
+The interactive renderer also overlays `csd_pipeline=`, `sgfx_element_map=`, and `runtime_evidence_compare=` lines when launched with `--template ...`, so the operator can see which visible placeholder elements come from recovered CSD evidence and which runtime event/native BMP set is being used as proof.
+
 ## Verification
 
 Local-only evidence, not committed:

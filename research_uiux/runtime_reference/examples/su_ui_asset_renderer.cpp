@@ -10,11 +10,13 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -22,6 +24,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace
@@ -105,6 +108,43 @@ struct SgfxTemplateRenderBinding
     std::string_view requiredEventId;
     std::string_view timelineBandId;
     std::string_view timelineEventLabel;
+};
+
+struct CsdPipelineSceneSummary
+{
+    std::string sceneName;
+    int castCount = 0;
+    int subimageCount = 0;
+    std::vector<std::string> textureNames;
+    double frameStart = 0.0;
+    double frameEnd = 0.0;
+};
+
+struct CsdPipelineTimelineHook
+{
+    std::string sceneName;
+    std::string animationName;
+    double frameCount = 0.0;
+    double timelineSeconds = 0.0;
+    int totalKeyframes = 0;
+};
+
+struct CsdPipelineEvidence
+{
+    std::filesystem::path sourcePath;
+    std::string layoutFileName;
+    std::vector<std::string> textureNames;
+    std::vector<CsdPipelineSceneSummary> scenes;
+    std::vector<CsdPipelineTimelineHook> timelines;
+};
+
+struct CsdPipelineTemplateBinding
+{
+    std::string_view templateId;
+    std::string_view layoutFileName;
+    std::string_view primarySceneName;
+    std::string_view timelineSceneName;
+    std::string_view timelineAnimationName;
 };
 
 inline constexpr std::array<TextureSourceCandidate, 13> kTextureSourceCandidates{{
@@ -233,6 +273,37 @@ inline constexpr std::array<SgfxTemplateRenderBinding, 4> kSgfxTemplateRenderBin
     },
 }};
 
+inline constexpr std::array<CsdPipelineTemplateBinding, 4> kCsdPipelineTemplateBindings{{
+    {
+        "title-menu",
+        "ui_mainmenu.yncp",
+        "mm_bg_usual",
+        "mm_donut_move",
+        "DefaultAnim",
+    },
+    {
+        "loading",
+        "ui_loading.yncp",
+        "pda",
+        "pda_txt",
+        "Usual_Anim_3",
+    },
+    {
+        "sonic-hud",
+        "ui_prov_playscreen.yncp",
+        "so_speed_gauge",
+        "so_speed_gauge",
+        "Size_Anim",
+    },
+    {
+        "tutorial",
+        "ui_prov_playscreen.yncp",
+        "info_1",
+        "info_1",
+        "Count_Anim",
+    },
+}};
+
 inline const std::array<SuUiRendererScreen, 8> kRendererScreens{{
     {
         "TitleLoopReconstruction",
@@ -325,6 +396,18 @@ inline const std::array<SuUiRendererScreen, 8> kRendererScreens{{
     return found == kSgfxTemplateRenderBindings.end() ? nullptr : &*found;
 }
 
+[[nodiscard]] const CsdPipelineTemplateBinding* findCsdPipelineTemplateBinding(std::string_view templateId)
+{
+    const auto found = std::find_if(
+        kCsdPipelineTemplateBindings.begin(),
+        kCsdPipelineTemplateBindings.end(),
+        [templateId](const CsdPipelineTemplateBinding& binding)
+        {
+            return binding.templateId == templateId;
+        });
+    return found == kCsdPipelineTemplateBindings.end() ? nullptr : &*found;
+}
+
 [[nodiscard]] const SuUiRendererScreen* rendererScreenById(std::string_view id)
 {
     const auto found = std::find_if(
@@ -386,6 +469,43 @@ void appendAncestorAssetRoots(std::vector<std::filesystem::path>& candidates, st
     appendAncestorAssetRoots(candidates, std::filesystem::current_path());
     appendAncestorAssetRoots(candidates, executableDirectory());
     return candidates;
+}
+
+void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std::filesystem::path start)
+{
+    std::error_code error;
+    start = std::filesystem::absolute(start, error);
+    if (error)
+        return;
+
+    for (auto current = start; !current.empty(); current = current.parent_path())
+    {
+        candidates.push_back(current);
+        if (current == current.root_path())
+            break;
+    }
+}
+
+[[nodiscard]] std::vector<std::filesystem::path> repoRootCandidates()
+{
+    std::vector<std::filesystem::path> candidates;
+    appendAncestorRepoRoots(candidates, std::filesystem::current_path());
+    appendAncestorRepoRoots(candidates, executableDirectory());
+    return candidates;
+}
+
+[[nodiscard]] std::optional<std::filesystem::path> layoutEvidencePath()
+{
+    constexpr std::string_view kLayoutEvidenceRelativePath = "research_uiux/data/layout_deep_analysis.json";
+    for (const auto& root : repoRootCandidates())
+    {
+        std::error_code error;
+        const auto path = root / std::filesystem::path(kLayoutEvidenceRelativePath);
+        if (std::filesystem::is_regular_file(path, error))
+            return path;
+    }
+
+    return std::nullopt;
 }
 
 [[nodiscard]] std::vector<std::filesystem::path> discoverAtlasSheetPaths()
@@ -510,6 +630,459 @@ void appendAncestorAssetRoots(std::vector<std::filesystem::path>& candidates, st
     bitmap.reset();
     Gdiplus::GdiplusShutdown(gdiplusToken);
     return loaded;
+}
+
+[[nodiscard]] std::string readTextFile(const std::filesystem::path& path)
+{
+    std::ifstream file(path, std::ios::binary);
+    if (!file)
+        return {};
+
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+[[nodiscard]] std::size_t skipJsonWhitespace(std::string_view text, std::size_t offset)
+{
+    while (offset < text.size() && std::isspace(static_cast<unsigned char>(text[offset])))
+        ++offset;
+    return offset;
+}
+
+[[nodiscard]] std::optional<std::size_t> matchJsonContainer(
+    std::string_view text,
+    std::size_t openOffset,
+    char openChar,
+    char closeChar)
+{
+    if (openOffset >= text.size() || text[openOffset] != openChar)
+        return std::nullopt;
+
+    bool inString = false;
+    bool escaped = false;
+    int depth = 0;
+    for (std::size_t index = openOffset; index < text.size(); ++index)
+    {
+        const char ch = text[index];
+        if (inString)
+        {
+            if (escaped)
+            {
+                escaped = false;
+            }
+            else if (ch == '\\')
+            {
+                escaped = true;
+            }
+            else if (ch == '"')
+            {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (ch == '"')
+        {
+            inString = true;
+            continue;
+        }
+
+        if (ch == openChar)
+            ++depth;
+        else if (ch == closeChar)
+        {
+            --depth;
+            if (depth == 0)
+                return index;
+        }
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<std::string> parseJsonStringAt(std::string_view text, std::size_t offset)
+{
+    if (offset >= text.size() || text[offset] != '"')
+        return std::nullopt;
+
+    std::string value;
+    bool escaped = false;
+    for (std::size_t index = offset + 1; index < text.size(); ++index)
+    {
+        const char ch = text[index];
+        if (escaped)
+        {
+            switch (ch)
+            {
+            case '"': value.push_back('"'); break;
+            case '\\': value.push_back('\\'); break;
+            case '/': value.push_back('/'); break;
+            case 'b': value.push_back('\b'); break;
+            case 'f': value.push_back('\f'); break;
+            case 'n': value.push_back('\n'); break;
+            case 'r': value.push_back('\r'); break;
+            case 't': value.push_back('\t'); break;
+            default: value.push_back(ch); break;
+            }
+            escaped = false;
+            continue;
+        }
+
+        if (ch == '\\')
+        {
+            escaped = true;
+            continue;
+        }
+
+        if (ch == '"')
+            return value;
+
+        value.push_back(ch);
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<std::size_t> findJsonFieldValueOffset(std::string_view text, std::string_view fieldName)
+{
+    const std::string needle = "\"" + std::string(fieldName) + "\"";
+    const auto fieldOffset = text.find(needle);
+    if (fieldOffset == std::string_view::npos)
+        return std::nullopt;
+
+    const auto colonOffset = text.find(':', fieldOffset + needle.size());
+    if (colonOffset == std::string_view::npos)
+        return std::nullopt;
+
+    return skipJsonWhitespace(text, colonOffset + 1);
+}
+
+[[nodiscard]] std::optional<std::string> jsonStringField(std::string_view text, std::string_view fieldName)
+{
+    const auto valueOffset = findJsonFieldValueOffset(text, fieldName);
+    if (!valueOffset)
+        return std::nullopt;
+    return parseJsonStringAt(text, *valueOffset);
+}
+
+[[nodiscard]] std::optional<double> jsonNumberField(std::string_view text, std::string_view fieldName)
+{
+    const auto valueOffset = findJsonFieldValueOffset(text, fieldName);
+    if (!valueOffset)
+        return std::nullopt;
+
+    std::size_t endOffset = *valueOffset;
+    while (endOffset < text.size())
+    {
+        const char ch = text[endOffset];
+        if (!(std::isdigit(static_cast<unsigned char>(ch)) || ch == '-' || ch == '+' || ch == '.' || ch == 'e' || ch == 'E'))
+            break;
+        ++endOffset;
+    }
+
+    if (endOffset == *valueOffset)
+        return std::nullopt;
+
+    try
+    {
+        return std::stod(std::string(text.substr(*valueOffset, endOffset - *valueOffset)));
+    }
+    catch (...)
+    {
+        return std::nullopt;
+    }
+}
+
+[[nodiscard]] std::optional<std::string_view> jsonArrayFieldSpan(std::string_view text, std::string_view fieldName)
+{
+    const auto valueOffset = findJsonFieldValueOffset(text, fieldName);
+    if (!valueOffset || *valueOffset >= text.size() || text[*valueOffset] != '[')
+        return std::nullopt;
+
+    const auto endOffset = matchJsonContainer(text, *valueOffset, '[', ']');
+    if (!endOffset)
+        return std::nullopt;
+
+    return text.substr(*valueOffset, (*endOffset - *valueOffset) + 1);
+}
+
+[[nodiscard]] std::vector<std::string> parseJsonStringArray(std::string_view arraySpan)
+{
+    std::vector<std::string> values;
+    bool inString = false;
+    bool escaped = false;
+    for (std::size_t index = 0; index < arraySpan.size(); ++index)
+    {
+        const char ch = arraySpan[index];
+        if (inString)
+        {
+            if (escaped)
+                escaped = false;
+            else if (ch == '\\')
+                escaped = true;
+            else if (ch == '"')
+                inString = false;
+            continue;
+        }
+
+        if (ch == '"')
+        {
+            if (const auto value = parseJsonStringAt(arraySpan, index))
+                values.push_back(*value);
+            inString = true;
+        }
+    }
+
+    return values;
+}
+
+[[nodiscard]] std::vector<std::string_view> jsonObjectSpansInArray(std::string_view arraySpan)
+{
+    std::vector<std::string_view> spans;
+    bool inString = false;
+    bool escaped = false;
+    for (std::size_t index = 0; index < arraySpan.size(); ++index)
+    {
+        const char ch = arraySpan[index];
+        if (inString)
+        {
+            if (escaped)
+                escaped = false;
+            else if (ch == '\\')
+                escaped = true;
+            else if (ch == '"')
+                inString = false;
+            continue;
+        }
+
+        if (ch == '"')
+        {
+            inString = true;
+            continue;
+        }
+
+        if (ch != '{')
+            continue;
+
+        const auto endOffset = matchJsonContainer(arraySpan, index, '{', '}');
+        if (!endOffset)
+            break;
+
+        spans.push_back(arraySpan.substr(index, (*endOffset - index) + 1));
+        index = *endOffset;
+    }
+
+    return spans;
+}
+
+[[nodiscard]] CsdPipelineSceneSummary parseCsdPipelineSceneSummary(std::string_view objectSpan)
+{
+    CsdPipelineSceneSummary summary;
+    summary.sceneName = jsonStringField(objectSpan, "scene_name").value_or("");
+    summary.castCount = static_cast<int>(jsonNumberField(objectSpan, "cast_count").value_or(0.0));
+    summary.subimageCount = static_cast<int>(jsonNumberField(objectSpan, "subimage_count").value_or(0.0));
+
+    if (const auto textures = jsonArrayFieldSpan(objectSpan, "used_texture_names"))
+        summary.textureNames = parseJsonStringArray(*textures);
+
+    if (const auto frameRange = jsonArrayFieldSpan(objectSpan, "frame_count_range"))
+    {
+        std::vector<double> values;
+        std::size_t offset = 0;
+        while (offset < frameRange->size())
+        {
+            if (!(std::isdigit(static_cast<unsigned char>((*frameRange)[offset])) || (*frameRange)[offset] == '-'))
+            {
+                ++offset;
+                continue;
+            }
+
+            std::size_t endOffset = offset + 1;
+            while (endOffset < frameRange->size())
+            {
+                const char ch = (*frameRange)[endOffset];
+                if (!(std::isdigit(static_cast<unsigned char>(ch)) || ch == '.' || ch == 'e' || ch == 'E' || ch == '+' || ch == '-'))
+                    break;
+                ++endOffset;
+            }
+            values.push_back(std::stod(std::string(frameRange->substr(offset, endOffset - offset))));
+            offset = endOffset;
+        }
+
+        if (!values.empty())
+            summary.frameStart = values.front();
+        if (values.size() > 1)
+            summary.frameEnd = values[1];
+    }
+
+    return summary;
+}
+
+[[nodiscard]] CsdPipelineTimelineHook parseCsdPipelineTimelineHook(std::string_view objectSpan)
+{
+    CsdPipelineTimelineHook hook;
+    hook.sceneName = jsonStringField(objectSpan, "scene_name").value_or("");
+    hook.animationName = jsonStringField(objectSpan, "animation_name").value_or("");
+    hook.frameCount = jsonNumberField(objectSpan, "frame_count").value_or(0.0);
+    hook.timelineSeconds = jsonNumberField(objectSpan, "timeline_seconds").value_or(0.0);
+    hook.totalKeyframes = static_cast<int>(jsonNumberField(objectSpan, "total_keyframes").value_or(0.0));
+    return hook;
+}
+
+[[nodiscard]] std::optional<CsdPipelineEvidence> loadCsdPipelineEvidence(std::string_view layoutFileName)
+{
+    const auto evidencePath = layoutEvidencePath();
+    if (!evidencePath)
+        return std::nullopt;
+
+    const std::string document = readTextFile(*evidencePath);
+    if (document.empty())
+        return std::nullopt;
+
+    const auto digestsSpan = jsonArrayFieldSpan(document, "digests");
+    if (!digestsSpan)
+        return std::nullopt;
+
+    std::optional<std::string_view> digestObjectSpan;
+    for (const auto objectSpan : jsonObjectSpansInArray(*digestsSpan))
+    {
+        if (jsonStringField(objectSpan, "file_name").value_or("") == layoutFileName)
+        {
+            digestObjectSpan = objectSpan;
+            break;
+        }
+    }
+
+    if (!digestObjectSpan)
+        return std::nullopt;
+
+    const auto objectSpan = *digestObjectSpan;
+    CsdPipelineEvidence evidence;
+    evidence.sourcePath = *evidencePath;
+    evidence.layoutFileName = jsonStringField(objectSpan, "file_name").value_or(std::string(layoutFileName));
+
+    if (const auto textures = jsonArrayFieldSpan(objectSpan, "texture_names"))
+        evidence.textureNames = parseJsonStringArray(*textures);
+
+    if (const auto scenes = jsonArrayFieldSpan(objectSpan, "scene_summaries"))
+    {
+        for (const auto sceneObject : jsonObjectSpansInArray(*scenes))
+            evidence.scenes.push_back(parseCsdPipelineSceneSummary(sceneObject));
+    }
+
+    if (const auto timelines = jsonArrayFieldSpan(objectSpan, "longest_animations"))
+    {
+        for (const auto timelineObject : jsonObjectSpansInArray(*timelines))
+            evidence.timelines.push_back(parseCsdPipelineTimelineHook(timelineObject));
+    }
+
+    return evidence;
+}
+
+[[nodiscard]] const CsdPipelineSceneSummary* findCsdPipelineScene(
+    const CsdPipelineEvidence& evidence,
+    std::string_view sceneName)
+{
+    const auto found = std::find_if(
+        evidence.scenes.begin(),
+        evidence.scenes.end(),
+        [sceneName](const CsdPipelineSceneSummary& scene)
+        {
+            return scene.sceneName == sceneName;
+        });
+    return found == evidence.scenes.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] const CsdPipelineTimelineHook* findCsdPipelineTimelineHook(
+    const CsdPipelineEvidence& evidence,
+    std::string_view sceneName,
+    std::string_view animationName)
+{
+    const auto found = std::find_if(
+        evidence.timelines.begin(),
+        evidence.timelines.end(),
+        [sceneName, animationName](const CsdPipelineTimelineHook& hook)
+        {
+            return hook.sceneName == sceneName && hook.animationName == animationName;
+        });
+    return found == evidence.timelines.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] std::string joinStrings(const std::vector<std::string>& values, std::size_t limit = 0)
+{
+    std::ostringstream joined;
+    const std::size_t count = limit == 0 ? values.size() : std::min(limit, values.size());
+    for (std::size_t index = 0; index < count; ++index)
+    {
+        if (index != 0)
+            joined << ",";
+        joined << values[index];
+    }
+    return joined.str();
+}
+
+[[nodiscard]] std::optional<std::filesystem::path> findRuntimeEvidenceManifestForTarget(std::string_view target)
+{
+    auto manifestMatchesTarget = [target](const std::filesystem::path& manifest)
+    {
+        const std::string text = readTextFile(manifest);
+        if (text.empty())
+            return false;
+        const std::string fieldNeedle = "\"target\"";
+        const std::string valueNeedle = "\"" + std::string(target) + "\"";
+        std::size_t offset = 0;
+        while ((offset = text.find(fieldNeedle, offset)) != std::string::npos)
+        {
+            const auto colonOffset = text.find(':', offset + fieldNeedle.size());
+            if (colonOffset == std::string::npos)
+                return false;
+            const auto nextFieldOffset = text.find('"', colonOffset + 1);
+            if (nextFieldOffset != std::string::npos && text.compare(nextFieldOffset, valueNeedle.size(), valueNeedle) == 0)
+                return true;
+            offset = colonOffset + 1;
+        }
+        return false;
+    };
+
+    std::optional<std::filesystem::path> bestManifest;
+    std::string bestSessionName;
+    for (const auto& root : repoRootCandidates())
+    {
+        std::error_code error;
+        const auto evidenceRoot = root / "out" / "ui_lab_runtime_evidence";
+        if (!std::filesystem::is_directory(evidenceRoot, error))
+            continue;
+
+        for (const auto& session : std::filesystem::directory_iterator(evidenceRoot, error))
+        {
+            if (error)
+                break;
+            if (!session.is_directory(error))
+                continue;
+
+            const auto sessionName = session.path().filename().string();
+            const auto targetManifest = session.path() / std::filesystem::path(std::string(target)) / "capture_manifest.json";
+            const auto rootManifest = session.path() / "capture_manifest.json";
+
+            std::optional<std::filesystem::path> manifest;
+            if (std::filesystem::is_regular_file(targetManifest, error))
+                manifest = targetManifest;
+            else if (std::filesystem::is_regular_file(rootManifest, error) && manifestMatchesTarget(rootManifest))
+                manifest = rootManifest;
+
+            if (!manifest)
+                continue;
+
+            if (!bestManifest || sessionName > bestSessionName)
+            {
+                bestManifest = *manifest;
+                bestSessionName = sessionName;
+            }
+        }
+    }
+
+    return bestManifest;
 }
 
 [[nodiscard]] std::uint16_t readLe16(const std::uint8_t* data)
@@ -1422,6 +1995,97 @@ void renderSgfxTemplatePlaceholderScreen(
     }
 }
 
+[[nodiscard]] std::string formatCsdNumber(double value);
+
+[[nodiscard]] const CsdPipelineEvidence* cachedCsdPipelineEvidence(std::string_view layoutFileName)
+{
+    static std::vector<std::pair<std::string, std::optional<CsdPipelineEvidence>>> cache;
+    const auto found = std::find_if(
+        cache.begin(),
+        cache.end(),
+        [layoutFileName](const std::pair<std::string, std::optional<CsdPipelineEvidence>>& entry)
+        {
+            return entry.first == layoutFileName;
+        });
+    if (found != cache.end())
+        return found->second ? &*found->second : nullptr;
+
+    cache.emplace_back(std::string(layoutFileName), loadCsdPipelineEvidence(layoutFileName));
+    return cache.back().second ? &*cache.back().second : nullptr;
+}
+
+void renderCsdPipelineEvidenceOverlay(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    const SgfxTemplateRenderBinding& sgfxBinding)
+{
+    const auto* csdBinding = findCsdPipelineTemplateBinding(sgfxBinding.templateId);
+    if (!csdBinding)
+        return;
+
+    const auto* evidence = cachedCsdPipelineEvidence(csdBinding->layoutFileName);
+    const auto* scene = evidence ? findCsdPipelineScene(*evidence, csdBinding->primarySceneName) : nullptr;
+    const auto* timeline = evidence ? findCsdPipelineTimelineHook(*evidence, csdBinding->timelineSceneName, csdBinding->timelineAnimationName) : nullptr;
+    const auto manifest = findRuntimeEvidenceManifestForTarget(csdBinding->templateId);
+
+    const auto panel = designRectToCanvas(canvas, 24, 226, 720, 142);
+    Gdiplus::SolidBrush panelFill(Gdiplus::Color(205, 12, 8, 22));
+    Gdiplus::Pen panelEdge(Gdiplus::Color(230, 170, 230, 120), std::max(1.0F, 2.0F * (canvas.Width / static_cast<float>(kDesignWidth))));
+    graphics.FillRectangle(&panelFill, panel);
+    graphics.DrawRectangle(&panelEdge, panel);
+
+    std::ostringstream pipeline;
+    pipeline
+        << "csd_pipeline="
+        << csdBinding->templateId
+        << ":layout="
+        << csdBinding->layoutFileName
+        << ":scene="
+        << csdBinding->primarySceneName
+        << ":casts="
+        << (scene ? scene->castCount : 0)
+        << ":subimages="
+        << (scene ? scene->subimageCount : 0);
+
+    std::ostringstream timelineText;
+    timelineText
+        << "timeline="
+        << (timeline ? timeline->sceneName : std::string(csdBinding->timelineSceneName))
+        << "/"
+        << (timeline ? timeline->animationName : std::string(csdBinding->timelineAnimationName))
+        << "/"
+        << (timeline ? formatCsdNumber(timeline->frameCount) : "0")
+        << "/"
+        << (timeline ? formatCsdNumber(timeline->timelineSeconds) : "0");
+
+    std::ostringstream map;
+    map
+        << "sgfx_element_map="
+        << csdBinding->templateId
+        << ":scene="
+        << csdBinding->primarySceneName
+        << ":slot="
+        << (sgfxBinding.slotCount > 0 ? sgfxBinding.slots[0].slotName : std::string_view("none"))
+        << ":texture="
+        << (sgfxBinding.slotCount > 0 ? sgfxBinding.slots[0].textureName : std::string_view("none"));
+
+    std::ostringstream comparison;
+    comparison
+        << "runtime_evidence_compare="
+        << csdBinding->templateId
+        << ":target="
+        << csdBinding->templateId
+        << ":event="
+        << sgfxBinding.requiredEventId
+        << ":manifest="
+        << (manifest ? "found" : "missing");
+
+    drawOutlinedText(graphics, canvas, pipeline.str(), 42, 242, 16, Gdiplus::Color(255, 248, 255, 238), Gdiplus::Color(255, 0, 0, 0));
+    drawOutlinedText(graphics, canvas, timelineText.str(), 42, 270, 15, Gdiplus::Color(255, 222, 255, 205), Gdiplus::Color(255, 0, 0, 0));
+    drawOutlinedText(graphics, canvas, map.str(), 42, 298, 15, Gdiplus::Color(255, 224, 236, 255), Gdiplus::Color(255, 0, 0, 0));
+    drawOutlinedText(graphics, canvas, comparison.str(), 42, 326, 15, Gdiplus::Color(255, 255, 224, 210), Gdiplus::Color(255, 0, 0, 0));
+}
+
 void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 {
     RECT client{};
@@ -1467,6 +2131,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     if (const auto* binding = renderer.selectedSgfxTemplateBinding())
     {
         renderSgfxTemplatePlaceholderScreen(graphics, canvas, renderer, *binding);
+        renderCsdPipelineEvidenceOverlay(graphics, canvas, *binding);
     }
 }
 
@@ -1905,6 +2570,149 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return failed || templateCount == 0 || templateCount != bindingCount ? 1 : 0;
 }
 
+[[nodiscard]] std::string formatCsdNumber(double value)
+{
+    if (std::fabs(value - std::round(value)) < 0.000001)
+    {
+        std::ostringstream integer;
+        integer << static_cast<long long>(std::llround(value));
+        return integer.str();
+    }
+
+    std::ostringstream formatted;
+    formatted << std::fixed << std::setprecision(6) << value;
+    return formatted.str();
+}
+
+[[nodiscard]] int runCsdPipelineSmoke(const std::optional<std::string>& templateFilter)
+{
+    std::size_t templateCount = 0;
+    bool failed = false;
+    std::vector<std::string> uniquePackages;
+    std::vector<std::pair<std::string, CsdPipelineEvidence>> loadedEvidence;
+    std::vector<std::string> descriptors;
+
+    auto evidenceFor = [&loadedEvidence](std::string_view layoutFileName) -> const CsdPipelineEvidence*
+    {
+        const auto found = std::find_if(
+            loadedEvidence.begin(),
+            loadedEvidence.end(),
+            [layoutFileName](const std::pair<std::string, CsdPipelineEvidence>& entry)
+            {
+                return entry.first == layoutFileName;
+            });
+        if (found != loadedEvidence.end())
+            return &found->second;
+
+        const auto evidence = loadCsdPipelineEvidence(layoutFileName);
+        if (!evidence)
+            return nullptr;
+
+        loadedEvidence.emplace_back(std::string(layoutFileName), *evidence);
+        return &loadedEvidence.back().second;
+    };
+
+    for (const auto& csdBinding : kCsdPipelineTemplateBindings)
+    {
+        if (templateFilter && csdBinding.templateId != *templateFilter)
+            continue;
+
+        ++templateCount;
+        if (std::find(uniquePackages.begin(), uniquePackages.end(), csdBinding.layoutFileName) == uniquePackages.end())
+            uniquePackages.emplace_back(csdBinding.layoutFileName);
+
+        const auto* evidence = evidenceFor(csdBinding.layoutFileName);
+        const auto* sgfxBinding = findSgfxTemplateRenderBinding(csdBinding.templateId);
+        if (!evidence || !sgfxBinding)
+        {
+            failed = true;
+            continue;
+        }
+
+        const auto* scene = findCsdPipelineScene(*evidence, csdBinding.primarySceneName);
+        const auto* timeline = findCsdPipelineTimelineHook(*evidence, csdBinding.timelineSceneName, csdBinding.timelineAnimationName);
+        if (!scene || !timeline)
+            failed = true;
+
+        std::ostringstream pipelineDescriptor;
+        pipelineDescriptor
+            << "csd_pipeline="
+            << csdBinding.templateId
+            << ":layout="
+            << csdBinding.layoutFileName
+            << ":scene="
+            << csdBinding.primarySceneName
+            << ":casts="
+            << (scene ? scene->castCount : 0)
+            << ":subimages="
+            << (scene ? scene->subimageCount : 0)
+            << ":textures="
+            << joinStrings(evidence->textureNames);
+        descriptors.push_back(pipelineDescriptor.str());
+
+        if (timeline)
+        {
+            std::ostringstream timelineDescriptor;
+            timelineDescriptor
+                << "timeline="
+                << timeline->sceneName
+                << "/"
+                << timeline->animationName
+                << "/"
+                << formatCsdNumber(timeline->frameCount)
+                << "/"
+                << formatCsdNumber(timeline->timelineSeconds)
+                << ":keyframes="
+                << timeline->totalKeyframes;
+            descriptors.push_back(timelineDescriptor.str());
+        }
+
+        for (std::size_t index = 0; index < sgfxBinding->slotCount; ++index)
+        {
+            const auto& slot = sgfxBinding->slots[index];
+            std::ostringstream mapDescriptor;
+            mapDescriptor
+                << "sgfx_element_map="
+                << csdBinding.templateId
+                << ":scene="
+                << csdBinding.primarySceneName
+                << ":slot="
+                << slot.slotName
+                << ":texture="
+                << slot.textureName;
+            descriptors.push_back(mapDescriptor.str());
+        }
+
+        const auto manifest = findRuntimeEvidenceManifestForTarget(csdBinding.templateId);
+        std::ostringstream evidenceDescriptor;
+        evidenceDescriptor
+            << "runtime_evidence_compare="
+            << csdBinding.templateId
+            << ":target="
+            << csdBinding.templateId
+            << ":event="
+            << sgfxBinding->requiredEventId
+            << ":manifest="
+            << (manifest ? "found" : "missing");
+        descriptors.push_back(evidenceDescriptor.str());
+    }
+
+    if (templateFilter && templateCount == 0)
+        failed = true;
+
+    std::cout
+        << "sward_su_ui_asset_renderer csd pipeline smoke ok "
+        << "layout_source=research_uiux/data/layout_deep_analysis.json "
+        << "templates=" << templateCount
+        << " packages=" << uniquePackages.size()
+        << '\n';
+
+    for (const auto& descriptor : descriptors)
+        std::cout << descriptor << '\n';
+
+    return failed || templateCount == 0 ? 1 : 0;
+}
+
 [[nodiscard]] std::vector<std::string> commandLineTokens()
 {
     std::vector<std::string> tokens;
@@ -2000,6 +2808,8 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
 {
     const auto templateFilter = commandLineValueAfter("--template");
+    if (commandLineHasFlag("--csd-pipeline-smoke"))
+        return runCsdPipelineSmoke(templateFilter);
     if (commandLineHasFlag("--sgfx-template-smoke"))
         return runSgfxTemplateSmoke(templateFilter);
     if (commandLineHasFlag("--renderer-smoke"))

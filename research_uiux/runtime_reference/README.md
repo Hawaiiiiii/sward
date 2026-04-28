@@ -315,6 +315,9 @@ Clean asset renderer notes:
 - `--template <title-menu|loading|sonic-hud|tutorial>` starts the renderer from the SGFX recipe's Sonic placeholder-backed screen
 - `--sgfx-template-smoke` verifies the SGFX template-to-renderer bridge without opening a window
 - the Phase 123 bridge reports `placeholder_slot=` bindings and `timeline_hook=` values so custom SGFX art can replace Sonic placeholders without losing recovered timing/state evidence
+- `--csd-pipeline-smoke` verifies the Phase 124 local CSD-driven pipeline view without opening a window
+- the Phase 124 pipeline reads ignored local `research_uiux/data/layout_deep_analysis.json`, reports `csd_pipeline=`, `sgfx_element_map=`, and `runtime_evidence_compare=` descriptors, and keeps Sonic assets/layout evidence local-only while exposing SGFX-replaceable slots
+- current CSD-driven mappings use `ui_mainmenu.yncp/mm_bg_usual`, `ui_loading.yncp/pda`, and the local HUD proxy `ui_prov_playscreen.yncp/so_speed_gauge` plus `info_1`; real runtime/native evidence remains the comparison oracle
 - it opens a native `1280x720` design canvas below `Prev` / `Next` / `Atlas Prev` / `Atlas Next` / screen-label navigation controls
 - it starts on `VisualAtlasGallery`, which discovers ignored local `extracted_assets/visual_atlas/sheets/*.png` files at runtime
 - `Left`, `Right`, and `Space` cycle the current seed screen samples; `Esc` exits
