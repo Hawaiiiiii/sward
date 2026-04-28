@@ -208,6 +208,21 @@ struct FrontendLiveStateAlignmentEvidence
     FrontendLiveBridgeProbeResult bridgeProbe;
 };
 
+struct FrontendUiOracleEvidence
+{
+    bool found = false;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string target;
+    std::string activeProject;
+    std::string runtimeDrawListStatus = "missing";
+    int sceneCount = 0;
+    int layerCount = 0;
+    std::vector<std::string> activeScenes;
+    std::filesystem::path liveStatePath;
+    FrontendLiveBridgeProbeResult bridgeProbe;
+};
+
 struct CsdColorRgba
 {
     std::uint8_t r = 255;
@@ -670,12 +685,21 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] std::filesystem::path repoRootForOutput();
 [[nodiscard]] std::optional<std::filesystem::path> findLatestFrontendLiveStatePath(std::string_view target);
 [[nodiscard]] std::string discoverFrontendLiveBridgeName(std::string_view target);
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeCommand(
+    std::string_view pipeName,
+    std::string_view command,
+    DWORD timeoutMilliseconds = 150);
 [[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeState(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds = 150);
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeUiOracle(
     std::string_view pipeName,
     DWORD timeoutMilliseconds = 150);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveBridge(
+    const sward::ui_runtime::FrontendScreenPolicy& policy);
+[[nodiscard]] FrontendUiOracleEvidence loadFrontendUiOracleEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] std::string formatFrontendRuntimeAlignmentEvidence(const FrontendLiveStateAlignmentEvidence& evidence);
 
@@ -5336,6 +5360,65 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return lanes.empty() ? 1 : 0;
 }
 
+[[nodiscard]] int runRendererUiOracleSmoke()
+{
+    constexpr std::string_view directProbeToken = "ui_oracle_probe=direct-ui-oracle";
+    constexpr std::string_view stateProbeToken = "ui_oracle_probe=state-fallback";
+    constexpr std::string_view snapshotProbeToken = "ui_oracle_probe=snapshot-fallback";
+
+    std::vector<std::pair<std::string, FrontendUiOracleEvidence>> oracleEvidence;
+    for (const auto& policy : frontendScreenPolicies())
+        oracleEvidence.emplace_back(policy.screenId, loadFrontendUiOracleEvidence(policy));
+
+    const bool anyDirect = std::any_of(
+        oracleEvidence.begin(),
+        oracleEvidence.end(),
+        [](const auto& entry)
+        {
+            return entry.second.probe == "direct-ui-oracle";
+        });
+    const bool anyState = std::any_of(
+        oracleEvidence.begin(),
+        oracleEvidence.end(),
+        [](const auto& entry)
+        {
+            return entry.second.probe == "state-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer ui oracle smoke ok "
+        << "mode=phase145-ui-only-oracle"
+        << " " << (anyDirect ? directProbeToken : (anyState ? stateProbeToken : snapshotProbeToken))
+        << " lanes=" << oracleEvidence.size()
+        << '\n';
+
+    for (const auto& [laneId, evidence] : oracleEvidence)
+    {
+        std::cout
+            << "ui_oracle=" << laneId
+            << ":source=" << evidence.source
+            << ":project=" << evidence.activeProject
+            << ":scenes=" << evidence.sceneCount
+            << ":layers=" << evidence.layerCount
+            << ":draw_list_status=" << evidence.runtimeDrawListStatus
+            << '\n';
+        std::cout
+            << "active_scenes=" << laneId << ":"
+            << (evidence.activeScenes.empty() ? std::string("none") : joinStrings(evidence.activeScenes))
+            << '\n';
+        std::cout
+            << "ui_oracle_bridge=" << laneId
+            << ":pipe=" << (evidence.bridgeProbe.pipeName.empty() ? std::string("sward_ui_lab_live") : evidence.bridgeProbe.pipeName)
+            << ":connected=" << (evidence.bridgeProbe.connected ? 1 : 0)
+            << ":command=" << evidence.bridgeProbe.command;
+        if (!evidence.bridgeProbe.error.empty())
+            std::cout << ":error=" << evidence.bridgeProbe.error;
+        std::cout << '\n';
+    }
+
+    return oracleEvidence.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -7396,22 +7479,23 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return std::string(defaultPipeName);
 }
 
-[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeState(
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeCommand(
     std::string_view pipeName,
+    std::string_view commandText,
     DWORD timeoutMilliseconds)
 {
     FrontendLiveBridgeProbeResult result;
     result.attempted = true;
     result.pipeName = pipeName.empty() ? "sward_ui_lab_live" : std::string(pipeName);
+    result.command = commandText.empty() ? "state" : std::string(commandText);
 
     const std::string pipePath = "\\\\.\\pipe\\" + result.pipeName;
     std::vector<char> response(1024 * 1024, '\0');
     DWORD bytesRead = 0;
-    char command[] = "state";
     const BOOL ok = CallNamedPipeA(
         pipePath.c_str(),
-        command,
-        static_cast<DWORD>(std::strlen(command)),
+        result.command.data(),
+        static_cast<DWORD>(result.command.size()),
         response.data(),
         static_cast<DWORD>(response.size() - 1),
         &bytesRead,
@@ -7433,6 +7517,20 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
         result.error = "empty-response";
 
     return result;
+}
+
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeState(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds)
+{
+    return queryUiLabLiveBridgeCommand(pipeName, "state", timeoutMilliseconds);
+}
+
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeUiOracle(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds)
+{
+    return queryUiLabLiveBridgeCommand(pipeName, "ui-oracle", timeoutMilliseconds);
 }
 
 [[nodiscard]] std::string frontendAlignmentCursorOwnerFromLiveState(
@@ -7619,6 +7717,149 @@ void applyFrontendRuntimeAlignmentFromLiveStateJson(
         probe.error = "target-mismatch-" + *responseTarget;
     probe.fallbackSource = fallback.fallbackSource;
     fallback.bridgeProbe = probe;
+    return fallback;
+}
+
+void applyFrontendUiOracleFromUiOracleJson(
+    FrontendUiOracleEvidence& evidence,
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    std::string_view text,
+    std::string_view source)
+{
+    evidence.found = true;
+    evidence.source = std::string(source);
+    evidence.target = jsonStringField(text, "target").value_or(policy.screenId);
+    evidence.runtimeDrawListStatus = jsonStringField(text, "runtimeDrawListStatus")
+        .value_or("runtime CSD tree; GPU draw-list pending");
+
+    if (const auto activeScenes = jsonArrayFieldSpan(text, "activeScenes"))
+        evidence.activeScenes = parseJsonStringArray(*activeScenes);
+
+    if (const auto oracle = jsonObjectFieldSpan(text, "uiLayerOracle"))
+    {
+        evidence.activeProject = jsonStringField(*oracle, "activeProject")
+            .value_or(jsonStringField(*oracle, "targetProject").value_or(""));
+        evidence.sceneCount = static_cast<int>(jsonNumberField(*oracle, "sceneCount").value_or(0.0));
+        evidence.layerCount = static_cast<int>(jsonNumberField(*oracle, "layerCount").value_or(0.0));
+        evidence.runtimeDrawListStatus = jsonStringField(*oracle, "runtimeDrawListStatus")
+            .value_or(evidence.runtimeDrawListStatus);
+
+        if (evidence.activeScenes.empty())
+        {
+            if (const auto scenes = jsonArrayFieldSpan(*oracle, "scenes"))
+            {
+                for (const auto sceneObject : jsonObjectSpansInArray(*scenes))
+                {
+                    const auto path = jsonStringField(sceneObject, "path");
+                    if (path && !path->empty())
+                        evidence.activeScenes.push_back(*path);
+                }
+            }
+        }
+    }
+
+    if (evidence.activeProject.empty())
+        evidence.activeProject = policy.layoutName;
+}
+
+void applyFrontendUiOracleFromLiveStateJson(
+    FrontendUiOracleEvidence& evidence,
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    std::string_view text,
+    std::string_view source)
+{
+    evidence.found = true;
+    evidence.source = std::string(source);
+    evidence.target = jsonStringField(text, "target").value_or(policy.screenId);
+    evidence.runtimeDrawListStatus = "runtime CSD tree; GPU draw-list pending";
+
+    if (const auto typedInspectors = jsonObjectFieldSpan(text, "typedInspectors"))
+    {
+        if (const auto tree = jsonObjectFieldSpan(*typedInspectors, "csdProjectTree"))
+        {
+            evidence.activeProject = jsonStringField(*tree, "activeProject")
+                .value_or(jsonStringField(*tree, "targetProject").value_or(""));
+            evidence.sceneCount = static_cast<int>(jsonNumberField(*tree, "sceneCount").value_or(0.0));
+            evidence.layerCount = static_cast<int>(jsonNumberField(*tree, "layerCount").value_or(0.0));
+
+            if (const auto scenes = jsonArrayFieldSpan(*tree, "scenes"))
+            {
+                for (const auto sceneObject : jsonObjectSpansInArray(*scenes))
+                {
+                    const auto path = jsonStringField(sceneObject, "path");
+                    if (path && !path->empty())
+                        evidence.activeScenes.push_back(*path);
+                }
+            }
+        }
+    }
+
+    if (evidence.activeProject.empty())
+        evidence.activeProject = policy.layoutName;
+}
+
+[[nodiscard]] FrontendUiOracleEvidence loadFrontendUiOracleEvidence(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    constexpr std::string_view defaultPipeName = "sward_ui_lab_live";
+    const auto discoveredPipeName = discoverFrontendLiveBridgeName(policy.screenId);
+    auto oracleProbe = queryUiLabLiveBridgeUiOracle(discoveredPipeName);
+    if (!oracleProbe.connected && discoveredPipeName != defaultPipeName)
+        oracleProbe = queryUiLabLiveBridgeUiOracle(defaultPipeName);
+
+    const auto oracleTarget = oracleProbe.connected && !oracleProbe.responseJson.empty()
+        ? jsonStringField(oracleProbe.responseJson, "target")
+        : std::optional<std::string>{};
+    if (oracleProbe.connected && oracleTarget && *oracleTarget == policy.screenId)
+    {
+        FrontendUiOracleEvidence evidence;
+        evidence.probe = "direct-ui-oracle";
+        evidence.bridgeProbe = oracleProbe;
+        applyFrontendUiOracleFromUiOracleJson(
+            evidence,
+            policy,
+            oracleProbe.responseJson,
+            "ui_lab_live_bridge_ui_oracle");
+        return evidence;
+    }
+
+    auto stateProbe = queryUiLabLiveBridgeState(discoveredPipeName);
+    if (!stateProbe.connected && discoveredPipeName != defaultPipeName)
+        stateProbe = queryUiLabLiveBridgeState(defaultPipeName);
+
+    const auto stateTarget = stateProbe.connected && !stateProbe.responseJson.empty()
+        ? jsonStringField(stateProbe.responseJson, "target")
+        : std::optional<std::string>{};
+    if (stateProbe.connected && stateTarget && *stateTarget == policy.screenId)
+    {
+        FrontendUiOracleEvidence evidence;
+        evidence.probe = "state-fallback";
+        evidence.bridgeProbe = stateProbe;
+        applyFrontendUiOracleFromLiveStateJson(
+            evidence,
+            policy,
+            stateProbe.responseJson,
+            "ui_lab_live_bridge_state");
+        return evidence;
+    }
+
+    FrontendUiOracleEvidence fallback;
+    fallback.probe = "snapshot-fallback";
+    fallback.bridgeProbe = oracleProbe;
+    const auto liveStatePath = findLatestFrontendLiveStatePath(policy.screenId);
+    if (!liveStatePath)
+        return fallback;
+
+    const std::string text = readTextFile(*liveStatePath);
+    if (text.empty())
+        return fallback;
+
+    fallback.liveStatePath = *liveStatePath;
+    applyFrontendUiOracleFromLiveStateJson(
+        fallback,
+        policy,
+        text,
+        "ui_lab_live_state");
     return fallback;
 }
 
@@ -9362,6 +9603,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererRuntimeAlignmentSmoke();
     if (commandLineHasFlag("--renderer-live-bridge-alignment-smoke"))
         return runRendererLiveBridgeAlignmentSmoke();
+    if (commandLineHasFlag("--renderer-ui-oracle-smoke"))
+        return runRendererUiOracleSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 

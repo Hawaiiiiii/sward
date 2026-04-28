@@ -119,6 +119,8 @@ Supported commands:
 
 - `state`
 - `events`
+- `route-status`
+- `ui-oracle`
 - `route <target>`
 - `reset`
 - `set-global <name> <0|1>`
@@ -336,6 +338,8 @@ Local-only evidence, not committed:
   - `--renderer-runtime-alignment-smoke` is the bounded operator check for this path; native BMPs remain the visual proof, while live-state/bridge evidence becomes the state driver
   - Phase 144 adds a read-only direct live-bridge probe for the same viewer lanes: `queryUiLabLiveBridgeState` sends `state` to the Windows named pipe when a running UI Lab is present, accepts the result only when the response target matches the lane, and reports `direct-live-bridge` vs `snapshot-fallback` through `--renderer-live-bridge-alignment-smoke`
   - missing, stale, or target-mismatched pipes now fall back to latest `ui_lab_live_state.json` snapshots without mutating routes or SGlobals, so native BMPs stay visual proof while the bridge becomes the preferred state read path
+  - Phase 145 adds the read-only `ui-oracle` bridge command as the first UI-only oracle seed. It returns active screen, active scenes, active motion/frame, cursor owner, transition band, input-lock state, and a `uiLayerOracle` block from the live runtime CSD tree; its `runtimeDrawListStatus` is intentionally `runtime CSD tree; GPU draw-list pending` until a true runtime GPU/UI draw-list capture exists.
+  - `--renderer-ui-oracle-smoke` lets the sidecar viewer query that direct oracle when a matching runtime is live, then falls back explicitly to `state` or latest `ui_lab_live_state.json` snapshots. This moves comparison toward CSD-to-CSD/UI-only oracle checks while native BMPs remain visual proof.
 
 - `research_uiux/runtime_reference/include/sward/ui_runtime/sonic_hud_reference.hpp` and `src/sonic_hud_reference.cpp`
   - Phase 137 promotes the generated Phase 136 reference into hand-written repo-safe source

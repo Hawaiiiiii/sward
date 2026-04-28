@@ -1331,6 +1331,18 @@ namespace UiLab
     static constexpr std::string_view kLiveStateStageGameModeAddressFieldName = R"("stageGameModeAddress")";
     static constexpr std::string_view kLiveStateNativeCaptureStatusFieldName = R"("nativeCaptureStatus")";
     static constexpr std::string_view kLiveStateTypedInspectorsFieldName = R"("typedInspectors")";
+    static constexpr std::string_view kUiOracleJsonFields[] =
+    {
+        R"("uiLayerOracle")",
+        R"("runtimeDrawListStatus")",
+        R"("activeScreen")",
+        R"("activeScenes")",
+        R"("activeMotionName")",
+        R"("cursorOwner")",
+        R"("transitionBand")",
+        R"("inputLockState")",
+        R"("runtime CSD tree; GPU draw-list pending")",
+    };
     static constexpr std::string_view kLiveStateTypedInspectorJsonFields[] =
     {
         R"("csd")",
@@ -1974,6 +1986,194 @@ namespace UiLab
             << "  }";
     }
 
+    static std::string UiOracleActivationEventName(ScreenId id)
+    {
+        switch (id)
+        {
+        case ScreenId::TitleMenu:
+            return "title-menu-visible";
+        case ScreenId::TitleOptions:
+            return "title-options-ready";
+        case ScreenId::Loading:
+            return "loading-display-active";
+        case ScreenId::SonicHud:
+            return "sonic-hud-ready";
+        case ScreenId::Pause:
+            return "pause-ready";
+        case ScreenId::Tutorial:
+            return "tutorial-ready";
+        case ScreenId::Result:
+            return "result-ready";
+        default:
+            return "target-csd-project-made";
+        }
+    }
+
+    static std::string UiOracleTransitionBand(ScreenId id)
+    {
+        switch (id)
+        {
+        case ScreenId::TitleMenu:
+            return "select_travel->title menu visual ready";
+        case ScreenId::TitleOptions:
+            return "select_travel->title options visual ready";
+        case ScreenId::Loading:
+            return "pda_intro->loading display active";
+        case ScreenId::Pause:
+            return "intro_medium->pause menu visual ready";
+        case ScreenId::SonicHud:
+            return "hud_in->sonic-hud-ready";
+        case ScreenId::Tutorial:
+            return "guide_in->tutorial-ready";
+        default:
+            return "runtime route->target ready";
+        }
+    }
+
+    static bool UiOracleTargetReady(ScreenId id)
+    {
+        switch (id)
+        {
+        case ScreenId::TitleMenu:
+            return g_titleMenuVisualReady;
+        case ScreenId::TitleOptions:
+            return g_targetCsdObserved;
+        case ScreenId::Loading:
+            return g_loadingDisplayWasActive;
+        case ScreenId::SonicHud:
+        case ScreenId::Tutorial:
+        case ScreenId::Pause:
+        case ScreenId::Result:
+            return !g_lastStageReadyEventName.empty();
+        default:
+            return g_targetCsdObserved;
+        }
+    }
+
+    static std::string UiOracleCursorOwnerLabel(
+        ScreenId id,
+        const LoadingLiveInspectorSnapshot& loading,
+        const SonicHudLiveInspectorSnapshot& sonicHud,
+        const PauseGeneralSaveLiveInspectorSnapshot& pauseGeneralSave)
+    {
+        std::ostringstream out;
+        switch (id)
+        {
+        case ScreenId::TitleMenu:
+            out << "CTitleStateMenu/menu_cursor=" << g_titleMenuInspector.menuCursor;
+            return out.str();
+        case ScreenId::TitleOptions:
+            out << "CTitleStateMenu/options/menu_cursor=" << g_titleMenuInspector.menuCursor;
+            return out.str();
+        case ScreenId::Loading:
+            out << "LoadingDisplay/display_type="
+                << (loading.displayType == UINT32_MAX ? -1 : static_cast<int32_t>(loading.displayType))
+                << "/label=" << LoadingDisplayTypeLabel(loading.displayType);
+            return out.str();
+        case ScreenId::Pause:
+            out << "CHudPause/menu=" << PauseMenuTypeLabel(pauseGeneralSave.pauseMenu)
+                << "/status=" << PauseStatusTypeLabel(pauseGeneralSave.pauseStatus)
+                << "/transition=" << PauseTransitionTypeLabel(pauseGeneralSave.pauseTransition)
+                << "/visible=" << (pauseGeneralSave.pauseVisible ? 1 : 0);
+            return out.str();
+        case ScreenId::SonicHud:
+        case ScreenId::Tutorial:
+            out << "CHudSonicStage/hud_owner=" << HexU32(sonicHud.hudOwnerAddress)
+                << "/ready=" << sonicHud.readyEvent;
+            return out.str();
+        default:
+            return "runtime-target";
+        }
+    }
+
+    static void AppendUiOracleActiveScenePaths(
+        std::ostringstream& out,
+        const CsdProjectTreeInspectorSnapshot& csdProjectTree)
+    {
+        out << "[";
+        for (size_t i = 0; i < csdProjectTree.scenes.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+            out << "\"" << JsonEscape(csdProjectTree.scenes[i].path) << "\"";
+        }
+        out << "]";
+    }
+
+    static std::string BuildUiOracleJson()
+    {
+        const auto& target = TargetFor(g_target);
+        const auto csd = BuildCsdLiveInspectorSnapshot();
+        const auto csdProjectTree = BuildCsdProjectTreeInspectorSnapshot();
+        const auto loading = BuildLoadingLiveInspectorSnapshot();
+        const auto sonicHud = BuildSonicHudLiveInspectorSnapshot();
+        const auto pauseGeneralSave = BuildPauseGeneralSaveLiveInspectorSnapshot();
+        const std::string activationEvent = UiOracleActivationEventName(target.id);
+        const bool ready = UiOracleTargetReady(target.id);
+        const std::string inputLockState = std::string(ready ? "released:" : "until:") + activationEvent;
+
+        std::ostringstream out;
+        out
+            << "{\n"
+            << "  \"ok\": true,\n"
+            << "  \"source\": \"live-bridge ui-only oracle\",\n"
+            << "  \"version\": 1,\n"
+            << "  \"frame\": " << g_presentedFrameCount << ",\n"
+            << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeProject\": \"" << JsonEscape(csdProjectTree.activeProject) << "\",\n"
+            << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
+            << "  \"route\": \"" << JsonEscape(g_routeStatus) << "\",\n"
+            << "  \"activeMotionName\": \"" << JsonEscape(g_routeStatus) << "\",\n"
+            << "  \"activeScenes\": ";
+        AppendUiOracleActiveScenePaths(out, csdProjectTree);
+        out
+            << ",\n"
+            << "  \"cursorOwner\": \"" << JsonEscape(UiOracleCursorOwnerLabel(target.id, loading, sonicHud, pauseGeneralSave)) << "\",\n"
+            << "  \"transitionBand\": \"" << JsonEscape(UiOracleTransitionBand(target.id)) << "\",\n"
+            << "  \"inputLockState\": \"" << JsonEscape(inputLockState) << "\",\n"
+            << "  \"activationEvent\": \"" << JsonEscape(activationEvent) << "\",\n"
+            << "  \"runtimeDrawListStatus\": \"runtime CSD tree; GPU draw-list pending\",\n"
+            << "  \"uiLayerOracle\": {\n"
+            << "    \"source\": \"" << JsonEscape(csdProjectTree.source) << "\",\n"
+            << "    \"activeProject\": \"" << JsonEscape(csdProjectTree.activeProject) << "\",\n"
+            << "    \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
+            << "    \"projectKnown\": " << (csdProjectTree.projectKnown ? "true" : "false") << ",\n"
+            << "    \"projectAddress\": \"" << JsonEscape(HexU32(csdProjectTree.projectAddress)) << "\",\n"
+            << "    \"rootNodeAddress\": \"" << JsonEscape(HexU32(csdProjectTree.rootNodeAddress)) << "\",\n"
+            << "    \"sceneCount\": " << csdProjectTree.sceneCount << ",\n"
+            << "    \"nodeCount\": " << csdProjectTree.nodeCount << ",\n"
+            << "    \"layerCount\": " << csdProjectTree.layerCount << ",\n"
+            << "    \"runtimeSceneMotionFrame\": ";
+        if (csd.sceneMotionKnown)
+            out << csd.sceneMotionFrame;
+        else
+            out << "null";
+        out
+            << ",\n"
+            << "    \"runtimeSceneMotionRepeatTypeLabel\": \"" << JsonEscape(MotionRepeatTypeLabel(csd.sceneMotionRepeatType)) << "\",\n"
+            << "    \"runtimeDrawListStatus\": \"runtime CSD tree; GPU draw-list pending\",\n"
+            << "    \"scenes\": ";
+        AppendCsdTreeEntries(out, csdProjectTree.scenes, "sceneAddress", "projectAddress", "castNodeCount", "castCount");
+        out
+            << ",\n"
+            << "    \"layers\": ";
+        AppendCsdTreeEntries(out, csdProjectTree.layers, "layerAddress", "castNodeAddress", "castNodeIndex", "castIndex");
+        out
+            << "\n"
+            << "  },\n"
+            << "  \"readiness\": {\n"
+            << "    \"ready\": " << (ready ? "true" : "false") << ",\n"
+            << "    \"titleMenuVisible\": " << (g_titleMenuVisualReady ? "true" : "false") << ",\n"
+            << "    \"loadingActive\": " << (g_loadingDisplayWasActive ? "true" : "false") << ",\n"
+            << "    \"stageTargetReady\": " << (g_loggedStageTargetReady ? "true" : "false") << ",\n"
+            << "    \"stageReadyEvent\": \"" << JsonEscape(g_lastStageReadyEventName) << "\"\n"
+            << "  }\n"
+            << "}\n";
+
+        return out.str();
+    }
+
     static void AppendRecentEvents(std::ostringstream& out)
     {
         std::lock_guard<std::mutex> lock(g_liveBridgeMutex);
@@ -2058,7 +2258,7 @@ namespace UiLab
             << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
             << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
             << "    \"commands\": ";
-        AppendStringArray(out, { "state", "events", "route-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out
             << "\n"
             << "  },\n"
@@ -2068,6 +2268,7 @@ namespace UiLab
             "route/event latch",
             "title/menu/loading/stage/HUD readiness",
             "CSD project and scene pointers",
+            "runtime UI-only CSD oracle",
             "SGlobals toggles",
             "debug-menu fork-derived typed fields",
             "command channel"
@@ -4124,7 +4325,7 @@ namespace UiLab
     {
         std::ostringstream out;
         out << "{\"ok\":true,\"commands\":";
-        AppendStringArray(out, { "state", "events", "route-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out << "}\n";
         return out.str();
     }
@@ -4157,6 +4358,9 @@ namespace UiLab
 
         if (verb == "route-status" || verb == "status")
             return BuildRouteStatusJson();
+
+        if (verb == "ui-oracle" || verb == "ui-layer-oracle" || verb == "csd-ui-oracle")
+            return BuildUiOracleJson();
 
         if (verb == "help" || verb == "commands")
             return BuildHelpJson();
@@ -4789,7 +4993,7 @@ namespace UiLab
             ImGui::Separator();
             ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
-            ImGui::Text("commands: state, events, route-status, route, reset, set-global, capture, help");
+            ImGui::Text("commands: state, events, route-status, ui-oracle, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
 
             if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))

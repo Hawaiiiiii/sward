@@ -699,6 +699,30 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("--ui-lab-live-bridge-name", script)
         self.assertIn("liveBridgeName =", script)
 
+    def test_ui_lab_phase145_exposes_runtime_ui_oracle_bridge_command(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        client = self.read("research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1")
+        harvest = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "BuildUiOracleJson",
+            '"uiLayerOracle"',
+            '"runtimeDrawListStatus"',
+            '"runtime CSD tree; GPU draw-list pending"',
+            '"activeScreen"',
+            '"activeScenes"',
+            '"activeMotionName"',
+            '"cursorOwner"',
+            '"transitionBand"',
+            '"inputLockState"',
+            '"ui-oracle"',
+            "ui-only oracle",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn("ui-oracle", harvest)
+
     def test_ui_lab_has_repo_safe_live_bridge_client_tool(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1"
         self.assertTrue(script_path.is_file())
@@ -709,7 +733,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "sward_ui_lab_live",
             "Invoke-UiLabBridgeCommand",
             "Read-UiLabBridgeResponse",
-            '[ValidateSet("state", "events", "route-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "ui-oracle", "route", "reset", "set-global", "capture", "help")]',
             "route <target>",
             "set-global <name> <0|1>",
             "Connect($TimeoutMilliseconds)",
@@ -772,7 +796,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, ui_lab)
 
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "ui-oracle", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
 
