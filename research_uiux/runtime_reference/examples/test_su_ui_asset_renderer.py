@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RENDERER_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "su_ui_asset_renderer.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr126" / "sward_su_ui_asset_renderer.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr127" / "sward_su_ui_asset_renderer.exe"
 
 
 class SuUiAssetRendererTests(unittest.TestCase):
@@ -160,6 +160,21 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("timeline_sample=", source_text)
         self.assertIn("timeline_draw_command=", source_text)
         self.assertIn("rendered_frame_compare=", source_text)
+
+    def test_renderer_source_exposes_phase127_offscreen_render_compare(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("CsdRenderedFrameComparison", source_text)
+        self.assertIn("renderCsdOffscreenFrame", source_text)
+        self.assertIn("saveBitmapAsBmp", source_text)
+        self.assertIn("computeBitmapComparisonStats", source_text)
+        self.assertIn("writeCsdRenderCompareManifest", source_text)
+        self.assertIn("--csd-render-compare-smoke", source_text)
+        self.assertIn("rendered_frame_path=", source_text)
+        self.assertIn("render_compare_manifest=", source_text)
+        self.assertIn("visual_delta=", source_text)
+        self.assertIn("material_semantics=", source_text)
+        self.assertIn("blend=source-over", source_text)
+        self.assertIn("native_best_path=", source_text)
 
     def test_renderer_source_exposes_title_loop_reconstruction_screen(self) -> None:
         source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
@@ -492,6 +507,34 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("timeline_draw_command=sonic-hud:so_speed_gauge/Cast_0641:frame=99", completed.stdout)
         self.assertNotIn("csd_timeline=title-menu:", completed.stdout)
         self.assertNotIn("csd_timeline=loading:", completed.stdout)
+
+    def test_renderer_csd_render_compare_smoke_writes_local_outputs_and_deltas(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--csd-render-compare-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer csd render compare smoke ok", completed.stdout)
+        self.assertIn("templates=4", completed.stdout)
+        self.assertIn("rendered_frame_path=title-menu:out/csd_render_compare/phase127/title-menu_frame10.bmp", completed.stdout)
+        self.assertIn("rendered_frame_path=loading:out/csd_render_compare/phase127/loading_frame75.bmp", completed.stdout)
+        self.assertIn("rendered_frame_path=sonic-hud:out/csd_render_compare/phase127/sonic-hud_frame99.bmp", completed.stdout)
+        self.assertIn("rendered_frame_path=tutorial:out/csd_render_compare/phase127/tutorial_frame50.bmp", completed.stdout)
+        self.assertIn("render_compare_manifest=out/csd_render_compare/phase127/csd_render_compare_manifest.json", completed.stdout)
+        self.assertIn("visual_delta=title-menu:native=found:sample_grid=64x36", completed.stdout)
+        self.assertIn("visual_delta=loading:native=found:sample_grid=64x36", completed.stdout)
+        self.assertIn("visual_delta=sonic-hud:native=found:sample_grid=64x36", completed.stdout)
+        self.assertIn("material_semantics=title-menu:blend=source-over", completed.stdout)
+        self.assertIn("material_semantics=loading:blend=source-over", completed.stdout)
+        self.assertIn("native_best_path=sonic-hud:", completed.stdout)
 
     def test_renderer_navigation_smoke_reports_interactive_catalog(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

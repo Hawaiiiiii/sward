@@ -13,6 +13,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <cwchar>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -173,6 +174,9 @@ struct CsdDrawableCommand
     double scaleX = 1.0;
     double scaleY = 1.0;
     double rotation = 0.0;
+    std::uint32_t colorArgb = 0xFFFFFFFF;
+    bool colorKnown = false;
+    bool hidden = false;
     bool flipX = false;
     bool flipY = false;
     bool textureResolved = false;
@@ -245,6 +249,48 @@ struct CsdTimelinePlayback
     int numericTrackCount = 0;
     int keyframeCount = 0;
     std::vector<CsdTimelineTrackSample> samples;
+};
+
+struct BitmapSignalStats
+{
+    bool loaded = false;
+    int width = 0;
+    int height = 0;
+    std::uint64_t rgbSum = 0;
+    std::uint64_t alphaSum = 0;
+    std::uint64_t rgbNonBlack = 0;
+};
+
+struct BitmapComparisonStats
+{
+    bool nativeFound = false;
+    int sampleGridWidth = 64;
+    int sampleGridHeight = 36;
+    int sampleCount = 0;
+    double meanAbsRgb = 0.0;
+    int maxAbsRgb = 0;
+    BitmapSignalStats rendered;
+    BitmapSignalStats native;
+};
+
+struct CsdRenderedFrameComparison
+{
+    std::string templateId;
+    std::string layoutFileName;
+    std::string sceneName;
+    std::string timelineSceneName;
+    std::string timelineAnimationName;
+    int frame = 0;
+    std::filesystem::path renderedFramePath;
+    std::optional<std::filesystem::path> nativeBestPath;
+    std::size_t drawCommandCount = 0;
+    std::size_t sampledCommandCount = 0;
+    std::size_t textureBindingCount = 0;
+    std::size_t colorCommandCount = 0;
+    std::size_t alphaModulatedCommandCount = 0;
+    std::size_t gradientTrackSampleCount = 0;
+    std::vector<std::string> sgfxSlots;
+    BitmapComparisonStats visualDelta;
 };
 
 inline constexpr std::array<TextureSourceCandidate, 15> kTextureSourceCandidates{{
@@ -1398,6 +1444,25 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
         && command.sourceY + command.sourceHeight <= command.textureHeight;
 }
 
+[[nodiscard]] std::optional<std::uint32_t> parseCsdHexColor(std::string_view text)
+{
+    if (text.empty())
+        return std::nullopt;
+
+    std::string value(text);
+    if (value.starts_with("0x") || value.starts_with("0X"))
+        value = value.substr(2);
+
+    try
+    {
+        return static_cast<std::uint32_t>(std::stoul(value, nullptr, 16));
+    }
+    catch (...)
+    {
+        return std::nullopt;
+    }
+}
+
 [[nodiscard]] std::vector<CsdDrawableCommand> buildCsdDrawableCommands(
     std::string_view sceneObject,
     std::string_view sceneName,
@@ -1459,6 +1524,9 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
             const double translationY = translation.size() >= 2 ? translation[1] : 0.0;
             const double scaleX = scale.size() >= 1 ? scale[0] : 1.0;
             const double scaleY = scale.size() >= 2 ? scale[1] : 1.0;
+            const int hideFlag = static_cast<int>(jsonNumberField(*castInfo, "hide_flag").value_or(0.0));
+            if (hideFlag != 0)
+                continue;
             const int castWidth = static_cast<int>(std::llround(jsonNumberField(castObject, "width").value_or(0.0)));
             const int castHeight = static_cast<int>(std::llround(jsonNumberField(castObject, "height").value_or(0.0)));
 
@@ -1477,6 +1545,15 @@ void appendAncestorRepoRoots(std::vector<std::filesystem::path>& candidates, std
             command.scaleX = scaleX;
             command.scaleY = scaleY;
             command.rotation = jsonNumberField(*castInfo, "rotation").value_or(0.0);
+            command.hidden = hideFlag != 0;
+            if (const auto colorText = jsonStringField(*castInfo, "color"))
+            {
+                if (const auto color = parseCsdHexColor(*colorText))
+                {
+                    command.colorArgb = *color;
+                    command.colorKnown = true;
+                }
+            }
             command.flipX = scaleX < 0.0;
             command.flipY = scaleY < 0.0;
             command.destinationWidth = std::max(1, static_cast<int>(std::llround(std::fabs(static_cast<double>(castWidth) * scaleX))));
@@ -2419,6 +2496,59 @@ void drawOutlinedText(
     return true;
 }
 
+[[nodiscard]] bool drawCsdDrawableCommand(
+    Gdiplus::Graphics& graphics,
+    const Gdiplus::RectF& canvas,
+    SwardSuUiAssetRenderer& renderer,
+    const CsdDrawableCommand& command)
+{
+    if (command.hidden)
+        return true;
+
+    const auto destination = designRectToCanvas(canvas, command.destinationX, command.destinationY, command.destinationWidth, command.destinationHeight);
+    const auto* texture = renderer.textureFor(command.textureName);
+    if (!texture || !texture->image || !texture->bitmap || !command.sourceFits)
+    {
+        drawMissingCast(graphics, destination);
+        return false;
+    }
+
+    const auto r = static_cast<float>((command.colorArgb >> 16) & 0xFF) / 255.0F;
+    const auto g = static_cast<float>((command.colorArgb >> 8) & 0xFF) / 255.0F;
+    const auto b = static_cast<float>(command.colorArgb & 0xFF) / 255.0F;
+    const auto a = static_cast<float>((command.colorArgb >> 24) & 0xFF) / 255.0F;
+    Gdiplus::ColorMatrix matrix = {{
+        { r, 0.0F, 0.0F, 0.0F, 0.0F },
+        { 0.0F, g, 0.0F, 0.0F, 0.0F },
+        { 0.0F, 0.0F, b, 0.0F, 0.0F },
+        { 0.0F, 0.0F, 0.0F, a, 0.0F },
+        { 0.0F, 0.0F, 0.0F, 0.0F, 1.0F },
+    }};
+    Gdiplus::ImageAttributes attributes;
+    attributes.SetColorMatrix(&matrix, Gdiplus::ColorMatrixFlagsDefault, Gdiplus::ColorAdjustTypeBitmap);
+
+    const auto state = graphics.Save();
+    if (std::fabs(command.rotation) > 0.000001)
+    {
+        graphics.TranslateTransform(destination.X + (destination.Width * 0.5F), destination.Y + (destination.Height * 0.5F));
+        graphics.RotateTransform(static_cast<Gdiplus::REAL>(command.rotation));
+        graphics.TranslateTransform(-(destination.X + (destination.Width * 0.5F)), -(destination.Y + (destination.Height * 0.5F)));
+    }
+
+    graphics.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
+    graphics.DrawImage(
+        texture->bitmap.get(),
+        destination,
+        static_cast<float>(command.sourceX),
+        static_cast<float>(command.sourceY),
+        static_cast<float>(command.sourceWidth),
+        static_cast<float>(command.sourceHeight),
+        Gdiplus::UnitPixel,
+        &attributes);
+    graphics.Restore(state);
+    return true;
+}
+
 void renderAtlasGalleryScreen(Gdiplus::Graphics& graphics, const Gdiplus::RectF& canvas, SwardSuUiAssetRenderer& renderer)
 {
     auto* bitmap = renderer.currentAtlasBitmap();
@@ -2798,22 +2928,7 @@ void renderSgfxTemplatePlaceholderScreen(
         return false;
 
     for (const auto& command : scene->commands)
-    {
-        const SuUiRenderCast cast{
-            std::string_view(command.sceneName),
-            std::string_view(command.castName),
-            std::string_view(command.textureName),
-            command.sourceX,
-            command.sourceY,
-            command.sourceWidth,
-            command.sourceHeight,
-            command.destinationX,
-            command.destinationY,
-            command.destinationWidth,
-            command.destinationHeight,
-        };
-        (void)drawRenderCastTexture(graphics, canvas, renderer, cast);
-    }
+        (void)drawCsdDrawableCommand(graphics, canvas, renderer, command);
 
     return true;
 }
@@ -3793,6 +3908,548 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return failed || templateCount == 0 ? 1 : 0;
 }
 
+[[nodiscard]] std::filesystem::path repoRootForOutput()
+{
+    for (const auto& root : repoRootCandidates())
+    {
+        std::error_code error;
+        if (std::filesystem::is_regular_file(root / "research_uiux" / "runtime_reference" / "examples" / "su_ui_asset_renderer.cpp", error))
+            return root;
+    }
+
+    return std::filesystem::current_path();
+}
+
+[[nodiscard]] std::string portablePath(const std::filesystem::path& path)
+{
+    std::error_code error;
+    auto relative = std::filesystem::relative(path, repoRootForOutput(), error);
+    std::string text = (error ? path : relative).generic_string();
+    return text;
+}
+
+[[nodiscard]] std::string jsonEscape(std::string_view text)
+{
+    std::ostringstream escaped;
+    for (const char ch : text)
+    {
+        switch (ch)
+        {
+        case '\\': escaped << "\\\\"; break;
+        case '"': escaped << "\\\""; break;
+        case '\n': escaped << "\\n"; break;
+        case '\r': escaped << "\\r"; break;
+        case '\t': escaped << "\\t"; break;
+        default: escaped << ch; break;
+        }
+    }
+    return escaped.str();
+}
+
+[[nodiscard]] std::optional<CLSID> imageEncoderClsid(const wchar_t* mimeType)
+{
+    UINT encoderCount = 0;
+    UINT encoderBytes = 0;
+    if (Gdiplus::GetImageEncodersSize(&encoderCount, &encoderBytes) != Gdiplus::Ok || encoderBytes == 0)
+        return std::nullopt;
+
+    std::vector<std::uint8_t> buffer(encoderBytes);
+    auto* encoders = reinterpret_cast<Gdiplus::ImageCodecInfo*>(buffer.data());
+    if (Gdiplus::GetImageEncoders(encoderCount, encoderBytes, encoders) != Gdiplus::Ok)
+        return std::nullopt;
+
+    for (UINT index = 0; index < encoderCount; ++index)
+    {
+        if (std::wcscmp(encoders[index].MimeType, mimeType) == 0)
+            return encoders[index].Clsid;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] bool saveBitmapAsBmp(Gdiplus::Bitmap& bitmap, const std::filesystem::path& path)
+{
+    std::error_code error;
+    std::filesystem::create_directories(path.parent_path(), error);
+    if (error)
+        return false;
+
+    const auto encoder = imageEncoderClsid(L"image/bmp");
+    if (!encoder)
+        return false;
+
+    return bitmap.Save(path.wstring().c_str(), &*encoder, nullptr) == Gdiplus::Ok;
+}
+
+[[nodiscard]] std::optional<std::string> findRuntimeEvidenceRecordForTarget(
+    const std::string& manifestText,
+    std::string_view target)
+{
+    for (const auto objectSpan : jsonObjectSpansInArray(manifestText))
+    {
+        if (jsonStringField(objectSpan, "target").value_or("") == target)
+            return std::string(objectSpan);
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<std::filesystem::path> extractNativeBestBmpPathFromManifestText(
+    const std::string& manifestText,
+    std::string_view target)
+{
+    if (manifestText.empty())
+        return std::nullopt;
+
+    const auto targetRecord = findRuntimeEvidenceRecordForTarget(manifestText, target);
+    if (targetRecord)
+    {
+        const auto summary = jsonObjectFieldSpan(*targetRecord, "nativeFrameSignalSummary");
+        const auto bestPath = summary ? jsonStringField(*summary, "bestPath") : std::optional<std::string>{};
+        if (bestPath && !bestPath->empty())
+            return std::filesystem::path(*bestPath);
+    }
+
+    const std::string fieldNeedle = "\"target\"";
+    const std::string valueNeedle = "\"" + std::string(target) + "\"";
+    std::size_t offset = 0;
+    while ((offset = manifestText.find(fieldNeedle, offset)) != std::string::npos)
+    {
+        const auto colonOffset = manifestText.find(':', offset + fieldNeedle.size());
+        if (colonOffset == std::string::npos)
+            break;
+
+        const auto valueOffset = skipJsonWhitespace(manifestText, colonOffset + 1);
+        const auto value = parseJsonStringAt(manifestText, valueOffset);
+        if (value && *value == valueNeedle.substr(1, valueNeedle.size() - 2))
+        {
+            const auto summaryOffset = manifestText.find("\"nativeFrameSignalSummary\"", valueOffset);
+            const auto bestPathOffset = summaryOffset == std::string::npos
+                ? std::string::npos
+                : manifestText.find("\"bestPath\"", summaryOffset);
+            const auto bestPathColon = bestPathOffset == std::string::npos
+                ? std::string::npos
+                : manifestText.find(':', bestPathOffset);
+            if (bestPathColon != std::string::npos)
+            {
+                const auto bestPathValueOffset = skipJsonWhitespace(manifestText, bestPathColon + 1);
+                if (const auto fallbackBestPath = parseJsonStringAt(manifestText, bestPathValueOffset))
+                    return std::filesystem::path(*fallbackBestPath);
+            }
+        }
+        offset = colonOffset + 1;
+    }
+
+    return std::nullopt;
+}
+
+[[nodiscard]] std::optional<std::filesystem::path> findNativeBestBmpPathForTarget(std::string_view target)
+{
+    std::optional<std::filesystem::path> bestPath;
+    std::filesystem::file_time_type bestWriteTime{};
+    bool hasBestWriteTime = false;
+
+    for (const auto& root : repoRootCandidates())
+    {
+        std::error_code error;
+        const auto evidenceRoot = root / "out" / "ui_lab_runtime_evidence";
+        if (!std::filesystem::is_directory(evidenceRoot, error))
+            continue;
+
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(evidenceRoot, error))
+        {
+            if (error)
+                break;
+            if (!entry.is_regular_file(error) || entry.path().filename() != "capture_manifest.json")
+                continue;
+
+            const auto manifestText = readTextFile(entry.path());
+            const auto candidate = extractNativeBestBmpPathFromManifestText(manifestText, target);
+            if (!candidate)
+                continue;
+
+            const auto writeTime = std::filesystem::last_write_time(entry.path(), error);
+            if (!bestPath || !hasBestWriteTime || (!error && writeTime > bestWriteTime))
+            {
+                bestPath = *candidate;
+                if (!error)
+                {
+                    bestWriteTime = writeTime;
+                    hasBestWriteTime = true;
+                }
+            }
+        }
+    }
+
+    return bestPath;
+}
+
+[[nodiscard]] Gdiplus::Color bitmapPixelNearest(Gdiplus::Bitmap& bitmap, int sampleX, int sampleY, int gridWidth, int gridHeight)
+{
+    const int x = std::clamp(
+        static_cast<int>(std::llround((static_cast<double>(sampleX) + 0.5) * static_cast<double>(bitmap.GetWidth()) / static_cast<double>(gridWidth))),
+        0,
+        std::max(0, static_cast<int>(bitmap.GetWidth()) - 1));
+    const int y = std::clamp(
+        static_cast<int>(std::llround((static_cast<double>(sampleY) + 0.5) * static_cast<double>(bitmap.GetHeight()) / static_cast<double>(gridHeight))),
+        0,
+        std::max(0, static_cast<int>(bitmap.GetHeight()) - 1));
+
+    Gdiplus::Color color;
+    bitmap.GetPixel(x, y, &color);
+    return color;
+}
+
+[[nodiscard]] BitmapSignalStats computeBitmapSignalStats(Gdiplus::Bitmap& bitmap)
+{
+    BitmapSignalStats stats;
+    stats.loaded = bitmap.GetLastStatus() == Gdiplus::Ok && bitmap.GetWidth() > 0 && bitmap.GetHeight() > 0;
+    if (!stats.loaded)
+        return stats;
+
+    stats.width = static_cast<int>(bitmap.GetWidth());
+    stats.height = static_cast<int>(bitmap.GetHeight());
+    constexpr int kGridWidth = 64;
+    constexpr int kGridHeight = 36;
+    for (int y = 0; y < kGridHeight; ++y)
+    {
+        for (int x = 0; x < kGridWidth; ++x)
+        {
+            const auto color = bitmapPixelNearest(bitmap, x, y, kGridWidth, kGridHeight);
+            stats.rgbSum += static_cast<std::uint64_t>(color.GetR()) + color.GetG() + color.GetB();
+            stats.alphaSum += color.GetA();
+            if (color.GetR() != 0 || color.GetG() != 0 || color.GetB() != 0)
+                ++stats.rgbNonBlack;
+        }
+    }
+
+    return stats;
+}
+
+[[nodiscard]] BitmapComparisonStats computeBitmapComparisonStats(
+    Gdiplus::Bitmap& rendered,
+    const std::optional<std::filesystem::path>& nativePath)
+{
+    BitmapComparisonStats stats;
+    stats.rendered = computeBitmapSignalStats(rendered);
+    if (!nativePath)
+        return stats;
+
+    auto native = std::unique_ptr<Gdiplus::Bitmap>(Gdiplus::Bitmap::FromFile(nativePath->wstring().c_str(), FALSE));
+    if (!native || native->GetLastStatus() != Gdiplus::Ok)
+        return stats;
+
+    stats.nativeFound = true;
+    stats.native = computeBitmapSignalStats(*native);
+    std::uint64_t totalAbs = 0;
+    int maxAbs = 0;
+    for (int y = 0; y < stats.sampleGridHeight; ++y)
+    {
+        for (int x = 0; x < stats.sampleGridWidth; ++x)
+        {
+            const auto left = bitmapPixelNearest(rendered, x, y, stats.sampleGridWidth, stats.sampleGridHeight);
+            const auto right = bitmapPixelNearest(*native, x, y, stats.sampleGridWidth, stats.sampleGridHeight);
+            const int dr = std::abs(static_cast<int>(left.GetR()) - static_cast<int>(right.GetR()));
+            const int dg = std::abs(static_cast<int>(left.GetG()) - static_cast<int>(right.GetG()));
+            const int db = std::abs(static_cast<int>(left.GetB()) - static_cast<int>(right.GetB()));
+            totalAbs += static_cast<std::uint64_t>(dr + dg + db);
+            maxAbs = std::max(maxAbs, std::max({ dr, dg, db }));
+            ++stats.sampleCount;
+        }
+    }
+
+    stats.meanAbsRgb = stats.sampleCount == 0 ? 0.0 : static_cast<double>(totalAbs) / static_cast<double>(stats.sampleCount * 3);
+    stats.maxAbsRgb = maxAbs;
+    return stats;
+}
+
+[[nodiscard]] std::vector<CsdDrawableCommand> timelineSampledCommands(
+    const CsdDrawableScene& scene,
+    const CsdTimelinePlayback* playback,
+    std::size_t& sampledCommandCount)
+{
+    std::vector<CsdDrawableCommand> commands = scene.commands;
+    sampledCommandCount = 0;
+    if (!playback)
+        return commands;
+
+    for (auto& command : commands)
+    {
+        for (const auto& sample : playback->samples)
+        {
+            const auto sampled = applyCsdTimelineToDrawableCommand(command, sample);
+            if (!sampled)
+                continue;
+
+            command = *sampled;
+            ++sampledCommandCount;
+        }
+    }
+
+    return commands;
+}
+
+[[nodiscard]] std::unique_ptr<Gdiplus::Bitmap> renderCsdOffscreenFrame(
+    const CsdDrawableScene& scene,
+    const CsdTimelinePlayback* playback,
+    SwardSuUiAssetRenderer& renderer,
+    std::size_t& sampledCommandCount)
+{
+    auto bitmap = std::make_unique<Gdiplus::Bitmap>(kDesignWidth, kDesignHeight, PixelFormat32bppARGB);
+    Gdiplus::Graphics graphics(bitmap.get());
+    graphics.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
+    graphics.SetCompositingQuality(Gdiplus::CompositingQualityHighQuality);
+    graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+    graphics.Clear(Gdiplus::Color(255, 0, 0, 0));
+
+    const Gdiplus::RectF canvas(0.0F, 0.0F, static_cast<Gdiplus::REAL>(kDesignWidth), static_cast<Gdiplus::REAL>(kDesignHeight));
+    const auto commands = timelineSampledCommands(scene, playback, sampledCommandCount);
+    for (const auto& command : commands)
+        (void)drawCsdDrawableCommand(graphics, canvas, renderer, command);
+
+    return bitmap;
+}
+
+[[nodiscard]] std::size_t countUniqueTextures(const std::vector<CsdDrawableCommand>& commands)
+{
+    std::vector<std::string> textures;
+    for (const auto& command : commands)
+    {
+        if (std::find(textures.begin(), textures.end(), command.textureName) == textures.end())
+            textures.push_back(command.textureName);
+    }
+    return textures.size();
+}
+
+[[nodiscard]] CsdRenderedFrameComparison renderCsdFrameComparison(
+    const CsdPipelineTemplateBinding& csdBinding,
+    const SgfxTemplateRenderBinding& sgfxBinding,
+    const std::filesystem::path& outputRoot)
+{
+    CsdRenderedFrameComparison comparison;
+    comparison.templateId = std::string(csdBinding.templateId);
+    comparison.layoutFileName = std::string(csdBinding.layoutFileName);
+    comparison.sceneName = std::string(csdBinding.primarySceneName);
+    comparison.timelineSceneName = std::string(csdBinding.timelineSceneName);
+    comparison.timelineAnimationName = std::string(csdBinding.timelineAnimationName);
+    comparison.frame = csdTimelineSampleFrameForTemplate(csdBinding.templateId);
+    comparison.renderedFramePath = outputRoot / (std::string(csdBinding.templateId) + "_frame" + std::to_string(comparison.frame) + ".bmp");
+
+    for (std::size_t index = 0; index < sgfxBinding.slotCount; ++index)
+        comparison.sgfxSlots.emplace_back(sgfxBinding.slots[index].slotName);
+
+    const auto scene = loadCsdDrawableScene(csdBinding);
+    const auto playback = loadCsdTimelinePlayback(csdBinding);
+    if (!scene)
+        return comparison;
+
+    comparison.drawCommandCount = scene->commands.size();
+    comparison.textureBindingCount = countUniqueTextures(scene->commands);
+    for (const auto& command : scene->commands)
+    {
+        if (command.colorKnown)
+            ++comparison.colorCommandCount;
+        if (((command.colorArgb >> 24) & 0xFF) != 0xFF)
+            ++comparison.alphaModulatedCommandCount;
+    }
+    if (playback)
+    {
+        for (const auto& sample : playback->samples)
+        {
+            if (sample.trackType.starts_with("Gradient"))
+                ++comparison.gradientTrackSampleCount;
+        }
+    }
+
+    SwardSuUiAssetRenderer renderer;
+    std::size_t sampledCommandCount = 0;
+    auto bitmap = renderCsdOffscreenFrame(*scene, playback ? &*playback : nullptr, renderer, sampledCommandCount);
+    comparison.sampledCommandCount = sampledCommandCount;
+    const bool saved = bitmap && saveBitmapAsBmp(*bitmap, comparison.renderedFramePath);
+    comparison.nativeBestPath = findNativeBestBmpPathForTarget(csdBinding.templateId);
+    comparison.visualDelta = bitmap
+        ? computeBitmapComparisonStats(*bitmap, comparison.nativeBestPath)
+        : BitmapComparisonStats{};
+    if (!saved)
+        comparison.renderedFramePath.clear();
+    return comparison;
+}
+
+void writeCsdRenderCompareManifest(
+    const std::filesystem::path& manifestPath,
+    const std::vector<CsdRenderedFrameComparison>& comparisons)
+{
+    std::error_code error;
+    std::filesystem::create_directories(manifestPath.parent_path(), error);
+    std::ofstream out(manifestPath, std::ios::binary);
+    if (!out)
+        return;
+
+    out << "{\n";
+    out << "  \"phase\": 127,\n";
+    out << "  \"canvas\": { \"width\": " << kDesignWidth << ", \"height\": " << kDesignHeight << " },\n";
+    out << "  \"records\": [\n";
+    for (std::size_t index = 0; index < comparisons.size(); ++index)
+    {
+        const auto& comparison = comparisons[index];
+        out << "    {\n";
+        out << "      \"template\": \"" << jsonEscape(comparison.templateId) << "\",\n";
+        out << "      \"layout\": \"" << jsonEscape(comparison.layoutFileName) << "\",\n";
+        out << "      \"scene\": \"" << jsonEscape(comparison.sceneName) << "\",\n";
+        out << "      \"timelineScene\": \"" << jsonEscape(comparison.timelineSceneName) << "\",\n";
+        out << "      \"animation\": \"" << jsonEscape(comparison.timelineAnimationName) << "\",\n";
+        out << "      \"frame\": " << comparison.frame << ",\n";
+        out << "      \"renderedFramePath\": \"" << jsonEscape(portablePath(comparison.renderedFramePath)) << "\",\n";
+        out << "      \"nativeBestPath\": \"" << jsonEscape(comparison.nativeBestPath ? portablePath(*comparison.nativeBestPath) : std::string("")) << "\",\n";
+        out << "      \"drawCommandCount\": " << comparison.drawCommandCount << ",\n";
+        out << "      \"sampledCommandCount\": " << comparison.sampledCommandCount << ",\n";
+        out << "      \"textureBindingCount\": " << comparison.textureBindingCount << ",\n";
+        out << "      \"materialSemantics\": { \"blend\": \"source-over\", \"colorCommands\": " << comparison.colorCommandCount
+            << ", \"alphaModulatedCommands\": " << comparison.alphaModulatedCommandCount
+            << ", \"gradientTrackSamples\": " << comparison.gradientTrackSampleCount << " },\n";
+        out << "      \"visualDelta\": { \"nativeFound\": " << (comparison.visualDelta.nativeFound ? "true" : "false")
+            << ", \"sampleGrid\": \"64x36\", \"sampleCount\": " << comparison.visualDelta.sampleCount
+            << ", \"meanAbsRgb\": " << std::fixed << std::setprecision(3) << comparison.visualDelta.meanAbsRgb
+            << ", \"maxAbsRgb\": " << comparison.visualDelta.maxAbsRgb
+            << ", \"renderRgbSum\": " << comparison.visualDelta.rendered.rgbSum
+            << ", \"nativeRgbSum\": " << comparison.visualDelta.native.rgbSum << " },\n";
+        out << "      \"sgfxSlots\": [";
+        for (std::size_t slotIndex = 0; slotIndex < comparison.sgfxSlots.size(); ++slotIndex)
+        {
+            if (slotIndex != 0)
+                out << ", ";
+            out << "\"" << jsonEscape(comparison.sgfxSlots[slotIndex]) << "\"";
+        }
+        out << "]\n";
+        out << "    }" << (index + 1 == comparisons.size() ? "\n" : ",\n");
+    }
+    out << "  ]\n";
+    out << "}\n";
+}
+
+[[nodiscard]] std::string formatVisualDeltaLine(const CsdRenderedFrameComparison& comparison)
+{
+    std::ostringstream descriptor;
+    descriptor
+        << "visual_delta="
+        << comparison.templateId
+        << ":native="
+        << (comparison.visualDelta.nativeFound ? "found" : "missing")
+        << ":sample_grid="
+        << comparison.visualDelta.sampleGridWidth
+        << "x"
+        << comparison.visualDelta.sampleGridHeight
+        << ":mean_abs_rgb="
+        << std::fixed
+        << std::setprecision(3)
+        << comparison.visualDelta.meanAbsRgb
+        << ":max_abs_rgb="
+        << comparison.visualDelta.maxAbsRgb
+        << ":render_rgb_sum="
+        << comparison.visualDelta.rendered.rgbSum
+        << ":native_rgb_sum="
+        << comparison.visualDelta.native.rgbSum;
+    return descriptor.str();
+}
+
+[[nodiscard]] int runCsdRenderCompareSmoke(const std::optional<std::string>& templateFilter)
+{
+    std::size_t templateCount = 0;
+    bool failed = false;
+    std::vector<CsdRenderedFrameComparison> comparisons;
+    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase127";
+    const auto manifestPath = outputRoot / "csd_render_compare_manifest.json";
+
+    Gdiplus::GdiplusStartupInput gdiplusInput{};
+    ULONG_PTR gdiplusToken = 0;
+    if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr) != Gdiplus::Ok)
+        return 1;
+
+    for (const auto& csdBinding : kCsdPipelineTemplateBindings)
+    {
+        if (templateFilter && csdBinding.templateId != *templateFilter)
+            continue;
+
+        ++templateCount;
+        const auto* sgfxBinding = findSgfxTemplateRenderBinding(csdBinding.templateId);
+        if (!sgfxBinding)
+        {
+            failed = true;
+            continue;
+        }
+
+        auto comparison = renderCsdFrameComparison(csdBinding, *sgfxBinding, outputRoot);
+        if (comparison.renderedFramePath.empty() || comparison.drawCommandCount == 0)
+            failed = true;
+        comparisons.push_back(std::move(comparison));
+    }
+
+    if (templateFilter && templateCount == 0)
+        failed = true;
+
+    writeCsdRenderCompareManifest(manifestPath, comparisons);
+
+    std::cout
+        << "sward_su_ui_asset_renderer csd render compare smoke ok "
+        << "layout_source=research_uiux/data/layout_deep_analysis.json "
+        << "templates=" << templateCount
+        << " manifest=" << portablePath(manifestPath)
+        << '\n';
+    std::cout << "render_compare_manifest=" << portablePath(manifestPath) << '\n';
+
+    for (const auto& comparison : comparisons)
+    {
+        std::cout
+            << "rendered_frame_path="
+            << comparison.templateId
+            << ":"
+            << portablePath(comparison.renderedFramePath)
+            << '\n';
+        std::cout
+            << "material_semantics="
+            << comparison.templateId
+            << ":blend=source-over"
+            << ":color_commands="
+            << comparison.colorCommandCount
+            << ":alpha_modulated="
+            << comparison.alphaModulatedCommandCount
+            << ":gradient_samples="
+            << comparison.gradientTrackSampleCount
+            << '\n';
+        std::cout << formatVisualDeltaLine(comparison) << '\n';
+        std::cout
+            << "native_best_path="
+            << comparison.templateId
+            << ":"
+            << (comparison.nativeBestPath ? portablePath(*comparison.nativeBestPath) : std::string("missing"))
+            << '\n';
+        std::cout
+            << "render_frame_source="
+            << comparison.templateId
+            << ":layout="
+            << comparison.layoutFileName
+            << ":scene="
+            << comparison.sceneName
+            << ":timeline="
+            << comparison.timelineSceneName
+            << "/"
+            << comparison.timelineAnimationName
+            << ":frame="
+            << comparison.frame
+            << ":commands="
+            << comparison.drawCommandCount
+            << ":sampled_commands="
+            << comparison.sampledCommandCount
+            << ":textures="
+            << comparison.textureBindingCount
+            << '\n';
+    }
+
+    Gdiplus::GdiplusShutdown(gdiplusToken);
+    return failed || templateCount == 0 ? 1 : 0;
+}
+
 [[nodiscard]] int runCsdPipelineSmoke(const std::optional<std::string>& templateFilter)
 {
     std::size_t templateCount = 0;
@@ -4017,6 +4674,8 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
 {
     const auto templateFilter = commandLineValueAfter("--template");
+    if (commandLineHasFlag("--csd-render-compare-smoke"))
+        return runCsdRenderCompareSmoke(templateFilter);
     if (commandLineHasFlag("--csd-timeline-smoke"))
         return runCsdTimelineSmoke(templateFilter);
     if (commandLineHasFlag("--csd-drawable-smoke"))

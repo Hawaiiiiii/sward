@@ -317,6 +317,9 @@ Clean asset renderer notes:
 - the Phase 123 bridge reports `placeholder_slot=` bindings and `timeline_hook=` values so custom SGFX art can replace Sonic placeholders without losing recovered timing/state evidence
 - `--csd-pipeline-smoke` verifies the Phase 124 local CSD-driven pipeline view without opening a window
 - the Phase 124 pipeline reads ignored local `research_uiux/data/layout_deep_analysis.json`, reports `csd_pipeline=`, `sgfx_element_map=`, and `runtime_evidence_compare=` descriptors, and keeps Sonic assets/layout evidence local-only while exposing SGFX-replaceable slots
+- `--csd-drawable-smoke` verifies the Phase 125 CSD scene/cast/subimage draw-command traversal without opening a window
+- `--csd-timeline-smoke` verifies the Phase 126 timeline/keyframe sampling path and reports which sampled draw commands line up with native runtime evidence
+- `--csd-render-compare-smoke` verifies the Phase 127 offscreen rendered-frame comparison path, writes ignored local BMPs plus `out/csd_render_compare/phase127/csd_render_compare_manifest.json`, and reports sampled RGB deltas against the latest native BMP evidence for title-menu/loading/Sonic HUD/tutorial
 - current CSD-driven mappings use `ui_mainmenu.yncp/mm_bg_usual`, `ui_loading.yncp/pda`, and the local HUD proxy `ui_prov_playscreen.yncp/so_speed_gauge` plus `info_1`; real runtime/native evidence remains the comparison oracle
 - it opens a native `1280x720` design canvas below `Prev` / `Next` / `Atlas Prev` / `Atlas Next` / screen-label navigation controls
 - it starts on `VisualAtlasGallery`, which discovers ignored local `extracted_assets/visual_atlas/sheets/*.png` files at runtime
