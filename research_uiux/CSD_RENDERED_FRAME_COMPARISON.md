@@ -14,6 +14,8 @@ Phase 127 adds the first hard pixel-output loop to the local SU UI pipeline view
 > Phase 130 moves the active output lane to `out/csd_render_compare/phase130/`, adds a named `csd-point-seam` sampler path, and scores native BMPs with searched centered 16:9 crop registration. See `CSD_SAMPLER_REGISTRATION_PARITY.md`.
 >
 > Phase 131 moves the active output lane to `out/csd_render_compare/phase131/`, writes diff BMPs, computes registered full-frame deltas, and triages high deltas into material/shader vs missing native backbuffer composition. See `CSD_MATERIAL_SHADER_TRIAGE.md`.
+>
+> Phase 132 moves the active output lane to `out/csd_render_compare/phase132/`, writes UI-layer coverage diff BMPs, and reports `ui_layer_delta=` so sparse HUD/tutorial CSD layers can be scored separately from the full native stage backbuffer. See `CSD_UI_LAYER_AWARE_DIFF.md`.
 
 The new command is:
 

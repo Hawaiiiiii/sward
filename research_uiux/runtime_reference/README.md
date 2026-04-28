@@ -60,7 +60,7 @@ It is intentionally decoupled from game assets and from the asset-backed Unleash
 - a separate clean SU UI asset renderer with local DDS-backed screen samples, visible `Prev` / `Next` navigation, and local visual-atlas gallery browsing
 - a Phase 122 SGFX template catalog that packages real-runtime evidence into reusable title/loading/HUD/tutorial state-machine recipes with Sonic placeholder assets now and custom SGFX art later, without shipping extracted Sonic assets
 - a Phase 123 SGFX template-driven placeholder renderer path where those recipes select Sonic placeholder screens, bind local asset slots, and expose first timing hooks for `title-menu`, `loading`, `sonic-hud`, and `tutorial`
-- a Phase 131 CSD compare renderer path where ignored local layout evidence preserves packed RGBA keyframes, Color/Gradient channels sample into real RGBA values, offscreen CSD frames render through a software ARGB quad compositor, and native BMP comparison writes diff BMPs plus registered full-frame material/composition triage
+- a Phase 132 CSD compare renderer path where ignored local layout evidence preserves packed RGBA keyframes, Color/Gradient channels sample into real RGBA values, offscreen CSD frames render through a software ARGB quad compositor, and native BMP comparison writes full-frame plus UI-layer coverage diff BMPs
 
 Contents:
 
@@ -324,6 +324,7 @@ Clean asset renderer notes:
 - Phase 128 tightens that same compare path with Shuriken-compatible RGBA color order, CSD cast flag reporting for alpha/additive blend and linear filtering, packed Color/Gradient channel blockers, and centered 16:9 native-crop alignment under `out/csd_render_compare/phase128/`
 - Phase 130 now writes `out/csd_render_compare/phase130/`, reports `sampler_filter=csd-point-seam`, sampler counts, and `native_frame_registration=` offsets against refreshed real runtime BMP captures
 - Phase 131 now writes `out/csd_render_compare/phase131/`, reports `diff_frame_path=`, `full_frame_delta=`, and `material_parity_triage=` so HUD/tutorial stage-backbuffer mismatch is separated from real CSD material work
+- Phase 132 now writes `out/csd_render_compare/phase132/`, reports `ui_layer_diff_frame_path=` and `ui_layer_delta=`, and masks native comparison to pixels actually touched by the rendered CSD command stream
 - current CSD-driven mappings use `ui_mainmenu.yncp/mm_bg_usual`, `ui_loading.yncp/pda`, and the local HUD proxy `ui_prov_playscreen.yncp/so_speed_gauge` plus `info_1`; real runtime/native evidence remains the comparison oracle
 - it opens a native `1280x720` design canvas below `Prev` / `Next` / `Atlas Prev` / `Atlas Next` / screen-label navigation controls
 - it starts on `VisualAtlasGallery`, which discovers ignored local `extracted_assets/visual_atlas/sheets/*.png` files at runtime

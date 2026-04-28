@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RENDERER_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "su_ui_asset_renderer.cpp"
 CMAKE_FILE = REPO_ROOT / "research_uiux" / "runtime_reference" / "CMakeLists.txt"
-DEFAULT_EXE = REPO_ROOT / "b" / "rr131" / "Release" / "sward_su_ui_asset_renderer.exe"
+DEFAULT_EXE = REPO_ROOT / "b" / "rr132" / "Release" / "sward_su_ui_asset_renderer.exe"
 
 
 class SuUiAssetRendererTests(unittest.TestCase):
@@ -234,7 +234,19 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("full_frame_delta=", source_text)
         self.assertIn("material_parity_triage=", source_text)
         self.assertIn("stage-background-not-rendered", source_text)
-        self.assertIn("out\" / \"csd_render_compare\" / \"phase131", source_text)
+        self.assertIn("materialParityTriage", source_text)
+
+    def test_renderer_source_exposes_phase132_ui_layer_coverage_delta(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("CsdUiLayerMaskStats", source_text)
+        self.assertIn("uiLayerDiffFramePath", source_text)
+        self.assertIn("computeUiLayerDeltaStats", source_text)
+        self.assertIn("renderCsdOffscreenFrameWithCoverageMask", source_text)
+        self.assertIn("rendered-csd-coverage-mask", source_text)
+        self.assertIn("ui_layer_delta=", source_text)
+        self.assertIn("ui_layer_diff_frame_path=", source_text)
+        self.assertIn("uiLayerDelta", source_text)
+        self.assertIn("out\" / \"csd_render_compare\" / \"phase132", source_text)
 
     def test_renderer_source_exposes_title_loop_reconstruction_screen(self) -> None:
         source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
@@ -584,11 +596,11 @@ class SuUiAssetRendererTests(unittest.TestCase):
 
         self.assertIn("sward_su_ui_asset_renderer csd render compare smoke ok", completed.stdout)
         self.assertIn("templates=4", completed.stdout)
-        self.assertIn("rendered_frame_path=title-menu:out/csd_render_compare/phase131/title-menu_frame10.bmp", completed.stdout)
-        self.assertIn("rendered_frame_path=loading:out/csd_render_compare/phase131/loading_frame75.bmp", completed.stdout)
-        self.assertIn("rendered_frame_path=sonic-hud:out/csd_render_compare/phase131/sonic-hud_frame99.bmp", completed.stdout)
-        self.assertIn("rendered_frame_path=tutorial:out/csd_render_compare/phase131/tutorial_frame50.bmp", completed.stdout)
-        self.assertIn("render_compare_manifest=out/csd_render_compare/phase131/csd_render_compare_manifest.json", completed.stdout)
+        self.assertIn("rendered_frame_path=title-menu:out/csd_render_compare/phase132/title-menu_frame10.bmp", completed.stdout)
+        self.assertIn("rendered_frame_path=loading:out/csd_render_compare/phase132/loading_frame75.bmp", completed.stdout)
+        self.assertIn("rendered_frame_path=sonic-hud:out/csd_render_compare/phase132/sonic-hud_frame99.bmp", completed.stdout)
+        self.assertIn("rendered_frame_path=tutorial:out/csd_render_compare/phase132/tutorial_frame50.bmp", completed.stdout)
+        self.assertIn("render_compare_manifest=out/csd_render_compare/phase132/csd_render_compare_manifest.json", completed.stdout)
         self.assertIn("visual_delta=title-menu:native=found:sample_grid=64x36:alignment=search-center-crop-16x9", completed.stdout)
         self.assertIn("visual_delta=loading:native=found:sample_grid=64x36:alignment=search-center-crop-16x9", completed.stdout)
         self.assertIn("visual_delta=sonic-hud:native=found:sample_grid=64x36:alignment=search-center-crop-16x9", completed.stdout)
@@ -604,8 +616,12 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("native_alignment=sonic-hud:mode=search-center-crop-16x9:crop=", completed.stdout)
         self.assertIn("native_frame_registration=title-menu:mode=search-center-crop-16x9:registration_offset=", completed.stdout)
         self.assertIn(":registration_candidates=", completed.stdout)
-        self.assertIn("diff_frame_path=sonic-hud:out/csd_render_compare/phase131/sonic-hud_frame99_diff.bmp", completed.stdout)
+        self.assertIn("diff_frame_path=sonic-hud:out/csd_render_compare/phase132/sonic-hud_frame99_diff.bmp", completed.stdout)
         self.assertIn("full_frame_delta=sonic-hud:mode=registered-full-frame-nearest", completed.stdout)
+        self.assertIn("ui_layer_diff_frame_path=sonic-hud:out/csd_render_compare/phase132/sonic-hud_frame99_ui_layer_diff.bmp", completed.stdout)
+        self.assertIn("ui_layer_delta=sonic-hud:mode=rendered-csd-coverage-mask", completed.stdout)
+        self.assertIn("ui_layer_delta=tutorial:mode=rendered-csd-coverage-mask", completed.stdout)
+        self.assertIn(":masked_pixels=", completed.stdout)
         self.assertIn("material_parity_triage=sonic-hud:primary=stage-background-not-rendered", completed.stdout)
         self.assertIn("material_parity_triage=tutorial:primary=stage-background-not-rendered", completed.stdout)
         self.assertIn("native_best_path=sonic-hud:", completed.stdout)

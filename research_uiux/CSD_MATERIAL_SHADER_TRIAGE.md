@@ -6,6 +6,9 @@
 
 Phase 131 adds the first full-frame parity triage pass on top of the sampled CSD/native comparison.
 
+> [!NOTE]
+> Phase 132 keeps this triage but moves the active compare lane to `out/csd_render_compare/phase132/`, adds CSD coverage-mask diff BMPs, and emits `ui_layer_delta=` so HUD/tutorial can be compared separately from the stage backbuffer. See `CSD_UI_LAYER_AWARE_DIFF.md`.
+
 The smoke command is:
 
 ```powershell
@@ -44,6 +47,8 @@ That means the high HUD/tutorial deltas are not primarily a CSD sampler bug. The
 For HUD/tutorial, the next useful comparison lane is an alpha/coverage-aware UI-layer diff or a runtime-captured UI-only layer if we can expose one. Tuning CSD shader math against the full native stage frame would chase the wrong signal.
 
 For loading/title/menu, material work is still useful because those screens are closer to full-screen UI composition.
+
+Phase 132 adds the coverage-aware lane. It improves the `tutorial` signal but keeps `sonic-hud` high inside the current rendered CSD mask, which means Sonic HUD still needs deeper scene/timing/material inspection or runtime UI-only capture.
 
 ## Verification
 

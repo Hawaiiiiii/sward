@@ -328,6 +328,23 @@ struct CsdFullFrameDeltaStats
     double nativeNonBlackRatio = 0.0;
 };
 
+struct CsdUiLayerMaskStats
+{
+    bool computed = false;
+    std::string mode = "rendered-csd-coverage-mask";
+    int width = kDesignWidth;
+    int height = kDesignHeight;
+    int pixelCount = 0;
+    int maskedPixelCount = 0;
+    int exactMatchPixels = 0;
+    int significantDeltaPixels = 0;
+    double maskCoverageRatio = 0.0;
+    double meanAbsRgb = 0.0;
+    int maxAbsRgb = 0;
+    double fullFrameMeanAbsRgb = 0.0;
+    double fullFrameDeltaReduction = 0.0;
+};
+
 struct BitmapComparisonStats
 {
     bool nativeFound = false;
@@ -348,6 +365,7 @@ struct BitmapComparisonStats
     BitmapSignalStats rendered;
     BitmapSignalStats native;
     CsdFullFrameDeltaStats fullFrame;
+    CsdUiLayerMaskStats uiLayerDelta;
 };
 
 struct CsdNativeFrameRegistration
@@ -382,6 +400,7 @@ struct CsdRenderedFrameComparison
     int frame = 0;
     std::filesystem::path renderedFramePath;
     std::filesystem::path diffFramePath;
+    std::filesystem::path uiLayerDiffFramePath;
     std::optional<std::filesystem::path> nativeBestPath;
     std::size_t drawCommandCount = 0;
     std::size_t sampledCommandCount = 0;
@@ -3086,6 +3105,7 @@ void blendCsdPixelSrcAlphaOne(std::uint32_t& destinationArgb, const CsdColorRgba
 
 [[nodiscard]] bool drawCsdDrawableCommandSoftware(
     std::vector<std::uint32_t>& canvasPixels,
+    std::vector<std::uint8_t>* coverageMask,
     int canvasWidth,
     int canvasHeight,
     SwardSuUiAssetRenderer& renderer,
@@ -3182,7 +3202,11 @@ void blendCsdPixelSrcAlphaOne(std::uint32_t& destinationArgb, const CsdColorRgba
             if (shaded.a == 0)
                 continue;
 
-            auto& destination = canvasPixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(canvasWidth) + static_cast<std::size_t>(x)];
+            const auto pixelIndex = static_cast<std::size_t>(y) * static_cast<std::size_t>(canvasWidth) + static_cast<std::size_t>(x);
+            if (coverageMask && pixelIndex < coverageMask->size())
+                (*coverageMask)[pixelIndex] = 255;
+
+            auto& destination = canvasPixels[pixelIndex];
             if (command.additiveBlend)
                 blendCsdPixelSrcAlphaOne(destination, shaded);
             else
@@ -4879,6 +4903,15 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return color;
 }
 
+[[nodiscard]] Gdiplus::Color bitmapPixelAtClamped(Gdiplus::Bitmap& bitmap, int x, int y)
+{
+    const int safeX = std::clamp(x, 0, std::max(0, static_cast<int>(bitmap.GetWidth()) - 1));
+    const int safeY = std::clamp(y, 0, std::max(0, static_cast<int>(bitmap.GetHeight()) - 1));
+    Gdiplus::Color color;
+    bitmap.GetPixel(safeX, safeY, &color);
+    return color;
+}
+
 void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
 {
     const int nativeWidth = static_cast<int>(native.GetWidth());
@@ -5068,6 +5101,69 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return stats;
 }
 
+[[nodiscard]] CsdUiLayerMaskStats computeUiLayerDeltaStats(
+    Gdiplus::Bitmap& rendered,
+    Gdiplus::Bitmap& native,
+    const BitmapComparisonStats& alignmentStats,
+    const std::vector<std::uint8_t>& coverageMask,
+    const std::filesystem::path& uiLayerDiffFramePath)
+{
+    CsdUiLayerMaskStats stats;
+    std::uint64_t totalAbs = 0;
+    std::vector<std::uint32_t> diffPixels(static_cast<std::size_t>(kDesignWidth) * static_cast<std::size_t>(kDesignHeight), 0xFF000000);
+
+    for (int y = 0; y < kDesignHeight; ++y)
+    {
+        for (int x = 0; x < kDesignWidth; ++x)
+        {
+            const auto pixelIndex = static_cast<std::size_t>(y) * static_cast<std::size_t>(kDesignWidth) + static_cast<std::size_t>(x);
+            if (pixelIndex >= coverageMask.size() || coverageMask[pixelIndex] == 0)
+                continue;
+
+            const auto left = bitmapPixelAtClamped(rendered, x, y);
+            const auto right = bitmapPixelNearest(
+                native,
+                x,
+                y,
+                kDesignWidth,
+                kDesignHeight,
+                alignmentStats.nativeAlignmentCropX,
+                alignmentStats.nativeAlignmentCropY,
+                alignmentStats.nativeAlignmentCropWidth,
+                alignmentStats.nativeAlignmentCropHeight);
+
+            const int dr = std::abs(static_cast<int>(left.GetR()) - static_cast<int>(right.GetR()));
+            const int dg = std::abs(static_cast<int>(left.GetG()) - static_cast<int>(right.GetG()));
+            const int db = std::abs(static_cast<int>(left.GetB()) - static_cast<int>(right.GetB()));
+            const int channelDelta = dr + dg + db;
+            totalAbs += static_cast<std::uint64_t>(channelDelta);
+            stats.maxAbsRgb = std::max(stats.maxAbsRgb, std::max({ dr, dg, db }));
+            if (channelDelta == 0)
+                ++stats.exactMatchPixels;
+            if (channelDelta > 24)
+                ++stats.significantDeltaPixels;
+            ++stats.maskedPixelCount;
+
+            diffPixels[pixelIndex] = packArgbPixel(CsdColorRgba{
+                static_cast<std::uint8_t>(dr),
+                static_cast<std::uint8_t>(dg),
+                static_cast<std::uint8_t>(db),
+                255,
+            });
+        }
+    }
+
+    stats.pixelCount = kDesignWidth * kDesignHeight;
+    stats.meanAbsRgb = stats.maskedPixelCount == 0 ? 0.0 : static_cast<double>(totalAbs) / static_cast<double>(stats.maskedPixelCount * 3);
+    stats.maskCoverageRatio = stats.pixelCount == 0 ? 0.0 : static_cast<double>(stats.maskedPixelCount) / static_cast<double>(stats.pixelCount);
+    stats.fullFrameMeanAbsRgb = alignmentStats.fullFrame.meanAbsRgb;
+    stats.fullFrameDeltaReduction = alignmentStats.fullFrame.meanAbsRgb - stats.meanAbsRgb;
+
+    auto diffBitmap = bitmapFromArgbPixels(kDesignWidth, kDesignHeight, diffPixels);
+    stats.computed = stats.maskedPixelCount != 0 && diffBitmap && saveBitmapAsBmp(*diffBitmap, uiLayerDiffFramePath);
+    return stats;
+}
+
 [[nodiscard]] BitmapSignalStats computeBitmapSignalStats(Gdiplus::Bitmap& bitmap)
 {
     BitmapSignalStats stats;
@@ -5097,7 +5193,9 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
 [[nodiscard]] BitmapComparisonStats computeBitmapComparisonStats(
     Gdiplus::Bitmap& rendered,
     const std::optional<std::filesystem::path>& nativePath,
-    const std::filesystem::path& diffFramePath)
+    const std::filesystem::path& diffFramePath,
+    const std::vector<std::uint8_t>& coverageMask,
+    const std::filesystem::path& uiLayerDiffFramePath)
 {
     BitmapComparisonStats stats;
     stats.rendered = computeBitmapSignalStats(rendered);
@@ -5124,6 +5222,7 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     stats.maxAbsRgb = registration.bestMaxAbsRgb;
     stats.sampleCount = stats.sampleGridWidth * stats.sampleGridHeight;
     stats.fullFrame = computeFullFrameDeltaStats(rendered, *native, stats, diffFramePath);
+    stats.uiLayerDelta = computeUiLayerDeltaStats(rendered, *native, stats, coverageMask, uiLayerDiffFramePath);
     return stats;
 }
 
@@ -5162,6 +5261,23 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return commands;
 }
 
+[[nodiscard]] std::unique_ptr<Gdiplus::Bitmap> renderCsdOffscreenFrameWithCoverageMask(
+    const CsdDrawableScene& scene,
+    const CsdTimelinePlayback* playback,
+    SwardSuUiAssetRenderer& renderer,
+    std::size_t& sampledCommandCount,
+    CsdSoftwareRenderStats& renderStats,
+    std::vector<std::uint8_t>& coverageMask)
+{
+    std::vector<std::uint32_t> canvasPixels(static_cast<std::size_t>(kDesignWidth) * static_cast<std::size_t>(kDesignHeight), 0xFF000000);
+    coverageMask.assign(static_cast<std::size_t>(kDesignWidth) * static_cast<std::size_t>(kDesignHeight), 0);
+    const auto commands = timelineSampledCommands(scene, playback, sampledCommandCount);
+    for (const auto& command : commands)
+        (void)drawCsdDrawableCommandSoftware(canvasPixels, &coverageMask, kDesignWidth, kDesignHeight, renderer, command, renderStats);
+
+    return bitmapFromArgbPixels(kDesignWidth, kDesignHeight, canvasPixels);
+}
+
 [[nodiscard]] std::unique_ptr<Gdiplus::Bitmap> renderCsdOffscreenFrame(
     const CsdDrawableScene& scene,
     const CsdTimelinePlayback* playback,
@@ -5169,12 +5285,8 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     std::size_t& sampledCommandCount,
     CsdSoftwareRenderStats& renderStats)
 {
-    std::vector<std::uint32_t> canvasPixels(static_cast<std::size_t>(kDesignWidth) * static_cast<std::size_t>(kDesignHeight), 0xFF000000);
-    const auto commands = timelineSampledCommands(scene, playback, sampledCommandCount);
-    for (const auto& command : commands)
-        (void)drawCsdDrawableCommandSoftware(canvasPixels, kDesignWidth, kDesignHeight, renderer, command, renderStats);
-
-    return bitmapFromArgbPixels(kDesignWidth, kDesignHeight, canvasPixels);
+    std::vector<std::uint8_t> coverageMask;
+    return renderCsdOffscreenFrameWithCoverageMask(scene, playback, renderer, sampledCommandCount, renderStats, coverageMask);
 }
 
 [[nodiscard]] std::size_t countUniqueTextures(const std::vector<CsdDrawableCommand>& commands)
@@ -5240,6 +5352,8 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
         triage.riskFlags.push_back("packed-rgba-timeline-active");
     if (comparison.visualDelta.registrationOffsetX != 0 || comparison.visualDelta.registrationOffsetY != 0)
         triage.riskFlags.push_back("native-frame-registration-shift");
+    if (comparison.visualDelta.uiLayerDelta.computed)
+        triage.riskFlags.push_back("ui-layer-aware-diff-active");
 
     return triage;
 }
@@ -5258,6 +5372,7 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     comparison.frame = csdTimelineSampleFrameForTemplate(csdBinding.templateId);
     comparison.renderedFramePath = outputRoot / (std::string(csdBinding.templateId) + "_frame" + std::to_string(comparison.frame) + ".bmp");
     comparison.diffFramePath = outputRoot / (std::string(csdBinding.templateId) + "_frame" + std::to_string(comparison.frame) + "_diff.bmp");
+    comparison.uiLayerDiffFramePath = outputRoot / (std::string(csdBinding.templateId) + "_frame" + std::to_string(comparison.frame) + "_ui_layer_diff.bmp");
 
     for (std::size_t index = 0; index < sgfxBinding.slotCount; ++index)
         comparison.sgfxSlots.emplace_back(sgfxBinding.slots[index].slotName);
@@ -5307,7 +5422,8 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     SwardSuUiAssetRenderer renderer;
     std::size_t sampledCommandCount = 0;
     CsdSoftwareRenderStats renderStats;
-    auto bitmap = renderCsdOffscreenFrame(*scene, playback ? &*playback : nullptr, renderer, sampledCommandCount, renderStats);
+    std::vector<std::uint8_t> coverageMask;
+    auto bitmap = renderCsdOffscreenFrameWithCoverageMask(*scene, playback ? &*playback : nullptr, renderer, sampledCommandCount, renderStats, coverageMask);
     comparison.sampledCommandCount = sampledCommandCount;
     comparison.softwareQuadCommandCount = renderStats.softwareQuadCommandCount;
     comparison.gradientVertexColorCommandCount = renderStats.gradientVertexColorCommandCount;
@@ -5318,7 +5434,7 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     const bool saved = bitmap && saveBitmapAsBmp(*bitmap, comparison.renderedFramePath);
     comparison.nativeBestPath = findNativeBestBmpPathForTarget(csdBinding.templateId);
     comparison.visualDelta = bitmap
-        ? computeBitmapComparisonStats(*bitmap, comparison.nativeBestPath, comparison.diffFramePath)
+        ? computeBitmapComparisonStats(*bitmap, comparison.nativeBestPath, comparison.diffFramePath, coverageMask, comparison.uiLayerDiffFramePath)
         : BitmapComparisonStats{};
     comparison.materialTriage = materialParityTriageForComparison(comparison);
     if (!saved)
@@ -5337,7 +5453,7 @@ void writeCsdRenderCompareManifest(
         return;
 
     out << "{\n";
-    out << "  \"phase\": 131,\n";
+    out << "  \"phase\": 132,\n";
     out << "  \"canvas\": { \"width\": " << kDesignWidth << ", \"height\": " << kDesignHeight << " },\n";
     out << "  \"records\": [\n";
     for (std::size_t index = 0; index < comparisons.size(); ++index)
@@ -5352,6 +5468,7 @@ void writeCsdRenderCompareManifest(
         out << "      \"frame\": " << comparison.frame << ",\n";
         out << "      \"renderedFramePath\": \"" << jsonEscape(portablePath(comparison.renderedFramePath)) << "\",\n";
         out << "      \"diffFramePath\": \"" << jsonEscape(portablePath(comparison.diffFramePath)) << "\",\n";
+        out << "      \"uiLayerDiffFramePath\": \"" << jsonEscape(portablePath(comparison.uiLayerDiffFramePath)) << "\",\n";
         out << "      \"nativeBestPath\": \"" << jsonEscape(comparison.nativeBestPath ? portablePath(*comparison.nativeBestPath) : std::string("")) << "\",\n";
         out << "      \"drawCommandCount\": " << comparison.drawCommandCount << ",\n";
         out << "      \"sampledCommandCount\": " << comparison.sampledCommandCount << ",\n";
@@ -5401,7 +5518,17 @@ void writeCsdRenderCompareManifest(
             << ", \"meanAbsRgb\": " << std::fixed << std::setprecision(3) << comparison.visualDelta.fullFrame.meanAbsRgb
             << ", \"maxAbsRgb\": " << comparison.visualDelta.fullFrame.maxAbsRgb
             << ", \"renderNonBlackRatio\": " << std::fixed << std::setprecision(6) << comparison.visualDelta.fullFrame.renderNonBlackRatio
-            << ", \"nativeNonBlackRatio\": " << comparison.visualDelta.fullFrame.nativeNonBlackRatio << " } },\n";
+            << ", \"nativeNonBlackRatio\": " << comparison.visualDelta.fullFrame.nativeNonBlackRatio
+            << " }, \"uiLayerDelta\": { \"mode\": \"" << jsonEscape(comparison.visualDelta.uiLayerDelta.mode)
+            << "\", \"computed\": " << (comparison.visualDelta.uiLayerDelta.computed ? "true" : "false")
+            << ", \"maskedPixels\": " << comparison.visualDelta.uiLayerDelta.maskedPixelCount
+            << ", \"maskCoverageRatio\": " << std::fixed << std::setprecision(6) << comparison.visualDelta.uiLayerDelta.maskCoverageRatio
+            << ", \"exactMatchPixels\": " << comparison.visualDelta.uiLayerDelta.exactMatchPixels
+            << ", \"significantDeltaPixels\": " << comparison.visualDelta.uiLayerDelta.significantDeltaPixels
+            << ", \"meanAbsRgb\": " << std::fixed << std::setprecision(3) << comparison.visualDelta.uiLayerDelta.meanAbsRgb
+            << ", \"maxAbsRgb\": " << comparison.visualDelta.uiLayerDelta.maxAbsRgb
+            << ", \"fullFrameMeanAbsRgb\": " << comparison.visualDelta.uiLayerDelta.fullFrameMeanAbsRgb
+            << ", \"fullFrameDeltaReduction\": " << comparison.visualDelta.uiLayerDelta.fullFrameDeltaReduction << " } },\n";
         out << "      \"materialParityTriage\": { \"primaryBlocker\": \"" << jsonEscape(comparison.materialTriage.primaryBlocker)
             << "\", \"coverageGap\": " << std::fixed << std::setprecision(6) << comparison.materialTriage.coverageGap
             << ", \"sampledVsFullFrameGap\": " << std::fixed << std::setprecision(3) << comparison.materialTriage.sampledVsFullFrameGap
@@ -5459,7 +5586,7 @@ void writeCsdRenderCompareManifest(
     std::size_t templateCount = 0;
     bool failed = false;
     std::vector<CsdRenderedFrameComparison> comparisons;
-    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase131";
+    const auto outputRoot = repoRootForOutput() / "out" / "csd_render_compare" / "phase132";
     const auto manifestPath = outputRoot / "csd_render_compare_manifest.json";
 
     Gdiplus::GdiplusStartupInput gdiplusInput{};
@@ -5512,6 +5639,12 @@ void writeCsdRenderCompareManifest(
             << comparison.templateId
             << ":"
             << portablePath(comparison.diffFramePath)
+            << '\n';
+        std::cout
+            << "ui_layer_diff_frame_path="
+            << comparison.templateId
+            << ":"
+            << portablePath(comparison.uiLayerDiffFramePath)
             << '\n';
         std::cout
             << "material_semantics="
@@ -5636,6 +5769,30 @@ void writeCsdRenderCompareManifest(
             << std::fixed
             << std::setprecision(3)
             << comparison.materialTriage.sampledVsFullFrameGap
+            << '\n';
+        std::cout
+            << "ui_layer_delta="
+            << comparison.templateId
+            << ":mode="
+            << comparison.visualDelta.uiLayerDelta.mode
+            << ":masked_pixels="
+            << comparison.visualDelta.uiLayerDelta.maskedPixelCount
+            << ":coverage="
+            << std::fixed
+            << std::setprecision(6)
+            << comparison.visualDelta.uiLayerDelta.maskCoverageRatio
+            << ":mean_abs_rgb="
+            << std::fixed
+            << std::setprecision(3)
+            << comparison.visualDelta.uiLayerDelta.meanAbsRgb
+            << ":max_abs_rgb="
+            << comparison.visualDelta.uiLayerDelta.maxAbsRgb
+            << ":significant="
+            << comparison.visualDelta.uiLayerDelta.significantDeltaPixels
+            << ":full_frame_mean_abs_rgb="
+            << comparison.visualDelta.uiLayerDelta.fullFrameMeanAbsRgb
+            << ":full_frame_delta_reduction="
+            << comparison.visualDelta.uiLayerDelta.fullFrameDeltaReduction
             << '\n';
         std::cout
             << "native_best_path="
