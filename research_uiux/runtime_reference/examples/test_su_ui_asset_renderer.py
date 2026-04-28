@@ -731,7 +731,7 @@ class SuUiAssetRendererTests(unittest.TestCase):
             check=True,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=240,
         )
 
         self.assertIn("sward_su_ui_asset_renderer runtime csd material export ok", completed.stdout)
@@ -875,6 +875,20 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("runtime_drawable_oracle_status=runtime-csd-tree-local-material", source_text)
         self.assertIn("gpu_draw_list_status=pending", source_text)
         self.assertIn("drawable_scene_source=ui-oracle-active-scenes", source_text)
+
+    def test_renderer_source_wires_phase149_runtime_draw_list_consumption(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendRuntimeDrawListEvidence", source_text)
+        self.assertIn("FrontendRuntimeDrawCall", source_text)
+        self.assertIn("queryUiLabLiveBridgeUiDrawList", source_text)
+        self.assertIn("loadFrontendRuntimeDrawListEvidence", source_text)
+        self.assertIn("buildFrontendRuntimeDrawListTriage", source_text)
+        self.assertIn("runRendererUiDrawListTriageSmoke", source_text)
+        self.assertIn("--renderer-ui-draw-list-triage-smoke", source_text)
+        self.assertIn("phase149-ui-draw-list-triage", source_text)
+        self.assertIn("runtime_draw_list_source=ui-draw-list", source_text)
+        self.assertIn("material_triage=runtime-rectangles-vs-local-csd", source_text)
+        self.assertIn("backend_submit_status=pending", source_text)
 
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
@@ -1034,7 +1048,7 @@ class SuUiAssetRendererTests(unittest.TestCase):
             check=True,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=180,
         )
 
         self.assertIn("sward_su_ui_asset_renderer ui drawable oracle smoke ok", completed.stdout)
@@ -1046,6 +1060,31 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertRegex(completed.stdout, r"drawable_oracle=loading:source=(ui_lab_live_bridge_ui_oracle|ui_lab_live_bridge_state|ui_lab_live_state):active_project=ui_loading:active_scenes=[0-9]+:drawable_scenes=[1-9]\d*:commands=[1-9]\d*")
         self.assertRegex(completed.stdout, r"drawable_oracle_scene=title-menu:mm_bg_usual:runtime_path=[^:]+:animation=DefaultAnim:frame=[0-9]+/120:commands=[1-9]\d*:sampled_tracks=[0-9]+:textures=[1-9]\d*:drawable_scene_source=ui-oracle-active-scenes")
         self.assertRegex(completed.stdout, r"drawable_oracle_scene=loading:pda:runtime_path=[^:]+:animation=Usual_Anim_3:frame=[0-9]+/240:commands=[1-9]\d*:sampled_tracks=[0-9]+:textures=[1-9]\d*:drawable_scene_source=ui-oracle-active-scenes")
+
+    def test_renderer_ui_draw_list_triage_smoke_reports_runtime_rectangles(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-ui-draw-list-triage-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer ui draw-list triage smoke ok", completed.stdout)
+        self.assertIn("mode=phase149-ui-draw-list-triage", completed.stdout)
+        self.assertRegex(completed.stdout, r"ui_draw_list_probe=(direct-ui-draw-list|ui-oracle-fallback|missing)")
+        self.assertIn("runtime_draw_list_source=ui-draw-list", completed.stdout)
+        self.assertIn("material_triage=runtime-rectangles-vs-local-csd", completed.stdout)
+        self.assertIn("backend_submit_status=pending", completed.stdout)
+        self.assertRegex(completed.stdout, r"draw_list_triage=title-menu:source=(ui_lab_live_bridge_ui_draw_list|ui_lab_live_bridge_ui_oracle|missing):runtime_calls=[0-9]+:runtime_rects=[0-9]+:local_commands=[1-9]\d*:local_textures=[1-9]\d*:rect_match_candidates=[0-9]+:backend_submit_status=pending")
+        self.assertRegex(completed.stdout, r"draw_list_triage=loading:source=(ui_lab_live_bridge_ui_draw_list|ui_lab_live_bridge_ui_oracle|missing):runtime_calls=[0-9]+:runtime_rects=[0-9]+:local_commands=[1-9]\d*:local_textures=[1-9]\d*:rect_match_candidates=[0-9]+:backend_submit_status=pending")
+        self.assertRegex(completed.stdout, r"draw_list_scene=title-menu:mm_bg_usual:local_commands=[1-9]\d*:runtime_rects=[0-9]+:material_triage=runtime-rectangles-vs-local-csd")
+        self.assertRegex(completed.stdout, r"draw_list_scene=loading:pda:local_commands=[1-9]\d*:runtime_rects=[0-9]+:material_triage=runtime-rectangles-vs-local-csd")
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

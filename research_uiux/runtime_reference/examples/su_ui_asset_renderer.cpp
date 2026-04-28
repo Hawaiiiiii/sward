@@ -279,6 +279,61 @@ struct FrontendRuntimeDrawableOracle
     std::vector<FrontendRuntimeDrawableOracleScene> scenes;
 };
 
+struct FrontendRuntimeDrawCall
+{
+    std::string project;
+    std::string layerPath;
+    std::string sceneName;
+    std::string primitive = "quad";
+    std::string colorSample;
+    bool textured = false;
+    int vertexCount = 0;
+    int vertexStride = 0;
+    double minX = 0.0;
+    double minY = 0.0;
+    double maxX = 0.0;
+    double maxY = 0.0;
+};
+
+struct FrontendRuntimeDrawListEvidence
+{
+    bool found = false;
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string activeProject;
+    std::string runtimeDrawListStatus = "missing";
+    std::string backendSubmitStatus = "pending";
+    int runtimeFrame = 0;
+    std::vector<FrontendRuntimeDrawCall> calls;
+    FrontendLiveBridgeProbeResult bridgeProbe;
+};
+
+struct FrontendRuntimeDrawListTriageScene
+{
+    std::string sceneName;
+    std::size_t localCommandCount = 0;
+    std::size_t localTextureCount = 0;
+    std::size_t runtimeRectCount = 0;
+    std::size_t rectMatchCandidates = 0;
+};
+
+struct FrontendRuntimeDrawListTriage
+{
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string runtimeDrawListSource = "ui-draw-list";
+    std::string materialTriage = "runtime-rectangles-vs-local-csd";
+    std::string backendSubmitStatus = "pending";
+    std::size_t runtimeCallCount = 0;
+    std::size_t runtimeRectCount = 0;
+    std::size_t localCommandCount = 0;
+    std::size_t localTextureCount = 0;
+    std::size_t rectMatchCandidates = 0;
+    std::vector<FrontendRuntimeDrawListTriageScene> scenes;
+};
+
 struct CsdColorRgba
 {
     std::uint8_t r = 255;
@@ -752,6 +807,9 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeUiOracle(
     std::string_view pipeName,
     DWORD timeoutMilliseconds = 150);
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeUiDrawList(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds = 150);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveBridge(
@@ -759,6 +817,8 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] FrontendUiOracleEvidence loadFrontendUiOracleEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendUiOraclePlaybackClock loadFrontendUiOraclePlaybackClock(
+    const sward::ui_runtime::FrontendScreenPolicy& policy);
+[[nodiscard]] FrontendRuntimeDrawListEvidence loadFrontendRuntimeDrawListEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] std::string formatFrontendRuntimeAlignmentEvidence(const FrontendLiveStateAlignmentEvidence& evidence);
 
@@ -5805,6 +5865,195 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return records.empty() ? 1 : 0;
 }
 
+[[nodiscard]] bool runtimeDrawCallHasRectangle(const FrontendRuntimeDrawCall& call)
+{
+    return call.maxX > call.minX && call.maxY > call.minY;
+}
+
+[[nodiscard]] bool csdCommandIsDrawable(const CsdDrawableCommand& command)
+{
+    return !command.hidden && (command.textureResolved || command.sourceFreeStructural);
+}
+
+[[nodiscard]] bool runtimeDrawCallMatchesScene(const FrontendRuntimeDrawCall& call, std::string_view sceneName)
+{
+    if (call.sceneName == sceneName)
+        return true;
+    const std::string sceneToken = "/" + std::string(sceneName) + "/";
+    return call.layerPath.find(sceneToken) != std::string::npos
+        || call.layerPath.ends_with("/" + std::string(sceneName));
+}
+
+[[nodiscard]] bool runtimeRectOverlapsCommand(
+    const FrontendRuntimeDrawCall& call,
+    const CsdDrawableCommand& command)
+{
+    if (!runtimeDrawCallHasRectangle(call) || !csdCommandIsDrawable(command))
+        return false;
+
+    const double commandMinX = static_cast<double>(command.destinationX);
+    const double commandMinY = static_cast<double>(command.destinationY);
+    const double commandMaxX = commandMinX + static_cast<double>(std::max(0, command.destinationWidth));
+    const double commandMaxY = commandMinY + static_cast<double>(std::max(0, command.destinationHeight));
+    return call.minX < commandMaxX
+        && call.maxX > commandMinX
+        && call.minY < commandMaxY
+        && call.maxY > commandMinY;
+}
+
+[[nodiscard]] FrontendRuntimeDrawListTriage buildFrontendRuntimeDrawListTriage(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendRuntimeDrawListTriage triage;
+    triage.screenId = policy.screenId;
+
+    const auto drawList = loadFrontendRuntimeDrawListEvidence(policy);
+    triage.source = drawList.source;
+    triage.probe = drawList.probe;
+    triage.runtimeCallCount = drawList.calls.size();
+    triage.runtimeRectCount = static_cast<std::size_t>(std::count_if(
+        drawList.calls.begin(),
+        drawList.calls.end(),
+        runtimeDrawCallHasRectangle));
+
+    const auto clock = loadFrontendUiOraclePlaybackClock(policy);
+    std::vector<std::string> screenTextureNames;
+
+    for (const auto& scenePolicy : policy.scenes)
+    {
+        FrontendRuntimeDrawListTriageScene scene;
+        scene.sceneName = scenePolicy.sceneName;
+
+        const int sceneFrame = uiOracleTimelineFrameForScene(clock, scenePolicy);
+        const CsdPipelineTemplateBinding sceneBinding{
+            policy.screenId,
+            policy.layoutName,
+            scenePolicy.sceneName,
+            scenePolicy.sceneName,
+            scenePolicy.timeline.animationName,
+        };
+
+        const auto* drawableScene = cachedCsdDrawableScene(sceneBinding);
+        auto playback = loadCsdTimelinePlayback(sceneBinding, sceneFrame);
+        if (!playback)
+            playback = loadTimelinePlaybackForScene(policy.screenId, policy.layoutName, scenePolicy.sceneName, sceneFrame);
+
+        std::vector<CsdDrawableCommand> commands;
+        if (drawableScene)
+        {
+            std::size_t sampledTrackCount = 0;
+            commands = timelineSampledCommands(
+                *drawableScene,
+                playback ? &*playback : nullptr,
+                sampledTrackCount);
+        }
+
+        std::vector<std::string> sceneTextureNames;
+        for (const auto& command : commands)
+        {
+            if (!csdCommandIsDrawable(command))
+                continue;
+            ++scene.localCommandCount;
+            appendUniqueTextureName(screenTextureNames, command.textureName);
+            appendUniqueTextureName(sceneTextureNames, command.textureName);
+        }
+        scene.localTextureCount = sceneTextureNames.size();
+
+        for (const auto& call : drawList.calls)
+        {
+            if (!runtimeDrawCallHasRectangle(call))
+                continue;
+
+            const bool sceneMatched = runtimeDrawCallMatchesScene(call, scene.sceneName);
+            if (sceneMatched)
+                ++scene.runtimeRectCount;
+
+            const bool overlapsLocalCommand = std::any_of(
+                commands.begin(),
+                commands.end(),
+                [&call](const CsdDrawableCommand& command)
+                {
+                    return runtimeRectOverlapsCommand(call, command);
+                });
+            if (sceneMatched || overlapsLocalCommand)
+                ++scene.rectMatchCandidates;
+        }
+
+        triage.localCommandCount += scene.localCommandCount;
+        triage.rectMatchCandidates += scene.rectMatchCandidates;
+        triage.scenes.push_back(std::move(scene));
+    }
+
+    triage.localTextureCount = screenTextureNames.size();
+    return triage;
+}
+
+[[nodiscard]] int runRendererUiDrawListTriageSmoke()
+{
+    constexpr std::string_view directProbeToken = "ui_draw_list_probe=direct-ui-draw-list";
+    constexpr std::string_view oracleFallbackToken = "ui_draw_list_probe=ui-oracle-fallback";
+    constexpr std::string_view missingProbeToken = "ui_draw_list_probe=missing";
+    constexpr std::string_view runtimeDrawListSourceToken = "runtime_draw_list_source=ui-draw-list";
+    constexpr std::string_view materialTriageToken = "material_triage=runtime-rectangles-vs-local-csd";
+    constexpr std::string_view backendSubmitStatusToken = "backend_submit_status=pending";
+
+    std::vector<FrontendRuntimeDrawListTriage> records;
+    for (const auto& policy : frontendScreenPolicies())
+        records.push_back(buildFrontendRuntimeDrawListTriage(policy));
+
+    const bool anyDirect = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendRuntimeDrawListTriage& record)
+        {
+            return record.probe == "direct-ui-draw-list";
+        });
+    const bool anyOracle = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendRuntimeDrawListTriage& record)
+        {
+            return record.probe == "ui-oracle-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer ui draw-list triage smoke ok "
+        << "mode=phase149-ui-draw-list-triage"
+        << " " << (anyDirect ? directProbeToken : (anyOracle ? oracleFallbackToken : missingProbeToken))
+        << " " << runtimeDrawListSourceToken
+        << " " << materialTriageToken
+        << " " << backendSubmitStatusToken
+        << " lanes=" << records.size()
+        << '\n';
+
+    for (const auto& record : records)
+    {
+        std::cout
+            << "draw_list_triage=" << record.screenId
+            << ":source=" << record.source
+            << ":runtime_calls=" << record.runtimeCallCount
+            << ":runtime_rects=" << record.runtimeRectCount
+            << ":local_commands=" << record.localCommandCount
+            << ":local_textures=" << record.localTextureCount
+            << ":rect_match_candidates=" << record.rectMatchCandidates
+            << ":backend_submit_status=" << record.backendSubmitStatus
+            << '\n';
+
+        for (const auto& scene : record.scenes)
+        {
+            std::cout
+                << "draw_list_scene=" << record.screenId
+                << ":" << scene.sceneName
+                << ":local_commands=" << scene.localCommandCount
+                << ":runtime_rects=" << scene.runtimeRectCount
+                << ":material_triage=" << record.materialTriage
+                << '\n';
+        }
+    }
+
+    return records.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -7928,6 +8177,13 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return queryUiLabLiveBridgeCommand(pipeName, "ui-oracle", timeoutMilliseconds);
 }
 
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeUiDrawList(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds)
+{
+    return queryUiLabLiveBridgeCommand(pipeName, "ui-draw-list", timeoutMilliseconds);
+}
+
 [[nodiscard]] std::string frontendAlignmentCursorOwnerFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy,
     std::string_view text)
@@ -8271,6 +8527,132 @@ void applyFrontendUiOracleFromLiveStateJson(
         text,
         "ui_lab_live_state");
     return fallback;
+}
+
+[[nodiscard]] std::string runtimeDrawListSceneFromLayerPath(std::string_view activeProject, std::string_view layerPath)
+{
+    std::string remaining(layerPath);
+    const std::string projectPrefix = std::string(activeProject) + "/";
+    if (!activeProject.empty() && remaining.starts_with(projectPrefix))
+        remaining = remaining.substr(projectPrefix.size());
+
+    const auto slash = remaining.find('/');
+    if (slash != std::string::npos)
+        return remaining.substr(0, slash);
+    return remaining;
+}
+
+[[nodiscard]] FrontendRuntimeDrawCall parseFrontendRuntimeDrawCall(
+    std::string_view objectSpan,
+    std::string_view activeProject)
+{
+    FrontendRuntimeDrawCall call;
+    call.project = jsonStringField(objectSpan, "project").value_or(std::string(activeProject));
+    call.layerPath = jsonStringField(objectSpan, "layerPath").value_or("");
+    call.sceneName = runtimeDrawListSceneFromLayerPath(
+        call.project.empty() ? activeProject : std::string_view(call.project),
+        call.layerPath);
+    call.primitive = jsonStringField(objectSpan, "primitive").value_or("quad");
+    call.colorSample = jsonStringField(objectSpan, "colorSample").value_or("");
+    call.textured = jsonBoolField(objectSpan, "textured").value_or(false);
+    call.vertexCount = static_cast<int>(jsonNumberField(objectSpan, "vertexCount").value_or(0.0));
+    call.vertexStride = static_cast<int>(jsonNumberField(objectSpan, "vertexStride").value_or(0.0));
+
+    if (const auto screenRect = jsonObjectFieldSpan(objectSpan, "screenRect"))
+    {
+        call.minX = jsonNumberField(*screenRect, "minX").value_or(0.0);
+        call.minY = jsonNumberField(*screenRect, "minY").value_or(0.0);
+        call.maxX = jsonNumberField(*screenRect, "maxX").value_or(0.0);
+        call.maxY = jsonNumberField(*screenRect, "maxY").value_or(0.0);
+    }
+
+    return call;
+}
+
+void applyFrontendRuntimeDrawListFromJson(
+    FrontendRuntimeDrawListEvidence& evidence,
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    std::string_view text,
+    std::string_view source,
+    std::string_view probe)
+{
+    evidence.found = true;
+    evidence.screenId = jsonStringField(text, "target").value_or(policy.screenId);
+    evidence.source = std::string(source);
+    evidence.probe = std::string(probe);
+    evidence.activeProject = jsonStringField(text, "targetProject").value_or("");
+    if (evidence.activeProject.empty())
+        evidence.activeProject = jsonStringField(text, "activeProject").value_or("");
+    if (evidence.activeProject.empty())
+        evidence.activeProject = frontendRuntimeDrawableProjectName(policy, "");
+    evidence.runtimeFrame = static_cast<int>(jsonNumberField(text, "frame").value_or(0.0));
+    evidence.runtimeDrawListStatus = jsonStringField(text, "runtimeDrawListStatus").value_or("missing");
+    evidence.backendSubmitStatus = jsonStringField(text, "gpuDrawListStatus").value_or("GPU backend submit pending");
+
+    const auto drawListOracle = jsonObjectFieldSpan(text, "uiDrawListOracle");
+    const std::string_view drawListSpan = drawListOracle ? *drawListOracle : text;
+    if (const auto calls = jsonArrayFieldSpan(drawListSpan, "drawCalls"))
+    {
+        for (const auto callSpan : jsonObjectSpansInArray(*calls))
+        {
+            auto call = parseFrontendRuntimeDrawCall(callSpan, evidence.activeProject);
+            if (!call.layerPath.empty())
+                evidence.calls.push_back(std::move(call));
+        }
+    }
+}
+
+[[nodiscard]] FrontendRuntimeDrawListEvidence loadFrontendRuntimeDrawListEvidence(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    constexpr std::string_view defaultPipeName = "sward_ui_lab_live";
+    const auto discoveredPipeName = discoverFrontendLiveBridgeName(policy.screenId);
+
+    auto drawProbe = queryUiLabLiveBridgeUiDrawList(discoveredPipeName);
+    if (!drawProbe.connected && discoveredPipeName != defaultPipeName)
+        drawProbe = queryUiLabLiveBridgeUiDrawList(defaultPipeName);
+
+    const auto drawTarget = drawProbe.connected && !drawProbe.responseJson.empty()
+        ? jsonStringField(drawProbe.responseJson, "target")
+        : std::optional<std::string>{};
+    if (drawProbe.connected && drawTarget && *drawTarget == policy.screenId)
+    {
+        FrontendRuntimeDrawListEvidence evidence;
+        evidence.bridgeProbe = drawProbe;
+        applyFrontendRuntimeDrawListFromJson(
+            evidence,
+            policy,
+            drawProbe.responseJson,
+            "ui_lab_live_bridge_ui_draw_list",
+            "direct-ui-draw-list");
+        return evidence;
+    }
+
+    auto oracleProbe = queryUiLabLiveBridgeUiOracle(discoveredPipeName);
+    if (!oracleProbe.connected && discoveredPipeName != defaultPipeName)
+        oracleProbe = queryUiLabLiveBridgeUiOracle(defaultPipeName);
+
+    const auto oracleTarget = oracleProbe.connected && !oracleProbe.responseJson.empty()
+        ? jsonStringField(oracleProbe.responseJson, "target")
+        : std::optional<std::string>{};
+    if (oracleProbe.connected && oracleTarget && *oracleTarget == policy.screenId)
+    {
+        FrontendRuntimeDrawListEvidence evidence;
+        evidence.bridgeProbe = oracleProbe;
+        applyFrontendRuntimeDrawListFromJson(
+            evidence,
+            policy,
+            oracleProbe.responseJson,
+            "ui_lab_live_bridge_ui_oracle",
+            "ui-oracle-fallback");
+        return evidence;
+    }
+
+    FrontendRuntimeDrawListEvidence missing;
+    missing.screenId = policy.screenId;
+    missing.activeProject = frontendRuntimeDrawableProjectName(policy, "");
+    missing.bridgeProbe = drawProbe;
+    return missing;
 }
 
 [[nodiscard]] FrontendUiOraclePlaybackClock loadFrontendUiOraclePlaybackClock(
@@ -10040,6 +10422,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererUiOraclePlaybackSmoke();
     if (commandLineHasFlag("--renderer-ui-drawable-oracle-smoke"))
         return runRendererUiDrawableOracleSmoke();
+    if (commandLineHasFlag("--renderer-ui-draw-list-triage-smoke"))
+        return runRendererUiDrawListTriageSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 
