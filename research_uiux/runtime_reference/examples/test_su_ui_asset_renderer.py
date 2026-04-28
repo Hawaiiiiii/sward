@@ -546,14 +546,15 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("layout_source=research_uiux/data/layout_deep_analysis.json", completed.stdout)
         self.assertIn("templates=4", completed.stdout)
         self.assertIn("packages=3", completed.stdout)
-        self.assertIn("csd_drawable=title-menu:layout=ui_mainmenu.yncp:scene=mm_bg_usual:commands=36:casts=47:subimages=46", completed.stdout)
-        self.assertIn("csd_drawable=loading:layout=ui_loading.yncp:scene=pda:commands=28:casts=57:subimages=320", completed.stdout)
-        self.assertIn("csd_drawable=sonic-hud:layout=ui_playscreen.yncp:scene=so_speed_gauge:commands=43:casts=47:subimages=202", completed.stdout)
-        self.assertIn("csd_drawable=tutorial:layout=ui_playscreen.yncp:scene=u_info:commands=10:casts=16:subimages=202", completed.stdout)
+        self.assertIn("csd_drawable=title-menu:layout=ui_mainmenu.yncp:scene=mm_bg_usual:commands=47:casts=47:subimages=46", completed.stdout)
+        self.assertIn("csd_drawable=loading:layout=ui_loading.yncp:scene=pda:commands=54:casts=57:subimages=320", completed.stdout)
+        self.assertIn("csd_drawable=sonic-hud:layout=ui_playscreen.yncp:scene=so_speed_gauge:commands=47:casts=47:subimages=202", completed.stdout)
+        self.assertIn("csd_drawable=tutorial:layout=ui_playscreen.yncp:scene=u_info:commands=16:casts=16:subimages=202", completed.stdout)
         self.assertIn("csd_draw_command=title-menu:mm_bg_usual/black3->black3:texture=ui_mm_parts1.dds:subimage=14:src=896,336,16x16:dst=655,435,368x464", completed.stdout)
         self.assertIn("csd_draw_command=loading:pda/bg->bg:texture=mat_load_comon_001.dds:subimage=201:src=595,463,10x60:dst=180,146,920x60", completed.stdout)
         self.assertIn("csd_draw_command=sonic-hud:so_speed_gauge/Cast_0506_bg->Cast_0506_bg:texture=ui_ps1_gauge1.dds:subimage=154:src=4,64,16x20:dst=752,357,16x20", completed.stdout)
         self.assertIn("csd_draw_command=tutorial:u_info/bar->bar:texture=mat_hit_001.dds:subimage=115:src=246,248,1x7:dst=646,352,243x7", completed.stdout)
+        self.assertIn(":source-free-structural", completed.stdout)
         self.assertIn("texture_binding=title-menu:ui_mm_parts1.dds:resolved=1:size=1280x640", completed.stdout)
         self.assertIn("texture_binding=loading:mat_load_comon_001.dds:resolved=1:size=1280x720", completed.stdout)
         self.assertIn("texture_binding=sonic-hud:ui_ps1_gauge1.dds:resolved=1:size=256x128", completed.stdout)
@@ -582,7 +583,7 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("sward_su_ui_asset_renderer csd drawable smoke ok", completed.stdout)
         self.assertIn("templates=1", completed.stdout)
         self.assertIn("packages=1", completed.stdout)
-        self.assertIn("csd_drawable=loading:layout=ui_loading.yncp:scene=pda:commands=28", completed.stdout)
+        self.assertIn("csd_drawable=loading:layout=ui_loading.yncp:scene=pda:commands=54", completed.stdout)
         self.assertIn("csd_draw_command=loading:pda/bg->bg:texture=mat_load_comon_001.dds", completed.stdout)
         self.assertNotIn("csd_drawable=title-menu:", completed.stdout)
         self.assertNotIn("csd_drawable=sonic-hud:", completed.stdout)
@@ -797,6 +798,16 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("title-options", source_text)
         self.assertIn("compact-reference-status:no-template-card=1", source_text)
 
+    def test_renderer_source_wires_phase140_reference_playback_and_policy_export(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("phase140-reference-playback", source_text)
+        self.assertIn("sourceFreeStructural", source_text)
+        self.assertIn("renderCsdReferenceViewerCommands", source_text)
+        self.assertIn("CsdReusableReferenceScreenModel", source_text)
+        self.assertIn("writeReusableScreenReferenceCode", source_text)
+        self.assertIn("runReferencePolicyExportSmoke", source_text)
+        self.assertIn("--renderer-reference-policy-export-smoke", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -835,16 +846,46 @@ class SuUiAssetRendererTests(unittest.TestCase):
         )
 
         self.assertIn("sward_su_ui_asset_renderer reference lanes smoke ok", completed.stdout)
+        self.assertIn("mode=phase140-reference-playback", completed.stdout)
         self.assertIn("reference_lane=title-menu:screen=MainMenuComposite:layout=ui_mainmenu.yncp:scenes=3", completed.stdout)
         self.assertIn("reference_lane=loading:screen=LoadingComposite:layout=ui_loading.yncp:scenes=2", completed.stdout)
         self.assertIn("reference_lane=title-options:screen=TitleOptionsReference:layout=ui_mainmenu.yncp:scenes=2", completed.stdout)
         self.assertIn("reference_lane=pause:screen=PauseMenuReference:layout=ui_pause.yncp:scenes=8", completed.stdout)
-        self.assertIn("reference_scene=title-menu:mm_bg_usual:commands=36", completed.stdout)
-        self.assertIn("reference_scene=loading:pda:commands=28", completed.stdout)
+        self.assertRegex(completed.stdout, r"reference_lane=title-menu:.*timeline_resolved=[1-9]\d*:.*sampled_tracks=[1-9]\d*")
+        self.assertRegex(completed.stdout, r"reference_lane=pause:.*structural=[1-9]\d*:source_free=[1-9]\d*")
+        self.assertRegex(completed.stdout, r"reference_scene=title-menu:mm_bg_usual:commands=[1-9]\d*")
+        self.assertRegex(completed.stdout, r"reference_scene=loading:pda:commands=[1-9]\d*")
         self.assertIn("reference_scene=title-options:mm_contentsitem_select", completed.stdout)
-        self.assertIn("reference_scene=pause:bg:commands=0", completed.stdout)
-        self.assertIn("reference_scene=pause:bg_1:commands=9", completed.stdout)
+        self.assertRegex(completed.stdout, r"reference_scene=pause:bg:commands=[1-9]\d*:.*structural=[1-9]\d*")
+        self.assertRegex(completed.stdout, r"reference_scene=pause:text_area:commands=[1-9]\d*:.*structural=[1-9]\d*")
+        self.assertRegex(completed.stdout, r"reference_scene=pause:bg_1:commands=[1-9]\d*")
+        self.assertRegex(completed.stdout, r"reference_scene=pause:bg_1:.*timeline=Intro_Anim@[0-9]+/[0-9]+:sampled_tracks=[1-9]\d*")
         self.assertIn("reference_overlay=compact-reference-status:no-template-card=1", completed.stdout)
+
+    def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-reference-policy-export-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer reference policy export smoke ok", completed.stdout)
+        self.assertIn("mode=phase140-reusable-screen-policy", completed.stdout)
+        self.assertIn("reference_policy_export_path=out/csd_runtime_exports/phase140/title_loading_options_pause_reference.hpp", completed.stdout)
+        self.assertIn("reference_policy=title-menu:screen=MainMenuComposite:layout=ui_mainmenu.yncp:activation=title-menu-visible:transition=select_travel->title menu visual ready:input_lock=until:title-menu-visible:render_order=scene-stack:material_slots=4:sgfx_slots=4", completed.stdout)
+        self.assertIn("reference_policy=loading:screen=LoadingComposite:layout=ui_loading.yncp:activation=loading-display-active:transition=pda_intro->loading display active:input_lock=until:loading-display-active:render_order=scene-stack:material_slots=4:sgfx_slots=4", completed.stdout)
+        self.assertIn("reference_policy=title-options:screen=TitleOptionsReference:layout=ui_mainmenu.yncp:activation=title-options-ready:transition=select_travel->title options visual ready:input_lock=until:title-options-ready:render_order=scene-stack:material_slots=4:sgfx_slots=4", completed.stdout)
+        self.assertIn("reference_policy=pause:screen=PauseMenuReference:layout=ui_pause.yncp:activation=pause-ready:transition=intro_medium->pause menu visual ready:input_lock=until:pause-ready:render_order=scene-stack:material_slots=4:sgfx_slots=4", completed.stdout)
+        self.assertRegex(completed.stdout, r"reference_policy_scene=pause:bg:timeline=Intro_Anim@[0-9]+/[0-9]+:commands=[1-9]\d*:structural=[1-9]\d*:sampled_tracks=[0-9]+")
+        self.assertRegex(completed.stdout, r"reference_policy_scene=pause:text_area:timeline=Usual_Anim@[0-9]+/[0-9]+:commands=[1-9]\d*:structural=[1-9]\d*:sampled_tracks=[0-9]+")
+        self.assertIn("reference_policy_source_status=clean-readable-title-loading-options-pause-exported", completed.stdout)
 
     def test_renderer_viewer_compare_smoke_writes_offscreen_viewer_frames(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

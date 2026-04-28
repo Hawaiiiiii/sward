@@ -223,6 +223,7 @@ struct CsdDrawableCommand
     bool flipY = false;
     bool textureResolved = false;
     bool sourceFits = false;
+    bool sourceFreeStructural = false;
 };
 
 struct CsdDrawableScene
@@ -616,6 +617,20 @@ struct CsdSoftwareRenderStats
     std::size_t additiveSoftwareCommandCount = 0;
     CsdSamplerStats samplerStats;
 };
+
+[[nodiscard]] std::optional<CsdTimelinePlayback> loadTimelinePlaybackForScene(
+    std::string_view templateId,
+    std::string_view layoutFileName,
+    std::string_view localSceneName);
+
+[[nodiscard]] std::vector<CsdDrawableCommand> timelineSampledCommands(
+    const CsdDrawableScene& scene,
+    const CsdTimelinePlayback* playback,
+    std::size_t& sampledCommandCount);
+
+[[nodiscard]] std::string portablePath(const std::filesystem::path& path);
+[[nodiscard]] std::string jsonEscape(std::string_view text);
+[[nodiscard]] std::filesystem::path repoRootForOutput();
 
 inline constexpr std::array<TextureSourceCandidate, 32> kTextureSourceCandidates{{
     { "mat_load_comon_001.dds", "ui_extended_archives/Loading/mat_load_comon_001.dds" },
@@ -2272,14 +2287,6 @@ void refreshCsdGradientState(CsdDrawableCommand& command)
             if (static_cast<int>(jsonNumberField(castObject, "is_enabled").value_or(0.0)) == 0)
                 continue;
 
-            const auto subimageIndex = firstUsedSubimageIndex(castObject);
-            if (!subimageIndex || *subimageIndex < 0 || static_cast<std::size_t>(*subimageIndex) >= subimages.size())
-                continue;
-
-            const auto& subimage = subimages[static_cast<std::size_t>(*subimageIndex)];
-            if (subimage.textureIndex < 0 || static_cast<std::size_t>(subimage.textureIndex) >= textureNames.size())
-                continue;
-
             const auto castInfo = jsonObjectFieldSpan(castObject, "cast_info");
             if (!castInfo)
                 continue;
@@ -2303,9 +2310,6 @@ void refreshCsdGradientState(CsdDrawableCommand& command)
             command.castName = csdCastNameFor(dictionary, command.groupIndex, command.castIndex);
             command.drawType = static_cast<int>(jsonNumberField(castObject, "field04").value_or(1.0));
             command.castFlags = static_cast<std::uint32_t>(jsonNumberField(castObject, "field38").value_or(0.0));
-            command.subimageIndex = *subimageIndex;
-            command.textureIndex = subimage.textureIndex;
-            command.textureName = textureNames[static_cast<std::size_t>(subimage.textureIndex)];
             command.castWidth = castWidth;
             command.castHeight = castHeight;
             command.translationX = translationX;
@@ -2349,21 +2353,41 @@ void refreshCsdGradientState(CsdDrawableCommand& command)
             command.destinationY = static_cast<int>(std::llround(
                 ((0.5 + translationY) * static_cast<double>(kDesignHeight)) - (static_cast<double>(command.destinationHeight) * 0.5)));
 
-            const auto* textureInfo = textureInfoFor(command.textureName);
-            if (textureInfo)
+            const auto subimageIndex = firstUsedSubimageIndex(castObject);
+            if (!subimageIndex || *subimageIndex < 0 || static_cast<std::size_t>(*subimageIndex) >= subimages.size())
             {
-                command.textureResolved = true;
-                command.textureWidth = textureInfo->width;
-                command.textureHeight = textureInfo->height;
-                const int sourceLeft = static_cast<int>(std::llround(subimage.left * static_cast<double>(textureInfo->width)));
-                const int sourceTop = static_cast<int>(std::llround(subimage.top * static_cast<double>(textureInfo->height)));
-                const int sourceRight = static_cast<int>(std::llround(subimage.right * static_cast<double>(textureInfo->width)));
-                const int sourceBottom = static_cast<int>(std::llround(subimage.bottom * static_cast<double>(textureInfo->height)));
-                command.sourceX = sourceLeft;
-                command.sourceY = sourceTop;
-                command.sourceWidth = std::max(1, sourceRight - sourceLeft);
-                command.sourceHeight = std::max(1, sourceBottom - sourceTop);
-                command.sourceFits = csdSourceRectFits(command);
+                command.sourceFreeStructural = true;
+            }
+            else
+            {
+                const auto& subimage = subimages[static_cast<std::size_t>(*subimageIndex)];
+                if (subimage.textureIndex < 0 || static_cast<std::size_t>(subimage.textureIndex) >= textureNames.size())
+                {
+                    command.sourceFreeStructural = true;
+                }
+                else
+                {
+                    command.subimageIndex = *subimageIndex;
+                    command.textureIndex = subimage.textureIndex;
+                    command.textureName = textureNames[static_cast<std::size_t>(subimage.textureIndex)];
+
+                    const auto* textureInfo = textureInfoFor(command.textureName);
+                    if (textureInfo)
+                    {
+                        command.textureResolved = true;
+                        command.textureWidth = textureInfo->width;
+                        command.textureHeight = textureInfo->height;
+                        const int sourceLeft = static_cast<int>(std::llround(subimage.left * static_cast<double>(textureInfo->width)));
+                        const int sourceTop = static_cast<int>(std::llround(subimage.top * static_cast<double>(textureInfo->height)));
+                        const int sourceRight = static_cast<int>(std::llround(subimage.right * static_cast<double>(textureInfo->width)));
+                        const int sourceBottom = static_cast<int>(std::llround(subimage.bottom * static_cast<double>(textureInfo->height)));
+                        command.sourceX = sourceLeft;
+                        command.sourceY = sourceTop;
+                        command.sourceWidth = std::max(1, sourceRight - sourceLeft);
+                        command.sourceHeight = std::max(1, sourceBottom - sourceTop);
+                        command.sourceFits = csdSourceRectFits(command);
+                    }
+                }
             }
 
             commands.push_back(std::move(command));
@@ -3654,7 +3678,7 @@ void blendCsdPixelSrcAlphaOne(std::uint32_t& destinationArgb, const CsdColorRgba
         return true;
 
     const auto* texture = renderer.textureFor(command.textureName);
-    if (!texture || !texture->image || !command.sourceFits || canvasWidth <= 0 || canvasHeight <= 0)
+    if ((!command.sourceFreeStructural && (!texture || !texture->image || !command.sourceFits)) || canvasWidth <= 0 || canvasHeight <= 0)
         return false;
 
     const double dstX = static_cast<double>(command.destinationX);
@@ -3720,20 +3744,23 @@ void blendCsdPixelSrcAlphaOne(std::uint32_t& destinationArgb, const CsdColorRgba
 
             const double u = localX / dstW;
             const double v = localY / dstH;
-            const double sourceX = static_cast<double>(command.sourceX) + (u * static_cast<double>(command.sourceWidth));
-            const double sourceY = static_cast<double>(command.sourceY) + (v * static_cast<double>(command.sourceHeight));
-            CsdColorRgba textureColor;
-            if (command.linearFiltering)
+            CsdColorRgba textureColor{};
+            if (!command.sourceFreeStructural)
             {
-                textureColor = sampleTextureArgbBilinear(*texture->image, sourceX, sourceY);
-                ++stats.samplerStats.bilinearSampleCount;
-            }
-            else
-            {
-                const double footprintX = static_cast<double>(std::max(1, command.sourceWidth)) / dstW;
-                const double footprintY = static_cast<double>(std::max(1, command.sourceHeight)) / dstH;
-                textureColor = sampleTextureArgbCsdFilter(*texture->image, sourceX, sourceY, footprintX, footprintY);
-                ++stats.samplerStats.csdPointFilterSampleCount;
+                const double sourceX = static_cast<double>(command.sourceX) + (u * static_cast<double>(command.sourceWidth));
+                const double sourceY = static_cast<double>(command.sourceY) + (v * static_cast<double>(command.sourceHeight));
+                if (command.linearFiltering)
+                {
+                    textureColor = sampleTextureArgbBilinear(*texture->image, sourceX, sourceY);
+                    ++stats.samplerStats.bilinearSampleCount;
+                }
+                else
+                {
+                    const double footprintX = static_cast<double>(std::max(1, command.sourceWidth)) / dstW;
+                    const double footprintY = static_cast<double>(std::max(1, command.sourceHeight)) / dstH;
+                    textureColor = sampleTextureArgbCsdFilter(*texture->image, sourceX, sourceY, footprintX, footprintY);
+                    ++stats.samplerStats.csdPointFilterSampleCount;
+                }
             }
             const auto vertexColor = multiplyCsdRgba(command.colorRgba, gradientVertexColor(command, u, v));
             const auto shaded = multiplyCsdRgba(textureColor, vertexColor);
@@ -3765,8 +3792,8 @@ void blendCsdPixelSrcAlphaOne(std::uint32_t& destinationArgb, const CsdColorRgba
         return true;
 
     const auto destination = designRectToCanvas(canvas, command.destinationX, command.destinationY, command.destinationWidth, command.destinationHeight);
-    const auto* texture = renderer.textureFor(command.textureName);
-    if (!texture || !texture->image || !texture->bitmap || !command.sourceFits)
+    const auto* texture = command.sourceFreeStructural ? nullptr : renderer.textureFor(command.textureName);
+    if (!command.sourceFreeStructural && (!texture || !texture->image || !texture->bitmap || !command.sourceFits))
     {
         drawMissingCast(graphics, destination);
         return false;
@@ -3806,6 +3833,14 @@ void blendCsdPixelSrcAlphaOne(std::uint32_t& destinationArgb, const CsdColorRgba
     }
 
     graphics.SetCompositingMode(Gdiplus::CompositingModeSourceOver);
+    if (command.sourceFreeStructural)
+    {
+        Gdiplus::SolidBrush brush(Gdiplus::Color(effectiveColor.a, effectiveColor.r, effectiveColor.g, effectiveColor.b));
+        graphics.FillRectangle(&brush, destination);
+        graphics.Restore(state);
+        return true;
+    }
+
     graphics.DrawImage(
         texture->bitmap.get(),
         destination,
@@ -4207,8 +4242,16 @@ struct CsdReferenceViewerSceneStats
 {
     std::string layoutFileName;
     std::string sceneName;
+    std::string timelineName;
+    int timelineFrame = 0;
+    int timelineFrameCount = 0;
+    bool timelineResolved = false;
     std::size_t commandCount = 0;
     std::size_t drawnCommandCount = 0;
+    std::size_t sampledTrackCount = 0;
+    std::size_t timelineTrackCount = 0;
+    std::size_t structuralCommandCount = 0;
+    std::size_t sourceFreeStructuralCommandCount = 0;
     std::size_t textureCount = 0;
     std::vector<std::string> textureNames;
 };
@@ -4218,6 +4261,11 @@ struct CsdReferenceViewerStats
     std::size_t sceneCount = 0;
     std::size_t commandCount = 0;
     std::size_t drawnCommandCount = 0;
+    std::size_t sampledTrackCount = 0;
+    std::size_t timelineResolvedCount = 0;
+    std::size_t timelineTrackCount = 0;
+    std::size_t structuralCommandCount = 0;
+    std::size_t sourceFreeStructuralCommandCount = 0;
     std::size_t textureCount = 0;
     std::vector<CsdReferenceViewerSceneStats> scenes;
 };
@@ -4228,6 +4276,51 @@ void appendUniqueTextureName(std::vector<std::string>& names, std::string_view t
         return;
     if (std::find(names.begin(), names.end(), textureName) == names.end())
         names.emplace_back(textureName);
+}
+
+[[nodiscard]] std::vector<CsdDrawableCommand> renderCsdReferenceViewerCommands(
+    const CsdPipelineTemplateBinding& sceneBinding,
+    const CsdDrawableScene& scene,
+    CsdReferenceViewerSceneStats& sceneStats)
+{
+    const CsdPipelineTemplateBinding sceneLocalTimelineBinding{
+        sceneBinding.templateId,
+        sceneBinding.layoutFileName,
+        sceneBinding.primarySceneName,
+        sceneBinding.primarySceneName,
+        sceneBinding.timelineAnimationName,
+    };
+    auto playback = loadCsdTimelinePlayback(sceneLocalTimelineBinding);
+    if (!playback)
+        playback = loadTimelinePlaybackForScene(
+            sceneBinding.templateId,
+            sceneBinding.layoutFileName,
+            sceneBinding.primarySceneName);
+    if (!playback && sceneBinding.timelineSceneName != sceneBinding.primarySceneName)
+        playback = loadCsdTimelinePlayback(sceneBinding);
+
+    const CsdTimelinePlayback* playbackPtr = playback ? &*playback : nullptr;
+    if (playbackPtr)
+    {
+        sceneStats.timelineResolved = true;
+        sceneStats.timelineName = playbackPtr->animationName;
+        sceneStats.timelineFrame = playbackPtr->sampleFrame;
+        sceneStats.timelineFrameCount = static_cast<int>(std::llround(playbackPtr->frameCount));
+        sceneStats.timelineTrackCount = static_cast<std::size_t>(playbackPtr->trackCount);
+    }
+
+    std::size_t sampledTrackCount = 0;
+    auto commands = timelineSampledCommands(scene, playbackPtr, sampledTrackCount);
+    sceneStats.sampledTrackCount = sampledTrackCount;
+    for (const auto& command : commands)
+    {
+        if (!command.sourceFreeStructural)
+            continue;
+        ++sceneStats.structuralCommandCount;
+        ++sceneStats.sourceFreeStructuralCommandCount;
+    }
+
+    return commands;
 }
 
 [[nodiscard]] CsdReferenceViewerStats renderCsdReferenceViewerLane(
@@ -4250,9 +4343,10 @@ void appendUniqueTextureName(std::vector<std::string>& names, std::string_view t
         const auto* scene = cachedCsdDrawableScene(sceneBinding);
         if (scene)
         {
-            sceneStats.commandCount = scene->commands.size();
             std::vector<std::string> sceneTextures;
-            for (const auto& command : scene->commands)
+            const auto commands = renderCsdReferenceViewerCommands(sceneBinding, *scene, sceneStats);
+            sceneStats.commandCount = commands.size();
+            for (const auto& command : commands)
             {
                 appendUniqueTextureName(sceneTextures, command.textureName);
                 appendUniqueTextureName(laneTextures, command.textureName);
@@ -4265,6 +4359,12 @@ void appendUniqueTextureName(std::vector<std::string>& names, std::string_view t
 
         stats.commandCount += sceneStats.commandCount;
         stats.drawnCommandCount += sceneStats.drawnCommandCount;
+        stats.sampledTrackCount += sceneStats.sampledTrackCount;
+        stats.timelineTrackCount += sceneStats.timelineTrackCount;
+        stats.structuralCommandCount += sceneStats.structuralCommandCount;
+        stats.sourceFreeStructuralCommandCount += sceneStats.sourceFreeStructuralCommandCount;
+        if (sceneStats.timelineResolved)
+            ++stats.timelineResolvedCount;
         stats.scenes.push_back(std::move(sceneStats));
     }
 
@@ -4287,7 +4387,7 @@ void renderCsdReferenceViewerOverlay(
     const std::string_view firstLayout = lane.sceneCount == 0 ? std::string_view("none") : lane.scenes[0].layoutFileName;
     std::ostringstream title;
     title
-        << "phase139-reference-viewer | lane=" << lane.laneId
+        << "phase140-reference-playback | lane=" << lane.laneId
         << " | screen=" << lane.rendererScreenId;
 
     std::ostringstream source;
@@ -4302,6 +4402,8 @@ void renderCsdReferenceViewerOverlay(
         << "compact-reference-status scenes=" << stats.sceneCount
         << " commands=" << stats.commandCount
         << " drawn=" << stats.drawnCommandCount
+        << " sampled=" << stats.sampledTrackCount
+        << " structural=" << stats.structuralCommandCount
         << " textures=" << stats.textureCount
         << " no-template-card=1";
 
@@ -4588,7 +4690,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     }
     else if (referenceLane)
     {
-        // Phase 139 exact viewer lanes render recovered CSD scene stacks directly.
+        // Phase 140 exact viewer lanes render recovered CSD scene stacks with timeline sampling.
     }
     else if (renderedCsdDrawableScene)
     {
@@ -5048,7 +5150,7 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
 
     std::cout
         << "sward_su_ui_asset_renderer reference lanes smoke ok "
-        << "mode=phase139-reference-viewer"
+        << "mode=phase140-reference-playback"
         << " lanes=" << kCsdReferenceViewerLanes.size()
         << '\n';
 
@@ -5065,6 +5167,11 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
             << ":commands=" << stats.commandCount
             << ":drawn=" << stats.drawnCommandCount
             << ":textures=" << stats.textureCount
+            << ":timeline_resolved=" << stats.timelineResolvedCount
+            << ":timeline_tracks=" << stats.timelineTrackCount
+            << ":sampled_tracks=" << stats.sampledTrackCount
+            << ":structural=" << stats.structuralCommandCount
+            << ":source_free=" << stats.sourceFreeStructuralCommandCount
             << ":event=" << lane.requiredEventId
             << ":overlay=compact-reference-status:no-template-card=1"
             << '\n';
@@ -5077,12 +5184,228 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
                 << ":commands=" << scene.commandCount
                 << ":drawn=" << scene.drawnCommandCount
                 << ":textures=" << scene.textureCount
+                << ":timeline=" << (scene.timelineResolved ? scene.timelineName : std::string("unresolved"))
+                << "@" << scene.timelineFrame
+                << "/" << scene.timelineFrameCount
+                << ":sampled_tracks=" << scene.sampledTrackCount
+                << ":structural=" << scene.structuralCommandCount
+                << ":source_free=" << scene.sourceFreeStructuralCommandCount
                 << ":texture_names=" << joinStrings(scene.textureNames)
                 << '\n';
         }
     }
 
     std::cout << "reference_overlay=compact-reference-status:no-template-card=1\n";
+    Gdiplus::GdiplusShutdown(gdiplusToken);
+    return failed ? 1 : 0;
+}
+
+struct CsdReusableReferenceSceneModel
+{
+    std::string sceneName;
+    std::string timelineName;
+    int timelineFrame = 0;
+    int timelineFrameCount = 0;
+    std::size_t commandCount = 0;
+    std::size_t drawnCommandCount = 0;
+    std::size_t sampledTrackCount = 0;
+    std::size_t structuralCommandCount = 0;
+};
+
+struct CsdReusableReferenceScreenModel
+{
+    std::string laneId;
+    std::string rendererScreenId;
+    std::string contractFileName;
+    std::string layoutFileName;
+    std::string activationEvent;
+    std::string transitionBandId;
+    std::string transitionReadyLabel;
+    std::size_t materialSlotCount = 0;
+    std::size_t sgfxSlotCount = 0;
+    std::size_t renderOrderSceneCount = 0;
+    std::size_t commandCount = 0;
+    std::size_t sampledTrackCount = 0;
+    std::size_t structuralCommandCount = 0;
+    std::vector<CsdReusableReferenceSceneModel> scenes;
+};
+
+[[nodiscard]] CsdReusableReferenceScreenModel buildReusableReferenceScreenModel(
+    const CsdReferenceViewerLane& lane,
+    const CsdReferenceViewerStats& stats)
+{
+    CsdReusableReferenceScreenModel model;
+    model.laneId = std::string(lane.laneId);
+    model.rendererScreenId = std::string(lane.rendererScreenId);
+    model.contractFileName = std::string(lane.contractFileName);
+    model.layoutFileName = lane.sceneCount == 0 ? std::string("none") : std::string(lane.scenes[0].layoutFileName);
+    model.activationEvent = std::string(lane.requiredEventId);
+    model.transitionBandId = std::string(lane.timelineBandId);
+    model.transitionReadyLabel = std::string(lane.timelineEventLabel);
+    model.materialSlotCount = lane.slotCount;
+    model.sgfxSlotCount = lane.slotCount;
+    model.renderOrderSceneCount = stats.sceneCount;
+    model.commandCount = stats.commandCount;
+    model.sampledTrackCount = stats.sampledTrackCount;
+    model.structuralCommandCount = stats.structuralCommandCount;
+
+    for (const auto& sceneStats : stats.scenes)
+    {
+        CsdReusableReferenceSceneModel scene;
+        scene.sceneName = sceneStats.sceneName;
+        scene.timelineName = sceneStats.timelineResolved ? sceneStats.timelineName : std::string("unresolved");
+        scene.timelineFrame = sceneStats.timelineFrame;
+        scene.timelineFrameCount = sceneStats.timelineFrameCount;
+        scene.commandCount = sceneStats.commandCount;
+        scene.drawnCommandCount = sceneStats.drawnCommandCount;
+        scene.sampledTrackCount = sceneStats.sampledTrackCount;
+        scene.structuralCommandCount = sceneStats.structuralCommandCount;
+        model.scenes.push_back(std::move(scene));
+    }
+
+    return model;
+}
+
+[[nodiscard]] bool writeReusableScreenReferenceCode(
+    const std::filesystem::path& exportPath,
+    const std::vector<CsdReusableReferenceScreenModel>& models)
+{
+    std::error_code error;
+    std::filesystem::create_directories(exportPath.parent_path(), error);
+    if (error)
+        return false;
+
+    std::ofstream out(exportPath, std::ios::binary);
+    if (!out)
+        return false;
+
+    out << "#pragma once\n";
+    out << "// Generated local-only by SWARD Phase 140 from recovered CSD evidence.\n";
+    out << "// Readable reference architecture only; Sonic assets remain local placeholders.\n\n";
+    out << "namespace sward::recovered::frontend_screens\n{\n";
+    out << "struct ScreenScenePolicy\n";
+    out << "{\n";
+    out << "    const char* scene;\n";
+    out << "    const char* timeline;\n";
+    out << "    int frame;\n";
+    out << "    int frameCount;\n";
+    out << "    int commands;\n";
+    out << "    int structuralCommands;\n";
+    out << "};\n\n";
+    out << "struct ScreenPolicy\n";
+    out << "{\n";
+    out << "    const char* id;\n";
+    out << "    const char* screen;\n";
+    out << "    const char* layout;\n";
+    out << "    const char* activation;\n";
+    out << "    const char* transition;\n";
+    out << "    const char* inputLock;\n";
+    out << "    int materialSlots;\n";
+    out << "    int sgfxSlots;\n";
+    out << "    int sceneCount;\n";
+    out << "};\n\n";
+    out << "inline constexpr ScreenPolicy kScreenPolicies[] = {\n";
+    for (const auto& model : models)
+    {
+        out << "    { \"" << jsonEscape(model.laneId)
+            << "\", \"" << jsonEscape(model.rendererScreenId)
+            << "\", \"" << jsonEscape(model.layoutFileName)
+            << "\", \"" << jsonEscape(model.activationEvent)
+            << "\", \"" << jsonEscape(model.transitionBandId + "->" + model.transitionReadyLabel)
+            << "\", \"" << jsonEscape(std::string("until:") + model.activationEvent)
+            << "\", " << model.materialSlotCount
+            << ", " << model.sgfxSlotCount
+            << ", " << model.renderOrderSceneCount
+            << " },\n";
+    }
+    out << "};\n\n";
+
+    for (const auto& model : models)
+    {
+        out << "inline constexpr ScreenScenePolicy k" << model.rendererScreenId << "Scenes[] = {\n";
+        for (const auto& scene : model.scenes)
+        {
+            out << "    { \"" << jsonEscape(scene.sceneName)
+                << "\", \"" << jsonEscape(scene.timelineName)
+                << "\", " << scene.timelineFrame
+                << ", " << scene.timelineFrameCount
+                << ", " << scene.commandCount
+                << ", " << scene.structuralCommandCount
+                << " },\n";
+        }
+        out << "};\n\n";
+    }
+    out << "} // namespace sward::recovered::frontend_screens\n";
+    return true;
+}
+
+[[nodiscard]] int runReferencePolicyExportSmoke()
+{
+    bool failed = false;
+    std::vector<CsdReusableReferenceScreenModel> models;
+    const auto outputRoot = repoRootForOutput() / "out" / "csd_runtime_exports" / "phase140";
+    const auto exportPath = outputRoot / "title_loading_options_pause_reference.hpp";
+
+    Gdiplus::GdiplusStartupInput gdiplusInput{};
+    ULONG_PTR gdiplusToken = 0;
+    if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr) != Gdiplus::Ok)
+        return 1;
+
+    for (const auto& lane : kCsdReferenceViewerLanes)
+    {
+        CsdReferenceViewerStats stats;
+        const auto bitmap = renderCsdReferenceViewerBitmap(lane, false, stats);
+        if (!bitmap || stats.commandCount == 0)
+            failed = true;
+        models.push_back(buildReusableReferenceScreenModel(lane, stats));
+    }
+
+    const bool wrote = writeReusableScreenReferenceCode(exportPath, models);
+    if (!wrote)
+        failed = true;
+
+    std::cout
+        << "sward_su_ui_asset_renderer reference policy export smoke ok "
+        << "mode=phase140-reusable-screen-policy"
+        << " screens=" << models.size()
+        << " output=" << portablePath(exportPath)
+        << '\n';
+    std::cout << "reference_policy_export_path=" << portablePath(exportPath) << '\n';
+
+    for (const auto& model : models)
+    {
+        std::cout
+            << "reference_policy=" << model.laneId
+            << ":screen=" << model.rendererScreenId
+            << ":layout=" << model.layoutFileName
+            << ":activation=" << model.activationEvent
+            << ":transition=" << model.transitionBandId << "->" << model.transitionReadyLabel
+            << ":input_lock=until:" << model.activationEvent
+            << ":render_order=scene-stack"
+            << ":material_slots=" << model.materialSlotCount
+            << ":sgfx_slots=" << model.sgfxSlotCount
+            << ":scenes=" << model.renderOrderSceneCount
+            << ":commands=" << model.commandCount
+            << ":sampled_tracks=" << model.sampledTrackCount
+            << ":structural=" << model.structuralCommandCount
+            << '\n';
+
+        for (const auto& scene : model.scenes)
+        {
+            std::cout
+                << "reference_policy_scene=" << model.laneId
+                << ":" << scene.sceneName
+                << ":timeline=" << scene.timelineName
+                << "@" << scene.timelineFrame
+                << "/" << scene.timelineFrameCount
+                << ":commands=" << scene.commandCount
+                << ":structural=" << scene.structuralCommandCount
+                << ":sampled_tracks=" << scene.sampledTrackCount
+                << '\n';
+        }
+    }
+
+    std::cout << "reference_policy_source_status=clean-readable-title-loading-options-pause-exported\n";
     Gdiplus::GdiplusShutdown(gdiplusToken);
     return failed ? 1 : 0;
 }
@@ -5254,7 +5577,9 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
         descriptor << ":flipX=1";
     if (command.flipY)
         descriptor << ":flipY=1";
-    if (!command.sourceFits)
+    if (command.sourceFreeStructural)
+        descriptor << ":source-free-structural";
+    else if (!command.sourceFits)
         descriptor << ":source-out-of-bounds";
     return descriptor.str();
 }
@@ -5933,7 +6258,10 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
         entries.end(),
         [runtimeSceneName](const CsdHudRuntimeMaterialEntry& entry)
         {
-            return entry.runtimeSceneName == runtimeSceneName;
+            return entry.runtimeSceneName == runtimeSceneName
+                && entry.subimageIndex >= 0
+                && entry.textureResolved
+                && entry.sourceFits;
         }));
 }
 
@@ -5951,20 +6279,22 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     if (!out)
         return false;
 
-    const int materialResolved = static_cast<int>(entries.size());
-    const int subimageResolved = static_cast<int>(std::count_if(
+    auto isResolvedMaterialEntry = [](const CsdHudRuntimeMaterialEntry& entry)
+    {
+        return entry.subimageIndex >= 0 && entry.textureResolved && entry.sourceFits;
+    };
+
+    const int materialResolved = static_cast<int>(std::count_if(
         entries.begin(),
         entries.end(),
-        [](const CsdHudRuntimeMaterialEntry& entry)
-        {
-            return entry.subimageIndex >= 0 && entry.textureResolved && entry.sourceFits;
-        }));
+        isResolvedMaterialEntry));
+    const int subimageResolved = materialResolved;
     const int timelineResolved = static_cast<int>(std::count_if(
         entries.begin(),
         entries.end(),
-        [](const CsdHudRuntimeMaterialEntry& entry)
+        [isResolvedMaterialEntry](const CsdHudRuntimeMaterialEntry& entry)
         {
-            return entry.timelineResolved;
+            return isResolvedMaterialEntry(entry) && entry.timelineResolved;
         }));
 
     out << "{\n";
@@ -6039,7 +6369,13 @@ void appendUniqueString(std::vector<std::string>& values, std::string_view value
     model.sceneCount = evidence.runtimeSceneCount;
     model.runtimeLayerCount = evidence.runtimeLayerCount;
     model.exportedLayerCount = static_cast<int>(evidence.runtimeLayers.size());
-    model.drawableLayerCount = static_cast<int>(entries.size());
+    model.drawableLayerCount = static_cast<int>(std::count_if(
+        entries.begin(),
+        entries.end(),
+        [](const CsdHudRuntimeMaterialEntry& entry)
+        {
+            return entry.subimageIndex >= 0 && entry.textureResolved && entry.sourceFits;
+        }));
     model.structuralLayerCount = model.exportedLayerCount - model.drawableLayerCount;
 
     for (const auto& runtimeScene : evidence.runtimeScenes)
@@ -6075,7 +6411,7 @@ void appendUniqueString(std::vector<std::string>& values, std::string_view value
 
         for (const auto& entry : entries)
         {
-            if (entry.runtimeSceneName == runtimeScene.sceneName)
+            if (entry.runtimeSceneName == runtimeScene.sceneName && entry.textureResolved && entry.sourceFits)
                 appendUniqueString(scene.textureNames, entry.textureName);
         }
 
@@ -7843,20 +8179,22 @@ void writeViewerRenderCompareManifest(
     if (entries.empty())
         return 1;
 
-    const int materialResolved = static_cast<int>(entries.size());
-    const int subimageResolved = static_cast<int>(std::count_if(
+    auto isResolvedMaterialEntry = [](const CsdHudRuntimeMaterialEntry& entry)
+    {
+        return entry.subimageIndex >= 0 && entry.textureResolved && entry.sourceFits;
+    };
+
+    const int materialResolved = static_cast<int>(std::count_if(
         entries.begin(),
         entries.end(),
-        [](const CsdHudRuntimeMaterialEntry& entry)
-        {
-            return entry.subimageIndex >= 0 && entry.textureResolved && entry.sourceFits;
-        }));
+        isResolvedMaterialEntry));
+    const int subimageResolved = materialResolved;
     const int timelineResolved = static_cast<int>(std::count_if(
         entries.begin(),
         entries.end(),
-        [](const CsdHudRuntimeMaterialEntry& entry)
+        [isResolvedMaterialEntry](const CsdHudRuntimeMaterialEntry& entry)
         {
-            return entry.timelineResolved;
+            return isResolvedMaterialEntry(entry) && entry.timelineResolved;
         }));
 
     const auto outputRoot = repoRootForOutput() / "out" / "csd_runtime_exports" / "phase135";
@@ -8615,6 +8953,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererSonicHudReferencePolicySmoke();
     if (commandLineHasFlag("--renderer-reference-lanes-smoke"))
         return runRendererReferenceLanesSmoke();
+    if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
+        return runReferencePolicyExportSmoke();
 
     return runRendererWindow(instance, showCommand, templateFilter);
 }
