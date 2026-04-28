@@ -181,6 +181,13 @@ struct CsdReferenceViewerLane
     bool runtimeAlignmentBridgeConnected = false;
     std::string runtimeAlignmentBridgeFallback;
     std::string runtimeAlignmentBridgeError;
+    int uiOracleRuntimeFrame = 0;
+    int uiOraclePlaybackFrame = 0;
+    std::string uiOraclePlaybackClock = "frontend-policy";
+    std::string uiOracleFrameSource = "policy-sample-frame";
+    std::string uiOracleSource = "missing";
+    std::string uiOracleProbe = "missing";
+    std::string uiOracleActiveMotionName;
     std::string materialSemantics;
     std::string policySource;
 };
@@ -215,12 +222,31 @@ struct FrontendUiOracleEvidence
     std::string probe = "missing";
     std::string target;
     std::string activeProject;
+    std::string activeMotionName;
+    std::string cursorOwner;
+    std::string transitionBand;
+    std::string inputLockState;
     std::string runtimeDrawListStatus = "missing";
+    int runtimeFrame = 0;
+    int runtimeSceneMotionFrame = -1;
     int sceneCount = 0;
     int layerCount = 0;
     std::vector<std::string> activeScenes;
     std::filesystem::path liveStatePath;
     FrontendLiveBridgeProbeResult bridgeProbe;
+};
+
+struct FrontendUiOraclePlaybackClock
+{
+    bool found = false;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string playbackClock = "frontend-policy";
+    std::string frameSource = "policy-sample-frame";
+    std::string activeMotionName;
+    int runtimeFrame = 0;
+    int playbackFrame = 0;
+    FrontendUiOracleEvidence oracle;
 };
 
 struct CsdColorRgba
@@ -673,7 +699,8 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] std::optional<CsdTimelinePlayback> loadTimelinePlaybackForScene(
     std::string_view templateId,
     std::string_view layoutFileName,
-    std::string_view localSceneName);
+    std::string_view localSceneName,
+    std::optional<int> sampleFrameOverride = std::nullopt);
 
 [[nodiscard]] std::vector<CsdDrawableCommand> timelineSampledCommands(
     const CsdDrawableScene& scene,
@@ -700,6 +727,8 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveBridge(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendUiOracleEvidence loadFrontendUiOracleEvidence(
+    const sward::ui_runtime::FrontendScreenPolicy& policy);
+[[nodiscard]] FrontendUiOraclePlaybackClock loadFrontendUiOraclePlaybackClock(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] std::string formatFrontendRuntimeAlignmentEvidence(const FrontendLiveStateAlignmentEvidence& evidence);
 
@@ -936,6 +965,19 @@ inline constexpr std::array<CsdPipelineTemplateBinding, 4> kCsdPipelineTemplateB
     return out.str();
 }
 
+void applyUiOraclePlaybackFrameToLane(
+    CsdReferenceViewerLane& lane,
+    const FrontendUiOraclePlaybackClock& clock)
+{
+    lane.uiOracleRuntimeFrame = clock.runtimeFrame;
+    lane.uiOraclePlaybackFrame = clock.playbackFrame;
+    lane.uiOraclePlaybackClock = clock.playbackClock;
+    lane.uiOracleFrameSource = clock.frameSource;
+    lane.uiOracleSource = clock.source;
+    lane.uiOracleProbe = clock.probe;
+    lane.uiOracleActiveMotionName = clock.activeMotionName;
+}
+
 [[nodiscard]] CsdReferenceViewerLane referenceViewerLaneFromTrackedPolicy(
     const sward::ui_runtime::FrontendScreenPolicy& policy)
 {
@@ -965,6 +1007,7 @@ inline constexpr std::array<CsdPipelineTemplateBinding, 4> kCsdPipelineTemplateB
         ? (alignmentEvidence.alignment.source == "ui_lab_live_bridge" ? "none" : "ui_lab_live_state")
         : alignmentEvidence.fallbackSource;
     lane.runtimeAlignmentBridgeError = alignmentEvidence.bridgeProbe.error;
+    applyUiOraclePlaybackFrameToLane(lane, loadFrontendUiOraclePlaybackClock(policy));
     lane.materialSemantics = frontendMaterialSemanticsDescriptor(policy);
     lane.policySource = "frontend_screen_reference";
 
@@ -2687,7 +2730,9 @@ void refreshCsdGradientState(CsdDrawableCommand& command)
     return keyframes.back().color;
 }
 
-[[nodiscard]] std::optional<CsdTimelinePlayback> loadCsdTimelinePlayback(const CsdPipelineTemplateBinding& binding)
+[[nodiscard]] std::optional<CsdTimelinePlayback> loadCsdTimelinePlayback(
+    const CsdPipelineTemplateBinding& binding,
+    std::optional<int> sampleFrameOverride = std::nullopt)
 {
     const auto evidencePath = layoutEvidencePath();
     if (!evidencePath)
@@ -2719,10 +2764,11 @@ void refreshCsdGradientState(CsdDrawableCommand& command)
     playback.animationName = std::string(binding.timelineAnimationName);
     playback.animationIndex = *animationIndex;
     playback.frameCount = jsonNumberField(*frameData, "frame_count").value_or(0.0);
-    playback.sampleFrame = std::clamp(
-        csdTimelineSampleFrameForTemplate(binding.templateId),
-        0,
-        std::max(0, static_cast<int>(std::llround(playback.frameCount))));
+    const int frameCount = std::max(0, static_cast<int>(std::llround(playback.frameCount)));
+    int requestedFrame = sampleFrameOverride.value_or(csdTimelineSampleFrameForTemplate(binding.templateId));
+    if (sampleFrameOverride && frameCount > 0)
+        requestedFrame = requestedFrame % frameCount;
+    playback.sampleFrame = std::clamp(requestedFrame, 0, frameCount);
 
     const auto dictionary = parseCsdCastDictionary(*sceneObject);
     const auto groups = jsonArrayFieldSpan(*keyframeData, "groups");
@@ -4360,7 +4406,8 @@ void appendUniqueTextureName(std::vector<std::string>& names, std::string_view t
 [[nodiscard]] std::vector<CsdDrawableCommand> renderCsdReferenceViewerCommands(
     const CsdPipelineTemplateBinding& sceneBinding,
     const CsdDrawableScene& scene,
-    CsdReferenceViewerSceneStats& sceneStats)
+    CsdReferenceViewerSceneStats& sceneStats,
+    std::optional<int> sampleFrameOverride)
 {
     const CsdPipelineTemplateBinding sceneLocalTimelineBinding{
         sceneBinding.templateId,
@@ -4369,14 +4416,15 @@ void appendUniqueTextureName(std::vector<std::string>& names, std::string_view t
         sceneBinding.primarySceneName,
         sceneBinding.timelineAnimationName,
     };
-    auto playback = loadCsdTimelinePlayback(sceneLocalTimelineBinding);
+    auto playback = loadCsdTimelinePlayback(sceneLocalTimelineBinding, sampleFrameOverride);
     if (!playback)
         playback = loadTimelinePlaybackForScene(
             sceneBinding.templateId,
             sceneBinding.layoutFileName,
-            sceneBinding.primarySceneName);
+            sceneBinding.primarySceneName,
+            sampleFrameOverride);
     if (!playback && sceneBinding.timelineSceneName != sceneBinding.primarySceneName)
-        playback = loadCsdTimelinePlayback(sceneBinding);
+        playback = loadCsdTimelinePlayback(sceneBinding, sampleFrameOverride);
 
     const CsdTimelinePlayback* playbackPtr = playback ? &*playback : nullptr;
     if (playbackPtr)
@@ -4423,7 +4471,13 @@ void appendUniqueTextureName(std::vector<std::string>& names, std::string_view t
         if (scene)
         {
             std::vector<std::string> sceneTextures;
-            const auto commands = renderCsdReferenceViewerCommands(sceneBinding, *scene, sceneStats);
+            const auto commands = renderCsdReferenceViewerCommands(
+                sceneBinding,
+                *scene,
+                sceneStats,
+                lane.uiOraclePlaybackClock == "ui-oracle-runtime-frame"
+                    ? std::optional<int>(lane.uiOracleRuntimeFrame)
+                    : std::nullopt);
             sceneStats.commandCount = commands.size();
             for (const auto& command : commands)
             {
@@ -4457,7 +4511,7 @@ void renderCsdReferenceViewerOverlay(
     const CsdReferenceViewerLane& lane,
     const CsdReferenceViewerStats& stats)
 {
-    const auto panel = designRectToCanvas(canvas, 20, 20, 710, 94);
+    const auto panel = designRectToCanvas(canvas, 20, 20, 780, 116);
     Gdiplus::SolidBrush panelFill(Gdiplus::Color(172, 4, 8, 12));
     Gdiplus::Pen panelEdge(Gdiplus::Color(210, 120, 230, 140), std::max(1.0F, 2.0F * (canvas.Width / static_cast<float>(kDesignWidth))));
     graphics.FillRectangle(&panelFill, panel);
@@ -4487,9 +4541,18 @@ void renderCsdReferenceViewerOverlay(
         << " textures=" << stats.textureCount
         << " no-template-card=1";
 
+    std::ostringstream oracle;
+    oracle
+        << "playback_clock=" << lane.uiOraclePlaybackClock
+        << ":runtime_frame=" << lane.uiOracleRuntimeFrame
+        << ":sample_frame=" << lane.uiOraclePlaybackFrame
+        << ":timeline_frame_source=" << lane.uiOracleFrameSource
+        << ":oracle=" << lane.uiOracleSource;
+
     drawOutlinedText(graphics, canvas, title.str(), 34, 30, 16, Gdiplus::Color(255, 245, 250, 255), Gdiplus::Color(255, 0, 0, 0));
     drawOutlinedText(graphics, canvas, source.str(), 34, 54, 14, Gdiplus::Color(255, 220, 255, 205), Gdiplus::Color(255, 0, 0, 0));
     drawOutlinedText(graphics, canvas, counts.str(), 34, 78, 14, Gdiplus::Color(255, 224, 236, 255), Gdiplus::Color(255, 0, 0, 0));
+    drawOutlinedText(graphics, canvas, oracle.str(), 34, 100, 14, Gdiplus::Color(255, 255, 224, 210), Gdiplus::Color(255, 0, 0, 0));
 }
 
 [[nodiscard]] std::unique_ptr<Gdiplus::Bitmap> renderCsdReferenceViewerBitmap(
@@ -5417,6 +5480,94 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     }
 
     return oracleEvidence.empty() ? 1 : 0;
+}
+
+[[nodiscard]] int uiOracleTimelineFrameForScene(
+    const FrontendUiOraclePlaybackClock& clock,
+    const sward::ui_runtime::FrontendScreenScenePolicy& scene)
+{
+    if (scene.timeline.frameCount <= 0)
+        return 0;
+
+    const int runtimeFrame = std::max(0, clock.runtimeFrame);
+    return runtimeFrame % scene.timeline.frameCount;
+}
+
+[[nodiscard]] int runRendererUiOraclePlaybackSmoke()
+{
+    constexpr std::string_view directProbeToken = "ui_oracle_playback_probe=direct-ui-oracle";
+    constexpr std::string_view stateProbeToken = "ui_oracle_playback_probe=state-fallback";
+    constexpr std::string_view snapshotProbeToken = "ui_oracle_playback_probe=snapshot-fallback";
+    constexpr std::string_view runtimeClockToken = "playback_clock=ui-oracle-runtime-frame";
+    constexpr std::string_view frameSourceToken = "timeline_frame_source=ui-oracle-mod-frame";
+
+    struct PlaybackRecord
+    {
+        const sward::ui_runtime::FrontendScreenPolicy* policy = nullptr;
+        FrontendUiOraclePlaybackClock clock;
+    };
+
+    std::vector<PlaybackRecord> records;
+    for (const auto& policy : frontendScreenPolicies())
+        records.push_back({ &policy, loadFrontendUiOraclePlaybackClock(policy) });
+
+    const bool anyDirect = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const PlaybackRecord& record)
+        {
+            return record.clock.probe == "direct-ui-oracle";
+        });
+    const bool anyState = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const PlaybackRecord& record)
+        {
+            return record.clock.probe == "state-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer ui oracle playback smoke ok "
+        << "mode=phase146-ui-oracle-playback"
+        << " " << (anyDirect ? directProbeToken : (anyState ? stateProbeToken : snapshotProbeToken))
+        << " " << runtimeClockToken
+        << " " << frameSourceToken
+        << " lanes=" << records.size()
+        << '\n';
+
+    for (const auto& record : records)
+    {
+        const auto& policy = *record.policy;
+        const auto& clock = record.clock;
+        const int firstSceneFrame = policy.scenes.empty()
+            ? clock.runtimeFrame
+            : uiOracleTimelineFrameForScene(clock, policy.scenes.front());
+
+        std::cout
+            << "oracle_playback=" << policy.screenId
+            << ":source=" << clock.source
+            << ":runtime_frame=" << clock.runtimeFrame
+            << ":playback_clock=" << clock.playbackClock
+            << ":playback_frame=" << firstSceneFrame
+            << ":active_motion=" << clock.activeMotionName
+            << '\n';
+
+        for (const auto& scene : policy.scenes)
+        {
+            const int sceneFrame = uiOracleTimelineFrameForScene(clock, scene);
+            const auto sample = sward::ui_runtime::sampleFrontendScreenTimeline(policy, scene, sceneFrame);
+            std::cout
+                << "oracle_scene_playback=" << policy.screenId
+                << ":" << scene.sceneName
+                << ":animation=" << sample.animationName
+                << ":frame=" << sample.frame
+                << "/" << sample.frameCount
+                << ":timeline_frame_source=" << clock.frameSource
+                << '\n';
+        }
+    }
+
+    return records.empty() ? 1 : 0;
 }
 
 struct CsdReusableReferenceSceneModel
@@ -6364,7 +6515,8 @@ struct CsdReusableReferenceScreenModel
 [[nodiscard]] std::optional<CsdTimelinePlayback> loadTimelinePlaybackForScene(
     std::string_view templateId,
     std::string_view layoutFileName,
-    std::string_view localSceneName)
+    std::string_view localSceneName,
+    std::optional<int> sampleFrameOverride)
 {
     const std::string animationName = timelineAnimationNameForLocalScene(layoutFileName, localSceneName);
     const CsdPipelineTemplateBinding binding{
@@ -6374,7 +6526,7 @@ struct CsdReusableReferenceScreenModel
         localSceneName,
         animationName,
     };
-    return loadCsdTimelinePlayback(binding);
+    return loadCsdTimelinePlayback(binding, sampleFrameOverride);
 }
 
 [[nodiscard]] std::vector<CsdHudRuntimeMaterialEntry> buildSonicHudRuntimeMaterialEntries(
@@ -7729,6 +7881,12 @@ void applyFrontendUiOracleFromUiOracleJson(
     evidence.found = true;
     evidence.source = std::string(source);
     evidence.target = jsonStringField(text, "target").value_or(policy.screenId);
+    evidence.activeMotionName = jsonStringField(text, "activeMotionName")
+        .value_or(jsonStringField(text, "route").value_or(""));
+    evidence.cursorOwner = jsonStringField(text, "cursorOwner").value_or("");
+    evidence.transitionBand = jsonStringField(text, "transitionBand").value_or(policy.transitionBand);
+    evidence.inputLockState = jsonStringField(text, "inputLockState").value_or(policy.inputLockTiming);
+    evidence.runtimeFrame = static_cast<int>(jsonNumberField(text, "frame").value_or(0.0));
     evidence.runtimeDrawListStatus = jsonStringField(text, "runtimeDrawListStatus")
         .value_or("runtime CSD tree; GPU draw-list pending");
 
@@ -7741,6 +7899,7 @@ void applyFrontendUiOracleFromUiOracleJson(
             .value_or(jsonStringField(*oracle, "targetProject").value_or(""));
         evidence.sceneCount = static_cast<int>(jsonNumberField(*oracle, "sceneCount").value_or(0.0));
         evidence.layerCount = static_cast<int>(jsonNumberField(*oracle, "layerCount").value_or(0.0));
+        evidence.runtimeSceneMotionFrame = static_cast<int>(jsonNumberField(*oracle, "runtimeSceneMotionFrame").value_or(-1.0));
         evidence.runtimeDrawListStatus = jsonStringField(*oracle, "runtimeDrawListStatus")
             .value_or(evidence.runtimeDrawListStatus);
 
@@ -7771,6 +7930,13 @@ void applyFrontendUiOracleFromLiveStateJson(
     evidence.found = true;
     evidence.source = std::string(source);
     evidence.target = jsonStringField(text, "target").value_or(policy.screenId);
+    evidence.activeMotionName = jsonStringField(text, "route").value_or(defaultFrontendRuntimeAlignment(policy).activeMotionName);
+    evidence.cursorOwner = frontendAlignmentCursorOwnerFromLiveState(policy, text);
+    evidence.transitionBand = policy.transitionBand;
+    evidence.inputLockState = frontendAlignmentReadyFromLiveState(policy, text)
+        ? "released:" + policy.activationEvent
+        : policy.inputLockTiming;
+    evidence.runtimeFrame = static_cast<int>(jsonNumberField(text, "frame").value_or(0.0));
     evidence.runtimeDrawListStatus = "runtime CSD tree; GPU draw-list pending";
 
     if (const auto typedInspectors = jsonObjectFieldSpan(text, "typedInspectors"))
@@ -7781,6 +7947,7 @@ void applyFrontendUiOracleFromLiveStateJson(
                 .value_or(jsonStringField(*tree, "targetProject").value_or(""));
             evidence.sceneCount = static_cast<int>(jsonNumberField(*tree, "sceneCount").value_or(0.0));
             evidence.layerCount = static_cast<int>(jsonNumberField(*tree, "layerCount").value_or(0.0));
+            evidence.runtimeSceneMotionFrame = static_cast<int>(jsonNumberField(*tree, "runtimeSceneMotionFrame").value_or(-1.0));
 
             if (const auto scenes = jsonArrayFieldSpan(*tree, "scenes"))
             {
@@ -7861,6 +8028,27 @@ void applyFrontendUiOracleFromLiveStateJson(
         text,
         "ui_lab_live_state");
     return fallback;
+}
+
+[[nodiscard]] FrontendUiOraclePlaybackClock loadFrontendUiOraclePlaybackClock(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    const auto oracle = loadFrontendUiOracleEvidence(policy);
+    const auto fallback = defaultFrontendRuntimeAlignment(policy);
+
+    FrontendUiOraclePlaybackClock clock;
+    clock.found = oracle.found;
+    clock.source = oracle.source;
+    clock.probe = oracle.probe;
+    clock.playbackClock = oracle.found ? "ui-oracle-runtime-frame" : "frontend-policy";
+    clock.frameSource = oracle.found ? "ui-oracle-mod-frame" : "policy-sample-frame";
+    clock.activeMotionName = !oracle.activeMotionName.empty() ? oracle.activeMotionName : fallback.activeMotionName;
+    clock.runtimeFrame = oracle.runtimeFrame > 0
+        ? oracle.runtimeFrame
+        : (oracle.runtimeSceneMotionFrame > 0 ? oracle.runtimeSceneMotionFrame : fallback.activeFrame);
+    clock.playbackFrame = clock.runtimeFrame;
+    clock.oracle = oracle;
+    return clock;
 }
 
 [[nodiscard]] std::string formatFrontendRuntimeAlignmentEvidence(const FrontendLiveStateAlignmentEvidence& evidence)
@@ -9605,6 +9793,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererLiveBridgeAlignmentSmoke();
     if (commandLineHasFlag("--renderer-ui-oracle-smoke"))
         return runRendererUiOracleSmoke();
+    if (commandLineHasFlag("--renderer-ui-oracle-playback-smoke"))
+        return runRendererUiOraclePlaybackSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 
