@@ -136,6 +136,7 @@ set(UNLEASHED_RECOMP_PATCHES_CXX_SOURCES
     "patches/CGameModeStageTitle_patches.cpp"
     "patches/CHudPause_patches.cpp"
     "patches/CHudSonicStage_patches.cpp"
+    "patches/CsdNodeLookup_patches.cpp"
     "patches/CsdNodeText_patches.cpp"
     "patches/CsdNodeValue_patches.cpp"
     "patches/CTitleStateIntro_patches.cpp"

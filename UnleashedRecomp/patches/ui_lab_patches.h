@@ -177,6 +177,19 @@ namespace UiLab
         uint32_t textAddress,
         std::string_view textUtf8,
         std::string_view hookSource);
+    void OnCsdChildNodeLookupResolved(
+        uint32_t resultOwnerAddress,
+        uint32_t parentNodeAddress,
+        std::string_view childName,
+        std::string_view hookSource);
+    void OnCsdNodePointerResolved(
+        uint32_t sourceOwnerAddress,
+        uint32_t nodeAddress,
+        std::string_view hookSource);
+    void PushSonicHudUpdateContext(
+        uint32_t ownerAddress,
+        std::string_view hookSource);
+    void PopSonicHudUpdateContext(std::string_view hookSource);
     void OnCsdNodeSetPatternIndex(
         uint32_t nodeAddress,
         uint32_t patternIndex,

@@ -2078,6 +2078,76 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, report)
 
+    def test_ui_lab_phase172_hooks_csd_child_lookup_and_sonic_hud_update_contexts(self):
+        cmake = self.read("UnleashedRecomp/CMakeLists.txt")
+        build_script = self.read("research_uiux/runtime_reference/tools/build_unleashed_recomp_ui_lab.ps1")
+        lookup_hook = self.read("UnleashedRecomp/patches/CsdNodeLookup_patches.cpp")
+        hud_hook = self.read("UnleashedRecomp/patches/CHudSonicStage_patches.cpp")
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        self.assertIn("patches/CsdNodeLookup_patches.cpp", cmake)
+        self.assertIn("UnleashedRecomp\\patches\\CsdNodeLookup_patches.cpp", build_script)
+
+        for token in [
+            "PPC_FUNC_IMPL(__imp__sub_830BCCA8)",
+            "PPC_FUNC(sub_830BCCA8)",
+            "PPC_FUNC_IMPL(__imp__sub_830BA228)",
+            "PPC_FUNC(sub_830BA228)",
+            "TryReadGuestLookupName",
+            "UiLab::OnCsdChildNodeLookupResolved",
+            "UiLab::OnCsdNodePointerResolved",
+            "CSD::CNode::GetChild/sub_830BCCA8",
+            "CSD::RCPtr::Get/sub_830BA228",
+        ]:
+            self.assertIn(token, lookup_hook)
+
+        for token in [
+            "PushSonicHudUpdateContext",
+            "PopSonicHudUpdateContext",
+            "sub_824D6048",
+            "sub_824D6418",
+            "sub_824D69B0",
+            "sub_824D6C18",
+            "sub_824D7100",
+        ]:
+            self.assertIn(token, hud_hook)
+
+        for token in [
+            "OnCsdChildNodeLookupResolved",
+            "OnCsdNodePointerResolved",
+            "PushSonicHudUpdateContext",
+            "PopSonicHudUpdateContext",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "CsdChildNodeLookupObservation",
+            "CsdNodeSourceOwnerObservation",
+            "g_csdChildNodeLookupObservations",
+            "g_csdNodeSourceOwnerObservations",
+            "ResolveSonicHudPathFromRawOwnerFieldsLocked",
+            "ResolveCsdNodePathFromLookupChainLocked",
+            "ResolveSonicHudPathFromNodeSourceOwnerLocked",
+            "sonic-hud-node-source-owner-resolved",
+            "sonic-hud-update-context",
+            "pathResolutionSource=raw-chud-sonic-stage-owner-field",
+            "pathResolutionSource=csd-child-lookup-chain",
+            "sourceOwnerAddress",
+            "sourceOwnerOffsetFromUpdateOwner",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 172",
+            "sub_830BCCA8",
+            "sub_830BA228",
+            "child lookup chain",
+            "CHudSonicStage update context",
+        ]:
+            self.assertIn(token, report)
+
 
 if __name__ == "__main__":
     unittest.main()

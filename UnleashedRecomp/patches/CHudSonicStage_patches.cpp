@@ -72,3 +72,55 @@ PPC_FUNC(sub_824D95F8)
     __imp__sub_824D95F8(ctx, base);
     RecordHudSonicStageInspector(ownerAddress, "raw CHudSonicStage owner hook sub_824D95F8");
 }
+
+// CHudSonicStage value update hooks. These are deliberately context hooks:
+// the nested CSD RCPtr/GetChild/SetText hooks do the exact node/path capture.
+PPC_FUNC_IMPL(__imp__sub_824D6048);
+PPC_FUNC(sub_824D6048)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    UiLab::PushSonicHudUpdateContext(ownerAddress, "sonic-hud-update-context CHudSonicStage/sub_824D6048");
+    __imp__sub_824D6048(ctx, base);
+    UiLab::PopSonicHudUpdateContext("sonic-hud-update-context CHudSonicStage/sub_824D6048");
+    RecordHudSonicStageInspector(ownerAddress, "raw CHudSonicStage value update hook sub_824D6048");
+}
+
+PPC_FUNC_IMPL(__imp__sub_824D6418);
+PPC_FUNC(sub_824D6418)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    UiLab::PushSonicHudUpdateContext(ownerAddress, "sonic-hud-update-context CHudSonicStage/sub_824D6418");
+    __imp__sub_824D6418(ctx, base);
+    UiLab::PopSonicHudUpdateContext("sonic-hud-update-context CHudSonicStage/sub_824D6418");
+    RecordHudSonicStageInspector(ownerAddress, "raw CHudSonicStage value update hook sub_824D6418");
+}
+
+PPC_FUNC_IMPL(__imp__sub_824D69B0);
+PPC_FUNC(sub_824D69B0)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    UiLab::PushSonicHudUpdateContext(ownerAddress, "sonic-hud-update-context CHudSonicStage/sub_824D69B0");
+    __imp__sub_824D69B0(ctx, base);
+    UiLab::PopSonicHudUpdateContext("sonic-hud-update-context CHudSonicStage/sub_824D69B0");
+    RecordHudSonicStageInspector(ownerAddress, "raw CHudSonicStage value update hook sub_824D69B0");
+}
+
+PPC_FUNC_IMPL(__imp__sub_824D6C18);
+PPC_FUNC(sub_824D6C18)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    UiLab::PushSonicHudUpdateContext(ownerAddress, "sonic-hud-update-context CHudSonicStage/sub_824D6C18");
+    __imp__sub_824D6C18(ctx, base);
+    UiLab::PopSonicHudUpdateContext("sonic-hud-update-context CHudSonicStage/sub_824D6C18");
+    RecordHudSonicStageInspector(ownerAddress, "raw CHudSonicStage value update hook sub_824D6C18");
+}
+
+PPC_FUNC_IMPL(__imp__sub_824D7100);
+PPC_FUNC(sub_824D7100)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    UiLab::PushSonicHudUpdateContext(ownerAddress, "sonic-hud-update-context CHudSonicStage/sub_824D7100");
+    __imp__sub_824D7100(ctx, base);
+    UiLab::PopSonicHudUpdateContext("sonic-hud-update-context CHudSonicStage/sub_824D7100");
+    RecordHudSonicStageInspector(ownerAddress, "raw CHudSonicStage value update hook sub_824D7100");
+}

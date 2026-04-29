@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <climits>
 #include <cctype>
 #include <cstring>
 #include <cstdlib>
@@ -450,6 +451,38 @@ namespace UiLab
         std::string pathResolutionSource;
     };
 
+    struct SonicHudUpdateContextFrame
+    {
+        uint32_t ownerAddress = 0;
+        std::string hookSource;
+        uint64_t frame = 0;
+    };
+
+    struct CsdChildNodeLookupObservation
+    {
+        uint32_t resultOwnerAddress = 0;
+        uint32_t parentNodeAddress = 0;
+        std::string childName;
+        std::string parentPath;
+        std::string path;
+        std::string hookSource;
+        SonicHudUpdateContextFrame updateContext;
+        uint64_t frame = 0;
+    };
+
+    struct CsdNodeSourceOwnerObservation
+    {
+        uint32_t sourceOwnerAddress = 0;
+        uint32_t nodeAddress = 0;
+        uint32_t parentNodeAddress = 0;
+        std::string childName;
+        std::string path;
+        std::string hookSource;
+        SonicHudUpdateContextFrame updateContext;
+        int32_t sourceOwnerOffsetFromUpdateOwner = INT32_MIN;
+        uint64_t frame = 0;
+    };
+
     struct SonicHudOwnerFieldSample
     {
         std::string field;
@@ -833,6 +866,11 @@ namespace UiLab
     static constexpr size_t kSonicHudValueWriteObservationLimit = 96;
     static std::vector<SonicHudValueWriteObservation> g_sonicHudValueWriteObservations;
     static std::unordered_set<std::string> g_loggedSonicHudValueTextWriteKeys;
+    static constexpr size_t kCsdChildNodeLookupObservationLimit = 256;
+    static std::unordered_map<uint32_t, CsdChildNodeLookupObservation> g_csdChildNodeLookupObservations;
+    static std::unordered_map<uint32_t, CsdNodeSourceOwnerObservation> g_csdNodeSourceOwnerObservations;
+    static std::unordered_set<std::string> g_loggedSonicHudNodeSourceOwnerKeys;
+    static thread_local std::vector<SonicHudUpdateContextFrame> g_sonicHudUpdateContextStack;
     static uint64_t g_lastLiveStateSnapshotFrame = 0;
     static std::string g_lastStageReadyEventName;
     static std::string g_lastCsdProjectName;
@@ -2413,6 +2451,175 @@ namespace UiLab
             });
     }
 
+    static SonicHudUpdateContextFrame CurrentSonicHudUpdateContext()
+    {
+        if (g_sonicHudUpdateContextStack.empty())
+            return {};
+
+        return g_sonicHudUpdateContextStack.back();
+    }
+
+    static int32_t SourceOwnerOffsetFromUpdateOwner(
+        uint32_t sourceOwnerAddress,
+        const SonicHudUpdateContextFrame& updateContext)
+    {
+        if (
+            updateContext.ownerAddress == 0 ||
+            sourceOwnerAddress < updateContext.ownerAddress)
+        {
+            return INT32_MIN;
+        }
+
+        const uint32_t offset = sourceOwnerAddress - updateContext.ownerAddress;
+        if (offset > 0x2000)
+            return INT32_MIN;
+
+        return static_cast<int32_t>(offset);
+    }
+
+    static std::string OptionalOffsetText(int32_t offset)
+    {
+        if (offset == INT32_MIN)
+            return "unknown";
+
+        return HexU32(static_cast<uint32_t>(offset));
+    }
+
+    static void TrimCsdLookupObservationMapsLocked()
+    {
+        while (g_csdChildNodeLookupObservations.size() > kCsdChildNodeLookupObservationLimit)
+            g_csdChildNodeLookupObservations.erase(g_csdChildNodeLookupObservations.begin());
+
+        while (g_csdNodeSourceOwnerObservations.size() > kCsdChildNodeLookupObservationLimit)
+            g_csdNodeSourceOwnerObservations.erase(g_csdNodeSourceOwnerObservations.begin());
+    }
+
+    static std::string ResolveAnyCsdNodePathLocked(uint32_t nodeAddress)
+    {
+        if (!IsPlausibleGuestPointer(nodeAddress))
+            return {};
+
+        for (const auto& record : g_csdProjectTrees)
+        {
+            for (const auto& entry : record.layers)
+            {
+                if (entry.address == nodeAddress || entry.relatedAddress == nodeAddress)
+                    return entry.path;
+            }
+
+            for (const auto& entry : record.nodes)
+            {
+                if (entry.address == nodeAddress || entry.relatedAddress == nodeAddress)
+                    return entry.path;
+            }
+
+            for (const auto& entry : record.scenes)
+            {
+                if (entry.address == nodeAddress || entry.relatedAddress == nodeAddress)
+                    return entry.path;
+            }
+        }
+
+        for (auto it = g_runtimeUiDrawCalls.rbegin(); it != g_runtimeUiDrawCalls.rend(); ++it)
+        {
+            if (g_presentedFrameCount >= it->frame && (g_presentedFrameCount - it->frame) > 180)
+                continue;
+
+            if (
+                (it->layerAddress == nodeAddress || it->castNodeAddress == nodeAddress) &&
+                !it->layerPath.empty() &&
+                it->layerPath != "unresolved")
+            {
+                return it->layerPath;
+            }
+        }
+
+        const auto sourceOwner = g_csdNodeSourceOwnerObservations.find(nodeAddress);
+        if (sourceOwner != g_csdNodeSourceOwnerObservations.end() && !sourceOwner->second.path.empty())
+            return sourceOwner->second.path;
+
+        return {};
+    }
+
+    static std::string ResolveCsdNodePathFromLookupChainLocked(
+        uint32_t nodeAddress,
+        bool (*pathPredicate)(std::string_view))
+    {
+        const auto sourceOwner = g_csdNodeSourceOwnerObservations.find(nodeAddress);
+        if (sourceOwner == g_csdNodeSourceOwnerObservations.end())
+            return {};
+
+        const auto& source = sourceOwner->second;
+        if (!source.path.empty() && pathPredicate(source.path))
+            return source.path;
+
+        if (source.childName.empty())
+            return {};
+
+        std::string parentPath;
+        const auto lookup = g_csdChildNodeLookupObservations.find(source.sourceOwnerAddress);
+        if (lookup != g_csdChildNodeLookupObservations.end())
+        {
+            parentPath = lookup->second.parentPath;
+            if (parentPath.empty())
+                parentPath = ResolveAnyCsdNodePathLocked(lookup->second.parentNodeAddress);
+        }
+
+        if (parentPath.empty())
+            parentPath = ResolveAnyCsdNodePathLocked(source.parentNodeAddress);
+
+        if (parentPath.empty())
+            return {};
+
+        const std::string path = parentPath + "/" + source.childName;
+        if (!pathPredicate(path))
+            return {};
+
+        return path;
+    }
+
+    static std::string ResolveSonicHudPathFromNodeSourceOwnerLocked(
+        uint32_t nodeAddress,
+        bool (*pathPredicate)(std::string_view))
+    {
+        return ResolveCsdNodePathFromLookupChainLocked(nodeAddress, pathPredicate);
+    }
+
+    static std::string ResolveSonicHudPathFromRawOwnerFieldsLocked(
+        uint32_t nodeAddress,
+        bool (*pathPredicate)(std::string_view),
+        std::string* pathResolutionSource = nullptr)
+    {
+        static constexpr std::string_view kRawOwnerFieldResolutionSource =
+            "raw-chud-sonic-stage-owner-field"; // pathResolutionSource=raw-chud-sonic-stage-owner-field
+
+        struct FieldPath
+        {
+            uint32_t address;
+            std::string_view path;
+        };
+
+        const FieldPath fields[] =
+        {
+            { g_chudSonicStageTimeCountNodeAddress, "ui_playscreen/time_count/time001" },
+            { g_chudSonicStageTimeCount2NodeAddress, "ui_playscreen/time_count/time010" },
+            { g_chudSonicStageTimeCount3NodeAddress, "ui_playscreen/time_count/time100" },
+            { g_chudSonicStagePlayerCountNodeAddress, "ui_playscreen/player_count/player" },
+        };
+
+        for (const auto& field : fields)
+        {
+            if (field.address == 0 || field.address != nodeAddress || !pathPredicate(field.path))
+                continue;
+
+            if (pathResolutionSource != nullptr)
+                *pathResolutionSource = kRawOwnerFieldResolutionSource;
+            return std::string(field.path);
+        }
+
+        return {};
+    }
+
     static bool RuntimeUiDrawCallSonicHudPathMatchesNode(
         const RuntimeUiDrawCall& call,
         uint32_t nodeAddress,
@@ -2524,6 +2731,23 @@ namespace UiLab
             }
         }
 
+        const std::string ownerFieldPath = ResolveSonicHudPathFromRawOwnerFieldsLocked(
+            nodeAddress,
+            IsSonicHudValueTextPath,
+            pathResolutionSource);
+        if (!ownerFieldPath.empty())
+            return ownerFieldPath;
+
+        const std::string lookupPath = ResolveSonicHudPathFromNodeSourceOwnerLocked(
+            nodeAddress,
+            IsSonicHudValueTextPath);
+        if (!lookupPath.empty())
+        {
+            if (pathResolutionSource != nullptr)
+                *pathResolutionSource = "csd-child-lookup-chain";
+            return lookupPath;
+        }
+
         const std::string path = ResolveSonicHudPathFromRecentDrawCallsLocked(nodeAddress, IsSonicHudValueTextPath);
         if (!path.empty() && pathResolutionSource != nullptr)
             *pathResolutionSource = "recent-ui-draw-list";
@@ -2563,6 +2787,23 @@ namespace UiLab
                     return entry.path;
                 }
             }
+        }
+
+        const std::string ownerFieldPath = ResolveSonicHudPathFromRawOwnerFieldsLocked(
+            nodeAddress,
+            IsSonicHudGaugeOrPromptPath,
+            pathResolutionSource);
+        if (!ownerFieldPath.empty())
+            return ownerFieldPath;
+
+        const std::string lookupPath = ResolveSonicHudPathFromNodeSourceOwnerLocked(
+            nodeAddress,
+            IsSonicHudGaugeOrPromptPath);
+        if (!lookupPath.empty())
+        {
+            if (pathResolutionSource != nullptr)
+                *pathResolutionSource = "csd-child-lookup-chain";
+            return lookupPath;
         }
 
         const std::string path = ResolveSonicHudPathFromRecentDrawCallsLocked(nodeAddress, IsSonicHudGaugeOrPromptPath);
@@ -2867,27 +3108,40 @@ namespace UiLab
             if (observation.pathResolved)
                 continue;
 
-            if (
-                observation.nodeAddress != call.layerAddress &&
-                observation.nodeAddress != call.castNodeAddress)
+            const std::string baseKind = BaseSonicHudWriteKind(observation.writeKind);
+            const bool wantsTextPath = baseKind == "text";
+            bool (*pathPredicate)(std::string_view) = wantsTextPath
+                ? IsSonicHudValueTextPath
+                : IsSonicHudGaugeOrPromptPath;
+
+            std::string resolvedPath = ResolveSonicHudPathFromNodeSourceOwnerLocked(
+                observation.nodeAddress,
+                pathPredicate);
+            std::string resolutionSource = "csd-child-lookup-chain";
+
+            if (resolvedPath.empty())
             {
-                continue;
+                if (
+                    observation.nodeAddress != call.layerAddress &&
+                    observation.nodeAddress != call.castNodeAddress)
+                {
+                    continue;
+                }
+
+                if (!pathPredicate(call.layerPath))
+                    continue;
+
+                resolvedPath = call.layerPath;
+                resolutionSource = "ui-draw-list-late-resolve";
             }
 
-            const std::string baseKind = BaseSonicHudWriteKind(observation.writeKind);
-            const bool pathMatches = baseKind == "text"
-                ? IsSonicHudValueTextPath(call.layerPath)
-                : (IsSonicHudGaugeOrPromptWriteKind(baseKind) && IsSonicHudGaugeOrPromptPath(call.layerPath));
-            if (!pathMatches)
-                continue;
-
             observation.writeKind = baseKind;
-            observation.path = call.layerPath;
+            observation.path = resolvedPath;
             observation.pathResolved = true;
-            observation.pathResolutionSource = "ui-draw-list-late-resolve";
-            observation.valueName = baseKind == "text"
-                ? SonicHudValueNameFromTextPath(call.layerPath)
-                : SonicHudValueNameFromGaugeOrPromptPath(call.layerPath);
+            observation.pathResolutionSource = resolutionSource;
+            observation.valueName = wantsTextPath
+                ? SonicHudValueNameFromTextPath(resolvedPath)
+                : SonicHudValueNameFromGaugeOrPromptPath(resolvedPath);
             observation.frame = g_presentedFrameCount;
 
             LateResolvedSonicHudNodeWrite event;
@@ -6973,6 +7227,141 @@ namespace UiLab
             EmitLateResolvedSonicHudNodeWriteEvents(TryLateResolveSonicHudNodeWriteObservations(lateResolveCall));
     }
 
+    void PushSonicHudUpdateContext(
+        uint32_t ownerAddress,
+        std::string_view hookSource)
+    {
+        if (!g_isEnabled)
+            return;
+
+        SonicHudUpdateContextFrame context;
+        context.ownerAddress = ownerAddress;
+        context.hookSource = hookSource.empty()
+            ? std::string("sonic-hud-update-context")
+            : std::string(hookSource);
+        context.frame = g_presentedFrameCount;
+        g_sonicHudUpdateContextStack.push_back(std::move(context));
+    }
+
+    void PopSonicHudUpdateContext(std::string_view hookSource)
+    {
+        (void)hookSource;
+
+        if (g_sonicHudUpdateContextStack.empty())
+            return;
+
+        g_sonicHudUpdateContextStack.pop_back();
+    }
+
+    void OnCsdChildNodeLookupResolved(
+        uint32_t resultOwnerAddress,
+        uint32_t parentNodeAddress,
+        std::string_view childName,
+        std::string_view hookSource)
+    {
+        if (
+            !g_isEnabled ||
+            !IsPlausibleGuestPointer(resultOwnerAddress) ||
+            !IsPlausibleGuestPointer(parentNodeAddress) ||
+            childName.empty())
+        {
+            return;
+        }
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+
+        CsdChildNodeLookupObservation observation;
+        observation.resultOwnerAddress = resultOwnerAddress;
+        observation.parentNodeAddress = parentNodeAddress;
+        observation.childName = std::string(childName);
+        observation.parentPath = ResolveAnyCsdNodePathLocked(parentNodeAddress);
+        if (!observation.parentPath.empty())
+            observation.path = observation.parentPath + "/" + observation.childName;
+        observation.hookSource = hookSource.empty()
+            ? std::string("CSD::CNode::GetChild/sub_830BCCA8")
+            : std::string(hookSource);
+        observation.updateContext = CurrentSonicHudUpdateContext();
+        observation.frame = g_presentedFrameCount;
+
+        g_csdChildNodeLookupObservations[resultOwnerAddress] = std::move(observation);
+        TrimCsdLookupObservationMapsLocked();
+    }
+
+    void OnCsdNodePointerResolved(
+        uint32_t sourceOwnerAddress,
+        uint32_t nodeAddress,
+        std::string_view hookSource)
+    {
+        if (
+            !g_isEnabled ||
+            !IsPlausibleGuestPointer(sourceOwnerAddress) ||
+            !IsPlausibleGuestPointer(nodeAddress))
+        {
+            return;
+        }
+
+        bool shouldLog = false;
+        CsdNodeSourceOwnerObservation loggedObservation;
+
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+
+            CsdNodeSourceOwnerObservation observation;
+            observation.sourceOwnerAddress = sourceOwnerAddress;
+            observation.nodeAddress = nodeAddress;
+            observation.hookSource = hookSource.empty()
+                ? std::string("CSD::RCPtr::Get/sub_830BA228")
+                : std::string(hookSource);
+            observation.updateContext = CurrentSonicHudUpdateContext();
+            observation.sourceOwnerOffsetFromUpdateOwner = SourceOwnerOffsetFromUpdateOwner(
+                sourceOwnerAddress,
+                observation.updateContext);
+            observation.frame = g_presentedFrameCount;
+
+            const auto lookup = g_csdChildNodeLookupObservations.find(sourceOwnerAddress);
+            if (lookup != g_csdChildNodeLookupObservations.end())
+            {
+                observation.parentNodeAddress = lookup->second.parentNodeAddress;
+                observation.childName = lookup->second.childName;
+                observation.path = lookup->second.path;
+                if (observation.path.empty() && !lookup->second.parentPath.empty())
+                    observation.path = lookup->second.parentPath + "/" + observation.childName;
+            }
+
+            if (observation.path.empty())
+                observation.path = ResolveAnyCsdNodePathLocked(nodeAddress);
+
+            g_csdNodeSourceOwnerObservations[nodeAddress] = observation;
+            TrimCsdLookupObservationMapsLocked();
+
+            if (
+                !observation.path.empty() &&
+                observation.path.starts_with("ui_playscreen/") &&
+                (IsSonicHudValueTextPath(observation.path) || IsSonicHudGaugeOrPromptPath(observation.path)))
+            {
+                const std::string logKey =
+                    HexU32(nodeAddress) + "|" + observation.path + "|" +
+                    HexU32(sourceOwnerAddress) + "|" + std::to_string(g_routeGeneration);
+                shouldLog = g_loggedSonicHudNodeSourceOwnerKeys.insert(logKey).second;
+                loggedObservation = observation;
+            }
+        }
+
+        if (shouldLog)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-node-source-owner-resolved",
+                "path=" + loggedObservation.path +
+                " node=" + HexU32(loggedObservation.nodeAddress) +
+                " sourceOwnerAddress=" + HexU32(loggedObservation.sourceOwnerAddress) +
+                " sourceOwnerOffsetFromUpdateOwner=" +
+                    OptionalOffsetText(loggedObservation.sourceOwnerOffsetFromUpdateOwner) +
+                " updateContext=\"" + loggedObservation.updateContext.hookSource + "\"" +
+                " source=" + loggedObservation.hookSource +
+                " pathResolutionSource=csd-child-lookup-chain");
+        }
+    }
+
     void OnCsdNodeSetText(
         uint32_t nodeAddress,
         uint32_t textAddress,
@@ -7047,6 +7436,7 @@ namespace UiLab
                 " path=" + path +
                 " node=" + HexU32(nodeAddress) +
                 " text=\"" + std::string(textUtf8) + "\"" +
+                " pathResolutionSource=" + pathResolutionSource +
                 " source=" + source);
         }
 
