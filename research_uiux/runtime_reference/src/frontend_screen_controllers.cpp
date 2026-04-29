@@ -221,6 +221,48 @@ std::vector<SonicDayHudRuntimeTextWriteObservation> makeRuntimeOwnerFieldTextWri
     };
 }
 
+std::vector<SonicDayHudRuntimeGaugePromptWriteObservation> makeRuntimeGaugePromptWriteObservations()
+{
+    return {
+        {
+            "boostGauge",
+            "ui_playscreen/so_speed_gauge",
+            "scale",
+            0.650,
+            true,
+            "raw-chud-sonic-stage-owner-field",
+            "sonic-hud-gauge-scale-write:CSD::CNode::SetScale/sub_830BF090",
+        },
+        {
+            "ringEnergyGauge",
+            "ui_playscreen/so_ringenagy_gauge",
+            "scale",
+            0.720,
+            true,
+            "raw-chud-sonic-stage-owner-field",
+            "sonic-hud-gauge-scale-write:CSD::CNode::SetScale/sub_830BF090",
+        },
+        {
+            "tutorialPrompt",
+            "ui_playscreen/add/u_info",
+            "pattern-index",
+            3.0,
+            true,
+            "csd-child-lookup-chain",
+            "sonic-hud-gauge-pattern-write:CSD::CNode::SetPatternIndex/sub_830BF300",
+        },
+        {
+            "tutorialPrompt",
+            "ui_playscreen/add/u_info",
+            "hide-flag",
+            0.0,
+            true,
+            "csd-child-lookup-chain",
+            "sonic-hud-gauge-hide-write:CSD::CNode::SetHideFlag/sub_830BF080",
+        },
+    };
+}
+
 SonicDayHudRuntimeCallsiteSample makeRuntimeTimerCallsiteSample()
 {
     SonicDayHudRuntimeCallsiteSample sample;
@@ -713,6 +755,72 @@ FrontendControllerFrame SonicDayHudController::applyRuntimeTextWrite(const Sonic
     return frame_;
 }
 
+FrontendControllerFrame SonicDayHudController::applyRuntimeGaugePromptWrite(
+    const SonicDayHudRuntimeGaugePromptWriteObservation& observation)
+{
+    if (!observation.numericValueKnown)
+        return frame_;
+
+    const std::string source =
+        observation.source + "@" + observation.path +
+        ":writeKind=" + observation.writeKind +
+        ":pathResolutionSource=" + observation.pathResolutionSource +
+        ":status=runtime-proven-via-csd-gauge-prompt-write";
+
+    const bool boostPath =
+        observation.valueName == "boostGauge" ||
+        observation.path.find("ui_playscreen/so_speed_gauge") != std::string::npos ||
+        observation.path.find("ui_playscreen/gauge_frame") != std::string::npos;
+    const bool energyPath =
+        observation.valueName == "ringEnergyGauge" ||
+        observation.path.find("ui_playscreen/so_ringenagy_gauge") != std::string::npos;
+    const bool tutorialPath =
+        observation.valueName == "tutorialPrompt" ||
+        observation.path.find("ui_playscreen/add/u_info") != std::string::npos;
+
+    if (observation.writeKind == "scale" && boostPath)
+    {
+        gameplayState_.boostGauge = std::clamp(observation.numericValue, 0.0, 1.0);
+        gameplayState_.provenance.boostGauge = observation.path;
+    }
+    else if (observation.writeKind == "scale" && energyPath)
+    {
+        gameplayState_.ringEnergyGauge = std::clamp(observation.numericValue, 0.0, 1.0);
+        gameplayState_.provenance.ringEnergyGauge = observation.path;
+    }
+    else if (tutorialPath)
+    {
+        if (observation.writeKind == "pattern-index")
+        {
+            const int promptIndex = std::max(0, static_cast<int>(observation.numericValue));
+            gameplayState_.tutorialPromptId = "pattern-" + std::to_string(promptIndex);
+            gameplayState_.tutorialVisible = true;
+        }
+        else if (observation.writeKind == "hide-flag")
+        {
+            gameplayState_.tutorialVisible = observation.numericValue == 0.0;
+        }
+        gameplayState_.provenance.tutorialPrompt = observation.path;
+    }
+
+    gameplayState_.provenance.valueSource = source;
+    gameplayState_.lastSfxHook = "none";
+    gameplayState_.sfxCueId = "audio-id-pending";
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        frame_.frame + 1,
+        "runtime-gauge-prompt-write",
+        observation.source.empty() ? "sonic-hud-gauge-prompt-write" : observation.source,
+        false,
+        0,
+        "none",
+        "none",
+        "none",
+        sonicHudSceneNames(gameplayState_.tutorialVisible));
+    return frame_;
+}
+
 FrontendControllerFrame SonicDayHudController::applyRuntimeCallsiteSample(
     const SonicDayHudRuntimeCallsiteSample& sample)
 {
@@ -1045,6 +1153,21 @@ std::string formatSonicDayHudRuntimeTextWriteObservation(const SonicDayHudRuntim
     return out.str();
 }
 
+std::string formatSonicDayHudRuntimeGaugePromptWriteObservation(
+    const SonicDayHudRuntimeGaugePromptWriteObservation& observation)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_runtime_gauge_prompt_write="
+        << "value=" << observation.valueName
+        << ":path=" << observation.path
+        << ":kind=" << observation.writeKind
+        << ":value=" << std::fixed << std::setprecision(3) << observation.numericValue
+        << ":resolution=" << observation.pathResolutionSource
+        << ":source=" << observation.source
+        << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage)
 {
     std::ostringstream out;
@@ -1245,6 +1368,28 @@ std::string formatSonicDayHudRuntimeBindingPhase175SmokeSequence()
         << "timer:runtime-proven-via-chud-update-callsite-sample,"
         << "ring/speed/lives:csd-text-write-ready,"
         << "boost/energy/tutorial:classified-callsite-candidates-pending-normalization"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase180SmokeSequence()
+{
+    SonicDayHudController hud;
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+
+    std::ostringstream out;
+    for (const auto& observation : makeRuntimeGaugePromptWriteObservations())
+    {
+        out << formatSonicDayHudRuntimeGaugePromptWriteObservation(observation);
+        (void)hud.applyRuntimeGaugePromptWrite(observation);
+    }
+
+    out << formatSonicDayHudGameplayState("gauge-prompt-write", hud.gameplayState());
+    out << "gameplay_numeric_binding=score:known,scoreinfo:known,"
+        << "timer:runtime-proven-via-chud-update-callsite-sample,"
+        << "ring/speed/lives:csd-text-write-ready,"
+        << "boost/energy/tutorial:runtime-proven-via-csd-gauge-prompt-write,"
+        << "audio:pending-exact-sfx-id"
         << '\n';
     return out.str();
 }

@@ -877,6 +877,54 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("sonic_day_hud_runtime_callsite_classification=value=rollingCounterGaugeState:status=classified-via-generated-PPC-callsite-candidate:source=generated-PPC:sub_824D6C18 owner+460/+480 rolling counter/gauge state", completed.stdout)
         self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,timer:runtime-proven-via-chud-update-callsite-sample,ring/speed/lives:csd-text-write-ready,boost/energy/tutorial:classified-callsite-candidates-pending-normalization", completed.stdout)
 
+    def test_phase180_sonic_day_hud_controller_consumes_gauge_prompt_write_observations(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+        report = self.read(REPORT)
+
+        for token in [
+            "struct SonicDayHudRuntimeGaugePromptWriteObservation",
+            "applyRuntimeGaugePromptWrite",
+            "formatSonicDayHudRuntimeGaugePromptWriteObservation",
+            "formatSonicDayHudRuntimeBindingPhase180SmokeSequence",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "sonic-hud-gauge-scale-write",
+            "sonic-hud-gauge-pattern-write",
+            "sonic-hud-gauge-hide-write",
+            "runtime-proven-via-csd-gauge-prompt-write",
+            "ui_playscreen/so_speed_gauge",
+            "ui_playscreen/so_ringenagy_gauge",
+            "ui_playscreen/add/u_info",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase180-sonic-hud-gauge-prompt-write-smoke", example)
+        self.assertIn("Phase 180", report)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase180-sonic-hud-gauge-prompt-write-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase180 sonic hud gauge prompt write smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_gauge_prompt_write=value=boostGauge:path=ui_playscreen/so_speed_gauge:kind=scale:value=0.650:resolution=raw-chud-sonic-stage-owner-field", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_gauge_prompt_write=value=ringEnergyGauge:path=ui_playscreen/so_ringenagy_gauge:kind=scale:value=0.720:resolution=raw-chud-sonic-stage-owner-field", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_gauge_prompt_write=value=tutorialPrompt:path=ui_playscreen/add/u_info:kind=pattern-index:value=3.000:resolution=csd-child-lookup-chain", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_gauge_prompt_write=value=tutorialPrompt:path=ui_playscreen/add/u_info:kind=hide-flag:value=0.000:resolution=csd-child-lookup-chain", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=gauge-prompt-write:rings=000:score=000000000:time=00:00:00:speed=000:boost=0.650:energy=0.720:lives=3:tutorial=pattern-3:visible:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
+        self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,timer:runtime-proven-via-chud-update-callsite-sample,ring/speed/lives:csd-text-write-ready,boost/energy/tutorial:runtime-proven-via-csd-gauge-prompt-write,audio:pending-exact-sfx-id", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

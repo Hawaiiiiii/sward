@@ -244,8 +244,12 @@ function Get-UiLabVirtualKey([string]$Key) {
         "D" { return 0x44 }
         "Q" { return 0x51 }
         "E" { return 0x45 }
+        "UP" { return 0x26 }
+        "DOWN" { return 0x28 }
+        "LEFT" { return 0x25 }
+        "RIGHT" { return 0x27 }
         default {
-            throw "Unsupported UI Lab control key: $Key. Supported keys: ENTER/W/A/S/D/Q/E."
+            throw "Unsupported UI Lab control key: $Key. Supported keys: ENTER/W/A/S/D/Q/E/UP/DOWN/LEFT/RIGHT."
         }
     }
 }
@@ -313,7 +317,7 @@ function Start-UiLabControlAutomation(
         enabled = $Enabled
         target = $Target
         plan = $Plan
-        supportedKeys = @("ENTER", "W", "A", "S", "D", "Q", "E")
+        supportedKeys = @("ENTER", "W", "A", "S", "D", "Q", "E", "UP", "DOWN", "LEFT", "RIGHT")
         handle = $Handle
         processId = $ProcessId
         durationSeconds = [Math]::Max(0, $DurationSeconds)
@@ -388,6 +392,10 @@ function Get-UiLabControlAutomationNextKey([object]$RuntimeState) {
         }
         "operator-sweep" {
             $sequence = @("ENTER", "S", "ENTER", "W", "ENTER", "Q", "E")
+            return $sequence[[int]$script:UiLabControlAutomationState.pulseCount % $sequence.Count]
+        }
+        "gameplay-sweep" {
+            $sequence = @("ENTER", "RIGHT", "RIGHT", "UP", "LEFT", "DOWN", "Q", "E")
             return $sequence[[int]$script:UiLabControlAutomationState.pulseCount % $sequence.Count]
         }
         default {
@@ -1478,7 +1486,7 @@ foreach ($target in $expandedTargets) {
     [void](Start-UiLabControlAutomation $controlAutomationEnabled $target $ControlAutomationPlan $handle $process.Id $ControlAutomationDurationSeconds $ControlAutomationIntervalMilliseconds $ControlAutomationKeyHoldMilliseconds)
 
     if ($controlAutomationEnabled) {
-        Write-Host "[$target] control automation enabled ($ControlAutomationPlan): ENTER/W/A/S/D/Q/E"
+        Write-Host "[$target] control automation enabled ($ControlAutomationPlan): ENTER/W/A/S/D/Q/E/UP/DOWN/LEFT/RIGHT"
     }
 
     Wait-UiLabControlAutomationAwareSleep $InitialWaitSeconds $process "initial-wait"
@@ -1574,7 +1582,9 @@ foreach ($target in $expandedTargets) {
                 }
 
                 if ($evidenceReady) {
-                    Stop-UiLabControlAutomation "evidence ready"
+                    if ($ControlAutomationPlan -ne "gameplay-sweep") {
+                        Stop-UiLabControlAutomation "evidence ready"
+                    }
 
                     if ($UiLayerCapture -and $LiveBridge -and -not $process.HasExited) {
                         $uiLayerCaptureAttempted = $true
@@ -1594,7 +1604,7 @@ foreach ($target in $expandedTargets) {
                     $settleSeconds = if ($stageTargets -contains $target) { $StagePostEvidenceDelaySeconds } else { $PostEvidenceDelaySeconds }
 
                     if ($settleSeconds -gt 0) {
-                        Start-Sleep -Seconds $settleSeconds
+                        Wait-UiLabControlAutomationAwareSleep $settleSeconds $process "post-evidence-settle"
                     }
                 }
             }
