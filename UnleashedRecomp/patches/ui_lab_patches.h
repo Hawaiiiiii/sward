@@ -347,6 +347,12 @@ namespace UiLab
         uint32_t playerCountNodeAddress,
         std::string_view hookSource);
     void OnHudSonicStageOwnerFieldSample(uint32_t ownerAddress, std::string_view hookSource);
+    void OnSonicHudUpdateCallsiteSample(
+        uint32_t ownerAddress,
+        std::string_view hookName,
+        std::string_view samplePhase,
+        double deltaTime,
+        uint32_t r4);
     void OnSonicHudGameplayValues(
         uint32_t ringCount,
         bool ringCountKnown,

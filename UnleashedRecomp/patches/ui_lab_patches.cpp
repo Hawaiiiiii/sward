@@ -458,6 +458,30 @@ namespace UiLab
         uint64_t frame = 0;
     };
 
+    struct SonicHudUpdateCallsiteSample
+    {
+        uint32_t ownerAddress = 0;
+        std::string hookName;
+        std::string samplePhase;
+        double deltaTime = 0.0;
+        uint32_t r4 = 0;
+        uint32_t ownerField424 = 0;
+        uint32_t ownerField432 = 0;
+        float ownerField440 = 0.0f;
+        float ownerField444 = 0.0f;
+        uint32_t ownerField452 = 0;
+        uint32_t ownerField456 = 0;
+        uint32_t ownerField460 = 0;
+        uint32_t ownerField464 = 0;
+        uint32_t ownerField468 = 0;
+        uint32_t ownerField472 = 0;
+        float ownerField476 = 0.0f;
+        uint32_t ownerField480 = 0;
+        uint32_t ownerField484 = 0;
+        uint32_t ownerField488 = 0;
+        uint64_t frame = 0;
+    };
+
     struct CsdChildNodeLookupObservation
     {
         uint32_t resultOwnerAddress = 0;
@@ -866,6 +890,9 @@ namespace UiLab
     static constexpr size_t kSonicHudValueWriteObservationLimit = 96;
     static std::vector<SonicHudValueWriteObservation> g_sonicHudValueWriteObservations;
     static std::unordered_set<std::string> g_loggedSonicHudValueTextWriteKeys;
+    static constexpr size_t kSonicHudUpdateCallsiteSampleLimit = 96;
+    static std::vector<SonicHudUpdateCallsiteSample> g_sonicHudUpdateCallsiteSamples;
+    static std::unordered_map<std::string, std::string> g_lastSonicHudUpdateCallsiteSampleDetails;
     static constexpr size_t kCsdChildNodeLookupObservationLimit = 256;
     static std::unordered_map<uint32_t, CsdChildNodeLookupObservation> g_csdChildNodeLookupObservations;
     static std::unordered_map<uint32_t, CsdNodeSourceOwnerObservation> g_csdNodeSourceOwnerObservations;
@@ -947,6 +974,7 @@ namespace UiLab
     static SonicHudGameplayValueSnapshot BuildSonicHudGameplayValueSnapshot();
     static std::string SonicHudValueWriteBindingStatus();
     static std::vector<SonicHudValueWriteObservation> BuildSonicHudValueWriteObservations();
+    static std::vector<SonicHudUpdateCallsiteSample> BuildSonicHudUpdateCallsiteSamples();
     static std::string ResolveSonicHudValuePathFromCsdNode(uint32_t nodeAddress);
     static bool ApplySonicHudTextWriteToGameplayValues(
         std::string_view path,
@@ -974,6 +1002,9 @@ namespace UiLab
     static void AppendSonicHudValueWriteObservations(
         std::ostringstream& out,
         const std::vector<SonicHudValueWriteObservation>& observations);
+    static void AppendSonicHudUpdateCallsiteSamples(
+        std::ostringstream& out,
+        const std::vector<SonicHudUpdateCallsiteSample>& samples);
     static void AppendTypedInspectors(std::ostringstream& out);
 
     static std::string_view RoutePolicyLabel()
@@ -2329,10 +2360,17 @@ namespace UiLab
         return g_sonicHudValueWriteObservations;
     }
 
+    static std::vector<SonicHudUpdateCallsiteSample> BuildSonicHudUpdateCallsiteSamples()
+    {
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        return g_sonicHudUpdateCallsiteSamples;
+    }
+
     static std::string SonicHudValueWriteBindingStatus()
     {
         return "score:known,scoreinfo:known,"
             "ring/timer/speed/lives:known-via-csd-text-write,"
+            "timer/counter/speed/gauge candidates:sampled-via-chud-update-callsites,"
             "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-with-unresolved-write-probe-pending-runtime-normalization";
     }
 
@@ -3285,6 +3323,44 @@ namespace UiLab
         out << "]";
     }
 
+    static void AppendSonicHudUpdateCallsiteSamples(
+        std::ostringstream& out,
+        const std::vector<SonicHudUpdateCallsiteSample>& samples)
+    {
+        out << "[";
+        for (size_t i = 0; i < samples.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            const auto& sample = samples[i];
+            out
+                << "{"
+                << "\"ownerAddress\":\"" << JsonEscape(HexU32(sample.ownerAddress)) << "\","
+                << "\"hookName\":\"" << JsonEscape(sample.hookName) << "\","
+                << "\"samplePhase\":\"" << JsonEscape(sample.samplePhase) << "\","
+                << "\"deltaTime\":" << sample.deltaTime << ","
+                << "\"r4\":\"" << JsonEscape(HexU32(sample.r4)) << "\","
+                << "\"ownerField424\":\"" << JsonEscape(HexU32(sample.ownerField424)) << "\","
+                << "\"ownerField432\":\"" << JsonEscape(HexU32(sample.ownerField432)) << "\","
+                << "\"ownerField440\":" << sample.ownerField440 << ","
+                << "\"ownerField444\":" << sample.ownerField444 << ","
+                << "\"ownerField452\":" << sample.ownerField452 << ","
+                << "\"ownerField456\":" << sample.ownerField456 << ","
+                << "\"ownerField460\":" << sample.ownerField460 << ","
+                << "\"ownerField464\":" << sample.ownerField464 << ","
+                << "\"ownerField468\":" << sample.ownerField468 << ","
+                << "\"ownerField472\":" << sample.ownerField472 << ","
+                << "\"ownerField476\":" << sample.ownerField476 << ","
+                << "\"ownerField480\":" << sample.ownerField480 << ","
+                << "\"ownerField484\":\"" << JsonEscape(HexU32(sample.ownerField484)) << "\","
+                << "\"ownerField488\":\"" << JsonEscape(HexU32(sample.ownerField488)) << "\","
+                << "\"frame\":" << sample.frame
+                << "}";
+        }
+        out << "]";
+    }
+
     static void AppendStringVector(std::ostringstream& out, const std::vector<std::string>& values)
     {
         out << "[";
@@ -3307,6 +3383,7 @@ namespace UiLab
         const auto sonicHud = BuildSonicHudLiveInspectorSnapshot();
         const auto sonicGameplay = BuildSonicHudGameplayValueSnapshot();
         const auto sonicValueWriteObservations = BuildSonicHudValueWriteObservations();
+        const auto sonicUpdateCallsiteSamples = BuildSonicHudUpdateCallsiteSamples();
         const auto sonicOwnerPath = BuildSonicHudOwnerPathInspectorSnapshot(csdProjectTree);
         const auto pauseGeneralSave = BuildPauseGeneralSaveLiveInspectorSnapshot();
 
@@ -3491,6 +3568,11 @@ namespace UiLab
             << "        \"valueWriteObservationCount\": " << sonicValueWriteObservations.size() << ",\n"
             << "        \"valueWriteObservations\": ";
         AppendSonicHudValueWriteObservations(out, sonicValueWriteObservations);
+        out
+            << ",\n"
+            << "        \"updateCallsiteSampleCount\": " << sonicUpdateCallsiteSamples.size() << ",\n"
+            << "        \"updateCallsiteSamples\": ";
+        AppendSonicHudUpdateCallsiteSamples(out, sonicUpdateCallsiteSamples);
         out
             << ",\n"
             << "        \"frame\": " << sonicGameplay.frame << "\n"
@@ -6185,6 +6267,8 @@ namespace UiLab
             g_chudSonicStageOwnerFieldSamples.clear();
             g_sonicHudGameplayValues = {};
             g_sonicHudValueWriteObservations.clear();
+            g_sonicHudUpdateCallsiteSamples.clear();
+            g_lastSonicHudUpdateCallsiteSampleDetails.clear();
             g_loggedSonicHudValueTextWriteKeys.clear();
         }
 
@@ -7251,6 +7335,90 @@ namespace UiLab
             return;
 
         g_sonicHudUpdateContextStack.pop_back();
+    }
+
+    void OnSonicHudUpdateCallsiteSample(
+        uint32_t ownerAddress,
+        std::string_view hookName,
+        std::string_view samplePhase,
+        double deltaTime,
+        uint32_t r4)
+    {
+        if (!g_isEnabled || !IsPlausibleGuestPointer(ownerAddress))
+            return;
+
+        SonicHudUpdateCallsiteSample sample;
+        sample.ownerAddress = ownerAddress;
+        sample.hookName = hookName.empty() ? "CHudSonicStage/update-callsite" : std::string(hookName);
+        sample.samplePhase = samplePhase.empty() ? "unknown" : std::string(samplePhase);
+        sample.deltaTime = deltaTime;
+        sample.r4 = r4;
+        sample.frame = g_presentedFrameCount;
+
+        TryReadGuestU32(ownerAddress + 424, sample.ownerField424);
+        TryReadGuestU32(ownerAddress + 432, sample.ownerField432);
+        TryReadGuestFloat(ownerAddress + 440, sample.ownerField440);
+        TryReadGuestFloat(ownerAddress + 444, sample.ownerField444);
+        TryReadGuestU32(ownerAddress + 452, sample.ownerField452);
+        TryReadGuestU32(ownerAddress + 456, sample.ownerField456);
+        TryReadGuestU32(ownerAddress + 460, sample.ownerField460);
+        TryReadGuestU32(ownerAddress + 464, sample.ownerField464);
+        TryReadGuestU32(ownerAddress + 468, sample.ownerField468);
+        TryReadGuestU32(ownerAddress + 472, sample.ownerField472);
+        TryReadGuestFloat(ownerAddress + 476, sample.ownerField476);
+        TryReadGuestU32(ownerAddress + 480, sample.ownerField480);
+        TryReadGuestU32(ownerAddress + 484, sample.ownerField484);
+        TryReadGuestU32(ownerAddress + 488, sample.ownerField488);
+
+        std::ostringstream detail;
+        detail
+            << "hook=" << sample.hookName
+            << " samplePhase=" << sample.samplePhase
+            << " owner=" << HexU32(sample.ownerAddress)
+            << " deltaTime=" << sample.deltaTime
+            << " r4=" << HexU32(sample.r4)
+            << " ownerField424=" << HexU32(sample.ownerField424)
+            << " ownerField432=" << HexU32(sample.ownerField432)
+            << " ownerField440=" << sample.ownerField440
+            << " ownerField444=" << sample.ownerField444
+            << " ownerField452=" << sample.ownerField452
+            << " ownerField456=" << sample.ownerField456
+            << " ownerField460=" << sample.ownerField460
+            << " ownerField464=" << sample.ownerField464
+            << " ownerField468=" << sample.ownerField468
+            << " ownerField472=" << sample.ownerField472
+            << " ownerField476=" << sample.ownerField476
+            << " ownerField480=" << sample.ownerField480
+            << " ownerField484=" << HexU32(sample.ownerField484)
+            << " ownerField488=" << HexU32(sample.ownerField488);
+
+        const std::string key =
+            sample.hookName + "|" + sample.samplePhase + "|" + HexU32(sample.ownerAddress);
+        const std::string detailText = detail.str();
+
+        bool changed = false;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            auto existing = g_lastSonicHudUpdateCallsiteSampleDetails.find(key);
+            changed =
+                existing == g_lastSonicHudUpdateCallsiteSampleDetails.end() ||
+                existing->second != detailText;
+
+            if (changed)
+            {
+                g_lastSonicHudUpdateCallsiteSampleDetails[key] = detailText;
+                if (g_sonicHudUpdateCallsiteSamples.size() < kSonicHudUpdateCallsiteSampleLimit)
+                    g_sonicHudUpdateCallsiteSamples.push_back(sample);
+                else
+                    g_sonicHudUpdateCallsiteSamples[g_sonicHudUpdateCallsiteSamples.size() - 1] = sample;
+            }
+        }
+
+        if (changed)
+        {
+            WriteEvidenceEvent("sonic-hud-update-callsite-sample", detailText);
+            WriteLiveStateSnapshot();
+        }
     }
 
     void OnCsdChildNodeLookupResolved(

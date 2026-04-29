@@ -2148,6 +2148,55 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, report)
 
+    def test_ui_lab_phase174_samples_sonic_hud_update_callsite_fields(self):
+        hud_hook = self.read("UnleashedRecomp/patches/CHudSonicStage_patches.cpp")
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "RecordHudSonicStageCallsiteSample",
+            "UiLab::OnSonicHudUpdateCallsiteSample",
+            "samplePhase=pre-original",
+            "samplePhase=post-original",
+            "sub_824D6048",
+            "sub_824D6418",
+            "sub_824D6C18",
+        ]:
+            self.assertIn(token, hud_hook)
+
+        for token in [
+            "OnSonicHudUpdateCallsiteSample",
+            "ownerAddress",
+            "hookName",
+            "samplePhase",
+            "deltaTime",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "SonicHudUpdateCallsiteSample",
+            "g_sonicHudUpdateCallsiteSamples",
+            "BuildSonicHudUpdateCallsiteSamples",
+            "AppendSonicHudUpdateCallsiteSamples",
+            "sonic-hud-update-callsite-sample",
+            "ownerField452",
+            "ownerField456",
+            "ownerField460",
+            "ownerField480",
+            "timer/counter/speed/gauge candidates:sampled-via-chud-update-callsites",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 174",
+            "sonic-hud-update-callsite-sample",
+            "owner +452/+456",
+            "owner +460/+480",
+            "manual observer windows where CNode::SetText does not fire",
+        ]:
+            self.assertIn(token, report)
+
 
 if __name__ == "__main__":
     unittest.main()
