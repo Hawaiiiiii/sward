@@ -2371,11 +2371,13 @@ static const char *DeviceTypeName(RenderDeviceType type)
 
 static void DrawProfiler()
 {
+    bool toggleOperator = SDL_GetKeyboardState(nullptr)[SDL_SCANCODE_F2] != 0;
+    UiLab::UpdateOperatorShellToggle(toggleOperator);
+
     bool toggleProfiler = SDL_GetKeyboardState(nullptr)[SDL_SCANCODE_F1] != 0;
 
     if (UiLab::ShouldReserveF1DebugToggle())
     {
-        UiLab::UpdateOperatorShellToggle(toggleProfiler);
         toggleProfiler = false;
     }
 
@@ -2489,9 +2491,6 @@ static void DrawProfiler()
 
         ImGui::NewLine();
         ImGui::Checkbox("Show FPS", &Config::ShowFPS.Value);
-        ImGui::NewLine();
-
-        UiLab::DrawProfilerAddon();
         ImGui::NewLine();
 
         if (ImGui::TreeNode("Device Names"))

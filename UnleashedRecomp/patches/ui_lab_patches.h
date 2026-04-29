@@ -53,7 +53,7 @@ namespace UiLab
     void SelectPreviousTarget();
     void SelectNextTarget();
     bool ShouldReserveF1DebugToggle();
-    void UpdateOperatorShellToggle(bool f1Down);
+    void UpdateOperatorShellToggle(bool toggleDown);
 
     void OnTitleStateIntroUpdate(float elapsedSeconds);
     void OnTitleIntroContext(

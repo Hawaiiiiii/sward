@@ -238,7 +238,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
 
         self.assertIn("bool ShouldReserveF1DebugToggle()", header)
-        self.assertIn("void UpdateOperatorShellToggle(bool f1Down)", header)
+        self.assertIn("void UpdateOperatorShellToggle(bool toggleDown)", header)
         self.assertIn("struct OperatorWindowEntry", ui_lab)
         self.assertIn("g_operatorShellVisible", ui_lab)
         self.assertIn("g_operatorWindowListVisible", ui_lab)
@@ -262,7 +262,9 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("SWARD Exports", ui_lab)
         self.assertIn("SWARD Debug Draw", ui_lab)
         self.assertIn("UiLab::ShouldReserveF1DebugToggle()", video)
-        self.assertIn("UiLab::UpdateOperatorShellToggle(toggleProfiler)", video)
+        self.assertIn("SDL_SCANCODE_F2", video)
+        self.assertIn("UiLab::UpdateOperatorShellToggle(toggleOperator)", video)
+        self.assertNotIn("UiLab::UpdateOperatorShellToggle(toggleProfiler)", video)
         self.assertIn("return false; // Leave F1 to DrawProfiler().", ui_lab)
         self.assertIn("F1 remains reserved for the native Recomp Profiler", report)
         self.assertIn("profiler-style SWARD operator panel", report)
@@ -2000,7 +2002,6 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
     def test_ui_lab_phase184_embeds_sward_operator_into_native_profiler(self):
         header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
-        video = self.read("UnleashedRecomp/gpu/video.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
         pivot = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
 
@@ -2009,13 +2010,6 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "DrawProfilerAddon",
         ]:
             self.assertIn(token, header)
-
-        for token in [
-            "UiLab::DrawProfilerAddon();",
-            "DrawProfiler()",
-            "Show FPS",
-        ]:
-            self.assertIn(token, video)
 
         for token in [
             "g_operatorShellVisible = false",
@@ -2042,6 +2036,42 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, report)
 
         self.assertIn("native Recomp Profiler is the primary operator surface", pivot)
+
+    def test_ui_lab_phase185_splits_sward_operator_to_f2(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        video = self.read("UnleashedRecomp/gpu/video.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        pivot = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
+
+        self.assertIn("void UpdateOperatorShellToggle(bool toggleDown)", header)
+        self.assertIn("SDL_SCANCODE_F2", video)
+        self.assertIn("toggleOperator", video)
+        self.assertIn("UiLab::UpdateOperatorShellToggle(toggleOperator)", video)
+        self.assertIn("SDL_SCANCODE_F1", video)
+        self.assertIn("DrawProfiler()", video)
+        self.assertNotIn("UiLab::DrawProfilerAddon();", video)
+
+        for token in [
+            "F2 toggles SWARD UI Lab",
+            "F1 remains native Profiler",
+            "SGlobals HUD/render switches",
+            "DrawOperatorHudSwitchesPanel",
+            "ImGui::BeginTabItem(\"HUD Switches\")",
+            "ms_IsRenderHud is the whole UI render gate",
+            "Legacy floating panes",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 185",
+            "F2 toggles SWARD UI Lab",
+            "F1 remains the native Recomp Profiler",
+            "ms_IsRenderHud is the whole UI/UX render gate",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("F2 toggles the detached SWARD UI Lab panel", pivot)
 
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")

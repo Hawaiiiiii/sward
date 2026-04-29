@@ -1490,10 +1490,12 @@ namespace UiLab
         }
     }
 
-    void UpdateOperatorShellToggle(bool f1Down)
+    void UpdateOperatorShellToggle(bool toggleDown)
     {
-        (void)f1Down;
-        g_operatorShellToggleWasDown = false;
+        if (!g_operatorShellToggleWasDown && toggleDown)
+            g_operatorShellVisible = !g_operatorShellVisible;
+
+        g_operatorShellToggleWasDown = toggleDown;
     }
 
     static const RuntimeTarget& TargetFor(ScreenId id)
@@ -9836,6 +9838,30 @@ namespace UiLab
         }
     }
 
+    static void DrawOperatorHudSwitchesPanel()
+    {
+        ImGui::TextUnformatted("SGlobals HUD/render switches");
+        ImGui::TextWrapped(
+            "ms_IsRenderHud is the whole UI render gate; ms_IsRenderGameMainHud and ms_IsRenderHudPause split the in-game HUD and pause HUD lanes for visual isolation.");
+        ImGui::Separator();
+
+        for (const auto& guestBool : kGuestRenderGlobals)
+        {
+            const std::string_view name = guestBool.name;
+            if (
+                name == "ms_IsRenderHud" ||
+                name == "ms_IsRenderGameMainHud" ||
+                name == "ms_IsRenderHudPause")
+            {
+                DrawGuestBoolCheckbox(guestBool);
+            }
+        }
+
+        ImGui::Separator();
+        ImGui::TextWrapped(
+            "These switches identify the global UI render gate and child HUD render lanes. They are an isolation oracle, not a substitute for the typed owner/CSD/callsite source recovery.");
+    }
+
     static void DrawOperatorProfilerPanelsTab()
     {
         ImGui::TextUnformatted("Open focused drill-down windows");
@@ -9871,6 +9897,8 @@ namespace UiLab
         if (!ImGui::CollapsingHeader("SWARD UI Lab", ImGuiTreeNodeFlags_DefaultOpen))
             return;
 
+        ImGui::TextUnformatted("F2 toggles SWARD UI Lab");
+        ImGui::TextUnformatted("F1 remains native Profiler");
         ImGui::Text("Target: %s", std::string(GetTargetToken()).c_str());
         ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
         ImGui::Text("Live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
@@ -9909,22 +9937,7 @@ namespace UiLab
 
             if (ImGui::BeginTabItem("HUD Switches"))
             {
-                ImGui::TextUnformatted("SGlobals HUD/render switches");
-                for (const auto& guestBool : kGuestRenderGlobals)
-                {
-                    const std::string_view name = guestBool.name;
-                    if (
-                        name == "ms_IsRenderHud" ||
-                        name == "ms_IsRenderGameMainHud" ||
-                        name == "ms_IsRenderHudPause")
-                    {
-                        DrawGuestBoolCheckbox(guestBool);
-                    }
-                }
-
-                ImGui::Separator();
-                ImGui::TextWrapped(
-                    "These switches are a visual isolation oracle for HUD pixels. They do not replace the typed owner/CSD/callsite path recovery.");
+                DrawOperatorHudSwitchesPanel();
                 ImGui::EndTabItem();
             }
 
@@ -9963,6 +9976,8 @@ namespace UiLab
         if (ImGui::Begin("SWARD Operator Profiler", nullptr, flags))
         {
             DrawOperatorProfilerSummary();
+            ImGui::TextUnformatted("F2 toggles SWARD UI Lab");
+            ImGui::TextUnformatted("F1 remains native Profiler");
             ImGui::Separator();
 
             if (ImGui::BeginTabBar("sward-operator-profiler-tabs"))
@@ -9990,6 +10005,12 @@ namespace UiLab
                 if (ImGui::BeginTabItem("HUD"))
                 {
                     DrawOperatorProfilerHudTab();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("HUD Switches"))
+                {
+                    DrawOperatorHudSwitchesPanel();
                     ImGui::EndTabItem();
                 }
 
