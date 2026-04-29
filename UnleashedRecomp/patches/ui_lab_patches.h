@@ -177,6 +177,19 @@ namespace UiLab
         uint32_t textAddress,
         std::string_view textUtf8,
         std::string_view hookSource);
+    void OnCsdNodeSetPatternIndex(
+        uint32_t nodeAddress,
+        uint32_t patternIndex,
+        std::string_view hookSource);
+    void OnCsdNodeSetHideFlag(
+        uint32_t nodeAddress,
+        uint32_t hideFlag,
+        std::string_view hookSource);
+    void OnCsdNodeSetScale(
+        uint32_t nodeAddress,
+        float scaleX,
+        float scaleY,
+        std::string_view hookSource);
     void OnBackendMaterialSubmit(
         std::string_view source,
         uint32_t primitiveType,

@@ -743,6 +743,48 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("lives=known:CSD::CNode::SetText/sub_830BF640@ui_playscreen/player_count/player", completed.stdout)
         self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,ring/timer/speed/lives:known-via-csd-text-write,boost/energy/tutorial:pending-gauge-or-prompt-write-hook", completed.stdout)
 
+    def test_phase169_sonic_day_hud_draw_list_coverage_and_gauge_hook_plan(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+
+        for token in [
+            "struct SonicDayHudRuntimeDrawListCoverage",
+            "speedGaugeObserved",
+            "ringEnergyGaugeObserved",
+            "pauseOverlayObserved",
+            "formatSonicDayHudRuntimeDrawListCoverage",
+            "formatSonicDayHudRuntimeBindingPhase169SmokeSequence",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "live-bridge/ui-draw-list manual observer",
+            "CSD::CNode::SetPatternIndex/SetHideFlag/SetScale",
+            "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase169-sonic-hud-draw-list-coverage-smoke", example)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase169-sonic-hud-draw-list-coverage-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase169 sonic hud draw-list coverage smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_draw_list_coverage=source=live-bridge/ui-draw-list manual observer:project=ui_playscreen:runtime_calls=96:correlated_pairs=96", completed.stdout)
+        self.assertIn("speed_gauge=observed:gauge_frame=observed:energy_gauge=observed:tutorial_prompt=pending:pause_overlay=observed:text_write_observed=0", completed.stdout)
+        self.assertIn("next_hook=CSD::CNode::SetPatternIndex/SetHideFlag/SetScale", completed.stdout)
+        self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,ring/timer/speed/lives:known-via-csd-text-write,boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

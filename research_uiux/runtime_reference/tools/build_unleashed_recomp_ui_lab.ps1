@@ -87,6 +87,7 @@ $root = Resolve-RequiredPath $GeneratedRoot "Generated UnleashedRecomp root"
     "UnleashedRecomp\patches\CTitleStateMenu_patches.cpp",
     "UnleashedRecomp\patches\CHudSonicStage_patches.cpp",
     "UnleashedRecomp\patches\CsdNodeText_patches.cpp",
+    "UnleashedRecomp\patches\CsdNodeValue_patches.cpp",
     "UnleashedRecomp\patches\resident_patches.cpp",
     "UnleashedRecomp\patches\ui_lab_patches.cpp",
     "UnleashedRecomp\patches\ui_lab_patches.h"

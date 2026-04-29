@@ -85,6 +85,21 @@ struct SonicDayHudRuntimeValueUpdatePath
     SonicDayHudRuntimeValueBinding tutorialPromptWritePath;
 };
 
+struct SonicDayHudRuntimeDrawListCoverage
+{
+    std::string source = "live-bridge/ui-draw-list";
+    std::string activeProject = "ui_playscreen";
+    int runtimeDrawCalls = 0;
+    int correlatedMaterialPairs = 0;
+    bool speedGaugeObserved = false;
+    bool gaugeFrameObserved = false;
+    bool ringEnergyGaugeObserved = false;
+    bool tutorialPromptObserved = false;
+    bool pauseOverlayObserved = false;
+    bool textWriteObserved = false;
+    std::string nextHook = "CSD::CNode::SetPatternIndex/SetHideFlag/SetScale";
+};
+
 struct SonicDayHudDisplayOwnerPathBinding
 {
     std::string ringCount = "ui_playscreen/ring_count";
@@ -205,8 +220,10 @@ private:
 [[nodiscard]] std::string formatSonicDayHudRuntimeBinding(const SonicDayHudRuntimeBindingSnapshot& snapshot);
 [[nodiscard]] std::string formatSonicDayHudRuntimeDisplayOwnerPaths(const SonicDayHudDisplayOwnerPathBinding& paths);
 [[nodiscard]] std::string formatSonicDayHudRuntimeWritePaths(const SonicDayHudRuntimeValueUpdatePath& paths);
+[[nodiscard]] std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage);
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingSmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase167SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase168SmokeSequence();
+[[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase169SmokeSequence();
 [[nodiscard]] std::string frontendControllerInputName(FrontendControllerInput input);
 } // namespace sward::ui_runtime

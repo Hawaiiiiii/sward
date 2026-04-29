@@ -1991,7 +1991,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "sonic-hud-value-text-write",
             "sonic-hud-value-write-update",
             "ring/timer/speed/lives:known-via-csd-text-write",
-            "boost/energy/tutorial:pending-gauge-or-prompt-write-hook",
+            "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization",
         ]:
             self.assertIn(token, ui_lab)
 
@@ -2003,6 +2003,65 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "add/speed_count/position/num_speed",
             "player_count/player",
             "boost/energy/tutorial remain pending until gauge/prompt setter callsites are proven",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_phase169_hooks_sonic_hud_csd_gauge_and_prompt_node_writes(self):
+        cmake = self.read("UnleashedRecomp/CMakeLists.txt")
+        build_script = self.read("research_uiux/runtime_reference/tools/build_unleashed_recomp_ui_lab.ps1")
+        hook = self.read("UnleashedRecomp/patches/CsdNodeValue_patches.cpp")
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        self.assertIn("patches/CsdNodeValue_patches.cpp", cmake)
+        self.assertIn("UnleashedRecomp\\patches\\CsdNodeValue_patches.cpp", build_script)
+
+        for token in [
+            "PPC_FUNC_IMPL(__imp__sub_830BF300)",
+            "PPC_FUNC(sub_830BF300)",
+            "PPC_FUNC_IMPL(__imp__sub_830BF080)",
+            "PPC_FUNC(sub_830BF080)",
+            "PPC_FUNC_IMPL(__imp__sub_830BF090)",
+            "PPC_FUNC(sub_830BF090)",
+            "UiLab::OnCsdNodeSetPatternIndex",
+            "UiLab::OnCsdNodeSetHideFlag",
+            "UiLab::OnCsdNodeSetScale",
+            "CSD::CNode::SetPatternIndex/sub_830BF300",
+            "CSD::CNode::SetHideFlag/sub_830BF080",
+            "CSD::CNode::SetScale/sub_830BF090",
+        ]:
+            self.assertIn(token, hook)
+
+        for token in [
+            "OnCsdNodeSetPatternIndex",
+            "OnCsdNodeSetHideFlag",
+            "OnCsdNodeSetScale",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "IsSonicHudGaugeOrPromptPath",
+            "ResolveSonicHudGaugeOrPromptPathFromCsdNode",
+            "ui_playscreen/so_speed_gauge",
+            "ui_playscreen/gauge_frame",
+            "ui_playscreen/so_ringenagy_gauge",
+            "ui_playscreen/add/u_info",
+            "sonic-hud-gauge-pattern-write",
+            "sonic-hud-gauge-hide-write",
+            "sonic-hud-gauge-scale-write",
+            "writeKind",
+            "numericValueKnown",
+            "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 169",
+            "ui-draw-list manual observer",
+            "CNode::SetPatternIndex/sub_830BF300",
+            "CNode::SetHideFlag/sub_830BF080",
+            "CNode::SetScale/sub_830BF090",
         ]:
             self.assertIn(token, report)
 

@@ -422,11 +422,14 @@ namespace UiLab
 
     struct SonicHudValueWriteObservation
     {
+        std::string writeKind = "text";
         std::string valueName;
         std::string path;
         uint32_t nodeAddress = 0;
         uint32_t textAddress = 0;
         std::string textUtf8;
+        bool numericValueKnown = false;
+        double numericValue = 0.0;
         std::string hookSource;
         uint64_t frame = 0;
     };
@@ -2276,7 +2279,7 @@ namespace UiLab
     {
         return "score:known,scoreinfo:known,"
             "ring/timer/speed/lives:known-via-csd-text-write,"
-            "boost/energy/tutorial:pending-gauge-or-prompt-write-hook";
+            "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization";
     }
 
     static bool IsSonicHudValueTextPath(std::string_view path)
@@ -2305,6 +2308,26 @@ namespace UiLab
             return "speedKmh";
         if (path == "ui_playscreen/player_count/player")
             return "lifeCount";
+        return "unknown";
+    }
+
+    static bool IsSonicHudGaugeOrPromptPath(std::string_view path)
+    {
+        return
+            path.starts_with("ui_playscreen/so_speed_gauge") ||
+            path.starts_with("ui_playscreen/gauge_frame") ||
+            path.starts_with("ui_playscreen/so_ringenagy_gauge") ||
+            path.starts_with("ui_playscreen/add/u_info");
+    }
+
+    static std::string SonicHudValueNameFromGaugeOrPromptPath(std::string_view path)
+    {
+        if (path.starts_with("ui_playscreen/so_speed_gauge") || path.starts_with("ui_playscreen/gauge_frame"))
+            return "boostGauge";
+        if (path.starts_with("ui_playscreen/so_ringenagy_gauge"))
+            return "ringEnergyGauge";
+        if (path.starts_with("ui_playscreen/add/u_info"))
+            return "tutorialPrompt";
         return "unknown";
     }
 
@@ -2354,6 +2377,36 @@ namespace UiLab
             for (const auto& entry : record.nodes)
             {
                 if (entry.address == nodeAddress && IsSonicHudValueTextPath(entry.path))
+                    return entry.path;
+            }
+        }
+
+        return {};
+    }
+
+    static std::string ResolveSonicHudGaugeOrPromptPathFromCsdNode(uint32_t nodeAddress)
+    {
+        if (!IsPlausibleGuestPointer(nodeAddress))
+            return {};
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        for (const auto& record : g_csdProjectTrees)
+        {
+            if (record.projectName != "ui_playscreen")
+                continue;
+
+            for (const auto& entry : record.layers)
+            {
+                if ((entry.relatedAddress == nodeAddress || entry.address == nodeAddress) &&
+                    IsSonicHudGaugeOrPromptPath(entry.path))
+                {
+                    return entry.path;
+                }
+            }
+
+            for (const auto& entry : record.nodes)
+            {
+                if (entry.address == nodeAddress && IsSonicHudGaugeOrPromptPath(entry.path))
                     return entry.path;
             }
         }
@@ -2445,6 +2498,56 @@ namespace UiLab
         return changed;
     }
 
+    static bool RecordSonicHudNodeWriteObservation(
+        std::string_view writeKind,
+        std::string_view valueName,
+        std::string_view path,
+        uint32_t nodeAddress,
+        uint32_t textAddress,
+        std::string_view textUtf8,
+        bool numericValueKnown,
+        double numericValue,
+        std::string_view hookSource,
+        std::string_view logValue)
+    {
+        const std::string logKey =
+            std::string(writeKind) + "|" + std::string(path) + "|" + std::string(logValue) +
+            "|" + std::to_string(g_routeGeneration);
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+
+        SonicHudValueWriteObservation observation;
+        observation.writeKind = std::string(writeKind);
+        observation.valueName = std::string(valueName);
+        observation.path = std::string(path);
+        observation.nodeAddress = nodeAddress;
+        observation.textAddress = textAddress;
+        observation.textUtf8 = std::string(textUtf8);
+        observation.numericValueKnown = numericValueKnown;
+        observation.numericValue = numericValue;
+        observation.hookSource = std::string(hookSource);
+        observation.frame = g_presentedFrameCount;
+
+        auto existing = std::find_if(
+            g_sonicHudValueWriteObservations.begin(),
+            g_sonicHudValueWriteObservations.end(),
+            [&](const SonicHudValueWriteObservation& current)
+            {
+                return current.path == observation.path && current.writeKind == observation.writeKind;
+            });
+
+        if (existing != g_sonicHudValueWriteObservations.end())
+        {
+            *existing = std::move(observation);
+        }
+        else if (g_sonicHudValueWriteObservations.size() < kSonicHudValueWriteObservationLimit)
+        {
+            g_sonicHudValueWriteObservations.push_back(std::move(observation));
+        }
+
+        return g_loggedSonicHudValueTextWriteKeys.insert(logKey).second;
+    }
+
     static void AppendCsdTreeEntries(
         std::ostringstream& out,
         const std::vector<CsdTreeEntry>& entries,
@@ -2511,11 +2614,14 @@ namespace UiLab
             const auto& observation = observations[i];
             out
                 << "{"
+                << "\"writeKind\":\"" << JsonEscape(observation.writeKind) << "\","
                 << "\"valueName\":\"" << JsonEscape(observation.valueName) << "\","
                 << "\"path\":\"" << JsonEscape(observation.path) << "\","
                 << "\"nodeAddress\":\"" << JsonEscape(HexU32(observation.nodeAddress)) << "\","
                 << "\"textAddress\":\"" << JsonEscape(HexU32(observation.textAddress)) << "\","
                 << "\"textUtf8\":\"" << JsonEscape(observation.textUtf8) << "\","
+                << "\"numericValueKnown\":" << (observation.numericValueKnown ? "true" : "false") << ","
+                << "\"numericValue\":" << observation.numericValue << ","
                 << "\"hookSource\":\"" << JsonEscape(observation.hookSource) << "\","
                 << "\"frame\":" << observation.frame
                 << "}";
@@ -6523,6 +6629,147 @@ namespace UiLab
         const bool changed = ApplySonicHudTextWriteToGameplayValues(path, textUtf8, source);
         if (shouldLogTextWrite || changed)
             WriteLiveStateSnapshot();
+    }
+
+    void OnCsdNodeSetPatternIndex(
+        uint32_t nodeAddress,
+        uint32_t patternIndex,
+        std::string_view hookSource)
+    {
+        if (!g_isEnabled)
+            return;
+
+        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
+        if (path.empty())
+            return;
+
+        const std::string source = hookSource.empty()
+            ? std::string("CSD::CNode::SetPatternIndex/sub_830BF300")
+            : std::string(hookSource);
+        const std::string valueName = SonicHudValueNameFromGaugeOrPromptPath(path);
+        const std::string patternText = std::to_string(patternIndex);
+
+        const bool shouldLog = RecordSonicHudNodeWriteObservation(
+            "pattern-index",
+            valueName,
+            path,
+            nodeAddress,
+            0,
+            patternText,
+            true,
+            static_cast<double>(patternIndex),
+            source,
+            patternText);
+
+        if (shouldLog)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-gauge-pattern-write",
+                "value=" + valueName +
+                " path=" + path +
+                " node=" + HexU32(nodeAddress) +
+                " pattern=" + patternText +
+                " source=" + source);
+            WriteLiveStateSnapshot();
+        }
+    }
+
+    void OnCsdNodeSetHideFlag(
+        uint32_t nodeAddress,
+        uint32_t hideFlag,
+        std::string_view hookSource)
+    {
+        if (!g_isEnabled)
+            return;
+
+        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
+        if (path.empty())
+            return;
+
+        const std::string source = hookSource.empty()
+            ? std::string("CSD::CNode::SetHideFlag/sub_830BF080")
+            : std::string(hookSource);
+        const std::string valueName = SonicHudValueNameFromGaugeOrPromptPath(path);
+        const std::string hideText = std::to_string(hideFlag);
+
+        const bool shouldLog = RecordSonicHudNodeWriteObservation(
+            "hide-flag",
+            valueName,
+            path,
+            nodeAddress,
+            0,
+            hideText,
+            true,
+            static_cast<double>(hideFlag),
+            source,
+            hideText);
+
+        if (path.starts_with("ui_playscreen/add/u_info"))
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            g_sonicHudGameplayValues.tutorialPromptKnown = true;
+            g_sonicHudGameplayValues.tutorialVisible = hideFlag == 0;
+            g_sonicHudGameplayValues.tutorialPromptSource = source + "@" + path;
+            g_sonicHudGameplayValues.frame = g_presentedFrameCount;
+        }
+
+        if (shouldLog)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-gauge-hide-write",
+                "value=" + valueName +
+                " path=" + path +
+                " node=" + HexU32(nodeAddress) +
+                " hide=" + hideText +
+                " source=" + source);
+            WriteLiveStateSnapshot();
+        }
+    }
+
+    void OnCsdNodeSetScale(
+        uint32_t nodeAddress,
+        float scaleX,
+        float scaleY,
+        std::string_view hookSource)
+    {
+        if (!g_isEnabled)
+            return;
+
+        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
+        if (path.empty())
+            return;
+
+        const std::string source = hookSource.empty()
+            ? std::string("CSD::CNode::SetScale/sub_830BF090")
+            : std::string(hookSource);
+        const std::string valueName = SonicHudValueNameFromGaugeOrPromptPath(path);
+
+        std::ostringstream value;
+        value << scaleX << "," << scaleY;
+
+        const bool shouldLog = RecordSonicHudNodeWriteObservation(
+            "scale",
+            valueName,
+            path,
+            nodeAddress,
+            0,
+            value.str(),
+            true,
+            static_cast<double>(scaleX),
+            source,
+            value.str());
+
+        if (shouldLog)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-gauge-scale-write",
+                "value=" + valueName +
+                " path=" + path +
+                " node=" + HexU32(nodeAddress) +
+                " scale=" + value.str() +
+                " source=" + source);
+            WriteLiveStateSnapshot();
+        }
     }
 
     void OnBackendMaterialSubmit(

@@ -161,6 +161,23 @@ SonicDayHudRuntimeValueUpdatePath makeRuntimeValueUpdatePathSnapshot()
     return paths;
 }
 
+SonicDayHudRuntimeDrawListCoverage makeRuntimeDrawListCoverageSnapshot()
+{
+    SonicDayHudRuntimeDrawListCoverage coverage;
+    coverage.source = "live-bridge/ui-draw-list manual observer";
+    coverage.activeProject = "ui_playscreen";
+    coverage.runtimeDrawCalls = 96;
+    coverage.correlatedMaterialPairs = 96;
+    coverage.speedGaugeObserved = true;
+    coverage.gaugeFrameObserved = true;
+    coverage.ringEnergyGaugeObserved = true;
+    coverage.tutorialPromptObserved = false;
+    coverage.pauseOverlayObserved = true;
+    coverage.textWriteObserved = false;
+    coverage.nextHook = "CSD::CNode::SetPatternIndex/SetHideFlag/SetScale";
+    return coverage;
+}
+
 FrontendControllerFrame makeFrame(
     std::string controllerName,
     std::string screenId,
@@ -863,6 +880,25 @@ std::string formatSonicDayHudRuntimeWritePaths(const SonicDayHudRuntimeValueUpda
     return out.str();
 }
 
+std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_runtime_draw_list_coverage="
+        << "source=" << coverage.source
+        << ":project=" << coverage.activeProject
+        << ":runtime_calls=" << coverage.runtimeDrawCalls
+        << ":correlated_pairs=" << coverage.correlatedMaterialPairs
+        << ":speed_gauge=" << (coverage.speedGaugeObserved ? "observed" : "missing")
+        << ":gauge_frame=" << (coverage.gaugeFrameObserved ? "observed" : "missing")
+        << ":energy_gauge=" << (coverage.ringEnergyGaugeObserved ? "observed" : "missing")
+        << ":tutorial_prompt=" << (coverage.tutorialPromptObserved ? "observed" : "pending")
+        << ":pause_overlay=" << (coverage.pauseOverlayObserved ? "observed" : "missing")
+        << ":text_write_observed=" << (coverage.textWriteObserved ? 1 : 0)
+        << ":next_hook=" << coverage.nextHook
+        << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeBindingSmokeSequence()
 {
     SonicDayHudController hud;
@@ -906,6 +942,23 @@ std::string formatSonicDayHudRuntimeBindingPhase168SmokeSequence()
     out << "gameplay_numeric_binding=score:known,scoreinfo:known,"
         << "ring/timer/speed/lives:known-via-csd-text-write,"
         << "boost/energy/tutorial:pending-gauge-or-prompt-write-hook"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase169SmokeSequence()
+{
+    const auto snapshot = makeRuntimeScoreBindingSnapshot();
+    const auto writePaths = makeRuntimeValueUpdatePathSnapshot();
+    const auto drawListCoverage = makeRuntimeDrawListCoverageSnapshot();
+    std::ostringstream out;
+    out << formatSonicDayHudRuntimeBinding(snapshot);
+    out << formatSonicDayHudRuntimeDisplayOwnerPaths(snapshot.displayOwnerPaths);
+    out << formatSonicDayHudRuntimeWritePaths(writePaths);
+    out << formatSonicDayHudRuntimeDrawListCoverage(drawListCoverage);
+    out << "gameplay_numeric_binding=score:known,scoreinfo:known,"
+        << "ring/timer/speed/lives:known-via-csd-text-write,"
+        << "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization"
         << '\n';
     return out.str();
 }
