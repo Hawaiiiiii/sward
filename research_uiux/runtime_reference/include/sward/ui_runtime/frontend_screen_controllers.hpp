@@ -17,6 +17,9 @@ enum class FrontendControllerInput
     RouteReady,
     LoadingComplete,
     Pause,
+    StageReady,
+    TutorialReady,
+    RingPickup,
 };
 
 struct FrontendControllerFrame
@@ -86,9 +89,26 @@ private:
     FrontendControllerFrame frame_;
 };
 
+class SonicDayHudController
+{
+public:
+    SonicDayHudController();
+
+    // Runtime archaeology inputs: FrontendControllerInput::StageReady,
+    // FrontendControllerInput::TutorialReady, and FrontendControllerInput::RingPickup.
+    void reset();
+    [[nodiscard]] FrontendControllerFrame handleInput(FrontendControllerInput input);
+    [[nodiscard]] const FrontendControllerFrame& frame() const;
+
+private:
+    FrontendControllerFrame frame_;
+};
+
 [[nodiscard]] std::vector<FrontendControllerFrame> runFrontendControllerSmokeSequence();
+[[nodiscard]] std::vector<FrontendControllerFrame> runSonicDayHudControllerSmokeSequence();
 [[nodiscard]] std::string formatFrontendControllerCatalog();
 [[nodiscard]] std::string formatFrontendControllerFrame(const FrontendControllerFrame& frame);
 [[nodiscard]] std::string formatFrontendControllerSmokeSequence();
+[[nodiscard]] std::string formatSonicDayHudControllerSmokeSequence();
 [[nodiscard]] std::string frontendControllerInputName(FrontendControllerInput input);
 } // namespace sward::ui_runtime

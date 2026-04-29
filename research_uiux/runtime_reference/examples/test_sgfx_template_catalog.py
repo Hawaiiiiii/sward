@@ -487,6 +487,59 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("controller_frame=OptionsMenuController:screen=title-options:frame=15:state=options-ready:motion=select_travel:input_locked=0:cursor=0/SOUND:sfx=title_cursor_move_sfx:next=title-menu:scenes=mm_bg_usual,mm_contentsitem_select", completed.stdout)
         self.assertIn("controller_frame=PauseMenuController:screen=pause:frame=15:state=pause-ready:motion=intro_medium:input_locked=0:cursor=0/RESUME:sfx=pause_display_open_sfx:next=sonic-day-hud-next:scenes=bg,bg_1,bg_1_select,bg_2,text_area,skill_select,arrow,skill_scroll_bar_bg", completed.stdout)
 
+    def test_phase164_declares_sonic_day_hud_controller(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+
+        for token in [
+            "class SonicDayHudController",
+            "runSonicDayHudControllerSmokeSequence",
+            "formatSonicDayHudControllerSmokeSequence",
+            "FrontendControllerInput::StageReady",
+            "FrontendControllerInput::TutorialReady",
+            "FrontendControllerInput::RingPickup",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "sonic_hud_reference.hpp",
+            "CHudSonicStage",
+            "sub_824D9308",
+            "ui_playscreen",
+            "sonic-hud-ready",
+            "stage-hud-ready",
+            "tutorial-hud-owner-path-ready",
+            "so_speed_gauge",
+            "so_ringenagy_gauge",
+            "ring_get",
+            "sonic_ring_pickup_sfx",
+            "SonicDayHudController",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase164-sonic-hud-smoke", example)
+
+    def test_phase164_sonic_day_hud_controller_smoke_reports_runtime_scene_state(self) -> None:
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase164-sonic-hud-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase164 sonic hud smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_controller=owner=CHudSonicStage:hook=sub_824D9308:project=ui_playscreen:scenes=13:runtime_layers=209:drawable_layers=167:policy_source=sonic_hud_reference", completed.stdout)
+        self.assertIn("controller_frame=SonicDayHudController:screen=sonic-day-hud:frame=0:state=hud-bootstrap:motion=owner-wait:input_locked=1:cursor=0/none:sfx=none:next=none:scenes=", completed.stdout)
+        self.assertIn("controller_frame=SonicDayHudController:screen=sonic-day-hud:frame=99:state=hud-ready:motion=DefaultAnim:input_locked=0:cursor=0/none:sfx=none:next=none:scenes=exp_count,gauge_frame,player_count,ring_count,ring_get,score_count,so_ringenagy_gauge,so_speed_gauge,time_count,add/medal_get_m,add/medal_get_s,add/speed_count", completed.stdout)
+        self.assertIn("controller_frame=SonicDayHudController:screen=sonic-day-hud:frame=20:state=tutorial-ready:motion=Intro_Anim:input_locked=0:cursor=0/none:sfx=tutorial_prompt_open_sfx:next=none:scenes=exp_count,gauge_frame,player_count,ring_count,ring_get,score_count,so_ringenagy_gauge,so_speed_gauge,time_count,add/medal_get_m,add/medal_get_s,add/speed_count,add/u_info", completed.stdout)
+        self.assertIn("controller_frame=SonicDayHudController:screen=sonic-day-hud:frame=60:state=ring-feedback:motion=Egg_Shackle:input_locked=0:cursor=0/none:sfx=sonic_ring_pickup_sfx:next=none:scenes=ring_get", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

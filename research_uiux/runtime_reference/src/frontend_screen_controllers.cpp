@@ -1,6 +1,7 @@
 #include <sward/ui_runtime/frontend_screen_controllers.hpp>
 
 #include <sward/ui_runtime/frontend_screen_reference.hpp>
+#include <sward/ui_runtime/sonic_hud_reference.hpp>
 
 #include <algorithm>
 #include <sstream>
@@ -41,6 +42,25 @@ std::vector<std::string> firstSceneOnly(std::string_view screenId)
     if (scenes.size() > 1)
         scenes.resize(1);
     return scenes;
+}
+
+std::vector<std::string> sonicHudSceneNames(bool includeTutorial)
+{
+    std::vector<std::string> scenes;
+    for (const auto& scene : sonicHudScenePolicies())
+    {
+        if (!includeTutorial && scene.activationEvent == "tutorial-hud-owner-path-ready")
+            continue;
+        scenes.push_back(scene.sceneName);
+    }
+    return scenes;
+}
+
+std::vector<std::string> sonicHudSceneName(std::string_view sceneName)
+{
+    if (const auto* scene = findSonicHudScenePolicy(sceneName))
+        return { scene->sceneName };
+    return {};
 }
 
 FrontendControllerFrame makeFrame(
@@ -323,6 +343,85 @@ const FrontendControllerFrame& PauseMenuController::frame() const
     return frame_;
 }
 
+SonicDayHudController::SonicDayHudController()
+{
+    reset();
+}
+
+// Sonic HUD ownership provenance: CHudSonicStage / sub_824D9308 / ui_playscreen,
+// readiness events sonic-hud-ready, stage-hud-ready, and tutorial-hud-owner-path-ready.
+// Key recovered scenes include so_speed_gauge, so_ringenagy_gauge, and ring_get.
+void SonicDayHudController::reset()
+{
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        0,
+        "hud-bootstrap",
+        "owner-wait",
+        true,
+        0,
+        "none",
+        "none",
+        "none",
+        {});
+}
+
+FrontendControllerFrame SonicDayHudController::handleInput(FrontendControllerInput input)
+{
+    if (input == FrontendControllerInput::StageReady)
+    {
+        frame_ = makeFrame(
+            "SonicDayHudController",
+            "sonic-day-hud",
+            99,
+            "hud-ready",
+            "DefaultAnim",
+            false,
+            0,
+            "none",
+            "none",
+            "none",
+            sonicHudSceneNames(false));
+    }
+    else if (input == FrontendControllerInput::TutorialReady)
+    {
+        frame_ = makeFrame(
+            "SonicDayHudController",
+            "sonic-day-hud",
+            20,
+            "tutorial-ready",
+            "Intro_Anim",
+            false,
+            0,
+            "none",
+            "tutorial_prompt_open_sfx",
+            "none",
+            sonicHudSceneNames(true));
+    }
+    else if (input == FrontendControllerInput::RingPickup)
+    {
+        frame_ = makeFrame(
+            "SonicDayHudController",
+            "sonic-day-hud",
+            60,
+            "ring-feedback",
+            "Egg_Shackle",
+            false,
+            0,
+            "none",
+            "sonic_ring_pickup_sfx",
+            "none",
+            sonicHudSceneName("ring_get"));
+    }
+    return frame_;
+}
+
+const FrontendControllerFrame& SonicDayHudController::frame() const
+{
+    return frame_;
+}
+
 std::vector<FrontendControllerFrame> runFrontendControllerSmokeSequence()
 {
     std::vector<FrontendControllerFrame> frames;
@@ -341,6 +440,17 @@ std::vector<FrontendControllerFrame> runFrontendControllerSmokeSequence()
     PauseMenuController pause;
     frames.push_back(pause.handleInput(FrontendControllerInput::RouteReady));
 
+    return frames;
+}
+
+std::vector<FrontendControllerFrame> runSonicDayHudControllerSmokeSequence()
+{
+    SonicDayHudController hud;
+    std::vector<FrontendControllerFrame> frames;
+    frames.push_back(hud.frame());
+    frames.push_back(hud.handleInput(FrontendControllerInput::StageReady));
+    frames.push_back(hud.handleInput(FrontendControllerInput::TutorialReady));
+    frames.push_back(hud.handleInput(FrontendControllerInput::RingPickup));
     return frames;
 }
 
@@ -393,6 +503,23 @@ std::string formatFrontendControllerSmokeSequence()
     return out.str();
 }
 
+std::string formatSonicDayHudControllerSmokeSequence()
+{
+    const auto& owner = sonicHudOwnerReference();
+    std::ostringstream out;
+    out << "sonic_day_hud_controller=owner=" << owner.ownerType
+        << ":hook=" << owner.ownerHook
+        << ":project=" << owner.projectName
+        << ":scenes=" << owner.sceneCount
+        << ":runtime_layers=" << owner.runtimeLayerCount
+        << ":drawable_layers=" << owner.drawableLayerCount
+        << ":policy_source=sonic_hud_reference"
+        << '\n';
+    for (const auto& frame : runSonicDayHudControllerSmokeSequence())
+        out << formatFrontendControllerFrame(frame);
+    return out.str();
+}
+
 std::string frontendControllerInputName(FrontendControllerInput input)
 {
     switch (input)
@@ -415,6 +542,12 @@ std::string frontendControllerInputName(FrontendControllerInput input)
         return "loading-complete";
     case FrontendControllerInput::Pause:
         return "pause";
+    case FrontendControllerInput::StageReady:
+        return "stage-ready";
+    case FrontendControllerInput::TutorialReady:
+        return "tutorial-ready";
+    case FrontendControllerInput::RingPickup:
+        return "ring-pickup";
     }
     return "unknown";
 }
