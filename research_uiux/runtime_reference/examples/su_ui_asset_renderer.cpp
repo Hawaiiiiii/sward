@@ -863,6 +863,21 @@ struct BitmapComparisonStats
     CsdUiLayerMaskStats uiLayerDelta;
 };
 
+struct FrontendUiLayerPixelCompareRecord
+{
+    std::string screenId;
+    std::string source = "missing";
+    std::string uiLayerCaptureIsolation = "pending-dedicated-ui-target-or-vendor-replay";
+    std::filesystem::path uiLayerCapturePath;
+    std::filesystem::path viewerFramePath;
+    std::filesystem::path diffFramePath;
+    std::size_t sceneCount = 0;
+    std::size_t localCommandCount = 0;
+    std::size_t localDrawnCommandCount = 0;
+    std::size_t textureCount = 0;
+    BitmapComparisonStats visualDelta;
+};
+
 struct CsdNativeFrameRegistration
 {
     int cropX = 0;
@@ -8941,6 +8956,47 @@ void appendUniqueString(std::vector<std::string>& values, std::string_view value
     return bestPath;
 }
 
+[[nodiscard]] std::optional<std::filesystem::path> findLatestUiLayerCaptureBmpPathForTarget(std::string_view target)
+{
+    std::optional<std::filesystem::path> bestPath;
+    std::filesystem::file_time_type bestWriteTime{};
+    bool hasBestWriteTime = false;
+    const std::string expectedPrefix = "ui_layer_render_target_" + std::string(target) + "_";
+
+    for (const auto& root : repoRootCandidates())
+    {
+        std::error_code error;
+        const auto evidenceRoot = root / "out" / "ui_lab_runtime_evidence";
+        if (!std::filesystem::is_directory(evidenceRoot, error))
+            continue;
+
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(evidenceRoot, error))
+        {
+            if (error)
+                break;
+            if (!entry.is_regular_file(error))
+                continue;
+
+            const auto fileName = entry.path().filename().string();
+            if (!fileName.starts_with(expectedPrefix) || entry.path().extension() != ".bmp")
+                continue;
+
+            const auto writeTime = std::filesystem::last_write_time(entry.path(), error);
+            if (!bestPath || !hasBestWriteTime || (!error && writeTime > bestWriteTime))
+            {
+                bestPath = entry.path();
+                if (!error)
+                {
+                    bestWriteTime = writeTime;
+                    hasBestWriteTime = true;
+                }
+            }
+        }
+    }
+
+    return bestPath;
+}
+
 [[nodiscard]] Gdiplus::Color bitmapPixelNearest(Gdiplus::Bitmap& bitmap, int sampleX, int sampleY, int gridWidth, int gridHeight)
 {
     const int x = std::clamp(
@@ -11337,6 +11393,88 @@ struct CsdReferenceViewerFrameComparison
     return comparison;
 }
 
+[[nodiscard]] FrontendUiLayerPixelCompareRecord renderFrontendPolicyUiLayerPixelCompare(
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    const std::filesystem::path& outputRoot)
+{
+    FrontendUiLayerPixelCompareRecord record;
+    record.screenId = policy.screenId;
+    record.viewerFramePath = outputRoot / (policy.screenId + "_viewer.bmp");
+    record.diffFramePath = outputRoot / (policy.screenId + "_ui_layer_diff.bmp");
+
+    const auto lane = referenceViewerLaneFromTrackedPolicy(policy);
+    CsdReferenceViewerStats stats;
+    auto bitmap = renderCsdReferenceViewerBitmap(lane, false, stats);
+    record.sceneCount = stats.sceneCount;
+    record.localCommandCount = stats.commandCount;
+    record.localDrawnCommandCount = stats.drawnCommandCount;
+    record.textureCount = stats.textureCount;
+
+    record.uiLayerCapturePath = findLatestUiLayerCaptureBmpPathForTarget(policy.screenId).value_or(std::filesystem::path{});
+    if (!record.uiLayerCapturePath.empty())
+    {
+        record.source = "ui-layer-capture-bmp";
+        record.uiLayerCaptureIsolation = "not-isolated-active-color-target";
+    }
+
+    if (bitmap)
+    {
+        const std::vector<std::uint8_t> emptyCoverageMask;
+        const auto uiLayerCoverageDiffPath = outputRoot / (policy.screenId + "_ui_layer_coverage_diff.bmp");
+        record.visualDelta = computeBitmapComparisonStats(
+            *bitmap,
+            record.uiLayerCapturePath.empty() ? std::optional<std::filesystem::path>{} : std::optional<std::filesystem::path>{ record.uiLayerCapturePath },
+            record.diffFramePath,
+            emptyCoverageMask,
+            uiLayerCoverageDiffPath);
+        if (!saveBitmapAsBmp(*bitmap, record.viewerFramePath))
+            record.viewerFramePath.clear();
+    }
+
+    return record;
+}
+
+void writeFrontendUiLayerPixelCompareManifest(
+    const std::filesystem::path& manifestPath,
+    const std::vector<FrontendUiLayerPixelCompareRecord>& records)
+{
+    std::error_code error;
+    std::filesystem::create_directories(manifestPath.parent_path(), error);
+    std::ofstream out(manifestPath, std::ios::binary);
+    if (!out)
+        return;
+
+    out << "{\n";
+    out << "  \"phase\": 159,\n";
+    out << "  \"mode\": \"phase159-ui-layer-pixel-compare\",\n";
+    out << "  \"uiLayerOracleUpgrade\": \"dedicated-ui-target-or-vendor-replay-needed\",\n";
+    out << "  \"textMovieSfxStatus\": \"pending-title-loading-media-timing\",\n";
+    out << "  \"records\": [\n";
+    for (std::size_t index = 0; index < records.size(); ++index)
+    {
+        const auto& record = records[index];
+        out << "    {\n";
+        out << "      \"screen\": \"" << jsonEscape(record.screenId) << "\",\n";
+        out << "      \"source\": \"" << jsonEscape(record.source) << "\",\n";
+        out << "      \"uiLayerCapturePath\": \"" << jsonEscape(portablePath(record.uiLayerCapturePath)) << "\",\n";
+        out << "      \"uiLayerCaptureIsolation\": \"" << jsonEscape(record.uiLayerCaptureIsolation) << "\",\n";
+        out << "      \"viewerFramePath\": \"" << jsonEscape(portablePath(record.viewerFramePath)) << "\",\n";
+        out << "      \"diffFramePath\": \"" << jsonEscape(portablePath(record.diffFramePath)) << "\",\n";
+        out << "      \"local\": { \"scenes\": " << record.sceneCount
+            << ", \"commands\": " << record.localCommandCount
+            << ", \"drawn\": " << record.localDrawnCommandCount
+            << ", \"textures\": " << record.textureCount << " },\n";
+        out << "      \"visualDelta\": { \"nativeFound\": " << (record.visualDelta.nativeFound ? "true" : "false")
+            << ", \"meanAbsRgb\": " << std::fixed << std::setprecision(3) << record.visualDelta.meanAbsRgb
+            << ", \"maxAbsRgb\": " << record.visualDelta.maxAbsRgb
+            << ", \"renderRgbSum\": " << record.visualDelta.rendered.rgbSum
+            << ", \"uiLayerRgbSum\": " << record.visualDelta.native.rgbSum << " }\n";
+        out << "    }" << (index + 1 == records.size() ? "\n" : ",\n");
+    }
+    out << "  ]\n";
+    out << "}\n";
+}
+
 void writeViewerRenderCompareManifest(
     const std::filesystem::path& manifestPath,
     const std::vector<CsdReferenceViewerFrameComparison>& comparisons)
@@ -11470,6 +11608,61 @@ void writeViewerRenderCompareManifest(
     }
 
     std::cout << "operator_overlay=compact-reference-status:excluded_from_native_compare=1\n";
+    Gdiplus::GdiplusShutdown(gdiplusToken);
+    return failed ? 1 : 0;
+}
+
+[[nodiscard]] int runRendererUiLayerPixelCompareSmoke()
+{
+    bool failed = false;
+    std::vector<FrontendUiLayerPixelCompareRecord> records;
+    const auto outputRoot = repoRootForOutput() / "out" / "ui_layer_pixel_compare" / "phase159";
+    const auto manifestPath = outputRoot / "ui_layer_pixel_compare_manifest.json";
+
+    Gdiplus::GdiplusStartupInput gdiplusInput{};
+    ULONG_PTR gdiplusToken = 0;
+    if (Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr) != Gdiplus::Ok)
+        return 1;
+
+    for (const auto& policy : frontendScreenPolicies())
+    {
+        auto record = renderFrontendPolicyUiLayerPixelCompare(policy, outputRoot);
+        if (record.viewerFramePath.empty() || record.localCommandCount == 0)
+            failed = true;
+        records.push_back(std::move(record));
+    }
+
+    writeFrontendUiLayerPixelCompareManifest(manifestPath, records);
+
+    std::cout
+        << "sward_su_ui_asset_renderer UI layer pixel compare smoke ok "
+        << "mode=phase159-ui-layer-pixel-compare"
+        << " ui_layer_oracle_upgrade=dedicated-ui-target-or-vendor-replay-needed"
+        << " text_movie_sfx_status=pending-title-loading-media-timing"
+        << " lanes=" << records.size()
+        << " manifest=" << portablePath(manifestPath)
+        << '\n';
+    std::cout << "ui_layer_pixel_compare_manifest=" << portablePath(manifestPath) << '\n';
+
+    for (const auto& record : records)
+    {
+        std::cout
+            << "ui_layer_pixel_delta=" << record.screenId
+            << ":source=" << record.source
+            << ":native=" << (record.visualDelta.nativeFound ? "found" : "missing")
+            << ":mean_abs_rgb=" << std::fixed << std::setprecision(3) << record.visualDelta.meanAbsRgb
+            << ":max_abs_rgb=" << record.visualDelta.maxAbsRgb
+            << ":local_commands=" << record.localCommandCount
+            << ":ui_layer_capture_isolation=" << record.uiLayerCaptureIsolation
+            << '\n';
+        std::cout
+            << "ui_layer_pixel_frame=" << record.screenId
+            << ":viewer=" << portablePath(record.viewerFramePath)
+            << ":capture=" << (record.uiLayerCapturePath.empty() ? std::string("missing") : portablePath(record.uiLayerCapturePath))
+            << ":diff=" << portablePath(record.diffFramePath)
+            << '\n';
+    }
+
     Gdiplus::GdiplusShutdown(gdiplusToken);
     return failed ? 1 : 0;
 }
@@ -12335,6 +12528,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runCsdRenderCompareSmoke(templateFilter);
     if (commandLineHasFlag("--viewer-render-compare-smoke"))
         return runViewerRenderCompareSmoke();
+    if (commandLineHasFlag("--renderer-ui-layer-pixel-compare-smoke"))
+        return runRendererUiLayerPixelCompareSmoke();
     if (commandLineHasFlag("--csd-timeline-smoke"))
         return runCsdTimelineSmoke(templateFilter);
     if (commandLineHasFlag("--csd-drawable-smoke"))

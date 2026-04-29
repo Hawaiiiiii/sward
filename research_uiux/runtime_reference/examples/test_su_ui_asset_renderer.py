@@ -1010,6 +1010,21 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("uiOnlyRenderTargetCaptureStatus", source_text)
         self.assertIn("uiOnlyRenderTargetCapturePath", source_text)
 
+    def test_renderer_source_wires_phase159_ui_layer_pixel_compare(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendUiLayerPixelCompareRecord", source_text)
+        self.assertIn("findLatestUiLayerCaptureBmpPathForTarget", source_text)
+        self.assertIn("renderFrontendPolicyUiLayerPixelCompare", source_text)
+        self.assertIn("writeFrontendUiLayerPixelCompareManifest", source_text)
+        self.assertIn("runRendererUiLayerPixelCompareSmoke", source_text)
+        self.assertIn("--renderer-ui-layer-pixel-compare-smoke", source_text)
+        self.assertIn("phase159-ui-layer-pixel-compare", source_text)
+        self.assertIn("ui_layer_pixel_compare_manifest=", source_text)
+        self.assertIn("ui_layer_pixel_delta=", source_text)
+        self.assertIn("ui_layer_capture_isolation=", source_text)
+        self.assertIn("ui_layer_oracle_upgrade=dedicated-ui-target-or-vendor-replay-needed", source_text)
+        self.assertIn("text_movie_sfx_status=pending-title-loading-media-timing", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -1410,6 +1425,28 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("ui_layer_capture_policy=copy-active-ui-render-target-before-imgui-present", completed.stdout)
         self.assertRegex(completed.stdout, r"ui_layer_capture=title-menu:source=(ui_lab_live_bridge_ui_layer_status|ui_lab_live_bridge_vendor_command_capture|missing):capture_status=[^:]+:isolation=[^:]+:width=[0-9]+:height=[0-9]+:local_commands=[1-9]\d*:ui_layer_capture_path=[^\r\n]*")
         self.assertRegex(completed.stdout, r"ui_layer_capture=loading:source=(ui_lab_live_bridge_ui_layer_status|ui_lab_live_bridge_vendor_command_capture|missing):capture_status=[^:]+:isolation=[^:]+:width=[0-9]+:height=[0-9]+:local_commands=[1-9]\d*:ui_layer_capture_path=[^\r\n]*")
+
+    def test_renderer_ui_layer_pixel_compare_smoke_reports_visual_delta_or_missing_capture(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-ui-layer-pixel-compare-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer UI layer pixel compare smoke ok", completed.stdout)
+        self.assertIn("mode=phase159-ui-layer-pixel-compare", completed.stdout)
+        self.assertIn("ui_layer_pixel_compare_manifest=out/ui_layer_pixel_compare/phase159/ui_layer_pixel_compare_manifest.json", completed.stdout)
+        self.assertIn("ui_layer_oracle_upgrade=dedicated-ui-target-or-vendor-replay-needed", completed.stdout)
+        self.assertIn("text_movie_sfx_status=pending-title-loading-media-timing", completed.stdout)
+        self.assertRegex(completed.stdout, r"ui_layer_pixel_delta=title-menu:source=(ui-layer-capture-bmp|missing):native=(found|missing):mean_abs_rgb=[0-9.]+:max_abs_rgb=[0-9]+:local_commands=[1-9]\d*:ui_layer_capture_isolation=[^\r\n]+")
+        self.assertRegex(completed.stdout, r"ui_layer_pixel_delta=loading:source=(ui-layer-capture-bmp|missing):native=(found|missing):mean_abs_rgb=[0-9.]+:max_abs_rgb=[0-9]+:local_commands=[1-9]\d*:ui_layer_capture_isolation=[^\r\n]+")
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

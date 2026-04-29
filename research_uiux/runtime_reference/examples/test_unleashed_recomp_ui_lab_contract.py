@@ -1178,6 +1178,32 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("UI render-target capture", harvest)
         self.assertIn("active render target may still include scene/background pixels", harvest)
 
+    def test_ui_lab_phase159_wires_ui_layer_pixel_compare_sidecar_oracle(self):
+        renderer = self.read("research_uiux/runtime_reference/examples/su_ui_asset_renderer.cpp")
+        tests = self.read("research_uiux/runtime_reference/examples/test_su_ui_asset_renderer.py")
+        harvest = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "FrontendUiLayerPixelCompareRecord",
+            "findLatestUiLayerCaptureBmpPathForTarget",
+            "renderFrontendPolicyUiLayerPixelCompare",
+            "writeFrontendUiLayerPixelCompareManifest",
+            "runRendererUiLayerPixelCompareSmoke",
+            "--renderer-ui-layer-pixel-compare-smoke",
+            "phase159-ui-layer-pixel-compare",
+            "ui_layer_pixel_compare_manifest=",
+            "ui_layer_pixel_delta=",
+            "ui_layer_capture_isolation=",
+            "ui_layer_oracle_upgrade=dedicated-ui-target-or-vendor-replay-needed",
+            "text_movie_sfx_status=pending-title-loading-media-timing",
+        ]:
+            self.assertIn(token, renderer)
+
+        self.assertIn("test_renderer_ui_layer_pixel_compare_smoke_reports_visual_delta_or_missing_capture", tests)
+        self.assertIn("Phase 159", harvest)
+        self.assertIn("UI-layer pixel comparison", harvest)
+        self.assertIn("dedicated UI target or vendor replay", harvest)
+
     def test_ui_lab_has_repo_safe_live_bridge_client_tool(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1"
         self.assertTrue(script_path.is_file())
