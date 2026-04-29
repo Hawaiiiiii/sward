@@ -31,6 +31,11 @@ param(
     [int]$ControlAutomationKeyHoldMilliseconds = 35,
     [int]$LiveBridgeReadinessPollMilliseconds = 250,
     [int]$StageTargetRetries = 2,
+    [switch]$UiLayerCapture,
+    [switch]$RequireUiLayerCapture,
+    [int]$UiLayerCaptureTimeoutSeconds = 8,
+    [int]$UiLayerCapturePollMilliseconds = 250,
+    [int]$UiLayerCaptureCommandTimeoutMilliseconds = 8000,
     [bool]$NormalizeWindow = $true,
     [switch]$Observer,
     [switch]$HideOverlay,
@@ -826,6 +831,114 @@ function Invoke-UiLabBridgeCommand([string]$CommandText, [string]$PipeName, [int
     }
 }
 
+function Invoke-UiLabBridgeJsonCommand([string]$CommandText, [string]$PipeName, [int]$TimeoutMilliseconds = 1000) {
+    try {
+        $raw = Invoke-UiLabBridgeCommand $CommandText $PipeName $TimeoutMilliseconds
+        $json = $raw | ConvertFrom-Json
+
+        return [ordered]@{
+            ok = $true
+            command = $CommandText
+            raw = $raw
+            json = $json
+            error = $null
+        }
+    }
+    catch {
+        return [ordered]@{
+            ok = $false
+            command = $CommandText
+            raw = $null
+            json = $null
+            error = $_.Exception.Message
+        }
+    }
+}
+
+function Get-UiLabUiLayerCapturePath([object]$State) {
+    if ($null -eq $State) {
+        return ""
+    }
+
+    if ($State.uiOnlyRenderTargetCapturePath) {
+        return [string]$State.uiOnlyRenderTargetCapturePath
+    }
+
+    if ($State.uiOnlyRenderTargetCapture -and $State.uiOnlyRenderTargetCapture.path) {
+        return [string]$State.uiOnlyRenderTargetCapture.path
+    }
+
+    return ""
+}
+
+function Test-UiLabUiLayerCaptureObserved([object]$State) {
+    if ($null -eq $State) {
+        return $false
+    }
+
+    if ($State.uiOnlyRenderTargetCapture -and [bool]$State.uiOnlyRenderTargetCapture.captured) {
+        return $true
+    }
+
+    $path = Get-UiLabUiLayerCapturePath $State
+    return -not [string]::IsNullOrWhiteSpace($path)
+}
+
+function Wait-UiLabUiLayerCapture(
+    [string]$PipeName,
+    [int]$TimeoutSeconds,
+    [int]$PollMilliseconds,
+    [int]$CommandTimeoutMilliseconds,
+    [System.Diagnostics.Process]$Process = $null
+) {
+    $request = Invoke-UiLabBridgeJsonCommand "ui-layer-capture" $PipeName $CommandTimeoutMilliseconds
+    $deadline = (Get-Date).AddSeconds([Math]::Max(0, $TimeoutSeconds))
+    $lastStatus = $request
+    $captured = $request.ok -and (Test-UiLabUiLayerCaptureObserved $request.json)
+
+    while (-not $captured -and (Get-Date) -lt $deadline) {
+        if ($null -ne $Process) {
+            $Process.Refresh()
+
+            if ($Process.HasExited) {
+                break
+            }
+        }
+
+        Start-Sleep -Milliseconds ([Math]::Max(50, $PollMilliseconds))
+        $lastStatus = Invoke-UiLabBridgeJsonCommand "ui-layer-status" $PipeName $CommandTimeoutMilliseconds
+        $captured = $lastStatus.ok -and (Test-UiLabUiLayerCaptureObserved $lastStatus.json)
+    }
+
+    $state = if ($null -ne $lastStatus -and $lastStatus.ok) { $lastStatus.json } else { $null }
+    $capturePath = Get-UiLabUiLayerCapturePath $state
+    $captureStatus = if ($null -ne $state -and $state.uiOnlyRenderTargetCaptureStatus) {
+        [string]$state.uiOnlyRenderTargetCaptureStatus
+    } elseif ($null -ne $state -and $state.uiOnlyRenderTargetCapture -and $state.uiOnlyRenderTargetCapture.status) {
+        [string]$state.uiOnlyRenderTargetCapture.status
+    } else {
+        ""
+    }
+    $isolationStatus = if ($null -ne $state -and $state.uiOnlyLayerIsolationStatus) {
+        [string]$state.uiOnlyLayerIsolationStatus
+    } elseif ($null -ne $state -and $state.uiOnlyRenderTargetCapture -and $state.uiOnlyRenderTargetCapture.isolationStatus) {
+        [string]$state.uiOnlyRenderTargetCapture.isolationStatus
+    } else {
+        ""
+    }
+
+    return [ordered]@{
+        requested = [bool]$request.ok
+        captured = [bool]$captured
+        reason = if ($captured) { "ui-layer-capture-observed" } else { "ui-layer-capture-timeout" }
+        path = $capturePath
+        captureStatus = $captureStatus
+        isolationStatus = $isolationStatus
+        request = $request
+        status = $lastStatus
+    }
+}
+
 function Get-UiLabLiveBridgeState([string]$PipeName, [int]$TimeoutMilliseconds = 1000) {
     try {
         $raw = Invoke-UiLabBridgeCommand "state" $PipeName $TimeoutMilliseconds
@@ -1281,6 +1394,7 @@ $controlAutomationTargets = @("title-menu", "title-options") + $stageTargets
 $records = @()
 $expandedTargets = @()
 $requiredNativeSignalFailed = $false
+$requiredUiLayerCaptureFailed = $false
 
 if ($Observer) {
     $expandedTargets = @("manual-observer")
@@ -1381,6 +1495,12 @@ foreach ($target in $expandedTargets) {
     $nativeFrameCapture = $null
     $nativeFrameCaptures = @()
     $skipLateWindowCapture = $false
+    $uiLayerCaptureResult = $null
+    $uiLayerCaptureRequest = $null
+    $uiLayerCaptureStatus = $null
+    $uiLayerCaptureAttempted = $false
+    $uiLayerCapturePassed = -not [bool]$RequireUiLayerCapture
+    $uiLayerCaptureRequired = [bool]$RequireUiLayerCapture
 
     try {
         if (-not $SkipWindowScreenshots -and -not $process.HasExited) {
@@ -1455,6 +1575,22 @@ foreach ($target in $expandedTargets) {
 
                 if ($evidenceReady) {
                     Stop-UiLabControlAutomation "evidence ready"
+
+                    if ($UiLayerCapture -and $LiveBridge -and -not $process.HasExited) {
+                        $uiLayerCaptureAttempted = $true
+                        $uiLayerCaptureResult = Wait-UiLabUiLayerCapture $effectiveLiveBridgeName $UiLayerCaptureTimeoutSeconds $UiLayerCapturePollMilliseconds $UiLayerCaptureCommandTimeoutMilliseconds $process
+                        $uiLayerCaptureRequest = $uiLayerCaptureResult.request
+                        $uiLayerCaptureStatus = $uiLayerCaptureResult.status
+                        $uiLayerCapturePassed = [bool]$uiLayerCaptureResult.captured
+
+                        if ($uiLayerCapturePassed) {
+                            $lateCaptureReason = "ui-layer-capture-observed"
+                        }
+                        else {
+                            $lateCaptureReason = "ui-layer-capture-timeout"
+                        }
+                    }
+
                     $settleSeconds = if ($stageTargets -contains $target) { $StagePostEvidenceDelaySeconds } else { $PostEvidenceDelaySeconds }
 
                     if ($settleSeconds -gt 0) {
@@ -1467,12 +1603,43 @@ foreach ($target in $expandedTargets) {
             }
         }
 
+        if ($UiLayerCapture -and -not $uiLayerCaptureAttempted -and $LiveBridge -and -not $process.HasExited) {
+            $uiLayerCaptureAttempted = $true
+            $uiLayerCaptureResult = Wait-UiLabUiLayerCapture $effectiveLiveBridgeName $UiLayerCaptureTimeoutSeconds $UiLayerCapturePollMilliseconds $UiLayerCaptureCommandTimeoutMilliseconds $process
+            $uiLayerCaptureRequest = $uiLayerCaptureResult.request
+            $uiLayerCaptureStatus = $uiLayerCaptureResult.status
+            $uiLayerCapturePassed = [bool]$uiLayerCaptureResult.captured
+
+            if ($uiLayerCapturePassed) {
+                $lateCaptureReason = "ui-layer-capture-observed"
+            }
+            elseif ([string]::IsNullOrWhiteSpace([string]$lateCaptureReason) -or $lateCaptureReason -eq "fixed-delay") {
+                $lateCaptureReason = "ui-layer-capture-timeout"
+            }
+        }
+        elseif ($UiLayerCapture -and -not $uiLayerCaptureAttempted -and -not $LiveBridge) {
+            $uiLayerCaptureAttempted = $true
+            $uiLayerCaptureResult = [ordered]@{
+                requested = $false
+                captured = $false
+                reason = "ui-layer-capture-live-bridge-disabled"
+                path = ""
+                captureStatus = ""
+                isolationStatus = ""
+                request = $null
+                status = $null
+            }
+            $uiLayerCapturePassed = -not $uiLayerCaptureRequired
+        }
+
         if ($NativeCapture) {
             $nativeWaitSeconds = if ($evidenceReady) { [Math]::Max(1, $PostEvidenceDelaySeconds) } else { [Math]::Max(1, $SecondCaptureDelaySeconds) }
             $nativeFrameCapture = Wait-UiLabNativeFrameCapture $eventsPath $nativeWaitSeconds $process
 
             if ($null -ne $nativeFrameCapture -and $nativeFrameCapture.exists) {
-                $lateCaptureReason = "native-frame-captured"
+                if (-not $uiLayerCapturePassed) {
+                    $lateCaptureReason = "native-frame-captured"
+                }
                 $skipLateWindowCapture = $true
             }
         }
@@ -1554,9 +1721,16 @@ foreach ($target in $expandedTargets) {
         controlAutomation = $controlAutomationRecord
         nativeSignalRequired = $nativeSignalRequired
         nativeSignalPassed = $nativeSignalPassed
+        uiLayerCaptureRequested = [bool]$UiLayerCapture
+        uiLayerCaptureRequired = $uiLayerCaptureRequired
+        uiLayerCaptureAttempted = $uiLayerCaptureAttempted
+        uiLayerCapturePassed = $uiLayerCapturePassed
+        uiLayerCaptureResult = $uiLayerCaptureResult
+        uiLayerCaptureRequest = $uiLayerCaptureRequest
+        uiLayerCaptureStatus = $uiLayerCaptureStatus
     }
 
-    $targetPassed = $evidenceChecks.passed -and $nativeSignalPassed
+    $targetPassed = $evidenceChecks.passed -and $nativeSignalPassed -and (-not $uiLayerCaptureRequired -or $uiLayerCapturePassed)
     if ($targetPassed) {
         $attemptLabel = if ($attempt -eq 1) { "" } else { " attempt $attempt" }
         Write-Host "[$target] evidence PASS$attemptLabel"
@@ -1573,6 +1747,10 @@ foreach ($target in $expandedTargets) {
             Write-Warning "[$target$attemptLabel] native BMP RGB signal missing"
         }
 
+        if ($uiLayerCaptureRequired -and -not $uiLayerCapturePassed) {
+            Write-Warning "[$target$attemptLabel] UI-layer capture missing"
+        }
+
         if ($attempt -lt $maxAttempts) {
             Write-Warning "[$target] retrying fresh runtime session after incomplete live/native evidence (attempt $attempt of $maxAttempts)."
             continue
@@ -1580,6 +1758,10 @@ foreach ($target in $expandedTargets) {
 
         if (-not $nativeSignalPassed) {
             $requiredNativeSignalFailed = $true
+        }
+
+        if ($uiLayerCaptureRequired -and -not $uiLayerCapturePassed) {
+            $requiredUiLayerCaptureFailed = $true
         }
     }
     }
@@ -1592,4 +1774,8 @@ Write-Host "UI Lab runtime evidence: $sessionDir"
 
 if ($requiredNativeSignalFailed) {
     throw "One or more UI Lab native captures did not produce RGB-nonblack BMP evidence."
+}
+
+if ($requiredUiLayerCaptureFailed) {
+    throw "One or more UI Lab UI-layer captures did not produce render-target evidence."
 }

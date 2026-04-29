@@ -1204,6 +1204,31 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("UI-layer pixel comparison", harvest)
         self.assertIn("dedicated UI target or vendor replay", harvest)
 
+    def test_ui_lab_capture_helper_can_arm_ui_layer_capture_per_target(self):
+        script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+        harvest = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "[switch]$UiLayerCapture",
+            "[switch]$RequireUiLayerCapture",
+            "Wait-UiLabUiLayerCapture",
+            "Invoke-UiLabBridgeJsonCommand",
+            "ui-layer-capture",
+            "ui-layer-status",
+            "uiLayerCaptureRequest =",
+            "uiLayerCaptureStatus =",
+            "uiLayerCaptureAttempted =",
+            "uiLayerCapturePassed =",
+            "uiLayerCaptureRequired =",
+            "ui-layer-capture-timeout",
+            "ui-layer-capture-observed",
+        ]:
+            self.assertIn(token, script)
+
+        self.assertIn("Phase 160", harvest)
+        self.assertIn("-UiLayerCapture", harvest)
+        self.assertIn("ui-layer-capture-observed", harvest)
+
     def test_ui_lab_has_repo_safe_live_bridge_client_tool(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1"
         self.assertTrue(script_path.is_file())
