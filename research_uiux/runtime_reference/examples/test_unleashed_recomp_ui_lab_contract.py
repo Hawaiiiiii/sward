@@ -2054,6 +2054,10 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "HasRecentUiPlayScreenDrawActivity",
             "IsLikelySonicHudUnresolvedValue",
             "RecordUnresolvedSonicHudNodeWrite",
+            "ResolveSonicHudPathFromRecentDrawCalls",
+            "TryLateResolveSonicHudNodeWriteObservations",
+            "sonic-hud-node-write-late-resolved",
+            "pathResolutionSource",
             "pathResolved",
             "writeKind",
             "numericValueKnown",
@@ -2069,6 +2073,8 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "CNode::SetScale/sub_830BF090",
             "Phase 170",
             "sonic-hud-node-write-unresolved",
+            "Phase 171",
+            "late-resolve unresolved CSD node writes",
         ]:
             self.assertIn(token, report)
 

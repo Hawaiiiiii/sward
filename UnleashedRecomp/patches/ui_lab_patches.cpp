@@ -426,6 +426,7 @@ namespace UiLab
         std::string valueName;
         std::string path;
         bool pathResolved = true;
+        std::string pathResolutionSource = "csd-project-tree";
         uint32_t nodeAddress = 0;
         uint32_t textAddress = 0;
         std::string textUtf8;
@@ -433,6 +434,20 @@ namespace UiLab
         double numericValue = 0.0;
         std::string hookSource;
         uint64_t frame = 0;
+    };
+
+    struct LateResolvedSonicHudNodeWrite
+    {
+        std::string writeKind;
+        std::string valueName;
+        std::string path;
+        uint32_t nodeAddress = 0;
+        uint32_t textAddress = 0;
+        std::string valueText;
+        bool numericValueKnown = false;
+        double numericValue = 0.0;
+        std::string hookSource;
+        std::string pathResolutionSource;
     };
 
     struct SonicHudOwnerFieldSample
@@ -2398,7 +2413,85 @@ namespace UiLab
             });
     }
 
-    static std::string ResolveSonicHudValuePathFromCsdNode(uint32_t nodeAddress)
+    static bool RuntimeUiDrawCallSonicHudPathMatchesNode(
+        const RuntimeUiDrawCall& call,
+        uint32_t nodeAddress,
+        bool (*pathPredicate)(std::string_view))
+    {
+        if (!IsPlausibleGuestPointer(nodeAddress))
+            return false;
+
+        if (
+            call.projectName != "ui_playscreen" &&
+            !call.layerPath.starts_with("ui_playscreen/"))
+        {
+            return false;
+        }
+
+        if (call.layerPath.empty() || call.layerPath == "unresolved")
+            return false;
+
+        if (call.layerAddress != nodeAddress && call.castNodeAddress != nodeAddress)
+            return false;
+
+        return pathPredicate(call.layerPath);
+    }
+
+    static std::string ResolveSonicHudPathFromRecentDrawCallsLocked(
+        uint32_t nodeAddress,
+        bool (*pathPredicate)(std::string_view))
+    {
+        for (auto it = g_runtimeUiDrawCalls.rbegin(); it != g_runtimeUiDrawCalls.rend(); ++it)
+        {
+            if (g_presentedFrameCount >= it->frame && (g_presentedFrameCount - it->frame) > 180)
+                continue;
+
+            if (RuntimeUiDrawCallSonicHudPathMatchesNode(*it, nodeAddress, pathPredicate))
+                return it->layerPath;
+        }
+
+        return {};
+    }
+
+    static std::string ResolveSonicHudPathFromRecentDrawCalls(
+        uint32_t nodeAddress,
+        bool (*pathPredicate)(std::string_view),
+        std::string* pathResolutionSource = nullptr)
+    {
+        if (!IsPlausibleGuestPointer(nodeAddress))
+            return {};
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        const std::string path = ResolveSonicHudPathFromRecentDrawCallsLocked(nodeAddress, pathPredicate);
+        if (!path.empty() && pathResolutionSource != nullptr)
+            *pathResolutionSource = "recent-ui-draw-list";
+        return path;
+    }
+
+    static std::string BaseSonicHudWriteKind(std::string_view writeKind)
+    {
+        constexpr std::string_view suffix = "-unresolved";
+        if (writeKind.size() > suffix.size() &&
+            writeKind.substr(writeKind.size() - suffix.size()) == suffix)
+        {
+            return std::string(writeKind.substr(0, writeKind.size() - suffix.size()));
+        }
+
+        return std::string(writeKind);
+    }
+
+    static bool IsSonicHudGaugeOrPromptWriteKind(std::string_view writeKind)
+    {
+        const std::string baseKind = BaseSonicHudWriteKind(writeKind);
+        return
+            baseKind == "pattern-index" ||
+            baseKind == "hide-flag" ||
+            baseKind == "scale";
+    }
+
+    static std::string ResolveSonicHudValuePathFromCsdNode(
+        uint32_t nodeAddress,
+        std::string* pathResolutionSource = nullptr)
     {
         if (!IsPlausibleGuestPointer(nodeAddress))
             return {};
@@ -2414,6 +2507,8 @@ namespace UiLab
                 if ((entry.relatedAddress == nodeAddress || entry.address == nodeAddress) &&
                     IsSonicHudValueTextPath(entry.path))
                 {
+                    if (pathResolutionSource != nullptr)
+                        *pathResolutionSource = "csd-project-tree";
                     return entry.path;
                 }
             }
@@ -2421,14 +2516,23 @@ namespace UiLab
             for (const auto& entry : record.nodes)
             {
                 if (entry.address == nodeAddress && IsSonicHudValueTextPath(entry.path))
+                {
+                    if (pathResolutionSource != nullptr)
+                        *pathResolutionSource = "csd-project-tree";
                     return entry.path;
+                }
             }
         }
 
-        return {};
+        const std::string path = ResolveSonicHudPathFromRecentDrawCallsLocked(nodeAddress, IsSonicHudValueTextPath);
+        if (!path.empty() && pathResolutionSource != nullptr)
+            *pathResolutionSource = "recent-ui-draw-list";
+        return path;
     }
 
-    static std::string ResolveSonicHudGaugeOrPromptPathFromCsdNode(uint32_t nodeAddress)
+    static std::string ResolveSonicHudGaugeOrPromptPathFromCsdNode(
+        uint32_t nodeAddress,
+        std::string* pathResolutionSource = nullptr)
     {
         if (!IsPlausibleGuestPointer(nodeAddress))
             return {};
@@ -2444,6 +2548,8 @@ namespace UiLab
                 if ((entry.relatedAddress == nodeAddress || entry.address == nodeAddress) &&
                     IsSonicHudGaugeOrPromptPath(entry.path))
                 {
+                    if (pathResolutionSource != nullptr)
+                        *pathResolutionSource = "csd-project-tree";
                     return entry.path;
                 }
             }
@@ -2451,11 +2557,18 @@ namespace UiLab
             for (const auto& entry : record.nodes)
             {
                 if (entry.address == nodeAddress && IsSonicHudGaugeOrPromptPath(entry.path))
+                {
+                    if (pathResolutionSource != nullptr)
+                        *pathResolutionSource = "csd-project-tree";
                     return entry.path;
+                }
             }
         }
 
-        return {};
+        const std::string path = ResolveSonicHudPathFromRecentDrawCallsLocked(nodeAddress, IsSonicHudGaugeOrPromptPath);
+        if (!path.empty() && pathResolutionSource != nullptr)
+            *pathResolutionSource = "recent-ui-draw-list";
+        return path;
     }
 
     static bool ApplySonicHudTextWriteToGameplayValues(
@@ -2542,6 +2655,90 @@ namespace UiLab
         return changed;
     }
 
+    static bool ApplySonicHudGaugeOrPromptWriteToGameplayValues(
+        std::string_view path,
+        std::string_view writeKind,
+        bool numericValueKnown,
+        double numericValue,
+        std::string_view hookSource)
+    {
+        if (!numericValueKnown)
+            return false;
+
+        const std::string baseKind = BaseSonicHudWriteKind(writeKind);
+        const std::string source =
+            std::string(hookSource) + "@" + std::string(path);
+
+        bool changed = false;
+        SonicHudGameplayValueSnapshot snapshot;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            snapshot = g_sonicHudGameplayValues;
+
+            if (
+                baseKind == "scale" &&
+                (path.starts_with("ui_playscreen/so_speed_gauge") ||
+                    path.starts_with("ui_playscreen/gauge_frame")))
+            {
+                const float boostGauge = static_cast<float>(numericValue);
+                changed =
+                    !snapshot.boostGaugeKnown ||
+                    snapshot.boostGauge != boostGauge ||
+                    snapshot.boostGaugeSource != source;
+                snapshot.boostGaugeKnown = true;
+                snapshot.boostGauge = boostGauge;
+                snapshot.boostGaugeSource = source;
+            }
+            else if (baseKind == "scale" && path.starts_with("ui_playscreen/so_ringenagy_gauge"))
+            {
+                const float ringEnergyGauge = static_cast<float>(numericValue);
+                changed =
+                    !snapshot.ringEnergyGaugeKnown ||
+                    snapshot.ringEnergyGauge != ringEnergyGauge ||
+                    snapshot.ringEnergyGaugeSource != source;
+                snapshot.ringEnergyGaugeKnown = true;
+                snapshot.ringEnergyGauge = ringEnergyGauge;
+                snapshot.ringEnergyGaugeSource = source;
+            }
+            else if (path.starts_with("ui_playscreen/add/u_info"))
+            {
+                const bool visible = baseKind == "hide-flag"
+                    ? numericValue == 0.0
+                    : true;
+                const std::string promptId = baseKind == "pattern-index"
+                    ? ("pattern-" + std::to_string(static_cast<uint32_t>(numericValue)))
+                    : "u_info";
+                changed =
+                    !snapshot.tutorialPromptKnown ||
+                    snapshot.tutorialVisible != visible ||
+                    snapshot.tutorialPromptId != promptId ||
+                    snapshot.tutorialPromptSource != source;
+                snapshot.tutorialPromptKnown = true;
+                snapshot.tutorialVisible = visible;
+                snapshot.tutorialPromptId = promptId;
+                snapshot.tutorialPromptSource = source;
+            }
+
+            if (changed)
+            {
+                snapshot.frame = g_presentedFrameCount;
+                g_sonicHudGameplayValues = std::move(snapshot);
+            }
+        }
+
+        if (changed)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-value-write-update",
+                "path=" + std::string(path) +
+                " kind=" + baseKind +
+                " value=" + std::to_string(numericValue) +
+                " source=" + source);
+        }
+
+        return changed;
+    }
+
     static bool RecordSonicHudNodeWriteObservation(
         std::string_view writeKind,
         std::string_view valueName,
@@ -2553,7 +2750,8 @@ namespace UiLab
         double numericValue,
         std::string_view hookSource,
         std::string_view logValue,
-        bool pathResolved)
+        bool pathResolved,
+        std::string_view pathResolutionSource)
     {
         const std::string logKey =
             std::string(writeKind) + "|" + std::string(path) + "|" + std::string(logValue) +
@@ -2567,6 +2765,7 @@ namespace UiLab
         observation.valueName = std::string(valueName);
         observation.path = std::string(path);
         observation.pathResolved = pathResolved;
+        observation.pathResolutionSource = std::string(pathResolutionSource);
         observation.nodeAddress = nodeAddress;
         observation.textAddress = textAddress;
         observation.textUtf8 = std::string(textUtf8);
@@ -2630,7 +2829,8 @@ namespace UiLab
             numericValue,
             hookSource,
             valueText,
-            false);
+            false,
+            "pending-ui-draw-list-late-resolve");
 
         if (shouldLog)
         {
@@ -2645,6 +2845,107 @@ namespace UiLab
         }
 
         return shouldLog;
+    }
+
+    static std::vector<LateResolvedSonicHudNodeWrite> TryLateResolveSonicHudNodeWriteObservations(
+        const RuntimeUiDrawCall& call)
+    {
+        std::vector<LateResolvedSonicHudNodeWrite> resolved;
+
+        if (
+            call.layerPath.empty() ||
+            call.layerPath == "unresolved" ||
+            (call.projectName != "ui_playscreen" && !call.layerPath.starts_with("ui_playscreen/")))
+        {
+            return resolved;
+        }
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+
+        for (auto& observation : g_sonicHudValueWriteObservations)
+        {
+            if (observation.pathResolved)
+                continue;
+
+            if (
+                observation.nodeAddress != call.layerAddress &&
+                observation.nodeAddress != call.castNodeAddress)
+            {
+                continue;
+            }
+
+            const std::string baseKind = BaseSonicHudWriteKind(observation.writeKind);
+            const bool pathMatches = baseKind == "text"
+                ? IsSonicHudValueTextPath(call.layerPath)
+                : (IsSonicHudGaugeOrPromptWriteKind(baseKind) && IsSonicHudGaugeOrPromptPath(call.layerPath));
+            if (!pathMatches)
+                continue;
+
+            observation.writeKind = baseKind;
+            observation.path = call.layerPath;
+            observation.pathResolved = true;
+            observation.pathResolutionSource = "ui-draw-list-late-resolve";
+            observation.valueName = baseKind == "text"
+                ? SonicHudValueNameFromTextPath(call.layerPath)
+                : SonicHudValueNameFromGaugeOrPromptPath(call.layerPath);
+            observation.frame = g_presentedFrameCount;
+
+            LateResolvedSonicHudNodeWrite event;
+            event.writeKind = observation.writeKind;
+            event.valueName = observation.valueName;
+            event.path = observation.path;
+            event.nodeAddress = observation.nodeAddress;
+            event.textAddress = observation.textAddress;
+            event.valueText = observation.textUtf8;
+            event.numericValueKnown = observation.numericValueKnown;
+            event.numericValue = observation.numericValue;
+            event.hookSource = observation.hookSource;
+            event.pathResolutionSource = observation.pathResolutionSource;
+            resolved.push_back(std::move(event));
+        }
+
+        return resolved;
+    }
+
+    static void EmitLateResolvedSonicHudNodeWriteEvents(
+        const std::vector<LateResolvedSonicHudNodeWrite>& resolvedWrites)
+    {
+        bool wroteSnapshot = false;
+
+        for (const auto& resolved : resolvedWrites)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-node-write-late-resolved",
+                "kind=" + resolved.writeKind +
+                " value=" + resolved.valueName +
+                " path=" + resolved.path +
+                " node=" + HexU32(resolved.nodeAddress) +
+                " rawValue=\"" + resolved.valueText + "\"" +
+                " source=" + resolved.hookSource +
+                " pathResolutionSource=" + resolved.pathResolutionSource);
+
+            if (resolved.writeKind == "text")
+            {
+                ApplySonicHudTextWriteToGameplayValues(
+                    resolved.path,
+                    resolved.valueText,
+                    resolved.hookSource);
+            }
+            else
+            {
+                ApplySonicHudGaugeOrPromptWriteToGameplayValues(
+                    resolved.path,
+                    resolved.writeKind,
+                    resolved.numericValueKnown,
+                    resolved.numericValue,
+                    resolved.hookSource);
+            }
+
+            wroteSnapshot = true;
+        }
+
+        if (wroteSnapshot)
+            WriteLiveStateSnapshot();
     }
 
     static void AppendCsdTreeEntries(
@@ -2717,6 +3018,7 @@ namespace UiLab
                 << "\"valueName\":\"" << JsonEscape(observation.valueName) << "\","
                 << "\"path\":\"" << JsonEscape(observation.path) << "\","
                 << "\"pathResolved\":" << (observation.pathResolved ? "true" : "false") << ","
+                << "\"pathResolutionSource\":\"" << JsonEscape(observation.pathResolutionSource) << "\","
                 << "\"nodeAddress\":\"" << JsonEscape(HexU32(observation.nodeAddress)) << "\","
                 << "\"textAddress\":\"" << JsonEscape(HexU32(observation.textAddress)) << "\","
                 << "\"textUtf8\":\"" << JsonEscape(observation.textUtf8) << "\","
@@ -6605,60 +6907,70 @@ namespace UiLab
         if (!g_isEnabled)
             return;
 
-        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        RuntimeUiDrawCall lateResolveCall;
+        bool hasLateResolveCall = false;
 
-        if (g_runtimeUiDrawListFrame != g_presentedFrameCount)
         {
-            g_runtimeUiDrawListFrame = g_presentedFrameCount;
-            g_runtimeUiDrawCalls.clear();
-            g_runtimeUiDrawCallSequence = 0;
-            g_runtimeUiDrawCallDroppedCount = 0;
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+
+            if (g_runtimeUiDrawListFrame != g_presentedFrameCount)
+            {
+                g_runtimeUiDrawListFrame = g_presentedFrameCount;
+                g_runtimeUiDrawCalls.clear();
+                g_runtimeUiDrawCallSequence = 0;
+                g_runtimeUiDrawCallDroppedCount = 0;
+            }
+
+            ++g_runtimeUiDrawCallSequence;
+            if (g_runtimeUiDrawCalls.size() >= kRuntimeUiDrawCallSampleLimit)
+            {
+                ++g_runtimeUiDrawCallDroppedCount;
+                return;
+            }
+
+            RuntimeUiDrawCall call;
+            call.frame = g_presentedFrameCount;
+            call.sequence = g_runtimeUiDrawCallSequence;
+            call.layerAddress = layerAddress;
+            call.castNodeAddress = castNodeAddress;
+            call.vertexBufferAddress = vertexBufferAddress;
+            call.vertexCount = vertexCount;
+            call.vertexStride = vertexStride;
+            call.textured = textured;
+            call.minX = minX;
+            call.minY = minY;
+            call.maxX = maxX;
+            call.maxY = maxY;
+            call.colorSample = colorSample;
+            call.layerPath = "unresolved";
+
+            for (const auto& record : g_csdProjectTrees)
+            {
+                const auto found = std::find_if(
+                    record.layers.begin(),
+                    record.layers.end(),
+                    [layerAddress](const CsdTreeEntry& entry)
+                    {
+                        return entry.address == layerAddress;
+                    });
+                if (found == record.layers.end())
+                    continue;
+
+                call.projectName = record.projectName;
+                call.layerPath = found->path;
+                break;
+            }
+
+            if (call.projectName.empty())
+                call.projectName = g_lastCsdProjectName.empty() ? std::string("unknown") : g_lastCsdProjectName;
+
+            lateResolveCall = call;
+            hasLateResolveCall = true;
+            g_runtimeUiDrawCalls.push_back(std::move(call));
         }
 
-        ++g_runtimeUiDrawCallSequence;
-        if (g_runtimeUiDrawCalls.size() >= kRuntimeUiDrawCallSampleLimit)
-        {
-            ++g_runtimeUiDrawCallDroppedCount;
-            return;
-        }
-
-        RuntimeUiDrawCall call;
-        call.frame = g_presentedFrameCount;
-        call.sequence = g_runtimeUiDrawCallSequence;
-        call.layerAddress = layerAddress;
-        call.castNodeAddress = castNodeAddress;
-        call.vertexBufferAddress = vertexBufferAddress;
-        call.vertexCount = vertexCount;
-        call.vertexStride = vertexStride;
-        call.textured = textured;
-        call.minX = minX;
-        call.minY = minY;
-        call.maxX = maxX;
-        call.maxY = maxY;
-        call.colorSample = colorSample;
-        call.layerPath = "unresolved";
-
-        for (const auto& record : g_csdProjectTrees)
-        {
-            const auto found = std::find_if(
-                record.layers.begin(),
-                record.layers.end(),
-                [layerAddress](const CsdTreeEntry& entry)
-                {
-                    return entry.address == layerAddress;
-                });
-            if (found == record.layers.end())
-                continue;
-
-            call.projectName = record.projectName;
-            call.layerPath = found->path;
-            break;
-        }
-
-        if (call.projectName.empty())
-            call.projectName = g_lastCsdProjectName.empty() ? std::string("unknown") : g_lastCsdProjectName;
-
-        g_runtimeUiDrawCalls.push_back(std::move(call));
+        if (hasLateResolveCall)
+            EmitLateResolvedSonicHudNodeWriteEvents(TryLateResolveSonicHudNodeWriteObservations(lateResolveCall));
     }
 
     void OnCsdNodeSetText(
@@ -6674,7 +6986,8 @@ namespace UiLab
             ? std::string("CSD::CNode::SetText/sub_830BF640")
             : std::string(hookSource);
 
-        const std::string path = ResolveSonicHudValuePathFromCsdNode(nodeAddress);
+        std::string pathResolutionSource;
+        const std::string path = ResolveSonicHudValuePathFromCsdNode(nodeAddress, &pathResolutionSource);
         if (path.empty())
         {
             RecordUnresolvedSonicHudNodeWrite(
@@ -6699,6 +7012,7 @@ namespace UiLab
             SonicHudValueWriteObservation observation;
             observation.valueName = valueName;
             observation.path = path;
+            observation.pathResolutionSource = pathResolutionSource;
             observation.nodeAddress = nodeAddress;
             observation.textAddress = textAddress;
             observation.textUtf8 = std::string(textUtf8);
@@ -6754,7 +7068,8 @@ namespace UiLab
             : std::string(hookSource);
         const std::string patternText = std::to_string(patternIndex);
 
-        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
+        std::string pathResolutionSource;
+        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress, &pathResolutionSource);
         if (path.empty())
         {
             RecordUnresolvedSonicHudNodeWrite(
@@ -6781,7 +7096,15 @@ namespace UiLab
             static_cast<double>(patternIndex),
             source,
             patternText,
-            true);
+            true,
+            pathResolutionSource);
+
+        const bool changed = ApplySonicHudGaugeOrPromptWriteToGameplayValues(
+            path,
+            "pattern-index",
+            true,
+            static_cast<double>(patternIndex),
+            source);
 
         if (shouldLog)
         {
@@ -6792,8 +7115,10 @@ namespace UiLab
                 " node=" + HexU32(nodeAddress) +
                 " pattern=" + patternText +
                 " source=" + source);
-            WriteLiveStateSnapshot();
         }
+
+        if (shouldLog || changed)
+            WriteLiveStateSnapshot();
     }
 
     void OnCsdNodeSetHideFlag(
@@ -6809,7 +7134,8 @@ namespace UiLab
             : std::string(hookSource);
         const std::string hideText = std::to_string(hideFlag);
 
-        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
+        std::string pathResolutionSource;
+        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress, &pathResolutionSource);
         if (path.empty())
         {
             RecordUnresolvedSonicHudNodeWrite(
@@ -6836,16 +7162,15 @@ namespace UiLab
             static_cast<double>(hideFlag),
             source,
             hideText,
-            true);
+            true,
+            pathResolutionSource);
 
-        if (path.starts_with("ui_playscreen/add/u_info"))
-        {
-            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
-            g_sonicHudGameplayValues.tutorialPromptKnown = true;
-            g_sonicHudGameplayValues.tutorialVisible = hideFlag == 0;
-            g_sonicHudGameplayValues.tutorialPromptSource = source + "@" + path;
-            g_sonicHudGameplayValues.frame = g_presentedFrameCount;
-        }
+        const bool changed = ApplySonicHudGaugeOrPromptWriteToGameplayValues(
+            path,
+            "hide-flag",
+            true,
+            static_cast<double>(hideFlag),
+            source);
 
         if (shouldLog)
         {
@@ -6856,8 +7181,10 @@ namespace UiLab
                 " node=" + HexU32(nodeAddress) +
                 " hide=" + hideText +
                 " source=" + source);
-            WriteLiveStateSnapshot();
         }
+
+        if (shouldLog || changed)
+            WriteLiveStateSnapshot();
     }
 
     void OnCsdNodeSetScale(
@@ -6876,7 +7203,8 @@ namespace UiLab
         std::ostringstream value;
         value << scaleX << "," << scaleY;
 
-        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
+        std::string pathResolutionSource;
+        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress, &pathResolutionSource);
         if (path.empty())
         {
             RecordUnresolvedSonicHudNodeWrite(
@@ -6903,7 +7231,15 @@ namespace UiLab
             static_cast<double>(scaleX),
             source,
             value.str(),
-            true);
+            true,
+            pathResolutionSource);
+
+        const bool changed = ApplySonicHudGaugeOrPromptWriteToGameplayValues(
+            path,
+            "scale",
+            true,
+            static_cast<double>(scaleX),
+            source);
 
         if (shouldLog)
         {
@@ -6914,8 +7250,10 @@ namespace UiLab
                 " node=" + HexU32(nodeAddress) +
                 " scale=" + value.str() +
                 " source=" + source);
-            WriteLiveStateSnapshot();
         }
+
+        if (shouldLog || changed)
+            WriteLiveStateSnapshot();
     }
 
     void OnBackendMaterialSubmit(
