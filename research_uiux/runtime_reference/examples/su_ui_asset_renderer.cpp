@@ -428,6 +428,10 @@ struct FrontendBackendResolvedSubmit
     std::string backend;
     std::string nativeCommand;
     std::string materialParityHint = "missing";
+    std::string textureDescriptorSemantic = "missing";
+    std::string samplerDescriptorSemantic = "missing";
+    bool textureDescriptorKnown = false;
+    bool samplerDescriptorKnown = false;
     bool indexed = false;
     bool resolvedPipelineKnown = false;
     bool activeFramebufferKnown = false;
@@ -453,9 +457,19 @@ struct FrontendBackendResolvedEvidence
     std::string blendParityPolicy = "missing";
     std::string framebufferParityPolicy = "missing";
     std::string textureViewSamplerGap = "pending";
+    std::string textureViewSamplerStatus = "missing";
+    std::string textureDescriptorPolicy = "missing";
+    std::string samplerDescriptorPolicy = "missing";
+    std::string vendorDescriptorCaptureGap = "pending-native-descriptor-dump";
     std::string textMovieSfxGap = "pending";
     int runtimeFrame = 0;
     std::size_t materialPairCount = 0;
+    std::size_t textureDescriptorKnownCount = 0;
+    std::size_t samplerDescriptorKnownCount = 0;
+    std::size_t linearSamplerDescriptorCount = 0;
+    std::size_t pointSamplerDescriptorCount = 0;
+    std::size_t wrapSamplerDescriptorCount = 0;
+    std::size_t clampSamplerDescriptorCount = 0;
     std::vector<FrontendBackendResolvedSubmit> submits;
     FrontendLiveBridgeProbeResult bridgeProbe;
 };
@@ -492,6 +506,24 @@ struct FrontendBackendMaterialParityTriage
     std::size_t additiveSubmitCount = 0;
     std::size_t opaqueSubmitCount = 0;
     std::size_t framebufferRegisteredSubmitCount = 0;
+    std::size_t localCommandCount = 0;
+};
+
+struct FrontendDescriptorSemanticsTriage
+{
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string textureSamplerPolicy = "runtime-descriptor-state";
+    std::string vendorDescriptorGap = "pending-native-descriptor-dump";
+    std::string textMovieSfxGap = "pending";
+    std::string textureViewSamplerStatus = "missing";
+    std::size_t textureDescriptorKnownCount = 0;
+    std::size_t samplerDescriptorKnownCount = 0;
+    std::size_t linearSamplerDescriptorCount = 0;
+    std::size_t pointSamplerDescriptorCount = 0;
+    std::size_t wrapSamplerDescriptorCount = 0;
+    std::size_t clampSamplerDescriptorCount = 0;
     std::size_t localCommandCount = 0;
 };
 
@@ -6770,6 +6802,118 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return records.empty() ? 1 : 0;
 }
 
+[[nodiscard]] FrontendDescriptorSemanticsTriage buildFrontendDescriptorSemanticsTriage(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendDescriptorSemanticsTriage triage;
+    triage.screenId = policy.screenId;
+
+    const auto resolved = loadFrontendBackendResolvedEvidence(policy);
+    triage.source = resolved.source;
+    triage.probe = resolved.probe;
+    triage.textureViewSamplerStatus = resolved.textureViewSamplerStatus;
+    triage.vendorDescriptorGap = resolved.vendorDescriptorCaptureGap;
+    triage.textMovieSfxGap = resolved.textMovieSfxGap == "pending-title-loading-media-timing"
+        ? "pending"
+        : resolved.textMovieSfxGap;
+    triage.textureDescriptorKnownCount = resolved.textureDescriptorKnownCount;
+    triage.samplerDescriptorKnownCount = resolved.samplerDescriptorKnownCount;
+    triage.linearSamplerDescriptorCount = resolved.linearSamplerDescriptorCount;
+    triage.pointSamplerDescriptorCount = resolved.pointSamplerDescriptorCount;
+    triage.wrapSamplerDescriptorCount = resolved.wrapSamplerDescriptorCount;
+    triage.clampSamplerDescriptorCount = resolved.clampSamplerDescriptorCount;
+
+    const auto clock = loadFrontendUiOraclePlaybackClock(policy);
+    for (const auto& scenePolicy : policy.scenes)
+    {
+        const int sceneFrame = uiOracleTimelineFrameForScene(clock, scenePolicy);
+        const CsdPipelineTemplateBinding sceneBinding{
+            policy.screenId,
+            policy.layoutName,
+            scenePolicy.sceneName,
+            scenePolicy.sceneName,
+            scenePolicy.timeline.animationName,
+        };
+
+        const auto* drawableScene = cachedCsdDrawableScene(sceneBinding);
+        if (!drawableScene)
+            continue;
+
+        auto playback = loadCsdTimelinePlayback(sceneBinding, sceneFrame);
+        if (!playback)
+            playback = loadTimelinePlaybackForScene(policy.screenId, policy.layoutName, scenePolicy.sceneName, sceneFrame);
+
+        std::size_t sampledTrackCount = 0;
+        const auto commands = timelineSampledCommands(
+            *drawableScene,
+            playback ? &*playback : nullptr,
+            sampledTrackCount);
+        triage.localCommandCount += static_cast<std::size_t>(std::count_if(
+            commands.begin(),
+            commands.end(),
+            csdCommandIsDrawable));
+    }
+
+    return triage;
+}
+
+[[nodiscard]] int runRendererDescriptorSemanticsSmoke()
+{
+    constexpr std::string_view directProbeToken = "descriptor_semantics_probe=direct-ui-backend-resolved";
+    constexpr std::string_view materialFallbackToken = "descriptor_semantics_probe=material-correlation-fallback";
+    constexpr std::string_view missingProbeToken = "descriptor_semantics_probe=missing";
+    constexpr std::string_view textureSamplerPolicyToken = "texture_sampler_policy=runtime-descriptor-state";
+    constexpr std::string_view vendorDescriptorGapToken = "vendor_descriptor_gap=pending-native-descriptor-dump";
+    constexpr std::string_view textMovieSfxGapToken = "text_movie_sfx_gap=pending";
+
+    std::vector<FrontendDescriptorSemanticsTriage> records;
+    for (const auto& policy : frontendScreenPolicies())
+        records.push_back(buildFrontendDescriptorSemanticsTriage(policy));
+
+    const bool anyDirect = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendDescriptorSemanticsTriage& record)
+        {
+            return record.probe == "direct-ui-backend-resolved";
+        });
+    const bool anyFallback = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendDescriptorSemanticsTriage& record)
+        {
+            return record.probe == "material-correlation-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer descriptor semantics smoke ok "
+        << "mode=phase154-texture-sampler-descriptor-semantics"
+        << " " << (anyDirect ? directProbeToken : (anyFallback ? materialFallbackToken : missingProbeToken))
+        << " " << textureSamplerPolicyToken
+        << " " << vendorDescriptorGapToken
+        << " " << textMovieSfxGapToken
+        << " lanes=" << records.size()
+        << '\n';
+
+    for (const auto& record : records)
+    {
+        std::cout
+            << "descriptor_semantics=" << record.screenId
+            << ":source=" << record.source
+            << ":texture_descriptor_known=" << record.textureDescriptorKnownCount
+            << ":sampler_descriptor_known=" << record.samplerDescriptorKnownCount
+            << ":linear=" << record.linearSamplerDescriptorCount
+            << ":point=" << record.pointSamplerDescriptorCount
+            << ":wrap=" << record.wrapSamplerDescriptorCount
+            << ":clamp=" << record.clampSamplerDescriptorCount
+            << ":local_commands=" << record.localCommandCount
+            << ":texture_view_sampler_status=" << record.textureViewSamplerStatus
+            << '\n';
+    }
+
+    return records.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -9607,6 +9751,18 @@ void applyFrontendBackendResolvedFromJson(
     evidence.framebufferParityPolicy = jsonStringField(paritySpan, "framebufferParityPolicy").value_or("missing");
     evidence.textureViewSamplerGap = jsonStringField(paritySpan, "textureViewSamplerGap").value_or("pending");
     evidence.textMovieSfxGap = jsonStringField(paritySpan, "textMovieSfxGap").value_or("pending");
+    const auto descriptorSemantics = jsonObjectFieldSpan(text, "backendDescriptorSemantics");
+    const std::string_view descriptorSpan = descriptorSemantics ? *descriptorSemantics : text;
+    evidence.textureViewSamplerStatus = jsonStringField(descriptorSpan, "textureViewSamplerStatus").value_or("missing");
+    evidence.textureDescriptorPolicy = jsonStringField(descriptorSpan, "textureDescriptorPolicy").value_or("missing");
+    evidence.samplerDescriptorPolicy = jsonStringField(descriptorSpan, "samplerDescriptorPolicy").value_or("missing");
+    evidence.vendorDescriptorCaptureGap = jsonStringField(descriptorSpan, "vendorDescriptorCaptureGap").value_or("pending-native-descriptor-dump");
+    evidence.textureDescriptorKnownCount = static_cast<std::size_t>(jsonNumberField(descriptorSpan, "textureDescriptorKnownCount").value_or(0.0));
+    evidence.samplerDescriptorKnownCount = static_cast<std::size_t>(jsonNumberField(descriptorSpan, "samplerDescriptorKnownCount").value_or(0.0));
+    evidence.linearSamplerDescriptorCount = static_cast<std::size_t>(jsonNumberField(descriptorSpan, "linearSamplerDescriptorCount").value_or(0.0));
+    evidence.pointSamplerDescriptorCount = static_cast<std::size_t>(jsonNumberField(descriptorSpan, "pointSamplerDescriptorCount").value_or(0.0));
+    evidence.wrapSamplerDescriptorCount = static_cast<std::size_t>(jsonNumberField(descriptorSpan, "wrapSamplerDescriptorCount").value_or(0.0));
+    evidence.clampSamplerDescriptorCount = static_cast<std::size_t>(jsonNumberField(descriptorSpan, "clampSamplerDescriptorCount").value_or(0.0));
     if (evidence.materialPairCount == 0)
         evidence.materialPairCount = static_cast<std::size_t>(jsonNumberField(oracleSpan, "materialPairCount").value_or(0.0));
 
@@ -9650,6 +9806,36 @@ void applyFrontendBackendResolvedFromJson(
     fallback.probe = material.found ? "material-correlation-fallback" : "missing";
     fallback.resolvedBackendStatus = material.resolvedBackendStatus;
     fallback.materialParityStatus = material.found ? "material correlation fallback; backend material parity hints unavailable" : "missing";
+    fallback.textureViewSamplerStatus = material.found ? "material correlation fallback; descriptor semantics unavailable" : "missing";
+    fallback.vendorDescriptorCaptureGap = "pending-native-descriptor-dump";
+    fallback.linearSamplerDescriptorCount = static_cast<std::size_t>(std::count_if(
+        material.pairs.begin(),
+        material.pairs.end(),
+        [](const FrontendMaterialCorrelationPair& pair)
+        {
+            return pair.linearFilter || pair.samplerSemantic.find("linear") != std::string::npos;
+        }));
+    fallback.pointSamplerDescriptorCount = static_cast<std::size_t>(std::count_if(
+        material.pairs.begin(),
+        material.pairs.end(),
+        [](const FrontendMaterialCorrelationPair& pair)
+        {
+            return pair.pointFilter || pair.samplerSemantic.find("point") != std::string::npos;
+        }));
+    fallback.wrapSamplerDescriptorCount = static_cast<std::size_t>(std::count_if(
+        material.pairs.begin(),
+        material.pairs.end(),
+        [](const FrontendMaterialCorrelationPair& pair)
+        {
+            return pair.addressSemantic.find("WRAP") != std::string::npos;
+        }));
+    fallback.clampSamplerDescriptorCount = static_cast<std::size_t>(std::count_if(
+        material.pairs.begin(),
+        material.pairs.end(),
+        [](const FrontendMaterialCorrelationPair& pair)
+        {
+            return pair.addressSemantic.find("CLAMP") != std::string::npos;
+        }));
     fallback.materialPairCount = material.pairs.size();
     fallback.bridgeProbe = backendProbe;
     return fallback;
@@ -11432,6 +11618,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererBackendResolvedTriageSmoke();
     if (commandLineHasFlag("--renderer-material-parity-hints-smoke"))
         return runRendererMaterialParityHintsSmoke();
+    if (commandLineHasFlag("--renderer-descriptor-semantics-smoke"))
+        return runRendererDescriptorSemanticsSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 

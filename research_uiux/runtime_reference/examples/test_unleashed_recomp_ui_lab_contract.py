@@ -935,6 +935,53 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("backend-resolved PSO/blend/framebuffer material parity hints", harvest)
         self.assertIn("texture-view/sampler descriptor internals remain pending", harvest)
 
+    def test_ui_lab_phase154_exposes_texture_sampler_descriptor_semantics(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        ui_lab_header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        video = self.read("UnleashedRecomp/gpu/video.cpp")
+        renderer = self.read("research_uiux/runtime_reference/examples/su_ui_asset_renderer.cpp")
+        tests = self.read("research_uiux/runtime_reference/examples/test_su_ui_asset_renderer.py")
+        harvest = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "RuntimeTextureDescriptorSemantic",
+            "RuntimeSamplerDescriptorSemantic",
+            "OnBackendTextureDescriptorResolved",
+            "OnBackendSamplerDescriptorResolved",
+            "BuildBackendDescriptorSemanticsJson",
+            '"backendDescriptorSemantics"',
+            '"textureViewSamplerStatus"',
+            '"textureDescriptorSemantic"',
+            '"samplerDescriptorSemantic"',
+            '"textureDescriptorPolicy": "runtime-texture-view-descriptor-state"',
+            '"samplerDescriptorPolicy": "runtime-sampler-descriptor-state"',
+            '"vendorDescriptorCaptureGap": "pending-native-descriptor-dump"',
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn("OnBackendTextureDescriptorResolved", ui_lab_header)
+        self.assertIn("OnBackendSamplerDescriptorResolved", ui_lab_header)
+        self.assertIn("UiLab::OnBackendTextureDescriptorResolved", video)
+        self.assertIn("UiLab::OnBackendSamplerDescriptorResolved", video)
+        self.assertIn("texture->descriptorIndex", video)
+        self.assertIn("g_samplerDescriptorSet->setSampler", video)
+
+        for token in [
+            "FrontendDescriptorSemanticsTriage",
+            "buildFrontendDescriptorSemanticsTriage",
+            "runRendererDescriptorSemanticsSmoke",
+            "--renderer-descriptor-semantics-smoke",
+            "phase154-texture-sampler-descriptor-semantics",
+            "texture_sampler_policy=runtime-descriptor-state",
+            "vendor_descriptor_gap=pending-native-descriptor-dump",
+        ]:
+            self.assertIn(token, renderer)
+
+        self.assertIn("test_renderer_descriptor_semantics_smoke_reports_runtime_descriptor_policy", tests)
+        self.assertIn("Phase 154", harvest)
+        self.assertIn("runtime texture-view/sampler descriptor semantics", harvest)
+        self.assertIn("native descriptor dump remains pending", harvest)
+
     def test_ui_lab_has_repo_safe_live_bridge_client_tool(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1"
         self.assertTrue(script_path.is_file())

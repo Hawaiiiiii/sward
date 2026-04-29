@@ -944,6 +944,18 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("texture_view_sampler_gap=pending", source_text)
         self.assertIn("text_movie_sfx_gap=pending", source_text)
 
+    def test_renderer_source_wires_phase154_descriptor_semantics(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendDescriptorSemanticsTriage", source_text)
+        self.assertIn("buildFrontendDescriptorSemanticsTriage", source_text)
+        self.assertIn("runRendererDescriptorSemanticsSmoke", source_text)
+        self.assertIn("--renderer-descriptor-semantics-smoke", source_text)
+        self.assertIn("phase154-texture-sampler-descriptor-semantics", source_text)
+        self.assertIn("texture_sampler_policy=runtime-descriptor-state", source_text)
+        self.assertIn("vendor_descriptor_gap=pending-native-descriptor-dump", source_text)
+        self.assertIn("textureDescriptorSemantic", source_text)
+        self.assertIn("samplerDescriptorSemantic", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -1231,6 +1243,29 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("text_movie_sfx_gap=pending", completed.stdout)
         self.assertRegex(completed.stdout, r"material_parity=title-menu:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):backend_resolved_submits=[0-9]+:source_over=[0-9]+:additive=[0-9]+:opaque=[0-9]+:framebuffer_registered=[0-9]+:local_commands=[1-9]\d*:material_parity_status=[^\r\n]+")
         self.assertRegex(completed.stdout, r"material_parity=loading:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):backend_resolved_submits=[0-9]+:source_over=[0-9]+:additive=[0-9]+:opaque=[0-9]+:framebuffer_registered=[0-9]+:local_commands=[1-9]\d*:material_parity_status=[^\r\n]+")
+
+    def test_renderer_descriptor_semantics_smoke_reports_runtime_descriptor_policy(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-descriptor-semantics-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer descriptor semantics smoke ok", completed.stdout)
+        self.assertIn("mode=phase154-texture-sampler-descriptor-semantics", completed.stdout)
+        self.assertRegex(completed.stdout, r"descriptor_semantics_probe=(direct-ui-backend-resolved|material-correlation-fallback|missing)")
+        self.assertIn("texture_sampler_policy=runtime-descriptor-state", completed.stdout)
+        self.assertIn("vendor_descriptor_gap=pending-native-descriptor-dump", completed.stdout)
+        self.assertIn("text_movie_sfx_gap=pending", completed.stdout)
+        self.assertRegex(completed.stdout, r"descriptor_semantics=title-menu:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):texture_descriptor_known=[0-9]+:sampler_descriptor_known=[0-9]+:linear=[0-9]+:point=[0-9]+:wrap=[0-9]+:clamp=[0-9]+:local_commands=[1-9]\d*:texture_view_sampler_status=[^\r\n]+")
+        self.assertRegex(completed.stdout, r"descriptor_semantics=loading:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):texture_descriptor_known=[0-9]+:sampler_descriptor_known=[0-9]+:linear=[0-9]+:point=[0-9]+:wrap=[0-9]+:clamp=[0-9]+:local_commands=[1-9]\d*:texture_view_sampler_status=[^\r\n]+")
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

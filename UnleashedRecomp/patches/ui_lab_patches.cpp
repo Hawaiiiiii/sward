@@ -18,6 +18,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -219,6 +220,38 @@ namespace UiLab
         bool depthEnabled = false;
         bool depthWriteEnabled = false;
         bool alphaToCoverageEnabled = false;
+    };
+
+    struct RuntimeTextureDescriptorSemantic
+    {
+        uint64_t frame = 0;
+        uint32_t descriptorIndex = 0;
+        std::string source;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        uint32_t depth = 0;
+        uint32_t format = 0;
+        uint32_t viewDimension = 0;
+        uint32_t layout = 0;
+    };
+
+    struct RuntimeSamplerDescriptorSemantic
+    {
+        uint64_t frame = 0;
+        uint32_t descriptorIndex = 0;
+        uint32_t minFilter = 0;
+        uint32_t magFilter = 0;
+        uint32_t mipMode = 0;
+        uint32_t addressU = 0;
+        uint32_t addressV = 0;
+        uint32_t addressW = 0;
+        float mipLodBias = 0.0f;
+        uint32_t maxAnisotropy = 0;
+        bool anisotropyEnabled = false;
+        bool comparisonEnabled = false;
+        uint32_t borderColor = 0;
+        float minLod = 0.0f;
+        float maxLod = 0.0f;
     };
 
     struct BackendMaterialParityHint
@@ -697,6 +730,8 @@ namespace UiLab
     static uint64_t g_runtimeBackendResolvedFrame = UINT64_MAX;
     static uint32_t g_runtimeBackendResolvedSequence = 0;
     static uint32_t g_runtimeBackendResolvedDroppedCount = 0;
+    static std::unordered_map<uint32_t, RuntimeTextureDescriptorSemantic> g_runtimeTextureDescriptorSemantics;
+    static std::unordered_map<uint32_t, RuntimeSamplerDescriptorSemantic> g_runtimeSamplerDescriptorSemantics;
     static PauseGeneralSaveLiveInspectorSnapshot g_pauseGeneralSaveInspector;
 
     static const RuntimeTarget& TargetFor(ScreenId id);
@@ -1522,6 +1557,7 @@ namespace UiLab
         R"("materialCorrelationOracle")",
         R"("backendResolvedSubmitOracle")",
         R"("backendMaterialParityHints")",
+        R"("backendDescriptorSemantics")",
         R"("uiDrawSequence")",
         R"("gpuSubmitSequence")",
         R"("correlationMethod": "same-frame-order-window")",
@@ -1529,6 +1565,12 @@ namespace UiLab
         R"("blendParityPolicy": "backend-resolved-pso-blend")",
         R"("framebufferParityPolicy": "backend-resolved-framebuffer-registration")",
         R"("textureViewSamplerGap": "pending-descriptor-view-decode")",
+        R"("textureViewSamplerStatus")",
+        R"("textureDescriptorSemantic")",
+        R"("samplerDescriptorSemantic")",
+        R"("textureDescriptorPolicy": "runtime-texture-view-descriptor-state")",
+        R"("samplerDescriptorPolicy": "runtime-sampler-descriptor-state")",
+        R"("vendorDescriptorCaptureGap": "pending-native-descriptor-dump")",
         R"("textMovieSfxGap": "pending-title-loading-media-timing")",
         R"("materialParityHint")",
         R"("materialParityStatus")",
@@ -2425,6 +2467,54 @@ namespace UiLab
         }
     }
 
+    static std::string RuntimeTextureViewDimensionName(uint32_t value)
+    {
+        switch (value)
+        {
+            case 1: return "texture-1d";
+            case 2: return "texture-2d";
+            case 3: return "texture-3d";
+            case 4: return "texture-cube";
+            default: return "texture-unknown";
+        }
+    }
+
+    static std::string RuntimeRenderFormatSemantic(uint32_t value)
+    {
+        std::ostringstream out;
+        out << "RenderFormat#" << value;
+        return out.str();
+    }
+
+    static std::string RuntimeTextureDescriptorSemanticName(const RuntimeTextureDescriptorSemantic& texture)
+    {
+        if (texture.descriptorIndex == 0 && texture.width == 0 && texture.height == 0)
+            return "texture-descriptor-unknown";
+
+        std::ostringstream out;
+        out << RuntimeTextureViewDimensionName(texture.viewDimension)
+            << "/" << RuntimeRenderFormatSemantic(texture.format)
+            << "/" << texture.width << "x" << texture.height;
+        return out.str();
+    }
+
+    static std::string RuntimeSamplerDescriptorSemanticName(const RuntimeSamplerDescriptorSemantic& sampler)
+    {
+        std::string family = "mixed";
+        if (sampler.minFilter == 2 && sampler.magFilter == 2)
+            family = "linear";
+        else if (sampler.minFilter == 1 && sampler.magFilter == 1)
+            family = "point";
+
+        return family + "(" +
+            RenderTextureFilterName(sampler.minFilter) + "," +
+            RenderTextureFilterName(sampler.magFilter) + "," +
+            RenderMipmapModeName(sampler.mipMode) + ")/" +
+            RenderTextureAddressName(sampler.addressU) + "/" +
+            RenderTextureAddressName(sampler.addressV) + "/" +
+            RenderTextureAddressName(sampler.addressW);
+    }
+
     static std::string RuntimeBlendSemantic(const RuntimeGpuSubmitCall& call)
     {
         if (!call.alphaBlendEnable)
@@ -2742,6 +2832,142 @@ namespace UiLab
             << "  },\n";
     }
 
+    static std::string RuntimeTextureViewSamplerStatus(
+        size_t materialPairCount,
+        uint32_t knownTextureCount,
+        uint32_t knownSamplerCount)
+    {
+        if (knownTextureCount > 0 || knownSamplerCount > 0)
+            return "runtime texture-view/sampler descriptor semantics active";
+        if (materialPairCount > 0)
+            return "runtime descriptor indices active; waiting for descriptor metadata";
+        return "runtime texture-view/sampler descriptor semantics armed; waiting for correlated submits";
+    }
+
+    static void BuildBackendDescriptorSemanticsJson(
+        std::ostringstream& out,
+        const std::vector<RuntimeMaterialCorrelation>& materialPairs,
+        const std::unordered_map<uint32_t, RuntimeTextureDescriptorSemantic>& textureDescriptors,
+        const std::unordered_map<uint32_t, RuntimeSamplerDescriptorSemantic>& samplerDescriptors)
+    {
+        uint32_t knownTextureCount = 0;
+        uint32_t knownSamplerCount = 0;
+        uint32_t linearSamplerCount = 0;
+        uint32_t pointSamplerCount = 0;
+        uint32_t wrapSamplerCount = 0;
+        uint32_t clampSamplerCount = 0;
+
+        for (const auto& pair : materialPairs)
+        {
+            if (textureDescriptors.find(pair.texture2DDescriptorIndex) != textureDescriptors.end())
+                ++knownTextureCount;
+
+            const auto samplerFound = samplerDescriptors.find(pair.samplerDescriptorIndex);
+            if (samplerFound == samplerDescriptors.end())
+                continue;
+
+            ++knownSamplerCount;
+            const auto& sampler = samplerFound->second;
+            if (sampler.minFilter == 2 || sampler.magFilter == 2)
+                ++linearSamplerCount;
+            if (sampler.minFilter == 1 && sampler.magFilter == 1)
+                ++pointSamplerCount;
+            if (sampler.addressU == 1 || sampler.addressV == 1 || sampler.addressW == 1)
+                ++wrapSamplerCount;
+            if (sampler.addressU == 3 || sampler.addressV == 3 || sampler.addressW == 3)
+                ++clampSamplerCount;
+        }
+
+        const std::string status = RuntimeTextureViewSamplerStatus(
+            materialPairs.size(),
+            knownTextureCount,
+            knownSamplerCount);
+
+        out
+            << "  \"textureViewSamplerStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "  \"backendDescriptorSemantics\": {\n"
+            << "    \"source\": \"runtime texture-view/sampler descriptor semantics\",\n"
+            << "    \"textureViewSamplerStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "    \"textureDescriptorPolicy\": \"runtime-texture-view-descriptor-state\",\n"
+            << "    \"samplerDescriptorPolicy\": \"runtime-sampler-descriptor-state\",\n"
+            << "    \"vendorDescriptorCaptureGap\": \"pending-native-descriptor-dump\",\n"
+            << "    \"materialPairCount\": " << materialPairs.size() << ",\n"
+            << "    \"textureDescriptorKnownCount\": " << knownTextureCount << ",\n"
+            << "    \"samplerDescriptorKnownCount\": " << knownSamplerCount << ",\n"
+            << "    \"linearSamplerDescriptorCount\": " << linearSamplerCount << ",\n"
+            << "    \"pointSamplerDescriptorCount\": " << pointSamplerCount << ",\n"
+            << "    \"wrapSamplerDescriptorCount\": " << wrapSamplerCount << ",\n"
+            << "    \"clampSamplerDescriptorCount\": " << clampSamplerCount << ",\n"
+            << "    \"descriptorPairs\": [";
+
+        const size_t pairLimit = std::min<size_t>(materialPairs.size(), 48);
+        for (size_t i = 0; i < pairLimit; ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            const auto& pair = materialPairs[i];
+            const auto textureFound = textureDescriptors.find(pair.texture2DDescriptorIndex);
+            const auto samplerFound = samplerDescriptors.find(pair.samplerDescriptorIndex);
+            const bool textureKnown = textureFound != textureDescriptors.end();
+            const bool samplerKnown = samplerFound != samplerDescriptors.end();
+
+            out
+                << "{"
+                << "\"uiDrawSequence\":" << pair.uiDrawSequence
+                << ",\"gpuSubmitSequence\":" << pair.gpuSubmitSequence
+                << ",\"texture2DDescriptorIndex\":" << pair.texture2DDescriptorIndex
+                << ",\"samplerDescriptorIndex\":" << pair.samplerDescriptorIndex
+                << ",\"textureDescriptorKnown\":" << (textureKnown ? "true" : "false")
+                << ",\"samplerDescriptorKnown\":" << (samplerKnown ? "true" : "false")
+                << ",\"textureDescriptorSemantic\":\""
+                << JsonEscape(textureKnown ? RuntimeTextureDescriptorSemanticName(textureFound->second) : "missing")
+                << "\""
+                << ",\"samplerDescriptorSemantic\":\""
+                << JsonEscape(samplerKnown ? RuntimeSamplerDescriptorSemanticName(samplerFound->second) : pair.samplerSemantic)
+                << "\"";
+
+            if (textureKnown)
+            {
+                const auto& texture = textureFound->second;
+                out
+                    << ",\"textureDescriptor\":{"
+                    << "\"source\":\"" << JsonEscape(texture.source) << "\""
+                    << ",\"width\":" << texture.width
+                    << ",\"height\":" << texture.height
+                    << ",\"depth\":" << texture.depth
+                    << ",\"format\":" << texture.format
+                    << ",\"viewDimension\":" << texture.viewDimension
+                    << ",\"layout\":" << texture.layout
+                    << "}";
+            }
+
+            if (samplerKnown)
+            {
+                const auto& sampler = samplerFound->second;
+                out
+                    << ",\"samplerDescriptor\":{"
+                    << "\"minFilter\":" << sampler.minFilter
+                    << ",\"magFilter\":" << sampler.magFilter
+                    << ",\"mipMode\":" << sampler.mipMode
+                    << ",\"addressU\":" << sampler.addressU
+                    << ",\"addressV\":" << sampler.addressV
+                    << ",\"addressW\":" << sampler.addressW
+                    << ",\"anisotropyEnabled\":" << (sampler.anisotropyEnabled ? "true" : "false")
+                    << ",\"maxAnisotropy\":" << sampler.maxAnisotropy
+                    << ",\"comparisonEnabled\":" << (sampler.comparisonEnabled ? "true" : "false")
+                    << ",\"borderColor\":" << sampler.borderColor
+                    << "}";
+            }
+
+            out << "}";
+        }
+
+        out
+            << "]\n"
+            << "  },\n";
+    }
+
     static void AppendRuntimeBackendResolvedSubmits(
         std::ostringstream& out,
         const std::vector<RuntimeBackendResolvedSubmit>& submits)
@@ -2861,6 +3087,8 @@ namespace UiLab
         std::vector<RuntimeBackendResolvedSubmit> submits;
         std::vector<RuntimeUiDrawCall> drawCalls;
         std::vector<RuntimeGpuSubmitCall> gpuSubmitCalls;
+        std::unordered_map<uint32_t, RuntimeTextureDescriptorSemantic> textureDescriptors;
+        std::unordered_map<uint32_t, RuntimeSamplerDescriptorSemantic> samplerDescriptors;
         uint64_t frame = g_presentedFrameCount;
         uint32_t droppedCount = 0;
         uint32_t sequence = 0;
@@ -2869,6 +3097,8 @@ namespace UiLab
             submits = g_runtimeBackendResolvedSubmits;
             drawCalls = g_runtimeUiDrawCalls;
             gpuSubmitCalls = g_runtimeGpuSubmitCalls;
+            textureDescriptors = g_runtimeTextureDescriptorSemantics;
+            samplerDescriptors = g_runtimeSamplerDescriptorSemantics;
             if (g_runtimeBackendResolvedFrame != UINT64_MAX)
                 frame = g_runtimeBackendResolvedFrame;
             else if (g_runtimeGpuSubmitFrame != UINT64_MAX)
@@ -2945,6 +3175,11 @@ namespace UiLab
             opaqueCount,
             customBlendCount,
             framebufferRegisteredCount);
+        BuildBackendDescriptorSemanticsJson(
+            out,
+            materialPairs,
+            textureDescriptors,
+            samplerDescriptors);
         out
             << "  \"backendResolvedJoinMethod\": \"same-frame-order-window\",\n"
             << "  \"sampleLimit\": " << kRuntimeBackendResolvedSubmitSampleLimit << ",\n"
@@ -5116,6 +5351,74 @@ namespace UiLab
         call.halfPixelOffsetY = halfPixelOffsetY;
 
         g_runtimeGpuSubmitCalls.push_back(std::move(call));
+    }
+
+    void OnBackendTextureDescriptorResolved(
+        uint32_t descriptorIndex,
+        std::string_view source,
+        uint32_t width,
+        uint32_t height,
+        uint32_t depth,
+        uint32_t format,
+        uint32_t viewDimension,
+        uint32_t layout)
+    {
+        if (!g_isEnabled)
+            return;
+
+        RuntimeTextureDescriptorSemantic descriptor;
+        descriptor.frame = g_presentedFrameCount;
+        descriptor.descriptorIndex = descriptorIndex;
+        descriptor.source = source.empty() ? std::string("unknown") : std::string(source);
+        descriptor.width = width;
+        descriptor.height = height;
+        descriptor.depth = depth;
+        descriptor.format = format;
+        descriptor.viewDimension = viewDimension;
+        descriptor.layout = layout;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        g_runtimeTextureDescriptorSemantics[descriptorIndex] = std::move(descriptor);
+    }
+
+    void OnBackendSamplerDescriptorResolved(
+        uint32_t descriptorIndex,
+        uint32_t minFilter,
+        uint32_t magFilter,
+        uint32_t mipMode,
+        uint32_t addressU,
+        uint32_t addressV,
+        uint32_t addressW,
+        float mipLodBias,
+        uint32_t maxAnisotropy,
+        bool anisotropyEnabled,
+        bool comparisonEnabled,
+        uint32_t borderColor,
+        float minLod,
+        float maxLod)
+    {
+        if (!g_isEnabled)
+            return;
+
+        RuntimeSamplerDescriptorSemantic descriptor;
+        descriptor.frame = g_presentedFrameCount;
+        descriptor.descriptorIndex = descriptorIndex;
+        descriptor.minFilter = minFilter;
+        descriptor.magFilter = magFilter;
+        descriptor.mipMode = mipMode;
+        descriptor.addressU = addressU;
+        descriptor.addressV = addressV;
+        descriptor.addressW = addressW;
+        descriptor.mipLodBias = mipLodBias;
+        descriptor.maxAnisotropy = maxAnisotropy;
+        descriptor.anisotropyEnabled = anisotropyEnabled;
+        descriptor.comparisonEnabled = comparisonEnabled;
+        descriptor.borderColor = borderColor;
+        descriptor.minLod = minLod;
+        descriptor.maxLod = maxLod;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        g_runtimeSamplerDescriptorSemantics[descriptorIndex] = descriptor;
     }
 
     void OnRawBackendCommand(

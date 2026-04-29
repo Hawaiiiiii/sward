@@ -3961,6 +3961,19 @@ static void SetTextureInRenderThread(uint32_t index, GuestTexture* texture)
     SetDirtyValue(g_dirtyStates.sharedConstants, g_sharedConstants.texture2DIndices[index],
         viewDimension == RenderTextureViewDimension::TEXTURE_2D ? texture->descriptorIndex : TEXTURE_DESCRIPTOR_NULL_TEXTURE_2D);
 
+    if (UiLab::IsEnabled() && texture != nullptr && viewDimension == RenderTextureViewDimension::TEXTURE_2D)
+    {
+        UiLab::OnBackendTextureDescriptorResolved(
+            texture->descriptorIndex,
+            "GuestTexture",
+            texture->width,
+            texture->height,
+            texture->depth,
+            static_cast<uint32_t>(texture->format),
+            static_cast<uint32_t>(texture->viewDimension),
+            static_cast<uint32_t>(RenderTextureLayout::SHADER_READ));
+    }
+
     SetDirtyValue(g_dirtyStates.sharedConstants, g_sharedConstants.texture3DIndices[index], texture != nullptr &&
         viewDimension == RenderTextureViewDimension::TEXTURE_3D ? texture->descriptorIndex : TEXTURE_DESCRIPTOR_NULL_TEXTURE_3D);
 
@@ -3981,6 +3994,18 @@ static void SetSurface(uint32_t index, GuestSurface* surface)
     AddBarrier(surface, RenderTextureLayout::SHADER_READ);
 
     SetDirtyValue(g_dirtyStates.sharedConstants, g_sharedConstants.texture2DIndices[index], surface->descriptorIndex);
+    if (UiLab::IsEnabled() && surface != nullptr)
+    {
+        UiLab::OnBackendTextureDescriptorResolved(
+            surface->descriptorIndex,
+            "GuestSurface",
+            surface->width,
+            surface->height,
+            1,
+            static_cast<uint32_t>(surface->format),
+            static_cast<uint32_t>(RenderTextureViewDimension::TEXTURE_2D),
+            static_cast<uint32_t>(RenderTextureLayout::SHADER_READ));
+    }
     SetDirtyValue(g_dirtyStates.sharedConstants, g_sharedConstants.texture3DIndices[index], uint32_t(TEXTURE_DESCRIPTOR_NULL_TEXTURE_3D));
     SetDirtyValue(g_dirtyStates.sharedConstants, g_sharedConstants.textureCubeIndices[index], uint32_t(TEXTURE_DESCRIPTOR_NULL_TEXTURE_CUBE));
 }
@@ -4778,6 +4803,22 @@ static void RecordUiLabBackendMaterialSubmit(
     const auto& samplerDesc = g_samplerDescs[0];
     const bool alphaTestEnable =
         (g_pipelineState.specConstants & (SPEC_CONSTANT_ALPHA_TEST | SPEC_CONSTANT_ALPHA_TO_COVERAGE)) != 0;
+
+    UiLab::OnBackendSamplerDescriptorResolved(
+        g_sharedConstants.samplerIndices[0],
+        static_cast<uint32_t>(samplerDesc.minFilter),
+        static_cast<uint32_t>(samplerDesc.magFilter),
+        static_cast<uint32_t>(samplerDesc.mipmapMode),
+        static_cast<uint32_t>(samplerDesc.addressU),
+        static_cast<uint32_t>(samplerDesc.addressV),
+        static_cast<uint32_t>(samplerDesc.addressW),
+        samplerDesc.mipLODBias,
+        samplerDesc.maxAnisotropy,
+        samplerDesc.anisotropyEnabled,
+        samplerDesc.comparisonEnabled,
+        static_cast<uint32_t>(samplerDesc.borderColor),
+        samplerDesc.minLOD,
+        samplerDesc.maxLOD);
 
     UiLab::OnBackendMaterialSubmit(
         source,

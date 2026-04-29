@@ -197,6 +197,30 @@ namespace UiLab
         uint32_t samplerAddressW,
         float halfPixelOffsetX,
         float halfPixelOffsetY);
+    void OnBackendTextureDescriptorResolved(
+        uint32_t descriptorIndex,
+        std::string_view source,
+        uint32_t width,
+        uint32_t height,
+        uint32_t depth,
+        uint32_t format,
+        uint32_t viewDimension,
+        uint32_t layout);
+    void OnBackendSamplerDescriptorResolved(
+        uint32_t descriptorIndex,
+        uint32_t minFilter,
+        uint32_t magFilter,
+        uint32_t mipMode,
+        uint32_t addressU,
+        uint32_t addressV,
+        uint32_t addressW,
+        float mipLodBias,
+        uint32_t maxAnisotropy,
+        bool anisotropyEnabled,
+        bool comparisonEnabled,
+        uint32_t borderColor,
+        float minLod,
+        float maxLod);
     void OnRawBackendCommand(
         std::string_view backend,
         std::string_view command,
