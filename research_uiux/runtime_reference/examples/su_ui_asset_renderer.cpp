@@ -427,10 +427,12 @@ struct FrontendBackendResolvedSubmit
 {
     std::string backend;
     std::string nativeCommand;
+    std::string materialParityHint = "missing";
     bool indexed = false;
     bool resolvedPipelineKnown = false;
     bool activeFramebufferKnown = false;
     bool blendEnabled = false;
+    bool framebufferRegistered = false;
     int vertexCount = 0;
     int indexCount = 0;
     int instanceCount = 0;
@@ -447,6 +449,11 @@ struct FrontendBackendResolvedEvidence
     std::string source = "missing";
     std::string probe = "missing";
     std::string resolvedBackendStatus = "missing";
+    std::string materialParityStatus = "missing";
+    std::string blendParityPolicy = "missing";
+    std::string framebufferParityPolicy = "missing";
+    std::string textureViewSamplerGap = "pending";
+    std::string textMovieSfxGap = "pending";
     int runtimeFrame = 0;
     std::size_t materialPairCount = 0;
     std::vector<FrontendBackendResolvedSubmit> submits;
@@ -468,6 +475,23 @@ struct FrontendBackendResolvedTriage
     std::size_t renderTargetFormatKnownCount = 0;
     std::size_t framebufferKnownCount = 0;
     std::size_t materialPairCount = 0;
+    std::size_t localCommandCount = 0;
+};
+
+struct FrontendBackendMaterialParityTriage
+{
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string materialParityPolicy = "backend-resolved-pso-blend-framebuffer";
+    std::string textureViewSamplerGap = "pending";
+    std::string textMovieSfxGap = "pending";
+    std::string materialParityStatus = "missing";
+    std::size_t backendResolvedSubmitCount = 0;
+    std::size_t sourceOverSubmitCount = 0;
+    std::size_t additiveSubmitCount = 0;
+    std::size_t opaqueSubmitCount = 0;
+    std::size_t framebufferRegisteredSubmitCount = 0;
     std::size_t localCommandCount = 0;
 };
 
@@ -6610,6 +6634,142 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return records.empty() ? 1 : 0;
 }
 
+[[nodiscard]] FrontendBackendMaterialParityTriage buildFrontendBackendMaterialParityTriage(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendBackendMaterialParityTriage triage;
+    triage.screenId = policy.screenId;
+
+    const auto resolved = loadFrontendBackendResolvedEvidence(policy);
+    triage.source = resolved.source;
+    triage.probe = resolved.probe;
+    triage.materialParityStatus = resolved.materialParityStatus;
+    triage.textureViewSamplerGap = resolved.textureViewSamplerGap == "pending-descriptor-view-decode"
+        ? "pending"
+        : resolved.textureViewSamplerGap;
+    triage.textMovieSfxGap = resolved.textMovieSfxGap == "pending-title-loading-media-timing"
+        ? "pending"
+        : resolved.textMovieSfxGap;
+    triage.backendResolvedSubmitCount = resolved.submits.size();
+    triage.sourceOverSubmitCount = static_cast<std::size_t>(std::count_if(
+        resolved.submits.begin(),
+        resolved.submits.end(),
+        [](const FrontendBackendResolvedSubmit& submit)
+        {
+            return submit.materialParityHint == "source-over-alpha";
+        }));
+    triage.additiveSubmitCount = static_cast<std::size_t>(std::count_if(
+        resolved.submits.begin(),
+        resolved.submits.end(),
+        [](const FrontendBackendResolvedSubmit& submit)
+        {
+            return submit.materialParityHint == "additive-alpha";
+        }));
+    triage.opaqueSubmitCount = static_cast<std::size_t>(std::count_if(
+        resolved.submits.begin(),
+        resolved.submits.end(),
+        [](const FrontendBackendResolvedSubmit& submit)
+        {
+            return submit.materialParityHint == "opaque-no-blend";
+        }));
+    triage.framebufferRegisteredSubmitCount = static_cast<std::size_t>(std::count_if(
+        resolved.submits.begin(),
+        resolved.submits.end(),
+        [](const FrontendBackendResolvedSubmit& submit)
+        {
+            return submit.framebufferRegistered;
+        }));
+
+    const auto clock = loadFrontendUiOraclePlaybackClock(policy);
+    for (const auto& scenePolicy : policy.scenes)
+    {
+        const int sceneFrame = uiOracleTimelineFrameForScene(clock, scenePolicy);
+        const CsdPipelineTemplateBinding sceneBinding{
+            policy.screenId,
+            policy.layoutName,
+            scenePolicy.sceneName,
+            scenePolicy.sceneName,
+            scenePolicy.timeline.animationName,
+        };
+
+        const auto* drawableScene = cachedCsdDrawableScene(sceneBinding);
+        if (!drawableScene)
+            continue;
+
+        auto playback = loadCsdTimelinePlayback(sceneBinding, sceneFrame);
+        if (!playback)
+            playback = loadTimelinePlaybackForScene(policy.screenId, policy.layoutName, scenePolicy.sceneName, sceneFrame);
+
+        std::size_t sampledTrackCount = 0;
+        const auto commands = timelineSampledCommands(
+            *drawableScene,
+            playback ? &*playback : nullptr,
+            sampledTrackCount);
+        triage.localCommandCount += static_cast<std::size_t>(std::count_if(
+            commands.begin(),
+            commands.end(),
+            csdCommandIsDrawable));
+    }
+
+    return triage;
+}
+
+[[nodiscard]] int runRendererMaterialParityHintsSmoke()
+{
+    constexpr std::string_view directProbeToken = "material_parity_probe=direct-ui-backend-resolved";
+    constexpr std::string_view materialFallbackToken = "material_parity_probe=material-correlation-fallback";
+    constexpr std::string_view missingProbeToken = "material_parity_probe=missing";
+    constexpr std::string_view policyToken = "material_parity_policy=backend-resolved-pso-blend-framebuffer";
+    constexpr std::string_view textureGapToken = "texture_view_sampler_gap=pending";
+    constexpr std::string_view textMovieSfxGapToken = "text_movie_sfx_gap=pending";
+
+    std::vector<FrontendBackendMaterialParityTriage> records;
+    for (const auto& policy : frontendScreenPolicies())
+        records.push_back(buildFrontendBackendMaterialParityTriage(policy));
+
+    const bool anyDirect = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendBackendMaterialParityTriage& record)
+        {
+            return record.probe == "direct-ui-backend-resolved";
+        });
+    const bool anyFallback = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendBackendMaterialParityTriage& record)
+        {
+            return record.probe == "material-correlation-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer material parity hints smoke ok "
+        << "mode=phase153-backend-material-parity-hints"
+        << " " << (anyDirect ? directProbeToken : (anyFallback ? materialFallbackToken : missingProbeToken))
+        << " " << policyToken
+        << " " << textureGapToken
+        << " " << textMovieSfxGapToken
+        << " lanes=" << records.size()
+        << '\n';
+
+    for (const auto& record : records)
+    {
+        std::cout
+            << "material_parity=" << record.screenId
+            << ":source=" << record.source
+            << ":backend_resolved_submits=" << record.backendResolvedSubmitCount
+            << ":source_over=" << record.sourceOverSubmitCount
+            << ":additive=" << record.additiveSubmitCount
+            << ":opaque=" << record.opaqueSubmitCount
+            << ":framebuffer_registered=" << record.framebufferRegisteredSubmitCount
+            << ":local_commands=" << record.localCommandCount
+            << ":material_parity_status=" << record.materialParityStatus
+            << '\n';
+    }
+
+    return records.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -9402,9 +9562,11 @@ void applyFrontendMaterialCorrelationFromJson(
     FrontendBackendResolvedSubmit submit;
     submit.backend = jsonStringField(objectSpan, "backend").value_or("");
     submit.nativeCommand = jsonStringField(objectSpan, "nativeCommand").value_or("");
+    submit.materialParityHint = jsonStringField(objectSpan, "materialParityHint").value_or("missing");
     submit.indexed = jsonBoolField(objectSpan, "indexed").value_or(false);
     submit.resolvedPipelineKnown = jsonBoolField(objectSpan, "resolvedPipelineKnown").value_or(false);
     submit.activeFramebufferKnown = jsonBoolField(objectSpan, "activeFramebufferKnown").value_or(false);
+    submit.framebufferRegistered = jsonBoolField(objectSpan, "framebufferRegistered").value_or(false);
     submit.vertexCount = static_cast<int>(jsonNumberField(objectSpan, "vertexCount").value_or(0.0));
     submit.indexCount = static_cast<int>(jsonNumberField(objectSpan, "indexCount").value_or(0.0));
     submit.instanceCount = static_cast<int>(jsonNumberField(objectSpan, "instanceCount").value_or(0.0));
@@ -9430,12 +9592,21 @@ void applyFrontendBackendResolvedFromJson(
     evidence.probe = std::string(probe);
     evidence.runtimeFrame = static_cast<int>(jsonNumberField(text, "frame").value_or(0.0));
     evidence.resolvedBackendStatus = jsonStringField(text, "resolvedBackendStatus").value_or("missing");
+    evidence.materialParityStatus = jsonStringField(text, "materialParityStatus").value_or("missing");
     evidence.materialPairCount = static_cast<std::size_t>(jsonNumberField(text, "materialPairCount").value_or(0.0));
 
     const auto oracle = jsonObjectFieldSpan(text, "backendResolvedSubmitOracle");
     const std::string_view oracleSpan = oracle ? *oracle : text;
+    const auto parityHints = jsonObjectFieldSpan(text, "backendMaterialParityHints");
+    const std::string_view paritySpan = parityHints ? *parityHints : text;
     if (evidence.resolvedBackendStatus == "missing")
         evidence.resolvedBackendStatus = jsonStringField(oracleSpan, "resolvedBackendStatus").value_or("missing");
+    if (evidence.materialParityStatus == "missing")
+        evidence.materialParityStatus = jsonStringField(paritySpan, "materialParityStatus").value_or("missing");
+    evidence.blendParityPolicy = jsonStringField(paritySpan, "blendParityPolicy").value_or("missing");
+    evidence.framebufferParityPolicy = jsonStringField(paritySpan, "framebufferParityPolicy").value_or("missing");
+    evidence.textureViewSamplerGap = jsonStringField(paritySpan, "textureViewSamplerGap").value_or("pending");
+    evidence.textMovieSfxGap = jsonStringField(paritySpan, "textMovieSfxGap").value_or("pending");
     if (evidence.materialPairCount == 0)
         evidence.materialPairCount = static_cast<std::size_t>(jsonNumberField(oracleSpan, "materialPairCount").value_or(0.0));
 
@@ -9478,6 +9649,7 @@ void applyFrontendBackendResolvedFromJson(
     fallback.source = material.found ? "ui_lab_live_bridge_material_correlation" : "missing";
     fallback.probe = material.found ? "material-correlation-fallback" : "missing";
     fallback.resolvedBackendStatus = material.resolvedBackendStatus;
+    fallback.materialParityStatus = material.found ? "material correlation fallback; backend material parity hints unavailable" : "missing";
     fallback.materialPairCount = material.pairs.size();
     fallback.bridgeProbe = backendProbe;
     return fallback;
@@ -11258,6 +11430,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererMaterialCorrelationSmoke();
     if (commandLineHasFlag("--renderer-backend-resolved-triage-smoke"))
         return runRendererBackendResolvedTriageSmoke();
+    if (commandLineHasFlag("--renderer-material-parity-hints-smoke"))
+        return runRendererMaterialParityHintsSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 

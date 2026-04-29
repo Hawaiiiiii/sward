@@ -933,6 +933,17 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("material_correlation_backend_resolved=joined", source_text)
         self.assertIn("resolved_pso_blend_framebuffer=runtime-backend", source_text)
 
+    def test_renderer_source_wires_phase153_backend_material_parity_hints(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendBackendMaterialParityTriage", source_text)
+        self.assertIn("buildFrontendBackendMaterialParityTriage", source_text)
+        self.assertIn("runRendererMaterialParityHintsSmoke", source_text)
+        self.assertIn("--renderer-material-parity-hints-smoke", source_text)
+        self.assertIn("phase153-backend-material-parity-hints", source_text)
+        self.assertIn("material_parity_policy=backend-resolved-pso-blend-framebuffer", source_text)
+        self.assertIn("texture_view_sampler_gap=pending", source_text)
+        self.assertIn("text_movie_sfx_gap=pending", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -1197,6 +1208,29 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("resolved_pso_blend_framebuffer=runtime-backend", completed.stdout)
         self.assertRegex(completed.stdout, r"backend_resolved=title-menu:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):backend_resolved_submits=[0-9]+:resolved_pipeline_submits=[0-9]+:blend_enabled_submits=[0-9]+:rt0_format_known=[0-9]+:framebuffer_known=[0-9]+:material_pairs=[0-9]+:local_commands=[1-9]\d*:resolved_backend_status=[^\r\n]+")
         self.assertRegex(completed.stdout, r"backend_resolved=loading:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):backend_resolved_submits=[0-9]+:resolved_pipeline_submits=[0-9]+:blend_enabled_submits=[0-9]+:rt0_format_known=[0-9]+:framebuffer_known=[0-9]+:material_pairs=[0-9]+:local_commands=[1-9]\d*:resolved_backend_status=[^\r\n]+")
+
+    def test_renderer_material_parity_hints_smoke_reports_backend_policy(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-material-parity-hints-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer material parity hints smoke ok", completed.stdout)
+        self.assertIn("mode=phase153-backend-material-parity-hints", completed.stdout)
+        self.assertRegex(completed.stdout, r"material_parity_probe=(direct-ui-backend-resolved|material-correlation-fallback|missing)")
+        self.assertIn("material_parity_policy=backend-resolved-pso-blend-framebuffer", completed.stdout)
+        self.assertIn("texture_view_sampler_gap=pending", completed.stdout)
+        self.assertIn("text_movie_sfx_gap=pending", completed.stdout)
+        self.assertRegex(completed.stdout, r"material_parity=title-menu:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):backend_resolved_submits=[0-9]+:source_over=[0-9]+:additive=[0-9]+:opaque=[0-9]+:framebuffer_registered=[0-9]+:local_commands=[1-9]\d*:material_parity_status=[^\r\n]+")
+        self.assertRegex(completed.stdout, r"material_parity=loading:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):backend_resolved_submits=[0-9]+:source_over=[0-9]+:additive=[0-9]+:opaque=[0-9]+:framebuffer_registered=[0-9]+:local_commands=[1-9]\d*:material_parity_status=[^\r\n]+")
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

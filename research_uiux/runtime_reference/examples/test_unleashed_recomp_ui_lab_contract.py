@@ -898,6 +898,43 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("backend-resolved D3D12/Vulkan submit details", harvest)
         self.assertIn("resolved PSO/blend/framebuffer state", harvest)
 
+    def test_ui_lab_phase153_exposes_backend_material_parity_hints(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        renderer = self.read("research_uiux/runtime_reference/examples/su_ui_asset_renderer.cpp")
+        tests = self.read("research_uiux/runtime_reference/examples/test_su_ui_asset_renderer.py")
+        harvest = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "BackendMaterialParityHint",
+            "BuildBackendMaterialParityHintsJson",
+            "RuntimeBackendMaterialParityHint",
+            '"backendMaterialParityHints"',
+            '"materialParityHint"',
+            '"blendParityPolicy": "backend-resolved-pso-blend"',
+            '"framebufferParityPolicy": "backend-resolved-framebuffer-registration"',
+            '"textureViewSamplerGap": "pending-descriptor-view-decode"',
+            '"textMovieSfxGap": "pending-title-loading-media-timing"',
+            '"materialParityStatus"',
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "FrontendBackendMaterialParityTriage",
+            "buildFrontendBackendMaterialParityTriage",
+            "runRendererMaterialParityHintsSmoke",
+            "--renderer-material-parity-hints-smoke",
+            "phase153-backend-material-parity-hints",
+            "material_parity_policy=backend-resolved-pso-blend-framebuffer",
+            "texture_view_sampler_gap=pending",
+            "text_movie_sfx_gap=pending",
+        ]:
+            self.assertIn(token, renderer)
+
+        self.assertIn("test_renderer_material_parity_hints_smoke_reports_backend_policy", tests)
+        self.assertIn("Phase 153", harvest)
+        self.assertIn("backend-resolved PSO/blend/framebuffer material parity hints", harvest)
+        self.assertIn("texture-view/sampler descriptor internals remain pending", harvest)
+
     def test_ui_lab_has_repo_safe_live_bridge_client_tool(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1"
         self.assertTrue(script_path.is_file())

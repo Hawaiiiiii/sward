@@ -221,6 +221,16 @@ namespace UiLab
         bool alphaToCoverageEnabled = false;
     };
 
+    struct BackendMaterialParityHint
+    {
+        std::string materialParityHint = "missing";
+        bool sourceOverAlpha = false;
+        bool additiveAlpha = false;
+        bool opaqueNoBlend = false;
+        bool customBlend = false;
+        bool framebufferRegistered = false;
+    };
+
     struct RuntimeMaterialCorrelation
     {
         uint64_t frame = 0;
@@ -1511,10 +1521,17 @@ namespace UiLab
         R"("gpuSubmitOracle")",
         R"("materialCorrelationOracle")",
         R"("backendResolvedSubmitOracle")",
+        R"("backendMaterialParityHints")",
         R"("uiDrawSequence")",
         R"("gpuSubmitSequence")",
         R"("correlationMethod": "same-frame-order-window")",
         R"("backendResolvedJoinMethod": "same-frame-order-window")",
+        R"("blendParityPolicy": "backend-resolved-pso-blend")",
+        R"("framebufferParityPolicy": "backend-resolved-framebuffer-registration")",
+        R"("textureViewSamplerGap": "pending-descriptor-view-decode")",
+        R"("textMovieSfxGap": "pending-title-loading-media-timing")",
+        R"("materialParityHint")",
+        R"("materialParityStatus")",
         R"("blendSemantic")",
         R"("blendOperationSemantic")",
         R"("samplerSemantic")",
@@ -2645,6 +2662,86 @@ namespace UiLab
         return call;
     }
 
+    static BackendMaterialParityHint RuntimeBackendMaterialParityHint(const RuntimeBackendResolvedSubmit& submit)
+    {
+        BackendMaterialParityHint hint;
+        const RuntimeGpuSubmitCall semantic = BackendResolvedAsGpuSubmitSemantic(submit);
+
+        hint.framebufferRegistered =
+            submit.activeFramebufferKnown &&
+            submit.framebufferWidth != 0 &&
+            submit.framebufferHeight != 0 &&
+            submit.renderTargetFormat0 != 0;
+
+        if (!submit.resolvedPipelineKnown)
+        {
+            hint.materialParityHint = "unresolved-pso";
+            return hint;
+        }
+
+        if (!submit.blendEnabled)
+        {
+            hint.materialParityHint = "opaque-no-blend";
+            hint.opaqueNoBlend = true;
+            return hint;
+        }
+
+        if (RuntimeBlendIsAdditive(semantic))
+        {
+            hint.materialParityHint = "additive-alpha";
+            hint.additiveAlpha = true;
+            return hint;
+        }
+
+        if (submit.srcBlend == 5 && submit.destBlend == 6 && submit.blendOp == 1)
+        {
+            hint.materialParityHint = "source-over-alpha";
+            hint.sourceOverAlpha = true;
+            return hint;
+        }
+
+        hint.materialParityHint = "custom-blend";
+        hint.customBlend = true;
+        return hint;
+    }
+
+    static std::string RuntimeBackendMaterialParityStatus(uint32_t capturedSubmits)
+    {
+        return capturedSubmits > 0
+            ? "backend-resolved PSO/blend/framebuffer material parity hints active"
+            : "backend-resolved material parity hints armed; waiting for D3D12/Vulkan draws";
+    }
+
+    static void BuildBackendMaterialParityHintsJson(
+        std::ostringstream& out,
+        const std::vector<RuntimeBackendResolvedSubmit>& submits,
+        uint32_t sourceOverCount,
+        uint32_t additiveCount,
+        uint32_t opaqueCount,
+        uint32_t customBlendCount,
+        uint32_t framebufferRegisteredCount)
+    {
+        const std::string status = RuntimeBackendMaterialParityStatus(static_cast<uint32_t>(submits.size()));
+        out
+            << "  \"materialParityStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "  \"backendMaterialParityHints\": {\n"
+            << "    \"source\": \"backend-resolved PSO/blend/framebuffer material parity hints\",\n"
+            << "    \"materialParityStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "    \"blendParityPolicy\": \"backend-resolved-pso-blend\",\n"
+            << "    \"framebufferParityPolicy\": \"backend-resolved-framebuffer-registration\",\n"
+            << "    \"alphaParityPolicy\": \"runtime-pso-blend-factors\",\n"
+            << "    \"premultipliedAlphaPolicy\": \"defer-to-runtime-blend-factors\",\n"
+            << "    \"gammaSrgbPolicy\": \"pending-texture-view-decode\",\n"
+            << "    \"textureViewSamplerGap\": \"pending-descriptor-view-decode\",\n"
+            << "    \"textMovieSfxGap\": \"pending-title-loading-media-timing\",\n"
+            << "    \"sourceOverSubmitCount\": " << sourceOverCount << ",\n"
+            << "    \"additiveSubmitCount\": " << additiveCount << ",\n"
+            << "    \"opaqueSubmitCount\": " << opaqueCount << ",\n"
+            << "    \"customBlendSubmitCount\": " << customBlendCount << ",\n"
+            << "    \"framebufferRegisteredSubmitCount\": " << framebufferRegisteredCount << "\n"
+            << "  },\n";
+    }
+
     static void AppendRuntimeBackendResolvedSubmits(
         std::ostringstream& out,
         const std::vector<RuntimeBackendResolvedSubmit>& submits)
@@ -2657,6 +2754,7 @@ namespace UiLab
 
             const auto& submit = submits[i];
             const RuntimeGpuSubmitCall semantic = BackendResolvedAsGpuSubmitSemantic(submit);
+            const BackendMaterialParityHint parityHint = RuntimeBackendMaterialParityHint(submit);
             out
                 << "{"
                 << "\"sequence\":" << submit.sequence
@@ -2694,6 +2792,8 @@ namespace UiLab
                 << ",\"additiveBlend\":" << (RuntimeBlendIsAdditive(semantic) ? "true" : "false")
                 << ",\"colorWriteSemantic\":\"" << JsonEscape(RuntimeColorWriteSemantic(semantic)) << "\""
                 << "}"
+                << ",\"materialParityHint\":\"" << JsonEscape(parityHint.materialParityHint) << "\""
+                << ",\"framebufferRegistered\":" << (parityHint.framebufferRegistered ? "true" : "false")
                 << ",\"depthState\":{"
                 << "\"depthEnabled\":" << (submit.depthEnabled ? "true" : "false")
                 << ",\"depthWriteEnabled\":" << (submit.depthWriteEnabled ? "true" : "false")
@@ -2782,6 +2882,11 @@ namespace UiLab
         uint32_t rt0KnownCount = 0;
         uint32_t framebufferKnownCount = 0;
         uint32_t indexedCount = 0;
+        uint32_t sourceOverCount = 0;
+        uint32_t additiveCount = 0;
+        uint32_t opaqueCount = 0;
+        uint32_t customBlendCount = 0;
+        uint32_t framebufferRegisteredCount = 0;
         for (const auto& submit : submits)
         {
             if (submit.resolvedPipelineKnown)
@@ -2794,6 +2899,18 @@ namespace UiLab
                 ++framebufferKnownCount;
             if (submit.indexed)
                 ++indexedCount;
+
+            const BackendMaterialParityHint hint = RuntimeBackendMaterialParityHint(submit);
+            if (hint.sourceOverAlpha)
+                ++sourceOverCount;
+            if (hint.additiveAlpha)
+                ++additiveCount;
+            if (hint.opaqueNoBlend)
+                ++opaqueCount;
+            if (hint.customBlend)
+                ++customBlendCount;
+            if (hint.framebufferRegistered)
+                ++framebufferRegisteredCount;
         }
 
         const auto materialPairs = BuildRuntimeMaterialCorrelationPairs(drawCalls, gpuSubmitCalls);
@@ -2819,7 +2936,16 @@ namespace UiLab
             << "  \"renderTargetFormat0KnownCount\": " << rt0KnownCount << ",\n"
             << "  \"framebufferKnownSubmitCount\": " << framebufferKnownCount << ",\n"
             << "  \"indexedSubmitCount\": " << indexedCount << ",\n"
-            << "  \"materialPairCount\": " << materialPairs.size() << ",\n"
+            << "  \"materialPairCount\": " << materialPairs.size() << ",\n";
+        BuildBackendMaterialParityHintsJson(
+            out,
+            submits,
+            sourceOverCount,
+            additiveCount,
+            opaqueCount,
+            customBlendCount,
+            framebufferRegisteredCount);
+        out
             << "  \"backendResolvedJoinMethod\": \"same-frame-order-window\",\n"
             << "  \"sampleLimit\": " << kRuntimeBackendResolvedSubmitSampleLimit << ",\n"
             << "  \"backendResolvedSubmitOracle\": {\n"
@@ -2831,6 +2957,11 @@ namespace UiLab
             << "    \"blendEnabledSubmitCount\": " << blendEnabledCount << ",\n"
             << "    \"renderTargetFormat0KnownCount\": " << rt0KnownCount << ",\n"
             << "    \"framebufferKnownSubmitCount\": " << framebufferKnownCount << ",\n"
+            << "    \"sourceOverSubmitCount\": " << sourceOverCount << ",\n"
+            << "    \"additiveSubmitCount\": " << additiveCount << ",\n"
+            << "    \"opaqueSubmitCount\": " << opaqueCount << ",\n"
+            << "    \"customBlendSubmitCount\": " << customBlendCount << ",\n"
+            << "    \"framebufferRegisteredSubmitCount\": " << framebufferRegisteredCount << ",\n"
             << "    \"materialPairCount\": " << materialPairs.size() << ",\n"
             << "    \"submits\": ";
         AppendRuntimeBackendResolvedSubmits(out, submits);
