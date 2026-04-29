@@ -1716,7 +1716,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "title-menu-direct-context-accept-injected",
             "shouldHoldDirectContext",
             "!g_targetCsdObserved",
-            "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0xFC",
+            "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0x14C",
         ]:
             self.assertIn(token, ui_lab)
         self.assertNotIn("title-intro-direct-state-refreshed", ui_lab)
@@ -1899,6 +1899,54 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "Score is the first runtime-bound gameplay value",
             "ring/speed/boost/energy/life/tutorial IDs remain pending-runtime-field until exact owner/player offsets are proven",
             "Sonic HUD SFX IDs remain audio-id-pending unless a runtime callsite proves the exact cue",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_phase167_promotes_exact_sonic_hud_display_and_scoreinfo_paths(self):
+        hud_hook = self.read("UnleashedRecomp/patches/CHudSonicStage_patches.cpp")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "m_rcScoreCount",
+            "m_rcTimeCount",
+            "m_rcTimeCount2",
+            "m_rcTimeCount3",
+            "m_rcPlayerCount",
+            "GuestAddressOf(pHudSonicStage->m_rcScoreCount.Get())",
+            "GuestAddressOf(pHudSonicStage->m_rcPlayerCount.Get())",
+        ]:
+            self.assertIn(token, hud_hook)
+
+        for token in [
+            "scoreInfoPointMarkerRecordSpeedKnown",
+            "scoreInfoPointMarkerRecordSpeed",
+            "scoreInfoPointMarkerRecordSpeedSource",
+            "scoreInfoPointMarkerCountKnown",
+            "scoreInfoPointMarkerCount",
+            "scoreInfoPointMarkerCountSource",
+            "CGameDocument::m_pMember->m_ScoreInfo.PointMarkerRecordSpeed",
+            "CGameDocument::m_pMember->m_ScoreInfo.PointMarkerCount",
+            "rcScoreCountNodeAddress",
+            "rcTimeCountNodeAddress",
+            "rcTimeCount2NodeAddress",
+            "rcTimeCount3NodeAddress",
+            "rcPlayerCountNodeAddress",
+            "rcRingCountSceneAddress",
+            "rcTutorialInfoSceneAddress",
+            "ui_playscreen/ring_count",
+            "ui_playscreen/add/u_info",
+            "displayOwnerPaths",
+            "gameplayNumericBindingStatus",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 167",
+            "ScoreInfo.PointMarkerRecordSpeed",
+            "ScoreInfo.PointMarkerCount",
+            "m_rcScoreCount/m_rcTimeCount/m_rcPlayerCount",
+            "ring/timer/speed/boost/energy/lives/tutorial gameplay numerics remain pending",
         ]:
             self.assertIn(token, report)
 

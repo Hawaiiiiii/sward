@@ -309,6 +309,11 @@ namespace UiLab
         uint32_t speedGaugeSceneAddress,
         uint32_t ringEnergyGaugeSceneAddress,
         uint32_t gaugeFrameSceneAddress,
+        uint32_t scoreCountNodeAddress,
+        uint32_t timeCountNodeAddress,
+        uint32_t timeCount2NodeAddress,
+        uint32_t timeCount3NodeAddress,
+        uint32_t playerCountNodeAddress,
         std::string_view hookSource);
     void OnHudSonicStageOwnerFieldSample(uint32_t ownerAddress, std::string_view hookSource);
     void OnSonicHudGameplayValues(

@@ -74,18 +74,33 @@ struct SonicDayHudRuntimeValueBinding
     std::string source = "pending-runtime-field";
 };
 
+struct SonicDayHudDisplayOwnerPathBinding
+{
+    std::string ringCount = "ui_playscreen/ring_count";
+    std::string score = "CHudSonicStage.m_rcScoreCount|ui_playscreen/score_count";
+    std::string elapsedFrames = "CHudSonicStage.m_rcTimeCount|ui_playscreen/time_count";
+    std::string speedKmh = "CHudSonicStage.m_rcSpeedGauge|ui_playscreen/so_speed_gauge";
+    std::string boostGauge = "CHudSonicStage.m_rcSpeedGauge|ui_playscreen/so_speed_gauge";
+    std::string ringEnergyGauge = "CHudSonicStage.m_rcRingEnergyGauge|ui_playscreen/so_ringenagy_gauge";
+    std::string lifeCount = "CHudSonicStage.m_rcPlayerCount|ui_playscreen/player_count";
+    std::string tutorialPrompt = "ui_playscreen/add/u_info";
+};
+
 struct SonicDayHudRuntimeBindingSnapshot
 {
     std::string source = "typedInspectors.sonicHud.gameplayValues";
     SonicDayHudGameplayState values;
     SonicDayHudRuntimeValueBinding ringCountBinding;
     SonicDayHudRuntimeValueBinding scoreBinding;
+    SonicDayHudRuntimeValueBinding scoreInfoPointMarkerRecordSpeedBinding;
+    SonicDayHudRuntimeValueBinding scoreInfoPointMarkerCountBinding;
     SonicDayHudRuntimeValueBinding elapsedFramesBinding;
     SonicDayHudRuntimeValueBinding speedKmhBinding;
     SonicDayHudRuntimeValueBinding boostGaugeBinding;
     SonicDayHudRuntimeValueBinding ringEnergyGaugeBinding;
     SonicDayHudRuntimeValueBinding lifeCountBinding;
     SonicDayHudRuntimeValueBinding tutorialPromptBinding;
+    SonicDayHudDisplayOwnerPathBinding displayOwnerPaths;
     std::string sonicRingPickupSfxId = "audio-id-pending";
     std::string tutorialPromptOpenSfxId = "audio-id-pending";
     std::string pauseOpenSfxId = "sys_actstg_pausewinopen";
@@ -177,6 +192,8 @@ private:
 [[nodiscard]] std::string formatSonicDayHudGameplayStateModel();
 [[nodiscard]] std::string formatSonicDayHudGameplayStateSmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBinding(const SonicDayHudRuntimeBindingSnapshot& snapshot);
+[[nodiscard]] std::string formatSonicDayHudRuntimeDisplayOwnerPaths(const SonicDayHudDisplayOwnerPathBinding& paths);
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingSmokeSequence();
+[[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase167SmokeSequence();
 [[nodiscard]] std::string frontendControllerInputName(FrontendControllerInput input);
 } // namespace sward::ui_runtime

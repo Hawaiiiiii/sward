@@ -386,6 +386,14 @@ namespace UiLab
         bool scoreKnown = false;
         uint32_t score = 0;
         std::string scoreSource = "SWA::CGameDocument::m_pMember->m_ScoreInfo.EnemyScore+TrickScore";
+        bool scoreInfoPointMarkerRecordSpeedKnown = false;
+        float scoreInfoPointMarkerRecordSpeed = 0.0f;
+        std::string scoreInfoPointMarkerRecordSpeedSource =
+            "SWA::CGameDocument::m_pMember->m_ScoreInfo.PointMarkerRecordSpeed";
+        bool scoreInfoPointMarkerCountKnown = false;
+        uint32_t scoreInfoPointMarkerCount = 0;
+        std::string scoreInfoPointMarkerCountSource =
+            "SWA::CGameDocument::m_pMember->m_ScoreInfo.PointMarkerCount";
         bool elapsedFramesKnown = false;
         uint32_t elapsedFrames = 0;
         std::string elapsedFramesSource = "pending-runtime-field";
@@ -433,6 +441,13 @@ namespace UiLab
         uint32_t rcSpeedGaugeSceneAddress = 0;
         uint32_t rcRingEnergyGaugeSceneAddress = 0;
         uint32_t rcGaugeFrameSceneAddress = 0;
+        uint32_t rcRingCountSceneAddress = 0;
+        uint32_t rcScoreCountNodeAddress = 0;
+        uint32_t rcTimeCountNodeAddress = 0;
+        uint32_t rcTimeCount2NodeAddress = 0;
+        uint32_t rcTimeCount3NodeAddress = 0;
+        uint32_t rcPlayerCountNodeAddress = 0;
+        uint32_t rcTutorialInfoSceneAddress = 0;
         bool rawOwnerKnown = false;
         bool rawOwnerFieldsReady = false;
         uint64_t rawOwnerFrame = 0;
@@ -443,6 +458,8 @@ namespace UiLab
         std::string ownerFieldMaturationStatus;
         std::string expectedOwnerFieldSource;
         std::string rawHookSource;
+        std::string displayOwnerPaths;
+        std::string gameplayNumericBindingStatus;
         std::vector<SonicHudOwnerFieldSample> rawOwnerFieldSamples;
     };
 
@@ -634,16 +651,21 @@ namespace UiLab
         },
     }};
 
-    static constexpr std::array<ChudSonicStageExpectedOwnerField, 4> kChudSonicStageExpectedOwnerFields =
+    static constexpr std::array<ChudSonicStageExpectedOwnerField, 9> kChudSonicStageExpectedOwnerFields =
     {{
         { "m_rcPlayScreen", 0xE0, 0xE4 },
         { "m_rcSpeedGauge", 0xE8, 0xEC },
         { "m_rcRingEnergyGauge", 0xF0, 0xF4 },
         { "m_rcGaugeFrame", 0xF8, 0xFC },
+        { "m_rcScoreCount", 0x128, 0x12C },
+        { "m_rcTimeCount", 0x130, 0x134 },
+        { "m_rcTimeCount2", 0x138, 0x13C },
+        { "m_rcTimeCount3", 0x140, 0x144 },
+        { "m_rcPlayerCount", 0x148, 0x14C },
     }};
 
     static constexpr std::string_view kChudSonicStageExpectedOwnerFieldSource =
-        "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0xFC";
+        "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0x14C";
 
     static constexpr std::array<RuntimeTarget, 11> kRuntimeTargets =
     {{
@@ -765,6 +787,11 @@ namespace UiLab
     static uint32_t g_chudSonicStageSpeedGaugeSceneAddress = 0;
     static uint32_t g_chudSonicStageRingEnergyGaugeSceneAddress = 0;
     static uint32_t g_chudSonicStageGaugeFrameSceneAddress = 0;
+    static uint32_t g_chudSonicStageScoreCountNodeAddress = 0;
+    static uint32_t g_chudSonicStageTimeCountNodeAddress = 0;
+    static uint32_t g_chudSonicStageTimeCount2NodeAddress = 0;
+    static uint32_t g_chudSonicStageTimeCount3NodeAddress = 0;
+    static uint32_t g_chudSonicStagePlayerCountNodeAddress = 0;
     static uint64_t g_chudSonicStageRawHookFrame = 0;
     static std::string g_chudSonicStageRawHookSource;
     static bool g_loggedChudSonicStageOwnerHook = false;
@@ -2034,12 +2061,20 @@ namespace UiLab
         snapshot.rcSpeedGaugeSceneAddress = g_chudSonicStageSpeedGaugeSceneAddress;
         snapshot.rcRingEnergyGaugeSceneAddress = g_chudSonicStageRingEnergyGaugeSceneAddress;
         snapshot.rcGaugeFrameSceneAddress = g_chudSonicStageGaugeFrameSceneAddress;
+        snapshot.rcScoreCountNodeAddress = g_chudSonicStageScoreCountNodeAddress;
+        snapshot.rcTimeCountNodeAddress = g_chudSonicStageTimeCountNodeAddress;
+        snapshot.rcTimeCount2NodeAddress = g_chudSonicStageTimeCount2NodeAddress;
+        snapshot.rcTimeCount3NodeAddress = g_chudSonicStageTimeCount3NodeAddress;
+        snapshot.rcPlayerCountNodeAddress = g_chudSonicStagePlayerCountNodeAddress;
         snapshot.rawOwnerKnown = g_chudSonicStageOwnerAddress != 0;
         snapshot.rawOwnerFieldsReady =
             g_chudSonicStagePlayScreenProjectAddress != 0 ||
             g_chudSonicStageSpeedGaugeSceneAddress != 0 ||
             g_chudSonicStageRingEnergyGaugeSceneAddress != 0 ||
-            g_chudSonicStageGaugeFrameSceneAddress != 0;
+            g_chudSonicStageGaugeFrameSceneAddress != 0 ||
+            g_chudSonicStageScoreCountNodeAddress != 0 ||
+            g_chudSonicStageTimeCountNodeAddress != 0 ||
+            g_chudSonicStagePlayerCountNodeAddress != 0;
         snapshot.rawOwnerFrame = g_chudSonicStageRawHookFrame;
         snapshot.rawHookSource = g_chudSonicStageRawHookSource;
         snapshot.expectedOwnerFieldSource = std::string(kChudSonicStageExpectedOwnerFieldSource);
@@ -2098,6 +2133,14 @@ namespace UiLab
                 snapshot.rcRingEnergyGaugeSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/so_ringenagy_gauge");
             if (snapshot.rcGaugeFrameSceneAddress == 0)
                 snapshot.rcGaugeFrameSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/gauge_frame");
+            snapshot.rcRingCountSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/ring_count");
+            if (snapshot.rcScoreCountNodeAddress == 0)
+                snapshot.rcScoreCountNodeAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/score_count");
+            if (snapshot.rcTimeCountNodeAddress == 0)
+                snapshot.rcTimeCountNodeAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/time_count");
+            if (snapshot.rcPlayerCountNodeAddress == 0)
+                snapshot.rcPlayerCountNodeAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/player_count");
+            snapshot.rcTutorialInfoSceneAddress = FindCsdTreeAddressBySuffix(csdProjectTree, "/add/u_info");
 
             if (!snapshot.rawOwnerKnown)
                 snapshot.ownerPointerStatus = "resolved CSD ownership; raw CHudSonicStage owner hook pending runtime observation";
@@ -2108,6 +2151,18 @@ namespace UiLab
                     "fork API CHudSonicStage RCPtr slots stayed null; resolved ui_playscreen project/scene addresses came from CCsdProject::Make traversal";
             }
         }
+
+        snapshot.displayOwnerPaths =
+            "ring=ui_playscreen/ring_count;"
+            "score=CHudSonicStage.m_rcScoreCount|ui_playscreen/score_count;"
+            "timer=CHudSonicStage.m_rcTimeCount|ui_playscreen/time_count;"
+            "speed=CHudSonicStage.m_rcSpeedGauge|ui_playscreen/so_speed_gauge;"
+            "boost=CHudSonicStage.m_rcSpeedGauge|ui_playscreen/so_speed_gauge;"
+            "energy=CHudSonicStage.m_rcRingEnergyGauge|ui_playscreen/so_ringenagy_gauge;"
+            "lives=CHudSonicStage.m_rcPlayerCount|ui_playscreen/player_count;"
+            "tutorial=ui_playscreen/add/u_info";
+        snapshot.gameplayNumericBindingStatus =
+            "score:known,scoreinfo:known,ring/timer/speed/boost/energy/lives/tutorial:pending-runtime-player-offsets";
 
         return snapshot;
     }
@@ -2130,7 +2185,10 @@ namespace UiLab
             g_chudSonicStagePlayScreenProjectAddress != 0 ||
             g_chudSonicStageSpeedGaugeSceneAddress != 0 ||
             g_chudSonicStageRingEnergyGaugeSceneAddress != 0 ||
-            g_chudSonicStageGaugeFrameSceneAddress != 0;
+            g_chudSonicStageGaugeFrameSceneAddress != 0 ||
+            g_chudSonicStageScoreCountNodeAddress != 0 ||
+            g_chudSonicStageTimeCountNodeAddress != 0 ||
+            g_chudSonicStagePlayerCountNodeAddress != 0;
         snapshot.hudOwnerAddress = g_chudSonicStageOwnerAddress;
         snapshot.stageGameModeAddress = g_lastStageGameModeAddress;
         snapshot.rawOwnerFrame = g_chudSonicStageRawHookFrame;
@@ -2168,6 +2226,16 @@ namespace UiLab
                 pGameDocument->m_pMember->m_ScoreInfo.EnemyScore +
                 pGameDocument->m_pMember->m_ScoreInfo.TrickScore;
             snapshot.scoreSource = "SWA::CGameDocument::m_pMember->m_ScoreInfo.EnemyScore+TrickScore";
+            snapshot.scoreInfoPointMarkerRecordSpeedKnown = true;
+            snapshot.scoreInfoPointMarkerRecordSpeed =
+                pGameDocument->m_pMember->m_ScoreInfo.PointMarkerRecordSpeed;
+            snapshot.scoreInfoPointMarkerRecordSpeedSource =
+                "SWA::CGameDocument::m_pMember->m_ScoreInfo.PointMarkerRecordSpeed";
+            snapshot.scoreInfoPointMarkerCountKnown = true;
+            snapshot.scoreInfoPointMarkerCount =
+                pGameDocument->m_pMember->m_ScoreInfo.PointMarkerCount;
+            snapshot.scoreInfoPointMarkerCountSource =
+                "SWA::CGameDocument::m_pMember->m_ScoreInfo.PointMarkerCount";
             snapshot.frame = g_presentedFrameCount;
         }
 
@@ -2397,6 +2465,12 @@ namespace UiLab
             << "        \"scoreKnown\": " << (sonicGameplay.scoreKnown ? "true" : "false") << ",\n"
             << "        \"score\": " << sonicGameplay.score << ",\n"
             << "        \"scoreSource\": \"" << JsonEscape(sonicGameplay.scoreSource) << "\",\n"
+            << "        \"scoreInfoPointMarkerRecordSpeedKnown\": " << (sonicGameplay.scoreInfoPointMarkerRecordSpeedKnown ? "true" : "false") << ",\n"
+            << "        \"scoreInfoPointMarkerRecordSpeed\": " << sonicGameplay.scoreInfoPointMarkerRecordSpeed << ",\n"
+            << "        \"scoreInfoPointMarkerRecordSpeedSource\": \"" << JsonEscape(sonicGameplay.scoreInfoPointMarkerRecordSpeedSource) << "\",\n"
+            << "        \"scoreInfoPointMarkerCountKnown\": " << (sonicGameplay.scoreInfoPointMarkerCountKnown ? "true" : "false") << ",\n"
+            << "        \"scoreInfoPointMarkerCount\": " << sonicGameplay.scoreInfoPointMarkerCount << ",\n"
+            << "        \"scoreInfoPointMarkerCountSource\": \"" << JsonEscape(sonicGameplay.scoreInfoPointMarkerCountSource) << "\",\n"
             << "        \"elapsedFramesKnown\": " << (sonicGameplay.elapsedFramesKnown ? "true" : "false") << ",\n"
             << "        \"elapsedFrames\": " << sonicGameplay.elapsedFrames << ",\n"
             << "        \"elapsedFramesSource\": \"" << JsonEscape(sonicGameplay.elapsedFramesSource) << "\",\n"
@@ -2439,9 +2513,18 @@ namespace UiLab
             << "        \"rcSpeedGaugeSceneAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcSpeedGaugeSceneAddress)) << "\",\n"
             << "        \"rcRingEnergyGaugeSceneAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcRingEnergyGaugeSceneAddress)) << "\",\n"
             << "        \"rcGaugeFrameSceneAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcGaugeFrameSceneAddress)) << "\",\n"
+            << "        \"rcRingCountSceneAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcRingCountSceneAddress)) << "\",\n"
+            << "        \"rcScoreCountNodeAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcScoreCountNodeAddress)) << "\",\n"
+            << "        \"rcTimeCountNodeAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcTimeCountNodeAddress)) << "\",\n"
+            << "        \"rcTimeCount2NodeAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcTimeCount2NodeAddress)) << "\",\n"
+            << "        \"rcTimeCount3NodeAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcTimeCount3NodeAddress)) << "\",\n"
+            << "        \"rcPlayerCountNodeAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcPlayerCountNodeAddress)) << "\",\n"
+            << "        \"rcTutorialInfoSceneAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.rcTutorialInfoSceneAddress)) << "\",\n"
             << "        \"resolvedFromCsdProjectTree\": " << (sonicOwnerPath.resolvedFromCsdProjectTree ? "true" : "false") << ",\n"
             << "        \"expectedOwnerFieldSource\": \"" << JsonEscape(sonicOwnerPath.expectedOwnerFieldSource) << "\",\n"
             << "        \"rawOwnerExpectedFieldOffsets\": \"" << JsonEscape(std::string(kChudSonicStageExpectedOwnerFieldSource)) << "\",\n"
+            << "        \"displayOwnerPaths\": \"" << JsonEscape(sonicOwnerPath.displayOwnerPaths) << "\",\n"
+            << "        \"gameplayNumericBindingStatus\": \"" << JsonEscape(sonicOwnerPath.gameplayNumericBindingStatus) << "\",\n"
             << "        \"rawOwnerFieldSamples\": ";
         AppendSonicHudOwnerFieldSamples(out, sonicOwnerPath.rawOwnerFieldSamples);
         out
@@ -5079,6 +5162,11 @@ namespace UiLab
         g_chudSonicStageSpeedGaugeSceneAddress = 0;
         g_chudSonicStageRingEnergyGaugeSceneAddress = 0;
         g_chudSonicStageGaugeFrameSceneAddress = 0;
+        g_chudSonicStageScoreCountNodeAddress = 0;
+        g_chudSonicStageTimeCountNodeAddress = 0;
+        g_chudSonicStageTimeCount2NodeAddress = 0;
+        g_chudSonicStageTimeCount3NodeAddress = 0;
+        g_chudSonicStagePlayerCountNodeAddress = 0;
         g_chudSonicStageRawHookFrame = 0;
         g_chudSonicStageRawHookSource.clear();
         g_loggedChudSonicStageOwnerHook = false;
@@ -6498,6 +6586,11 @@ namespace UiLab
         uint32_t speedGaugeSceneAddress,
         uint32_t ringEnergyGaugeSceneAddress,
         uint32_t gaugeFrameSceneAddress,
+        uint32_t scoreCountNodeAddress,
+        uint32_t timeCountNodeAddress,
+        uint32_t timeCount2NodeAddress,
+        uint32_t timeCount3NodeAddress,
+        uint32_t playerCountNodeAddress,
         std::string_view hookSource)
     {
         if (!g_isEnabled || !IsPlausibleGuestPointer(ownerAddress))
@@ -6511,12 +6604,25 @@ namespace UiLab
             ringEnergyGaugeSceneAddress = 0;
         if (!IsPlausibleGuestPointer(gaugeFrameSceneAddress))
             gaugeFrameSceneAddress = 0;
+        if (!IsPlausibleGuestPointer(scoreCountNodeAddress))
+            scoreCountNodeAddress = 0;
+        if (!IsPlausibleGuestPointer(timeCountNodeAddress))
+            timeCountNodeAddress = 0;
+        if (!IsPlausibleGuestPointer(timeCount2NodeAddress))
+            timeCount2NodeAddress = 0;
+        if (!IsPlausibleGuestPointer(timeCount3NodeAddress))
+            timeCount3NodeAddress = 0;
+        if (!IsPlausibleGuestPointer(playerCountNodeAddress))
+            playerCountNodeAddress = 0;
 
         const bool hasOwnerFields =
             playScreenProjectAddress != 0 ||
             speedGaugeSceneAddress != 0 ||
             ringEnergyGaugeSceneAddress != 0 ||
-            gaugeFrameSceneAddress != 0;
+            gaugeFrameSceneAddress != 0 ||
+            scoreCountNodeAddress != 0 ||
+            timeCountNodeAddress != 0 ||
+            playerCountNodeAddress != 0;
 
         const bool changed =
             g_chudSonicStageOwnerAddress != ownerAddress ||
@@ -6524,6 +6630,11 @@ namespace UiLab
             g_chudSonicStageSpeedGaugeSceneAddress != speedGaugeSceneAddress ||
             g_chudSonicStageRingEnergyGaugeSceneAddress != ringEnergyGaugeSceneAddress ||
             g_chudSonicStageGaugeFrameSceneAddress != gaugeFrameSceneAddress ||
+            g_chudSonicStageScoreCountNodeAddress != scoreCountNodeAddress ||
+            g_chudSonicStageTimeCountNodeAddress != timeCountNodeAddress ||
+            g_chudSonicStageTimeCount2NodeAddress != timeCount2NodeAddress ||
+            g_chudSonicStageTimeCount3NodeAddress != timeCount3NodeAddress ||
+            g_chudSonicStagePlayerCountNodeAddress != playerCountNodeAddress ||
             g_chudSonicStageRawHookSource != hookSource;
 
         g_chudSonicStageOwnerAddress = ownerAddress;
@@ -6531,6 +6642,11 @@ namespace UiLab
         g_chudSonicStageSpeedGaugeSceneAddress = speedGaugeSceneAddress;
         g_chudSonicStageRingEnergyGaugeSceneAddress = ringEnergyGaugeSceneAddress;
         g_chudSonicStageGaugeFrameSceneAddress = gaugeFrameSceneAddress;
+        g_chudSonicStageScoreCountNodeAddress = scoreCountNodeAddress;
+        g_chudSonicStageTimeCountNodeAddress = timeCountNodeAddress;
+        g_chudSonicStageTimeCount2NodeAddress = timeCount2NodeAddress;
+        g_chudSonicStageTimeCount3NodeAddress = timeCount3NodeAddress;
+        g_chudSonicStagePlayerCountNodeAddress = playerCountNodeAddress;
         g_chudSonicStageRawHookFrame = g_presentedFrameCount;
         g_chudSonicStageRawHookSource = hookSource;
 
@@ -6543,6 +6659,11 @@ namespace UiLab
                 " speed_gauge=" + HexU32(speedGaugeSceneAddress) +
                 " ring_energy_gauge=" + HexU32(ringEnergyGaugeSceneAddress) +
                 " gauge_frame=" + HexU32(gaugeFrameSceneAddress) +
+                " score_count=" + HexU32(scoreCountNodeAddress) +
+                " time_count=" + HexU32(timeCountNodeAddress) +
+                " time_count2=" + HexU32(timeCount2NodeAddress) +
+                " time_count3=" + HexU32(timeCount3NodeAddress) +
+                " player_count=" + HexU32(playerCountNodeAddress) +
                 " owner_fields_ready=" + std::string(hasOwnerFields ? "1" : "0") +
                 " source=" + std::string(hookSource) +
                 (hasOwnerFields

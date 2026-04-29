@@ -27,6 +27,11 @@ static void RecordHudSonicStageInspector(
         GuestAddressOf(pHudSonicStage->m_rcSpeedGauge.Get()),
         GuestAddressOf(pHudSonicStage->m_rcRingEnergyGauge.Get()),
         GuestAddressOf(pHudSonicStage->m_rcGaugeFrame.Get()),
+        GuestAddressOf(pHudSonicStage->m_rcScoreCount.Get()),
+        GuestAddressOf(pHudSonicStage->m_rcTimeCount.Get()),
+        GuestAddressOf(pHudSonicStage->m_rcTimeCount2.Get()),
+        GuestAddressOf(pHudSonicStage->m_rcTimeCount3.Get()),
+        GuestAddressOf(pHudSonicStage->m_rcPlayerCount.Get()),
         hookSource);
     UiLab::OnHudSonicStageOwnerFieldSample(ownerAddress, hookSource);
 }

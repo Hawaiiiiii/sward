@@ -120,6 +120,12 @@ SonicDayHudRuntimeBindingSnapshot makeRuntimeScoreBindingSnapshot()
     snapshot.values.score = 1250;
     snapshot.scoreBinding.known = true;
     snapshot.scoreBinding.source = "SWA::CGameDocument::m_pMember->m_ScoreInfo.EnemyScore+TrickScore";
+    snapshot.scoreInfoPointMarkerRecordSpeedBinding.known = true;
+    snapshot.scoreInfoPointMarkerRecordSpeedBinding.source =
+        "SWA::CGameDocument::m_pMember->m_ScoreInfo.PointMarkerRecordSpeed";
+    snapshot.scoreInfoPointMarkerCountBinding.known = true;
+    snapshot.scoreInfoPointMarkerCountBinding.source =
+        "SWA::CGameDocument::m_pMember->m_ScoreInfo.PointMarkerCount";
     snapshot.ringCountBinding.source = "pending-runtime-field";
     snapshot.elapsedFramesBinding.source = "pending-runtime-field";
     snapshot.speedKmhBinding.source = "pending-runtime-field";
@@ -805,6 +811,22 @@ std::string formatSonicDayHudRuntimeBinding(const SonicDayHudRuntimeBindingSnaps
     return out.str();
 }
 
+std::string formatSonicDayHudRuntimeDisplayOwnerPaths(const SonicDayHudDisplayOwnerPathBinding& paths)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_display_owner_paths="
+        << "ring=" << paths.ringCount
+        << ":score=" << paths.score
+        << ":timer=" << paths.elapsedFrames
+        << ":speed=" << paths.speedKmh
+        << ":boost=" << paths.boostGauge
+        << ":energy=" << paths.ringEnergyGauge
+        << ":lives=" << paths.lifeCount
+        << ":tutorial=" << paths.tutorialPrompt
+        << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeBindingSmokeSequence()
 {
     SonicDayHudController hud;
@@ -814,6 +836,22 @@ std::string formatSonicDayHudRuntimeBindingSmokeSequence()
     (void)hud.handleInput(FrontendControllerInput::StageReady);
     (void)hud.applyRuntimeBinding(snapshot);
     out << formatSonicDayHudGameplayState("runtime-bound", hud.gameplayState());
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase167SmokeSequence()
+{
+    const auto snapshot = makeRuntimeScoreBindingSnapshot();
+    std::ostringstream out;
+    out << formatSonicDayHudRuntimeBinding(snapshot);
+    out << "sonic_day_hud_runtime_scoreinfo="
+        << "record_speed=" << formatRuntimeBindingStatus(snapshot.scoreInfoPointMarkerRecordSpeedBinding)
+        << ":point_marker_count=" << formatRuntimeBindingStatus(snapshot.scoreInfoPointMarkerCountBinding)
+        << '\n';
+    out << formatSonicDayHudRuntimeDisplayOwnerPaths(snapshot.displayOwnerPaths);
+    out << "gameplay_numeric_binding=score:known,scoreinfo:known,"
+        << "ring/timer/speed/boost/energy/lives/tutorial:pending-runtime-player-offsets"
+        << '\n';
     return out.str();
 }
 

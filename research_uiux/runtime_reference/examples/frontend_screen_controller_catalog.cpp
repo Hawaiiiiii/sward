@@ -44,6 +44,12 @@ int main(int argc, char** argv)
         std::cout << formatSonicDayHudRuntimeBindingSmokeSequence();
         return 0;
     }
+    if (hasArg(argc, argv, "--phase167-sonic-hud-runtime-field-path-smoke"))
+    {
+        std::cout << "sward_frontend_screen_controller_catalog phase167 sonic hud runtime field path smoke ok\n";
+        std::cout << formatSonicDayHudRuntimeBindingPhase167SmokeSequence();
+        return 0;
+    }
 
     if (hasArg(argc, argv, "--catalog") || argc == 1)
     {
@@ -52,6 +58,6 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    std::cerr << "Usage: sward_frontend_screen_controller_catalog [--catalog] [--phase163-smoke] [--phase164-sonic-hud-smoke] [--phase165-sonic-hud-state-smoke] [--phase166-sonic-hud-runtime-binding-smoke]\n";
+    std::cerr << "Usage: sward_frontend_screen_controller_catalog [--catalog] [--phase163-smoke] [--phase164-sonic-hud-smoke] [--phase165-sonic-hud-state-smoke] [--phase166-sonic-hud-runtime-binding-smoke] [--phase167-sonic-hud-runtime-field-path-smoke]\n";
     return 2;
 }

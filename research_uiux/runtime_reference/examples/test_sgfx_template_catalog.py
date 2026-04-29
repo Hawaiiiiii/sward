@@ -660,6 +660,41 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("sonic_day_hud_state=phase=runtime-bound:rings=000:score=000001250:time=00:00:00:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
         self.assertIn("value_source:typedInspectors.sonicHud.gameplayValues", completed.stdout)
 
+    def test_phase167_sonic_day_hud_runtime_binding_smoke_reports_scoreinfo_and_display_owner_paths(self) -> None:
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+
+        for token in [
+            "SonicDayHudDisplayOwnerPathBinding",
+            "scoreInfoPointMarkerRecordSpeedBinding",
+            "scoreInfoPointMarkerCountBinding",
+            "CGameDocument::m_pMember->m_ScoreInfo.PointMarkerRecordSpeed",
+            "ui_playscreen/ring_count",
+            "ui_playscreen/add/u_info",
+            "formatSonicDayHudRuntimeDisplayOwnerPaths",
+            "formatSonicDayHudRuntimeBindingPhase167SmokeSequence",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase167-sonic-hud-runtime-field-path-smoke", example)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase167-sonic-hud-runtime-field-path-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase167 sonic hud runtime field path smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_scoreinfo=record_speed=known:SWA::CGameDocument::m_pMember->m_ScoreInfo.PointMarkerRecordSpeed:point_marker_count=known:SWA::CGameDocument::m_pMember->m_ScoreInfo.PointMarkerCount", completed.stdout)
+        self.assertIn("sonic_day_hud_display_owner_paths=ring=ui_playscreen/ring_count:score=CHudSonicStage.m_rcScoreCount|ui_playscreen/score_count:timer=CHudSonicStage.m_rcTimeCount|ui_playscreen/time_count:speed=CHudSonicStage.m_rcSpeedGauge|ui_playscreen/so_speed_gauge:boost=CHudSonicStage.m_rcSpeedGauge|ui_playscreen/so_speed_gauge:energy=CHudSonicStage.m_rcRingEnergyGauge|ui_playscreen/so_ringenagy_gauge:lives=CHudSonicStage.m_rcPlayerCount|ui_playscreen/player_count:tutorial=ui_playscreen/add/u_info", completed.stdout)
+        self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,ring/timer/speed/boost/energy/lives/tutorial:pending-runtime-player-offsets", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
