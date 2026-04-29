@@ -787,7 +787,7 @@ namespace UiLab
     static bool g_observerMode = false;
     static bool g_routeTargetExplicit = false;
     static bool g_hideOverlay = false;
-    static bool g_operatorShellVisible = true;
+    static bool g_operatorShellVisible = false;
     static bool g_operatorShellToggleWasDown = false;
     // Compact-on-demand operator windows: direct live bridge/API stays enabled, panes open only when requested.
     static bool g_operatorWindowListVisible = false;
@@ -2302,7 +2302,7 @@ namespace UiLab
 
         snapshot.displayOwnerPaths =
             "ring=ui_playscreen/ring_count;"
-            "score=CHudSonicStage.m_rcScoreCount|ui_playscreen/score_count;"
+            "score=CHudSonicStage.m_rcScoreCount|ui_playscreen/score_count/score|ui_playscreen/score_count/num_score;"
             "timer=CHudSonicStage.m_rcTimeCount|ui_playscreen/time_count;"
             "speed=CHudSonicStage.m_rcSpeedGauge|ui_playscreen/so_speed_gauge;"
             "boost=CHudSonicStage.m_rcSpeedGauge|ui_playscreen/so_speed_gauge;"
@@ -2414,7 +2414,7 @@ namespace UiLab
         // ring/timer/speed/lives:known-via-csd-text-write
         // timer/counter/speed/gauge candidates:sampled-via-chud-update-callsites
         // boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-with-unresolved-write-probe-pending-runtime-normalization
-        return "score:known,scoreinfo:known,"
+        return "score:known-via-csd-text-or-game-document,scoreinfo:known,"
             "ring/speed/lives:known-via-csd-text-write,"
             "timer:runtime-proven-via-chud-update-callsite-sample,"
             "counter/speed/gauge candidates:sampled-via-chud-update-callsites,"
@@ -2425,6 +2425,8 @@ namespace UiLab
     {
         return
             path == "ui_playscreen/ring_count/num_ring" ||
+            path == "ui_playscreen/score_count/score" ||
+            path == "ui_playscreen/score_count/num_score" ||
             path == "ui_playscreen/time_count/time001" ||
             path == "ui_playscreen/time_count/time010" ||
             path == "ui_playscreen/time_count/time100" ||
@@ -2436,6 +2438,12 @@ namespace UiLab
     {
         if (path == "ui_playscreen/ring_count/num_ring")
             return "ringCount";
+        if (
+            path == "ui_playscreen/score_count/score" ||
+            path == "ui_playscreen/score_count/num_score")
+        {
+            return "score";
+        }
         if (
             path == "ui_playscreen/time_count/time001" ||
             path == "ui_playscreen/time_count/time010" ||
@@ -2924,6 +2932,18 @@ namespace UiLab
                 snapshot.ringCountKnown = true;
                 snapshot.ringCount = parsedValue;
                 snapshot.ringCountSource = source;
+            }
+            else if (
+                path == "ui_playscreen/score_count/score" ||
+                path == "ui_playscreen/score_count/num_score")
+            {
+                changed =
+                    !snapshot.scoreKnown ||
+                    snapshot.score != parsedValue ||
+                    snapshot.scoreSource != source;
+                snapshot.scoreKnown = true;
+                snapshot.score = parsedValue;
+                snapshot.scoreSource = source;
             }
             else if (
                 path == "ui_playscreen/time_count/time001" ||
@@ -9839,6 +9859,91 @@ namespace UiLab
 
         if (ImGui::Button("Manual Evidence"))
             WriteEvidenceEvent("manual-evidence-marker");
+    }
+
+    void DrawProfilerAddon()
+    {
+        if (!g_isEnabled)
+            return;
+
+        ImGui::Separator();
+
+        if (!ImGui::CollapsingHeader("SWARD UI Lab", ImGuiTreeNodeFlags_DefaultOpen))
+            return;
+
+        ImGui::Text("Target: %s", std::string(GetTargetToken()).c_str());
+        ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
+        ImGui::Text("Live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
+        ImGui::Text("UI layer: %s", std::string(UiOnlyLayerIsolationStatusLabel()).c_str());
+
+        const auto observations = BuildSonicHudValueWriteObservations();
+        uint64_t resolvedObservations = 0;
+        uint64_t unresolvedObservations = 0;
+        for (const auto& observation : observations)
+        {
+            if (observation.pathResolved)
+                ++resolvedObservations;
+            else
+                ++unresolvedObservations;
+        }
+
+        ImGui::Text(
+            "HUD node writes: resolved=%llu unresolved=%llu",
+            static_cast<unsigned long long>(resolvedObservations),
+            static_cast<unsigned long long>(unresolvedObservations));
+        ImGui::TextWrapped("Sonic HUD binding: %s", SonicHudValueWriteBindingStatus().c_str());
+
+        if (ImGui::BeginTabBar("sward-profiler-addon-tabs"))
+        {
+            if (ImGui::BeginTabItem("Overview"))
+            {
+                DrawRuntimeInspectorOverview();
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("HUD"))
+            {
+                DrawOperatorProfilerHudTab();
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("HUD Switches"))
+            {
+                ImGui::TextUnformatted("SGlobals HUD/render switches");
+                for (const auto& guestBool : kGuestRenderGlobals)
+                {
+                    const std::string_view name = guestBool.name;
+                    if (
+                        name == "ms_IsRenderHud" ||
+                        name == "ms_IsRenderGameMainHud" ||
+                        name == "ms_IsRenderHudPause")
+                    {
+                        DrawGuestBoolCheckbox(guestBool);
+                    }
+                }
+
+                ImGui::Separator();
+                ImGui::TextWrapped(
+                    "These switches are a visual isolation oracle for HUD pixels. They do not replace the typed owner/CSD/callsite path recovery.");
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Capture"))
+            {
+                DrawCaptureInspector();
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Panels"))
+            {
+                ImGui::Checkbox("Legacy floating panes", &g_operatorShellVisible);
+                ImGui::Separator();
+                DrawOperatorProfilerPanelsTab();
+                ImGui::EndTabItem();
+            }
+
+            ImGui::EndTabBar();
+        }
     }
 
     static void DrawOperatorProfilerPanel()

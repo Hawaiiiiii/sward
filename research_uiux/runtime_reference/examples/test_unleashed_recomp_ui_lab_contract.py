@@ -1997,6 +1997,76 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         )
         self.assertIn("likely=gauge-or-prompt-candidate", completed.stdout)
 
+    def test_ui_lab_phase184_embeds_sward_operator_into_native_profiler(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        video = self.read("UnleashedRecomp/gpu/video.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        pivot = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
+
+        for token in [
+            "void DrawProfilerAddon()",
+            "DrawProfilerAddon",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "UiLab::DrawProfilerAddon();",
+            "DrawProfiler()",
+            "Show FPS",
+        ]:
+            self.assertIn(token, video)
+
+        for token in [
+            "g_operatorShellVisible = false",
+            "DrawProfilerAddon",
+            "SWARD UI Lab",
+            "sward-profiler-addon-tabs",
+            "HUD Switches",
+            "Legacy floating panes",
+            "SGlobals HUD/render switches",
+            "ms_IsRenderHud",
+            "ms_IsRenderGameMainHud",
+            "ms_IsRenderHudPause",
+            "HUD node writes: resolved=",
+            "Sonic HUD binding:",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 184",
+            "embeds SWARD operator readouts into the native Recomp Profiler",
+            "Legacy floating panes",
+            "SGlobals HUD/render switches",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("native Recomp Profiler is the primary operator surface", pivot)
+
+    def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "ui_playscreen/score_count/score",
+            "ui_playscreen/score_count/num_score",
+            "return \"score\"",
+            "snapshot.scoreKnown = true",
+            "snapshot.score = parsedValue",
+            "snapshot.scoreSource = source",
+            "score:known-via-csd-text-or-game-document",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 184",
+            "score_count/score",
+            "score_count/num_score",
+            "anonymous Sonic HUD text writes",
+            "named score value",
+        ]:
+            self.assertIn(token, report)
+
     def test_ui_lab_phase166_exposes_sonic_hud_gameplay_value_bridge_contract(self):
         header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")

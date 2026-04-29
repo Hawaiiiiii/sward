@@ -389,5 +389,6 @@ namespace UiLab
     bool ShouldArmTitleIntroCsdCompletion();
     bool ShouldHoldTitleMenuRuntime();
     bool ApplyTitleMenuStateForcing(int32_t& cursorIndex, bool& injectAccept, bool& suppressAccept, bool& directContext);
+    void DrawProfilerAddon();
     void DrawOverlay();
 }

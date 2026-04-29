@@ -2491,6 +2491,9 @@ static void DrawProfiler()
         ImGui::Checkbox("Show FPS", &Config::ShowFPS.Value);
         ImGui::NewLine();
 
+        UiLab::DrawProfilerAddon();
+        ImGui::NewLine();
+
         if (ImGui::TreeNode("Device Names"))
         {
             ImGui::Indent();
