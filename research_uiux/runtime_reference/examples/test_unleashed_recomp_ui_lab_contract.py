@@ -982,6 +982,56 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("runtime texture-view/sampler descriptor semantics", harvest)
         self.assertIn("native descriptor dump remains pending", harvest)
 
+    def test_ui_lab_phase155_exposes_vendor_resource_capture_oracle(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        ui_lab_header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        d3d12 = self.read("UnleashedRecomp/gpu/rhi/plume_d3d12.cpp")
+        vulkan = self.read("UnleashedRecomp/gpu/rhi/plume_vulkan.cpp")
+        renderer = self.read("research_uiux/runtime_reference/examples/su_ui_asset_renderer.cpp")
+        tests = self.read("research_uiux/runtime_reference/examples/test_su_ui_asset_renderer.py")
+        harvest = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "RuntimeVendorTextureResourceView",
+            "RuntimeVendorSamplerResourceView",
+            "OnVendorTextureResourceViewResolved",
+            "OnVendorSamplerResourceViewResolved",
+            "BuildBackendVendorResourceCaptureJson",
+            '"backendVendorResourceCapture"',
+            '"vendorResourceCaptureStatus"',
+            '"vendorResourceCapturePolicy": "native-rhi-resource-view-and-sampler-handles"',
+            '"uiOnlyLayerCaptureStatus": "pending-runtime-ui-render-target-copy"',
+            '"nativeCommandCaptureGap": "pending-full-vendor-command-buffer-dump"',
+            '"nativeTextureResourceHandle"',
+            '"nativeSamplerHandle"',
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn("OnVendorTextureResourceViewResolved", ui_lab_header)
+        self.assertIn("OnVendorSamplerResourceViewResolved", ui_lab_header)
+        self.assertIn("UiLab::OnVendorTextureResourceViewResolved", d3d12)
+        self.assertIn("UiLab::OnVendorSamplerResourceViewResolved", d3d12)
+        self.assertIn("UiLab::OnVendorTextureResourceViewResolved", vulkan)
+        self.assertIn("UiLab::OnVendorSamplerResourceViewResolved", vulkan)
+        self.assertIn("NativeVkHandleToU64", vulkan)
+
+        for token in [
+            "FrontendVendorResourceCaptureTriage",
+            "buildFrontendVendorResourceCaptureTriage",
+            "runRendererVendorResourceCaptureSmoke",
+            "--renderer-vendor-resource-capture-smoke",
+            "phase155-vendor-resource-capture",
+            "vendor_resource_policy=native-rhi-resource-view-sampler",
+            "ui_only_layer_status=pending-runtime-ui-render-target-copy",
+            "native_command_gap=pending-full-vendor-command-buffer-dump",
+        ]:
+            self.assertIn(token, renderer)
+
+        self.assertIn("test_renderer_vendor_resource_capture_smoke_reports_native_resource_policy", tests)
+        self.assertIn("Phase 155", harvest)
+        self.assertIn("native RHI resource-view/sampler handle capture", harvest)
+        self.assertIn("true UI-only rendered layer remains pending", harvest)
+
     def test_ui_lab_has_repo_safe_live_bridge_client_tool(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1"
         self.assertTrue(script_path.is_file())

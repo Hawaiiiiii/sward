@@ -1132,9 +1132,38 @@ namespace plume {
                 }
 
                 setSRV(descriptorIndex, nativeResource, &srvDesc);
+                const uint32_t descriptorIndexRelative = descriptorIndex - descriptorIndexClamped;
+                const uint32_t descriptorHeapIndex = descriptorHeapIndices[descriptorIndexClamped];
+                const D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = device->viewHeapAllocator->getCPUHandleAt(viewAllocation.offset + descriptorHeapIndex + descriptorIndexRelative);
+                UiLab::OnVendorTextureResourceViewResolved(
+                    "D3D12",
+                    descriptorIndex,
+                    static_cast<uint64_t>(reinterpret_cast<std::uintptr_t>(nativeResource)),
+                    static_cast<uint64_t>(cpuHandle.ptr),
+                    static_cast<uint32_t>(srvDesc.Format),
+                    static_cast<uint32_t>(srvDesc.ViewDimension),
+                    interfaceTexture != nullptr ? interfaceTexture->desc.width : 0,
+                    interfaceTexture != nullptr ? interfaceTexture->desc.height : 0,
+                    interfaceTextureView->mipLevels,
+                    "D3D12DescriptorSet::setTexture");
             }
             else if (nativeResource != nullptr) {
                 setSRV(descriptorIndex, nativeResource, nullptr);
+                const uint32_t descriptorIndexRelative = descriptorIndex - descriptorIndexClamped;
+                const uint32_t descriptorHeapIndex = descriptorHeapIndices[descriptorIndexClamped];
+                const D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = device->viewHeapAllocator->getCPUHandleAt(viewAllocation.offset + descriptorHeapIndex + descriptorIndexRelative);
+                const D3D12_RESOURCE_DESC resourceDesc = nativeResource->GetDesc();
+                UiLab::OnVendorTextureResourceViewResolved(
+                    "D3D12",
+                    descriptorIndex,
+                    static_cast<uint64_t>(reinterpret_cast<std::uintptr_t>(nativeResource)),
+                    static_cast<uint64_t>(cpuHandle.ptr),
+                    static_cast<uint32_t>(resourceDesc.Format),
+                    static_cast<uint32_t>(D3D12_SRV_DIMENSION_UNKNOWN),
+                    interfaceTexture != nullptr ? interfaceTexture->desc.width : static_cast<uint32_t>(resourceDesc.Width),
+                    interfaceTexture != nullptr ? interfaceTexture->desc.height : resourceDesc.Height,
+                    interfaceTexture != nullptr ? interfaceTexture->desc.mipLevels : static_cast<uint32_t>(resourceDesc.MipLevels),
+                    "D3D12DescriptorSet::setTexture default view");
             }
             else {
                 D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -1203,6 +1232,15 @@ namespace plume {
             uint32_t descriptorHeapIndex = descriptorHeapIndices[descriptorIndexClamped];
             const D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = device->samplerHeapAllocator->getCPUHandleAt(samplerAllocation.offset + descriptorHeapIndex + descriptorIndexRelative);
             device->d3d->CreateSampler(&interfaceSampler->samplerDesc, cpuHandle);
+            UiLab::OnVendorSamplerResourceViewResolved(
+                "D3D12",
+                descriptorIndex,
+                static_cast<uint64_t>(cpuHandle.ptr),
+                static_cast<uint32_t>(interfaceSampler->samplerDesc.Filter),
+                static_cast<uint32_t>(interfaceSampler->samplerDesc.AddressU),
+                static_cast<uint32_t>(interfaceSampler->samplerDesc.AddressV),
+                static_cast<uint32_t>(interfaceSampler->samplerDesc.AddressW),
+                "D3D12DescriptorSet::setSampler");
         }
     }
 

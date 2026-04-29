@@ -956,6 +956,19 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("textureDescriptorSemantic", source_text)
         self.assertIn("samplerDescriptorSemantic", source_text)
 
+    def test_renderer_source_wires_phase155_vendor_resource_capture(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendVendorResourceCaptureTriage", source_text)
+        self.assertIn("buildFrontendVendorResourceCaptureTriage", source_text)
+        self.assertIn("runRendererVendorResourceCaptureSmoke", source_text)
+        self.assertIn("--renderer-vendor-resource-capture-smoke", source_text)
+        self.assertIn("phase155-vendor-resource-capture", source_text)
+        self.assertIn("vendor_resource_policy=native-rhi-resource-view-sampler", source_text)
+        self.assertIn("ui_only_layer_status=pending-runtime-ui-render-target-copy", source_text)
+        self.assertIn("native_command_gap=pending-full-vendor-command-buffer-dump", source_text)
+        self.assertIn("vendorResourceCaptureStatus", source_text)
+        self.assertIn("textureResourceViewKnownCount", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -1266,6 +1279,29 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("text_movie_sfx_gap=pending", completed.stdout)
         self.assertRegex(completed.stdout, r"descriptor_semantics=title-menu:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):texture_descriptor_known=[0-9]+:sampler_descriptor_known=[0-9]+:linear=[0-9]+:point=[0-9]+:wrap=[0-9]+:clamp=[0-9]+:local_commands=[1-9]\d*:texture_view_sampler_status=[^\r\n]+")
         self.assertRegex(completed.stdout, r"descriptor_semantics=loading:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):texture_descriptor_known=[0-9]+:sampler_descriptor_known=[0-9]+:linear=[0-9]+:point=[0-9]+:wrap=[0-9]+:clamp=[0-9]+:local_commands=[1-9]\d*:texture_view_sampler_status=[^\r\n]+")
+
+    def test_renderer_vendor_resource_capture_smoke_reports_native_resource_policy(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-vendor-resource-capture-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer vendor resource capture smoke ok", completed.stdout)
+        self.assertIn("mode=phase155-vendor-resource-capture", completed.stdout)
+        self.assertRegex(completed.stdout, r"vendor_resource_probe=(direct-ui-backend-resolved|material-correlation-fallback|missing)")
+        self.assertIn("vendor_resource_policy=native-rhi-resource-view-sampler", completed.stdout)
+        self.assertIn("ui_only_layer_status=pending-runtime-ui-render-target-copy", completed.stdout)
+        self.assertIn("native_command_gap=pending-full-vendor-command-buffer-dump", completed.stdout)
+        self.assertRegex(completed.stdout, r"vendor_resource=title-menu:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):texture_views=[0-9]+:sampler_views=[0-9]+:resource_pairs=[0-9]+:local_commands=[1-9]\d*:vendor_resource_status=[^\r\n]+")
+        self.assertRegex(completed.stdout, r"vendor_resource=loading:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):texture_views=[0-9]+:sampler_views=[0-9]+:resource_pairs=[0-9]+:local_commands=[1-9]\d*:vendor_resource_status=[^\r\n]+")
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

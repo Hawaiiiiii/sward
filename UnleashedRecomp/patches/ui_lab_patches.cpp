@@ -254,6 +254,34 @@ namespace UiLab
         float maxLod = 0.0f;
     };
 
+    struct RuntimeVendorTextureResourceView
+    {
+        uint64_t frame = 0;
+        uint32_t descriptorIndex = 0;
+        std::string backend;
+        std::string source;
+        uint64_t nativeTextureResourceHandle = 0;
+        uint64_t nativeTextureViewHandle = 0;
+        uint32_t nativeFormat = 0;
+        uint32_t nativeViewDimension = 0;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        uint32_t mipLevels = 0;
+    };
+
+    struct RuntimeVendorSamplerResourceView
+    {
+        uint64_t frame = 0;
+        uint32_t descriptorIndex = 0;
+        std::string backend;
+        std::string source;
+        uint64_t nativeSamplerHandle = 0;
+        uint32_t nativeFilter = 0;
+        uint32_t nativeAddressU = 0;
+        uint32_t nativeAddressV = 0;
+        uint32_t nativeAddressW = 0;
+    };
+
     struct BackendMaterialParityHint
     {
         std::string materialParityHint = "missing";
@@ -732,6 +760,8 @@ namespace UiLab
     static uint32_t g_runtimeBackendResolvedDroppedCount = 0;
     static std::unordered_map<uint32_t, RuntimeTextureDescriptorSemantic> g_runtimeTextureDescriptorSemantics;
     static std::unordered_map<uint32_t, RuntimeSamplerDescriptorSemantic> g_runtimeSamplerDescriptorSemantics;
+    static std::unordered_map<uint32_t, RuntimeVendorTextureResourceView> g_runtimeVendorTextureResourceViews;
+    static std::unordered_map<uint32_t, RuntimeVendorSamplerResourceView> g_runtimeVendorSamplerResourceViews;
     static PauseGeneralSaveLiveInspectorSnapshot g_pauseGeneralSaveInspector;
 
     static const RuntimeTarget& TargetFor(ScreenId id);
@@ -1558,6 +1588,7 @@ namespace UiLab
         R"("backendResolvedSubmitOracle")",
         R"("backendMaterialParityHints")",
         R"("backendDescriptorSemantics")",
+        R"("backendVendorResourceCapture")",
         R"("uiDrawSequence")",
         R"("gpuSubmitSequence")",
         R"("correlationMethod": "same-frame-order-window")",
@@ -1571,6 +1602,12 @@ namespace UiLab
         R"("textureDescriptorPolicy": "runtime-texture-view-descriptor-state")",
         R"("samplerDescriptorPolicy": "runtime-sampler-descriptor-state")",
         R"("vendorDescriptorCaptureGap": "pending-native-descriptor-dump")",
+        R"("vendorResourceCapturePolicy": "native-rhi-resource-view-and-sampler-handles")",
+        R"("vendorResourceCaptureStatus")",
+        R"("uiOnlyLayerCaptureStatus": "pending-runtime-ui-render-target-copy")",
+        R"("nativeCommandCaptureGap": "pending-full-vendor-command-buffer-dump")",
+        R"("nativeTextureResourceHandle")",
+        R"("nativeSamplerHandle")",
         R"("textMovieSfxGap": "pending-title-loading-media-timing")",
         R"("materialParityHint")",
         R"("materialParityStatus")",
@@ -2968,6 +3005,130 @@ namespace UiLab
             << "  },\n";
     }
 
+    static std::string RuntimeVendorResourceCaptureStatus(
+        size_t materialPairCount,
+        uint32_t textureResourceViewKnownCount,
+        uint32_t samplerResourceViewKnownCount)
+    {
+        if (textureResourceViewKnownCount > 0 || samplerResourceViewKnownCount > 0)
+            return "native RHI resource-view/sampler handles active";
+        if (materialPairCount > 0)
+            return "runtime material pairs active; waiting for native RHI resource-view/sampler handles";
+        return "native RHI resource-view/sampler capture armed; waiting for correlated submits";
+    }
+
+    static void BuildBackendVendorResourceCaptureJson(
+        std::ostringstream& out,
+        const std::vector<RuntimeMaterialCorrelation>& materialPairs,
+        const std::unordered_map<uint32_t, RuntimeVendorTextureResourceView>& textureResourceViews,
+        const std::unordered_map<uint32_t, RuntimeVendorSamplerResourceView>& samplerResourceViews)
+    {
+        uint32_t textureResourceViewKnownCount = 0;
+        uint32_t samplerResourceViewKnownCount = 0;
+        uint32_t resourceViewPairCount = 0;
+
+        for (const auto& pair : materialPairs)
+        {
+            const bool textureKnown = textureResourceViews.find(pair.texture2DDescriptorIndex) != textureResourceViews.end();
+            const bool samplerKnown = samplerResourceViews.find(pair.samplerDescriptorIndex) != samplerResourceViews.end();
+            if (textureKnown)
+                ++textureResourceViewKnownCount;
+            if (samplerKnown)
+                ++samplerResourceViewKnownCount;
+            if (textureKnown && samplerKnown)
+                ++resourceViewPairCount;
+        }
+
+        const std::string status = RuntimeVendorResourceCaptureStatus(
+            materialPairs.size(),
+            textureResourceViewKnownCount,
+            samplerResourceViewKnownCount);
+
+        out
+            << "  \"vendorResourceCaptureStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "  \"uiOnlyLayerCaptureStatus\": \"pending-runtime-ui-render-target-copy\",\n"
+            << "  \"nativeCommandCaptureGap\": \"pending-full-vendor-command-buffer-dump\",\n"
+            << "  \"backendVendorResourceCapture\": {\n"
+            << "    \"source\": \"native RHI resource-view/sampler handle capture\",\n"
+            << "    \"vendorResourceCapturePolicy\": \"native-rhi-resource-view-and-sampler-handles\",\n"
+            << "    \"vendorResourceCaptureStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "    \"uiOnlyLayerCaptureStatus\": \"pending-runtime-ui-render-target-copy\",\n"
+            << "    \"nativeCommandCaptureGap\": \"pending-full-vendor-command-buffer-dump\",\n"
+            << "    \"materialPairCount\": " << materialPairs.size() << ",\n"
+            << "    \"textureResourceViewKnownCount\": " << textureResourceViewKnownCount << ",\n"
+            << "    \"samplerResourceViewKnownCount\": " << samplerResourceViewKnownCount << ",\n"
+            << "    \"resourceViewPairCount\": " << resourceViewPairCount << ",\n"
+            << "    \"observedTextureResourceViewCount\": " << textureResourceViews.size() << ",\n"
+            << "    \"observedSamplerResourceViewCount\": " << samplerResourceViews.size() << ",\n"
+            << "    \"resourcePairs\": [";
+
+        const size_t pairLimit = std::min<size_t>(materialPairs.size(), 48);
+        for (size_t i = 0; i < pairLimit; ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            const auto& pair = materialPairs[i];
+            const auto textureFound = textureResourceViews.find(pair.texture2DDescriptorIndex);
+            const auto samplerFound = samplerResourceViews.find(pair.samplerDescriptorIndex);
+            const bool textureKnown = textureFound != textureResourceViews.end();
+            const bool samplerKnown = samplerFound != samplerResourceViews.end();
+
+            out
+                << "{"
+                << "\"uiDrawSequence\":" << pair.uiDrawSequence
+                << ",\"gpuSubmitSequence\":" << pair.gpuSubmitSequence
+                << ",\"texture2DDescriptorIndex\":" << pair.texture2DDescriptorIndex
+                << ",\"samplerDescriptorIndex\":" << pair.samplerDescriptorIndex
+                << ",\"textureResourceViewKnown\":" << (textureKnown ? "true" : "false")
+                << ",\"samplerResourceViewKnown\":" << (samplerKnown ? "true" : "false")
+                << ",\"nativeTextureResourceHandle\":\""
+                << JsonEscape(textureKnown ? HexU64(textureFound->second.nativeTextureResourceHandle) : "0x0000000000000000")
+                << "\""
+                << ",\"nativeTextureViewHandle\":\""
+                << JsonEscape(textureKnown ? HexU64(textureFound->second.nativeTextureViewHandle) : "0x0000000000000000")
+                << "\""
+                << ",\"nativeSamplerHandle\":\""
+                << JsonEscape(samplerKnown ? HexU64(samplerFound->second.nativeSamplerHandle) : "0x0000000000000000")
+                << "\"";
+
+            if (textureKnown)
+            {
+                const auto& texture = textureFound->second;
+                out
+                    << ",\"textureResourceView\":{"
+                    << "\"backend\":\"" << JsonEscape(texture.backend) << "\""
+                    << ",\"source\":\"" << JsonEscape(texture.source) << "\""
+                    << ",\"nativeFormat\":" << texture.nativeFormat
+                    << ",\"nativeViewDimension\":" << texture.nativeViewDimension
+                    << ",\"width\":" << texture.width
+                    << ",\"height\":" << texture.height
+                    << ",\"mipLevels\":" << texture.mipLevels
+                    << "}";
+            }
+
+            if (samplerKnown)
+            {
+                const auto& sampler = samplerFound->second;
+                out
+                    << ",\"samplerResourceView\":{"
+                    << "\"backend\":\"" << JsonEscape(sampler.backend) << "\""
+                    << ",\"source\":\"" << JsonEscape(sampler.source) << "\""
+                    << ",\"nativeFilter\":" << sampler.nativeFilter
+                    << ",\"nativeAddressU\":" << sampler.nativeAddressU
+                    << ",\"nativeAddressV\":" << sampler.nativeAddressV
+                    << ",\"nativeAddressW\":" << sampler.nativeAddressW
+                    << "}";
+            }
+
+            out << "}";
+        }
+
+        out
+            << "]\n"
+            << "  },\n";
+    }
+
     static void AppendRuntimeBackendResolvedSubmits(
         std::ostringstream& out,
         const std::vector<RuntimeBackendResolvedSubmit>& submits)
@@ -3089,6 +3250,8 @@ namespace UiLab
         std::vector<RuntimeGpuSubmitCall> gpuSubmitCalls;
         std::unordered_map<uint32_t, RuntimeTextureDescriptorSemantic> textureDescriptors;
         std::unordered_map<uint32_t, RuntimeSamplerDescriptorSemantic> samplerDescriptors;
+        std::unordered_map<uint32_t, RuntimeVendorTextureResourceView> textureResourceViews;
+        std::unordered_map<uint32_t, RuntimeVendorSamplerResourceView> samplerResourceViews;
         uint64_t frame = g_presentedFrameCount;
         uint32_t droppedCount = 0;
         uint32_t sequence = 0;
@@ -3099,6 +3262,8 @@ namespace UiLab
             gpuSubmitCalls = g_runtimeGpuSubmitCalls;
             textureDescriptors = g_runtimeTextureDescriptorSemantics;
             samplerDescriptors = g_runtimeSamplerDescriptorSemantics;
+            textureResourceViews = g_runtimeVendorTextureResourceViews;
+            samplerResourceViews = g_runtimeVendorSamplerResourceViews;
             if (g_runtimeBackendResolvedFrame != UINT64_MAX)
                 frame = g_runtimeBackendResolvedFrame;
             else if (g_runtimeGpuSubmitFrame != UINT64_MAX)
@@ -3180,6 +3345,11 @@ namespace UiLab
             materialPairs,
             textureDescriptors,
             samplerDescriptors);
+        BuildBackendVendorResourceCaptureJson(
+            out,
+            materialPairs,
+            textureResourceViews,
+            samplerResourceViews);
         out
             << "  \"backendResolvedJoinMethod\": \"same-frame-order-window\",\n"
             << "  \"sampleLimit\": " << kRuntimeBackendResolvedSubmitSampleLimit << ",\n"
@@ -5419,6 +5589,66 @@ namespace UiLab
 
         std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
         g_runtimeSamplerDescriptorSemantics[descriptorIndex] = descriptor;
+    }
+
+    void OnVendorTextureResourceViewResolved(
+        std::string_view backend,
+        uint32_t descriptorIndex,
+        uint64_t nativeTextureResourceHandle,
+        uint64_t nativeTextureViewHandle,
+        uint32_t nativeFormat,
+        uint32_t nativeViewDimension,
+        uint32_t width,
+        uint32_t height,
+        uint32_t mipLevels,
+        std::string_view source)
+    {
+        if (!g_isEnabled)
+            return;
+
+        RuntimeVendorTextureResourceView resourceView;
+        resourceView.frame = g_presentedFrameCount;
+        resourceView.descriptorIndex = descriptorIndex;
+        resourceView.backend = backend.empty() ? std::string("unknown") : std::string(backend);
+        resourceView.source = source.empty() ? std::string("unknown") : std::string(source);
+        resourceView.nativeTextureResourceHandle = nativeTextureResourceHandle;
+        resourceView.nativeTextureViewHandle = nativeTextureViewHandle;
+        resourceView.nativeFormat = nativeFormat;
+        resourceView.nativeViewDimension = nativeViewDimension;
+        resourceView.width = width;
+        resourceView.height = height;
+        resourceView.mipLevels = mipLevels;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        g_runtimeVendorTextureResourceViews[descriptorIndex] = std::move(resourceView);
+    }
+
+    void OnVendorSamplerResourceViewResolved(
+        std::string_view backend,
+        uint32_t descriptorIndex,
+        uint64_t nativeSamplerHandle,
+        uint32_t nativeFilter,
+        uint32_t nativeAddressU,
+        uint32_t nativeAddressV,
+        uint32_t nativeAddressW,
+        std::string_view source)
+    {
+        if (!g_isEnabled)
+            return;
+
+        RuntimeVendorSamplerResourceView resourceView;
+        resourceView.frame = g_presentedFrameCount;
+        resourceView.descriptorIndex = descriptorIndex;
+        resourceView.backend = backend.empty() ? std::string("unknown") : std::string(backend);
+        resourceView.source = source.empty() ? std::string("unknown") : std::string(source);
+        resourceView.nativeSamplerHandle = nativeSamplerHandle;
+        resourceView.nativeFilter = nativeFilter;
+        resourceView.nativeAddressU = nativeAddressU;
+        resourceView.nativeAddressV = nativeAddressV;
+        resourceView.nativeAddressW = nativeAddressW;
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        g_runtimeVendorSamplerResourceViews[descriptorIndex] = std::move(resourceView);
     }
 
     void OnRawBackendCommand(

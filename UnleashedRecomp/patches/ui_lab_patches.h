@@ -221,6 +221,26 @@ namespace UiLab
         uint32_t borderColor,
         float minLod,
         float maxLod);
+    void OnVendorTextureResourceViewResolved(
+        std::string_view backend,
+        uint32_t descriptorIndex,
+        uint64_t nativeTextureResourceHandle,
+        uint64_t nativeTextureViewHandle,
+        uint32_t nativeFormat,
+        uint32_t nativeViewDimension,
+        uint32_t width,
+        uint32_t height,
+        uint32_t mipLevels,
+        std::string_view source);
+    void OnVendorSamplerResourceViewResolved(
+        std::string_view backend,
+        uint32_t descriptorIndex,
+        uint64_t nativeSamplerHandle,
+        uint32_t nativeFilter,
+        uint32_t nativeAddressU,
+        uint32_t nativeAddressV,
+        uint32_t nativeAddressW,
+        std::string_view source);
     void OnRawBackendCommand(
         std::string_view backend,
         std::string_view command,

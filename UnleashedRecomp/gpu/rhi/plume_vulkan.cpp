@@ -1085,6 +1085,9 @@ namespace plume {
         assert(texture != nullptr);
 
         this->texture = texture;
+        this->dimension = desc.dimension;
+        this->format = desc.format;
+        this->mipLevels = desc.mipLevels;
 
         VkImageViewCreateInfo viewInfo = {};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1336,6 +1339,13 @@ namespace plume {
         samplerInfo.maxLod = desc.maxLOD;
         samplerInfo.borderColor = toVk(desc.borderColor);
         samplerInfo.unnormalizedCoordinates = VK_FALSE;
+
+        this->minFilter = samplerInfo.minFilter;
+        this->magFilter = samplerInfo.magFilter;
+        this->mipmapMode = samplerInfo.mipmapMode;
+        this->addressU = samplerInfo.addressModeU;
+        this->addressV = samplerInfo.addressModeV;
+        this->addressW = samplerInfo.addressModeW;
 
         VkResult res = vkCreateSampler(device->vk, &samplerInfo, nullptr, &vk);
         if (res != VK_SUCCESS) {
@@ -1979,9 +1989,31 @@ namespace plume {
         if (textureView != nullptr) {
             const VulkanTextureView *interfaceTextureView = static_cast<const VulkanTextureView *>(textureView);
             imageInfo.imageView = interfaceTextureView->vk;
+            UiLab::OnVendorTextureResourceViewResolved(
+                "Vulkan",
+                descriptorIndex,
+                NativeVkHandleToU64(interfaceTexture->vk),
+                NativeVkHandleToU64(imageInfo.imageView),
+                static_cast<uint32_t>(toVk(interfaceTextureView->format)),
+                static_cast<uint32_t>(interfaceTextureView->dimension),
+                interfaceTexture->desc.width,
+                interfaceTexture->desc.height,
+                interfaceTextureView->mipLevels,
+                "VulkanDescriptorSet::setTexture");
         }
         else {
             imageInfo.imageView = (interfaceTexture != nullptr) ? interfaceTexture->imageView : VK_NULL_HANDLE;
+            UiLab::OnVendorTextureResourceViewResolved(
+                "Vulkan",
+                descriptorIndex,
+                NativeVkHandleToU64(interfaceTexture->vk),
+                NativeVkHandleToU64(imageInfo.imageView),
+                static_cast<uint32_t>(interfaceTexture->imageFormat),
+                0,
+                interfaceTexture->desc.width,
+                interfaceTexture->desc.height,
+                interfaceTexture->desc.mipLevels,
+                "VulkanDescriptorSet::setTexture default view");
         }
 
         setDescriptor(descriptorIndex, nullptr, &imageInfo, nullptr, nullptr);
@@ -1996,6 +2028,15 @@ namespace plume {
         VkDescriptorImageInfo imageInfo = {};
         imageInfo.sampler = interfaceSampler->vk;
         setDescriptor(descriptorIndex, nullptr, &imageInfo, nullptr, nullptr);
+        UiLab::OnVendorSamplerResourceViewResolved(
+            "Vulkan",
+            descriptorIndex,
+            NativeVkHandleToU64(interfaceSampler->vk),
+            static_cast<uint32_t>(interfaceSampler->minFilter),
+            static_cast<uint32_t>(interfaceSampler->addressU),
+            static_cast<uint32_t>(interfaceSampler->addressV),
+            static_cast<uint32_t>(interfaceSampler->addressW),
+            "VulkanDescriptorSet::setSampler");
     }
 
     void VulkanDescriptorSet::setAccelerationStructure(uint32_t descriptorIndex, const RenderAccelerationStructure *accelerationStructure) {

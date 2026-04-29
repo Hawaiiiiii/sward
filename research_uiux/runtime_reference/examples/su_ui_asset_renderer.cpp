@@ -461,6 +461,10 @@ struct FrontendBackendResolvedEvidence
     std::string textureDescriptorPolicy = "missing";
     std::string samplerDescriptorPolicy = "missing";
     std::string vendorDescriptorCaptureGap = "pending-native-descriptor-dump";
+    std::string vendorResourceCaptureStatus = "missing";
+    std::string vendorResourceCapturePolicy = "missing";
+    std::string uiOnlyLayerCaptureStatus = "pending-runtime-ui-render-target-copy";
+    std::string nativeCommandCaptureGap = "pending-full-vendor-command-buffer-dump";
     std::string textMovieSfxGap = "pending";
     int runtimeFrame = 0;
     std::size_t materialPairCount = 0;
@@ -470,6 +474,9 @@ struct FrontendBackendResolvedEvidence
     std::size_t pointSamplerDescriptorCount = 0;
     std::size_t wrapSamplerDescriptorCount = 0;
     std::size_t clampSamplerDescriptorCount = 0;
+    std::size_t textureResourceViewKnownCount = 0;
+    std::size_t samplerResourceViewKnownCount = 0;
+    std::size_t resourceViewPairCount = 0;
     std::vector<FrontendBackendResolvedSubmit> submits;
     FrontendLiveBridgeProbeResult bridgeProbe;
 };
@@ -524,6 +531,21 @@ struct FrontendDescriptorSemanticsTriage
     std::size_t pointSamplerDescriptorCount = 0;
     std::size_t wrapSamplerDescriptorCount = 0;
     std::size_t clampSamplerDescriptorCount = 0;
+    std::size_t localCommandCount = 0;
+};
+
+struct FrontendVendorResourceCaptureTriage
+{
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string vendorResourcePolicy = "native-rhi-resource-view-sampler";
+    std::string uiOnlyLayerStatus = "pending-runtime-ui-render-target-copy";
+    std::string nativeCommandGap = "pending-full-vendor-command-buffer-dump";
+    std::string vendorResourceCaptureStatus = "missing";
+    std::size_t textureResourceViewKnownCount = 0;
+    std::size_t samplerResourceViewKnownCount = 0;
+    std::size_t resourceViewPairCount = 0;
     std::size_t localCommandCount = 0;
 };
 
@@ -6914,6 +6936,110 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return records.empty() ? 1 : 0;
 }
 
+[[nodiscard]] FrontendVendorResourceCaptureTriage buildFrontendVendorResourceCaptureTriage(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendVendorResourceCaptureTriage triage;
+    triage.screenId = policy.screenId;
+
+    const auto resolved = loadFrontendBackendResolvedEvidence(policy);
+    triage.source = resolved.source;
+    triage.probe = resolved.probe;
+    triage.vendorResourceCaptureStatus = resolved.vendorResourceCaptureStatus;
+    triage.uiOnlyLayerStatus = resolved.uiOnlyLayerCaptureStatus;
+    triage.nativeCommandGap = resolved.nativeCommandCaptureGap;
+    triage.textureResourceViewKnownCount = resolved.textureResourceViewKnownCount;
+    triage.samplerResourceViewKnownCount = resolved.samplerResourceViewKnownCount;
+    triage.resourceViewPairCount = resolved.resourceViewPairCount;
+
+    const auto clock = loadFrontendUiOraclePlaybackClock(policy);
+    for (const auto& scenePolicy : policy.scenes)
+    {
+        const int sceneFrame = uiOracleTimelineFrameForScene(clock, scenePolicy);
+        const CsdPipelineTemplateBinding sceneBinding{
+            policy.screenId,
+            policy.layoutName,
+            scenePolicy.sceneName,
+            scenePolicy.sceneName,
+            scenePolicy.timeline.animationName,
+        };
+
+        const auto* drawableScene = cachedCsdDrawableScene(sceneBinding);
+        if (!drawableScene)
+            continue;
+
+        auto playback = loadCsdTimelinePlayback(sceneBinding, sceneFrame);
+        if (!playback)
+            playback = loadTimelinePlaybackForScene(policy.screenId, policy.layoutName, scenePolicy.sceneName, sceneFrame);
+
+        std::size_t sampledTrackCount = 0;
+        const auto commands = timelineSampledCommands(
+            *drawableScene,
+            playback ? &*playback : nullptr,
+            sampledTrackCount);
+        triage.localCommandCount += static_cast<std::size_t>(std::count_if(
+            commands.begin(),
+            commands.end(),
+            csdCommandIsDrawable));
+    }
+
+    return triage;
+}
+
+[[nodiscard]] int runRendererVendorResourceCaptureSmoke()
+{
+    constexpr std::string_view directProbeToken = "vendor_resource_probe=direct-ui-backend-resolved";
+    constexpr std::string_view materialFallbackToken = "vendor_resource_probe=material-correlation-fallback";
+    constexpr std::string_view missingProbeToken = "vendor_resource_probe=missing";
+    constexpr std::string_view policyToken = "vendor_resource_policy=native-rhi-resource-view-sampler";
+    constexpr std::string_view uiOnlyLayerToken = "ui_only_layer_status=pending-runtime-ui-render-target-copy";
+    constexpr std::string_view nativeCommandGapToken = "native_command_gap=pending-full-vendor-command-buffer-dump";
+
+    std::vector<FrontendVendorResourceCaptureTriage> records;
+    for (const auto& policy : frontendScreenPolicies())
+        records.push_back(buildFrontendVendorResourceCaptureTriage(policy));
+
+    const bool anyDirect = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendVendorResourceCaptureTriage& record)
+        {
+            return record.probe == "direct-ui-backend-resolved";
+        });
+    const bool anyFallback = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendVendorResourceCaptureTriage& record)
+        {
+            return record.probe == "material-correlation-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer vendor resource capture smoke ok "
+        << "mode=phase155-vendor-resource-capture"
+        << " " << (anyDirect ? directProbeToken : (anyFallback ? materialFallbackToken : missingProbeToken))
+        << " " << policyToken
+        << " " << uiOnlyLayerToken
+        << " " << nativeCommandGapToken
+        << " lanes=" << records.size()
+        << '\n';
+
+    for (const auto& record : records)
+    {
+        std::cout
+            << "vendor_resource=" << record.screenId
+            << ":source=" << record.source
+            << ":texture_views=" << record.textureResourceViewKnownCount
+            << ":sampler_views=" << record.samplerResourceViewKnownCount
+            << ":resource_pairs=" << record.resourceViewPairCount
+            << ":local_commands=" << record.localCommandCount
+            << ":vendor_resource_status=" << record.vendorResourceCaptureStatus
+            << '\n';
+    }
+
+    return records.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -9763,6 +9889,18 @@ void applyFrontendBackendResolvedFromJson(
     evidence.pointSamplerDescriptorCount = static_cast<std::size_t>(jsonNumberField(descriptorSpan, "pointSamplerDescriptorCount").value_or(0.0));
     evidence.wrapSamplerDescriptorCount = static_cast<std::size_t>(jsonNumberField(descriptorSpan, "wrapSamplerDescriptorCount").value_or(0.0));
     evidence.clampSamplerDescriptorCount = static_cast<std::size_t>(jsonNumberField(descriptorSpan, "clampSamplerDescriptorCount").value_or(0.0));
+    const auto vendorResourceCapture = jsonObjectFieldSpan(text, "backendVendorResourceCapture");
+    const std::string_view vendorResourceSpan = vendorResourceCapture ? *vendorResourceCapture : text;
+    evidence.vendorResourceCaptureStatus = jsonStringField(vendorResourceSpan, "vendorResourceCaptureStatus")
+        .value_or(jsonStringField(text, "vendorResourceCaptureStatus").value_or("missing"));
+    evidence.vendorResourceCapturePolicy = jsonStringField(vendorResourceSpan, "vendorResourceCapturePolicy").value_or("missing");
+    evidence.uiOnlyLayerCaptureStatus = jsonStringField(vendorResourceSpan, "uiOnlyLayerCaptureStatus")
+        .value_or(jsonStringField(text, "uiOnlyLayerCaptureStatus").value_or("pending-runtime-ui-render-target-copy"));
+    evidence.nativeCommandCaptureGap = jsonStringField(vendorResourceSpan, "nativeCommandCaptureGap")
+        .value_or(jsonStringField(text, "nativeCommandCaptureGap").value_or("pending-full-vendor-command-buffer-dump"));
+    evidence.textureResourceViewKnownCount = static_cast<std::size_t>(jsonNumberField(vendorResourceSpan, "textureResourceViewKnownCount").value_or(0.0));
+    evidence.samplerResourceViewKnownCount = static_cast<std::size_t>(jsonNumberField(vendorResourceSpan, "samplerResourceViewKnownCount").value_or(0.0));
+    evidence.resourceViewPairCount = static_cast<std::size_t>(jsonNumberField(vendorResourceSpan, "resourceViewPairCount").value_or(0.0));
     if (evidence.materialPairCount == 0)
         evidence.materialPairCount = static_cast<std::size_t>(jsonNumberField(oracleSpan, "materialPairCount").value_or(0.0));
 
@@ -9808,6 +9946,10 @@ void applyFrontendBackendResolvedFromJson(
     fallback.materialParityStatus = material.found ? "material correlation fallback; backend material parity hints unavailable" : "missing";
     fallback.textureViewSamplerStatus = material.found ? "material correlation fallback; descriptor semantics unavailable" : "missing";
     fallback.vendorDescriptorCaptureGap = "pending-native-descriptor-dump";
+    fallback.vendorResourceCaptureStatus = material.found ? "material correlation fallback; vendor resource capture unavailable" : "missing";
+    fallback.vendorResourceCapturePolicy = "native-rhi-resource-view-and-sampler-handles";
+    fallback.uiOnlyLayerCaptureStatus = "pending-runtime-ui-render-target-copy";
+    fallback.nativeCommandCaptureGap = "pending-full-vendor-command-buffer-dump";
     fallback.linearSamplerDescriptorCount = static_cast<std::size_t>(std::count_if(
         material.pairs.begin(),
         material.pairs.end(),
@@ -11620,6 +11762,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererMaterialParityHintsSmoke();
     if (commandLineHasFlag("--renderer-descriptor-semantics-smoke"))
         return runRendererDescriptorSemanticsSmoke();
+    if (commandLineHasFlag("--renderer-vendor-resource-capture-smoke"))
+        return runRendererVendorResourceCaptureSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 

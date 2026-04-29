@@ -96,6 +96,9 @@ namespace plume {
     struct VulkanTextureView : RenderTextureView {
         VkImageView vk = VK_NULL_HANDLE;
         VulkanTexture *texture = nullptr;
+        RenderTextureViewDimension dimension = RenderTextureViewDimension::UNKNOWN;
+        RenderFormat format = RenderFormat::UNKNOWN;
+        uint32_t mipLevels = 0;
 
         VulkanTextureView(VulkanTexture *texture, const RenderTextureViewDesc &desc);
         ~VulkanTextureView() override;
@@ -144,6 +147,12 @@ namespace plume {
     struct VulkanSampler : RenderSampler {
         VkSampler vk = VK_NULL_HANDLE;
         VulkanDevice *device = nullptr;
+        VkFilter minFilter = VK_FILTER_NEAREST;
+        VkFilter magFilter = VK_FILTER_NEAREST;
+        VkSamplerMipmapMode mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        VkSamplerAddressMode addressU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        VkSamplerAddressMode addressV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        VkSamplerAddressMode addressW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
         VulkanSampler(VulkanDevice *device, const RenderSamplerDesc &desc);
         ~VulkanSampler();
