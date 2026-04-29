@@ -425,6 +425,7 @@ namespace UiLab
         std::string writeKind = "text";
         std::string valueName;
         std::string path;
+        bool pathResolved = true;
         uint32_t nodeAddress = 0;
         uint32_t textAddress = 0;
         std::string textUtf8;
@@ -2279,7 +2280,7 @@ namespace UiLab
     {
         return "score:known,scoreinfo:known,"
             "ring/timer/speed/lives:known-via-csd-text-write,"
-            "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization";
+            "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-with-unresolved-write-probe-pending-runtime-normalization";
     }
 
     static bool IsSonicHudValueTextPath(std::string_view path)
@@ -2352,6 +2353,49 @@ namespace UiLab
 
         value = static_cast<uint32_t>(result);
         return true;
+    }
+
+    static bool HasRecentUiPlayScreenDrawActivity()
+    {
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+
+        if (g_runtimeUiDrawCalls.empty())
+            return false;
+
+        if (g_runtimeUiDrawListFrame > g_presentedFrameCount)
+            return false;
+
+        if ((g_presentedFrameCount - g_runtimeUiDrawListFrame) > 180)
+            return false;
+
+        return std::any_of(
+            g_runtimeUiDrawCalls.begin(),
+            g_runtimeUiDrawCalls.end(),
+            [](const RuntimeUiDrawCall& call)
+            {
+                return
+                    call.projectName == "ui_playscreen" ||
+                    call.layerPath.starts_with("ui_playscreen/");
+            });
+    }
+
+    static bool IsLikelySonicHudUnresolvedValue(
+        std::string_view writeKind,
+        std::string_view valueText)
+    {
+        if (writeKind != "text")
+            return true;
+
+        if (valueText.empty() || valueText.size() > 8)
+            return false;
+
+        return std::all_of(
+            valueText.begin(),
+            valueText.end(),
+            [](char c)
+            {
+                return std::isdigit(static_cast<unsigned char>(c));
+            });
     }
 
     static std::string ResolveSonicHudValuePathFromCsdNode(uint32_t nodeAddress)
@@ -2508,10 +2552,12 @@ namespace UiLab
         bool numericValueKnown,
         double numericValue,
         std::string_view hookSource,
-        std::string_view logValue)
+        std::string_view logValue,
+        bool pathResolved)
     {
         const std::string logKey =
             std::string(writeKind) + "|" + std::string(path) + "|" + std::string(logValue) +
+            "|" + (pathResolved ? std::string("resolved") : HexU32(nodeAddress)) +
             "|" + std::to_string(g_routeGeneration);
 
         std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
@@ -2520,6 +2566,7 @@ namespace UiLab
         observation.writeKind = std::string(writeKind);
         observation.valueName = std::string(valueName);
         observation.path = std::string(path);
+        observation.pathResolved = pathResolved;
         observation.nodeAddress = nodeAddress;
         observation.textAddress = textAddress;
         observation.textUtf8 = std::string(textUtf8);
@@ -2533,7 +2580,13 @@ namespace UiLab
             g_sonicHudValueWriteObservations.end(),
             [&](const SonicHudValueWriteObservation& current)
             {
-                return current.path == observation.path && current.writeKind == observation.writeKind;
+                if (current.path != observation.path || current.writeKind != observation.writeKind)
+                    return false;
+
+                if (observation.pathResolved)
+                    return true;
+
+                return current.nodeAddress == observation.nodeAddress;
             });
 
         if (existing != g_sonicHudValueWriteObservations.end())
@@ -2546,6 +2599,52 @@ namespace UiLab
         }
 
         return g_loggedSonicHudValueTextWriteKeys.insert(logKey).second;
+    }
+
+    static bool RecordUnresolvedSonicHudNodeWrite(
+        std::string_view writeKind,
+        uint32_t nodeAddress,
+        uint32_t textAddress,
+        std::string_view valueText,
+        bool numericValueKnown,
+        double numericValue,
+        std::string_view hookSource)
+    {
+        if (
+            !IsPlausibleGuestPointer(nodeAddress) ||
+            !IsLikelySonicHudUnresolvedValue(writeKind, valueText) ||
+            !HasRecentUiPlayScreenDrawActivity())
+        {
+            return false;
+        }
+
+        const std::string unresolvedKind = std::string(writeKind) + "-unresolved";
+        const bool shouldLog = RecordSonicHudNodeWriteObservation(
+            unresolvedKind,
+            "unknown",
+            "unresolved",
+            nodeAddress,
+            textAddress,
+            valueText,
+            numericValueKnown,
+            numericValue,
+            hookSource,
+            valueText,
+            false);
+
+        if (shouldLog)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-node-write-unresolved",
+                "kind=" + std::string(writeKind) +
+                " node=" + HexU32(nodeAddress) +
+                " value=\"" + std::string(valueText) + "\"" +
+                " source=" + std::string(hookSource) +
+                " reason=ui_playscreen-active-path-unresolved");
+            WriteLiveStateSnapshot();
+        }
+
+        return shouldLog;
     }
 
     static void AppendCsdTreeEntries(
@@ -2617,6 +2716,7 @@ namespace UiLab
                 << "\"writeKind\":\"" << JsonEscape(observation.writeKind) << "\","
                 << "\"valueName\":\"" << JsonEscape(observation.valueName) << "\","
                 << "\"path\":\"" << JsonEscape(observation.path) << "\","
+                << "\"pathResolved\":" << (observation.pathResolved ? "true" : "false") << ","
                 << "\"nodeAddress\":\"" << JsonEscape(HexU32(observation.nodeAddress)) << "\","
                 << "\"textAddress\":\"" << JsonEscape(HexU32(observation.textAddress)) << "\","
                 << "\"textUtf8\":\"" << JsonEscape(observation.textUtf8) << "\","
@@ -6570,13 +6670,23 @@ namespace UiLab
         if (!g_isEnabled || textUtf8.empty())
             return;
 
-        const std::string path = ResolveSonicHudValuePathFromCsdNode(nodeAddress);
-        if (path.empty())
-            return;
-
         const std::string source = hookSource.empty()
             ? std::string("CSD::CNode::SetText/sub_830BF640")
             : std::string(hookSource);
+
+        const std::string path = ResolveSonicHudValuePathFromCsdNode(nodeAddress);
+        if (path.empty())
+        {
+            RecordUnresolvedSonicHudNodeWrite(
+                "text",
+                nodeAddress,
+                textAddress,
+                textUtf8,
+                false,
+                0.0,
+                source);
+            return;
+        }
 
         const std::string valueName = SonicHudValueNameFromTextPath(path);
         const std::string logKey =
@@ -6639,15 +6749,26 @@ namespace UiLab
         if (!g_isEnabled)
             return;
 
-        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
-        if (path.empty())
-            return;
-
         const std::string source = hookSource.empty()
             ? std::string("CSD::CNode::SetPatternIndex/sub_830BF300")
             : std::string(hookSource);
-        const std::string valueName = SonicHudValueNameFromGaugeOrPromptPath(path);
         const std::string patternText = std::to_string(patternIndex);
+
+        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
+        if (path.empty())
+        {
+            RecordUnresolvedSonicHudNodeWrite(
+                "pattern-index",
+                nodeAddress,
+                0,
+                patternText,
+                true,
+                static_cast<double>(patternIndex),
+                source);
+            return;
+        }
+
+        const std::string valueName = SonicHudValueNameFromGaugeOrPromptPath(path);
 
         const bool shouldLog = RecordSonicHudNodeWriteObservation(
             "pattern-index",
@@ -6659,7 +6780,8 @@ namespace UiLab
             true,
             static_cast<double>(patternIndex),
             source,
-            patternText);
+            patternText,
+            true);
 
         if (shouldLog)
         {
@@ -6682,15 +6804,26 @@ namespace UiLab
         if (!g_isEnabled)
             return;
 
-        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
-        if (path.empty())
-            return;
-
         const std::string source = hookSource.empty()
             ? std::string("CSD::CNode::SetHideFlag/sub_830BF080")
             : std::string(hookSource);
-        const std::string valueName = SonicHudValueNameFromGaugeOrPromptPath(path);
         const std::string hideText = std::to_string(hideFlag);
+
+        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
+        if (path.empty())
+        {
+            RecordUnresolvedSonicHudNodeWrite(
+                "hide-flag",
+                nodeAddress,
+                0,
+                hideText,
+                true,
+                static_cast<double>(hideFlag),
+                source);
+            return;
+        }
+
+        const std::string valueName = SonicHudValueNameFromGaugeOrPromptPath(path);
 
         const bool shouldLog = RecordSonicHudNodeWriteObservation(
             "hide-flag",
@@ -6702,7 +6835,8 @@ namespace UiLab
             true,
             static_cast<double>(hideFlag),
             source,
-            hideText);
+            hideText,
+            true);
 
         if (path.starts_with("ui_playscreen/add/u_info"))
         {
@@ -6735,17 +6869,28 @@ namespace UiLab
         if (!g_isEnabled)
             return;
 
-        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
-        if (path.empty())
-            return;
-
         const std::string source = hookSource.empty()
             ? std::string("CSD::CNode::SetScale/sub_830BF090")
             : std::string(hookSource);
-        const std::string valueName = SonicHudValueNameFromGaugeOrPromptPath(path);
 
         std::ostringstream value;
         value << scaleX << "," << scaleY;
+
+        const std::string path = ResolveSonicHudGaugeOrPromptPathFromCsdNode(nodeAddress);
+        if (path.empty())
+        {
+            RecordUnresolvedSonicHudNodeWrite(
+                "scale",
+                nodeAddress,
+                0,
+                value.str(),
+                true,
+                static_cast<double>(scaleX),
+                source);
+            return;
+        }
+
+        const std::string valueName = SonicHudValueNameFromGaugeOrPromptPath(path);
 
         const bool shouldLog = RecordSonicHudNodeWriteObservation(
             "scale",
@@ -6757,7 +6902,8 @@ namespace UiLab
             true,
             static_cast<double>(scaleX),
             source,
-            value.str());
+            value.str(),
+            true);
 
         if (shouldLog)
         {

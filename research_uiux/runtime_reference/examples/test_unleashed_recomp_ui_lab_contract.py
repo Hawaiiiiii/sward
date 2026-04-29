@@ -1991,7 +1991,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "sonic-hud-value-text-write",
             "sonic-hud-value-write-update",
             "ring/timer/speed/lives:known-via-csd-text-write",
-            "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization",
+            "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-with-unresolved-write-probe-pending-runtime-normalization",
         ]:
             self.assertIn(token, ui_lab)
 
@@ -2050,9 +2050,14 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "sonic-hud-gauge-pattern-write",
             "sonic-hud-gauge-hide-write",
             "sonic-hud-gauge-scale-write",
+            "sonic-hud-node-write-unresolved",
+            "HasRecentUiPlayScreenDrawActivity",
+            "IsLikelySonicHudUnresolvedValue",
+            "RecordUnresolvedSonicHudNodeWrite",
+            "pathResolved",
             "writeKind",
             "numericValueKnown",
-            "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization",
+            "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-with-unresolved-write-probe-pending-runtime-normalization",
         ]:
             self.assertIn(token, ui_lab)
 
@@ -2062,6 +2067,8 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "CNode::SetPatternIndex/sub_830BF300",
             "CNode::SetHideFlag/sub_830BF080",
             "CNode::SetScale/sub_830BF090",
+            "Phase 170",
+            "sonic-hud-node-write-unresolved",
         ]:
             self.assertIn(token, report)
 
