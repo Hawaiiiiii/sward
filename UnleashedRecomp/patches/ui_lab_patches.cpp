@@ -1608,6 +1608,17 @@ namespace UiLab
         R"("nativeCommandCaptureGap": "pending-full-vendor-command-buffer-dump")",
         R"("nativeTextureResourceHandle")",
         R"("nativeSamplerHandle")",
+        R"("backendMaterialResourceViewParity")",
+        R"("materialResourceViewParityPolicy": "vendor-resource-view-alpha-gamma-srgb")",
+        R"("premultipliedAlphaPolicy": "runtime-blend-state-plus-vendor-resource-view")",
+        R"("gammaSrgbPolicy": "native-resource-view-format-classification")",
+        R"("resourceViewExactnessStatus")",
+        R"("resourceViewExactPairCount")",
+        R"("srgbTextureResourceViewCount")",
+        R"("premultipliedAlphaStatus")",
+        R"("gammaSrgbStatus")",
+        R"("uiOnlyRenderTargetCaptureProbe")",
+        R"("uiOnlyRenderTargetCapturePolicy": "copy-ui-render-target-before-present")",
         R"("textMovieSfxGap": "pending-title-loading-media-timing")",
         R"("materialParityHint")",
         R"("materialParityStatus")",
@@ -3129,6 +3140,149 @@ namespace UiLab
             << "  },\n";
     }
 
+    static bool RuntimeNativeFormatLooksSrgb(const RuntimeVendorTextureResourceView& texture)
+    {
+        switch (texture.nativeFormat)
+        {
+            // DXGI_FORMAT_*_SRGB values observed by D3D12 resource views.
+            case 29:  // DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
+            case 72:  // DXGI_FORMAT_BC1_UNORM_SRGB
+            case 75:  // DXGI_FORMAT_BC2_UNORM_SRGB
+            case 78:  // DXGI_FORMAT_BC3_UNORM_SRGB
+            case 91:  // DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
+            case 93:  // DXGI_FORMAT_B8G8R8X8_UNORM_SRGB
+            case 99:  // DXGI_FORMAT_BC7_UNORM_SRGB
+            // VkFormat *_SRGB values observed by Vulkan image views.
+            case 43:  // VK_FORMAT_R8G8B8A8_SRGB
+            case 50:  // VK_FORMAT_B8G8R8A8_SRGB
+            case 132: // VK_FORMAT_BC1_RGB_SRGB_BLOCK
+            case 134: // VK_FORMAT_BC1_RGBA_SRGB_BLOCK
+            case 136: // VK_FORMAT_BC2_SRGB_BLOCK
+            case 138: // VK_FORMAT_BC3_SRGB_BLOCK
+            case 146: // VK_FORMAT_BC7_SRGB_BLOCK
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    static std::string RuntimeMaterialResourceViewParityStatus(
+        uint32_t resourceViewExactPairCount,
+        uint32_t srgbTextureResourceViewCount,
+        uint32_t alphaBlendResourcePairCount)
+    {
+        if (resourceViewExactPairCount == 0)
+            return "waiting-for-native-resource-view-pairs";
+        if (srgbTextureResourceViewCount > 0)
+            return "native-resource-view-pairs-active-with-srgb-format-candidates";
+        if (alphaBlendResourcePairCount > 0)
+            return "native-resource-view-pairs-active-with-alpha-blend-materials";
+        return "native-resource-view-pairs-active";
+    }
+
+    static std::string RuntimeResourceViewExactnessStatus(uint32_t resourceViewExactPairCount, size_t materialPairCount)
+    {
+        if (resourceViewExactPairCount > 0)
+            return "native-texture-view-and-sampler-handles-paired";
+        if (materialPairCount > 0)
+            return "material-pairs-active-waiting-for-native-resource-handles";
+        return "waiting-for-material-pairs";
+    }
+
+    static std::string RuntimePremultipliedAlphaStatus(uint32_t alphaBlendResourcePairCount, uint32_t additiveResourcePairCount)
+    {
+        if (alphaBlendResourcePairCount == 0)
+            return "no-alpha-blend-resource-pairs-yet";
+        if (additiveResourcePairCount > 0)
+            return "runtime-blend-state-and-resource-views-show-additive-alpha-paths";
+        return "runtime-blend-state-and-resource-views-show-straight-alpha-paths";
+    }
+
+    static std::string RuntimeGammaSrgbStatus(uint32_t srgbTextureResourceViewCount, uint32_t textureResourceViewKnownCount)
+    {
+        if (srgbTextureResourceViewCount > 0)
+            return "native-srgb-resource-view-formats-observed";
+        if (textureResourceViewKnownCount > 0)
+            return "native-resource-view-formats-captured-no-srgb-classification";
+        return "waiting-for-native-resource-view-formats";
+    }
+
+    static void BuildBackendMaterialResourceViewParityJson(
+        std::ostringstream& out,
+        const std::vector<RuntimeMaterialCorrelation>& materialPairs,
+        const std::unordered_map<uint32_t, RuntimeVendorTextureResourceView>& textureResourceViews,
+        const std::unordered_map<uint32_t, RuntimeVendorSamplerResourceView>& samplerResourceViews)
+    {
+        uint32_t textureResourceViewKnownCount = 0;
+        uint32_t samplerResourceViewKnownCount = 0;
+        uint32_t resourceViewExactPairCount = 0;
+        uint32_t alphaBlendResourcePairCount = 0;
+        uint32_t additiveResourcePairCount = 0;
+        uint32_t srgbTextureResourceViewCount = 0;
+
+        for (const auto& pair : materialPairs)
+        {
+            const auto textureFound = textureResourceViews.find(pair.texture2DDescriptorIndex);
+            const auto samplerFound = samplerResourceViews.find(pair.samplerDescriptorIndex);
+            const bool textureKnown = textureFound != textureResourceViews.end();
+            const bool samplerKnown = samplerFound != samplerResourceViews.end();
+            if (textureKnown)
+            {
+                ++textureResourceViewKnownCount;
+                if (RuntimeNativeFormatLooksSrgb(textureFound->second))
+                    ++srgbTextureResourceViewCount;
+            }
+            if (samplerKnown)
+                ++samplerResourceViewKnownCount;
+            if (!textureKnown || !samplerKnown)
+                continue;
+
+            ++resourceViewExactPairCount;
+            if (pair.alphaBlendEnable)
+                ++alphaBlendResourcePairCount;
+            if (pair.additiveBlend)
+                ++additiveResourcePairCount;
+        }
+
+        const std::string status = RuntimeMaterialResourceViewParityStatus(
+            resourceViewExactPairCount,
+            srgbTextureResourceViewCount,
+            alphaBlendResourcePairCount);
+        const std::string exactnessStatus = RuntimeResourceViewExactnessStatus(resourceViewExactPairCount, materialPairs.size());
+        const std::string premultipliedStatus = RuntimePremultipliedAlphaStatus(alphaBlendResourcePairCount, additiveResourcePairCount);
+        const std::string gammaStatus = RuntimeGammaSrgbStatus(srgbTextureResourceViewCount, textureResourceViewKnownCount);
+
+        out
+            << "  \"materialResourceViewParityStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "  \"resourceViewExactnessStatus\": \"" << JsonEscape(exactnessStatus) << "\",\n"
+            << "  \"premultipliedAlphaStatus\": \"" << JsonEscape(premultipliedStatus) << "\",\n"
+            << "  \"gammaSrgbStatus\": \"" << JsonEscape(gammaStatus) << "\",\n"
+            << "  \"backendMaterialResourceViewParity\": {\n"
+            << "    \"source\": \"vendor resource-view material parity tightening\",\n"
+            << "    \"materialResourceViewParityPolicy\": \"vendor-resource-view-alpha-gamma-srgb\",\n"
+            << "    \"materialResourceViewParityStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "    \"premultipliedAlphaPolicy\": \"runtime-blend-state-plus-vendor-resource-view\",\n"
+            << "    \"gammaSrgbPolicy\": \"native-resource-view-format-classification\",\n"
+            << "    \"resourceViewExactnessPolicy\": \"native-resource-view-and-sampler-handle-pairing\",\n"
+            << "    \"resourceViewExactnessStatus\": \"" << JsonEscape(exactnessStatus) << "\",\n"
+            << "    \"premultipliedAlphaStatus\": \"" << JsonEscape(premultipliedStatus) << "\",\n"
+            << "    \"gammaSrgbStatus\": \"" << JsonEscape(gammaStatus) << "\",\n"
+            << "    \"materialPairCount\": " << materialPairs.size() << ",\n"
+            << "    \"textureResourceViewKnownCount\": " << textureResourceViewKnownCount << ",\n"
+            << "    \"samplerResourceViewKnownCount\": " << samplerResourceViewKnownCount << ",\n"
+            << "    \"resourceViewExactPairCount\": " << resourceViewExactPairCount << ",\n"
+            << "    \"alphaBlendResourcePairCount\": " << alphaBlendResourcePairCount << ",\n"
+            << "    \"additiveResourcePairCount\": " << additiveResourcePairCount << ",\n"
+            << "    \"srgbTextureResourceViewCount\": " << srgbTextureResourceViewCount << ",\n"
+            << "    \"uiOnlyRenderTargetCaptureProbe\": {\n"
+            << "      \"uiOnlyRenderTargetCapturePolicy\": \"copy-ui-render-target-before-present\",\n"
+            << "      \"uiOnlyLayerCaptureStatus\": \"pending-runtime-ui-render-target-copy\",\n"
+            << "      \"captureHookStatus\": \"pending-ui-pass-render-target-copy\",\n"
+            << "      \"nativeCommandCaptureGap\": \"pending-full-vendor-command-buffer-dump\"\n"
+            << "    }\n"
+            << "  },\n";
+    }
+
     static void AppendRuntimeBackendResolvedSubmits(
         std::ostringstream& out,
         const std::vector<RuntimeBackendResolvedSubmit>& submits)
@@ -3346,6 +3500,11 @@ namespace UiLab
             textureDescriptors,
             samplerDescriptors);
         BuildBackendVendorResourceCaptureJson(
+            out,
+            materialPairs,
+            textureResourceViews,
+            samplerResourceViews);
+        BuildBackendMaterialResourceViewParityJson(
             out,
             materialPairs,
             textureResourceViews,

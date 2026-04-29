@@ -1032,6 +1032,50 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("native RHI resource-view/sampler handle capture", harvest)
         self.assertIn("true UI-only rendered layer remains pending", harvest)
 
+    def test_ui_lab_phase156_exposes_material_resource_view_parity_oracle(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        renderer = self.read("research_uiux/runtime_reference/examples/su_ui_asset_renderer.cpp")
+        tests = self.read("research_uiux/runtime_reference/examples/test_su_ui_asset_renderer.py")
+        harvest = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "RuntimeMaterialResourceViewParityStatus",
+            "RuntimeNativeFormatLooksSrgb",
+            "BuildBackendMaterialResourceViewParityJson",
+            '"backendMaterialResourceViewParity"',
+            '"materialResourceViewParityPolicy": "vendor-resource-view-alpha-gamma-srgb"',
+            '"premultipliedAlphaPolicy": "runtime-blend-state-plus-vendor-resource-view"',
+            '"gammaSrgbPolicy": "native-resource-view-format-classification"',
+            '"premultipliedAlphaStatus"',
+            '"gammaSrgbStatus"',
+            '"resourceViewExactnessStatus"',
+            '"resourceViewExactPairCount"',
+            '"srgbTextureResourceViewCount"',
+            '"uiOnlyRenderTargetCaptureProbe"',
+            '"uiOnlyRenderTargetCapturePolicy": "copy-ui-render-target-before-present"',
+            '"uiOnlyLayerCaptureStatus": "pending-runtime-ui-render-target-copy"',
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "FrontendMaterialResourceViewParityTriage",
+            "buildFrontendMaterialResourceViewParityTriage",
+            "runRendererMaterialResourceViewParitySmoke",
+            "--renderer-material-resource-view-parity-smoke",
+            "phase156-material-resource-view-parity",
+            "material_parity_policy=vendor-resource-view-alpha-gamma-srgb",
+            "ui_only_capture_policy=copy-ui-render-target-before-present",
+            "resource_view_exactness=",
+            "premultiplied_alpha_status=",
+            "gamma_srgb_status=",
+        ]:
+            self.assertIn(token, renderer)
+
+        self.assertIn("test_renderer_material_resource_view_parity_smoke_reports_resource_view_exactness", tests)
+        self.assertIn("Phase 156", harvest)
+        self.assertIn("premultiplied alpha/gamma/sRGB resource-view parity", harvest)
+        self.assertIn("UI-only render-target capture remains pending", harvest)
+
     def test_ui_lab_has_repo_safe_live_bridge_client_tool(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1"
         self.assertTrue(script_path.is_file())

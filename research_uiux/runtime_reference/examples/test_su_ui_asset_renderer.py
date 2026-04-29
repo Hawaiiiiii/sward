@@ -969,6 +969,21 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("vendorResourceCaptureStatus", source_text)
         self.assertIn("textureResourceViewKnownCount", source_text)
 
+    def test_renderer_source_wires_phase156_material_resource_view_parity(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendMaterialResourceViewParityTriage", source_text)
+        self.assertIn("buildFrontendMaterialResourceViewParityTriage", source_text)
+        self.assertIn("runRendererMaterialResourceViewParitySmoke", source_text)
+        self.assertIn("--renderer-material-resource-view-parity-smoke", source_text)
+        self.assertIn("phase156-material-resource-view-parity", source_text)
+        self.assertIn("material_parity_policy=vendor-resource-view-alpha-gamma-srgb", source_text)
+        self.assertIn("ui_only_capture_policy=copy-ui-render-target-before-present", source_text)
+        self.assertIn("resource_view_exactness=", source_text)
+        self.assertIn("premultiplied_alpha_status=", source_text)
+        self.assertIn("gamma_srgb_status=", source_text)
+        self.assertIn("materialResourceViewParityStatus", source_text)
+        self.assertIn("resourceViewExactPairCount", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -1302,6 +1317,29 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("native_command_gap=pending-full-vendor-command-buffer-dump", completed.stdout)
         self.assertRegex(completed.stdout, r"vendor_resource=title-menu:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):texture_views=[0-9]+:sampler_views=[0-9]+:resource_pairs=[0-9]+:local_commands=[1-9]\d*:vendor_resource_status=[^\r\n]+")
         self.assertRegex(completed.stdout, r"vendor_resource=loading:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):texture_views=[0-9]+:sampler_views=[0-9]+:resource_pairs=[0-9]+:local_commands=[1-9]\d*:vendor_resource_status=[^\r\n]+")
+
+    def test_renderer_material_resource_view_parity_smoke_reports_resource_view_exactness(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-material-resource-view-parity-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer material resource-view parity smoke ok", completed.stdout)
+        self.assertIn("mode=phase156-material-resource-view-parity", completed.stdout)
+        self.assertRegex(completed.stdout, r"material_resource_view_probe=(direct-ui-backend-resolved|material-correlation-fallback|missing)")
+        self.assertIn("material_parity_policy=vendor-resource-view-alpha-gamma-srgb", completed.stdout)
+        self.assertIn("ui_only_capture_policy=copy-ui-render-target-before-present", completed.stdout)
+        self.assertIn("ui_only_layer_status=pending-runtime-ui-render-target-copy", completed.stdout)
+        self.assertRegex(completed.stdout, r"material_resource_view=title-menu:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):resource_pairs=[0-9]+:srgb_candidates=[0-9]+:local_commands=[1-9]\d*:resource_view_exactness=[^:]+:premultiplied_alpha_status=[^:]+:gamma_srgb_status=[^\r\n]+")
+        self.assertRegex(completed.stdout, r"material_resource_view=loading:source=(ui_lab_live_bridge_backend_resolved|ui_lab_live_bridge_material_correlation|missing):resource_pairs=[0-9]+:srgb_candidates=[0-9]+:local_commands=[1-9]\d*:resource_view_exactness=[^:]+:premultiplied_alpha_status=[^:]+:gamma_srgb_status=[^\r\n]+")
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

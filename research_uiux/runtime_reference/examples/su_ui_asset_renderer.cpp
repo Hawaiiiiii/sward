@@ -465,6 +465,11 @@ struct FrontendBackendResolvedEvidence
     std::string vendorResourceCapturePolicy = "missing";
     std::string uiOnlyLayerCaptureStatus = "pending-runtime-ui-render-target-copy";
     std::string nativeCommandCaptureGap = "pending-full-vendor-command-buffer-dump";
+    std::string materialResourceViewParityStatus = "missing";
+    std::string resourceViewExactnessStatus = "missing";
+    std::string premultipliedAlphaStatus = "missing";
+    std::string gammaSrgbStatus = "missing";
+    std::string uiOnlyRenderTargetCapturePolicy = "copy-ui-render-target-before-present";
     std::string textMovieSfxGap = "pending";
     int runtimeFrame = 0;
     std::size_t materialPairCount = 0;
@@ -477,6 +482,8 @@ struct FrontendBackendResolvedEvidence
     std::size_t textureResourceViewKnownCount = 0;
     std::size_t samplerResourceViewKnownCount = 0;
     std::size_t resourceViewPairCount = 0;
+    std::size_t resourceViewExactPairCount = 0;
+    std::size_t srgbTextureResourceViewCount = 0;
     std::vector<FrontendBackendResolvedSubmit> submits;
     FrontendLiveBridgeProbeResult bridgeProbe;
 };
@@ -546,6 +553,22 @@ struct FrontendVendorResourceCaptureTriage
     std::size_t textureResourceViewKnownCount = 0;
     std::size_t samplerResourceViewKnownCount = 0;
     std::size_t resourceViewPairCount = 0;
+    std::size_t localCommandCount = 0;
+};
+
+struct FrontendMaterialResourceViewParityTriage
+{
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string materialResourceViewParityStatus = "missing";
+    std::string resourceViewExactnessStatus = "missing";
+    std::string premultipliedAlphaStatus = "missing";
+    std::string gammaSrgbStatus = "missing";
+    std::string uiOnlyLayerStatus = "pending-runtime-ui-render-target-copy";
+    std::string uiOnlyRenderTargetCapturePolicy = "copy-ui-render-target-before-present";
+    std::size_t resourceViewExactPairCount = 0;
+    std::size_t srgbTextureResourceViewCount = 0;
     std::size_t localCommandCount = 0;
 };
 
@@ -7040,6 +7063,113 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return records.empty() ? 1 : 0;
 }
 
+[[nodiscard]] FrontendMaterialResourceViewParityTriage buildFrontendMaterialResourceViewParityTriage(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendMaterialResourceViewParityTriage triage;
+    triage.screenId = policy.screenId;
+
+    const auto resolved = loadFrontendBackendResolvedEvidence(policy);
+    triage.source = resolved.source;
+    triage.probe = resolved.probe;
+    triage.materialResourceViewParityStatus = resolved.materialResourceViewParityStatus;
+    triage.resourceViewExactnessStatus = resolved.resourceViewExactnessStatus;
+    triage.premultipliedAlphaStatus = resolved.premultipliedAlphaStatus;
+    triage.gammaSrgbStatus = resolved.gammaSrgbStatus;
+    triage.uiOnlyLayerStatus = resolved.uiOnlyLayerCaptureStatus;
+    triage.uiOnlyRenderTargetCapturePolicy = resolved.uiOnlyRenderTargetCapturePolicy;
+    triage.resourceViewExactPairCount = resolved.resourceViewExactPairCount;
+    triage.srgbTextureResourceViewCount = resolved.srgbTextureResourceViewCount;
+
+    const auto clock = loadFrontendUiOraclePlaybackClock(policy);
+    for (const auto& scenePolicy : policy.scenes)
+    {
+        const int sceneFrame = uiOracleTimelineFrameForScene(clock, scenePolicy);
+        const CsdPipelineTemplateBinding sceneBinding{
+            policy.screenId,
+            policy.layoutName,
+            scenePolicy.sceneName,
+            scenePolicy.sceneName,
+            scenePolicy.timeline.animationName,
+        };
+
+        const auto* drawableScene = cachedCsdDrawableScene(sceneBinding);
+        if (!drawableScene)
+            continue;
+
+        auto playback = loadCsdTimelinePlayback(sceneBinding, sceneFrame);
+        if (!playback)
+            playback = loadTimelinePlaybackForScene(policy.screenId, policy.layoutName, scenePolicy.sceneName, sceneFrame);
+
+        std::size_t sampledTrackCount = 0;
+        const auto commands = timelineSampledCommands(
+            *drawableScene,
+            playback ? &*playback : nullptr,
+            sampledTrackCount);
+        triage.localCommandCount += static_cast<std::size_t>(std::count_if(
+            commands.begin(),
+            commands.end(),
+            csdCommandIsDrawable));
+    }
+
+    return triage;
+}
+
+[[nodiscard]] int runRendererMaterialResourceViewParitySmoke()
+{
+    constexpr std::string_view directProbeToken = "material_resource_view_probe=direct-ui-backend-resolved";
+    constexpr std::string_view materialFallbackToken = "material_resource_view_probe=material-correlation-fallback";
+    constexpr std::string_view missingProbeToken = "material_resource_view_probe=missing";
+    constexpr std::string_view policyToken = "material_parity_policy=vendor-resource-view-alpha-gamma-srgb";
+    constexpr std::string_view uiOnlyCapturePolicyToken = "ui_only_capture_policy=copy-ui-render-target-before-present";
+    constexpr std::string_view uiOnlyLayerToken = "ui_only_layer_status=pending-runtime-ui-render-target-copy";
+
+    std::vector<FrontendMaterialResourceViewParityTriage> records;
+    for (const auto& policy : frontendScreenPolicies())
+        records.push_back(buildFrontendMaterialResourceViewParityTriage(policy));
+
+    const bool anyDirect = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendMaterialResourceViewParityTriage& record)
+        {
+            return record.probe == "direct-ui-backend-resolved";
+        });
+    const bool anyFallback = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendMaterialResourceViewParityTriage& record)
+        {
+            return record.probe == "material-correlation-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer material resource-view parity smoke ok "
+        << "mode=phase156-material-resource-view-parity"
+        << " " << (anyDirect ? directProbeToken : (anyFallback ? materialFallbackToken : missingProbeToken))
+        << " " << policyToken
+        << " " << uiOnlyCapturePolicyToken
+        << " " << uiOnlyLayerToken
+        << " lanes=" << records.size()
+        << '\n';
+
+    for (const auto& record : records)
+    {
+        std::cout
+            << "material_resource_view=" << record.screenId
+            << ":source=" << record.source
+            << ":resource_pairs=" << record.resourceViewExactPairCount
+            << ":srgb_candidates=" << record.srgbTextureResourceViewCount
+            << ":local_commands=" << record.localCommandCount
+            << ":resource_view_exactness=" << record.resourceViewExactnessStatus
+            << ":premultiplied_alpha_status=" << record.premultipliedAlphaStatus
+            << ":gamma_srgb_status=" << record.gammaSrgbStatus
+            << '\n';
+    }
+
+    return records.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -9901,6 +10031,20 @@ void applyFrontendBackendResolvedFromJson(
     evidence.textureResourceViewKnownCount = static_cast<std::size_t>(jsonNumberField(vendorResourceSpan, "textureResourceViewKnownCount").value_or(0.0));
     evidence.samplerResourceViewKnownCount = static_cast<std::size_t>(jsonNumberField(vendorResourceSpan, "samplerResourceViewKnownCount").value_or(0.0));
     evidence.resourceViewPairCount = static_cast<std::size_t>(jsonNumberField(vendorResourceSpan, "resourceViewPairCount").value_or(0.0));
+    const auto materialResourceViewParity = jsonObjectFieldSpan(text, "backendMaterialResourceViewParity");
+    const std::string_view materialResourceSpan = materialResourceViewParity ? *materialResourceViewParity : text;
+    evidence.materialResourceViewParityStatus = jsonStringField(materialResourceSpan, "materialResourceViewParityStatus")
+        .value_or(jsonStringField(text, "materialResourceViewParityStatus").value_or("missing"));
+    evidence.resourceViewExactnessStatus = jsonStringField(materialResourceSpan, "resourceViewExactnessStatus")
+        .value_or(jsonStringField(text, "resourceViewExactnessStatus").value_or("missing"));
+    evidence.premultipliedAlphaStatus = jsonStringField(materialResourceSpan, "premultipliedAlphaStatus")
+        .value_or(jsonStringField(text, "premultipliedAlphaStatus").value_or("missing"));
+    evidence.gammaSrgbStatus = jsonStringField(materialResourceSpan, "gammaSrgbStatus")
+        .value_or(jsonStringField(text, "gammaSrgbStatus").value_or("missing"));
+    evidence.resourceViewExactPairCount = static_cast<std::size_t>(jsonNumberField(materialResourceSpan, "resourceViewExactPairCount").value_or(0.0));
+    evidence.srgbTextureResourceViewCount = static_cast<std::size_t>(jsonNumberField(materialResourceSpan, "srgbTextureResourceViewCount").value_or(0.0));
+    if (const auto captureProbe = jsonObjectFieldSpan(materialResourceSpan, "uiOnlyRenderTargetCaptureProbe"))
+        evidence.uiOnlyRenderTargetCapturePolicy = jsonStringField(*captureProbe, "uiOnlyRenderTargetCapturePolicy").value_or("copy-ui-render-target-before-present");
     if (evidence.materialPairCount == 0)
         evidence.materialPairCount = static_cast<std::size_t>(jsonNumberField(oracleSpan, "materialPairCount").value_or(0.0));
 
@@ -9950,6 +10094,11 @@ void applyFrontendBackendResolvedFromJson(
     fallback.vendorResourceCapturePolicy = "native-rhi-resource-view-and-sampler-handles";
     fallback.uiOnlyLayerCaptureStatus = "pending-runtime-ui-render-target-copy";
     fallback.nativeCommandCaptureGap = "pending-full-vendor-command-buffer-dump";
+    fallback.materialResourceViewParityStatus = material.found ? "material correlation fallback; resource-view parity unavailable" : "missing";
+    fallback.resourceViewExactnessStatus = material.found ? "resource-view handles unavailable" : "missing";
+    fallback.premultipliedAlphaStatus = material.found ? "runtime blend semantics only" : "missing";
+    fallback.gammaSrgbStatus = material.found ? "native resource-view formats unavailable" : "missing";
+    fallback.uiOnlyRenderTargetCapturePolicy = "copy-ui-render-target-before-present";
     fallback.linearSamplerDescriptorCount = static_cast<std::size_t>(std::count_if(
         material.pairs.begin(),
         material.pairs.end(),
@@ -11764,6 +11913,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererDescriptorSemanticsSmoke();
     if (commandLineHasFlag("--renderer-vendor-resource-capture-smoke"))
         return runRendererVendorResourceCaptureSmoke();
+    if (commandLineHasFlag("--renderer-material-resource-view-parity-smoke"))
+        return runRendererMaterialResourceViewParitySmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 
