@@ -74,6 +74,17 @@ struct SonicDayHudRuntimeValueBinding
     std::string source = "pending-runtime-field";
 };
 
+struct SonicDayHudRuntimeValueUpdatePath
+{
+    SonicDayHudRuntimeValueBinding ringCountWritePath;
+    SonicDayHudRuntimeValueBinding elapsedFramesWritePath;
+    SonicDayHudRuntimeValueBinding speedReadoutWritePath;
+    SonicDayHudRuntimeValueBinding lifeCountWritePath;
+    SonicDayHudRuntimeValueBinding boostGaugeWritePath;
+    SonicDayHudRuntimeValueBinding ringEnergyGaugeWritePath;
+    SonicDayHudRuntimeValueBinding tutorialPromptWritePath;
+};
+
 struct SonicDayHudDisplayOwnerPathBinding
 {
     std::string ringCount = "ui_playscreen/ring_count";
@@ -193,7 +204,9 @@ private:
 [[nodiscard]] std::string formatSonicDayHudGameplayStateSmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBinding(const SonicDayHudRuntimeBindingSnapshot& snapshot);
 [[nodiscard]] std::string formatSonicDayHudRuntimeDisplayOwnerPaths(const SonicDayHudDisplayOwnerPathBinding& paths);
+[[nodiscard]] std::string formatSonicDayHudRuntimeWritePaths(const SonicDayHudRuntimeValueUpdatePath& paths);
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingSmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase167SmokeSequence();
+[[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase168SmokeSequence();
 [[nodiscard]] std::string frontendControllerInputName(FrontendControllerInput input);
 } // namespace sward::ui_runtime

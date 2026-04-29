@@ -140,6 +140,27 @@ SonicDayHudRuntimeBindingSnapshot makeRuntimeScoreBindingSnapshot()
     return snapshot;
 }
 
+SonicDayHudRuntimeValueUpdatePath makeRuntimeValueUpdatePathSnapshot()
+{
+    SonicDayHudRuntimeValueUpdatePath paths;
+    paths.ringCountWritePath.known = true;
+    paths.ringCountWritePath.source =
+        "CSD::CNode::SetText/sub_830BF640@ui_playscreen/ring_count/num_ring";
+    paths.elapsedFramesWritePath.known = true;
+    paths.elapsedFramesWritePath.source =
+        "CSD::CNode::SetText/sub_830BF640@ui_playscreen/time_count/time001|time010|time100";
+    paths.speedReadoutWritePath.known = true;
+    paths.speedReadoutWritePath.source =
+        "CSD::CNode::SetText/sub_830BF640@ui_playscreen/add/speed_count/position/num_speed";
+    paths.lifeCountWritePath.known = true;
+    paths.lifeCountWritePath.source =
+        "CSD::CNode::SetText/sub_830BF640@ui_playscreen/player_count/player";
+    paths.boostGaugeWritePath.source = "pending-gauge-or-prompt-write-hook";
+    paths.ringEnergyGaugeWritePath.source = "pending-gauge-or-prompt-write-hook";
+    paths.tutorialPromptWritePath.source = "pending-gauge-or-prompt-write-hook";
+    return paths;
+}
+
 FrontendControllerFrame makeFrame(
     std::string controllerName,
     std::string screenId,
@@ -827,6 +848,21 @@ std::string formatSonicDayHudRuntimeDisplayOwnerPaths(const SonicDayHudDisplayOw
     return out.str();
 }
 
+std::string formatSonicDayHudRuntimeWritePaths(const SonicDayHudRuntimeValueUpdatePath& paths)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_runtime_write_paths="
+        << "ring=" << formatRuntimeBindingStatus(paths.ringCountWritePath)
+        << ":timer=" << formatRuntimeBindingStatus(paths.elapsedFramesWritePath)
+        << ":speed=" << formatRuntimeBindingStatus(paths.speedReadoutWritePath)
+        << ":lives=" << formatRuntimeBindingStatus(paths.lifeCountWritePath)
+        << ":boost=" << formatRuntimeBindingStatus(paths.boostGaugeWritePath)
+        << ":energy=" << formatRuntimeBindingStatus(paths.ringEnergyGaugeWritePath)
+        << ":tutorial=" << formatRuntimeBindingStatus(paths.tutorialPromptWritePath)
+        << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeBindingSmokeSequence()
 {
     SonicDayHudController hud;
@@ -851,6 +887,25 @@ std::string formatSonicDayHudRuntimeBindingPhase167SmokeSequence()
     out << formatSonicDayHudRuntimeDisplayOwnerPaths(snapshot.displayOwnerPaths);
     out << "gameplay_numeric_binding=score:known,scoreinfo:known,"
         << "ring/timer/speed/boost/energy/lives/tutorial:pending-runtime-player-offsets"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase168SmokeSequence()
+{
+    const auto snapshot = makeRuntimeScoreBindingSnapshot();
+    const auto writePaths = makeRuntimeValueUpdatePathSnapshot();
+    std::ostringstream out;
+    out << formatSonicDayHudRuntimeBinding(snapshot);
+    out << "sonic_day_hud_runtime_scoreinfo="
+        << "record_speed=" << formatRuntimeBindingStatus(snapshot.scoreInfoPointMarkerRecordSpeedBinding)
+        << ":point_marker_count=" << formatRuntimeBindingStatus(snapshot.scoreInfoPointMarkerCountBinding)
+        << '\n';
+    out << formatSonicDayHudRuntimeDisplayOwnerPaths(snapshot.displayOwnerPaths);
+    out << formatSonicDayHudRuntimeWritePaths(writePaths);
+    out << "gameplay_numeric_binding=score:known,scoreinfo:known,"
+        << "ring/timer/speed/lives:known-via-csd-text-write,"
+        << "boost/energy/tutorial:pending-gauge-or-prompt-write-hook"
         << '\n';
     return out.str();
 }

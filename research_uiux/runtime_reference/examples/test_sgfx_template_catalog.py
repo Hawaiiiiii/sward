@@ -695,6 +695,54 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("sonic_day_hud_display_owner_paths=ring=ui_playscreen/ring_count:score=CHudSonicStage.m_rcScoreCount|ui_playscreen/score_count:timer=CHudSonicStage.m_rcTimeCount|ui_playscreen/time_count:speed=CHudSonicStage.m_rcSpeedGauge|ui_playscreen/so_speed_gauge:boost=CHudSonicStage.m_rcSpeedGauge|ui_playscreen/so_speed_gauge:energy=CHudSonicStage.m_rcRingEnergyGauge|ui_playscreen/so_ringenagy_gauge:lives=CHudSonicStage.m_rcPlayerCount|ui_playscreen/player_count:tutorial=ui_playscreen/add/u_info", completed.stdout)
         self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,ring/timer/speed/boost/energy/lives/tutorial:pending-runtime-player-offsets", completed.stdout)
 
+    def test_phase168_sonic_day_hud_runtime_write_paths_promote_csd_text_sinks(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+
+        for token in [
+            "SonicDayHudRuntimeValueUpdatePath",
+            "ringCountWritePath",
+            "elapsedFramesWritePath",
+            "speedReadoutWritePath",
+            "lifeCountWritePath",
+            "formatSonicDayHudRuntimeWritePaths",
+            "formatSonicDayHudRuntimeBindingPhase168SmokeSequence",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "CSD::CNode::SetText/sub_830BF640",
+            "ui_playscreen/ring_count/num_ring",
+            "ui_playscreen/time_count/time001|time010|time100",
+            "ui_playscreen/add/speed_count/position/num_speed",
+            "ui_playscreen/player_count/player",
+            "ring/timer/speed/lives:known-via-csd-text-write",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase168-sonic-hud-runtime-write-path-smoke", example)
+
+    def test_phase168_sonic_day_hud_runtime_write_path_smoke_reports_text_write_bindings(self) -> None:
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase168-sonic-hud-runtime-write-path-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase168 sonic hud runtime write path smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_write_paths=ring=known:CSD::CNode::SetText/sub_830BF640@ui_playscreen/ring_count/num_ring", completed.stdout)
+        self.assertIn("timer=known:CSD::CNode::SetText/sub_830BF640@ui_playscreen/time_count/time001|time010|time100", completed.stdout)
+        self.assertIn("speed=known:CSD::CNode::SetText/sub_830BF640@ui_playscreen/add/speed_count/position/num_speed", completed.stdout)
+        self.assertIn("lives=known:CSD::CNode::SetText/sub_830BF640@ui_playscreen/player_count/player", completed.stdout)
+        self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,ring/timer/speed/lives:known-via-csd-text-write,boost/energy/tutorial:pending-gauge-or-prompt-write-hook", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

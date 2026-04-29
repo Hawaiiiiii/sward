@@ -420,6 +420,17 @@ namespace UiLab
         uint64_t frame = 0;
     };
 
+    struct SonicHudValueWriteObservation
+    {
+        std::string valueName;
+        std::string path;
+        uint32_t nodeAddress = 0;
+        uint32_t textAddress = 0;
+        std::string textUtf8;
+        std::string hookSource;
+        uint64_t frame = 0;
+    };
+
     struct SonicHudOwnerFieldSample
     {
         std::string field;
@@ -800,6 +811,9 @@ namespace UiLab
     static uint64_t g_chudSonicStageOwnerFieldSampleCount = 0;
     static std::vector<SonicHudOwnerFieldSample> g_chudSonicStageOwnerFieldSamples;
     static SonicHudGameplayValueSnapshot g_sonicHudGameplayValues;
+    static constexpr size_t kSonicHudValueWriteObservationLimit = 96;
+    static std::vector<SonicHudValueWriteObservation> g_sonicHudValueWriteObservations;
+    static std::unordered_set<std::string> g_loggedSonicHudValueTextWriteKeys;
     static uint64_t g_lastLiveStateSnapshotFrame = 0;
     static std::string g_lastStageReadyEventName;
     static std::string g_lastCsdProjectName;
@@ -874,6 +888,13 @@ namespace UiLab
     static LoadingLiveInspectorSnapshot BuildLoadingLiveInspectorSnapshot();
     static SonicHudLiveInspectorSnapshot BuildSonicHudLiveInspectorSnapshot();
     static SonicHudGameplayValueSnapshot BuildSonicHudGameplayValueSnapshot();
+    static std::string SonicHudValueWriteBindingStatus();
+    static std::vector<SonicHudValueWriteObservation> BuildSonicHudValueWriteObservations();
+    static std::string ResolveSonicHudValuePathFromCsdNode(uint32_t nodeAddress);
+    static bool ApplySonicHudTextWriteToGameplayValues(
+        std::string_view path,
+        std::string_view textUtf8,
+        std::string_view hookSource);
     static SonicHudOwnerPathInspectorSnapshot BuildSonicHudOwnerPathInspectorSnapshot(
         const CsdProjectTreeInspectorSnapshot& csdProjectTree);
     static PauseGeneralSaveLiveInspectorSnapshot BuildPauseGeneralSaveLiveInspectorSnapshot();
@@ -893,6 +914,9 @@ namespace UiLab
         const std::vector<RuntimeUiDrawCall>& drawCalls,
         const std::vector<RuntimeGpuSubmitCall>& submitCalls);
     static void AppendSonicHudOwnerFieldSamples(std::ostringstream& out, const std::vector<SonicHudOwnerFieldSample>& samples);
+    static void AppendSonicHudValueWriteObservations(
+        std::ostringstream& out,
+        const std::vector<SonicHudValueWriteObservation>& observations);
     static void AppendTypedInspectors(std::ostringstream& out);
 
     static std::string_view RoutePolicyLabel()
@@ -2162,7 +2186,7 @@ namespace UiLab
             "lives=CHudSonicStage.m_rcPlayerCount|ui_playscreen/player_count;"
             "tutorial=ui_playscreen/add/u_info";
         snapshot.gameplayNumericBindingStatus =
-            "score:known,scoreinfo:known,ring/timer/speed/boost/energy/lives/tutorial:pending-runtime-player-offsets";
+            SonicHudValueWriteBindingStatus();
 
         return snapshot;
     }
@@ -2242,6 +2266,185 @@ namespace UiLab
         return snapshot;
     }
 
+    static std::vector<SonicHudValueWriteObservation> BuildSonicHudValueWriteObservations()
+    {
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        return g_sonicHudValueWriteObservations;
+    }
+
+    static std::string SonicHudValueWriteBindingStatus()
+    {
+        return "score:known,scoreinfo:known,"
+            "ring/timer/speed/lives:known-via-csd-text-write,"
+            "boost/energy/tutorial:pending-gauge-or-prompt-write-hook";
+    }
+
+    static bool IsSonicHudValueTextPath(std::string_view path)
+    {
+        return
+            path == "ui_playscreen/ring_count/num_ring" ||
+            path == "ui_playscreen/time_count/time001" ||
+            path == "ui_playscreen/time_count/time010" ||
+            path == "ui_playscreen/time_count/time100" ||
+            path == "ui_playscreen/add/speed_count/position/num_speed" ||
+            path == "ui_playscreen/player_count/player";
+    }
+
+    static std::string SonicHudValueNameFromTextPath(std::string_view path)
+    {
+        if (path == "ui_playscreen/ring_count/num_ring")
+            return "ringCount";
+        if (
+            path == "ui_playscreen/time_count/time001" ||
+            path == "ui_playscreen/time_count/time010" ||
+            path == "ui_playscreen/time_count/time100")
+        {
+            return "elapsedFrames";
+        }
+        if (path == "ui_playscreen/add/speed_count/position/num_speed")
+            return "speedKmh";
+        if (path == "ui_playscreen/player_count/player")
+            return "lifeCount";
+        return "unknown";
+    }
+
+    static bool TryParseUnsignedText(std::string_view text, uint32_t& value)
+    {
+        uint64_t result = 0;
+        bool sawDigit = false;
+
+        for (char c : text)
+        {
+            if (!std::isdigit(static_cast<unsigned char>(c)))
+                continue;
+
+            sawDigit = true;
+            result = (result * 10) + static_cast<uint32_t>(c - '0');
+            if (result > UINT32_MAX)
+                result = UINT32_MAX;
+        }
+
+        if (!sawDigit)
+            return false;
+
+        value = static_cast<uint32_t>(result);
+        return true;
+    }
+
+    static std::string ResolveSonicHudValuePathFromCsdNode(uint32_t nodeAddress)
+    {
+        if (!IsPlausibleGuestPointer(nodeAddress))
+            return {};
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        for (const auto& record : g_csdProjectTrees)
+        {
+            if (record.projectName != "ui_playscreen")
+                continue;
+
+            for (const auto& entry : record.layers)
+            {
+                if ((entry.relatedAddress == nodeAddress || entry.address == nodeAddress) &&
+                    IsSonicHudValueTextPath(entry.path))
+                {
+                    return entry.path;
+                }
+            }
+
+            for (const auto& entry : record.nodes)
+            {
+                if (entry.address == nodeAddress && IsSonicHudValueTextPath(entry.path))
+                    return entry.path;
+            }
+        }
+
+        return {};
+    }
+
+    static bool ApplySonicHudTextWriteToGameplayValues(
+        std::string_view path,
+        std::string_view textUtf8,
+        std::string_view hookSource)
+    {
+        uint32_t parsedValue = 0;
+        if (!TryParseUnsignedText(textUtf8, parsedValue))
+            return false;
+
+        const std::string source =
+            std::string(hookSource) + "@" + std::string(path);
+
+        bool changed = false;
+        SonicHudGameplayValueSnapshot snapshot;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            snapshot = g_sonicHudGameplayValues;
+
+            if (path == "ui_playscreen/ring_count/num_ring")
+            {
+                changed =
+                    !snapshot.ringCountKnown ||
+                    snapshot.ringCount != parsedValue ||
+                    snapshot.ringCountSource != source;
+                snapshot.ringCountKnown = true;
+                snapshot.ringCount = parsedValue;
+                snapshot.ringCountSource = source;
+            }
+            else if (
+                path == "ui_playscreen/time_count/time001" ||
+                path == "ui_playscreen/time_count/time010" ||
+                path == "ui_playscreen/time_count/time100")
+            {
+                changed =
+                    !snapshot.elapsedFramesKnown ||
+                    snapshot.elapsedFrames != parsedValue ||
+                    snapshot.elapsedFramesSource != source;
+                // This is the exact CSD-displayed timer write sink. It is promoted
+                // as elapsedFrames until the earlier game-clock storage path is proven.
+                snapshot.elapsedFramesKnown = true;
+                snapshot.elapsedFrames = parsedValue;
+                snapshot.elapsedFramesSource = source;
+            }
+            else if (path == "ui_playscreen/add/speed_count/position/num_speed")
+            {
+                const float speed = static_cast<float>(parsedValue);
+                changed =
+                    !snapshot.speedKmhKnown ||
+                    snapshot.speedKmh != speed ||
+                    snapshot.speedKmhSource != source;
+                snapshot.speedKmhKnown = true;
+                snapshot.speedKmh = speed;
+                snapshot.speedKmhSource = source;
+            }
+            else if (path == "ui_playscreen/player_count/player")
+            {
+                changed =
+                    !snapshot.lifeCountKnown ||
+                    snapshot.lifeCount != parsedValue ||
+                    snapshot.lifeCountSource != source;
+                snapshot.lifeCountKnown = true;
+                snapshot.lifeCount = parsedValue;
+                snapshot.lifeCountSource = source;
+            }
+
+            if (changed)
+            {
+                snapshot.frame = g_presentedFrameCount;
+                g_sonicHudGameplayValues = std::move(snapshot);
+            }
+        }
+
+        if (changed)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-value-write-update",
+                "path=" + std::string(path) +
+                " value=" + std::to_string(parsedValue) +
+                " source=" + source);
+        }
+
+        return changed;
+    }
+
     static void AppendCsdTreeEntries(
         std::ostringstream& out,
         const std::vector<CsdTreeEntry>& entries,
@@ -2295,6 +2498,31 @@ namespace UiLab
         out << "]";
     }
 
+    static void AppendSonicHudValueWriteObservations(
+        std::ostringstream& out,
+        const std::vector<SonicHudValueWriteObservation>& observations)
+    {
+        out << "[";
+        for (size_t i = 0; i < observations.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            const auto& observation = observations[i];
+            out
+                << "{"
+                << "\"valueName\":\"" << JsonEscape(observation.valueName) << "\","
+                << "\"path\":\"" << JsonEscape(observation.path) << "\","
+                << "\"nodeAddress\":\"" << JsonEscape(HexU32(observation.nodeAddress)) << "\","
+                << "\"textAddress\":\"" << JsonEscape(HexU32(observation.textAddress)) << "\","
+                << "\"textUtf8\":\"" << JsonEscape(observation.textUtf8) << "\","
+                << "\"hookSource\":\"" << JsonEscape(observation.hookSource) << "\","
+                << "\"frame\":" << observation.frame
+                << "}";
+        }
+        out << "]";
+    }
+
     static void AppendStringVector(std::ostringstream& out, const std::vector<std::string>& values)
     {
         out << "[";
@@ -2316,6 +2544,7 @@ namespace UiLab
         const auto loading = BuildLoadingLiveInspectorSnapshot();
         const auto sonicHud = BuildSonicHudLiveInspectorSnapshot();
         const auto sonicGameplay = BuildSonicHudGameplayValueSnapshot();
+        const auto sonicValueWriteObservations = BuildSonicHudValueWriteObservations();
         const auto sonicOwnerPath = BuildSonicHudOwnerPathInspectorSnapshot(csdProjectTree);
         const auto pauseGeneralSave = BuildPauseGeneralSaveLiveInspectorSnapshot();
 
@@ -2496,6 +2725,12 @@ namespace UiLab
             << "          \"pauseOpen\": \"" << JsonEscape(sonicGameplay.pauseOpenSfxId) << "\",\n"
             << "          \"pauseCursor\": \"" << JsonEscape(sonicGameplay.pauseCursorSfxId) << "\"\n"
             << "        },\n"
+            << "        \"valueWriteBindingStatus\": \"" << JsonEscape(SonicHudValueWriteBindingStatus()) << "\",\n"
+            << "        \"valueWriteObservationCount\": " << sonicValueWriteObservations.size() << ",\n"
+            << "        \"valueWriteObservations\": ";
+        AppendSonicHudValueWriteObservations(out, sonicValueWriteObservations);
+        out
+            << ",\n"
             << "        \"frame\": " << sonicGameplay.frame << "\n"
             << "      },\n"
             << "      \"ownerPath\": {\n"
@@ -5187,6 +5422,8 @@ namespace UiLab
             g_pauseGeneralSaveInspector = {};
             g_chudSonicStageOwnerFieldSamples.clear();
             g_sonicHudGameplayValues = {};
+            g_sonicHudValueWriteObservations.clear();
+            g_loggedSonicHudValueTextWriteKeys.clear();
         }
 
         {
@@ -6216,6 +6453,76 @@ namespace UiLab
             call.projectName = g_lastCsdProjectName.empty() ? std::string("unknown") : g_lastCsdProjectName;
 
         g_runtimeUiDrawCalls.push_back(std::move(call));
+    }
+
+    void OnCsdNodeSetText(
+        uint32_t nodeAddress,
+        uint32_t textAddress,
+        std::string_view textUtf8,
+        std::string_view hookSource)
+    {
+        if (!g_isEnabled || textUtf8.empty())
+            return;
+
+        const std::string path = ResolveSonicHudValuePathFromCsdNode(nodeAddress);
+        if (path.empty())
+            return;
+
+        const std::string source = hookSource.empty()
+            ? std::string("CSD::CNode::SetText/sub_830BF640")
+            : std::string(hookSource);
+
+        const std::string valueName = SonicHudValueNameFromTextPath(path);
+        const std::string logKey =
+            path + "|" + std::string(textUtf8) + "|" + std::to_string(g_routeGeneration);
+
+        bool shouldLogTextWrite = false;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+
+            SonicHudValueWriteObservation observation;
+            observation.valueName = valueName;
+            observation.path = path;
+            observation.nodeAddress = nodeAddress;
+            observation.textAddress = textAddress;
+            observation.textUtf8 = std::string(textUtf8);
+            observation.hookSource = source;
+            observation.frame = g_presentedFrameCount;
+
+            auto existing = std::find_if(
+                g_sonicHudValueWriteObservations.begin(),
+                g_sonicHudValueWriteObservations.end(),
+                [&](const SonicHudValueWriteObservation& current)
+                {
+                    return current.path == observation.path;
+                });
+
+            if (existing != g_sonicHudValueWriteObservations.end())
+            {
+                *existing = std::move(observation);
+            }
+            else if (g_sonicHudValueWriteObservations.size() < kSonicHudValueWriteObservationLimit)
+            {
+                g_sonicHudValueWriteObservations.push_back(std::move(observation));
+            }
+
+            shouldLogTextWrite = g_loggedSonicHudValueTextWriteKeys.insert(logKey).second;
+        }
+
+        if (shouldLogTextWrite)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-value-text-write",
+                "value=" + valueName +
+                " path=" + path +
+                " node=" + HexU32(nodeAddress) +
+                " text=\"" + std::string(textUtf8) + "\"" +
+                " source=" + source);
+        }
+
+        const bool changed = ApplySonicHudTextWriteToGameplayValues(path, textUtf8, source);
+        if (shouldLogTextWrite || changed)
+            WriteLiveStateSnapshot();
     }
 
     void OnBackendMaterialSubmit(

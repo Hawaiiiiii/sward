@@ -1950,6 +1950,62 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, report)
 
+    def test_ui_lab_phase168_hooks_sonic_hud_csd_text_value_write_paths(self):
+        cmake = self.read("UnleashedRecomp/CMakeLists.txt")
+        hook = self.read("UnleashedRecomp/patches/CsdNodeText_patches.cpp")
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        self.assertIn("patches/CsdNodeText_patches.cpp", cmake)
+
+        for token in [
+            "PPC_FUNC_IMPL(__imp__sub_830BF640)",
+            "PPC_FUNC(sub_830BF640)",
+            "TryReadGuestAsciiString",
+            "UiLab::OnCsdNodeSetText",
+            "CSD::CNode::SetText/sub_830BF640",
+        ]:
+            self.assertIn(token, hook)
+
+        for token in [
+            "OnCsdNodeSetText",
+            "nodeAddress",
+            "textAddress",
+            "textUtf8",
+            "hookSource",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "SonicHudValueWriteObservation",
+            "g_sonicHudValueWriteObservations",
+            "ResolveSonicHudValuePathFromCsdNode",
+            "ApplySonicHudTextWriteToGameplayValues",
+            "ui_playscreen/ring_count/num_ring",
+            "ui_playscreen/time_count/time001",
+            "ui_playscreen/time_count/time010",
+            "ui_playscreen/time_count/time100",
+            "ui_playscreen/add/speed_count/position/num_speed",
+            "ui_playscreen/player_count/player",
+            "sonic-hud-value-text-write",
+            "sonic-hud-value-write-update",
+            "ring/timer/speed/lives:known-via-csd-text-write",
+            "boost/energy/tutorial:pending-gauge-or-prompt-write-hook",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 168",
+            "CNode::SetText/sub_830BF640",
+            "ring_count/num_ring",
+            "time_count/time001",
+            "add/speed_count/position/num_speed",
+            "player_count/player",
+            "boost/energy/tutorial remain pending until gauge/prompt setter callsites are proven",
+        ]:
+            self.assertIn(token, report)
+
 
 if __name__ == "__main__":
     unittest.main()

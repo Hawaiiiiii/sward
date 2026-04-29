@@ -172,6 +172,11 @@ namespace UiLab
         float maxX,
         float maxY,
         uint32_t colorSample);
+    void OnCsdNodeSetText(
+        uint32_t nodeAddress,
+        uint32_t textAddress,
+        std::string_view textUtf8,
+        std::string_view hookSource);
     void OnBackendMaterialSubmit(
         std::string_view source,
         uint32_t primitiveType,
