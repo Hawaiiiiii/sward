@@ -50,6 +50,31 @@ struct FrontendScreenMediaCueCounts
     int audioPending = 0;
 };
 
+struct FrontendScreenMediaAssetProbe
+{
+    std::string screenId;
+    std::string cueId;
+    std::string cueKind;
+    std::string assetName;
+    std::string resolvedPath;
+    std::string previewPath;
+    std::string playbackStatus;
+    bool assetResolved = false;
+    bool previewResolved = false;
+    bool playbackReady = false;
+    bool decodePending = false;
+    bool audioPending = false;
+};
+
+struct FrontendScreenMediaAssetProbeCounts
+{
+    int resolved = 0;
+    int preview = 0;
+    int playbackReady = 0;
+    int decodePending = 0;
+    int audioPending = 0;
+};
+
 struct FrontendScreenTimelineChannel
 {
     std::string animationName;
@@ -132,5 +157,13 @@ struct FrontendScreenTimelineSample
 [[nodiscard]] std::string formatFrontendScreenMediaCueDetail(
     const FrontendScreenPolicy& screen,
     const FrontendScreenMediaCue& cue);
+[[nodiscard]] std::vector<FrontendScreenMediaAssetProbe> frontendScreenMediaAssetProbes(
+    const FrontendScreenPolicy& screen,
+    std::string_view repoRoot);
+[[nodiscard]] FrontendScreenMediaAssetProbeCounts frontendScreenMediaAssetProbeCounts(
+    const std::vector<FrontendScreenMediaAssetProbe>& probes);
+[[nodiscard]] std::string formatFrontendScreenMediaAssetProbeCatalog(std::string_view repoRoot);
+[[nodiscard]] std::string formatFrontendScreenMediaAssetProbeDetail(
+    const FrontendScreenMediaAssetProbe& probe);
 [[nodiscard]] std::string formatFrontendRuntimeAlignment(const FrontendRuntimeAlignment& alignment);
 } // namespace sward::ui_runtime

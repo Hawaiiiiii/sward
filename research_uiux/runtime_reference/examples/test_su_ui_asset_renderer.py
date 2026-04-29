@@ -1025,6 +1025,13 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("ui_layer_oracle_upgrade=dedicated-ui-target-or-vendor-replay-needed", source_text)
         self.assertIn("text_movie_sfx_status=title-loading-media-timing-reference-ready-audio-id-pending", source_text)
 
+    def test_renderer_source_wires_phase162_media_asset_readiness(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("runRendererMediaAssetReadinessSmoke", source_text)
+        self.assertIn("--renderer-media-asset-readiness-smoke", source_text)
+        self.assertIn("phase162-media-asset-resolution", source_text)
+        self.assertIn("formatFrontendScreenMediaAssetProbeCatalog", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -1447,6 +1454,27 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("text_movie_sfx_status=title-loading-media-timing-reference-ready-audio-id-pending", completed.stdout)
         self.assertRegex(completed.stdout, r"ui_layer_pixel_delta=title-menu:source=(ui-layer-capture-bmp|missing):native=(found|missing):mean_abs_rgb=[0-9.]+:max_abs_rgb=[0-9]+:local_commands=[1-9]\d*:ui_layer_capture_isolation=[^\r\n]+")
         self.assertRegex(completed.stdout, r"ui_layer_pixel_delta=loading:source=(ui-layer-capture-bmp|missing):native=(found|missing):mean_abs_rgb=[0-9.]+:max_abs_rgb=[0-9]+:local_commands=[1-9]\d*:ui_layer_capture_isolation=[^\r\n]+")
+
+    def test_renderer_media_asset_readiness_smoke_reports_resolved_visual_media(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-media-asset-readiness-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer media asset readiness smoke ok", completed.stdout)
+        self.assertIn("mode=phase162-media-asset-resolution", completed.stdout)
+        self.assertIn("media_asset_status=title-menu:resolved=4:preview=1:playback_ready=3:decode_pending=1:audio_pending=2", completed.stdout)
+        self.assertIn("media_asset_status=loading:resolved=4:preview=0:playback_ready=4:decode_pending=0:audio_pending=2", completed.stdout)
+        self.assertIn("media_asset_probe=title-menu:title_loop_movie:kind=movie:asset=game/movie/evmo_title_loop.sfd:resolved=1", completed.stdout)
+        self.assertIn("media_asset_probe=loading:loading_now_loading_copy:kind=text:asset=mat_load_en_001.dds:resolved=1", completed.stdout)
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

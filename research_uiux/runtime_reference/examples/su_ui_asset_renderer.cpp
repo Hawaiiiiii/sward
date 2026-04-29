@@ -38,6 +38,7 @@ using sward::ui_runtime::SonicHudScenePolicy;
 using sward::ui_runtime::defaultFrontendRuntimeAlignment;
 using sward::ui_runtime::findSgfxScreenTemplate;
 using sward::ui_runtime::formatFrontendRuntimeAlignment;
+using sward::ui_runtime::formatFrontendScreenMediaAssetProbeCatalog;
 using sward::ui_runtime::frontendScreenPolicies;
 using sward::ui_runtime::sgfxScreenTemplates;
 using sward::ui_runtime::sampleSonicHudTimeline;
@@ -11667,6 +11668,16 @@ void writeViewerRenderCompareManifest(
     return failed ? 1 : 0;
 }
 
+[[nodiscard]] int runRendererMediaAssetReadinessSmoke()
+{
+    std::cout
+        << "sward_su_ui_asset_renderer media asset readiness smoke ok "
+        << "mode=phase162-media-asset-resolution"
+        << '\n';
+    std::cout << formatFrontendScreenMediaAssetProbeCatalog(repoRootForOutput().string());
+    return 0;
+}
+
 [[nodiscard]] int runRuntimeCsdTreeExportSmoke(const std::optional<std::string>& templateFilter)
 {
     const std::string target = templateFilter.value_or("sonic-hud");
@@ -12530,6 +12541,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runViewerRenderCompareSmoke();
     if (commandLineHasFlag("--renderer-ui-layer-pixel-compare-smoke"))
         return runRendererUiLayerPixelCompareSmoke();
+    if (commandLineHasFlag("--renderer-media-asset-readiness-smoke"))
+        return runRendererMediaAssetReadinessSmoke();
     if (commandLineHasFlag("--csd-timeline-smoke"))
         return runCsdTimelineSmoke(templateFilter);
     if (commandLineHasFlag("--csd-drawable-smoke"))

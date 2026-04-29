@@ -1,6 +1,7 @@
 #include <sward/ui_runtime/frontend_screen_reference.hpp>
 
 #include <algorithm>
+#include <filesystem>
 #include <iomanip>
 #include <numeric>
 #include <sstream>
@@ -21,6 +22,117 @@ std::string joinStrings(const std::vector<T>& values, std::string_view separator
         out << values[index];
     }
     return out.str();
+}
+
+std::string portablePath(const std::filesystem::path& path)
+{
+    return path.generic_string();
+}
+
+std::string repoRelativePath(const std::filesystem::path& repoRoot, const std::filesystem::path& path)
+{
+    std::error_code error;
+    const auto relative = std::filesystem::relative(path, repoRoot, error);
+    if (!error)
+        return portablePath(relative);
+    return portablePath(path);
+}
+
+std::filesystem::path firstExistingPath(const std::vector<std::filesystem::path>& candidates)
+{
+    for (const auto& candidate : candidates)
+    {
+        std::error_code error;
+        if (std::filesystem::exists(candidate, error))
+            return candidate;
+    }
+    return {};
+}
+
+bool startsWith(std::string_view text, std::string_view prefix)
+{
+    return text.size() >= prefix.size() && text.substr(0, prefix.size()) == prefix;
+}
+
+std::vector<std::filesystem::path> mediaAssetCandidatePaths(
+    const std::filesystem::path& repoRoot,
+    const FrontendScreenMediaCue& cue)
+{
+    const std::string& asset = cue.assetName;
+    if (startsWith(asset, "host-"))
+        return {};
+
+    std::vector<std::filesystem::path> candidates;
+    if (startsWith(asset, "game/movie/"))
+    {
+        candidates.push_back(repoRoot / "Unleashed Recomp - Windows (Complete Installation) 1.0.3" / asset);
+        candidates.push_back(repoRoot / asset);
+    }
+    else if (asset == "ui_mm_contentstext.dds")
+    {
+        candidates.push_back(repoRoot / "extracted_assets/ui_frontend_archives/MainMenu/ui_mm_contentstext.dds");
+    }
+    else if (asset == "ui_mm_parts1.dds")
+    {
+        candidates.push_back(repoRoot / "extracted_assets/ui_frontend_archives/MainMenu/ui_mm_parts1.dds");
+    }
+    else if (startsWith(asset, "ui_mm_"))
+    {
+        candidates.push_back(repoRoot / "extracted_assets/ui_frontend_archives/MainMenu" / asset);
+    }
+    else if (asset == "mat_load_en_001.dds")
+    {
+        candidates.push_back(repoRoot / "extracted_assets/ui_frontend_archives/Loading_English/mat_load_en_001.dds");
+        candidates.push_back(repoRoot / "extracted_assets/phase25_commonflow_archives/Languages/English/Loading" / asset);
+    }
+    else if (asset == "mat_load_comon_001.dds" || asset == "mat_comon_txt_001.dds")
+    {
+        candidates.push_back(repoRoot / "extracted_assets/ui_extended_archives/Loading" / asset);
+    }
+    else if (asset == "mat_start_en_001.dds")
+    {
+        candidates.push_back(repoRoot / "extracted_assets/phase135_ui_playscreen_probe/Languages/English/ActionCommon" / asset);
+        candidates.push_back(repoRoot / "extracted_assets/phase25_commonflow_archives/Languages/English/ActionCommon" / asset);
+    }
+    else
+    {
+        candidates.push_back(repoRoot / "extracted_assets" / asset);
+    }
+    return candidates;
+}
+
+std::vector<std::filesystem::path> mediaPreviewCandidatePaths(
+    const std::filesystem::path& repoRoot,
+    const FrontendScreenMediaCue& cue)
+{
+    if (cue.cueId == "title_loop_movie")
+    {
+        return {
+            repoRoot / "extracted_assets/runtime_previews/title/evmo_title_loop_0001.png",
+            repoRoot / "extracted_assets/runtime_previews/title/evmo_title_loop_00_00_05_000.png",
+        };
+    }
+    return {};
+}
+
+std::string mediaPlaybackStatus(
+    const FrontendScreenMediaCue& cue,
+    bool assetResolved,
+    bool previewResolved)
+{
+    if (cue.audioPending || cue.cueKind == "sfx")
+        return "audio-id-pending";
+    if (cue.cueKind == "movie")
+    {
+        if (assetResolved && previewResolved)
+            return "sfd-found-preview-frame-ready-movie-decode-pending";
+        if (assetResolved)
+            return "sfd-found-movie-decode-pending";
+        return "missing-movie-asset";
+    }
+    if (assetResolved)
+        return "dds-material-ready";
+    return "missing-visual-asset";
 }
 
 FrontendScreenMaterialSlot materialSlot(
@@ -873,6 +985,95 @@ std::string formatFrontendScreenMediaCueDetail(
         << ":duration=" << std::fixed << std::setprecision(3) << cue.durationSeconds
         << ":source=" << cue.timingSource
         << ":status=" << cue.evidenceStatus
+        << '\n';
+    return out.str();
+}
+
+std::vector<FrontendScreenMediaAssetProbe> frontendScreenMediaAssetProbes(
+    const FrontendScreenPolicy& screen,
+    std::string_view repoRootText)
+{
+    const std::filesystem::path repoRoot{std::string(repoRootText)};
+    std::vector<FrontendScreenMediaAssetProbe> probes;
+    for (const auto& cue : screen.mediaCues)
+    {
+        const auto assetPath = firstExistingPath(mediaAssetCandidatePaths(repoRoot, cue));
+        const auto previewPath = firstExistingPath(mediaPreviewCandidatePaths(repoRoot, cue));
+        const bool assetResolved = !assetPath.empty();
+        const bool previewResolved = !previewPath.empty();
+        FrontendScreenMediaAssetProbe probe;
+        probe.screenId = screen.screenId;
+        probe.cueId = cue.cueId;
+        probe.cueKind = cue.cueKind;
+        probe.assetName = cue.assetName;
+        probe.assetResolved = assetResolved;
+        probe.previewResolved = previewResolved;
+        probe.audioPending = cue.audioPending || cue.cueKind == "sfx";
+        probe.decodePending = cue.cueKind == "movie";
+        probe.playbackReady = assetResolved && cue.cueKind != "movie" && !probe.audioPending;
+        probe.resolvedPath = assetResolved ? repoRelativePath(repoRoot, assetPath) : "missing";
+        probe.previewPath = previewResolved ? repoRelativePath(repoRoot, previewPath) : "missing";
+        probe.playbackStatus = mediaPlaybackStatus(cue, assetResolved, previewResolved);
+        probes.push_back(std::move(probe));
+    }
+    return probes;
+}
+
+FrontendScreenMediaAssetProbeCounts frontendScreenMediaAssetProbeCounts(
+    const std::vector<FrontendScreenMediaAssetProbe>& probes)
+{
+    FrontendScreenMediaAssetProbeCounts counts;
+    for (const auto& probe : probes)
+    {
+        if (probe.assetResolved)
+            ++counts.resolved;
+        if (probe.previewResolved)
+            ++counts.preview;
+        if (probe.playbackReady)
+            ++counts.playbackReady;
+        if (probe.decodePending)
+            ++counts.decodePending;
+        if (probe.audioPending)
+            ++counts.audioPending;
+    }
+    return counts;
+}
+
+std::string formatFrontendScreenMediaAssetProbeCatalog(std::string_view repoRoot)
+{
+    std::ostringstream out;
+    for (const auto& policy : frontendScreenPolicies())
+    {
+        if (policy.mediaCues.empty())
+            continue;
+
+        const auto probes = frontendScreenMediaAssetProbes(policy, repoRoot);
+        const auto counts = frontendScreenMediaAssetProbeCounts(probes);
+        out << "media_asset_status=" << policy.screenId
+            << ":resolved=" << counts.resolved
+            << ":preview=" << counts.preview
+            << ":playback_ready=" << counts.playbackReady
+            << ":decode_pending=" << counts.decodePending
+            << ":audio_pending=" << counts.audioPending
+            << '\n';
+        for (const auto& probe : probes)
+            out << formatFrontendScreenMediaAssetProbeDetail(probe);
+    }
+    return out.str();
+}
+
+std::string formatFrontendScreenMediaAssetProbeDetail(
+    const FrontendScreenMediaAssetProbe& probe)
+{
+    std::ostringstream out;
+    out << "media_asset_probe=" << probe.screenId
+        << ':' << probe.cueId
+        << ":kind=" << probe.cueKind
+        << ":asset=" << probe.assetName
+        << ":resolved=" << (probe.assetResolved ? 1 : 0)
+        << ":resolved_path=" << probe.resolvedPath
+        << ":preview=" << probe.previewPath
+        << ":playback=" << probe.playbackStatus
         << '\n';
     return out.str();
 }

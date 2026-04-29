@@ -373,6 +373,54 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("media_cue=loading:loading_now_loading_copy:kind=text:slot=loading_copy:asset=mat_load_en_001.dds:start=1.250:duration=3.000:source=runtime-ui-layer-capture + CSD timeline:status=visual-policy-proven", completed.stdout)
         self.assertIn("media_cue=loading:loading_display_open_sfx:kind=sfx:slot=loading_open_audio:asset=host-loading-open-sfx:start=0.000:duration=0.000:source=loading-display-active latch:status=audio-id-pending", completed.stdout)
 
+    def test_phase162_declares_media_asset_resolution_for_title_loading(self) -> None:
+        header = self.read(FRONTEND_SCREEN_HEADER)
+        source = self.read(FRONTEND_SCREEN_SOURCE)
+        example = self.read(FRONTEND_SCREEN_EXAMPLE)
+
+        for token in [
+            "struct FrontendScreenMediaAssetProbe",
+            "FrontendScreenMediaAssetProbeCounts",
+            "frontendScreenMediaAssetProbes",
+            "formatFrontendScreenMediaAssetProbeCatalog",
+            "formatFrontendScreenMediaAssetProbeDetail",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "Unleashed Recomp - Windows (Complete Installation) 1.0.3",
+            "extracted_assets/runtime_previews/title/evmo_title_loop_0001.png",
+            "extracted_assets/ui_frontend_archives/MainMenu/ui_mm_contentstext.dds",
+            "extracted_assets/ui_frontend_archives/Loading_English/mat_load_en_001.dds",
+            "sfd-found-preview-frame-ready-movie-decode-pending",
+            "dds-material-ready",
+            "audio-id-pending",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase162-media-asset-smoke", example)
+
+    def test_phase162_media_asset_smoke_resolves_local_visual_placeholders(self) -> None:
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_REFERENCE_CATALOG_EXE", DEFAULT_FRONTEND_SCREEN_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen reference catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase162-media-asset-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_reference_catalog phase162 media asset smoke ok", completed.stdout)
+        self.assertIn("media_asset_status=title-menu:resolved=4:preview=1:playback_ready=3:decode_pending=1:audio_pending=2", completed.stdout)
+        self.assertIn("media_asset_status=loading:resolved=4:preview=0:playback_ready=4:decode_pending=0:audio_pending=2", completed.stdout)
+        self.assertIn("media_asset_probe=title-menu:title_loop_movie:kind=movie:asset=game/movie/evmo_title_loop.sfd:resolved=1:resolved_path=Unleashed Recomp - Windows (Complete Installation) 1.0.3/game/movie/evmo_title_loop.sfd:preview=extracted_assets/runtime_previews/title/evmo_title_loop_0001.png:playback=sfd-found-preview-frame-ready-movie-decode-pending", completed.stdout)
+        self.assertIn("media_asset_probe=title-menu:title_menu_copy:kind=text:asset=ui_mm_contentstext.dds:resolved=1:resolved_path=extracted_assets/ui_frontend_archives/MainMenu/ui_mm_contentstext.dds:preview=missing:playback=dds-material-ready", completed.stdout)
+        self.assertIn("media_asset_probe=loading:loading_now_loading_copy:kind=text:asset=mat_load_en_001.dds:resolved=1:resolved_path=extracted_assets/ui_frontend_archives/Loading_English/mat_load_en_001.dds:preview=missing:playback=dds-material-ready", completed.stdout)
+        self.assertIn("media_asset_probe=title-menu:title_press_start_accept_sfx:kind=sfx:asset=host-title-confirm-sfx:resolved=0:resolved_path=missing:preview=missing:playback=audio-id-pending", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
