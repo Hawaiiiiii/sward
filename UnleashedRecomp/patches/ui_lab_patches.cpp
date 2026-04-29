@@ -482,6 +482,20 @@ namespace UiLab
         uint64_t frame = 0;
     };
 
+    struct SonicHudLastClassifiedCallsiteValue
+    {
+        bool lastClassificationKnown = false;
+        std::string valueName;
+        std::string status;
+        std::string lastClassifiedCallsiteValueSource;
+        std::string hookName;
+        std::string samplePhase;
+        uint32_t ownerAddress = 0;
+        bool normalizedValueKnown = false;
+        uint32_t normalizedValue = 0;
+        uint64_t lastClassifiedCallsiteValueFrame = 0;
+    };
+
     struct CsdChildNodeLookupObservation
     {
         uint32_t resultOwnerAddress = 0;
@@ -892,6 +906,7 @@ namespace UiLab
     static std::unordered_set<std::string> g_loggedSonicHudValueTextWriteKeys;
     static constexpr size_t kSonicHudUpdateCallsiteSampleLimit = 96;
     static std::vector<SonicHudUpdateCallsiteSample> g_sonicHudUpdateCallsiteSamples;
+    static SonicHudLastClassifiedCallsiteValue g_lastSonicHudClassifiedCallsiteValue;
     static std::unordered_map<std::string, std::string> g_lastSonicHudUpdateCallsiteSampleDetails;
     static constexpr size_t kCsdChildNodeLookupObservationLimit = 256;
     static std::unordered_map<uint32_t, CsdChildNodeLookupObservation> g_csdChildNodeLookupObservations;
@@ -975,6 +990,7 @@ namespace UiLab
     static std::string SonicHudValueWriteBindingStatus();
     static std::vector<SonicHudValueWriteObservation> BuildSonicHudValueWriteObservations();
     static std::vector<SonicHudUpdateCallsiteSample> BuildSonicHudUpdateCallsiteSamples();
+    static SonicHudLastClassifiedCallsiteValue BuildSonicHudLastClassifiedCallsiteValue();
     static bool ClassifySonicHudUpdateCallsiteSample(
         const SonicHudUpdateCallsiteSample& sample,
         std::string& valueName,
@@ -2375,6 +2391,12 @@ namespace UiLab
         return g_sonicHudUpdateCallsiteSamples;
     }
 
+    static SonicHudLastClassifiedCallsiteValue BuildSonicHudLastClassifiedCallsiteValue()
+    {
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        return g_lastSonicHudClassifiedCallsiteValue;
+    }
+
     static std::string SonicHudValueWriteBindingStatus()
     {
         // Legacy phase markers retained for contract archaeology:
@@ -3104,6 +3126,20 @@ namespace UiLab
         }
 
         bool changed = false;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            g_lastSonicHudClassifiedCallsiteValue.lastClassificationKnown = true;
+            g_lastSonicHudClassifiedCallsiteValue.valueName = valueName;
+            g_lastSonicHudClassifiedCallsiteValue.status = status;
+            g_lastSonicHudClassifiedCallsiteValue.lastClassifiedCallsiteValueSource = source;
+            g_lastSonicHudClassifiedCallsiteValue.hookName = sample.hookName;
+            g_lastSonicHudClassifiedCallsiteValue.samplePhase = sample.samplePhase;
+            g_lastSonicHudClassifiedCallsiteValue.ownerAddress = sample.ownerAddress;
+            g_lastSonicHudClassifiedCallsiteValue.normalizedValueKnown = normalizedValueKnown;
+            g_lastSonicHudClassifiedCallsiteValue.normalizedValue = normalizedValue;
+            g_lastSonicHudClassifiedCallsiteValue.lastClassifiedCallsiteValueFrame = g_presentedFrameCount;
+        }
+
         if (valueName == "elapsedFrames" && normalizedValueKnown)
         {
             SonicHudGameplayValueSnapshot snapshot;
@@ -3505,6 +3541,7 @@ namespace UiLab
         const auto sonicGameplay = BuildSonicHudGameplayValueSnapshot();
         const auto sonicValueWriteObservations = BuildSonicHudValueWriteObservations();
         const auto sonicUpdateCallsiteSamples = BuildSonicHudUpdateCallsiteSamples();
+        const auto lastClassifiedCallsiteValue = BuildSonicHudLastClassifiedCallsiteValue();
         const auto sonicOwnerPath = BuildSonicHudOwnerPathInspectorSnapshot(csdProjectTree);
         const auto pauseGeneralSave = BuildPauseGeneralSaveLiveInspectorSnapshot();
 
@@ -3696,6 +3733,20 @@ namespace UiLab
         AppendSonicHudUpdateCallsiteSamples(out, sonicUpdateCallsiteSamples);
         out
             << ",\n"
+            << "        \"lastClassifiedCallsiteValue\": {\n"
+            << "          \"lastClassificationKnown\": " << (lastClassifiedCallsiteValue.lastClassificationKnown ? "true" : "false") << ",\n"
+            << "          \"valueName\": \"" << JsonEscape(lastClassifiedCallsiteValue.valueName) << "\",\n"
+            << "          \"status\": \"" << JsonEscape(lastClassifiedCallsiteValue.status) << "\",\n"
+            << "          \"lastClassifiedCallsiteValueSource\": \""
+            << JsonEscape(lastClassifiedCallsiteValue.lastClassifiedCallsiteValueSource) << "\",\n"
+            << "          \"hookName\": \"" << JsonEscape(lastClassifiedCallsiteValue.hookName) << "\",\n"
+            << "          \"samplePhase\": \"" << JsonEscape(lastClassifiedCallsiteValue.samplePhase) << "\",\n"
+            << "          \"ownerAddress\": \"" << JsonEscape(HexU32(lastClassifiedCallsiteValue.ownerAddress)) << "\",\n"
+            << "          \"normalizedValueKnown\": " << (lastClassifiedCallsiteValue.normalizedValueKnown ? "true" : "false") << ",\n"
+            << "          \"normalizedValue\": " << lastClassifiedCallsiteValue.normalizedValue << ",\n"
+            << "          \"lastClassifiedCallsiteValueFrame\": "
+            << lastClassifiedCallsiteValue.lastClassifiedCallsiteValueFrame << "\n"
+            << "        },\n"
             << "        \"frame\": " << sonicGameplay.frame << "\n"
             << "      },\n"
             << "      \"ownerPath\": {\n"
@@ -6389,6 +6440,7 @@ namespace UiLab
             g_sonicHudGameplayValues = {};
             g_sonicHudValueWriteObservations.clear();
             g_sonicHudUpdateCallsiteSamples.clear();
+            g_lastSonicHudClassifiedCallsiteValue = {};
             g_lastSonicHudUpdateCallsiteSampleDetails.clear();
             g_loggedSonicHudValueTextWriteKeys.clear();
         }

@@ -2224,6 +2224,30 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, report)
 
+    def test_ui_lab_phase177_keeps_last_classified_sonic_hud_callsite_value_readable(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "SonicHudLastClassifiedCallsiteValue",
+            "g_lastSonicHudClassifiedCallsiteValue",
+            "BuildSonicHudLastClassifiedCallsiteValue",
+            "lastClassifiedCallsiteValue",
+            "lastClassificationKnown",
+            "normalizedValueKnown",
+            "lastClassifiedCallsiteValueSource",
+            "lastClassifiedCallsiteValueFrame",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 177",
+            "lastClassifiedCallsiteValue",
+            "durable JSONL evidence",
+            "latest live-state snapshot",
+        ]:
+            self.assertIn(token, report)
+
 
 if __name__ == "__main__":
     unittest.main()
