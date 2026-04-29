@@ -4,6 +4,7 @@
 #include <sward/ui_runtime/sonic_hud_reference.hpp>
 
 #include <algorithm>
+#include <iomanip>
 #include <sstream>
 
 namespace sward::ui_runtime
@@ -11,6 +12,19 @@ namespace sward::ui_runtime
 namespace
 {
 constexpr std::string_view kSonicDayHudNext = "sonic-day-hud-next";
+
+const SonicDayHudValueProvenance kSonicDayHudValueProvenance{
+    "ui_playscreen/ring_count",
+    "ui_playscreen/score_count",
+    "ui_playscreen/time_count",
+    "ui_playscreen/so_speed_gauge",
+    "ui_playscreen/so_speed_gauge",
+    "ui_playscreen/so_ringenagy_gauge",
+    "ui_playscreen/player_count",
+    "ui_playscreen/add/u_info",
+    "stage-route-hook=CGameModeStage::ExitLoading",
+    "host/live-bridge supplied value",
+};
 
 template <typename T>
 std::string joinStrings(const std::vector<T>& values, std::string_view separator)
@@ -61,6 +75,35 @@ std::vector<std::string> sonicHudSceneName(std::string_view sceneName)
     if (const auto* scene = findSonicHudScenePolicy(sceneName))
         return { scene->sceneName };
     return {};
+}
+
+std::string formatPaddedInt(int value, int width)
+{
+    std::ostringstream out;
+    out << std::setw(width) << std::setfill('0') << std::max(0, value);
+    return out.str();
+}
+
+std::string formatElapsedFrames(int elapsedFrames)
+{
+    const int clampedFrames = std::max(0, elapsedFrames);
+    const int totalSeconds = clampedFrames / 60;
+    const int minutes = totalSeconds / 60;
+    const int seconds = totalSeconds % 60;
+    const int frames = clampedFrames % 60;
+
+    std::ostringstream out;
+    out << formatPaddedInt(minutes, 2)
+        << ':' << formatPaddedInt(seconds, 2)
+        << ':' << formatPaddedInt(frames, 2);
+    return out.str();
+}
+
+std::string formatGauge(double value)
+{
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(3) << std::clamp(value, 0.0, 1.0);
+    return out.str();
 }
 
 FrontendControllerFrame makeFrame(
@@ -353,6 +396,8 @@ SonicDayHudController::SonicDayHudController()
 // Key recovered scenes include so_speed_gauge, so_ringenagy_gauge, and ring_get.
 void SonicDayHudController::reset()
 {
+    gameplayState_ = {};
+    gameplayState_.provenance = kSonicDayHudValueProvenance;
     frame_ = makeFrame(
         "SonicDayHudController",
         "sonic-day-hud",
@@ -383,42 +428,113 @@ FrontendControllerFrame SonicDayHudController::handleInput(FrontendControllerInp
             "none",
             "none",
             sonicHudSceneNames(false));
+        gameplayState_.routeEvent = "stage-hud-ready";
+        gameplayState_.lastSfxHook = "none";
+        gameplayState_.sfxCueId = "audio-id-pending";
     }
     else if (input == FrontendControllerInput::TutorialReady)
     {
-        frame_ = makeFrame(
-            "SonicDayHudController",
-            "sonic-day-hud",
-            20,
-            "tutorial-ready",
-            "Intro_Anim",
-            false,
-            0,
-            "none",
-            "tutorial_prompt_open_sfx",
-            "none",
-            sonicHudSceneNames(true));
+        return openTutorialPrompt("boost_prompt");
     }
     else if (input == FrontendControllerInput::RingPickup)
     {
-        frame_ = makeFrame(
-            "SonicDayHudController",
-            "sonic-day-hud",
-            60,
-            "ring-feedback",
-            "Egg_Shackle",
-            false,
-            0,
-            "none",
-            "sonic_ring_pickup_sfx",
-            "none",
-            sonicHudSceneName("ring_get"));
+        return applyRingPickup(1, 100);
     }
     return frame_;
 }
 
 const FrontendControllerFrame& SonicDayHudController::frame() const
 {
+    return frame_;
+}
+
+const SonicDayHudGameplayState& SonicDayHudController::gameplayState() const
+{
+    return gameplayState_;
+}
+
+FrontendControllerFrame SonicDayHudController::setGameplayState(const SonicDayHudGameplayState& state)
+{
+    gameplayState_ = state;
+    gameplayState_.provenance = kSonicDayHudValueProvenance;
+    gameplayState_.lastSfxHook = "none";
+    gameplayState_.sfxCueId = "audio-id-pending";
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        100,
+        "hud-value-tick",
+        "DefaultAnim",
+        false,
+        0,
+        "none",
+        "none",
+        "none",
+        sonicHudSceneNames(gameplayState_.tutorialVisible));
+    return frame_;
+}
+
+FrontendControllerFrame SonicDayHudController::applyRingPickup(int ringDelta, int scoreDelta)
+{
+    gameplayState_.ringCount = std::max(0, gameplayState_.ringCount + ringDelta);
+    gameplayState_.score = std::max(0, gameplayState_.score + scoreDelta);
+    gameplayState_.lastSfxHook = "sonic_ring_pickup_sfx";
+    gameplayState_.sfxCueId = "audio-id-pending";
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        60,
+        "ring-feedback",
+        "Egg_Shackle",
+        false,
+        0,
+        "none",
+        gameplayState_.lastSfxHook,
+        "none",
+        sonicHudSceneName("ring_get"));
+    return frame_;
+}
+
+FrontendControllerFrame SonicDayHudController::openTutorialPrompt(std::string_view promptId)
+{
+    gameplayState_.tutorialPromptId = promptId.empty() ? "unknown_prompt" : std::string(promptId);
+    gameplayState_.tutorialVisible = true;
+    gameplayState_.routeEvent = "tutorial-hud-owner-path-ready";
+    gameplayState_.lastSfxHook = "tutorial_prompt_open_sfx";
+    gameplayState_.sfxCueId = "audio-id-pending";
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        20,
+        "tutorial-ready",
+        "Intro_Anim",
+        false,
+        0,
+        "none",
+        gameplayState_.lastSfxHook,
+        "none",
+        sonicHudSceneNames(true));
+    return frame_;
+}
+
+FrontendControllerFrame SonicDayHudController::dismissTutorialPrompt()
+{
+    gameplayState_.tutorialVisible = false;
+    gameplayState_.routeEvent = "stage-hud-ready";
+    gameplayState_.lastSfxHook = "tutorial_prompt_close_sfx";
+    gameplayState_.sfxCueId = "audio-id-pending";
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        40,
+        "tutorial-dismiss",
+        "Outro_Anim",
+        false,
+        0,
+        "none",
+        gameplayState_.lastSfxHook,
+        "none",
+        sonicHudSceneNames(false));
     return frame_;
 }
 
@@ -452,6 +568,11 @@ std::vector<FrontendControllerFrame> runSonicDayHudControllerSmokeSequence()
     frames.push_back(hud.handleInput(FrontendControllerInput::TutorialReady));
     frames.push_back(hud.handleInput(FrontendControllerInput::RingPickup));
     return frames;
+}
+
+const SonicDayHudValueProvenance& sonicDayHudValueProvenance()
+{
+    return kSonicDayHudValueProvenance;
 }
 
 std::string formatFrontendControllerCatalog()
@@ -517,6 +638,78 @@ std::string formatSonicDayHudControllerSmokeSequence()
         << '\n';
     for (const auto& frame : runSonicDayHudControllerSmokeSequence())
         out << formatFrontendControllerFrame(frame);
+    return out.str();
+}
+
+std::string formatSonicDayHudGameplayState(std::string_view phase, const SonicDayHudGameplayState& state)
+{
+    const auto& provenance = sonicDayHudValueProvenance();
+    std::ostringstream out;
+    out << "sonic_day_hud_state=phase=" << phase
+        << ":rings=" << formatPaddedInt(state.ringCount, 3)
+        << ":score=" << formatPaddedInt(state.score, 9)
+        << ":time=" << formatElapsedFrames(state.elapsedFrames)
+        << ":speed=" << formatPaddedInt(state.speedKmh, 3)
+        << ":boost=" << formatGauge(state.boostGauge)
+        << ":energy=" << formatGauge(state.ringEnergyGauge)
+        << ":lives=" << state.lifeCount
+        << ":tutorial=" << state.tutorialPromptId << ':' << (state.tutorialVisible ? "visible" : "hidden")
+        << ":route=" << state.routeEvent
+        << ":sfx=" << state.lastSfxHook
+        << ":sfx_id=" << state.sfxCueId
+        << ":provenance=ring:" << provenance.ringCount
+        << ",score:" << provenance.score
+        << ",time:" << provenance.elapsedFrames
+        << ",speed:" << provenance.speedKmh
+        << ",boost:" << provenance.boostGauge
+        << ",energy:" << provenance.ringEnergyGauge
+        << ",lives:" << provenance.lifeCount
+        << ",tutorial:" << provenance.tutorialPrompt
+        << ",route:" << provenance.routeEvent
+        << ",value_source:" << provenance.valueSource
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudGameplayStateModel()
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_state_model=fields=ring,score,time,speed,boost,energy,lives,tutorial,route"
+        << ":layout=" << sonicHudOwnerReference().projectName
+        << ":controller=SonicDayHudController"
+        << ":value_source=" << sonicDayHudValueProvenance().valueSource
+        << ":memory_binding=live-bridge-value-port-pending"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudGameplayStateSmokeSequence()
+{
+    SonicDayHudController hud;
+    std::ostringstream out;
+    out << formatSonicDayHudGameplayStateModel();
+
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+    out << formatSonicDayHudGameplayState("stage-ready", hud.gameplayState());
+
+    SonicDayHudGameplayState values = hud.gameplayState();
+    values.score = 1250;
+    values.elapsedFrames = 320;
+    values.speedKmh = 186;
+    values.boostGauge = 0.65;
+    values.ringEnergyGauge = 0.72;
+    (void)hud.setGameplayState(values);
+    out << formatSonicDayHudGameplayState("value-tick", hud.gameplayState());
+
+    (void)hud.applyRingPickup(1, 100);
+    out << formatSonicDayHudGameplayState("ring-pickup", hud.gameplayState());
+
+    (void)hud.openTutorialPrompt("boost_prompt");
+    out << formatSonicDayHudGameplayState("tutorial-open", hud.gameplayState());
+
+    (void)hud.dismissTutorialPrompt();
+    out << formatSonicDayHudGameplayState("tutorial-dismiss", hud.gameplayState());
+
     return out.str();
 }
 

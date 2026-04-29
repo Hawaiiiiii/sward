@@ -540,6 +540,71 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("controller_frame=SonicDayHudController:screen=sonic-day-hud:frame=20:state=tutorial-ready:motion=Intro_Anim:input_locked=0:cursor=0/none:sfx=tutorial_prompt_open_sfx:next=none:scenes=exp_count,gauge_frame,player_count,ring_count,ring_get,score_count,so_ringenagy_gauge,so_speed_gauge,time_count,add/medal_get_m,add/medal_get_s,add/speed_count,add/u_info", completed.stdout)
         self.assertIn("controller_frame=SonicDayHudController:screen=sonic-day-hud:frame=60:state=ring-feedback:motion=Egg_Shackle:input_locked=0:cursor=0/none:sfx=sonic_ring_pickup_sfx:next=none:scenes=ring_get", completed.stdout)
 
+    def test_phase165_declares_sonic_day_hud_gameplay_state_model(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+
+        for token in [
+            "struct SonicDayHudGameplayState",
+            "struct SonicDayHudValueProvenance",
+            "ringCount",
+            "score",
+            "elapsedFrames",
+            "speedKmh",
+            "boostGauge",
+            "ringEnergyGauge",
+            "lifeCount",
+            "tutorialPromptId",
+            "tutorialVisible",
+            "routeEvent",
+            "setGameplayState",
+            "applyRingPickup",
+            "openTutorialPrompt",
+            "dismissTutorialPrompt",
+            "formatSonicDayHudGameplayState",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "ui_playscreen/ring_count",
+            "ui_playscreen/score_count",
+            "ui_playscreen/time_count",
+            "ui_playscreen/so_speed_gauge",
+            "ui_playscreen/so_ringenagy_gauge",
+            "ui_playscreen/player_count",
+            "ui_playscreen/add/u_info",
+            "host/live-bridge supplied value",
+            "live-bridge-value-port-pending",
+            "audio-id-pending",
+            "tutorial_prompt_close_sfx",
+            "stage-route-hook=CGameModeStage::ExitLoading",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase165-sonic-hud-state-smoke", example)
+
+    def test_phase165_sonic_day_hud_state_smoke_reports_gameplay_value_transitions(self) -> None:
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase165-sonic-hud-state-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase165 sonic hud state smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_state_model=fields=ring,score,time,speed,boost,energy,lives,tutorial,route:layout=ui_playscreen:controller=SonicDayHudController:value_source=host/live-bridge supplied value:memory_binding=live-bridge-value-port-pending", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=stage-ready:rings=000:score=000000000:time=00:00:00:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending:provenance=ring:ui_playscreen/ring_count,score:ui_playscreen/score_count,time:ui_playscreen/time_count,speed:ui_playscreen/so_speed_gauge,boost:ui_playscreen/so_speed_gauge,energy:ui_playscreen/so_ringenagy_gauge,lives:ui_playscreen/player_count,tutorial:ui_playscreen/add/u_info,route:stage-route-hook=CGameModeStage::ExitLoading,value_source:host/live-bridge supplied value", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=value-tick:rings=000:score=000001250:time=00:05:20:speed=186:boost=0.650:energy=0.720:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=ring-pickup:rings=001:score=000001350:time=00:05:20:speed=186:boost=0.650:energy=0.720:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=sonic_ring_pickup_sfx:sfx_id=audio-id-pending", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=tutorial-open:rings=001:score=000001350:time=00:05:20:speed=186:boost=0.650:energy=0.720:lives=3:tutorial=boost_prompt:visible:route=tutorial-hud-owner-path-ready:sfx=tutorial_prompt_open_sfx:sfx_id=audio-id-pending", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=tutorial-dismiss:rings=001:score=000001350:time=00:05:20:speed=186:boost=0.650:energy=0.720:lives=3:tutorial=boost_prompt:hidden:route=stage-hud-ready:sfx=tutorial_prompt_close_sfx:sfx_id=audio-id-pending", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

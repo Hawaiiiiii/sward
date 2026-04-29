@@ -32,6 +32,12 @@ int main(int argc, char** argv)
         std::cout << formatSonicDayHudControllerSmokeSequence();
         return 0;
     }
+    if (hasArg(argc, argv, "--phase165-sonic-hud-state-smoke"))
+    {
+        std::cout << "sward_frontend_screen_controller_catalog phase165 sonic hud state smoke ok\n";
+        std::cout << formatSonicDayHudGameplayStateSmokeSequence();
+        return 0;
+    }
 
     if (hasArg(argc, argv, "--catalog") || argc == 1)
     {
@@ -40,6 +46,6 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    std::cerr << "Usage: sward_frontend_screen_controller_catalog [--catalog] [--phase163-smoke] [--phase164-sonic-hud-smoke]\n";
+    std::cerr << "Usage: sward_frontend_screen_controller_catalog [--catalog] [--phase163-smoke] [--phase164-sonic-hud-smoke] [--phase165-sonic-hud-state-smoke]\n";
     return 2;
 }
