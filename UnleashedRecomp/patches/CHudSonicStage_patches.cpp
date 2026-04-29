@@ -13,6 +13,9 @@ static bool IsPlausibleGuestAddress(uint32_t address)
     return address >= 0x10000;
 }
 
+static thread_local uint32_t g_sonicHudSpeedReadoutOwnerAddress = 0;
+static thread_local uint32_t g_sonicHudSpeedReadoutCaptureDepth = 0;
+
 static void RecordHudSonicStageInspector(
     uint32_t ownerAddress,
     const SWA::CHudSonicStage* pHudSonicStage,
@@ -112,10 +115,31 @@ PPC_FUNC(sub_824D6418)
     const uint32_t ownerAddress = ctx.r3.u32;
     RecordHudSonicStageCallsiteSample(ownerAddress, "sub_824D6418", "pre-original", ctx);
     UiLab::PushSonicHudUpdateContext(ownerAddress, "sonic-hud-update-context CHudSonicStage/sub_824D6418");
+    const uint32_t previousSpeedReadoutOwnerAddress = g_sonicHudSpeedReadoutOwnerAddress;
+    g_sonicHudSpeedReadoutOwnerAddress = ownerAddress;
+    ++g_sonicHudSpeedReadoutCaptureDepth;
     __imp__sub_824D6418(ctx, base);
+    --g_sonicHudSpeedReadoutCaptureDepth;
+    g_sonicHudSpeedReadoutOwnerAddress = previousSpeedReadoutOwnerAddress;
     UiLab::PopSonicHudUpdateContext("sonic-hud-update-context CHudSonicStage/sub_824D6418");
     RecordHudSonicStageCallsiteSample(ownerAddress, "sub_824D6418", "post-original", ctx);
     RecordHudSonicStageInspector(ownerAddress, "raw CHudSonicStage value update hook sub_824D6418");
+}
+
+PPC_FUNC_IMPL(__imp__sub_8251A568);
+PPC_FUNC(sub_8251A568)
+{
+    __imp__sub_8251A568(ctx, base);
+
+    if (
+        g_sonicHudSpeedReadoutCaptureDepth != 0 &&
+        IsPlausibleGuestAddress(g_sonicHudSpeedReadoutOwnerAddress))
+    {
+        UiLab::OnSonicHudSpeedReadoutValue(
+            g_sonicHudSpeedReadoutOwnerAddress,
+            ctx.r3.u32,
+            "generated-PPC:sub_824D6418 -> sub_8251A568 return");
+    }
 }
 
 PPC_FUNC_IMPL(__imp__sub_824D69B0);

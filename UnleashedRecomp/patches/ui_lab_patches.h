@@ -353,6 +353,10 @@ namespace UiLab
         std::string_view samplePhase,
         double deltaTime,
         uint32_t r4);
+    void OnSonicHudSpeedReadoutValue(
+        uint32_t ownerAddress,
+        uint32_t speedKmh,
+        std::string_view hookSource);
     void OnSonicHudGameplayValues(
         uint32_t ringCount,
         bool ringCountKnown,

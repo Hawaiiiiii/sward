@@ -261,25 +261,27 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("draggable debug icon", report)
         self.assertIn("counter/view/export/debug-draw windows", report)
 
-    def test_ui_lab_operator_shell_defaults_to_internal_runtime_views(self):
+    def test_ui_lab_operator_shell_defaults_to_compact_runtime_views(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
 
-        self.assertIn("g_operatorWindowListVisible = true", ui_lab)
-        self.assertIn("g_operatorCounterVisible = true", ui_lab)
-        self.assertIn("g_operatorViewVisible = true", ui_lab)
-        self.assertIn("g_operatorExportsVisible = true", ui_lab)
-        self.assertIn("g_operatorDebugDrawVisible = true", ui_lab)
-        self.assertIn("g_operatorWelcomeVisible = true", ui_lab)
-        self.assertIn("g_operatorStageHudVisible = true", ui_lab)
-        self.assertIn("g_operatorLiveApiVisible = true", ui_lab)
+        self.assertIn("Compact-on-demand operator windows", ui_lab)
+        self.assertIn("g_operatorWindowListVisible = false", ui_lab)
+        self.assertIn("g_operatorCounterVisible = false", ui_lab)
+        self.assertIn("g_operatorViewVisible = false", ui_lab)
+        self.assertIn("g_operatorExportsVisible = false", ui_lab)
+        self.assertIn("g_operatorDebugDrawVisible = false", ui_lab)
+        self.assertIn("g_operatorWelcomeVisible = false", ui_lab)
+        self.assertIn("g_operatorStageHudVisible = false", ui_lab)
+        self.assertIn("g_operatorLiveApiVisible = false", ui_lab)
+        self.assertIn("g_operatorDebugDrawLayerVisible = false", ui_lab)
         self.assertIn("DrawOperatorWelcomeWindow", ui_lab)
         self.assertIn("DrawOperatorStageHudWindow", ui_lab)
         self.assertIn("DrawOperatorLiveApiWindow", ui_lab)
         self.assertIn("SWARD Welcome", ui_lab)
         self.assertIn("SWARD Stage / HUD", ui_lab)
         self.assertIn("SWARD Live API", ui_lab)
-        self.assertIn("Default-open operator windows", report)
+        self.assertIn("Compact-on-demand operator windows", report)
 
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
@@ -2245,6 +2247,45 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "lastClassifiedCallsiteValue",
             "durable JSONL evidence",
             "latest live-state snapshot",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_phase178_compacts_overlay_and_throttles_hud_callsite_spam(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        hud_hook = self.read("UnleashedRecomp/patches/CHudSonicStage_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "BuildSonicHudUpdateCallsiteStableSignature",
+            "g_lastSonicHudUpdateCallsiteStableSignatures",
+            "g_lastSonicHudUpdateCallsiteEvidenceFrames",
+            "kSonicHudUpdateCallsiteMinEvidenceIntervalFrames",
+            "stableSignature",
+            "intervalElapsed",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "OnSonicHudSpeedReadoutValue",
+            "sonic-hud-speed-readout-value",
+            "runtime-proven-via-sub_8251A568-return",
+            "generated-PPC:sub_824D6418 -> sub_8251A568 return",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn("void OnSonicHudSpeedReadoutValue", header)
+        self.assertIn("PPC_FUNC_IMPL(__imp__sub_8251A568)", hud_hook)
+        self.assertIn("PPC_FUNC(sub_8251A568)", hud_hook)
+        self.assertIn("g_sonicHudSpeedReadoutCaptureDepth", hud_hook)
+        self.assertIn("OnSonicHudSpeedReadoutValue", hud_hook)
+
+        for token in [
+            "Phase 178",
+            "compact-on-demand operator overlay",
+            "stable HUD callsite signature",
+            "sub_8251A568 return",
+            "speed:runtime-proven-via-sub_8251A568-return",
         ]:
             self.assertIn(token, report)
 

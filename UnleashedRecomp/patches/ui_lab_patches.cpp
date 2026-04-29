@@ -789,16 +789,17 @@ namespace UiLab
     static bool g_hideOverlay = false;
     static bool g_operatorShellVisible = true;
     static bool g_operatorShellToggleWasDown = false;
-    static bool g_operatorWindowListVisible = true;
-    static bool g_operatorInspectorVisible = true;
-    static bool g_operatorCounterVisible = true;
-    static bool g_operatorViewVisible = true;
-    static bool g_operatorExportsVisible = true;
-    static bool g_operatorDebugDrawVisible = true;
-    static bool g_operatorWelcomeVisible = true;
-    static bool g_operatorStageHudVisible = true;
-    static bool g_operatorLiveApiVisible = true;
-    static bool g_operatorDebugDrawLayerVisible = true;
+    // Compact-on-demand operator windows: direct live bridge/API stays enabled, panes open only when requested.
+    static bool g_operatorWindowListVisible = false;
+    static bool g_operatorInspectorVisible = false;
+    static bool g_operatorCounterVisible = false;
+    static bool g_operatorViewVisible = false;
+    static bool g_operatorExportsVisible = false;
+    static bool g_operatorDebugDrawVisible = false;
+    static bool g_operatorWelcomeVisible = false;
+    static bool g_operatorStageHudVisible = false;
+    static bool g_operatorLiveApiVisible = false;
+    static bool g_operatorDebugDrawLayerVisible = false;
     static ImVec2 g_operatorDebugIconPos = { 18.0f, 18.0f };
     static RoutePolicy g_routePolicy = RoutePolicy::InputInjection;
     static ScreenId g_target = ScreenId::TitleLoop;
@@ -908,6 +909,11 @@ namespace UiLab
     static std::vector<SonicHudUpdateCallsiteSample> g_sonicHudUpdateCallsiteSamples;
     static SonicHudLastClassifiedCallsiteValue g_lastSonicHudClassifiedCallsiteValue;
     static std::unordered_map<std::string, std::string> g_lastSonicHudUpdateCallsiteSampleDetails;
+    static constexpr uint64_t kSonicHudUpdateCallsiteMinEvidenceIntervalFrames = 120;
+    static std::unordered_map<std::string, std::string> g_lastSonicHudUpdateCallsiteStableSignatures;
+    static std::unordered_map<std::string, uint64_t> g_lastSonicHudUpdateCallsiteEvidenceFrames;
+    static std::unordered_map<std::string, uint32_t> g_lastSonicHudSpeedReadoutValues;
+    static std::unordered_map<std::string, uint64_t> g_lastSonicHudSpeedReadoutEvidenceFrames;
     static constexpr size_t kCsdChildNodeLookupObservationLimit = 256;
     static std::unordered_map<uint32_t, CsdChildNodeLookupObservation> g_csdChildNodeLookupObservations;
     static std::unordered_map<uint32_t, CsdNodeSourceOwnerObservation> g_csdNodeSourceOwnerObservations;
@@ -1003,8 +1009,15 @@ namespace UiLab
         std::string_view path,
         std::string_view textUtf8,
         std::string_view hookSource);
-    static bool ApplySonicHudUpdateCallsiteSampleToGameplayValues(
+    static std::string BuildSonicHudUpdateCallsiteStableSignature(
         const SonicHudUpdateCallsiteSample& sample);
+    static bool ApplySonicHudUpdateCallsiteSampleToGameplayValues(
+        const SonicHudUpdateCallsiteSample& sample,
+        bool writeEvidence);
+    static bool ApplySonicHudSpeedReadoutValueToGameplayValues(
+        uint32_t ownerAddress,
+        uint32_t speedKmh,
+        std::string_view hookSource);
     static SonicHudOwnerPathInspectorSnapshot BuildSonicHudOwnerPathInspectorSnapshot(
         const CsdProjectTreeInspectorSnapshot& csdProjectTree);
     static PauseGeneralSaveLiveInspectorSnapshot BuildPauseGeneralSaveLiveInspectorSnapshot();
@@ -3105,8 +3118,31 @@ namespace UiLab
         return false;
     }
 
-    static bool ApplySonicHudUpdateCallsiteSampleToGameplayValues(
+    static std::string BuildSonicHudUpdateCallsiteStableSignature(
         const SonicHudUpdateCallsiteSample& sample)
+    {
+        std::ostringstream out;
+        out
+            << sample.hookName
+            << "|" << sample.samplePhase
+            << "|owner=" << HexU32(sample.ownerAddress)
+            << "|f424=" << HexU32(sample.ownerField424)
+            << "|f432=" << HexU32(sample.ownerField432)
+            << "|f452=" << sample.ownerField452
+            << "|f456=" << sample.ownerField456
+            << "|f460=" << sample.ownerField460
+            << "|f464=" << sample.ownerField464
+            << "|f468=" << sample.ownerField468
+            << "|f472=" << sample.ownerField472
+            << "|f480=" << sample.ownerField480
+            << "|f484=" << HexU32(sample.ownerField484)
+            << "|f488=" << HexU32(sample.ownerField488);
+        return out.str();
+    }
+
+    static bool ApplySonicHudUpdateCallsiteSampleToGameplayValues(
+        const SonicHudUpdateCallsiteSample& sample,
+        bool writeEvidence)
     {
         std::string valueName;
         std::string status;
@@ -3171,7 +3207,48 @@ namespace UiLab
         if (normalizedValueKnown)
             detail << " normalizedValue=" << normalizedValue;
 
-        WriteEvidenceEvent("sonic-hud-callsite-value-classified", detail.str());
+        if (writeEvidence)
+            WriteEvidenceEvent("sonic-hud-callsite-value-classified", detail.str());
+        return changed;
+    }
+
+    static bool ApplySonicHudSpeedReadoutValueToGameplayValues(
+        uint32_t ownerAddress,
+        uint32_t speedKmh,
+        std::string_view hookSource)
+    {
+        const std::string source = hookSource.empty()
+            ? std::string("generated-PPC:sub_824D6418 -> sub_8251A568 return")
+            : std::string(hookSource);
+        bool changed = false;
+
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            SonicHudGameplayValueSnapshot snapshot = g_sonicHudGameplayValues;
+            changed =
+                !snapshot.speedKmhKnown ||
+                snapshot.speedKmh != static_cast<float>(speedKmh) ||
+                snapshot.speedKmhSource != source;
+            snapshot.speedKmhKnown = true;
+            snapshot.speedKmh = static_cast<float>(speedKmh);
+            snapshot.speedKmhSource = source;
+            snapshot.frame = g_presentedFrameCount;
+            g_sonicHudGameplayValues = std::move(snapshot);
+
+            g_lastSonicHudClassifiedCallsiteValue.lastClassificationKnown = true;
+            g_lastSonicHudClassifiedCallsiteValue.valueName = "speedKmh";
+            g_lastSonicHudClassifiedCallsiteValue.status =
+                "runtime-proven-via-sub_8251A568-return";
+            g_lastSonicHudClassifiedCallsiteValue.lastClassifiedCallsiteValueSource = source;
+            g_lastSonicHudClassifiedCallsiteValue.hookName = "sub_8251A568";
+            g_lastSonicHudClassifiedCallsiteValue.samplePhase = "return";
+            g_lastSonicHudClassifiedCallsiteValue.ownerAddress = ownerAddress;
+            g_lastSonicHudClassifiedCallsiteValue.normalizedValueKnown = true;
+            g_lastSonicHudClassifiedCallsiteValue.normalizedValue = speedKmh;
+            g_lastSonicHudClassifiedCallsiteValue.lastClassifiedCallsiteValueFrame =
+                g_presentedFrameCount;
+        }
+
         return changed;
     }
 
@@ -6442,6 +6519,10 @@ namespace UiLab
             g_sonicHudUpdateCallsiteSamples.clear();
             g_lastSonicHudClassifiedCallsiteValue = {};
             g_lastSonicHudUpdateCallsiteSampleDetails.clear();
+            g_lastSonicHudUpdateCallsiteStableSignatures.clear();
+            g_lastSonicHudUpdateCallsiteEvidenceFrames.clear();
+            g_lastSonicHudSpeedReadoutValues.clear();
+            g_lastSonicHudSpeedReadoutEvidenceFrames.clear();
             g_loggedSonicHudValueTextWriteKeys.clear();
         }
 
@@ -7568,29 +7649,107 @@ namespace UiLab
         const std::string key =
             sample.hookName + "|" + sample.samplePhase + "|" + HexU32(sample.ownerAddress);
         const std::string detailText = detail.str();
+        const std::string stableSignature =
+            BuildSonicHudUpdateCallsiteStableSignature(sample);
 
-        bool changed = false;
+        bool signatureChanged = false;
+        bool intervalElapsed = false;
+        bool shouldWriteEvidence = false;
         {
             std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
-            auto existing = g_lastSonicHudUpdateCallsiteSampleDetails.find(key);
-            changed =
-                existing == g_lastSonicHudUpdateCallsiteSampleDetails.end() ||
-                existing->second != detailText;
+            auto existing = g_lastSonicHudUpdateCallsiteStableSignatures.find(key);
+            signatureChanged =
+                existing == g_lastSonicHudUpdateCallsiteStableSignatures.end() ||
+                existing->second != stableSignature;
 
-            if (changed)
+            auto lastEvidenceFrame = g_lastSonicHudUpdateCallsiteEvidenceFrames.find(key);
+            intervalElapsed =
+                lastEvidenceFrame == g_lastSonicHudUpdateCallsiteEvidenceFrames.end() ||
+                g_presentedFrameCount >=
+                    lastEvidenceFrame->second + kSonicHudUpdateCallsiteMinEvidenceIntervalFrames;
+
+            shouldWriteEvidence =
+                existing == g_lastSonicHudUpdateCallsiteStableSignatures.end() ||
+                intervalElapsed;
+
+            if (signatureChanged)
             {
+                g_lastSonicHudUpdateCallsiteStableSignatures[key] = stableSignature;
                 g_lastSonicHudUpdateCallsiteSampleDetails[key] = detailText;
                 if (g_sonicHudUpdateCallsiteSamples.size() < kSonicHudUpdateCallsiteSampleLimit)
                     g_sonicHudUpdateCallsiteSamples.push_back(sample);
                 else
                     g_sonicHudUpdateCallsiteSamples[g_sonicHudUpdateCallsiteSamples.size() - 1] = sample;
             }
+
+            if (shouldWriteEvidence)
+                g_lastSonicHudUpdateCallsiteEvidenceFrames[key] = g_presentedFrameCount;
         }
 
-        if (changed)
+        const bool gameplayChanged =
+            ApplySonicHudUpdateCallsiteSampleToGameplayValues(sample, shouldWriteEvidence);
+
+        if (shouldWriteEvidence)
         {
-            WriteEvidenceEvent("sonic-hud-update-callsite-sample", detailText);
-            ApplySonicHudUpdateCallsiteSampleToGameplayValues(sample);
+            WriteEvidenceEvent(
+                "sonic-hud-update-callsite-sample",
+                detailText + " stableSignature=" + stableSignature);
+            WriteLiveStateSnapshot();
+        }
+        else if (gameplayChanged && intervalElapsed)
+        {
+            WriteLiveStateSnapshot();
+        }
+    }
+
+    void OnSonicHudSpeedReadoutValue(
+        uint32_t ownerAddress,
+        uint32_t speedKmh,
+        std::string_view hookSource)
+    {
+        if (!g_isEnabled || !IsPlausibleGuestPointer(ownerAddress))
+            return;
+
+        const std::string source = hookSource.empty()
+            ? std::string("generated-PPC:sub_824D6418 -> sub_8251A568 return")
+            : std::string(hookSource);
+        const std::string key = HexU32(ownerAddress);
+
+        bool valueChanged = false;
+        bool intervalElapsed = false;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            auto existing = g_lastSonicHudSpeedReadoutValues.find(key);
+            valueChanged =
+                existing == g_lastSonicHudSpeedReadoutValues.end() ||
+                existing->second != speedKmh;
+            if (valueChanged)
+                g_lastSonicHudSpeedReadoutValues[key] = speedKmh;
+
+            auto lastEvidenceFrame = g_lastSonicHudSpeedReadoutEvidenceFrames.find(key);
+            intervalElapsed =
+                lastEvidenceFrame == g_lastSonicHudSpeedReadoutEvidenceFrames.end() ||
+                g_presentedFrameCount >=
+                    lastEvidenceFrame->second + kSonicHudUpdateCallsiteMinEvidenceIntervalFrames;
+            if (intervalElapsed)
+                g_lastSonicHudSpeedReadoutEvidenceFrames[key] = g_presentedFrameCount;
+        }
+
+        const bool gameplayChanged =
+            ApplySonicHudSpeedReadoutValueToGameplayValues(ownerAddress, speedKmh, source);
+
+        if (valueChanged || intervalElapsed)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-speed-readout-value",
+                "value=speedKmh status=runtime-proven-via-sub_8251A568-return source=" +
+                    source +
+                    " owner=" + HexU32(ownerAddress) +
+                    " normalizedValue=" + std::to_string(speedKmh));
+            WriteLiveStateSnapshot();
+        }
+        else if (gameplayChanged && intervalElapsed)
+        {
             WriteLiveStateSnapshot();
         }
     }
@@ -9544,7 +9703,7 @@ namespace UiLab
 
         if (ImGui::Begin("SWARD Welcome", &g_operatorWelcomeVisible))
         {
-            ImGui::TextUnformatted("Default-open operator windows");
+            ImGui::TextUnformatted("Compact-on-demand operator windows");
             ImGui::Separator();
             ImGui::Text("Target: %s", std::string(GetTargetToken()).c_str());
             ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
