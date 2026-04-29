@@ -997,6 +997,19 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("vendorCommandResourceDumpStatus", source_text)
         self.assertIn("rawBackendCommandCount", source_text)
 
+    def test_renderer_source_wires_phase158_ui_layer_capture(self) -> None:
+        source_text = RENDERER_SOURCE.read_text(encoding="utf-8")
+        self.assertIn("FrontendUiOnlyLayerCaptureTriage", source_text)
+        self.assertIn("buildFrontendUiOnlyLayerCaptureTriage", source_text)
+        self.assertIn("runRendererUiOnlyLayerCaptureSmoke", source_text)
+        self.assertIn("--renderer-ui-layer-capture-smoke", source_text)
+        self.assertIn("phase158-ui-render-target-capture", source_text)
+        self.assertIn("ui_layer_capture_policy=copy-active-ui-render-target-before-imgui-present", source_text)
+        self.assertIn("ui_layer_capture_status=", source_text)
+        self.assertIn("ui_layer_isolation_status=", source_text)
+        self.assertIn("uiOnlyRenderTargetCaptureStatus", source_text)
+        self.assertIn("uiOnlyRenderTargetCapturePath", source_text)
+
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
         if not exe.exists():
@@ -1376,6 +1389,27 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("vendor_command_replay_gap=pending-full-vendor-command-buffer-replay", completed.stdout)
         self.assertRegex(completed.stdout, r"vendor_command_resource=title-menu:source=(ui_lab_live_bridge_vendor_command_capture|ui_lab_live_bridge_backend_resolved|missing):raw_commands=[0-9]+:backend_submits=[0-9]+:resource_pairs=[0-9]+:texture_views=[0-9]+:sampler_views=[0-9]+:local_commands=[1-9]\d*:dump_status=[^\r\n]+")
         self.assertRegex(completed.stdout, r"vendor_command_resource=loading:source=(ui_lab_live_bridge_vendor_command_capture|ui_lab_live_bridge_backend_resolved|missing):raw_commands=[0-9]+:backend_submits=[0-9]+:resource_pairs=[0-9]+:texture_views=[0-9]+:sampler_views=[0-9]+:local_commands=[1-9]\d*:dump_status=[^\r\n]+")
+
+    def test_renderer_ui_layer_capture_smoke_reports_render_target_readback(self) -> None:
+        exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
+        if not exe.exists():
+            self.skipTest(f"renderer executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--renderer-ui-layer-capture-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        self.assertIn("sward_su_ui_asset_renderer UI layer capture smoke ok", completed.stdout)
+        self.assertIn("mode=phase158-ui-render-target-capture", completed.stdout)
+        self.assertRegex(completed.stdout, r"ui_layer_capture_probe=(direct-ui-layer-status|vendor-command-fallback|missing)")
+        self.assertIn("ui_layer_capture_policy=copy-active-ui-render-target-before-imgui-present", completed.stdout)
+        self.assertRegex(completed.stdout, r"ui_layer_capture=title-menu:source=(ui_lab_live_bridge_ui_layer_status|ui_lab_live_bridge_vendor_command_capture|missing):capture_status=[^:]+:isolation=[^:]+:width=[0-9]+:height=[0-9]+:local_commands=[1-9]\d*:ui_layer_capture_path=[^\r\n]*")
+        self.assertRegex(completed.stdout, r"ui_layer_capture=loading:source=(ui_lab_live_bridge_ui_layer_status|ui_lab_live_bridge_vendor_command_capture|missing):capture_status=[^:]+:isolation=[^:]+:width=[0-9]+:height=[0-9]+:local_commands=[1-9]\d*:ui_layer_capture_path=[^\r\n]*")
 
     def test_renderer_reference_policy_export_smoke_writes_clean_reusable_source(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))

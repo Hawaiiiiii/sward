@@ -606,6 +606,43 @@ struct FrontendVendorCommandResourceDumpTriage
     std::size_t localCommandCount = 0;
 };
 
+struct FrontendUiOnlyLayerCaptureEvidence
+{
+    bool found = false;
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string capturePolicy = "copy-active-ui-render-target-before-imgui-present";
+    std::string captureStatus = "missing";
+    std::string layerStatus = "missing";
+    std::string isolationStatus = "missing";
+    std::string capturePath;
+    std::string captureSource = "active-render-target-before-imgui-present";
+    int width = 0;
+    int height = 0;
+    int frame = 0;
+    std::size_t runtimeUiDrawCallCount = 0;
+    std::size_t runtimeGpuSubmitCallCount = 0;
+    FrontendLiveBridgeProbeResult bridgeProbe;
+};
+
+struct FrontendUiOnlyLayerCaptureTriage
+{
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string capturePolicy = "copy-active-ui-render-target-before-imgui-present";
+    std::string captureStatus = "missing";
+    std::string isolationStatus = "missing";
+    std::string capturePath;
+    std::string captureSource = "active-render-target-before-imgui-present";
+    int width = 0;
+    int height = 0;
+    std::size_t runtimeUiDrawCallCount = 0;
+    std::size_t runtimeGpuSubmitCallCount = 0;
+    std::size_t localCommandCount = 0;
+};
+
 struct CsdColorRgba
 {
     std::uint8_t r = 255;
@@ -1094,6 +1131,9 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeVendorCommandCapture(
     std::string_view pipeName,
     DWORD timeoutMilliseconds = 150);
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeUiLayerStatus(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds = 150);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveBridge(
@@ -1101,6 +1141,8 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] FrontendUiOracleEvidence loadFrontendUiOracleEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendUiOraclePlaybackClock loadFrontendUiOraclePlaybackClock(
+    const sward::ui_runtime::FrontendScreenPolicy& policy);
+[[nodiscard]] FrontendUiOnlyLayerCaptureEvidence loadFrontendUiOnlyLayerCaptureEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendRuntimeDrawListEvidence loadFrontendRuntimeDrawListEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
@@ -7317,6 +7359,113 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return records.empty() ? 1 : 0;
 }
 
+[[nodiscard]] FrontendUiOnlyLayerCaptureTriage buildFrontendUiOnlyLayerCaptureTriage(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendUiOnlyLayerCaptureTriage triage;
+    triage.screenId = policy.screenId;
+
+    const auto evidence = loadFrontendUiOnlyLayerCaptureEvidence(policy);
+    triage.source = evidence.source;
+    triage.probe = evidence.probe;
+    triage.capturePolicy = evidence.capturePolicy;
+    triage.captureStatus = evidence.captureStatus;
+    triage.isolationStatus = evidence.isolationStatus;
+    triage.capturePath = evidence.capturePath;
+    triage.captureSource = evidence.captureSource;
+    triage.width = evidence.width;
+    triage.height = evidence.height;
+    triage.runtimeUiDrawCallCount = evidence.runtimeUiDrawCallCount;
+    triage.runtimeGpuSubmitCallCount = evidence.runtimeGpuSubmitCallCount;
+
+    const auto clock = loadFrontendUiOraclePlaybackClock(policy);
+    for (const auto& scenePolicy : policy.scenes)
+    {
+        const int sceneFrame = uiOracleTimelineFrameForScene(clock, scenePolicy);
+        const CsdPipelineTemplateBinding sceneBinding{
+            policy.screenId,
+            policy.layoutName,
+            scenePolicy.sceneName,
+            scenePolicy.sceneName,
+            scenePolicy.timeline.animationName,
+        };
+
+        const auto* drawableScene = cachedCsdDrawableScene(sceneBinding);
+        if (!drawableScene)
+            continue;
+
+        auto playback = loadCsdTimelinePlayback(sceneBinding, sceneFrame);
+        if (!playback)
+            playback = loadTimelinePlaybackForScene(policy.screenId, policy.layoutName, scenePolicy.sceneName, sceneFrame);
+
+        std::size_t sampledTrackCount = 0;
+        const auto commands = timelineSampledCommands(
+            *drawableScene,
+            playback ? &*playback : nullptr,
+            sampledTrackCount);
+        triage.localCommandCount += static_cast<std::size_t>(std::count_if(
+            commands.begin(),
+            commands.end(),
+            csdCommandIsDrawable));
+    }
+
+    return triage;
+}
+
+[[nodiscard]] int runRendererUiOnlyLayerCaptureSmoke()
+{
+    constexpr std::string_view directProbeToken = "ui_layer_capture_probe=direct-ui-layer-status";
+    constexpr std::string_view vendorFallbackToken = "ui_layer_capture_probe=vendor-command-fallback";
+    constexpr std::string_view missingProbeToken = "ui_layer_capture_probe=missing";
+    constexpr std::string_view policyToken = "ui_layer_capture_policy=copy-active-ui-render-target-before-imgui-present";
+
+    std::vector<FrontendUiOnlyLayerCaptureTriage> records;
+    for (const auto& policy : frontendScreenPolicies())
+        records.push_back(buildFrontendUiOnlyLayerCaptureTriage(policy));
+
+    const bool anyDirect = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendUiOnlyLayerCaptureTriage& record)
+        {
+            return record.probe == "direct-ui-layer-status";
+        });
+    const bool anyVendorFallback = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendUiOnlyLayerCaptureTriage& record)
+        {
+            return record.probe == "vendor-command-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer UI layer capture smoke ok "
+        << "mode=phase158-ui-render-target-capture"
+        << " " << (anyDirect ? directProbeToken : (anyVendorFallback ? vendorFallbackToken : missingProbeToken))
+        << " " << policyToken
+        << " ui_layer_capture_status=per-lane"
+        << " ui_layer_isolation_status=per-lane"
+        << " ui_layer_capture_path=per-lane"
+        << " lanes=" << records.size()
+        << '\n';
+
+    for (const auto& record : records)
+    {
+        std::cout
+            << "ui_layer_capture=" << record.screenId
+            << ":source=" << record.source
+            << ":capture_status=" << record.captureStatus
+            << ":isolation=" << record.isolationStatus
+            << ":width=" << record.width
+            << ":height=" << record.height
+            << ":local_commands=" << record.localCommandCount
+            << ":ui_layer_capture_path=" << record.capturePath
+            << '\n';
+    }
+
+    return records.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -9475,6 +9624,13 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return queryUiLabLiveBridgeCommand(pipeName, "ui-vendor-command-capture", timeoutMilliseconds);
 }
 
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeUiLayerStatus(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds)
+{
+    return queryUiLabLiveBridgeCommand(pipeName, "ui-layer-status", timeoutMilliseconds);
+}
+
 [[nodiscard]] std::string frontendAlignmentCursorOwnerFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy,
     std::string_view text)
@@ -10357,6 +10513,90 @@ void applyFrontendVendorCommandResourceDumpFromJson(
     fallback.uiOnlyLayerStatus = backend.uiOnlyLayerCaptureStatus;
     fallback.vendorCommandReplayGap = "pending-full-vendor-command-buffer-replay";
     fallback.bridgeProbe = vendorProbe;
+    return fallback;
+}
+
+void applyFrontendUiOnlyLayerCaptureFromJson(
+    FrontendUiOnlyLayerCaptureEvidence& evidence,
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    std::string_view text,
+    std::string_view source,
+    std::string_view probe)
+{
+    evidence.found = true;
+    evidence.screenId = jsonStringField(text, "target").value_or(policy.screenId);
+    evidence.source = std::string(source);
+    evidence.probe = std::string(probe);
+
+    const auto capture = jsonObjectFieldSpan(text, "uiOnlyRenderTargetCapture");
+    const std::string_view captureSpan = capture ? *capture : text;
+    evidence.capturePolicy = jsonStringField(captureSpan, "policy")
+        .value_or(jsonStringField(text, "uiOnlyRenderTargetCapturePolicy")
+        .value_or("copy-active-ui-render-target-before-imgui-present"));
+    evidence.captureStatus = jsonStringField(captureSpan, "status")
+        .value_or(jsonStringField(text, "uiOnlyRenderTargetCaptureStatus").value_or("missing"));
+    evidence.layerStatus = jsonStringField(captureSpan, "layerStatus")
+        .value_or(jsonStringField(text, "uiOnlyLayerCaptureStatus").value_or(evidence.captureStatus));
+    evidence.isolationStatus = jsonStringField(captureSpan, "isolationStatus")
+        .value_or(jsonStringField(text, "uiOnlyLayerIsolationStatus").value_or("pending-active-render-target-copy"));
+    evidence.capturePath = jsonStringField(captureSpan, "path")
+        .value_or(jsonStringField(text, "uiOnlyRenderTargetCapturePath").value_or(""));
+    evidence.captureSource = jsonStringField(captureSpan, "source")
+        .value_or(jsonStringField(text, "uiOnlyRenderTargetCaptureSource")
+        .value_or("active-render-target-before-imgui-present"));
+    evidence.width = static_cast<int>(jsonNumberField(captureSpan, "width")
+        .value_or(jsonNumberField(text, "uiOnlyRenderTargetCaptureWidth").value_or(0.0)));
+    evidence.height = static_cast<int>(jsonNumberField(captureSpan, "height")
+        .value_or(jsonNumberField(text, "uiOnlyRenderTargetCaptureHeight").value_or(0.0)));
+    evidence.frame = static_cast<int>(jsonNumberField(captureSpan, "frame")
+        .value_or(jsonNumberField(text, "uiOnlyRenderTargetCaptureFrame").value_or(0.0)));
+    evidence.runtimeUiDrawCallCount = static_cast<std::size_t>(jsonNumberField(captureSpan, "runtimeUiDrawCallCount")
+        .value_or(jsonNumberField(text, "runtimeUiDrawCallCount").value_or(0.0)));
+    evidence.runtimeGpuSubmitCallCount = static_cast<std::size_t>(jsonNumberField(captureSpan, "runtimeGpuSubmitCallCount")
+        .value_or(jsonNumberField(text, "runtimeGpuSubmitCallCount").value_or(0.0)));
+}
+
+[[nodiscard]] FrontendUiOnlyLayerCaptureEvidence loadFrontendUiOnlyLayerCaptureEvidence(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    constexpr std::string_view defaultPipeName = "sward_ui_lab_live";
+    const auto discoveredPipeName = discoverFrontendLiveBridgeName(policy.screenId);
+
+    auto layerProbe = queryUiLabLiveBridgeUiLayerStatus(discoveredPipeName);
+    if (!layerProbe.connected && discoveredPipeName != defaultPipeName)
+        layerProbe = queryUiLabLiveBridgeUiLayerStatus(defaultPipeName);
+
+    const auto layerTarget = layerProbe.connected && !layerProbe.responseJson.empty()
+        ? jsonStringField(layerProbe.responseJson, "target")
+        : std::optional<std::string>{};
+    if (layerProbe.connected && layerTarget && *layerTarget == policy.screenId)
+    {
+        FrontendUiOnlyLayerCaptureEvidence evidence;
+        evidence.bridgeProbe = layerProbe;
+        applyFrontendUiOnlyLayerCaptureFromJson(
+            evidence,
+            policy,
+            layerProbe.responseJson,
+            "ui_lab_live_bridge_ui_layer_status",
+            "direct-ui-layer-status");
+        return evidence;
+    }
+
+    const auto vendor = loadFrontendVendorCommandResourceDumpEvidence(policy);
+    FrontendUiOnlyLayerCaptureEvidence fallback;
+    fallback.screenId = policy.screenId;
+    fallback.source = vendor.found ? "ui_lab_live_bridge_vendor_command_capture" : "missing";
+    fallback.probe = vendor.found ? "vendor-command-fallback" : "missing";
+    fallback.captureStatus = vendor.found
+        ? "vendor-command-resource-fallback"
+        : "missing";
+    fallback.layerStatus = vendor.uiOnlyLayerStatus;
+    fallback.isolationStatus = vendor.found
+        ? "pending-active-render-target-copy"
+        : "missing";
+    fallback.runtimeUiDrawCallCount = 0;
+    fallback.runtimeGpuSubmitCallCount = vendor.backendResolvedSubmitCount;
+    fallback.bridgeProbe = vendor.bridgeProbe;
     return fallback;
 }
 
@@ -12145,6 +12385,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererMaterialResourceViewParitySmoke();
     if (commandLineHasFlag("--renderer-vendor-command-resource-dump-smoke"))
         return runRendererVendorCommandResourceDumpSmoke();
+    if (commandLineHasFlag("--renderer-ui-layer-capture-smoke"))
+        return runRendererUiOnlyLayerCaptureSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 

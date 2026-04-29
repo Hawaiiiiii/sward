@@ -682,6 +682,16 @@ namespace UiLab
     static std::string g_lastNativeFrameCapturePath;
     static std::string g_lastNativeFrameCaptureFailure;
     static bool g_nativeFrameCaptureCompleteExitPending = false;
+    static bool g_uiOnlyRenderTargetCaptureRequested = false;
+    static bool g_uiOnlyRenderTargetCaptureReserved = false;
+    static uint32_t g_uiOnlyRenderTargetCaptureIndex = 0;
+    static uint64_t g_lastUiOnlyRenderTargetCaptureFrame = 0;
+    static std::string g_lastUiOnlyRenderTargetCapturePath;
+    static std::string g_lastUiOnlyRenderTargetCaptureFailure;
+    static std::string g_lastUiOnlyRenderTargetCaptureSource;
+    static uint32_t g_lastUiOnlyRenderTargetCaptureWidth = 0;
+    static uint32_t g_lastUiOnlyRenderTargetCaptureHeight = 0;
+    static bool g_lastUiOnlyRenderTargetCaptureContainsFullFramebuffer = true;
     static const std::chrono::steady_clock::time_point g_startedAt = std::chrono::steady_clock::now();
     static bool g_loggedIntroHook = false;
     static bool g_loggedMenuHook = false;
@@ -775,6 +785,9 @@ namespace UiLab
     static bool IsStageTargetRuntimeReady();
     static bool IsNativeFrameCaptureReady();
     static std::string_view NativeFrameCaptureStatusLabel();
+    static std::string_view UiOnlyRenderTargetCaptureStatusLabel();
+    static std::string_view UiOnlyLayerIsolationStatusLabel();
+    static std::string BuildRuntimeUiOnlyRenderTargetCaptureJson();
     static void EmitTutorialHudOwnerPathReadyIfNeeded();
     static void EmitStageTargetReadyIfNeeded();
     static std::array<OperatorWindowEntry, 8> GetOperatorWindowEntries();
@@ -1565,6 +1578,33 @@ namespace UiLab
             return "complete";
 
         return IsNativeFrameCaptureReady() ? "ready" : "waiting";
+    }
+
+    static std::string_view UiOnlyRenderTargetCaptureStatusLabel()
+    {
+        if (g_uiOnlyRenderTargetCaptureReserved)
+            return "reserved";
+
+        if (!g_lastUiOnlyRenderTargetCapturePath.empty())
+            return "active-render-target-copy-before-present";
+
+        if (!g_lastUiOnlyRenderTargetCaptureFailure.empty())
+            return "failed";
+
+        if (g_uiOnlyRenderTargetCaptureRequested)
+            return "armed-waiting-for-pre-present-copy";
+
+        return "not-requested";
+    }
+
+    static std::string_view UiOnlyLayerIsolationStatusLabel()
+    {
+        if (g_lastUiOnlyRenderTargetCapturePath.empty())
+            return "pending-active-render-target-copy";
+
+        return g_lastUiOnlyRenderTargetCaptureContainsFullFramebuffer
+            ? "not-isolated-active-color-target"
+            : "candidate-dedicated-ui-render-target";
     }
 
     static std::filesystem::path LiveStateSnapshotPath()
@@ -3506,6 +3546,17 @@ namespace UiLab
         return "vendor command/resource dump armed; waiting for backend commands";
     }
 
+    [[maybe_unused]] static constexpr std::string_view kUiOnlyRenderTargetCaptureSchemaMarkers[] =
+    {
+        R"("uiOnlyRenderTargetCapture")",
+        R"("uiOnlyRenderTargetCapturePolicy": "copy-active-ui-render-target-before-imgui-present")",
+        R"("uiOnlyRenderTargetCaptureStatus")",
+        R"("uiOnlyLayerCaptureStatus")",
+        R"("uiOnlyLayerIsolationStatus")",
+        R"("uiOnlyRenderTargetCapturePath")",
+        R"("uiOnlyRenderTargetCaptureSource")"
+    };
+
     static std::string BuildRuntimeVendorCommandResourceDumpJson()
     {
         const auto& target = TargetFor(g_target);
@@ -3598,6 +3649,82 @@ namespace UiLab
         AppendRuntimeVendorResourceDumpPairs(out, materialPairs, textureResourceViews, samplerResourceViews);
         out
             << "\n"
+            << "  }\n"
+            << "}\n";
+
+        return out.str();
+    }
+
+    static std::string BuildRuntimeUiOnlyRenderTargetCaptureJson()
+    {
+        const auto& target = TargetFor(g_target);
+
+        std::vector<RuntimeUiDrawCall> drawCalls;
+        std::vector<RuntimeGpuSubmitCall> gpuSubmitCalls;
+        uint64_t drawListFrame = UINT64_MAX;
+        uint64_t submitFrame = UINT64_MAX;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            drawCalls = g_runtimeUiDrawCalls;
+            gpuSubmitCalls = g_runtimeGpuSubmitCalls;
+            drawListFrame = g_runtimeUiDrawListFrame;
+            submitFrame = g_runtimeGpuSubmitFrame;
+        }
+
+        const uint64_t frame = g_lastUiOnlyRenderTargetCaptureFrame != 0
+            ? g_lastUiOnlyRenderTargetCaptureFrame
+            : g_presentedFrameCount;
+        const std::string_view status = UiOnlyRenderTargetCaptureStatusLabel();
+        const std::string_view isolation = UiOnlyLayerIsolationStatusLabel();
+        const bool captured = !g_lastUiOnlyRenderTargetCapturePath.empty();
+        const std::string source = !g_lastUiOnlyRenderTargetCaptureSource.empty()
+            ? g_lastUiOnlyRenderTargetCaptureSource
+            : "active-render-target-before-imgui-present";
+
+        std::ostringstream out;
+        out
+            << "{\n"
+            << "  \"ok\": true,\n"
+            << "  \"source\": \"runtime UI render-target capture status\",\n"
+            << "  \"version\": 1,\n"
+            << "  \"frame\": " << frame << ",\n"
+            << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
+            << "  \"uiOnlyRenderTargetCapturePolicy\": \"copy-active-ui-render-target-before-imgui-present\",\n"
+            << "  \"uiOnlyRenderTargetCaptureStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "  \"uiOnlyLayerCaptureStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "  \"uiOnlyLayerIsolationStatus\": \"" << JsonEscape(isolation) << "\",\n"
+            << "  \"uiOnlyRenderTargetCapturePath\": \"" << JsonEscape(g_lastUiOnlyRenderTargetCapturePath) << "\",\n"
+            << "  \"uiOnlyRenderTargetCaptureFailure\": \"" << JsonEscape(g_lastUiOnlyRenderTargetCaptureFailure) << "\",\n"
+            << "  \"uiOnlyRenderTargetCaptureSource\": \"" << JsonEscape(source) << "\",\n"
+            << "  \"uiOnlyRenderTargetCaptureWidth\": " << g_lastUiOnlyRenderTargetCaptureWidth << ",\n"
+            << "  \"uiOnlyRenderTargetCaptureHeight\": " << g_lastUiOnlyRenderTargetCaptureHeight << ",\n"
+            << "  \"uiOnlyRenderTargetCaptureFrame\": " << g_lastUiOnlyRenderTargetCaptureFrame << ",\n"
+            << "  \"uiOnlyRenderTargetContainsFullFramebuffer\": "
+            << (g_lastUiOnlyRenderTargetCaptureContainsFullFramebuffer ? "true" : "false") << ",\n"
+            << "  \"runtimeUiDrawCallCount\": " << drawCalls.size() << ",\n"
+            << "  \"runtimeGpuSubmitCallCount\": " << gpuSubmitCalls.size() << ",\n"
+            << "  \"runtimeUiDrawListFrame\": "
+            << (drawListFrame == UINT64_MAX ? -1 : static_cast<int64_t>(drawListFrame)) << ",\n"
+            << "  \"runtimeGpuSubmitFrame\": "
+            << (submitFrame == UINT64_MAX ? -1 : static_cast<int64_t>(submitFrame)) << ",\n"
+            << "  \"uiOnlyRenderTargetCapture\": {\n"
+            << "    \"captured\": " << (captured ? "true" : "false") << ",\n"
+            << "    \"policy\": \"copy-active-ui-render-target-before-imgui-present\",\n"
+            << "    \"status\": \"" << JsonEscape(status) << "\",\n"
+            << "    \"layerStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "    \"isolationStatus\": \"" << JsonEscape(isolation) << "\",\n"
+            << "    \"path\": \"" << JsonEscape(g_lastUiOnlyRenderTargetCapturePath) << "\",\n"
+            << "    \"failure\": \"" << JsonEscape(g_lastUiOnlyRenderTargetCaptureFailure) << "\",\n"
+            << "    \"source\": \"" << JsonEscape(source) << "\",\n"
+            << "    \"width\": " << g_lastUiOnlyRenderTargetCaptureWidth << ",\n"
+            << "    \"height\": " << g_lastUiOnlyRenderTargetCaptureHeight << ",\n"
+            << "    \"frame\": " << g_lastUiOnlyRenderTargetCaptureFrame << ",\n"
+            << "    \"containsFullFramebuffer\": "
+            << (g_lastUiOnlyRenderTargetCaptureContainsFullFramebuffer ? "true" : "false") << ",\n"
+            << "    \"runtimeUiDrawCallCount\": " << drawCalls.size() << ",\n"
+            << "    \"runtimeGpuSubmitCallCount\": " << gpuSubmitCalls.size() << "\n"
             << "  }\n"
             << "}\n";
 
@@ -4129,6 +4256,11 @@ namespace UiLab
             << "  " << kLiveStateNativeCaptureStatusFieldName << ": \"" << JsonEscape(NativeFrameCaptureStatusLabel()) << "\",\n"
             << "  \"lastNativeFrameCapturePath\": \"" << JsonEscape(g_lastNativeFrameCapturePath) << "\",\n"
             << "  \"lastNativeFrameCaptureFailure\": \"" << JsonEscape(g_lastNativeFrameCaptureFailure) << "\",\n"
+            << "  \"uiOnlyRenderTargetCaptureStatus\": \"" << JsonEscape(UiOnlyRenderTargetCaptureStatusLabel()) << "\",\n"
+            << "  \"uiOnlyLayerCaptureStatus\": \"" << JsonEscape(UiOnlyRenderTargetCaptureStatusLabel()) << "\",\n"
+            << "  \"uiOnlyLayerIsolationStatus\": \"" << JsonEscape(UiOnlyLayerIsolationStatusLabel()) << "\",\n"
+            << "  \"uiOnlyRenderTargetCapturePath\": \"" << JsonEscape(g_lastUiOnlyRenderTargetCapturePath) << "\",\n"
+            << "  \"uiOnlyRenderTargetCaptureSource\": \"" << JsonEscape(g_lastUiOnlyRenderTargetCaptureSource) << "\",\n"
             << "  \"lastCsdProject\": \"" << JsonEscape(g_lastCsdProjectName) << "\",\n"
             << "  \"lastCsdProjectFrame\": " << g_lastCsdProjectFrame << ",\n"
             << "  \"loadingRequestType\": "
@@ -4171,7 +4303,7 @@ namespace UiLab
             << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
             << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
             << "    \"commands\": ";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out
             << "\n"
             << "  },\n"
@@ -4820,6 +4952,15 @@ namespace UiLab
         g_lastNativeFrameCapturePath.clear();
         g_lastNativeFrameCaptureFailure.clear();
         g_nativeFrameCaptureCompleteExitPending = false;
+        g_uiOnlyRenderTargetCaptureRequested = false;
+        g_uiOnlyRenderTargetCaptureReserved = false;
+        g_lastUiOnlyRenderTargetCaptureFrame = 0;
+        g_lastUiOnlyRenderTargetCapturePath.clear();
+        g_lastUiOnlyRenderTargetCaptureFailure.clear();
+        g_lastUiOnlyRenderTargetCaptureSource.clear();
+        g_lastUiOnlyRenderTargetCaptureWidth = 0;
+        g_lastUiOnlyRenderTargetCaptureHeight = 0;
+        g_lastUiOnlyRenderTargetCaptureContainsFullFramebuffer = true;
         g_lastLoadingRequestType = UINT32_MAX;
         g_lastLoadingRequestFrame = 0;
         g_lastLoadingDisplayType = UINT32_MAX;
@@ -5551,6 +5692,108 @@ namespace UiLab
         g_nativeFrameCaptureReserved = false;
         g_lastNativeFrameCaptureFailure = std::string(reason);
         WriteEvidenceEvent("native-frame-capture-failed", reason);
+        WriteLiveStateSnapshot();
+    }
+
+    bool IsUiOnlyRenderTargetCaptureRequested()
+    {
+        return g_isEnabled &&
+            g_uiOnlyRenderTargetCaptureRequested &&
+            !g_uiOnlyRenderTargetCaptureReserved;
+    }
+
+    std::string ConsumeUiOnlyRenderTargetCapturePath(
+        uint32_t width,
+        uint32_t height,
+        std::string_view source,
+        bool containsFullFramebuffer)
+    {
+        if (!IsUiOnlyRenderTargetCaptureRequested())
+            return {};
+
+        const std::filesystem::path directory = !g_nativeFrameCaptureDirectory.empty()
+            ? g_nativeFrameCaptureDirectory
+            : g_evidenceDirectory;
+
+        if (directory.empty())
+        {
+            OnUiOnlyRenderTargetCaptureFailed("UI render-target capture directory is empty");
+            return {};
+        }
+
+        g_uiOnlyRenderTargetCaptureReserved = true;
+        ++g_uiOnlyRenderTargetCaptureIndex;
+
+        std::error_code ec;
+        std::filesystem::create_directories(directory, ec);
+
+        if (ec)
+        {
+            OnUiOnlyRenderTargetCaptureFailed("failed to create UI render-target capture directory: " + ec.message());
+            return {};
+        }
+
+        g_lastUiOnlyRenderTargetCaptureSource = std::string(source);
+        g_lastUiOnlyRenderTargetCaptureWidth = width;
+        g_lastUiOnlyRenderTargetCaptureHeight = height;
+        g_lastUiOnlyRenderTargetCaptureContainsFullFramebuffer = containsFullFramebuffer;
+
+        const auto& target = TargetFor(g_target);
+        std::ostringstream fileName;
+        fileName
+            << "ui_layer_render_target_"
+            << target.token
+            << "_"
+            << g_uiOnlyRenderTargetCaptureIndex
+            << "_"
+            << width
+            << "x"
+            << height
+            << ".bmp";
+
+        return (directory / fileName.str()).string();
+    }
+
+    void OnUiOnlyRenderTargetCaptured(
+        std::string_view path,
+        uint32_t width,
+        uint32_t height,
+        std::string_view source,
+        bool containsFullFramebuffer)
+    {
+        if (!g_isEnabled)
+            return;
+
+        g_uiOnlyRenderTargetCaptureRequested = false;
+        g_uiOnlyRenderTargetCaptureReserved = false;
+        g_lastUiOnlyRenderTargetCaptureFrame = g_presentedFrameCount + 1;
+        g_lastUiOnlyRenderTargetCapturePath = std::string(path);
+        g_lastUiOnlyRenderTargetCaptureFailure.clear();
+        g_lastUiOnlyRenderTargetCaptureSource = std::string(source);
+        g_lastUiOnlyRenderTargetCaptureWidth = width;
+        g_lastUiOnlyRenderTargetCaptureHeight = height;
+        g_lastUiOnlyRenderTargetCaptureContainsFullFramebuffer = containsFullFramebuffer;
+
+        WriteEvidenceEvent(
+            "ui-render-target-captured",
+            "path=" + std::string(path) +
+            " width=" + std::to_string(width) +
+            " height=" + std::to_string(height) +
+            " source=" + std::string(source) +
+            " isolation=" + std::string(UiOnlyLayerIsolationStatusLabel()) +
+            " format=B8G8R8A8 bmp=1");
+        WriteLiveStateSnapshot();
+    }
+
+    void OnUiOnlyRenderTargetCaptureFailed(std::string_view reason)
+    {
+        if (!g_isEnabled)
+            return;
+
+        g_uiOnlyRenderTargetCaptureRequested = false;
+        g_uiOnlyRenderTargetCaptureReserved = false;
+        g_lastUiOnlyRenderTargetCaptureFailure = std::string(reason);
+        WriteEvidenceEvent("ui-render-target-capture-failed", reason);
         WriteLiveStateSnapshot();
     }
 
@@ -6672,7 +6915,7 @@ namespace UiLab
     {
         std::ostringstream out;
         out << "{\"ok\":true,\"commands\":";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out << "}\n";
         return out.str();
     }
@@ -6723,6 +6966,20 @@ namespace UiLab
 
         if (verb == "ui-vendor-command-capture" || verb == "vendor-command-resource-dump" || verb == "ui-vendor-resource-dump")
             return BuildRuntimeVendorCommandResourceDumpJson();
+
+        if (verb == "ui-layer-status" || verb == "ui-render-target-status")
+            return BuildRuntimeUiOnlyRenderTargetCaptureJson();
+
+        if (verb == "ui-layer-capture" || verb == "ui-render-target-capture")
+        {
+            g_uiOnlyRenderTargetCaptureRequested = true;
+            g_uiOnlyRenderTargetCaptureReserved = false;
+            g_lastUiOnlyRenderTargetCaptureFailure.clear();
+            WriteEvidenceEvent(
+                "ui-render-target-capture-requested",
+                "policy=copy-active-ui-render-target-before-imgui-present");
+            return BuildRuntimeUiOnlyRenderTargetCaptureJson();
+        }
 
         if (verb == "help" || verb == "commands")
             return BuildHelpJson();
@@ -7355,7 +7612,7 @@ namespace UiLab
             ImGui::Separator();
             ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
-            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, ui-backend-resolved, ui-vendor-command-capture, route, reset, set-global, capture, help");
+            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, ui-backend-resolved, ui-vendor-command-capture, ui-layer-capture, ui-layer-status, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
 
             if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))

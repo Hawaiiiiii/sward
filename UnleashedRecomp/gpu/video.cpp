@@ -820,6 +820,7 @@ enum class RenderCommandType
     DrawImGui,
     ExecuteCommandList,
     BeginCommandList,
+    QueueUiLayerCapture,
     StretchRect,
     SetRenderTarget,
     SetDepthStencilSurface,
@@ -2778,9 +2779,11 @@ struct UiLabNativeFrameCapture
 {
     std::unique_ptr<RenderBuffer> readbackBuffer;
     std::string path;
+    std::string source;
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t rowPitch = 0;
+    bool containsFullFramebuffer = true;
 };
 
 static bool WriteUiLabNativeFrameBmp(const UiLabNativeFrameCapture& capture)
@@ -2900,6 +2903,75 @@ static bool QueueUiLabNativeFrameCapture(
     return true;
 }
 
+static UiLabNativeFrameCapture g_uiLabUiOnlyRenderTargetCapture;
+
+static bool QueueUiLabUiOnlyRenderTargetCapture(
+    RenderCommandList* commandList,
+    GuestSurface* surface,
+    UiLabNativeFrameCapture& capture)
+{
+    if (!UiLab::IsUiOnlyRenderTargetCaptureRequested())
+        return false;
+
+    constexpr std::string_view source = "active-render-target-before-imgui-present";
+
+    if (surface == nullptr || surface->texture == nullptr)
+    {
+        UiLab::OnUiOnlyRenderTargetCaptureFailed("active render target unavailable before ImGui/present");
+        return false;
+    }
+
+    if (surface->format != RenderFormat::B8G8R8A8_UNORM)
+    {
+        UiLab::OnUiOnlyRenderTargetCaptureFailed("active render target format is not B8G8R8A8");
+        return false;
+    }
+
+    const bool containsFullFramebuffer =
+        surface == g_backBuffer ||
+        (surface->width >= Video::s_viewportWidth && surface->height >= Video::s_viewportHeight);
+    const auto path = UiLab::ConsumeUiOnlyRenderTargetCapturePath(
+        surface->width,
+        surface->height,
+        source,
+        containsFullFramebuffer);
+
+    if (path.empty())
+        return false;
+
+    capture.path = path;
+    capture.source = std::string(source);
+    capture.width = surface->width;
+    capture.height = surface->height;
+    capture.containsFullFramebuffer = containsFullFramebuffer;
+    capture.rowPitch = (surface->width * 4 + PITCH_ALIGNMENT - 1) & ~(PITCH_ALIGNMENT - 1);
+    const uint32_t slicePitch = capture.rowPitch * surface->height;
+    capture.readbackBuffer = g_device->createBuffer(RenderBufferDesc::ReadbackBuffer(slicePitch));
+
+    const RenderTextureLayout restoreLayout = surface->layout == RenderTextureLayout::UNKNOWN
+        ? RenderTextureLayout::COLOR_WRITE
+        : surface->layout;
+
+    commandList->barriers(
+        RenderBarrierStage::GRAPHICS | RenderBarrierStage::COPY,
+        RenderTextureBarrier(surface->texture, RenderTextureLayout::COPY_SOURCE));
+    commandList->copyTextureRegion(
+        RenderTextureCopyLocation::PlacedFootprint(
+            capture.readbackBuffer.get(),
+            BACKBUFFER_FORMAT,
+            surface->width,
+            surface->height,
+            1,
+            capture.rowPitch / 4,
+            0),
+        RenderTextureCopyLocation::Subresource(surface->texture, 0));
+    commandList->barriers(
+        RenderBarrierStage::GRAPHICS | RenderBarrierStage::COPY,
+        RenderTextureBarrier(surface->texture, restoreLayout));
+
+    return true;
+}
+
 // We have to check for this to properly handle the following situation:
 // 1. Wait on swap chain.
 // 2. Create loading thread.
@@ -2926,12 +2998,28 @@ void Video::WaitOnSwapChain()
 static bool g_shouldPrecompilePipelines;
 static std::atomic<bool> g_executedCommandList;
 
+static void ProcQueueUiLayerCapture(const RenderCommand& cmd)
+{
+    (void)cmd;
+
+    if (g_uiLabUiOnlyRenderTargetCapture.readbackBuffer)
+        return;
+
+    QueueUiLabUiOnlyRenderTargetCapture(
+        g_commandLists[g_frame].get(),
+        g_pipelineState.colorWriteEnable ? g_renderTarget : nullptr,
+        g_uiLabUiOnlyRenderTargetCapture);
+}
+
 void Video::Present() 
 {
     g_readyForCommands = false;
 
     RenderCommand cmd;
     cmd.type = RenderCommandType::ExecutePendingStretchRectCommands;
+    g_renderQueue.enqueue(cmd);
+
+    cmd.type = RenderCommandType::QueueUiLayerCapture;
     g_renderQueue.enqueue(cmd);
 
     DrawImGui();
@@ -3173,6 +3261,31 @@ static void ProcExecuteCommandList(const RenderCommand& cmd)
         {
             UiLab::OnNativeFrameCaptureFailed("failed to write native backbuffer BMP");
         }
+    }
+
+    if (g_uiLabUiOnlyRenderTargetCapture.readbackBuffer)
+    {
+        if (!commandFenceAlreadyWaited)
+        {
+            g_queue->waitForCommandFence(g_commandFences[g_frame].get());
+            commandFenceAlreadyWaited = true;
+        }
+
+        if (WriteUiLabNativeFrameBmp(g_uiLabUiOnlyRenderTargetCapture))
+        {
+            UiLab::OnUiOnlyRenderTargetCaptured(
+                g_uiLabUiOnlyRenderTargetCapture.path,
+                g_uiLabUiOnlyRenderTargetCapture.width,
+                g_uiLabUiOnlyRenderTargetCapture.height,
+                g_uiLabUiOnlyRenderTargetCapture.source,
+                g_uiLabUiOnlyRenderTargetCapture.containsFullFramebuffer);
+        }
+        else
+        {
+            UiLab::OnUiOnlyRenderTargetCaptureFailed("failed to write UI render-target BMP");
+        }
+
+        g_uiLabUiOnlyRenderTargetCapture = {};
     }
 
     g_commandListStates[g_frame] = !commandFenceAlreadyWaited;
@@ -5639,6 +5752,7 @@ static std::thread g_renderThread([]
                 case RenderCommandType::DrawImGui:                         ProcDrawImGui(cmd); break;
                 case RenderCommandType::ExecuteCommandList:                ProcExecuteCommandList(cmd); break;
                 case RenderCommandType::BeginCommandList:                  ProcBeginCommandList(cmd); break;
+                case RenderCommandType::QueueUiLayerCapture:               ProcQueueUiLayerCapture(cmd); break;
                 case RenderCommandType::StretchRect:                       ProcStretchRect(cmd); break;
                 case RenderCommandType::SetRenderTarget:                   ProcSetRenderTarget(cmd); break;
                 case RenderCommandType::SetDepthStencilSurface:            ProcSetDepthStencilSurface(cmd); break;

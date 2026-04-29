@@ -124,6 +124,19 @@ namespace UiLab
     std::string ConsumeNativeFrameCapturePath(uint32_t width, uint32_t height);
     void OnNativeFrameCaptured(std::string_view path, uint32_t width, uint32_t height);
     void OnNativeFrameCaptureFailed(std::string_view reason);
+    bool IsUiOnlyRenderTargetCaptureRequested();
+    std::string ConsumeUiOnlyRenderTargetCapturePath(
+        uint32_t width,
+        uint32_t height,
+        std::string_view source,
+        bool containsFullFramebuffer);
+    void OnUiOnlyRenderTargetCaptured(
+        std::string_view path,
+        uint32_t width,
+        uint32_t height,
+        std::string_view source,
+        bool containsFullFramebuffer);
+    void OnUiOnlyRenderTargetCaptureFailed(std::string_view reason);
     void OnLoadingRequest(uint32_t displayType);
     void OnLoadingUpdate(uint32_t displayType);
     void OnCsdProjectMade(std::string_view projectName);
