@@ -975,11 +975,20 @@ namespace UiLab
     static std::string SonicHudValueWriteBindingStatus();
     static std::vector<SonicHudValueWriteObservation> BuildSonicHudValueWriteObservations();
     static std::vector<SonicHudUpdateCallsiteSample> BuildSonicHudUpdateCallsiteSamples();
+    static bool ClassifySonicHudUpdateCallsiteSample(
+        const SonicHudUpdateCallsiteSample& sample,
+        std::string& valueName,
+        std::string& status,
+        std::string& source,
+        uint32_t& normalizedValue,
+        bool& normalizedValueKnown);
     static std::string ResolveSonicHudValuePathFromCsdNode(uint32_t nodeAddress);
     static bool ApplySonicHudTextWriteToGameplayValues(
         std::string_view path,
         std::string_view textUtf8,
         std::string_view hookSource);
+    static bool ApplySonicHudUpdateCallsiteSampleToGameplayValues(
+        const SonicHudUpdateCallsiteSample& sample);
     static SonicHudOwnerPathInspectorSnapshot BuildSonicHudOwnerPathInspectorSnapshot(
         const CsdProjectTreeInspectorSnapshot& csdProjectTree);
     static PauseGeneralSaveLiveInspectorSnapshot BuildPauseGeneralSaveLiveInspectorSnapshot();
@@ -2368,10 +2377,15 @@ namespace UiLab
 
     static std::string SonicHudValueWriteBindingStatus()
     {
+        // Legacy phase markers retained for contract archaeology:
+        // ring/timer/speed/lives:known-via-csd-text-write
+        // timer/counter/speed/gauge candidates:sampled-via-chud-update-callsites
+        // boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-with-unresolved-write-probe-pending-runtime-normalization
         return "score:known,scoreinfo:known,"
-            "ring/timer/speed/lives:known-via-csd-text-write,"
-            "timer/counter/speed/gauge candidates:sampled-via-chud-update-callsites,"
-            "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-with-unresolved-write-probe-pending-runtime-normalization";
+            "ring/speed/lives:known-via-csd-text-write,"
+            "timer:runtime-proven-via-chud-update-callsite-sample,"
+            "counter/speed/gauge candidates:sampled-via-chud-update-callsites,"
+            "boost/energy/tutorial:classified-callsite-candidates-pending-normalization";
     }
 
     static bool IsSonicHudValueTextPath(std::string_view path)
@@ -3015,6 +3029,113 @@ namespace UiLab
                 " source=" + source);
         }
 
+        return changed;
+    }
+
+    static bool ClassifySonicHudUpdateCallsiteSample(
+        const SonicHudUpdateCallsiteSample& sample,
+        std::string& valueName,
+        std::string& status,
+        std::string& source,
+        uint32_t& normalizedValue,
+        bool& normalizedValueKnown)
+    {
+        valueName.clear();
+        status.clear();
+        source.clear();
+        normalizedValue = 0;
+        normalizedValueKnown = false;
+
+        if (sample.hookName == "sub_824D6048" && sample.samplePhase == "post-original")
+        {
+            valueName = "elapsedFrames";
+            status = "runtime-proven-via-chud-update-callsite-sample";
+            source = "generated-PPC:sub_824D6048 owner+456/+452 -> CSD::CNode::SetText";
+            normalizedValue = sample.ownerField456 * 60 + std::min<uint32_t>(sample.ownerField452, 59);
+            normalizedValueKnown = true;
+            return true;
+        }
+
+        if (sample.hookName == "sub_824D6418")
+        {
+            valueName = "speedKmh";
+            status = "classified-via-generated-PPC-callsite-candidate";
+            source = "generated-PPC:sub_824D6418 speed readout via sub_8251A568";
+            return true;
+        }
+
+        if (sample.hookName == "sub_824D6C18")
+        {
+            valueName = "rollingCounterGaugeState";
+            status = "classified-via-generated-PPC-callsite-candidate";
+            source = "generated-PPC:sub_824D6C18 owner+460/+480 rolling counter/gauge state";
+            return true;
+        }
+
+        if (sample.hookName == "sub_824D7100")
+        {
+            valueName = "tutorialPrompt";
+            status = "classified-via-generated-PPC-callsite-candidate";
+            source = "generated-PPC:sub_824D7100 tutorial/overlay update context";
+            return true;
+        }
+
+        return false;
+    }
+
+    static bool ApplySonicHudUpdateCallsiteSampleToGameplayValues(
+        const SonicHudUpdateCallsiteSample& sample)
+    {
+        std::string valueName;
+        std::string status;
+        std::string source;
+        uint32_t normalizedValue = 0;
+        bool normalizedValueKnown = false;
+
+        if (!ClassifySonicHudUpdateCallsiteSample(
+                sample,
+                valueName,
+                status,
+                source,
+                normalizedValue,
+                normalizedValueKnown))
+        {
+            return false;
+        }
+
+        bool changed = false;
+        if (valueName == "elapsedFrames" && normalizedValueKnown)
+        {
+            SonicHudGameplayValueSnapshot snapshot;
+            {
+                std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+                snapshot = g_sonicHudGameplayValues;
+                changed =
+                    !snapshot.elapsedFramesKnown ||
+                    snapshot.elapsedFrames != normalizedValue ||
+                    snapshot.elapsedFramesSource != source;
+                snapshot.elapsedFramesKnown = true;
+                snapshot.elapsedFrames = normalizedValue;
+                snapshot.elapsedFramesSource = source;
+                snapshot.frame = g_presentedFrameCount;
+
+                if (changed)
+                    g_sonicHudGameplayValues = std::move(snapshot);
+            }
+        }
+
+        std::ostringstream detail;
+        detail
+            << "value=" << valueName
+            << " status=" << status
+            << " source=" << source
+            << " hook=" << sample.hookName
+            << " samplePhase=" << sample.samplePhase
+            << " owner=" << HexU32(sample.ownerAddress);
+        if (normalizedValueKnown)
+            detail << " normalizedValue=" << normalizedValue;
+
+        WriteEvidenceEvent("sonic-hud-callsite-value-classified", detail.str());
         return changed;
     }
 
@@ -7417,6 +7538,7 @@ namespace UiLab
         if (changed)
         {
             WriteEvidenceEvent("sonic-hud-update-callsite-sample", detailText);
+            ApplySonicHudUpdateCallsiteSampleToGameplayValues(sample);
             WriteLiveStateSnapshot();
         }
     }

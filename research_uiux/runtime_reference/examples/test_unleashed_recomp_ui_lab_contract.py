@@ -2197,6 +2197,33 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, report)
 
+    def test_ui_lab_phase176_classifies_sonic_hud_callsite_samples_into_live_values(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "ApplySonicHudUpdateCallsiteSampleToGameplayValues",
+            "ClassifySonicHudUpdateCallsiteSample",
+            "sonic-hud-callsite-value-classified",
+            "generated-PPC:sub_824D6048 owner+456/+452 -> CSD::CNode::SetText",
+            "runtime-proven-via-chud-update-callsite-sample",
+            "classified-via-generated-PPC-callsite-candidate",
+            "elapsedFramesKnown = true",
+            "elapsedFramesSource = source",
+            "ownerField456 * 60 + std::min<uint32_t>(sample.ownerField452, 59)",
+            "timer:runtime-proven-via-chud-update-callsite-sample",
+            "boost/energy/tutorial:classified-callsite-candidates-pending-normalization",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 176",
+            "sonic-hud-callsite-value-classified",
+            "timer:runtime-proven-via-chud-update-callsite-sample",
+            "boost/energy/tutorial remain classified candidates pending normalization",
+        ]:
+            self.assertIn(token, report)
+
 
 if __name__ == "__main__":
     unittest.main()

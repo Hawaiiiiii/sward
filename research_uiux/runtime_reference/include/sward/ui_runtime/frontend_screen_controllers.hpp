@@ -109,6 +109,38 @@ struct SonicDayHudRuntimeDrawListCoverage
     std::string nextHook = "CSD::CNode::SetPatternIndex/SetHideFlag/SetScale";
 };
 
+struct SonicDayHudRuntimeCallsiteSample
+{
+    std::string ownerAddress = "0x0";
+    std::string hookName;
+    std::string samplePhase;
+    double deltaTime = 0.0;
+    std::string r4 = "0x0";
+    int ownerField432 = 0;
+    int ownerField440 = 0;
+    int ownerField444 = 0;
+    int ownerField452 = 0;
+    int ownerField456 = 0;
+    int ownerField460 = 0;
+    int ownerField464 = 0;
+    int ownerField468 = 0;
+    int ownerField472 = 0;
+    int ownerField476 = 0;
+    int ownerField480 = 0;
+    std::string ownerField484 = "0x0";
+    std::string ownerField488 = "0x0";
+};
+
+struct SonicDayHudRuntimeCallsiteClassification
+{
+    std::string valueName = "unknown";
+    std::string status = "unclassified";
+    std::string source = "pending-runtime-callsite";
+    std::string path = "unresolved";
+    bool normalizedValueKnown = false;
+    int normalizedValue = 0;
+};
+
 struct SonicDayHudDisplayOwnerPathBinding
 {
     std::string ringCount = "ui_playscreen/ring_count";
@@ -208,6 +240,8 @@ public:
     [[nodiscard]] FrontendControllerFrame setGameplayState(const SonicDayHudGameplayState& state);
     [[nodiscard]] FrontendControllerFrame applyRuntimeBinding(const SonicDayHudRuntimeBindingSnapshot& snapshot);
     [[nodiscard]] FrontendControllerFrame applyRuntimeTextWrite(const SonicDayHudRuntimeTextWriteObservation& observation);
+    [[nodiscard]] FrontendControllerFrame applyRuntimeCallsiteSample(
+        const SonicDayHudRuntimeCallsiteSample& sample);
     [[nodiscard]] FrontendControllerFrame applyRingPickup(int ringDelta, int scoreDelta);
     [[nodiscard]] FrontendControllerFrame openTutorialPrompt(std::string_view promptId);
     [[nodiscard]] FrontendControllerFrame dismissTutorialPrompt();
@@ -232,10 +266,16 @@ private:
 [[nodiscard]] std::string formatSonicDayHudRuntimeWritePaths(const SonicDayHudRuntimeValueUpdatePath& paths);
 [[nodiscard]] std::string formatSonicDayHudRuntimeTextWriteObservation(const SonicDayHudRuntimeTextWriteObservation& observation);
 [[nodiscard]] std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage);
+[[nodiscard]] SonicDayHudRuntimeCallsiteClassification classifySonicDayHudRuntimeCallsiteSample(
+    const SonicDayHudRuntimeCallsiteSample& sample);
+[[nodiscard]] std::string formatSonicDayHudRuntimeCallsiteSample(const SonicDayHudRuntimeCallsiteSample& sample);
+[[nodiscard]] std::string formatSonicDayHudRuntimeCallsiteClassification(
+    const SonicDayHudRuntimeCallsiteClassification& classification);
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingSmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase167SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase168SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase169SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase173SmokeSequence();
+[[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase175SmokeSequence();
 [[nodiscard]] std::string frontendControllerInputName(FrontendControllerInput input);
 } // namespace sward::ui_runtime

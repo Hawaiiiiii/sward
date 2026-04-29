@@ -68,6 +68,12 @@ int main(int argc, char** argv)
         std::cout << formatSonicDayHudRuntimeBindingPhase173SmokeSequence();
         return 0;
     }
+    if (hasArg(argc, argv, "--phase175-sonic-hud-callsite-sample-smoke"))
+    {
+        std::cout << "sward_frontend_screen_controller_catalog phase175 sonic hud callsite sample smoke ok\n";
+        std::cout << formatSonicDayHudRuntimeBindingPhase175SmokeSequence();
+        return 0;
+    }
 
     if (hasArg(argc, argv, "--catalog") || argc == 1)
     {
@@ -76,6 +82,6 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    std::cerr << "Usage: sward_frontend_screen_controller_catalog [--catalog] [--phase163-smoke] [--phase164-sonic-hud-smoke] [--phase165-sonic-hud-state-smoke] [--phase166-sonic-hud-runtime-binding-smoke] [--phase167-sonic-hud-runtime-field-path-smoke] [--phase168-sonic-hud-runtime-write-path-smoke] [--phase169-sonic-hud-draw-list-coverage-smoke] [--phase173-sonic-hud-live-text-write-smoke]\n";
+    std::cerr << "Usage: sward_frontend_screen_controller_catalog [--catalog] [--phase163-smoke] [--phase164-sonic-hud-smoke] [--phase165-sonic-hud-state-smoke] [--phase166-sonic-hud-runtime-binding-smoke] [--phase167-sonic-hud-runtime-field-path-smoke] [--phase168-sonic-hud-runtime-write-path-smoke] [--phase169-sonic-hud-draw-list-coverage-smoke] [--phase173-sonic-hud-live-text-write-smoke] [--phase175-sonic-hud-callsite-sample-smoke]\n";
     return 2;
 }

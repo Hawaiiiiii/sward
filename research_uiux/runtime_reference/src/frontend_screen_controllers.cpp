@@ -221,6 +221,35 @@ std::vector<SonicDayHudRuntimeTextWriteObservation> makeRuntimeOwnerFieldTextWri
     };
 }
 
+SonicDayHudRuntimeCallsiteSample makeRuntimeTimerCallsiteSample()
+{
+    SonicDayHudRuntimeCallsiteSample sample;
+    sample.ownerAddress = "0xCE2D6B0";
+    sample.hookName = "sub_824D6048";
+    sample.samplePhase = "post-original";
+    sample.deltaTime = 0.066667;
+    sample.r4 = "0x2F3BB30";
+    sample.ownerField452 = 39;
+    sample.ownerField456 = 11;
+    return sample;
+}
+
+SonicDayHudRuntimeCallsiteSample makeRuntimeRollingCounterCallsiteSample()
+{
+    SonicDayHudRuntimeCallsiteSample sample;
+    sample.ownerAddress = "0xCE2D6B0";
+    sample.hookName = "sub_824D6C18";
+    sample.samplePhase = "post-original";
+    sample.deltaTime = 0.066667;
+    sample.r4 = "0x2F3BB30";
+    sample.ownerField460 = 4;
+    sample.ownerField464 = 1;
+    sample.ownerField468 = 2;
+    sample.ownerField472 = 3;
+    sample.ownerField480 = 1234;
+    return sample;
+}
+
 FrontendControllerFrame makeFrame(
     std::string controllerName,
     std::string screenId,
@@ -684,6 +713,35 @@ FrontendControllerFrame SonicDayHudController::applyRuntimeTextWrite(const Sonic
     return frame_;
 }
 
+FrontendControllerFrame SonicDayHudController::applyRuntimeCallsiteSample(
+    const SonicDayHudRuntimeCallsiteSample& sample)
+{
+    const SonicDayHudRuntimeCallsiteClassification classification =
+        classifySonicDayHudRuntimeCallsiteSample(sample);
+
+    if (classification.normalizedValueKnown && classification.valueName == "elapsedFrames")
+    {
+        gameplayState_.elapsedFrames = classification.normalizedValue;
+        gameplayState_.provenance.elapsedFrames = classification.path;
+        gameplayState_.provenance.valueSource = classification.source;
+    }
+
+    gameplayState_.lastSfxHook = "none";
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        frame_.frame + 1,
+        "runtime-callsite-sample",
+        sample.hookName.empty() ? "sonic-hud-update-callsite-sample" : sample.hookName,
+        false,
+        0,
+        "none",
+        "none",
+        "none",
+        sonicHudSceneNames(gameplayState_.tutorialVisible));
+    return frame_;
+}
+
 FrontendControllerFrame SonicDayHudController::applyRingPickup(int ringDelta, int scoreDelta)
 {
     gameplayState_.ringCount = std::max(0, gameplayState_.ringCount + ringDelta);
@@ -1006,6 +1064,78 @@ std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDra
     return out.str();
 }
 
+SonicDayHudRuntimeCallsiteClassification classifySonicDayHudRuntimeCallsiteSample(
+    const SonicDayHudRuntimeCallsiteSample& sample)
+{
+    SonicDayHudRuntimeCallsiteClassification classification;
+
+    if (sample.hookName == "sub_824D6048" && sample.samplePhase == "post-original")
+    {
+        classification.valueName = "elapsedFrames";
+        classification.status = "runtime-proven-via-chud-update-callsite-sample";
+        classification.source = "generated-PPC:sub_824D6048 owner+456/+452 -> CSD::CNode::SetText";
+        classification.path = "CHudSonicStage.owner+456/+452|ui_playscreen/time_count";
+        classification.normalizedValueKnown = true;
+        classification.normalizedValue =
+            std::max(0, sample.ownerField456) * 60 + std::clamp(sample.ownerField452, 0, 59);
+    }
+    else if (sample.hookName == "sub_824D6418")
+    {
+        classification.valueName = "speedKmh";
+        classification.status = "classified-via-generated-PPC-callsite-candidate";
+        classification.source = "generated-PPC:sub_824D6418 speed readout via sub_8251A568";
+        classification.path = "CHudSonicStage.m_rcSpeedGauge|ui_playscreen/add/speed_count/position/num_speed";
+    }
+    else if (sample.hookName == "sub_824D6C18")
+    {
+        classification.valueName = "rollingCounterGaugeState";
+        classification.status = "classified-via-generated-PPC-callsite-candidate";
+        classification.source = "generated-PPC:sub_824D6C18 owner+460/+480 rolling counter/gauge state";
+        classification.path = "CHudSonicStage.owner+460/+464/+468/+472/+480|ui_playscreen gauge/counter nodes";
+    }
+    else if (sample.hookName == "sub_824D7100")
+    {
+        classification.valueName = "tutorialPrompt";
+        classification.status = "classified-via-generated-PPC-callsite-candidate";
+        classification.source = "generated-PPC:sub_824D7100 tutorial/overlay update context";
+        classification.path = "CHudSonicStage tutorial/update context|ui_playscreen/add/u_info";
+    }
+
+    return classification;
+}
+
+std::string formatSonicDayHudRuntimeCallsiteSample(const SonicDayHudRuntimeCallsiteSample& sample)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_runtime_callsite_sample="
+        << "hook=" << sample.hookName
+        << ":phase=" << sample.samplePhase
+        << ":owner=" << sample.ownerAddress
+        << ":delta=" << std::fixed << std::setprecision(6) << sample.deltaTime
+        << ":r4=" << sample.r4
+        << ":field452=" << sample.ownerField452
+        << ":field456=" << sample.ownerField456
+        << ":field460=" << sample.ownerField460
+        << ":field480=" << sample.ownerField480
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeCallsiteClassification(
+    const SonicDayHudRuntimeCallsiteClassification& classification)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_runtime_callsite_classification="
+        << "value=" << classification.valueName
+        << ":status=" << classification.status
+        << ":source=" << classification.source
+        << ":path=" << classification.path;
+    if (classification.normalizedValueKnown)
+        out << ":normalized=" << classification.normalizedValue;
+    out << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeBindingSmokeSequence()
 {
     SonicDayHudController hud;
@@ -1088,6 +1218,33 @@ std::string formatSonicDayHudRuntimeBindingPhase173SmokeSequence()
         << "timer/lives:runtime-proven-via-raw-owner-field-text-write,"
         << "ring/speed:csd-text-write-ready,"
         << "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase175SmokeSequence()
+{
+    SonicDayHudController hud;
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+
+    const auto timerSample = makeRuntimeTimerCallsiteSample();
+    const auto rollingCounterSample = makeRuntimeRollingCounterCallsiteSample();
+
+    std::ostringstream out;
+    out << formatSonicDayHudRuntimeCallsiteSample(timerSample);
+    out << formatSonicDayHudRuntimeCallsiteClassification(
+        classifySonicDayHudRuntimeCallsiteSample(timerSample));
+    (void)hud.applyRuntimeCallsiteSample(timerSample);
+    out << formatSonicDayHudGameplayState("callsite-sample", hud.gameplayState());
+
+    out << formatSonicDayHudRuntimeCallsiteSample(rollingCounterSample);
+    out << formatSonicDayHudRuntimeCallsiteClassification(
+        classifySonicDayHudRuntimeCallsiteSample(rollingCounterSample));
+
+    out << "gameplay_numeric_binding=score:known,scoreinfo:known,"
+        << "timer:runtime-proven-via-chud-update-callsite-sample,"
+        << "ring/speed/lives:csd-text-write-ready,"
+        << "boost/energy/tutorial:classified-callsite-candidates-pending-normalization"
         << '\n';
     return out.str();
 }

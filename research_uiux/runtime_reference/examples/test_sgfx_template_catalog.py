@@ -829,6 +829,54 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("sonic_day_hud_state=phase=raw-owner-text-write:rings=000:score=000000000:time=00:00:39:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
         self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,timer/lives:runtime-proven-via-raw-owner-field-text-write,ring/speed:csd-text-write-ready,boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization", completed.stdout)
 
+    def test_phase175_sonic_day_hud_controller_classifies_update_callsite_samples(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+        report = self.read(REPORT)
+
+        for token in [
+            "struct SonicDayHudRuntimeCallsiteSample",
+            "struct SonicDayHudRuntimeCallsiteClassification",
+            "classifySonicDayHudRuntimeCallsiteSample",
+            "applyRuntimeCallsiteSample",
+            "formatSonicDayHudRuntimeCallsiteSample",
+            "formatSonicDayHudRuntimeCallsiteClassification",
+            "formatSonicDayHudRuntimeBindingPhase175SmokeSequence",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "generated-PPC:sub_824D6048 owner+456/+452 -> CSD::CNode::SetText",
+            "generated-PPC:sub_824D6418 speed readout via sub_8251A568",
+            "generated-PPC:sub_824D6C18 owner+460/+480 rolling counter/gauge state",
+            "runtime-proven-via-chud-update-callsite-sample",
+            "classified-via-generated-PPC-callsite-candidate",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase175-sonic-hud-callsite-sample-smoke", example)
+        self.assertIn("Phase 175", report)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase175-sonic-hud-callsite-sample-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase175 sonic hud callsite sample smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_callsite_sample=hook=sub_824D6048:phase=post-original:owner=0xCE2D6B0:delta=0.066667:r4=0x2F3BB30:field452=39:field456=11:field460=0:field480=0", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_callsite_classification=value=elapsedFrames:status=runtime-proven-via-chud-update-callsite-sample:source=generated-PPC:sub_824D6048 owner+456/+452 -> CSD::CNode::SetText", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=callsite-sample:rings=000:score=000000000:time=00:11:39:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_callsite_classification=value=rollingCounterGaugeState:status=classified-via-generated-PPC-callsite-candidate:source=generated-PPC:sub_824D6C18 owner+460/+480 rolling counter/gauge state", completed.stdout)
+        self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,timer:runtime-proven-via-chud-update-callsite-sample,ring/speed/lives:csd-text-write-ready,boost/energy/tutorial:classified-callsite-candidates-pending-normalization", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
