@@ -217,10 +217,13 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("DrawTitleMenuLatchInspector", ui_lab)
         self.assertIn("DrawCaptureInspector", ui_lab)
         self.assertIn("DrawTargetRouterInspector", ui_lab)
-        self.assertIn("ImGui::BeginTabBar(\"ui-lab-inspector-tabs\")", ui_lab)
+        self.assertIn("ImGui::BeginTabBar(\"sward-operator-profiler-tabs\")", ui_lab)
         self.assertIn("ImGui::BeginTabItem(\"Overview\")", ui_lab)
+        self.assertIn("ImGui::BeginTabItem(\"Runtime\")", ui_lab)
         self.assertIn("ImGui::BeginTabItem(\"Title/Menu\")", ui_lab)
+        self.assertIn("ImGui::BeginTabItem(\"HUD\")", ui_lab)
         self.assertIn("ImGui::BeginTabItem(\"Capture\")", ui_lab)
+        self.assertIn("ImGui::BeginTabItem(\"Panels\")", ui_lab)
         self.assertIn("ImGui::BeginTabItem(\"Targets\")", ui_lab)
         self.assertIn("Title menu latch predicates", ui_lab)
         self.assertIn("Reddog-style window-list pattern", report)
@@ -239,12 +242,14 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("g_operatorWindowListVisible", ui_lab)
         self.assertIn("DrawOperatorDebugIcon", ui_lab)
         self.assertIn("DrawOperatorWindowList", ui_lab)
+        self.assertIn("DrawOperatorProfilerPanel", ui_lab)
+        self.assertIn("SWARD Operator Profiler", ui_lab)
+        self.assertIn("ImGui::PlotLines(\"Frame Time\"", ui_lab)
         self.assertIn("DrawOperatorCounterWindow", ui_lab)
         self.assertIn("DrawOperatorViewWindow", ui_lab)
         self.assertIn("DrawOperatorExportsWindow", ui_lab)
         self.assertIn("DrawOperatorDebugDrawWindow", ui_lab)
         self.assertIn("DrawOperatorDebugDrawLayer", ui_lab)
-        self.assertIn("operator-shell-f1-toggle", ui_lab)
         self.assertIn("Config::ShowFPS", ui_lab)
         self.assertIn("Config::EnableEventCollisionDebugView", ui_lab)
         self.assertIn("Config::AllowCancellingUnleash", ui_lab)
@@ -256,9 +261,9 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("SWARD Debug Draw", ui_lab)
         self.assertIn("UiLab::ShouldReserveF1DebugToggle()", video)
         self.assertIn("UiLab::UpdateOperatorShellToggle(toggleProfiler)", video)
-        self.assertIn("toggleProfiler = false", video)
-        self.assertIn("F1-toggled operator shell", report)
-        self.assertIn("draggable debug icon", report)
+        self.assertIn("return false; // Leave F1 to DrawProfiler().", ui_lab)
+        self.assertIn("F1 remains reserved for the native Recomp Profiler", report)
+        self.assertIn("profiler-style SWARD operator panel", report)
         self.assertIn("counter/view/export/debug-draw windows", report)
 
     def test_ui_lab_operator_shell_defaults_to_compact_runtime_views(self):
@@ -281,7 +286,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("SWARD Welcome", ui_lab)
         self.assertIn("SWARD Stage / HUD", ui_lab)
         self.assertIn("SWARD Live API", ui_lab)
-        self.assertIn("Compact-on-demand operator windows", report)
+        self.assertIn("profiler-style SWARD operator panel", report)
 
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
@@ -1552,16 +1557,18 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "IsPlausibleGuestAddress",
             "RecordHudSonicStageInspector",
             "UiLab::OnHudSonicStageUpdate",
-            "GuestAddressOf(pHudSonicStage->m_rcPlayScreen.Get())",
-            "GuestAddressOf(pHudSonicStage->m_rcSpeedGauge.Get())",
-            "GuestAddressOf(pHudSonicStage->m_rcRingEnergyGauge.Get())",
-            "GuestAddressOf(pHudSonicStage->m_rcGaugeFrame.Get())",
+            "Do not call RCPtr::Get() here",
+            "OnHudSonicStageOwnerFieldSample",
             "PPC_FUNC_IMPL(__imp__sub_824D89B0)",
             "PPC_FUNC_IMPL(__imp__sub_824D9308)",
             "PPC_FUNC_IMPL(__imp__sub_824D95F8)",
             "raw CHudSonicStage owner hook",
         ]:
             self.assertIn(token, sonic)
+        self.assertNotIn("GuestAddressOf(pHudSonicStage->m_rcPlayScreen.Get())", sonic)
+        self.assertNotIn("GuestAddressOf(pHudSonicStage->m_rcSpeedGauge.Get())", sonic)
+        self.assertNotIn("GuestAddressOf(pHudSonicStage->m_rcRingEnergyGauge.Get())", sonic)
+        self.assertNotIn("GuestAddressOf(pHudSonicStage->m_rcGaugeFrame.Get())", sonic)
 
         for token in [
             "g_chudSonicStageOwnerAddress",
@@ -1915,10 +1922,10 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "m_rcTimeCount2",
             "m_rcTimeCount3",
             "m_rcPlayerCount",
-            "GuestAddressOf(pHudSonicStage->m_rcScoreCount.Get())",
-            "GuestAddressOf(pHudSonicStage->m_rcPlayerCount.Get())",
         ]:
-            self.assertIn(token, hud_hook)
+            self.assertIn(token, ui_lab)
+        self.assertNotIn("GuestAddressOf(pHudSonicStage->m_rcScoreCount.Get())", hud_hook)
+        self.assertNotIn("GuestAddressOf(pHudSonicStage->m_rcPlayerCount.Get())", hud_hook)
 
         for token in [
             "scoreInfoPointMarkerRecordSpeedKnown",
@@ -2261,6 +2268,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "g_lastSonicHudUpdateCallsiteStableSignatures",
             "g_lastSonicHudUpdateCallsiteEvidenceFrames",
             "kSonicHudUpdateCallsiteMinEvidenceIntervalFrames",
+            "ShouldSampleSonicHudUpdateCallsiteFrame",
             "stableSignature",
             "intervalElapsed",
         ]:
@@ -2279,6 +2287,8 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("PPC_FUNC(sub_8251A568)", hud_hook)
         self.assertIn("g_sonicHudSpeedReadoutCaptureDepth", hud_hook)
         self.assertIn("OnSonicHudSpeedReadoutValue", hud_hook)
+        self.assertIn("value update hook", hud_hook)
+        self.assertIn("RCPtr::Get()", hud_hook)
 
         for token in [
             "Phase 178",
@@ -2288,6 +2298,47 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "speed:runtime-proven-via-sub_8251A568-return",
         ]:
             self.assertIn(token, report)
+
+    def test_ui_lab_phase179_profiler_style_operator_panel_and_perf_safe_hud_sampling(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        hud_hook = self.read("UnleashedRecomp/patches/CHudSonicStage_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        pivot = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
+
+        for token in [
+            "SWARD Operator Profiler",
+            "DrawOperatorProfilerPanel",
+            "DrawOperatorProfilerSummary",
+            "DrawOperatorProfilerPanelsTab",
+            "ImGui::PlotLines(\"Frame Time\"",
+            "ImGui::BeginTabBar(\"sward-operator-profiler-tabs\")",
+            "ImGui::BeginTabItem(\"Runtime\")",
+            "ImGui::BeginTabItem(\"HUD\")",
+            "ImGui::BeginTabItem(\"Capture\")",
+            "ImGui::BeginTabItem(\"Panels\")",
+            "return false; // Leave F1 to DrawProfiler().",
+            "ShouldSampleSonicHudUpdateCallsiteFrame",
+            "g_lastSonicHudUpdateCallsiteSampleFrame",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Do not call RCPtr::Get() here",
+            "source.find(\"value update hook\")",
+            "OnHudSonicStageOwnerFieldSample",
+        ]:
+            self.assertIn(token, hud_hook)
+
+        for token in [
+            "Phase 179",
+            "profiler-style SWARD operator panel",
+            "F1 remains the native Recomp Profiler toggle",
+            "low-overhead Sonic HUD callsite sampling",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("profiler-style SWARD operator panel", pivot)
+        self.assertIn("F1 remains reserved for the native Recomp Profiler", pivot)
 
 
 if __name__ == "__main__":

@@ -2,11 +2,7 @@
 #include <kernel/memory.h>
 #include <api/SWA.h>
 #include <patches/ui_lab_patches.h>
-
-static uint32_t GuestAddressOf(const void* host)
-{
-    return host != nullptr ? g_memory.MapVirtual(host) : 0;
-}
+#include <string_view>
 
 static bool IsPlausibleGuestAddress(uint32_t address)
 {
@@ -24,19 +20,25 @@ static void RecordHudSonicStageInspector(
     if (pHudSonicStage == nullptr)
         return;
 
+    // The raw owner hook can run while the embedded RCPtr slots are still
+    // transient. Do not call RCPtr::Get() here; the live bridge samples the raw
+    // slot bytes separately and CSD tree/draw-list hooks resolve real nodes.
     UiLab::OnHudSonicStageUpdate(
         ownerAddress,
-        GuestAddressOf(pHudSonicStage->m_rcPlayScreen.Get()),
-        GuestAddressOf(pHudSonicStage->m_rcSpeedGauge.Get()),
-        GuestAddressOf(pHudSonicStage->m_rcRingEnergyGauge.Get()),
-        GuestAddressOf(pHudSonicStage->m_rcGaugeFrame.Get()),
-        GuestAddressOf(pHudSonicStage->m_rcScoreCount.Get()),
-        GuestAddressOf(pHudSonicStage->m_rcTimeCount.Get()),
-        GuestAddressOf(pHudSonicStage->m_rcTimeCount2.Get()),
-        GuestAddressOf(pHudSonicStage->m_rcTimeCount3.Get()),
-        GuestAddressOf(pHudSonicStage->m_rcPlayerCount.Get()),
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
         hookSource);
-    UiLab::OnHudSonicStageOwnerFieldSample(ownerAddress, hookSource);
+
+    const std::string_view source(hookSource);
+    if (source.find("value update hook") == std::string_view::npos)
+        UiLab::OnHudSonicStageOwnerFieldSample(ownerAddress, hookSource);
 }
 
 static void RecordHudSonicStageInspector(uint32_t ownerAddress, const char* hookSource)

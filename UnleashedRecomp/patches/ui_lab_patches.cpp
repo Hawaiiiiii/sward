@@ -801,6 +801,10 @@ namespace UiLab
     static bool g_operatorLiveApiVisible = false;
     static bool g_operatorDebugDrawLayerVisible = false;
     static ImVec2 g_operatorDebugIconPos = { 18.0f, 18.0f };
+    static constexpr int kOperatorProfilerFrameHistoryCount = 256;
+    static float g_operatorProfilerFrameMs[kOperatorProfilerFrameHistoryCount] = {};
+    static int g_operatorProfilerFrameMsIndex = 0;
+    static uint64_t g_operatorProfilerLastFrame = 0;
     static RoutePolicy g_routePolicy = RoutePolicy::InputInjection;
     static ScreenId g_target = ScreenId::TitleLoop;
     static bool g_liveBridgeEnabled = true;
@@ -898,6 +902,11 @@ namespace UiLab
     static std::string g_chudSonicStageRawHookSource;
     static bool g_loggedChudSonicStageOwnerHook = false;
     static bool g_loggedChudSonicStageOwnerFieldSample = false;
+    static bool g_loggedChudSonicStageOwnerFieldsReady = false;
+    static std::string g_chudSonicStageOwnerHookStableSignature;
+    static uint64_t g_chudSonicStageOwnerHookLastEvidenceFrame = 0;
+    static std::string g_chudSonicStageOwnerFieldSampleStableSignature;
+    static uint64_t g_chudSonicStageOwnerFieldSampleLastEvidenceFrame = 0;
     static bool g_loggedTutorialHudOwnerPathReady = false;
     static uint64_t g_chudSonicStageOwnerFieldSampleCount = 0;
     static std::vector<SonicHudOwnerFieldSample> g_chudSonicStageOwnerFieldSamples;
@@ -909,7 +918,8 @@ namespace UiLab
     static std::vector<SonicHudUpdateCallsiteSample> g_sonicHudUpdateCallsiteSamples;
     static SonicHudLastClassifiedCallsiteValue g_lastSonicHudClassifiedCallsiteValue;
     static std::unordered_map<std::string, std::string> g_lastSonicHudUpdateCallsiteSampleDetails;
-    static constexpr uint64_t kSonicHudUpdateCallsiteMinEvidenceIntervalFrames = 120;
+    static constexpr uint64_t kSonicHudUpdateCallsiteMinEvidenceIntervalFrames = 600;
+    static uint64_t g_lastSonicHudUpdateCallsiteSampleFrame = 0;
     static std::unordered_map<std::string, std::string> g_lastSonicHudUpdateCallsiteStableSignatures;
     static std::unordered_map<std::string, uint64_t> g_lastSonicHudUpdateCallsiteEvidenceFrames;
     static std::unordered_map<std::string, uint32_t> g_lastSonicHudSpeedReadoutValues;
@@ -1128,7 +1138,7 @@ namespace UiLab
 
     bool ShouldReserveF1DebugToggle()
     {
-        return g_isEnabled && ShouldDrawOverlay();
+        return false; // Leave F1 to DrawProfiler().
     }
 
     static std::string JsonEscape(std::string_view value)
@@ -1482,20 +1492,8 @@ namespace UiLab
 
     void UpdateOperatorShellToggle(bool f1Down)
     {
-        if (!ShouldReserveF1DebugToggle())
-        {
-            g_operatorShellToggleWasDown = false;
-            return;
-        }
-
-        if (!g_operatorShellToggleWasDown && f1Down)
-        {
-            g_operatorShellVisible = !g_operatorShellVisible;
-            g_routeStatus = g_operatorShellVisible ? "operator shell visible" : "operator shell hidden";
-            WriteEvidenceEvent("operator-shell-f1-toggle", g_operatorShellVisible ? "visible" : "hidden");
-        }
-
-        g_operatorShellToggleWasDown = f1Down;
+        (void)f1Down;
+        g_operatorShellToggleWasDown = false;
     }
 
     static const RuntimeTarget& TargetFor(ScreenId id)
@@ -6499,8 +6497,14 @@ namespace UiLab
         g_chudSonicStageRawHookSource.clear();
         g_loggedChudSonicStageOwnerHook = false;
         g_loggedChudSonicStageOwnerFieldSample = false;
+        g_loggedChudSonicStageOwnerFieldsReady = false;
+        g_chudSonicStageOwnerHookStableSignature.clear();
+        g_chudSonicStageOwnerHookLastEvidenceFrame = 0;
+        g_chudSonicStageOwnerFieldSampleStableSignature.clear();
+        g_chudSonicStageOwnerFieldSampleLastEvidenceFrame = 0;
         g_loggedTutorialHudOwnerPathReady = false;
         g_chudSonicStageOwnerFieldSampleCount = 0;
+        g_lastSonicHudUpdateCallsiteSampleFrame = 0;
         g_lastCsdProjectName.clear();
         g_lastCsdProjectFrame = 0;
         g_lastTitleIntroContextDetail.clear();
@@ -7591,6 +7595,22 @@ namespace UiLab
         g_sonicHudUpdateContextStack.pop_back();
     }
 
+    static bool ShouldSampleSonicHudUpdateCallsiteFrame()
+    {
+        if (g_lastSonicHudUpdateCallsiteSampleFrame == g_presentedFrameCount)
+            return true;
+
+        if (g_lastSonicHudUpdateCallsiteSampleFrame != 0 &&
+            g_presentedFrameCount <
+                g_lastSonicHudUpdateCallsiteSampleFrame + kSonicHudUpdateCallsiteMinEvidenceIntervalFrames)
+        {
+            return false;
+        }
+
+        g_lastSonicHudUpdateCallsiteSampleFrame = g_presentedFrameCount;
+        return true;
+    }
+
     void OnSonicHudUpdateCallsiteSample(
         uint32_t ownerAddress,
         std::string_view hookName,
@@ -7599,6 +7619,9 @@ namespace UiLab
         uint32_t r4)
     {
         if (!g_isEnabled || !IsPlausibleGuestPointer(ownerAddress))
+            return;
+
+        if (!ShouldSampleSonicHudUpdateCallsiteFrame())
             return;
 
         SonicHudUpdateCallsiteSample sample;
@@ -8579,7 +8602,29 @@ namespace UiLab
         g_chudSonicStageRawHookFrame = g_presentedFrameCount;
         g_chudSonicStageRawHookSource = hookSource;
 
-        if (!g_loggedChudSonicStageOwnerHook || changed)
+        const std::string stableSignature =
+            std::string(hasOwnerFields ? "fields-ready" : "owner-only") +
+            "|play=" + HexU32(playScreenProjectAddress) +
+            "|speed=" + HexU32(speedGaugeSceneAddress) +
+            "|energy=" + HexU32(ringEnergyGaugeSceneAddress) +
+            "|gauge=" + HexU32(gaugeFrameSceneAddress) +
+            "|score=" + HexU32(scoreCountNodeAddress) +
+            "|time=" + HexU32(timeCountNodeAddress) +
+            "|player=" + HexU32(playerCountNodeAddress);
+        const bool ownerFieldsBecameReady =
+            hasOwnerFields && !g_loggedChudSonicStageOwnerFieldsReady;
+        const bool evidenceIntervalElapsed =
+            g_chudSonicStageOwnerHookLastEvidenceFrame == 0 ||
+            g_presentedFrameCount >=
+                g_chudSonicStageOwnerHookLastEvidenceFrame +
+                    kSonicHudUpdateCallsiteMinEvidenceIntervalFrames;
+        const bool stableSignatureChanged =
+            g_chudSonicStageOwnerHookStableSignature != stableSignature;
+
+        if (
+            !g_loggedChudSonicStageOwnerHook ||
+            ownerFieldsBecameReady ||
+            (changed && stableSignatureChanged && evidenceIntervalElapsed))
         {
             WriteEvidenceEvent(
                 "sonic-hud-owner-hooked",
@@ -8599,6 +8644,10 @@ namespace UiLab
                     ? " status=raw CHudSonicStage owner hook"
                     : " status=raw CHudSonicStage owner hook owner-only; CSD owner fields pending"));
             g_loggedChudSonicStageOwnerHook = true;
+            if (hasOwnerFields)
+                g_loggedChudSonicStageOwnerFieldsReady = true;
+            g_chudSonicStageOwnerHookStableSignature = stableSignature;
+            g_chudSonicStageOwnerHookLastEvidenceFrame = g_presentedFrameCount;
             WriteLiveStateSnapshot();
         }
     }
@@ -8626,18 +8675,11 @@ namespace UiLab
 
             sample.rcObjectAddress = sample.slotValue;
             sample.rcObjectKnown = IsPlausibleGuestPointer(sample.rcObjectAddress);
-
-            if (sample.rcObjectKnown)
-            {
-                uint32_t resolvedMemoryAddress = 0;
-                if (TryReadGuestU32(sample.rcObjectAddress + 0x4, resolvedMemoryAddress) &&
-                    IsPlausibleGuestPointer(resolvedMemoryAddress))
-                {
-                    sample.resolvedMemoryAddress = resolvedMemoryAddress;
-                    sample.resolvedMemoryKnown = true;
-                    ++resolvedMemoryCount;
-                }
-            }
+            // Do not dereference the RCObject pointer from this raw owner
+            // sampler. The CHudSonicStage owner is live before every embedded
+            // RCPtr slot is guaranteed to be a stable CSD RCObject, and the
+            // real CSD node/project addresses are resolved by tree/draw-list
+            // hooks that run at the CSD boundary.
 
             samples.push_back(std::move(sample));
         }
@@ -8664,7 +8706,20 @@ namespace UiLab
             g_chudSonicStageOwnerFieldSampleCount += kChudSonicStageExpectedOwnerFields.size();
         }
 
-        if (!g_loggedChudSonicStageOwnerFieldSample || changed || resolvedMemoryCount != 0)
+        const std::string stableSignature =
+            "resolved_memory_count=" + std::to_string(resolvedMemoryCount);
+        const bool evidenceIntervalElapsed =
+            g_chudSonicStageOwnerFieldSampleLastEvidenceFrame == 0 ||
+            g_presentedFrameCount >=
+                g_chudSonicStageOwnerFieldSampleLastEvidenceFrame +
+                    kSonicHudUpdateCallsiteMinEvidenceIntervalFrames;
+        const bool stableSignatureChanged =
+            g_chudSonicStageOwnerFieldSampleStableSignature != stableSignature;
+
+        if (
+            !g_loggedChudSonicStageOwnerFieldSample ||
+            (resolvedMemoryCount != 0 && stableSignatureChanged) ||
+            (changed && stableSignatureChanged && evidenceIntervalElapsed))
         {
             WriteEvidenceEvent(
                 "sonic-hud-owner-field-sample",
@@ -8674,6 +8729,8 @@ namespace UiLab
                 " sample_count=" + std::to_string(kChudSonicStageExpectedOwnerFields.size()) +
                 " resolved_memory_count=" + std::to_string(resolvedMemoryCount));
             g_loggedChudSonicStageOwnerFieldSample = true;
+            g_chudSonicStageOwnerFieldSampleStableSignature = stableSignature;
+            g_chudSonicStageOwnerFieldSampleLastEvidenceFrame = g_presentedFrameCount;
             EmitTutorialHudOwnerPathReadyIfNeeded();
             WriteLiveStateSnapshot();
         }
@@ -9639,6 +9696,223 @@ namespace UiLab
         }
     }
 
+    static void UpdateOperatorProfilerFrameHistory()
+    {
+        if (g_operatorProfilerLastFrame == g_presentedFrameCount)
+            return;
+
+        g_operatorProfilerLastFrame = g_presentedFrameCount;
+        g_operatorProfilerFrameMs[g_operatorProfilerFrameMsIndex] =
+            static_cast<float>(App::s_deltaTime * 1000.0);
+        g_operatorProfilerFrameMsIndex =
+            (g_operatorProfilerFrameMsIndex + 1) % kOperatorProfilerFrameHistoryCount;
+    }
+
+    static void DrawOperatorProfilerSummary()
+    {
+        UpdateOperatorProfilerFrameHistory();
+
+        const double frameMs = App::s_deltaTime * 1000.0;
+        const double fps = App::s_deltaTime > 0.0 ? 1.0 / App::s_deltaTime : 0.0;
+        float averageFrameMs = 0.0f;
+        int averageFrameCount = 0;
+
+        for (const float value : g_operatorProfilerFrameMs)
+        {
+            if (value <= 0.0f)
+                continue;
+
+            averageFrameMs += value;
+            ++averageFrameCount;
+        }
+
+        if (averageFrameCount > 0)
+            averageFrameMs /= static_cast<float>(averageFrameCount);
+
+        ImGui::TextUnformatted("Frame Time");
+        ImGui::PlotLines("Frame Time",
+            g_operatorProfilerFrameMs,
+            kOperatorProfilerFrameHistoryCount,
+            g_operatorProfilerFrameMsIndex,
+            nullptr,
+            0.0f,
+            33.33f,
+            ImVec2(360.0f, 118.0f));
+        ImGui::Text("Current Application: %.3f ms (%.2f FPS)", frameMs, fps);
+        ImGui::Text(
+            "Average Application: %.3f ms (%.2f FPS)",
+            averageFrameMs,
+            averageFrameMs > 0.0f ? 1000.0f / averageFrameMs : 0.0f);
+        ImGui::Text("Frame: %llu", static_cast<unsigned long long>(g_presentedFrameCount));
+        ImGui::Separator();
+        ImGui::Text("Target: %s", std::string(GetTargetToken()).c_str());
+        ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
+        ImGui::Text("Native: %s", std::string(NativeFrameCaptureStatusLabel()).c_str());
+        ImGui::Text("UI layer: %s", std::string(UiOnlyLayerIsolationStatusLabel()).c_str());
+        ImGui::Text("Live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
+        DrawPredicate("Stage/HUD ready", !g_lastStageReadyEventName.empty());
+    }
+
+    static void DrawOperatorProfilerHudTab()
+    {
+        const auto sonicHud = BuildSonicHudLiveInspectorSnapshot();
+        const auto sonicGameplay = BuildSonicHudGameplayValueSnapshot();
+        const auto lastClassified = BuildSonicHudLastClassifiedCallsiteValue();
+
+        ImGui::TextUnformatted("Sonic Day HUD");
+        ImGui::Separator();
+        DrawPredicate("Stage context", sonicHud.stageContextObserved);
+        DrawPredicate("Target CSD", sonicHud.targetCsdObserved);
+        DrawPredicate("Stage target ready", sonicHud.stageTargetReady);
+        DrawPredicate("Raw owner", sonicHud.rawOwnerKnown);
+        DrawPredicate("Owner fields", sonicHud.rawOwnerFieldsReady);
+        DrawHexField("CHudSonicStage", sonicHud.hudOwnerAddress);
+        DrawHexField("Stage game mode", sonicHud.stageGameModeAddress);
+        ImGui::Text("Play screen: %s", sonicHud.playScreenProject.empty() ? "waiting" : sonicHud.playScreenProject.c_str());
+        ImGui::Text("Speed gauge: %s", sonicHud.speedGaugeScene.empty() ? "waiting" : sonicHud.speedGaugeScene.c_str());
+        ImGui::Text("Ready event: %s", sonicHud.readyEvent.empty() ? "waiting" : sonicHud.readyEvent.c_str());
+        ImGui::Separator();
+        ImGui::Text("Binding: %s", SonicHudValueWriteBindingStatus().c_str());
+        ImGui::Text(
+            "rings: %s %u",
+            sonicGameplay.ringCountKnown ? "known" : "waiting",
+            sonicGameplay.ringCount);
+        ImGui::Text(
+            "score: %s %u",
+            sonicGameplay.scoreKnown ? "known" : "waiting",
+            sonicGameplay.score);
+        ImGui::Text(
+            "timer frames: %s %u",
+            sonicGameplay.elapsedFramesKnown ? "known" : "waiting",
+            sonicGameplay.elapsedFrames);
+        ImGui::Text(
+            "speed: %s %.1f km/h",
+            sonicGameplay.speedKmhKnown ? "known" : "waiting",
+            sonicGameplay.speedKmh);
+        ImGui::Text(
+            "boost: %s %.3f",
+            sonicGameplay.boostGaugeKnown ? "known" : "waiting",
+            sonicGameplay.boostGauge);
+        ImGui::Text(
+            "ring energy: %s %.3f",
+            sonicGameplay.ringEnergyGaugeKnown ? "known" : "waiting",
+            sonicGameplay.ringEnergyGauge);
+        ImGui::Text(
+            "lives: %s %u",
+            sonicGameplay.lifeCountKnown ? "known" : "waiting",
+            sonicGameplay.lifeCount);
+        ImGui::Text(
+            "tutorial: %s %s",
+            sonicGameplay.tutorialPromptKnown ? "known" : "waiting",
+            sonicGameplay.tutorialPromptId.c_str());
+
+        if (lastClassified.lastClassificationKnown)
+        {
+            ImGui::Separator();
+            ImGui::Text("Last classified: %s", lastClassified.valueName.c_str());
+            ImGui::Text("Status: %s", lastClassified.status.c_str());
+            ImGui::Text("Hook: %s / %s", lastClassified.hookName.c_str(), lastClassified.samplePhase.c_str());
+            ImGui::Text("Frame: %llu", static_cast<unsigned long long>(lastClassified.lastClassifiedCallsiteValueFrame));
+        }
+    }
+
+    static void DrawOperatorProfilerPanelsTab()
+    {
+        ImGui::TextUnformatted("Open focused drill-down windows");
+        ImGui::Separator();
+
+        for (const auto& entry : GetOperatorWindowEntries())
+        {
+            ImGui::Checkbox(entry.name, entry.visible);
+
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", entry.description);
+        }
+
+        ImGui::Separator();
+        ImGui::Checkbox("Operator foreground layer", &g_operatorDebugDrawLayerVisible);
+
+        if (ImGui::Button("Write Live State Snapshot"))
+            WriteLiveStateSnapshot();
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Manual Evidence"))
+            WriteEvidenceEvent("manual-evidence-marker");
+    }
+
+    static void DrawOperatorProfilerPanel()
+    {
+        if (!g_operatorShellVisible)
+            return;
+
+        ImGui::SetNextWindowPos(ImVec2(96.0f, 118.0f), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(500.0f, 640.0f), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowBgAlpha(0.86f);
+
+        constexpr ImGuiWindowFlags flags =
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoFocusOnAppearing;
+
+        if (ImGui::Begin("SWARD Operator Profiler", nullptr, flags))
+        {
+            DrawOperatorProfilerSummary();
+            ImGui::Separator();
+
+            if (ImGui::BeginTabBar("sward-operator-profiler-tabs"))
+            {
+                if (ImGui::BeginTabItem("Overview"))
+                {
+                    DrawRuntimeInspectorOverview();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Runtime"))
+                {
+                    DrawRuntimeInspectorOverview();
+                    ImGui::Separator();
+                    DrawTargetRouterInspector();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Title/Menu"))
+                {
+                    DrawTitleMenuLatchInspector();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("HUD"))
+                {
+                    DrawOperatorProfilerHudTab();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Capture"))
+                {
+                    DrawCaptureInspector();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Panels"))
+                {
+                    DrawOperatorProfilerPanelsTab();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Targets"))
+                {
+                    DrawTargetRouterInspector();
+                    ImGui::EndTabItem();
+                }
+
+                ImGui::EndTabBar();
+            }
+        }
+
+        ImGui::End();
+    }
+
     static void DrawOperatorDebugIcon()
     {
         ImGui::SetNextWindowPos(g_operatorDebugIconPos, ImGuiCond_FirstUseEver);
@@ -9947,64 +10221,9 @@ namespace UiLab
             return;
 
         DrawOperatorDebugDrawLayer();
-        DrawOperatorDebugIcon();
+        DrawOperatorProfilerPanel();
         DrawOperatorWindowList();
         DrawOperatorWelcomeWindow();
-
-        if (!g_operatorInspectorVisible)
-        {
-            DrawOperatorCounterWindow();
-            DrawOperatorViewWindow();
-            DrawOperatorExportsWindow();
-            DrawOperatorDebugDrawWindow();
-            DrawOperatorStageHudWindow();
-            DrawOperatorLiveApiWindow();
-            return;
-        }
-
-        ImGui::SetNextWindowPos({ 18.0f, 72.0f }, ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowBgAlpha(0.82f);
-
-        constexpr ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoSavedSettings |
-            ImGuiWindowFlags_AlwaysAutoResize |
-            ImGuiWindowFlags_NoFocusOnAppearing;
-
-        if (ImGui::Begin("SWARD UI Lab", nullptr, flags))
-        {
-            if (ImGui::BeginTabBar("ui-lab-inspector-tabs"))
-            {
-                if (ImGui::BeginTabItem("Overview"))
-                {
-                    DrawRuntimeInspectorOverview();
-                    ImGui::EndTabItem();
-                }
-
-                if (ImGui::BeginTabItem("Title/Menu"))
-                {
-                    DrawTitleMenuLatchInspector();
-                    ImGui::EndTabItem();
-                }
-
-                if (ImGui::BeginTabItem("Capture"))
-                {
-                    DrawCaptureInspector();
-                    ImGui::EndTabItem();
-                }
-
-                if (ImGui::BeginTabItem("Targets"))
-                {
-                    DrawTargetRouterInspector();
-                    ImGui::EndTabItem();
-                }
-
-                ImGui::EndTabBar();
-            }
-        }
-
-        ImGui::End();
-
         DrawOperatorCounterWindow();
         DrawOperatorViewWindow();
         DrawOperatorExportsWindow();
