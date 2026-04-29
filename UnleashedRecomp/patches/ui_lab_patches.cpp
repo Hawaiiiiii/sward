@@ -811,6 +811,7 @@ namespace UiLab
     static std::string BuildRuntimeGpuSubmitJson();
     static std::string BuildRuntimeMaterialCorrelationJson();
     static std::string BuildRuntimeBackendResolvedJson();
+    static std::string BuildRuntimeVendorCommandResourceDumpJson();
     static std::vector<RuntimeMaterialCorrelation> BuildRuntimeMaterialCorrelationPairs(
         const std::vector<RuntimeUiDrawCall>& drawCalls,
         const std::vector<RuntimeGpuSubmitCall>& submitCalls);
@@ -1619,6 +1620,16 @@ namespace UiLab
         R"("gammaSrgbStatus")",
         R"("uiOnlyRenderTargetCaptureProbe")",
         R"("uiOnlyRenderTargetCapturePolicy": "copy-ui-render-target-before-present")",
+        R"("vendorCommandResourceDump")",
+        R"("vendorCommandResourceDumpPolicy": "raw-backend-command-plus-resource-view-dump")",
+        R"("vendorCommandResourceDumpStatus")",
+        R"("rawBackendCommandCount")",
+        R"("backendResolvedSubmitCount")",
+        R"("textureResourceViewDumpCount")",
+        R"("samplerResourceViewDumpCount")",
+        R"("resourcePairDumpCount")",
+        R"("uiOnlyRenderedLayerStatus": "pending-runtime-ui-render-target-copy")",
+        R"("vendorCommandReplayGap": "pending-full-vendor-command-buffer-replay")",
         R"("textMovieSfxGap": "pending-title-loading-media-timing")",
         R"("materialParityHint")",
         R"("materialParityStatus")",
@@ -3395,6 +3406,204 @@ namespace UiLab
         out << "]";
     }
 
+    static void AppendRuntimeRawBackendCommands(
+        std::ostringstream& out,
+        const std::vector<RuntimeRawBackendCommand>& commands)
+    {
+        out << "[";
+        for (size_t i = 0; i < commands.size(); ++i)
+        {
+            if (i != 0)
+                out << ",";
+
+            const auto& command = commands[i];
+            out
+                << "{"
+                << "\"sequence\":" << command.sequence
+                << ",\"frame\":" << command.frame
+                << ",\"backend\":\"" << JsonEscape(command.backend) << "\""
+                << ",\"command\":\"" << JsonEscape(command.command) << "\""
+                << ",\"source\":\"" << JsonEscape(command.source) << "\""
+                << ",\"indexed\":" << (command.indexed ? "true" : "false")
+                << ",\"vertexCount\":" << command.vertexCount
+                << ",\"indexCount\":" << command.indexCount
+                << ",\"instanceCount\":" << command.instanceCount
+                << "}";
+        }
+        out << "]";
+    }
+
+    static void AppendRuntimeVendorResourceDumpPairs(
+        std::ostringstream& out,
+        const std::vector<RuntimeMaterialCorrelation>& materialPairs,
+        const std::unordered_map<uint32_t, RuntimeVendorTextureResourceView>& textureResourceViews,
+        const std::unordered_map<uint32_t, RuntimeVendorSamplerResourceView>& samplerResourceViews)
+    {
+        out << "[";
+        const size_t pairLimit = std::min<size_t>(materialPairs.size(), 96);
+        bool wrote = false;
+        for (size_t i = 0; i < pairLimit; ++i)
+        {
+            const auto& pair = materialPairs[i];
+            const auto textureFound = textureResourceViews.find(pair.texture2DDescriptorIndex);
+            const auto samplerFound = samplerResourceViews.find(pair.samplerDescriptorIndex);
+            if (textureFound == textureResourceViews.end() && samplerFound == samplerResourceViews.end())
+                continue;
+
+            if (wrote)
+                out << ",";
+            wrote = true;
+
+            out
+                << "{"
+                << "\"uiDrawSequence\":" << pair.uiDrawSequence
+                << ",\"gpuSubmitSequence\":" << pair.gpuSubmitSequence
+                << ",\"texture2DDescriptorIndex\":" << pair.texture2DDescriptorIndex
+                << ",\"samplerDescriptorIndex\":" << pair.samplerDescriptorIndex
+                << ",\"textureResourceViewKnown\":" << (textureFound != textureResourceViews.end() ? "true" : "false")
+                << ",\"samplerResourceViewKnown\":" << (samplerFound != samplerResourceViews.end() ? "true" : "false");
+
+            if (textureFound != textureResourceViews.end())
+            {
+                const auto& texture = textureFound->second;
+                out
+                    << ",\"nativeTextureResourceHandle\":\"" << JsonEscape(HexU64(texture.nativeTextureResourceHandle)) << "\""
+                    << ",\"nativeTextureViewHandle\":\"" << JsonEscape(HexU64(texture.nativeTextureViewHandle)) << "\""
+                    << ",\"nativeFormat\":" << texture.nativeFormat
+                    << ",\"nativeViewDimension\":" << texture.nativeViewDimension
+                    << ",\"width\":" << texture.width
+                    << ",\"height\":" << texture.height
+                    << ",\"mipLevels\":" << texture.mipLevels;
+            }
+
+            if (samplerFound != samplerResourceViews.end())
+            {
+                const auto& sampler = samplerFound->second;
+                out
+                    << ",\"nativeSamplerHandle\":\"" << JsonEscape(HexU64(sampler.nativeSamplerHandle)) << "\""
+                    << ",\"nativeFilter\":" << sampler.nativeFilter
+                    << ",\"nativeAddressU\":" << sampler.nativeAddressU
+                    << ",\"nativeAddressV\":" << sampler.nativeAddressV
+                    << ",\"nativeAddressW\":" << sampler.nativeAddressW;
+            }
+
+            out << "}";
+        }
+        out << "]";
+    }
+
+    static std::string RuntimeVendorCommandResourceDumpStatus(
+        size_t rawBackendCommandCount,
+        size_t backendResolvedSubmitCount,
+        uint32_t resourcePairDumpCount)
+    {
+        if (rawBackendCommandCount > 0 && resourcePairDumpCount > 0)
+            return "vendor command/resource dump active";
+        if (backendResolvedSubmitCount > 0 && resourcePairDumpCount > 0)
+            return "vendor resource dump active; raw command boundary sparse";
+        if (backendResolvedSubmitCount > 0)
+            return "backend command dump active; waiting for vendor resource pairs";
+        return "vendor command/resource dump armed; waiting for backend commands";
+    }
+
+    static std::string BuildRuntimeVendorCommandResourceDumpJson()
+    {
+        const auto& target = TargetFor(g_target);
+
+        std::vector<RuntimeRawBackendCommand> rawBackendCommands;
+        std::vector<RuntimeBackendResolvedSubmit> backendResolvedSubmits;
+        std::vector<RuntimeUiDrawCall> drawCalls;
+        std::vector<RuntimeGpuSubmitCall> gpuSubmitCalls;
+        std::unordered_map<uint32_t, RuntimeVendorTextureResourceView> textureResourceViews;
+        std::unordered_map<uint32_t, RuntimeVendorSamplerResourceView> samplerResourceViews;
+        uint64_t frame = g_presentedFrameCount;
+        uint32_t rawDroppedCount = 0;
+        uint32_t backendDroppedCount = 0;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            rawBackendCommands = g_runtimeRawBackendCommands;
+            backendResolvedSubmits = g_runtimeBackendResolvedSubmits;
+            drawCalls = g_runtimeUiDrawCalls;
+            gpuSubmitCalls = g_runtimeGpuSubmitCalls;
+            textureResourceViews = g_runtimeVendorTextureResourceViews;
+            samplerResourceViews = g_runtimeVendorSamplerResourceViews;
+            if (g_runtimeBackendResolvedFrame != UINT64_MAX)
+                frame = g_runtimeBackendResolvedFrame;
+            else if (g_runtimeRawBackendCommandFrame != UINT64_MAX)
+                frame = g_runtimeRawBackendCommandFrame;
+            rawDroppedCount = g_runtimeRawBackendCommandDroppedCount;
+            backendDroppedCount = g_runtimeBackendResolvedDroppedCount;
+        }
+
+        const auto materialPairs = BuildRuntimeMaterialCorrelationPairs(drawCalls, gpuSubmitCalls);
+        uint32_t resourcePairDumpCount = 0;
+        for (const auto& pair : materialPairs)
+        {
+            if (textureResourceViews.find(pair.texture2DDescriptorIndex) != textureResourceViews.end() &&
+                samplerResourceViews.find(pair.samplerDescriptorIndex) != samplerResourceViews.end())
+            {
+                ++resourcePairDumpCount;
+            }
+        }
+
+        const std::string status = RuntimeVendorCommandResourceDumpStatus(
+            rawBackendCommands.size(),
+            backendResolvedSubmits.size(),
+            resourcePairDumpCount);
+
+        std::ostringstream out;
+        out
+            << "{\n"
+            << "  \"ok\": true,\n"
+            << "  \"source\": \"runtime vendor command/resource dump\",\n"
+            << "  \"version\": 1,\n"
+            << "  \"frame\": " << frame << ",\n"
+            << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
+            << "  \"vendorCommandResourceDumpPolicy\": \"raw-backend-command-plus-resource-view-dump\",\n"
+            << "  \"vendorCommandResourceDumpStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "  \"rawBackendCommandCount\": " << rawBackendCommands.size() << ",\n"
+            << "  \"backendResolvedSubmitCount\": " << backendResolvedSubmits.size() << ",\n"
+            << "  \"materialPairCount\": " << materialPairs.size() << ",\n"
+            << "  \"textureResourceViewDumpCount\": " << textureResourceViews.size() << ",\n"
+            << "  \"samplerResourceViewDumpCount\": " << samplerResourceViews.size() << ",\n"
+            << "  \"resourcePairDumpCount\": " << resourcePairDumpCount << ",\n"
+            << "  \"droppedRawBackendCommandCount\": " << rawDroppedCount << ",\n"
+            << "  \"droppedBackendResolvedSubmitCount\": " << backendDroppedCount << ",\n"
+            << "  \"uiOnlyRenderedLayerStatus\": \"pending-runtime-ui-render-target-copy\",\n"
+            << "  \"uiOnlyLayerCaptureStatus\": \"pending-runtime-ui-render-target-copy\",\n"
+            << "  \"vendorCommandReplayGap\": \"pending-full-vendor-command-buffer-replay\",\n"
+            << "  \"nativeCommandCaptureGap\": \"vendor command/resource dump active; full command-buffer replay pending\",\n"
+            << "  \"vendorCommandResourceDump\": {\n"
+            << "    \"source\": \"raw backend command samples plus native resource views\",\n"
+            << "    \"vendorCommandResourceDumpPolicy\": \"raw-backend-command-plus-resource-view-dump\",\n"
+            << "    \"vendorCommandResourceDumpStatus\": \"" << JsonEscape(status) << "\",\n"
+            << "    \"rawBackendCommandCount\": " << rawBackendCommands.size() << ",\n"
+            << "    \"backendResolvedSubmitCount\": " << backendResolvedSubmits.size() << ",\n"
+            << "    \"textureResourceViewDumpCount\": " << textureResourceViews.size() << ",\n"
+            << "    \"samplerResourceViewDumpCount\": " << samplerResourceViews.size() << ",\n"
+            << "    \"resourcePairDumpCount\": " << resourcePairDumpCount << ",\n"
+            << "    \"uiOnlyRenderedLayerStatus\": \"pending-runtime-ui-render-target-copy\",\n"
+            << "    \"vendorCommandReplayGap\": \"pending-full-vendor-command-buffer-replay\",\n"
+            << "    \"rawCommands\": ";
+        AppendRuntimeRawBackendCommands(out, rawBackendCommands);
+        out
+            << ",\n"
+            << "    \"backendSubmits\": ";
+        AppendRuntimeBackendResolvedSubmits(out, backendResolvedSubmits);
+        out
+            << ",\n"
+            << "    \"resourcePairs\": ";
+        AppendRuntimeVendorResourceDumpPairs(out, materialPairs, textureResourceViews, samplerResourceViews);
+        out
+            << "\n"
+            << "  }\n"
+            << "}\n";
+
+        return out.str();
+    }
+
     static std::string BuildRuntimeBackendResolvedJson()
     {
         const auto& target = TargetFor(g_target);
@@ -3962,7 +4171,7 @@ namespace UiLab
             << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
             << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
             << "    \"commands\": ";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out
             << "\n"
             << "  },\n"
@@ -6463,7 +6672,7 @@ namespace UiLab
     {
         std::ostringstream out;
         out << "{\"ok\":true,\"commands\":";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out << "}\n";
         return out.str();
     }
@@ -6511,6 +6720,9 @@ namespace UiLab
 
         if (verb == "ui-backend-resolved" || verb == "backend-resolved" || verb == "ui-backend-submit")
             return BuildRuntimeBackendResolvedJson();
+
+        if (verb == "ui-vendor-command-capture" || verb == "vendor-command-resource-dump" || verb == "ui-vendor-resource-dump")
+            return BuildRuntimeVendorCommandResourceDumpJson();
 
         if (verb == "help" || verb == "commands")
             return BuildHelpJson();
@@ -7143,7 +7355,7 @@ namespace UiLab
             ImGui::Separator();
             ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
-            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, ui-backend-resolved, route, reset, set-global, capture, help");
+            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, ui-backend-resolved, ui-vendor-command-capture, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
 
             if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))

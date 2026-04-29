@@ -720,7 +720,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, ui_lab)
 
-        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route", "reset", "set-global", "capture", "help")]', client)
         self.assertIn("ui-oracle", harvest)
 
     def test_ui_lab_phase148_exposes_runtime_csd_platform_draw_list_bridge_command(self):
@@ -751,7 +751,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("UiLab::OnCsdPlatformDraw", aspect)
         self.assertIn("SWA::CCsdPlatformMirage::Draw", aspect)
         self.assertIn("SWA::CCsdPlatformMirage::DrawNoTex", aspect)
-        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route", "reset", "set-global", "capture", "help")]', client)
         self.assertIn("Phase 148", harvest)
         self.assertIn("runtime CSD platform draw hook", harvest)
         self.assertIn("GPU backend submit pending", harvest)
@@ -786,7 +786,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("ProcDrawPrimitive", video)
         self.assertIn("ProcDrawIndexedPrimitive", video)
         self.assertIn("ProcDrawPrimitiveUP", video)
-        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route", "reset", "set-global", "capture", "help")]', client)
         self.assertIn("Phase 150", harvest)
         self.assertIn("render-thread material submit hook", harvest)
         self.assertIn("raw D3D12/Vulkan backend capture pending", harvest)
@@ -839,7 +839,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("UiLab::OnRawBackendCommand", video)
         self.assertIn('"RHI command-list boundary"', video)
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
         self.assertIn("Phase 151", harvest)
@@ -891,7 +891,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("uiLabRenderTargetFormat0", vulkan_header)
         self.assertIn("activeGraphicsPipeline", vulkan_header)
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
         self.assertIn("Phase 152", harvest)
@@ -1076,6 +1076,53 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("premultiplied alpha/gamma/sRGB resource-view parity", harvest)
         self.assertIn("UI-only render-target capture remains pending", harvest)
 
+    def test_ui_lab_phase157_exposes_vendor_command_resource_dump_oracle(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        renderer = self.read("research_uiux/runtime_reference/examples/su_ui_asset_renderer.cpp")
+        tests = self.read("research_uiux/runtime_reference/examples/test_su_ui_asset_renderer.py")
+        client = self.read("research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1")
+        harvest = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "BuildRuntimeVendorCommandResourceDumpJson",
+            "RuntimeVendorCommandResourceDumpStatus",
+            '"vendorCommandResourceDump"',
+            '"vendorCommandResourceDumpPolicy": "raw-backend-command-plus-resource-view-dump"',
+            '"vendorCommandResourceDumpStatus"',
+            '"rawBackendCommandCount"',
+            '"backendResolvedSubmitCount"',
+            '"textureResourceViewDumpCount"',
+            '"samplerResourceViewDumpCount"',
+            '"resourcePairDumpCount"',
+            '"uiOnlyRenderedLayerStatus": "pending-runtime-ui-render-target-copy"',
+            '"vendorCommandReplayGap": "pending-full-vendor-command-buffer-replay"',
+            "ui-vendor-command-capture",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn(
+            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route", "reset", "set-global", "capture", "help")]',
+            client,
+        )
+
+        for token in [
+            "FrontendVendorCommandResourceDumpTriage",
+            "buildFrontendVendorCommandResourceDumpTriage",
+            "runRendererVendorCommandResourceDumpSmoke",
+            "--renderer-vendor-command-resource-dump-smoke",
+            "phase157-vendor-command-resource-dump",
+            "vendor_command_resource_dump_policy=raw-backend-command-plus-resource-view-dump",
+            "ui_only_layer_status=pending-runtime-ui-render-target-copy",
+            "vendor_command_replay_gap=pending-full-vendor-command-buffer-replay",
+            "vendor_command_resource=",
+        ]:
+            self.assertIn(token, renderer)
+
+        self.assertIn("test_renderer_vendor_command_resource_dump_smoke_reports_raw_backend_dump", tests)
+        self.assertIn("Phase 157", harvest)
+        self.assertIn("vendor command/resource dump", harvest)
+        self.assertIn("UI-only render-target copy remains pending", harvest)
+
     def test_ui_lab_has_repo_safe_live_bridge_client_tool(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1"
         self.assertTrue(script_path.is_file())
@@ -1086,7 +1133,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "sward_ui_lab_live",
             "Invoke-UiLabBridgeCommand",
             "Read-UiLabBridgeResponse",
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route", "reset", "set-global", "capture", "help")]',
             "route <target>",
             "set-global <name> <0|1>",
             "Connect($TimeoutMilliseconds)",
@@ -1149,7 +1196,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, ui_lab)
 
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
 

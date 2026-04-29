@@ -572,6 +572,40 @@ struct FrontendMaterialResourceViewParityTriage
     std::size_t localCommandCount = 0;
 };
 
+struct FrontendVendorCommandResourceDumpEvidence
+{
+    bool found = false;
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string vendorCommandResourceDumpStatus = "missing";
+    std::string vendorCommandResourceDumpPolicy = "raw-backend-command-plus-resource-view-dump";
+    std::string uiOnlyLayerStatus = "pending-runtime-ui-render-target-copy";
+    std::string vendorCommandReplayGap = "pending-full-vendor-command-buffer-replay";
+    std::size_t rawBackendCommandCount = 0;
+    std::size_t backendResolvedSubmitCount = 0;
+    std::size_t resourcePairDumpCount = 0;
+    std::size_t textureResourceViewDumpCount = 0;
+    std::size_t samplerResourceViewDumpCount = 0;
+    FrontendLiveBridgeProbeResult bridgeProbe;
+};
+
+struct FrontendVendorCommandResourceDumpTriage
+{
+    std::string screenId;
+    std::string source = "missing";
+    std::string probe = "missing";
+    std::string vendorCommandResourceDumpStatus = "missing";
+    std::string uiOnlyLayerStatus = "pending-runtime-ui-render-target-copy";
+    std::string vendorCommandReplayGap = "pending-full-vendor-command-buffer-replay";
+    std::size_t rawBackendCommandCount = 0;
+    std::size_t backendResolvedSubmitCount = 0;
+    std::size_t resourcePairDumpCount = 0;
+    std::size_t textureResourceViewDumpCount = 0;
+    std::size_t samplerResourceViewDumpCount = 0;
+    std::size_t localCommandCount = 0;
+};
+
 struct CsdColorRgba
 {
     std::uint8_t r = 255;
@@ -1057,6 +1091,9 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeBackendResolved(
     std::string_view pipeName,
     DWORD timeoutMilliseconds = 150);
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeVendorCommandCapture(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds = 150);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendLiveStateAlignmentEvidence loadFrontendRuntimeAlignmentFromLiveBridge(
@@ -1072,6 +1109,8 @@ struct CsdSoftwareRenderStats
 [[nodiscard]] FrontendMaterialCorrelationEvidence loadFrontendMaterialCorrelationEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] FrontendBackendResolvedEvidence loadFrontendBackendResolvedEvidence(
+    const sward::ui_runtime::FrontendScreenPolicy& policy);
+[[nodiscard]] FrontendVendorCommandResourceDumpEvidence loadFrontendVendorCommandResourceDumpEvidence(
     const sward::ui_runtime::FrontendScreenPolicy& policy);
 [[nodiscard]] std::string formatFrontendRuntimeAlignmentEvidence(const FrontendLiveStateAlignmentEvidence& evidence);
 
@@ -7170,6 +7209,114 @@ void renderCleanScreen(HWND hwnd, HDC dc, SwardSuUiAssetRenderer& renderer)
     return records.empty() ? 1 : 0;
 }
 
+[[nodiscard]] FrontendVendorCommandResourceDumpTriage buildFrontendVendorCommandResourceDumpTriage(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    FrontendVendorCommandResourceDumpTriage triage;
+    triage.screenId = policy.screenId;
+
+    const auto dump = loadFrontendVendorCommandResourceDumpEvidence(policy);
+    triage.source = dump.source;
+    triage.probe = dump.probe;
+    triage.vendorCommandResourceDumpStatus = dump.vendorCommandResourceDumpStatus;
+    triage.uiOnlyLayerStatus = dump.uiOnlyLayerStatus;
+    triage.vendorCommandReplayGap = dump.vendorCommandReplayGap;
+    triage.rawBackendCommandCount = dump.rawBackendCommandCount;
+    triage.backendResolvedSubmitCount = dump.backendResolvedSubmitCount;
+    triage.resourcePairDumpCount = dump.resourcePairDumpCount;
+    triage.textureResourceViewDumpCount = dump.textureResourceViewDumpCount;
+    triage.samplerResourceViewDumpCount = dump.samplerResourceViewDumpCount;
+
+    const auto clock = loadFrontendUiOraclePlaybackClock(policy);
+    for (const auto& scenePolicy : policy.scenes)
+    {
+        const int sceneFrame = uiOracleTimelineFrameForScene(clock, scenePolicy);
+        const CsdPipelineTemplateBinding sceneBinding{
+            policy.screenId,
+            policy.layoutName,
+            scenePolicy.sceneName,
+            scenePolicy.sceneName,
+            scenePolicy.timeline.animationName,
+        };
+
+        const auto* drawableScene = cachedCsdDrawableScene(sceneBinding);
+        if (!drawableScene)
+            continue;
+
+        auto playback = loadCsdTimelinePlayback(sceneBinding, sceneFrame);
+        if (!playback)
+            playback = loadTimelinePlaybackForScene(policy.screenId, policy.layoutName, scenePolicy.sceneName, sceneFrame);
+
+        std::size_t sampledTrackCount = 0;
+        const auto commands = timelineSampledCommands(
+            *drawableScene,
+            playback ? &*playback : nullptr,
+            sampledTrackCount);
+        triage.localCommandCount += static_cast<std::size_t>(std::count_if(
+            commands.begin(),
+            commands.end(),
+            csdCommandIsDrawable));
+    }
+
+    return triage;
+}
+
+[[nodiscard]] int runRendererVendorCommandResourceDumpSmoke()
+{
+    constexpr std::string_view directProbeToken = "vendor_command_resource_probe=direct-ui-vendor-command-capture";
+    constexpr std::string_view backendFallbackToken = "vendor_command_resource_probe=backend-resolved-fallback";
+    constexpr std::string_view missingProbeToken = "vendor_command_resource_probe=missing";
+    constexpr std::string_view policyToken = "vendor_command_resource_dump_policy=raw-backend-command-plus-resource-view-dump";
+    constexpr std::string_view uiOnlyLayerToken = "ui_only_layer_status=pending-runtime-ui-render-target-copy";
+    constexpr std::string_view replayGapToken = "vendor_command_replay_gap=pending-full-vendor-command-buffer-replay";
+
+    std::vector<FrontendVendorCommandResourceDumpTriage> records;
+    for (const auto& policy : frontendScreenPolicies())
+        records.push_back(buildFrontendVendorCommandResourceDumpTriage(policy));
+
+    const bool anyDirect = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendVendorCommandResourceDumpTriage& record)
+        {
+            return record.probe == "direct-ui-vendor-command-capture";
+        });
+    const bool anyBackendFallback = std::any_of(
+        records.begin(),
+        records.end(),
+        [](const FrontendVendorCommandResourceDumpTriage& record)
+        {
+            return record.probe == "backend-resolved-fallback";
+        });
+
+    std::cout
+        << "sward_su_ui_asset_renderer vendor command/resource dump smoke ok "
+        << "mode=phase157-vendor-command-resource-dump"
+        << " " << (anyDirect ? directProbeToken : (anyBackendFallback ? backendFallbackToken : missingProbeToken))
+        << " " << policyToken
+        << " " << uiOnlyLayerToken
+        << " " << replayGapToken
+        << " lanes=" << records.size()
+        << '\n';
+
+    for (const auto& record : records)
+    {
+        std::cout
+            << "vendor_command_resource=" << record.screenId
+            << ":source=" << record.source
+            << ":raw_commands=" << record.rawBackendCommandCount
+            << ":backend_submits=" << record.backendResolvedSubmitCount
+            << ":resource_pairs=" << record.resourcePairDumpCount
+            << ":texture_views=" << record.textureResourceViewDumpCount
+            << ":sampler_views=" << record.samplerResourceViewDumpCount
+            << ":local_commands=" << record.localCommandCount
+            << ":dump_status=" << record.vendorCommandResourceDumpStatus
+            << '\n';
+    }
+
+    return records.empty() ? 1 : 0;
+}
+
 struct CsdReusableReferenceSceneModel
 {
     std::string sceneName;
@@ -9321,6 +9468,13 @@ void nativeAlignmentCrop(Gdiplus::Bitmap& native, BitmapComparisonStats& stats)
     return queryUiLabLiveBridgeCommand(pipeName, "ui-backend-resolved", timeoutMilliseconds);
 }
 
+[[nodiscard]] FrontendLiveBridgeProbeResult queryUiLabLiveBridgeVendorCommandCapture(
+    std::string_view pipeName,
+    DWORD timeoutMilliseconds)
+{
+    return queryUiLabLiveBridgeCommand(pipeName, "ui-vendor-command-capture", timeoutMilliseconds);
+}
+
 [[nodiscard]] std::string frontendAlignmentCursorOwnerFromLiveState(
     const sward::ui_runtime::FrontendScreenPolicy& policy,
     std::string_view text)
@@ -10129,6 +10283,80 @@ void applyFrontendBackendResolvedFromJson(
         }));
     fallback.materialPairCount = material.pairs.size();
     fallback.bridgeProbe = backendProbe;
+    return fallback;
+}
+
+void applyFrontendVendorCommandResourceDumpFromJson(
+    FrontendVendorCommandResourceDumpEvidence& evidence,
+    const sward::ui_runtime::FrontendScreenPolicy& policy,
+    std::string_view text,
+    std::string_view source,
+    std::string_view probe)
+{
+    evidence.found = true;
+    evidence.screenId = jsonStringField(text, "target").value_or(policy.screenId);
+    evidence.source = std::string(source);
+    evidence.probe = std::string(probe);
+
+    const auto dump = jsonObjectFieldSpan(text, "vendorCommandResourceDump");
+    const std::string_view dumpSpan = dump ? *dump : text;
+    evidence.vendorCommandResourceDumpStatus = jsonStringField(dumpSpan, "vendorCommandResourceDumpStatus")
+        .value_or(jsonStringField(text, "vendorCommandResourceDumpStatus").value_or("missing"));
+    evidence.vendorCommandResourceDumpPolicy = jsonStringField(dumpSpan, "vendorCommandResourceDumpPolicy")
+        .value_or(jsonStringField(text, "vendorCommandResourceDumpPolicy").value_or("raw-backend-command-plus-resource-view-dump"));
+    evidence.uiOnlyLayerStatus = jsonStringField(dumpSpan, "uiOnlyRenderedLayerStatus")
+        .value_or(jsonStringField(text, "uiOnlyLayerCaptureStatus").value_or("pending-runtime-ui-render-target-copy"));
+    evidence.vendorCommandReplayGap = jsonStringField(dumpSpan, "vendorCommandReplayGap")
+        .value_or(jsonStringField(text, "vendorCommandReplayGap").value_or("pending-full-vendor-command-buffer-replay"));
+    evidence.rawBackendCommandCount = static_cast<std::size_t>(jsonNumberField(dumpSpan, "rawBackendCommandCount").value_or(0.0));
+    evidence.backendResolvedSubmitCount = static_cast<std::size_t>(jsonNumberField(dumpSpan, "backendResolvedSubmitCount").value_or(0.0));
+    evidence.resourcePairDumpCount = static_cast<std::size_t>(jsonNumberField(dumpSpan, "resourcePairDumpCount").value_or(0.0));
+    evidence.textureResourceViewDumpCount = static_cast<std::size_t>(jsonNumberField(dumpSpan, "textureResourceViewDumpCount").value_or(0.0));
+    evidence.samplerResourceViewDumpCount = static_cast<std::size_t>(jsonNumberField(dumpSpan, "samplerResourceViewDumpCount").value_or(0.0));
+}
+
+[[nodiscard]] FrontendVendorCommandResourceDumpEvidence loadFrontendVendorCommandResourceDumpEvidence(
+    const sward::ui_runtime::FrontendScreenPolicy& policy)
+{
+    constexpr std::string_view defaultPipeName = "sward_ui_lab_live";
+    const auto discoveredPipeName = discoverFrontendLiveBridgeName(policy.screenId);
+
+    auto vendorProbe = queryUiLabLiveBridgeVendorCommandCapture(discoveredPipeName);
+    if (!vendorProbe.connected && discoveredPipeName != defaultPipeName)
+        vendorProbe = queryUiLabLiveBridgeVendorCommandCapture(defaultPipeName);
+
+    const auto vendorTarget = vendorProbe.connected && !vendorProbe.responseJson.empty()
+        ? jsonStringField(vendorProbe.responseJson, "target")
+        : std::optional<std::string>{};
+    if (vendorProbe.connected && vendorTarget && *vendorTarget == policy.screenId)
+    {
+        FrontendVendorCommandResourceDumpEvidence evidence;
+        evidence.bridgeProbe = vendorProbe;
+        applyFrontendVendorCommandResourceDumpFromJson(
+            evidence,
+            policy,
+            vendorProbe.responseJson,
+            "ui_lab_live_bridge_vendor_command_capture",
+            "direct-ui-vendor-command-capture");
+        return evidence;
+    }
+
+    const auto backend = loadFrontendBackendResolvedEvidence(policy);
+    FrontendVendorCommandResourceDumpEvidence fallback;
+    fallback.screenId = policy.screenId;
+    fallback.source = backend.found ? "ui_lab_live_bridge_backend_resolved" : "missing";
+    fallback.probe = backend.found ? "backend-resolved-fallback" : "missing";
+    fallback.vendorCommandResourceDumpStatus = backend.found
+        ? "backend-resolved fallback; raw command/resource dump unavailable"
+        : "missing";
+    fallback.rawBackendCommandCount = 0;
+    fallback.backendResolvedSubmitCount = backend.submits.size();
+    fallback.resourcePairDumpCount = backend.resourceViewExactPairCount;
+    fallback.textureResourceViewDumpCount = backend.textureResourceViewKnownCount;
+    fallback.samplerResourceViewDumpCount = backend.samplerResourceViewKnownCount;
+    fallback.uiOnlyLayerStatus = backend.uiOnlyLayerCaptureStatus;
+    fallback.vendorCommandReplayGap = "pending-full-vendor-command-buffer-replay";
+    fallback.bridgeProbe = vendorProbe;
     return fallback;
 }
 
@@ -11915,6 +12143,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
         return runRendererVendorResourceCaptureSmoke();
     if (commandLineHasFlag("--renderer-material-resource-view-parity-smoke"))
         return runRendererMaterialResourceViewParitySmoke();
+    if (commandLineHasFlag("--renderer-vendor-command-resource-dump-smoke"))
+        return runRendererVendorCommandResourceDumpSmoke();
     if (commandLineHasFlag("--renderer-reference-policy-export-smoke"))
         return runReferencePolicyExportSmoke();
 
