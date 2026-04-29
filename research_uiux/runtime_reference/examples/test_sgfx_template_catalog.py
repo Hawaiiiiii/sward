@@ -18,11 +18,15 @@ SONIC_HUD_EXAMPLE = REPO_ROOT / "research_uiux" / "runtime_reference" / "example
 FRONTEND_SCREEN_HEADER = REPO_ROOT / "research_uiux" / "runtime_reference" / "include" / "sward" / "ui_runtime" / "frontend_screen_reference.hpp"
 FRONTEND_SCREEN_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "src" / "frontend_screen_reference.cpp"
 FRONTEND_SCREEN_EXAMPLE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "frontend_screen_reference_catalog.cpp"
+FRONTEND_CONTROLLERS_HEADER = REPO_ROOT / "research_uiux" / "runtime_reference" / "include" / "sward" / "ui_runtime" / "frontend_screen_controllers.hpp"
+FRONTEND_CONTROLLERS_SOURCE = REPO_ROOT / "research_uiux" / "runtime_reference" / "src" / "frontend_screen_controllers.cpp"
+FRONTEND_CONTROLLERS_EXAMPLE = REPO_ROOT / "research_uiux" / "runtime_reference" / "examples" / "frontend_screen_controller_catalog.cpp"
 REPORT = REPO_ROOT / "research_uiux" / "DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md"
 README = REPO_ROOT / "research_uiux" / "runtime_reference" / "README.md"
 DEFAULT_EXE = REPO_ROOT / "b" / "rr122" / "sward_sgfx_template_catalog.exe"
 DEFAULT_SONIC_HUD_EXE = REPO_ROOT / "b" / "rr134" / "Release" / "sward_sonic_hud_reference_catalog.exe"
 DEFAULT_FRONTEND_SCREEN_EXE = REPO_ROOT / "b" / "rr134" / "Release" / "sward_frontend_screen_reference_catalog.exe"
+DEFAULT_FRONTEND_CONTROLLER_EXE = REPO_ROOT / "b" / "rr134" / "Release" / "sward_frontend_screen_controller_catalog.exe"
 
 
 class SgfxTemplateCatalogTests(unittest.TestCase):
@@ -420,6 +424,68 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("media_asset_probe=title-menu:title_menu_copy:kind=text:asset=ui_mm_contentstext.dds:resolved=1:resolved_path=extracted_assets/ui_frontend_archives/MainMenu/ui_mm_contentstext.dds:preview=missing:playback=dds-material-ready", completed.stdout)
         self.assertIn("media_asset_probe=loading:loading_now_loading_copy:kind=text:asset=mat_load_en_001.dds:resolved=1:resolved_path=extracted_assets/ui_frontend_archives/Loading_English/mat_load_en_001.dds:preview=missing:playback=dds-material-ready", completed.stdout)
         self.assertIn("media_asset_probe=title-menu:title_press_start_accept_sfx:kind=sfx:asset=host-title-confirm-sfx:resolved=0:resolved_path=missing:preview=missing:playback=audio-id-pending", completed.stdout)
+
+    def test_phase163_declares_native_frontend_screen_controllers(self) -> None:
+        cmake = self.read(CMAKE_FILE)
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+
+        self.assertIn("src/frontend_screen_controllers.cpp", cmake)
+        self.assertIn("add_executable(sward_frontend_screen_controller_catalog", cmake)
+        self.assertIn("examples/frontend_screen_controller_catalog.cpp", cmake)
+
+        for token in [
+            "class TitleMenuController",
+            "class LoadingScreenController",
+            "class OptionsMenuController",
+            "class PauseMenuController",
+            "struct FrontendControllerFrame",
+            "enum class FrontendControllerInput",
+            "runFrontendControllerSmokeSequence",
+            "formatFrontendControllerCatalog",
+            "formatFrontendControllerFrame",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "NEW_FILE",
+            "CONTINUE",
+            "SETTINGS",
+            "DLC",
+            "EXIT",
+            "title_press_start_accept_sfx",
+            "title_cursor_move_sfx",
+            "loading_display_open_sfx",
+            "loading_display_close_sfx",
+            "pause_display_open_sfx",
+            "sonic-day-hud-next",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase163-smoke", example)
+
+    def test_phase163_frontend_controller_smoke_reports_frame_by_frame_state(self) -> None:
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase163-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase163 smoke ok", completed.stdout)
+        self.assertIn("controller_catalog=frontend-native-screen-controllers:count=4:policy_source=frontend_screen_reference:sonic_day_hud_next=1", completed.stdout)
+        self.assertIn("controller_frame=TitleMenuController:screen=title-menu:frame=0:state=press-start-wait:motion=title_loop:input_locked=1:cursor=1/CONTINUE:sfx=none:next=none:scenes=mm_bg_usual", completed.stdout)
+        self.assertIn("controller_frame=TitleMenuController:screen=title-menu:frame=20:state=menu-ready:motion=select_travel:input_locked=0:cursor=1/CONTINUE:sfx=title_press_start_accept_sfx:next=none:scenes=mm_bg_usual,mm_donut_move,mm_contentsitem_select", completed.stdout)
+        self.assertIn("controller_frame=TitleMenuController:screen=title-menu:frame=21:state=menu-ready:motion=cursor_move:input_locked=0:cursor=2/SETTINGS:sfx=title_cursor_move_sfx:next=title-options:scenes=mm_bg_usual,mm_donut_move,mm_contentsitem_select", completed.stdout)
+        self.assertIn("controller_frame=LoadingScreenController:screen=loading:frame=75:state=loading-visible:motion=pda_intro:input_locked=1:cursor=0/none:sfx=loading_display_open_sfx:next=sonic-day-hud-next:scenes=pda,pda_txt", completed.stdout)
+        self.assertIn("controller_frame=OptionsMenuController:screen=title-options:frame=15:state=options-ready:motion=select_travel:input_locked=0:cursor=0/SOUND:sfx=title_cursor_move_sfx:next=title-menu:scenes=mm_bg_usual,mm_contentsitem_select", completed.stdout)
+        self.assertIn("controller_frame=PauseMenuController:screen=pause:frame=15:state=pause-ready:motion=intro_medium:input_locked=0:cursor=0/RESUME:sfx=pause_display_open_sfx:next=sonic-day-hud-next:scenes=bg,bg_1,bg_1_select,bg_2,text_area,skill_select,arrow,skill_scroll_bar_bg", completed.stdout)
 
 
 if __name__ == "__main__":

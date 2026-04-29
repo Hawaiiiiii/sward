@@ -8,6 +8,7 @@ add_library(sward_ui_runtime STATIC
     src/sgfx_templates.cpp
     src/sonic_hud_reference.cpp
     src/frontend_screen_reference.cpp
+    src/frontend_screen_controllers.cpp
 )
 
 target_include_directories(sward_ui_runtime
@@ -117,6 +118,15 @@ add_executable(sward_frontend_screen_reference_catalog
 )
 
 target_link_libraries(sward_frontend_screen_reference_catalog
+    PRIVATE
+        sward_ui_runtime
+)
+
+add_executable(sward_frontend_screen_controller_catalog
+    examples/frontend_screen_controller_catalog.cpp
+)
+
+target_link_libraries(sward_frontend_screen_controller_catalog
     PRIVATE
         sward_ui_runtime
 )
