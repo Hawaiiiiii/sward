@@ -85,6 +85,15 @@ struct SonicDayHudRuntimeValueUpdatePath
     SonicDayHudRuntimeValueBinding tutorialPromptWritePath;
 };
 
+struct SonicDayHudRuntimeTextWriteObservation
+{
+    std::string valueName;
+    std::string path;
+    std::string textUtf8;
+    std::string pathResolutionSource;
+    std::string source;
+};
+
 struct SonicDayHudRuntimeDrawListCoverage
 {
     std::string source = "live-bridge/ui-draw-list";
@@ -198,6 +207,7 @@ public:
     [[nodiscard]] const SonicDayHudGameplayState& gameplayState() const;
     [[nodiscard]] FrontendControllerFrame setGameplayState(const SonicDayHudGameplayState& state);
     [[nodiscard]] FrontendControllerFrame applyRuntimeBinding(const SonicDayHudRuntimeBindingSnapshot& snapshot);
+    [[nodiscard]] FrontendControllerFrame applyRuntimeTextWrite(const SonicDayHudRuntimeTextWriteObservation& observation);
     [[nodiscard]] FrontendControllerFrame applyRingPickup(int ringDelta, int scoreDelta);
     [[nodiscard]] FrontendControllerFrame openTutorialPrompt(std::string_view promptId);
     [[nodiscard]] FrontendControllerFrame dismissTutorialPrompt();
@@ -220,10 +230,12 @@ private:
 [[nodiscard]] std::string formatSonicDayHudRuntimeBinding(const SonicDayHudRuntimeBindingSnapshot& snapshot);
 [[nodiscard]] std::string formatSonicDayHudRuntimeDisplayOwnerPaths(const SonicDayHudDisplayOwnerPathBinding& paths);
 [[nodiscard]] std::string formatSonicDayHudRuntimeWritePaths(const SonicDayHudRuntimeValueUpdatePath& paths);
+[[nodiscard]] std::string formatSonicDayHudRuntimeTextWriteObservation(const SonicDayHudRuntimeTextWriteObservation& observation);
 [[nodiscard]] std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage);
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingSmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase167SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase168SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase169SmokeSequence();
+[[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase173SmokeSequence();
 [[nodiscard]] std::string frontendControllerInputName(FrontendControllerInput input);
 } // namespace sward::ui_runtime

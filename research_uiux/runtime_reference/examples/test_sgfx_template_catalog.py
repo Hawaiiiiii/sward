@@ -785,6 +785,50 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("next_hook=CSD::CNode::SetPatternIndex/SetHideFlag/SetScale", completed.stdout)
         self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,ring/timer/speed/lives:known-via-csd-text-write,boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization", completed.stdout)
 
+    def test_phase173_sonic_day_hud_controller_consumes_live_text_write_observations(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+        report = self.read(REPORT)
+
+        for token in [
+            "struct SonicDayHudRuntimeTextWriteObservation",
+            "applyRuntimeTextWrite",
+            "formatSonicDayHudRuntimeTextWriteObservation",
+            "formatSonicDayHudRuntimeBindingPhase173SmokeSequence",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "pathResolutionSource=raw-chud-sonic-stage-owner-field",
+            "sonic-hud-value-text-write",
+            "runtime-proven-via-raw-owner-field-text-write",
+            "ui_playscreen/time_count/time100",
+            "ui_playscreen/player_count/player",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase173-sonic-hud-live-text-write-smoke", example)
+        self.assertIn("Phase 173", report)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase173-sonic-hud-live-text-write-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase173 sonic hud live text write smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_text_write=value=elapsedFrames:path=ui_playscreen/time_count/time100:text=39:resolution=raw-chud-sonic-stage-owner-field", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_text_write=value=lifeCount:path=ui_playscreen/player_count/player:text=03:resolution=raw-chud-sonic-stage-owner-field", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=raw-owner-text-write:rings=000:score=000000000:time=00:00:39:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
+        self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,timer/lives:runtime-proven-via-raw-owner-field-text-write,ring/speed:csd-text-write-ready,boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

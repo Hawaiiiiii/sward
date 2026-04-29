@@ -4,6 +4,7 @@
 #include <sward/ui_runtime/sonic_hud_reference.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <iomanip>
 #include <sstream>
 
@@ -113,6 +114,26 @@ std::string formatRuntimeBindingStatus(const SonicDayHudRuntimeValueBinding& bin
     return binding.source;
 }
 
+bool parseUnsignedRuntimeText(std::string_view text, int& value)
+{
+    int result = 0;
+    bool sawDigit = false;
+    for (const char c : text)
+    {
+        if (!std::isdigit(static_cast<unsigned char>(c)))
+            continue;
+
+        sawDigit = true;
+        result = (result * 10) + (c - '0');
+    }
+
+    if (!sawDigit)
+        return false;
+
+    value = result;
+    return true;
+}
+
 SonicDayHudRuntimeBindingSnapshot makeRuntimeScoreBindingSnapshot()
 {
     SonicDayHudRuntimeBindingSnapshot snapshot;
@@ -148,13 +169,15 @@ SonicDayHudRuntimeValueUpdatePath makeRuntimeValueUpdatePathSnapshot()
         "CSD::CNode::SetText/sub_830BF640@ui_playscreen/ring_count/num_ring";
     paths.elapsedFramesWritePath.known = true;
     paths.elapsedFramesWritePath.source =
-        "CSD::CNode::SetText/sub_830BF640@ui_playscreen/time_count/time001|time010|time100";
+        "CSD::CNode::SetText/sub_830BF640@ui_playscreen/time_count/time001|time010|time100"
+        ":pathResolutionSource=raw-chud-sonic-stage-owner-field";
     paths.speedReadoutWritePath.known = true;
     paths.speedReadoutWritePath.source =
         "CSD::CNode::SetText/sub_830BF640@ui_playscreen/add/speed_count/position/num_speed";
     paths.lifeCountWritePath.known = true;
     paths.lifeCountWritePath.source =
-        "CSD::CNode::SetText/sub_830BF640@ui_playscreen/player_count/player";
+        "CSD::CNode::SetText/sub_830BF640@ui_playscreen/player_count/player"
+        ":pathResolutionSource=raw-chud-sonic-stage-owner-field";
     paths.boostGaugeWritePath.source = "pending-gauge-or-prompt-write-hook";
     paths.ringEnergyGaugeWritePath.source = "pending-gauge-or-prompt-write-hook";
     paths.tutorialPromptWritePath.source = "pending-gauge-or-prompt-write-hook";
@@ -176,6 +199,26 @@ SonicDayHudRuntimeDrawListCoverage makeRuntimeDrawListCoverageSnapshot()
     coverage.textWriteObserved = false;
     coverage.nextHook = "CSD::CNode::SetPatternIndex/SetHideFlag/SetScale";
     return coverage;
+}
+
+std::vector<SonicDayHudRuntimeTextWriteObservation> makeRuntimeOwnerFieldTextWriteObservations()
+{
+    return {
+        {
+            "elapsedFrames",
+            "ui_playscreen/time_count/time100",
+            "39",
+            "raw-chud-sonic-stage-owner-field",
+            "sonic-hud-value-text-write:CSD::CNode::SetText/sub_830BF640",
+        },
+        {
+            "lifeCount",
+            "ui_playscreen/player_count/player",
+            "03",
+            "raw-chud-sonic-stage-owner-field",
+            "sonic-hud-value-text-write:CSD::CNode::SetText/sub_830BF640",
+        },
+    };
 }
 
 FrontendControllerFrame makeFrame(
@@ -590,6 +633,57 @@ FrontendControllerFrame SonicDayHudController::applyRuntimeBinding(const SonicDa
     return frame_;
 }
 
+FrontendControllerFrame SonicDayHudController::applyRuntimeTextWrite(const SonicDayHudRuntimeTextWriteObservation& observation)
+{
+    int parsedValue = 0;
+    if (!parseUnsignedRuntimeText(observation.textUtf8, parsedValue))
+        return frame_;
+
+    const std::string source =
+        observation.source + "@" + observation.path +
+        ":pathResolutionSource=" + observation.pathResolutionSource;
+
+    if (observation.path == "ui_playscreen/ring_count/num_ring")
+    {
+        gameplayState_.ringCount = parsedValue;
+        gameplayState_.provenance.ringCount = observation.path;
+    }
+    else if (
+        observation.path == "ui_playscreen/time_count/time001" ||
+        observation.path == "ui_playscreen/time_count/time010" ||
+        observation.path == "ui_playscreen/time_count/time100")
+    {
+        gameplayState_.elapsedFrames = parsedValue;
+        gameplayState_.provenance.elapsedFrames = observation.path;
+    }
+    else if (observation.path == "ui_playscreen/add/speed_count/position/num_speed")
+    {
+        gameplayState_.speedKmh = parsedValue;
+        gameplayState_.provenance.speedKmh = observation.path;
+    }
+    else if (observation.path == "ui_playscreen/player_count/player")
+    {
+        gameplayState_.lifeCount = parsedValue;
+        gameplayState_.provenance.lifeCount = observation.path;
+    }
+
+    gameplayState_.provenance.valueSource = source;
+    gameplayState_.lastSfxHook = "none";
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        frame_.frame + 1,
+        "runtime-text-write",
+        "sonic-hud-value-text-write",
+        false,
+        0,
+        "none",
+        "none",
+        "none",
+        sonicHudSceneNames(gameplayState_.tutorialVisible));
+    return frame_;
+}
+
 FrontendControllerFrame SonicDayHudController::applyRingPickup(int ringDelta, int scoreDelta)
 {
     gameplayState_.ringCount = std::max(0, gameplayState_.ringCount + ringDelta);
@@ -880,6 +974,19 @@ std::string formatSonicDayHudRuntimeWritePaths(const SonicDayHudRuntimeValueUpda
     return out.str();
 }
 
+std::string formatSonicDayHudRuntimeTextWriteObservation(const SonicDayHudRuntimeTextWriteObservation& observation)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_runtime_text_write="
+        << "value=" << observation.valueName
+        << ":path=" << observation.path
+        << ":text=" << observation.textUtf8
+        << ":resolution=" << observation.pathResolutionSource
+        << ":source=" << observation.source
+        << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage)
 {
     std::ostringstream out;
@@ -958,6 +1065,28 @@ std::string formatSonicDayHudRuntimeBindingPhase169SmokeSequence()
     out << formatSonicDayHudRuntimeDrawListCoverage(drawListCoverage);
     out << "gameplay_numeric_binding=score:known,scoreinfo:known,"
         << "ring/timer/speed/lives:known-via-csd-text-write,"
+        << "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase173SmokeSequence()
+{
+    SonicDayHudController hud;
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+
+    const auto observations = makeRuntimeOwnerFieldTextWriteObservations();
+    std::ostringstream out;
+    for (const auto& observation : observations)
+    {
+        out << formatSonicDayHudRuntimeTextWriteObservation(observation);
+        (void)hud.applyRuntimeTextWrite(observation);
+    }
+
+    out << formatSonicDayHudGameplayState("raw-owner-text-write", hud.gameplayState());
+    out << "gameplay_numeric_binding=score:known,scoreinfo:known,"
+        << "timer/lives:runtime-proven-via-raw-owner-field-text-write,"
+        << "ring/speed:csd-text-write-ready,"
         << "boost/energy/tutorial:csd-node-pattern-hide-scale-hooks-installed-pending-runtime-normalization"
         << '\n';
     return out.str();
