@@ -11448,7 +11448,7 @@ void writeFrontendUiLayerPixelCompareManifest(
     out << "  \"phase\": 159,\n";
     out << "  \"mode\": \"phase159-ui-layer-pixel-compare\",\n";
     out << "  \"uiLayerOracleUpgrade\": \"dedicated-ui-target-or-vendor-replay-needed\",\n";
-    out << "  \"textMovieSfxStatus\": \"pending-title-loading-media-timing\",\n";
+    out << "  \"textMovieSfxStatus\": \"title-loading-media-timing-reference-ready-audio-id-pending\",\n";
     out << "  \"records\": [\n";
     for (std::size_t index = 0; index < records.size(); ++index)
     {
@@ -11638,7 +11638,7 @@ void writeViewerRenderCompareManifest(
         << "sward_su_ui_asset_renderer UI layer pixel compare smoke ok "
         << "mode=phase159-ui-layer-pixel-compare"
         << " ui_layer_oracle_upgrade=dedicated-ui-target-or-vendor-replay-needed"
-        << " text_movie_sfx_status=pending-title-loading-media-timing"
+        << " text_movie_sfx_status=title-loading-media-timing-reference-ready-audio-id-pending"
         << " lanes=" << records.size()
         << " manifest=" << portablePath(manifestPath)
         << '\n';

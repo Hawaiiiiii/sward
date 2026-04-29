@@ -1195,7 +1195,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "ui_layer_pixel_delta=",
             "ui_layer_capture_isolation=",
             "ui_layer_oracle_upgrade=dedicated-ui-target-or-vendor-replay-needed",
-            "text_movie_sfx_status=pending-title-loading-media-timing",
+            "text_movie_sfx_status=title-loading-media-timing-reference-ready-audio-id-pending",
         ]:
             self.assertIn(token, renderer)
 

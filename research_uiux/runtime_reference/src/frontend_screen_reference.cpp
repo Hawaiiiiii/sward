@@ -51,6 +51,32 @@ FrontendScreenMaterialSemantics defaultMaterialSemantics()
     };
 }
 
+FrontendScreenMediaCue mediaCue(
+    std::string cueId,
+    std::string cueKind,
+    std::string sgfxSlot,
+    std::string assetName,
+    double startSeconds,
+    double durationSeconds,
+    std::string timingSource,
+    std::string evidenceStatus,
+    bool runtimeVisualProven,
+    bool audioPending)
+{
+    return {
+        std::move(cueId),
+        std::move(cueKind),
+        std::move(sgfxSlot),
+        std::move(assetName),
+        startSeconds,
+        durationSeconds,
+        std::move(timingSource),
+        std::move(evidenceStatus),
+        runtimeVisualProven,
+        audioPending,
+    };
+}
+
 FrontendScreenTimelineChannel timeline(
     std::string animationName,
     int sampleFrame,
@@ -146,6 +172,74 @@ const std::vector<FrontendScreenPolicy> kFrontendScreenPolicies{
             materialSlot("prompt_glyphs", "mat_start_en_001.dds", "frontend-title-menu", "input_prompt_glyphs"),
         },
         {
+            mediaCue(
+                "title_loop_movie",
+                "movie",
+                "title_backdrop_movie",
+                "game/movie/evmo_title_loop.sfd",
+                0.0,
+                0.333333,
+                "runtime-ui-layer-capture + CSD timeline",
+                "visual-policy-proven",
+                true,
+                false),
+            mediaCue(
+                "title_press_start_to_menu_fade",
+                "fade",
+                "title_transition_fade",
+                "ui_mm_parts1.dds",
+                0.0,
+                0.333333,
+                "runtime-ui-layer-capture + CSD timeline",
+                "visual-policy-proven",
+                true,
+                false),
+            mediaCue(
+                "title_menu_copy",
+                "text",
+                "menu_copy",
+                "ui_mm_contentstext.dds",
+                0.333333,
+                2.0,
+                "runtime-ui-layer-capture + CSD timeline",
+                "visual-policy-proven",
+                true,
+                false),
+            mediaCue(
+                "title_prompt_glyphs",
+                "glyph",
+                "prompt_glyphs",
+                "mat_start_en_001.dds",
+                0.333333,
+                2.0,
+                "runtime-ui-layer-capture + CSD timeline",
+                "visual-policy-proven",
+                true,
+                false),
+            mediaCue(
+                "title_press_start_accept_sfx",
+                "sfx",
+                "confirm_audio",
+                "host-title-confirm-sfx",
+                0.333333,
+                0.0,
+                "title-menu-visible latch",
+                "audio-id-pending",
+                false,
+                true),
+            mediaCue(
+                "title_cursor_move_sfx",
+                "sfx",
+                "cursor_audio",
+                "host-title-cursor-sfx",
+                0.666667,
+                0.0,
+                "title cursor owner/menu input",
+                "audio-id-pending",
+                false,
+                true),
+        },
+        {
             scene(
                 "mm_bg_usual",
                 "title_backdrop",
@@ -204,6 +298,74 @@ const std::vector<FrontendScreenPolicy> kFrontendScreenPolicies{
             materialSlot("controller_variant", "mat_comon_txt_001.dds", "frontend-loading", "controller_variant"),
         },
         {
+            mediaCue(
+                "loading_pda_intro_fade",
+                "fade",
+                "loading_intro_fade",
+                "mat_load_comon_001.dds",
+                0.0,
+                1.25,
+                "runtime-ui-layer-capture + CSD timeline",
+                "visual-policy-proven",
+                true,
+                false),
+            mediaCue(
+                "loading_now_loading_copy",
+                "text",
+                "loading_copy",
+                "mat_load_en_001.dds",
+                1.25,
+                3.0,
+                "runtime-ui-layer-capture + CSD timeline",
+                "visual-policy-proven",
+                true,
+                false),
+            mediaCue(
+                "loading_controller_glyphs",
+                "glyph",
+                "controller_variant",
+                "mat_comon_txt_001.dds",
+                1.25,
+                3.0,
+                "runtime-ui-layer-capture + CSD timeline",
+                "visual-policy-proven",
+                true,
+                false),
+            mediaCue(
+                "loading_pda_outro_fade",
+                "fade",
+                "loading_outro_fade",
+                "mat_load_comon_001.dds",
+                4.25,
+                0.75,
+                "runtime-ui-layer-capture + CSD timeline",
+                "visual-policy-proven",
+                true,
+                false),
+            mediaCue(
+                "loading_display_open_sfx",
+                "sfx",
+                "loading_open_audio",
+                "host-loading-open-sfx",
+                0.0,
+                0.0,
+                "loading-display-active latch",
+                "audio-id-pending",
+                false,
+                true),
+            mediaCue(
+                "loading_display_close_sfx",
+                "sfx",
+                "loading_close_audio",
+                "host-loading-close-sfx",
+                4.25,
+                0.0,
+                "loading-display-ended latch",
+                "audio-id-pending",
+                false,
+                true),
+        },
+        {
             scene(
                 "pda",
                 "loading_device",
@@ -248,6 +410,7 @@ const std::vector<FrontendScreenPolicy> kFrontendScreenPolicies{
             materialSlot("option_cursor", "ui_mm_parts1.dds", "frontend-title-options", "option_cursor"),
             materialSlot("prompt_glyphs", "mat_start_en_001.dds", "frontend-title-options", "input_prompt_glyphs"),
         },
+        {},
         {
             scene(
                 "mm_bg_usual",
@@ -293,6 +456,7 @@ const std::vector<FrontendScreenPolicy> kFrontendScreenPolicies{
             materialSlot("pause_content", "mat_comon_001.dds", "frontend-pause", "pause_content"),
             materialSlot("prompt_strip", "mat_ex_common_002.dds", "frontend-pause", "pause_prompt_strip"),
         },
+        {},
         {
             scene(
                 "bg",
@@ -506,6 +670,30 @@ FrontendScreenTimelineSample sampleFrontendScreenTimeline(
     return sample;
 }
 
+FrontendScreenMediaCueCounts frontendScreenMediaCueCounts(const FrontendScreenPolicy& screen)
+{
+    FrontendScreenMediaCueCounts counts;
+    for (const auto& cue : screen.mediaCues)
+    {
+        if (cue.cueKind == "movie")
+            ++counts.movie;
+        else if (cue.cueKind == "text")
+            ++counts.text;
+        else if (cue.cueKind == "glyph")
+            ++counts.glyph;
+        else if (cue.cueKind == "fade")
+            ++counts.fade;
+        else if (cue.cueKind == "sfx")
+            ++counts.sfx;
+
+        if (cue.runtimeVisualProven)
+            ++counts.visualProven;
+        if (cue.audioPending)
+            ++counts.audioPending;
+    }
+    return counts;
+}
+
 std::string formatFrontendScreenReferenceCatalog()
 {
     std::ostringstream out;
@@ -535,6 +723,19 @@ std::string formatFrontendScreenReferenceCatalog()
             << ":oracle=" << policy.materialSemantics.oraclePolicy
             << '\n';
         out << "runtime_alignment=" << formatFrontendRuntimeAlignment(defaultFrontendRuntimeAlignment(policy)) << '\n';
+        if (!policy.mediaCues.empty())
+        {
+            const auto mediaCounts = frontendScreenMediaCueCounts(policy);
+            out << "media_timing_status=" << policy.screenId
+                << ":movie=" << mediaCounts.movie
+                << ":text=" << mediaCounts.text
+                << ":glyph=" << mediaCounts.glyph
+                << ":fade=" << mediaCounts.fade
+                << ":sfx=" << mediaCounts.sfx
+                << ":visual_proven=" << mediaCounts.visualProven
+                << ":audio_pending=" << mediaCounts.audioPending
+                << '\n';
+        }
         for (const auto& scene : policy.scenes)
         {
             out << "scene=" << policy.screenId << '/' << scene.sceneName
@@ -574,6 +775,19 @@ std::string formatFrontendScreenReferenceDetail(const FrontendScreenPolicy& scre
     out << "command_count=" << totalDrawableCommands(screen) << '\n';
     out << "structural_command_count=" << totalStructuralCommands(screen) << '\n';
     out << "source_free_structural_command_count=" << totalSourceFreeStructuralCommands(screen) << '\n';
+    if (!screen.mediaCues.empty())
+    {
+        const auto mediaCounts = frontendScreenMediaCueCounts(screen);
+        out << "media_timing_status=" << screen.screenId
+            << ":movie=" << mediaCounts.movie
+            << ":text=" << mediaCounts.text
+            << ":glyph=" << mediaCounts.glyph
+            << ":fade=" << mediaCounts.fade
+            << ":sfx=" << mediaCounts.sfx
+            << ":visual_proven=" << mediaCounts.visualProven
+            << ":audio_pending=" << mediaCounts.audioPending
+            << '\n';
+    }
     for (const auto& slot : screen.materialSlots)
     {
         out << "material_slot=" << screen.screenId
@@ -593,6 +807,8 @@ std::string formatFrontendScreenReferenceDetail(const FrontendScreenPolicy& scre
             << ":timeline=" << scene.timeline.animationName
             << '\n';
     }
+    for (const auto& cue : screen.mediaCues)
+        out << formatFrontendScreenMediaCueDetail(screen, cue);
     return out.str();
 }
 
@@ -616,6 +832,48 @@ std::string formatFrontendScreenSceneDetail(
         << '\n';
     out << "timeline_roles=" << joinStrings(scene.timeline.channelRoles, ",") << '\n';
     out << "state_policy=" << joinStrings(scene.statePolicy, " | ") << '\n';
+    return out.str();
+}
+
+std::string formatFrontendScreenMediaTimingCatalog()
+{
+    std::ostringstream out;
+    for (const auto& policy : frontendScreenPolicies())
+    {
+        if (policy.mediaCues.empty())
+            continue;
+
+        const auto mediaCounts = frontendScreenMediaCueCounts(policy);
+        out << "media_timing_status=" << policy.screenId
+            << ":movie=" << mediaCounts.movie
+            << ":text=" << mediaCounts.text
+            << ":glyph=" << mediaCounts.glyph
+            << ":fade=" << mediaCounts.fade
+            << ":sfx=" << mediaCounts.sfx
+            << ":visual_proven=" << mediaCounts.visualProven
+            << ":audio_pending=" << mediaCounts.audioPending
+            << '\n';
+        for (const auto& cue : policy.mediaCues)
+            out << formatFrontendScreenMediaCueDetail(policy, cue);
+    }
+    return out.str();
+}
+
+std::string formatFrontendScreenMediaCueDetail(
+    const FrontendScreenPolicy& screen,
+    const FrontendScreenMediaCue& cue)
+{
+    std::ostringstream out;
+    out << "media_cue=" << screen.screenId
+        << ':' << cue.cueId
+        << ":kind=" << cue.cueKind
+        << ":slot=" << cue.sgfxSlot
+        << ":asset=" << cue.assetName
+        << ":start=" << std::fixed << std::setprecision(3) << cue.startSeconds
+        << ":duration=" << std::fixed << std::setprecision(3) << cue.durationSeconds
+        << ":source=" << cue.timingSource
+        << ":status=" << cue.evidenceStatus
+        << '\n';
     return out.str();
 }
 

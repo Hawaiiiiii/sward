@@ -89,12 +89,21 @@ int runPhase141Smoke()
     }
     return 0;
 }
+
+int runPhase161MediaSmoke()
+{
+    std::cout << "sward_frontend_screen_reference_catalog phase161 media timing smoke ok\n";
+    std::cout << formatFrontendScreenMediaTimingCatalog();
+    return 0;
+}
 } // namespace
 
 int main(int argc, char** argv)
 {
     if (hasArg(argc, argv, "--phase141-smoke"))
         return runPhase141Smoke();
+    if (hasArg(argc, argv, "--phase161-media-smoke"))
+        return runPhase161MediaSmoke();
 
     const auto* screen = selectedScreen(argc, argv);
     const std::string screenArg = valueAfterArg(argc, argv, "--screen");
@@ -152,6 +161,6 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    std::cerr << "Usage: sward_frontend_screen_reference_catalog [--catalog] [--screen <id>] [--scene <name>] [--sample <frame>] [--phase141-smoke]\n";
+    std::cerr << "Usage: sward_frontend_screen_reference_catalog [--catalog] [--screen <id>] [--scene <name>] [--sample <frame>] [--phase141-smoke] [--phase161-media-smoke]\n";
     return 2;
 }

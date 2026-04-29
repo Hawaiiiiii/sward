@@ -25,6 +25,31 @@ struct FrontendScreenMaterialSemantics
     std::string oraclePolicy;
 };
 
+struct FrontendScreenMediaCue
+{
+    std::string cueId;
+    std::string cueKind;
+    std::string sgfxSlot;
+    std::string assetName;
+    double startSeconds = 0.0;
+    double durationSeconds = 0.0;
+    std::string timingSource;
+    std::string evidenceStatus;
+    bool runtimeVisualProven = false;
+    bool audioPending = false;
+};
+
+struct FrontendScreenMediaCueCounts
+{
+    int movie = 0;
+    int text = 0;
+    int glyph = 0;
+    int fade = 0;
+    int sfx = 0;
+    int visualProven = 0;
+    int audioPending = 0;
+};
+
 struct FrontendScreenTimelineChannel
 {
     std::string animationName;
@@ -60,6 +85,7 @@ struct FrontendScreenPolicy
     std::string renderOrderPolicy;
     FrontendScreenMaterialSemantics materialSemantics;
     std::vector<FrontendScreenMaterialSlot> materialSlots;
+    std::vector<FrontendScreenMediaCue> mediaCues;
     std::vector<FrontendScreenScenePolicy> scenes;
 };
 
@@ -96,10 +122,15 @@ struct FrontendScreenTimelineSample
     const FrontendScreenPolicy& screen,
     const FrontendScreenScenePolicy& scene,
     int frame);
+[[nodiscard]] FrontendScreenMediaCueCounts frontendScreenMediaCueCounts(const FrontendScreenPolicy& screen);
 [[nodiscard]] std::string formatFrontendScreenReferenceCatalog();
 [[nodiscard]] std::string formatFrontendScreenReferenceDetail(const FrontendScreenPolicy& screen);
 [[nodiscard]] std::string formatFrontendScreenSceneDetail(
     const FrontendScreenPolicy& screen,
     const FrontendScreenScenePolicy& scene);
+[[nodiscard]] std::string formatFrontendScreenMediaTimingCatalog();
+[[nodiscard]] std::string formatFrontendScreenMediaCueDetail(
+    const FrontendScreenPolicy& screen,
+    const FrontendScreenMediaCue& cue);
 [[nodiscard]] std::string formatFrontendRuntimeAlignment(const FrontendRuntimeAlignment& alignment);
 } // namespace sward::ui_runtime

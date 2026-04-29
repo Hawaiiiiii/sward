@@ -1023,7 +1023,7 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("ui_layer_pixel_delta=", source_text)
         self.assertIn("ui_layer_capture_isolation=", source_text)
         self.assertIn("ui_layer_oracle_upgrade=dedicated-ui-target-or-vendor-replay-needed", source_text)
-        self.assertIn("text_movie_sfx_status=pending-title-loading-media-timing", source_text)
+        self.assertIn("text_movie_sfx_status=title-loading-media-timing-reference-ready-audio-id-pending", source_text)
 
     def test_renderer_sonic_hud_reference_smoke_reports_exact_policy_viewer(self) -> None:
         exe = Path(os.environ.get("SWARD_SU_UI_RENDERER_EXE", DEFAULT_EXE))
@@ -1444,7 +1444,7 @@ class SuUiAssetRendererTests(unittest.TestCase):
         self.assertIn("mode=phase159-ui-layer-pixel-compare", completed.stdout)
         self.assertIn("ui_layer_pixel_compare_manifest=out/ui_layer_pixel_compare/phase159/ui_layer_pixel_compare_manifest.json", completed.stdout)
         self.assertIn("ui_layer_oracle_upgrade=dedicated-ui-target-or-vendor-replay-needed", completed.stdout)
-        self.assertIn("text_movie_sfx_status=pending-title-loading-media-timing", completed.stdout)
+        self.assertIn("text_movie_sfx_status=title-loading-media-timing-reference-ready-audio-id-pending", completed.stdout)
         self.assertRegex(completed.stdout, r"ui_layer_pixel_delta=title-menu:source=(ui-layer-capture-bmp|missing):native=(found|missing):mean_abs_rgb=[0-9.]+:max_abs_rgb=[0-9]+:local_commands=[1-9]\d*:ui_layer_capture_isolation=[^\r\n]+")
         self.assertRegex(completed.stdout, r"ui_layer_pixel_delta=loading:source=(ui-layer-capture-bmp|missing):native=(found|missing):mean_abs_rgb=[0-9.]+:max_abs_rgb=[0-9]+:local_commands=[1-9]\d*:ui_layer_capture_isolation=[^\r\n]+")
 

@@ -321,6 +321,58 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("timeline_sample=pause/text_area:Usual_Anim:frame=50/200:progress=0.250", completed.stdout)
         self.assertIn("material_slot=title-menu:backdrop:ui_mm_base.dds:placeholder=frontend-title-menu", completed.stdout)
 
+    def test_phase161_declares_title_loading_media_timing_reference(self) -> None:
+        header = self.read(FRONTEND_SCREEN_HEADER)
+        source = self.read(FRONTEND_SCREEN_SOURCE)
+        example = self.read(FRONTEND_SCREEN_EXAMPLE)
+
+        for token in [
+            "struct FrontendScreenMediaCue",
+            "mediaCues",
+            "formatFrontendScreenMediaTimingCatalog",
+            "formatFrontendScreenMediaCueDetail",
+            "frontendScreenMediaCueCounts",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "title_loop_movie",
+            "evmo_title_loop.sfd",
+            "title_press_start_to_menu_fade",
+            "title_prompt_glyphs",
+            "title_press_start_accept_sfx",
+            "loading_pda_intro_fade",
+            "loading_now_loading_copy",
+            "loading_controller_glyphs",
+            "loading_display_open_sfx",
+            "runtime-ui-layer-capture + CSD timeline",
+            "audio-id-pending",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase161-media-smoke", example)
+
+    def test_phase161_frontend_media_timing_smoke_reports_title_loading_cues(self) -> None:
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_REFERENCE_CATALOG_EXE", DEFAULT_FRONTEND_SCREEN_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen reference catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase161-media-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_reference_catalog phase161 media timing smoke ok", completed.stdout)
+        self.assertIn("media_timing_status=title-menu:movie=1:text=1:glyph=1:fade=1:sfx=2:visual_proven=4:audio_pending=2", completed.stdout)
+        self.assertIn("media_timing_status=loading:movie=0:text=1:glyph=1:fade=2:sfx=2:visual_proven=4:audio_pending=2", completed.stdout)
+        self.assertIn("media_cue=title-menu:title_loop_movie:kind=movie:slot=title_backdrop_movie:asset=game/movie/evmo_title_loop.sfd:start=0.000:duration=0.333:source=runtime-ui-layer-capture + CSD timeline:status=visual-policy-proven", completed.stdout)
+        self.assertIn("media_cue=title-menu:title_press_start_accept_sfx:kind=sfx:slot=confirm_audio:asset=host-title-confirm-sfx:start=0.333:duration=0.000:source=title-menu-visible latch:status=audio-id-pending", completed.stdout)
+        self.assertIn("media_cue=loading:loading_now_loading_copy:kind=text:slot=loading_copy:asset=mat_load_en_001.dds:start=1.250:duration=3.000:source=runtime-ui-layer-capture + CSD timeline:status=visual-policy-proven", completed.stdout)
+        self.assertIn("media_cue=loading:loading_display_open_sfx:kind=sfx:slot=loading_open_audio:asset=host-loading-open-sfx:start=0.000:duration=0.000:source=loading-display-active latch:status=audio-id-pending", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
