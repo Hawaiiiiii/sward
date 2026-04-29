@@ -311,6 +311,25 @@ namespace UiLab
         uint32_t gaugeFrameSceneAddress,
         std::string_view hookSource);
     void OnHudSonicStageOwnerFieldSample(uint32_t ownerAddress, std::string_view hookSource);
+    void OnSonicHudGameplayValues(
+        uint32_t ringCount,
+        bool ringCountKnown,
+        uint32_t score,
+        bool scoreKnown,
+        uint32_t elapsedFrames,
+        bool elapsedFramesKnown,
+        float speedKmh,
+        bool speedKmhKnown,
+        float boostGauge,
+        bool boostGaugeKnown,
+        float ringEnergyGauge,
+        bool ringEnergyGaugeKnown,
+        uint32_t lifeCount,
+        bool lifeCountKnown,
+        std::string_view tutorialPromptId,
+        bool tutorialPromptKnown,
+        bool tutorialVisible,
+        std::string_view hookSource);
     void OnGeneralWindowUpdate(
         uint32_t generalWindowAddress,
         uint32_t generalProjectAddress,

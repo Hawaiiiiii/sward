@@ -377,6 +377,41 @@ namespace UiLab
         std::string source;
     };
 
+    struct SonicHudGameplayValueSnapshot
+    {
+        std::string source = "typedInspectors.sonicHud.gameplayValues";
+        bool ringCountKnown = false;
+        uint32_t ringCount = 0;
+        std::string ringCountSource = "pending-runtime-field";
+        bool scoreKnown = false;
+        uint32_t score = 0;
+        std::string scoreSource = "SWA::CGameDocument::m_pMember->m_ScoreInfo.EnemyScore+TrickScore";
+        bool elapsedFramesKnown = false;
+        uint32_t elapsedFrames = 0;
+        std::string elapsedFramesSource = "pending-runtime-field";
+        bool speedKmhKnown = false;
+        float speedKmh = 0.0f;
+        std::string speedKmhSource = "pending-runtime-field";
+        bool boostGaugeKnown = false;
+        float boostGauge = 0.0f;
+        std::string boostGaugeSource = "pending-runtime-field";
+        bool ringEnergyGaugeKnown = false;
+        float ringEnergyGauge = 1.0f;
+        std::string ringEnergyGaugeSource = "pending-runtime-field";
+        bool lifeCountKnown = false;
+        uint32_t lifeCount = 3;
+        std::string lifeCountSource = "pending-runtime-field";
+        bool tutorialPromptKnown = false;
+        std::string tutorialPromptId = "none";
+        bool tutorialVisible = false;
+        std::string tutorialPromptSource = "pending-runtime-field";
+        std::string sonicRingPickupSfxId = "audio-id-pending";
+        std::string tutorialPromptOpenSfxId = "audio-id-pending";
+        std::string pauseOpenSfxId = "sys_actstg_pausewinopen";
+        std::string pauseCursorSfxId = "sys_actstg_pausecursor";
+        uint64_t frame = 0;
+    };
+
     struct SonicHudOwnerFieldSample
     {
         std::string field;
@@ -737,6 +772,7 @@ namespace UiLab
     static bool g_loggedTutorialHudOwnerPathReady = false;
     static uint64_t g_chudSonicStageOwnerFieldSampleCount = 0;
     static std::vector<SonicHudOwnerFieldSample> g_chudSonicStageOwnerFieldSamples;
+    static SonicHudGameplayValueSnapshot g_sonicHudGameplayValues;
     static uint64_t g_lastLiveStateSnapshotFrame = 0;
     static std::string g_lastStageReadyEventName;
     static std::string g_lastCsdProjectName;
@@ -810,6 +846,7 @@ namespace UiLab
     static CsdProjectTreeInspectorSnapshot BuildCsdProjectTreeInspectorSnapshot();
     static LoadingLiveInspectorSnapshot BuildLoadingLiveInspectorSnapshot();
     static SonicHudLiveInspectorSnapshot BuildSonicHudLiveInspectorSnapshot();
+    static SonicHudGameplayValueSnapshot BuildSonicHudGameplayValueSnapshot();
     static SonicHudOwnerPathInspectorSnapshot BuildSonicHudOwnerPathInspectorSnapshot(
         const CsdProjectTreeInspectorSnapshot& csdProjectTree);
     static PauseGeneralSaveLiveInspectorSnapshot BuildPauseGeneralSaveLiveInspectorSnapshot();
@@ -2112,6 +2149,31 @@ namespace UiLab
         return snapshot;
     }
 
+    static SonicHudGameplayValueSnapshot BuildSonicHudGameplayValueSnapshot()
+    {
+        SonicHudGameplayValueSnapshot snapshot;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            snapshot = g_sonicHudGameplayValues;
+        }
+
+        snapshot.source = "typedInspectors.sonicHud.gameplayValues";
+        if (snapshot.scoreSource.empty() || snapshot.scoreSource == "pending-runtime-field")
+            snapshot.scoreSource = "SWA::CGameDocument::m_pMember->m_ScoreInfo.EnemyScore+TrickScore";
+
+        if (auto pGameDocument = SWA::CGameDocument::GetInstance())
+        {
+            snapshot.scoreKnown = true;
+            snapshot.score =
+                pGameDocument->m_pMember->m_ScoreInfo.EnemyScore +
+                pGameDocument->m_pMember->m_ScoreInfo.TrickScore;
+            snapshot.scoreSource = "SWA::CGameDocument::m_pMember->m_ScoreInfo.EnemyScore+TrickScore";
+            snapshot.frame = g_presentedFrameCount;
+        }
+
+        return snapshot;
+    }
+
     static void AppendCsdTreeEntries(
         std::ostringstream& out,
         const std::vector<CsdTreeEntry>& entries,
@@ -2185,6 +2247,7 @@ namespace UiLab
         const auto csdProjectTree = BuildCsdProjectTreeInspectorSnapshot();
         const auto loading = BuildLoadingLiveInspectorSnapshot();
         const auto sonicHud = BuildSonicHudLiveInspectorSnapshot();
+        const auto sonicGameplay = BuildSonicHudGameplayValueSnapshot();
         const auto sonicOwnerPath = BuildSonicHudOwnerPathInspectorSnapshot(csdProjectTree);
         const auto pauseGeneralSave = BuildPauseGeneralSaveLiveInspectorSnapshot();
 
@@ -2326,6 +2389,41 @@ namespace UiLab
             << "      \"targetCsdObserved\": " << (sonicHud.targetCsdObserved ? "true" : "false") << ",\n"
             << "      \"stageTargetReady\": " << (sonicHud.stageTargetReady ? "true" : "false") << ",\n"
             << "      \"readyEvent\": \"" << JsonEscape(sonicHud.readyEvent) << "\",\n"
+            << "      \"gameplayValues\": {\n"
+            << "        \"source\": \"" << JsonEscape(sonicGameplay.source) << "\",\n"
+            << "        \"ringCountKnown\": " << (sonicGameplay.ringCountKnown ? "true" : "false") << ",\n"
+            << "        \"ringCount\": " << sonicGameplay.ringCount << ",\n"
+            << "        \"ringCountSource\": \"" << JsonEscape(sonicGameplay.ringCountSource) << "\",\n"
+            << "        \"scoreKnown\": " << (sonicGameplay.scoreKnown ? "true" : "false") << ",\n"
+            << "        \"score\": " << sonicGameplay.score << ",\n"
+            << "        \"scoreSource\": \"" << JsonEscape(sonicGameplay.scoreSource) << "\",\n"
+            << "        \"elapsedFramesKnown\": " << (sonicGameplay.elapsedFramesKnown ? "true" : "false") << ",\n"
+            << "        \"elapsedFrames\": " << sonicGameplay.elapsedFrames << ",\n"
+            << "        \"elapsedFramesSource\": \"" << JsonEscape(sonicGameplay.elapsedFramesSource) << "\",\n"
+            << "        \"speedKmhKnown\": " << (sonicGameplay.speedKmhKnown ? "true" : "false") << ",\n"
+            << "        \"speedKmh\": " << sonicGameplay.speedKmh << ",\n"
+            << "        \"speedKmhSource\": \"" << JsonEscape(sonicGameplay.speedKmhSource) << "\",\n"
+            << "        \"boostGaugeKnown\": " << (sonicGameplay.boostGaugeKnown ? "true" : "false") << ",\n"
+            << "        \"boostGauge\": " << sonicGameplay.boostGauge << ",\n"
+            << "        \"boostGaugeSource\": \"" << JsonEscape(sonicGameplay.boostGaugeSource) << "\",\n"
+            << "        \"ringEnergyGaugeKnown\": " << (sonicGameplay.ringEnergyGaugeKnown ? "true" : "false") << ",\n"
+            << "        \"ringEnergyGauge\": " << sonicGameplay.ringEnergyGauge << ",\n"
+            << "        \"ringEnergyGaugeSource\": \"" << JsonEscape(sonicGameplay.ringEnergyGaugeSource) << "\",\n"
+            << "        \"lifeCountKnown\": " << (sonicGameplay.lifeCountKnown ? "true" : "false") << ",\n"
+            << "        \"lifeCount\": " << sonicGameplay.lifeCount << ",\n"
+            << "        \"lifeCountSource\": \"" << JsonEscape(sonicGameplay.lifeCountSource) << "\",\n"
+            << "        \"tutorialPromptKnown\": " << (sonicGameplay.tutorialPromptKnown ? "true" : "false") << ",\n"
+            << "        \"tutorialPromptId\": \"" << JsonEscape(sonicGameplay.tutorialPromptId) << "\",\n"
+            << "        \"tutorialVisible\": " << (sonicGameplay.tutorialVisible ? "true" : "false") << ",\n"
+            << "        \"tutorialPromptSource\": \"" << JsonEscape(sonicGameplay.tutorialPromptSource) << "\",\n"
+            << "        \"audioIds\": {\n"
+            << "          \"sonicRingPickup\": \"" << JsonEscape(sonicGameplay.sonicRingPickupSfxId) << "\",\n"
+            << "          \"tutorialPromptOpen\": \"" << JsonEscape(sonicGameplay.tutorialPromptOpenSfxId) << "\",\n"
+            << "          \"pauseOpen\": \"" << JsonEscape(sonicGameplay.pauseOpenSfxId) << "\",\n"
+            << "          \"pauseCursor\": \"" << JsonEscape(sonicGameplay.pauseCursorSfxId) << "\"\n"
+            << "        },\n"
+            << "        \"frame\": " << sonicGameplay.frame << "\n"
+            << "      },\n"
             << "      \"ownerPath\": {\n"
             << "        \"chudSonicStageOwnerAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.chudSonicStageOwnerAddress)) << "\",\n"
             << "        \"ownerPointerStatus\": \"" << JsonEscape(sonicOwnerPath.ownerPointerStatus) << "\",\n"
@@ -5000,6 +5098,7 @@ namespace UiLab
             g_csdProjectTrees.clear();
             g_pauseGeneralSaveInspector = {};
             g_chudSonicStageOwnerFieldSamples.clear();
+            g_sonicHudGameplayValues = {};
         }
 
         {
@@ -6530,6 +6629,107 @@ namespace UiLab
         }
 
         EmitStageTargetReadyIfNeeded();
+    }
+
+    void OnSonicHudGameplayValues(
+        uint32_t ringCount,
+        bool ringCountKnown,
+        uint32_t score,
+        bool scoreKnown,
+        uint32_t elapsedFrames,
+        bool elapsedFramesKnown,
+        float speedKmh,
+        bool speedKmhKnown,
+        float boostGauge,
+        bool boostGaugeKnown,
+        float ringEnergyGauge,
+        bool ringEnergyGaugeKnown,
+        uint32_t lifeCount,
+        bool lifeCountKnown,
+        std::string_view tutorialPromptId,
+        bool tutorialPromptKnown,
+        bool tutorialVisible,
+        std::string_view hookSource)
+    {
+        if (!g_isEnabled)
+            return;
+
+        const std::string source = hookSource.empty()
+            ? std::string("runtime gameplay value hook")
+            : std::string(hookSource);
+
+        SonicHudGameplayValueSnapshot snapshot;
+        snapshot.ringCountKnown = ringCountKnown;
+        snapshot.ringCount = ringCount;
+        snapshot.ringCountSource = ringCountKnown ? source : "pending-runtime-field";
+        snapshot.scoreKnown = scoreKnown;
+        snapshot.score = score;
+        snapshot.scoreSource = scoreKnown
+            ? source
+            : "SWA::CGameDocument::m_pMember->m_ScoreInfo.EnemyScore+TrickScore";
+        snapshot.elapsedFramesKnown = elapsedFramesKnown;
+        snapshot.elapsedFrames = elapsedFrames;
+        snapshot.elapsedFramesSource = elapsedFramesKnown ? source : "pending-runtime-field";
+        snapshot.speedKmhKnown = speedKmhKnown;
+        snapshot.speedKmh = speedKmh;
+        snapshot.speedKmhSource = speedKmhKnown ? source : "pending-runtime-field";
+        snapshot.boostGaugeKnown = boostGaugeKnown;
+        snapshot.boostGauge = boostGauge;
+        snapshot.boostGaugeSource = boostGaugeKnown ? source : "pending-runtime-field";
+        snapshot.ringEnergyGaugeKnown = ringEnergyGaugeKnown;
+        snapshot.ringEnergyGauge = ringEnergyGauge;
+        snapshot.ringEnergyGaugeSource = ringEnergyGaugeKnown ? source : "pending-runtime-field";
+        snapshot.lifeCountKnown = lifeCountKnown;
+        snapshot.lifeCount = lifeCount;
+        snapshot.lifeCountSource = lifeCountKnown ? source : "pending-runtime-field";
+        snapshot.tutorialPromptKnown = tutorialPromptKnown;
+        snapshot.tutorialPromptId = tutorialPromptKnown && !tutorialPromptId.empty()
+            ? std::string(tutorialPromptId)
+            : "none";
+        snapshot.tutorialVisible = tutorialVisible;
+        snapshot.tutorialPromptSource = tutorialPromptKnown ? source : "pending-runtime-field";
+        snapshot.frame = g_presentedFrameCount;
+
+        bool changed = false;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            changed =
+                g_sonicHudGameplayValues.ringCountKnown != snapshot.ringCountKnown ||
+                g_sonicHudGameplayValues.ringCount != snapshot.ringCount ||
+                g_sonicHudGameplayValues.scoreKnown != snapshot.scoreKnown ||
+                g_sonicHudGameplayValues.score != snapshot.score ||
+                g_sonicHudGameplayValues.elapsedFramesKnown != snapshot.elapsedFramesKnown ||
+                g_sonicHudGameplayValues.elapsedFrames != snapshot.elapsedFrames ||
+                g_sonicHudGameplayValues.speedKmhKnown != snapshot.speedKmhKnown ||
+                g_sonicHudGameplayValues.speedKmh != snapshot.speedKmh ||
+                g_sonicHudGameplayValues.boostGaugeKnown != snapshot.boostGaugeKnown ||
+                g_sonicHudGameplayValues.boostGauge != snapshot.boostGauge ||
+                g_sonicHudGameplayValues.ringEnergyGaugeKnown != snapshot.ringEnergyGaugeKnown ||
+                g_sonicHudGameplayValues.ringEnergyGauge != snapshot.ringEnergyGauge ||
+                g_sonicHudGameplayValues.lifeCountKnown != snapshot.lifeCountKnown ||
+                g_sonicHudGameplayValues.lifeCount != snapshot.lifeCount ||
+                g_sonicHudGameplayValues.tutorialPromptKnown != snapshot.tutorialPromptKnown ||
+                g_sonicHudGameplayValues.tutorialPromptId != snapshot.tutorialPromptId ||
+                g_sonicHudGameplayValues.tutorialVisible != snapshot.tutorialVisible;
+
+            g_sonicHudGameplayValues = std::move(snapshot);
+        }
+
+        if (changed)
+        {
+            WriteEvidenceEvent(
+                "sonic-hud-gameplay-values",
+                "ring_known=" + std::string(ringCountKnown ? "1" : "0") +
+                " score_known=" + std::string(scoreKnown ? "1" : "0") +
+                " timer_known=" + std::string(elapsedFramesKnown ? "1" : "0") +
+                " speed_known=" + std::string(speedKmhKnown ? "1" : "0") +
+                " boost_known=" + std::string(boostGaugeKnown ? "1" : "0") +
+                " energy_known=" + std::string(ringEnergyGaugeKnown ? "1" : "0") +
+                " lives_known=" + std::string(lifeCountKnown ? "1" : "0") +
+                " tutorial_known=" + std::string(tutorialPromptKnown ? "1" : "0") +
+                " source=" + source);
+            WriteLiveStateSnapshot();
+        }
     }
 
     void OnHudPauseUpdate(

@@ -1842,6 +1842,66 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, report)
 
+    def test_ui_lab_phase166_exposes_sonic_hud_gameplay_value_bridge_contract(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        player = self.read("UnleashedRecomp/patches/player_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "OnSonicHudGameplayValues",
+            "ringCountKnown",
+            "scoreKnown",
+            "elapsedFramesKnown",
+            "speedKmhKnown",
+            "boostGaugeKnown",
+            "ringEnergyGaugeKnown",
+            "lifeCountKnown",
+            "tutorialPromptKnown",
+            "tutorialVisible",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "struct SonicHudGameplayValueSnapshot",
+            "BuildSonicHudGameplayValueSnapshot",
+            "gameplayValues",
+            "ringCountKnown",
+            "scoreKnown",
+            "elapsedFramesKnown",
+            "speedKmhKnown",
+            "boostGaugeKnown",
+            "ringEnergyGaugeKnown",
+            "lifeCountKnown",
+            "tutorialPromptKnown",
+            "scoreSource",
+            "SWA::CGameDocument::GetInstance",
+            "m_ScoreInfo.EnemyScore",
+            "m_ScoreInfo.TrickScore",
+            "SWA::CGameDocument::m_pMember->m_ScoreInfo.EnemyScore+TrickScore",
+            "pending-runtime-field",
+            "audioIds",
+            "sys_actstg_pausewinopen",
+            "sys_actstg_pausecursor",
+            "audio-id-pending",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "m_ScoreInfo.EnemyScore",
+            "m_ScoreInfo.TrickScore",
+        ]:
+            self.assertIn(token, player)
+
+        for token in [
+            "Phase 166",
+            "typedInspectors.sonicHud.gameplayValues",
+            "Score is the first runtime-bound gameplay value",
+            "ring/speed/boost/energy/life/tutorial IDs remain pending-runtime-field until exact owner/player offsets are proven",
+            "Sonic HUD SFX IDs remain audio-id-pending unless a runtime callsite proves the exact cue",
+        ]:
+            self.assertIn(token, report)
+
 
 if __name__ == "__main__":
     unittest.main()

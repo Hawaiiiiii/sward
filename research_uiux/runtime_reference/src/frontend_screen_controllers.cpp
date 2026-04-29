@@ -106,6 +106,34 @@ std::string formatGauge(double value)
     return out.str();
 }
 
+std::string formatRuntimeBindingStatus(const SonicDayHudRuntimeValueBinding& binding)
+{
+    if (binding.known)
+        return "known:" + binding.source;
+    return binding.source;
+}
+
+SonicDayHudRuntimeBindingSnapshot makeRuntimeScoreBindingSnapshot()
+{
+    SonicDayHudRuntimeBindingSnapshot snapshot;
+    snapshot.source = "typedInspectors.sonicHud.gameplayValues";
+    snapshot.values.score = 1250;
+    snapshot.scoreBinding.known = true;
+    snapshot.scoreBinding.source = "SWA::CGameDocument::m_pMember->m_ScoreInfo.EnemyScore+TrickScore";
+    snapshot.ringCountBinding.source = "pending-runtime-field";
+    snapshot.elapsedFramesBinding.source = "pending-runtime-field";
+    snapshot.speedKmhBinding.source = "pending-runtime-field";
+    snapshot.boostGaugeBinding.source = "pending-runtime-field";
+    snapshot.ringEnergyGaugeBinding.source = "pending-runtime-field";
+    snapshot.lifeCountBinding.source = "pending-runtime-field";
+    snapshot.tutorialPromptBinding.source = "pending-runtime-field";
+    snapshot.sonicRingPickupSfxId = "audio-id-pending";
+    snapshot.tutorialPromptOpenSfxId = "audio-id-pending";
+    snapshot.pauseOpenSfxId = "sys_actstg_pausewinopen";
+    snapshot.pauseCursorSfxId = "sys_actstg_pausecursor";
+    return snapshot;
+}
+
 FrontendControllerFrame makeFrame(
     std::string controllerName,
     std::string screenId,
@@ -474,6 +502,50 @@ FrontendControllerFrame SonicDayHudController::setGameplayState(const SonicDayHu
     return frame_;
 }
 
+FrontendControllerFrame SonicDayHudController::applyRuntimeBinding(const SonicDayHudRuntimeBindingSnapshot& snapshot)
+{
+    SonicDayHudGameplayState values = gameplayState_;
+
+    if (snapshot.ringCountBinding.known)
+        values.ringCount = snapshot.values.ringCount;
+    if (snapshot.scoreBinding.known)
+        values.score = snapshot.values.score;
+    if (snapshot.elapsedFramesBinding.known)
+        values.elapsedFrames = snapshot.values.elapsedFrames;
+    if (snapshot.speedKmhBinding.known)
+        values.speedKmh = snapshot.values.speedKmh;
+    if (snapshot.boostGaugeBinding.known)
+        values.boostGauge = snapshot.values.boostGauge;
+    if (snapshot.ringEnergyGaugeBinding.known)
+        values.ringEnergyGauge = snapshot.values.ringEnergyGauge;
+    if (snapshot.lifeCountBinding.known)
+        values.lifeCount = snapshot.values.lifeCount;
+    if (snapshot.tutorialPromptBinding.known)
+    {
+        values.tutorialPromptId = snapshot.values.tutorialPromptId;
+        values.tutorialVisible = snapshot.values.tutorialVisible;
+    }
+
+    values.provenance = kSonicDayHudValueProvenance;
+    values.provenance.valueSource = snapshot.source;
+    gameplayState_ = values;
+    gameplayState_.lastSfxHook = "none";
+    gameplayState_.sfxCueId = snapshot.sonicRingPickupSfxId;
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        101,
+        "hud-runtime-bound",
+        "DefaultAnim",
+        false,
+        0,
+        "none",
+        "none",
+        "none",
+        sonicHudSceneNames(gameplayState_.tutorialVisible));
+    return frame_;
+}
+
 FrontendControllerFrame SonicDayHudController::applyRingPickup(int ringDelta, int scoreDelta)
 {
     gameplayState_.ringCount = std::max(0, gameplayState_.ringCount + ringDelta);
@@ -643,7 +715,7 @@ std::string formatSonicDayHudControllerSmokeSequence()
 
 std::string formatSonicDayHudGameplayState(std::string_view phase, const SonicDayHudGameplayState& state)
 {
-    const auto& provenance = sonicDayHudValueProvenance();
+    const auto& provenance = state.provenance;
     std::ostringstream out;
     out << "sonic_day_hud_state=phase=" << phase
         << ":rings=" << formatPaddedInt(state.ringCount, 3)
@@ -710,6 +782,38 @@ std::string formatSonicDayHudGameplayStateSmokeSequence()
     (void)hud.dismissTutorialPrompt();
     out << formatSonicDayHudGameplayState("tutorial-dismiss", hud.gameplayState());
 
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBinding(const SonicDayHudRuntimeBindingSnapshot& snapshot)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_runtime_binding=source=" << snapshot.source
+        << ":score=" << formatRuntimeBindingStatus(snapshot.scoreBinding)
+        << ":ring=" << formatRuntimeBindingStatus(snapshot.ringCountBinding)
+        << ":timer=" << formatRuntimeBindingStatus(snapshot.elapsedFramesBinding)
+        << ":speed=" << formatRuntimeBindingStatus(snapshot.speedKmhBinding)
+        << ":boost=" << formatRuntimeBindingStatus(snapshot.boostGaugeBinding)
+        << ":energy=" << formatRuntimeBindingStatus(snapshot.ringEnergyGaugeBinding)
+        << ":lives=" << formatRuntimeBindingStatus(snapshot.lifeCountBinding)
+        << ":tutorial=" << formatRuntimeBindingStatus(snapshot.tutorialPromptBinding)
+        << ":sfx=sonic_ring_pickup:" << snapshot.sonicRingPickupSfxId
+        << ",tutorial_prompt_open:" << snapshot.tutorialPromptOpenSfxId
+        << ",pause_open:" << snapshot.pauseOpenSfxId
+        << ",pause_cursor:" << snapshot.pauseCursorSfxId
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingSmokeSequence()
+{
+    SonicDayHudController hud;
+    const auto snapshot = makeRuntimeScoreBindingSnapshot();
+    std::ostringstream out;
+    out << formatSonicDayHudRuntimeBinding(snapshot);
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+    (void)hud.applyRuntimeBinding(snapshot);
+    out << formatSonicDayHudGameplayState("runtime-bound", hud.gameplayState());
     return out.str();
 }
 

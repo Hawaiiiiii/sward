@@ -605,6 +605,61 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("sonic_day_hud_state=phase=tutorial-open:rings=001:score=000001350:time=00:05:20:speed=186:boost=0.650:energy=0.720:lives=3:tutorial=boost_prompt:visible:route=tutorial-hud-owner-path-ready:sfx=tutorial_prompt_open_sfx:sfx_id=audio-id-pending", completed.stdout)
         self.assertIn("sonic_day_hud_state=phase=tutorial-dismiss:rings=001:score=000001350:time=00:05:20:speed=186:boost=0.650:energy=0.720:lives=3:tutorial=boost_prompt:hidden:route=stage-hud-ready:sfx=tutorial_prompt_close_sfx:sfx_id=audio-id-pending", completed.stdout)
 
+    def test_phase166_declares_sonic_day_hud_runtime_binding_model(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+
+        for token in [
+            "struct SonicDayHudRuntimeValueBinding",
+            "struct SonicDayHudRuntimeBindingSnapshot",
+            "ringCountBinding",
+            "scoreBinding",
+            "elapsedFramesBinding",
+            "speedKmhBinding",
+            "boostGaugeBinding",
+            "ringEnergyGaugeBinding",
+            "lifeCountBinding",
+            "tutorialPromptBinding",
+            "sonicRingPickupSfxId",
+            "tutorialPromptOpenSfxId",
+            "applyRuntimeBinding",
+            "formatSonicDayHudRuntimeBinding",
+            "formatSonicDayHudRuntimeBindingSmokeSequence",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "typedInspectors.sonicHud.gameplayValues",
+            "SWA::CGameDocument::m_pMember->m_ScoreInfo.EnemyScore+TrickScore",
+            "pending-runtime-field",
+            "audio-id-pending",
+            "sys_actstg_pausewinopen",
+            "sys_actstg_pausecursor",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase166-sonic-hud-runtime-binding-smoke", example)
+
+    def test_phase166_sonic_day_hud_runtime_binding_smoke_reports_bound_and_pending_fields(self) -> None:
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase166-sonic-hud-runtime-binding-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase166 sonic hud runtime binding smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_binding=source=typedInspectors.sonicHud.gameplayValues:score=known:SWA::CGameDocument::m_pMember->m_ScoreInfo.EnemyScore+TrickScore:ring=pending-runtime-field:timer=pending-runtime-field:speed=pending-runtime-field:boost=pending-runtime-field:energy=pending-runtime-field:lives=pending-runtime-field:tutorial=pending-runtime-field", completed.stdout)
+        self.assertIn("sfx=sonic_ring_pickup:audio-id-pending,tutorial_prompt_open:audio-id-pending,pause_open:sys_actstg_pausewinopen,pause_cursor:sys_actstg_pausecursor", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=runtime-bound:rings=000:score=000001250:time=00:00:00:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
+        self.assertIn("value_source:typedInspectors.sonicHud.gameplayValues", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

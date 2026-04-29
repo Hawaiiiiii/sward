@@ -68,6 +68,30 @@ struct SonicDayHudGameplayState
     SonicDayHudValueProvenance provenance;
 };
 
+struct SonicDayHudRuntimeValueBinding
+{
+    bool known = false;
+    std::string source = "pending-runtime-field";
+};
+
+struct SonicDayHudRuntimeBindingSnapshot
+{
+    std::string source = "typedInspectors.sonicHud.gameplayValues";
+    SonicDayHudGameplayState values;
+    SonicDayHudRuntimeValueBinding ringCountBinding;
+    SonicDayHudRuntimeValueBinding scoreBinding;
+    SonicDayHudRuntimeValueBinding elapsedFramesBinding;
+    SonicDayHudRuntimeValueBinding speedKmhBinding;
+    SonicDayHudRuntimeValueBinding boostGaugeBinding;
+    SonicDayHudRuntimeValueBinding ringEnergyGaugeBinding;
+    SonicDayHudRuntimeValueBinding lifeCountBinding;
+    SonicDayHudRuntimeValueBinding tutorialPromptBinding;
+    std::string sonicRingPickupSfxId = "audio-id-pending";
+    std::string tutorialPromptOpenSfxId = "audio-id-pending";
+    std::string pauseOpenSfxId = "sys_actstg_pausewinopen";
+    std::string pauseCursorSfxId = "sys_actstg_pausecursor";
+};
+
 class TitleMenuController
 {
 public:
@@ -132,6 +156,7 @@ public:
     [[nodiscard]] const FrontendControllerFrame& frame() const;
     [[nodiscard]] const SonicDayHudGameplayState& gameplayState() const;
     [[nodiscard]] FrontendControllerFrame setGameplayState(const SonicDayHudGameplayState& state);
+    [[nodiscard]] FrontendControllerFrame applyRuntimeBinding(const SonicDayHudRuntimeBindingSnapshot& snapshot);
     [[nodiscard]] FrontendControllerFrame applyRingPickup(int ringDelta, int scoreDelta);
     [[nodiscard]] FrontendControllerFrame openTutorialPrompt(std::string_view promptId);
     [[nodiscard]] FrontendControllerFrame dismissTutorialPrompt();
@@ -151,5 +176,7 @@ private:
 [[nodiscard]] std::string formatSonicDayHudGameplayState(std::string_view phase, const SonicDayHudGameplayState& state);
 [[nodiscard]] std::string formatSonicDayHudGameplayStateModel();
 [[nodiscard]] std::string formatSonicDayHudGameplayStateSmokeSequence();
+[[nodiscard]] std::string formatSonicDayHudRuntimeBinding(const SonicDayHudRuntimeBindingSnapshot& snapshot);
+[[nodiscard]] std::string formatSonicDayHudRuntimeBindingSmokeSequence();
 [[nodiscard]] std::string frontendControllerInputName(FrontendControllerInput input);
 } // namespace sward::ui_runtime
