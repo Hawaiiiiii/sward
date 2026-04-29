@@ -1,3 +1,5 @@
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -1861,6 +1863,139 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "live bridge plus native BMP remain the oracle",
         ]:
             self.assertIn(token, report)
+
+    def test_ui_lab_phase182_summarizes_manual_sonic_hud_value_observer_runs(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        self.assertTrue(script_path.is_file())
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "sonic-hud-value-text-write",
+            "sonic-hud-gauge-pattern-write",
+            "sonic-hud-gauge-hide-write",
+            "sonic-hud-gauge-scale-write",
+            "sonic-hud-value-write-update",
+            "sonic-hud-callsite-value-classified",
+            "ui_playscreen/so_speed_gauge",
+            "ui_playscreen/so_ringenagy_gauge",
+            "ui_playscreen/add/u_info",
+            "manual gameplay observer",
+        ]:
+            self.assertIn(token, script)
+
+        self.assertIn("Phase 182", report)
+        self.assertIn("manual Sonic HUD value observer summarizer", report)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"event":"sonic-hud-value-text-write","detail":"value=ringCount path=ui_playscreen/ring_count/num_ring node=0x1 text=\\"005\\" pathResolutionSource=raw-chud-sonic-stage-owner-field source=CSD::CNode::SetText/sub_830BF640"}',
+                        '{"event":"sonic-hud-gauge-scale-write","detail":"value=boostGauge path=ui_playscreen/so_speed_gauge node=0x2 scale=0.650,1 source=CSD::CNode::SetScale/sub_830BF090"}',
+                        '{"event":"sonic-hud-gauge-pattern-write","detail":"value=tutorialPrompt path=ui_playscreen/add/u_info node=0x3 pattern=3 source=CSD::CNode::SetPatternIndex/sub_830BF300"}',
+                        '{"event":"sonic-hud-gauge-hide-write","detail":"value=tutorialPrompt path=ui_playscreen/add/u_info node=0x3 hide=0 source=CSD::CNode::SetHideFlag/sub_830BF080"}',
+                        '{"event":"sonic-hud-value-write-update","detail":"path=ui_playscreen/so_ringenagy_gauge kind=scale value=0.720000 source=CSD::CNode::SetScale/sub_830BF090@ui_playscreen/so_ringenagy_gauge"}',
+                        '{"event":"sonic-hud-callsite-value-classified","detail":"value=speedKmh status=runtime-proven-via-sub_8251A568-return source=generated-PPC:sub_824D6418"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("sward_ui_lab_hud_value_summary", completed.stdout)
+        self.assertIn("text_writes=1", completed.stdout)
+        self.assertIn("gauge_writes=3", completed.stdout)
+        self.assertIn("gauge_scale=1", completed.stdout)
+        self.assertIn("gauge_pattern=1", completed.stdout)
+        self.assertIn("gauge_hide=1", completed.stdout)
+        self.assertIn("gameplay_updates=1", completed.stdout)
+        self.assertIn("callsite_classifications=1", completed.stdout)
+        self.assertIn("paths=ui_playscreen/add/u_info,ui_playscreen/ring_count/num_ring,ui_playscreen/so_ringenagy_gauge,ui_playscreen/so_speed_gauge", completed.stdout)
+        self.assertIn("status=sonic-hud-value-events-found", completed.stdout)
+
+    def test_ui_lab_phase183_groups_unresolved_sonic_hud_node_candidates(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        self.assertTrue(script_path.is_file())
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+
+        for token in [
+            "sonic-hud-node-write-unresolved",
+            "unresolvedNodeCandidates",
+            "Get-UnresolvedNodeCandidateLabel",
+            "node_candidate node=",
+            "numeric-text-counter-candidate",
+            "gauge-or-prompt-candidate",
+            "manual unresolved node resolver",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 183",
+            "unresolved Sonic HUD node candidates",
+            "manual unresolved node resolver",
+        ]:
+            self.assertIn(token, report)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":10,"event":"sonic-hud-node-write-unresolved","detail":"kind=text node=0x1111 value=\\"000\\" source=CSD::CNode::SetText/sub_830BF640 reason=ui_playscreen-active-path-unresolved"}',
+                        '{"time":1.1,"frame":11,"event":"sonic-hud-node-write-unresolved","detail":"kind=text node=0x1111 value=\\"001\\" source=CSD::CNode::SetText/sub_830BF640 reason=ui_playscreen-active-path-unresolved"}',
+                        '{"time":2.0,"frame":20,"event":"sonic-hud-node-write-unresolved","detail":"kind=scale node=0x2222 value=\\"0.650\\" source=CSD::CNode::SetScale/sub_830BF090 reason=ui_playscreen-active-path-unresolved"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("unresolved_node_writes=3:node_candidates=2", completed.stdout)
+        self.assertIn(
+            "node_candidate node=0x1111 writes=2 kinds=text values=000,001 frames=10-11",
+            completed.stdout,
+        )
+        self.assertIn("likely=numeric-text-counter-candidate", completed.stdout)
+        self.assertIn(
+            "node_candidate node=0x2222 writes=1 kinds=scale values=0.650 frames=20-20",
+            completed.stdout,
+        )
+        self.assertIn("likely=gauge-or-prompt-candidate", completed.stdout)
 
     def test_ui_lab_phase166_exposes_sonic_hud_gameplay_value_bridge_contract(self):
         header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
