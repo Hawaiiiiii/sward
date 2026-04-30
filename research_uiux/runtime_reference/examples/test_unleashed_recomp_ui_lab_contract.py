@@ -2073,6 +2073,44 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("F2 toggles the detached SWARD UI Lab panel", pivot)
 
+    def test_ui_lab_phase186_restores_f2_embedded_style_and_hud_gate_correlation(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        pivot = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
+
+        for token in [
+            "DrawProfilerAddonContent",
+            "DrawDetachedProfilerAddonTab",
+            "ImGui::BeginTabItem(\"SWARD UI Lab\")",
+            "sward-profiler-addon-tabs",
+            "F2 toggles detached SWARD UI Lab",
+            "F1 remains native Profiler",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "struct HudRenderGateCorrelationSnapshot",
+            "BuildHudRenderGateCorrelationSnapshot",
+            "hudRenderGateCorrelation",
+            "ms_IsRenderHudCallers",
+            "frontend_listener.cpp",
+            "options_menu.cpp::SetOptionsMenuVisible",
+            "CHudPause_patches.cpp",
+            "unresolvedUiPlayScreenNodeWrites",
+            "sonic-hud-render-gate-correlated",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 186",
+            "ms_IsRenderHud / ms_IsRenderGameMainHud / ms_IsRenderHudPause",
+            "unresolved ui_playscreen node writes",
+            "sonic-hud-render-gate-correlated",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("F2 panel now contains the old embedded-profiler SWARD UI Lab tab", pivot)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")

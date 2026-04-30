@@ -437,6 +437,21 @@ namespace UiLab
         uint64_t frame = 0;
     };
 
+    struct HudRenderGateCorrelationSnapshot
+    {
+        bool renderHud = false;
+        bool renderGameMainHud = false;
+        bool renderHudPause = false;
+        uint64_t resolvedUiPlayScreenNodeWrites = 0;
+        uint64_t unresolvedUiPlayScreenNodeWrites = 0;
+        std::string gateStatus = "unknown";
+        std::string unresolvedWriteKinds;
+        uint64_t frame = 0;
+        std::vector<std::string> ms_IsRenderHudCallers;
+        std::vector<std::string> ms_IsRenderGameMainHudCallers;
+        std::vector<std::string> ms_IsRenderHudPauseCallers;
+    };
+
     struct LateResolvedSonicHudNodeWrite
     {
         std::string writeKind;
@@ -924,6 +939,12 @@ namespace UiLab
     static std::unordered_map<std::string, uint64_t> g_lastSonicHudUpdateCallsiteEvidenceFrames;
     static std::unordered_map<std::string, uint32_t> g_lastSonicHudSpeedReadoutValues;
     static std::unordered_map<std::string, uint64_t> g_lastSonicHudSpeedReadoutEvidenceFrames;
+    static bool g_hudRenderGateCorrelationKnown = false;
+    static bool g_lastHudRenderGateRenderHud = false;
+    static bool g_lastHudRenderGateGameMainHud = false;
+    static bool g_lastHudRenderGatePauseHud = false;
+    static uint64_t g_lastHudRenderGateUnresolvedWrites = 0;
+    static uint64_t g_lastHudRenderGateCorrelationEvidenceFrame = 0;
     static constexpr size_t kCsdChildNodeLookupObservationLimit = 256;
     static std::unordered_map<uint32_t, CsdChildNodeLookupObservation> g_csdChildNodeLookupObservations;
     static std::unordered_map<uint32_t, CsdNodeSourceOwnerObservation> g_csdNodeSourceOwnerObservations;
@@ -1005,6 +1026,9 @@ namespace UiLab
     static SonicHudGameplayValueSnapshot BuildSonicHudGameplayValueSnapshot();
     static std::string SonicHudValueWriteBindingStatus();
     static std::vector<SonicHudValueWriteObservation> BuildSonicHudValueWriteObservations();
+    static std::string BaseSonicHudWriteKind(std::string_view writeKind);
+    static HudRenderGateCorrelationSnapshot BuildHudRenderGateCorrelationSnapshot();
+    static void UpdateHudRenderGateCorrelation();
     static std::vector<SonicHudUpdateCallsiteSample> BuildSonicHudUpdateCallsiteSamples();
     static SonicHudLastClassifiedCallsiteValue BuildSonicHudLastClassifiedCallsiteValue();
     static bool ClassifySonicHudUpdateCallsiteSample(
@@ -2398,6 +2422,108 @@ namespace UiLab
         return g_sonicHudValueWriteObservations;
     }
 
+    static HudRenderGateCorrelationSnapshot BuildHudRenderGateCorrelationSnapshot()
+    {
+        HudRenderGateCorrelationSnapshot snapshot;
+        snapshot.renderHud = ReadGuestBool(0x8328BB26);
+        snapshot.renderGameMainHud = ReadGuestBool(0x8328BB27);
+        snapshot.renderHudPause = ReadGuestBool(0x8328BB28);
+        snapshot.frame = g_presentedFrameCount;
+        snapshot.ms_IsRenderHudCallers = {
+            "frontend_listener.cpp toggles ms_IsRenderHud",
+            "options_menu.cpp::SetOptionsMenuVisible writes ms_IsRenderHud",
+            "CHudPause_patches.cpp reads ms_IsRenderHud for pause/button-guide visibility"
+        };
+        snapshot.ms_IsRenderGameMainHudCallers = {
+            "SGlobals render lane at 0x8328BB27",
+            "debug-menu fork SGlobals HUD/render switch",
+            "UI Lab sampled child lane for game-main HUD isolation"
+        };
+        snapshot.ms_IsRenderHudPauseCallers = {
+            "SGlobals render lane at 0x8328BB28",
+            "debug-menu fork SGlobals HUD/render switch",
+            "UI Lab sampled child lane for pause HUD isolation"
+        };
+
+        std::unordered_set<std::string> unresolvedKinds;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            for (const auto& observation : g_sonicHudValueWriteObservations)
+            {
+                if (observation.pathResolved)
+                {
+                    if (observation.path.starts_with("ui_playscreen/"))
+                        ++snapshot.resolvedUiPlayScreenNodeWrites;
+                }
+                else
+                {
+                    ++snapshot.unresolvedUiPlayScreenNodeWrites;
+                    unresolvedKinds.insert(BaseSonicHudWriteKind(observation.writeKind));
+                }
+            }
+        }
+
+        std::vector<std::string> sortedKinds(unresolvedKinds.begin(), unresolvedKinds.end());
+        std::sort(sortedKinds.begin(), sortedKinds.end());
+        for (size_t i = 0; i < sortedKinds.size(); ++i)
+        {
+            if (i != 0)
+                snapshot.unresolvedWriteKinds += ",";
+
+            snapshot.unresolvedWriteKinds += sortedKinds[i];
+        }
+
+        if (!snapshot.renderHud)
+            snapshot.gateStatus = "whole-ui-render-disabled";
+        else if (!snapshot.renderGameMainHud && snapshot.renderHudPause)
+            snapshot.gateStatus = "pause-ui-only-or-game-main-hud-muted";
+        else if (snapshot.renderGameMainHud && !snapshot.renderHudPause)
+            snapshot.gateStatus = "game-main-hud-only-or-pause-muted";
+        else if (snapshot.renderGameMainHud && snapshot.renderHudPause)
+            snapshot.gateStatus = "whole-ui-render-enabled";
+        else
+            snapshot.gateStatus = "whole-ui-render-enabled-child-lanes-muted";
+
+        if (snapshot.unresolvedUiPlayScreenNodeWrites > 0)
+            snapshot.gateStatus += ":unresolved-ui_playscreen-node-writes-present";
+
+        return snapshot;
+    }
+
+    static void UpdateHudRenderGateCorrelation()
+    {
+        const auto snapshot = BuildHudRenderGateCorrelationSnapshot();
+        const bool changed =
+            !g_hudRenderGateCorrelationKnown ||
+            g_lastHudRenderGateRenderHud != snapshot.renderHud ||
+            g_lastHudRenderGateGameMainHud != snapshot.renderGameMainHud ||
+            g_lastHudRenderGatePauseHud != snapshot.renderHudPause ||
+            g_lastHudRenderGateUnresolvedWrites != snapshot.unresolvedUiPlayScreenNodeWrites;
+
+        const bool periodicUnresolved =
+            snapshot.unresolvedUiPlayScreenNodeWrites > 0 &&
+            g_presentedFrameCount >= g_lastHudRenderGateCorrelationEvidenceFrame + 600;
+
+        if (!changed && !periodicUnresolved)
+            return;
+
+        g_hudRenderGateCorrelationKnown = true;
+        g_lastHudRenderGateRenderHud = snapshot.renderHud;
+        g_lastHudRenderGateGameMainHud = snapshot.renderGameMainHud;
+        g_lastHudRenderGatePauseHud = snapshot.renderHudPause;
+        g_lastHudRenderGateUnresolvedWrites = snapshot.unresolvedUiPlayScreenNodeWrites;
+        g_lastHudRenderGateCorrelationEvidenceFrame = g_presentedFrameCount;
+
+        WriteEvidenceEvent(
+            "sonic-hud-render-gate-correlated",
+            "ms_IsRenderHud=" + std::to_string(snapshot.renderHud ? 1 : 0) +
+            " ms_IsRenderGameMainHud=" + std::to_string(snapshot.renderGameMainHud ? 1 : 0) +
+            " ms_IsRenderHudPause=" + std::to_string(snapshot.renderHudPause ? 1 : 0) +
+            " unresolved_ui_playscreen_node_writes=" +
+            std::to_string(snapshot.unresolvedUiPlayScreenNodeWrites) +
+            " gate_status=" + snapshot.gateStatus);
+    }
+
     static std::vector<SonicHudUpdateCallsiteSample> BuildSonicHudUpdateCallsiteSamples()
     {
         std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
@@ -3641,6 +3767,7 @@ namespace UiLab
         const auto lastClassifiedCallsiteValue = BuildSonicHudLastClassifiedCallsiteValue();
         const auto sonicOwnerPath = BuildSonicHudOwnerPathInspectorSnapshot(csdProjectTree);
         const auto pauseGeneralSave = BuildPauseGeneralSaveLiveInspectorSnapshot();
+        const auto hudRenderGateCorrelation = BuildHudRenderGateCorrelationSnapshot();
 
         out
             << "{\n"
@@ -3765,6 +3892,31 @@ namespace UiLab
             << "        \"saveIconVisible\": " << (pauseGeneralSave.saveIconVisible ? "true" : "false") << ",\n"
             << "        \"frame\": " << pauseGeneralSave.saveIconFrame << "\n"
             << "      }\n"
+            << "    },\n"
+            << "    \"hudRenderGateCorrelation\": {\n"
+            << "      \"renderHud\": " << (hudRenderGateCorrelation.renderHud ? "true" : "false") << ",\n"
+            << "      \"renderGameMainHud\": " << (hudRenderGateCorrelation.renderGameMainHud ? "true" : "false") << ",\n"
+            << "      \"renderHudPause\": " << (hudRenderGateCorrelation.renderHudPause ? "true" : "false") << ",\n"
+            << "      \"gateStatus\": \"" << JsonEscape(hudRenderGateCorrelation.gateStatus) << "\",\n"
+            << "      \"resolvedUiPlayScreenNodeWrites\": "
+            << hudRenderGateCorrelation.resolvedUiPlayScreenNodeWrites << ",\n"
+            << "      \"unresolvedUiPlayScreenNodeWrites\": "
+            << hudRenderGateCorrelation.unresolvedUiPlayScreenNodeWrites << ",\n"
+            << "      \"unresolvedWriteKinds\": \""
+            << JsonEscape(hudRenderGateCorrelation.unresolvedWriteKinds) << "\",\n"
+            << "      \"ms_IsRenderHudCallers\": ";
+        AppendStringVector(out, hudRenderGateCorrelation.ms_IsRenderHudCallers);
+        out
+            << ",\n"
+            << "      \"ms_IsRenderGameMainHudCallers\": ";
+        AppendStringVector(out, hudRenderGateCorrelation.ms_IsRenderGameMainHudCallers);
+        out
+            << ",\n"
+            << "      \"ms_IsRenderHudPauseCallers\": ";
+        AppendStringVector(out, hudRenderGateCorrelation.ms_IsRenderHudPauseCallers);
+        out
+            << ",\n"
+            << "      \"frame\": " << hudRenderGateCorrelation.frame << "\n"
             << "    },\n"
             << "    \"sonicHud\": {\n"
             << "      \"source\": \"" << JsonEscape(sonicHud.source) << "\",\n"
@@ -7149,6 +7301,8 @@ namespace UiLab
         else if ((g_presentedFrameCount % 60) == 0)
             WriteEvidenceEvent("presented-frame");
 
+        UpdateHudRenderGateCorrelation();
+
         if ((g_presentedFrameCount % 30) == 0 && g_lastLiveStateSnapshotFrame != g_presentedFrameCount)
             WriteLiveStateSnapshot();
 
@@ -9858,6 +10012,19 @@ namespace UiLab
         }
 
         ImGui::Separator();
+        const auto gateCorrelation = BuildHudRenderGateCorrelationSnapshot();
+        ImGui::TextWrapped("HUD render gate correlation: %s", gateCorrelation.gateStatus.c_str());
+        ImGui::Text(
+            "ui_playscreen writes: resolved=%llu unresolved=%llu",
+            static_cast<unsigned long long>(gateCorrelation.resolvedUiPlayScreenNodeWrites),
+            static_cast<unsigned long long>(gateCorrelation.unresolvedUiPlayScreenNodeWrites));
+
+        if (!gateCorrelation.unresolvedWriteKinds.empty())
+            ImGui::TextWrapped("unresolved kinds: %s", gateCorrelation.unresolvedWriteKinds.c_str());
+
+        ImGui::TextWrapped(
+            "ms_IsRenderHud callers: frontend_listener.cpp, options_menu.cpp::SetOptionsMenuVisible, CHudPause_patches.cpp");
+        ImGui::Separator();
         ImGui::TextWrapped(
             "These switches identify the global UI render gate and child HUD render lanes. They are an isolation oracle, not a substitute for the typed owner/CSD/callsite source recovery.");
     }
@@ -9887,17 +10054,12 @@ namespace UiLab
             WriteEvidenceEvent("manual-evidence-marker");
     }
 
-    void DrawProfilerAddon()
+    static void DrawProfilerAddonContent()
     {
-        if (!g_isEnabled)
-            return;
-
-        ImGui::Separator();
-
         if (!ImGui::CollapsingHeader("SWARD UI Lab", ImGuiTreeNodeFlags_DefaultOpen))
             return;
 
-        ImGui::TextUnformatted("F2 toggles SWARD UI Lab");
+        ImGui::TextUnformatted("F2 toggles detached SWARD UI Lab; F2 toggles SWARD UI Lab");
         ImGui::TextUnformatted("F1 remains native Profiler");
         ImGui::Text("Target: %s", std::string(GetTargetToken()).c_str());
         ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
@@ -9949,7 +10111,7 @@ namespace UiLab
 
             if (ImGui::BeginTabItem("Panels"))
             {
-                ImGui::Checkbox("Legacy floating panes", &g_operatorShellVisible);
+                ImGui::TextUnformatted("Legacy floating panes");
                 ImGui::Separator();
                 DrawOperatorProfilerPanelsTab();
                 ImGui::EndTabItem();
@@ -9957,6 +10119,22 @@ namespace UiLab
 
             ImGui::EndTabBar();
         }
+    }
+
+    static void DrawDetachedProfilerAddonTab()
+    {
+        ImGui::PushID("sward-detached-profiler-addon");
+        DrawProfilerAddonContent();
+        ImGui::PopID();
+    }
+
+    void DrawProfilerAddon()
+    {
+        if (!g_isEnabled)
+            return;
+
+        ImGui::Separator();
+        DrawProfilerAddonContent();
     }
 
     static void DrawOperatorProfilerPanel()
@@ -9982,6 +10160,12 @@ namespace UiLab
 
             if (ImGui::BeginTabBar("sward-operator-profiler-tabs"))
             {
+                if (ImGui::BeginTabItem("SWARD UI Lab"))
+                {
+                    DrawDetachedProfilerAddonTab();
+                    ImGui::EndTabItem();
+                }
+
                 if (ImGui::BeginTabItem("Overview"))
                 {
                     DrawRuntimeInspectorOverview();
