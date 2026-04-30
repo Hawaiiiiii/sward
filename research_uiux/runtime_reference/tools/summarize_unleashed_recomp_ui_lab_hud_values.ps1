@@ -1,6 +1,7 @@
 param(
     [string]$EventsPath = "",
     [string]$EvidenceDir = "",
+    [string]$DrawListPath = "",
     [int]$CandidateValueLimit = 32,
     [switch]$AsJson
 )
@@ -63,6 +64,8 @@ function New-UnresolvedNodeCandidate([string]$Node) {
         kinds = [System.Collections.Generic.SortedSet[string]]::new()
         values = [System.Collections.Generic.SortedSet[string]]::new()
         sources = [System.Collections.Generic.SortedSet[string]]::new()
+        semanticPathCandidates = [System.Collections.Generic.SortedSet[string]]::new()
+        semanticValueNames = [System.Collections.Generic.SortedSet[string]]::new()
         firstFrame = $null
         lastFrame = $null
         likely = "unknown-unresolved-node-candidate"
@@ -124,6 +127,67 @@ function Add-SemanticBoundGroup($Groups, [string]$Detail, $EventObject) {
     Add-SemanticPathCandidateGroup $Groups $Detail $EventObject
 }
 
+function New-GaugeDrawPathGroup([string]$Path, [string]$ValueName) {
+    return [ordered]@{
+        path = $Path
+        semanticValueName = $ValueName
+        draws = 0
+        childPaths = [System.Collections.Generic.SortedSet[string]]::new()
+        layerAddresses = [System.Collections.Generic.SortedSet[string]]::new()
+        castNodeAddresses = [System.Collections.Generic.SortedSet[string]]::new()
+    }
+}
+
+function Get-GaugeDrawPathInfo([string]$LayerPath) {
+    $speedGaugeParent = "ui_playscreen/so_speed_gauge/position/speed_gauge_color"
+    $ringEnergyParent = "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color"
+
+    if ($LayerPath.StartsWith($speedGaugeParent)) {
+        return [ordered]@{ parent = $speedGaugeParent; semanticValueName = "boostGauge" }
+    }
+
+    if ($LayerPath.StartsWith($ringEnergyParent)) {
+        return [ordered]@{ parent = $ringEnergyParent; semanticValueName = "ringEnergyGauge" }
+    }
+
+    return $null
+}
+
+function Add-GaugeDrawPathGroup($Groups, $DrawCall) {
+    $layerPath = [string]$DrawCall.layerPath
+    if ([string]::IsNullOrWhiteSpace($layerPath)) {
+        return
+    }
+
+    $info = Get-GaugeDrawPathInfo $layerPath
+    if ($null -eq $info) {
+        return
+    }
+
+    $key = "{0}:{1}" -f $info.parent, $info.semanticValueName
+    if (-not $Groups.ContainsKey($key)) {
+        $Groups[$key] = New-GaugeDrawPathGroup $info.parent $info.semanticValueName
+    }
+
+    $group = $Groups[$key]
+    $group.draws++
+    Add-UniqueSorted $group.childPaths $layerPath
+    Add-UniqueSorted $group.layerAddresses ([string]$DrawCall.layerAddress)
+    Add-UniqueSorted $group.castNodeAddresses ([string]$DrawCall.castNodeAddress)
+}
+
+function Get-DrawListCalls($DrawListObject) {
+    if ($null -ne $DrawListObject.uiDrawListOracle -and $null -ne $DrawListObject.uiDrawListOracle.drawCalls) {
+        return @($DrawListObject.uiDrawListOracle.drawCalls)
+    }
+
+    if ($null -ne $DrawListObject.drawCalls) {
+        return @($DrawListObject.drawCalls)
+    }
+
+    return @()
+}
+
 function Get-UnresolvedNodeCandidateLabel($Candidate) {
     $kindList = @($Candidate.kinds)
     if (
@@ -174,6 +238,7 @@ $semanticBoundPaths = [System.Collections.Generic.SortedSet[string]]::new()
 $unresolvedNodeCandidatesByNode = @{}
 $semanticPathCandidateGroupsByKey = @{}
 $semanticBoundGroupsByKey = @{}
+$gaugeDrawPathGroupsByKey = @{}
 $manualObserverHudPaths = @(
     "ui_playscreen/so_speed_gauge",
     "ui_playscreen/so_ringenagy_gauge",
@@ -201,6 +266,10 @@ $summary = [ordered]@{
     semanticPathCandidateGroups = @()
     semanticBoundPaths = @()
     semanticBoundGroups = @()
+    drawListPath = ""
+    gaugeDrawPathGroups = @()
+    gaugeSetterNodeCandidates = @()
+    gaugeChildPathStatus = "pending-runtime-ui-draw-list"
     unresolvedNodeCandidates = @()
     paths = @()
     values = @()
@@ -279,6 +348,8 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
                 Add-UniqueSorted $candidate.kinds (Get-DetailToken $detail "kind")
                 Add-UniqueSorted $candidate.values (Get-DetailToken $detail "value")
                 Add-UniqueSorted $candidate.sources (Get-DetailToken $detail "source")
+                Add-UniqueSorted $candidate.semanticPathCandidates (Get-DetailToken $detail "semanticPathCandidate")
+                Add-UniqueSorted $candidate.semanticValueNames (Get-DetailToken $detail "semanticValueName")
 
                 $frame = Get-EventFrame $eventObject
                 if ($null -ne $frame) {
@@ -300,6 +371,21 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
         if ($eventName -ne "sonic-hud-node-write-semantic-bound") {
             Add-UniqueSorted $semanticPathCandidates (Get-DetailToken $detail "semanticPathCandidate")
         }
+    }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($DrawListPath)) {
+    $resolvedDrawListPath = Resolve-Path -LiteralPath $DrawListPath -ErrorAction Stop
+    $summary.drawListPath = $resolvedDrawListPath.Path
+
+    try {
+        $drawListObject = Get-Content -Raw -LiteralPath $resolvedDrawListPath.Path | ConvertFrom-Json
+        foreach ($drawCall in (Get-DrawListCalls $drawListObject)) {
+            Add-GaugeDrawPathGroup $gaugeDrawPathGroupsByKey $drawCall
+        }
+    }
+    catch {
+        throw "Could not parse UI draw-list JSON: $($resolvedDrawListPath.Path)"
     }
 }
 
@@ -344,6 +430,21 @@ $summary.semanticBoundGroups = @(
             }
         }
 )
+$summary.gaugeDrawPathGroups = @(
+    $gaugeDrawPathGroupsByKey.Keys |
+        Sort-Object @{ Expression = { -1 * $gaugeDrawPathGroupsByKey[$_].draws } }, @{ Expression = { $_ } } |
+        ForEach-Object {
+            $group = $gaugeDrawPathGroupsByKey[$_]
+            [ordered]@{
+                path = $group.path
+                semanticValueName = $group.semanticValueName
+                draws = $group.draws
+                childPaths = @($group.childPaths)
+                layerAddresses = @($group.layerAddresses)
+                castNodeAddresses = @($group.castNodeAddresses)
+            }
+        }
+)
 $summary.unresolvedNodeCandidates = @(
     $unresolvedNodeCandidatesByNode.Keys |
         Sort-Object @{ Expression = { -1 * $unresolvedNodeCandidatesByNode[$_].writes } }, @{ Expression = { $_ } } |
@@ -356,6 +457,8 @@ $summary.unresolvedNodeCandidates = @(
                 kinds = @($candidate.kinds)
                 values = @($candidate.values)
                 sources = @($candidate.sources)
+                semanticPathCandidates = @($candidate.semanticPathCandidates)
+                semanticValueNames = @($candidate.semanticValueNames)
                 firstFrame = $candidate.firstFrame
                 lastFrame = $candidate.lastFrame
                 likely = $candidate.likely
@@ -363,6 +466,29 @@ $summary.unresolvedNodeCandidates = @(
         }
 )
 $summary.unresolvedNodeCandidateCount = $summary.unresolvedNodeCandidates.Count
+$summary.gaugeSetterNodeCandidates = @(
+    $summary.unresolvedNodeCandidates |
+        Where-Object {
+            $_.likely -eq "gauge-or-prompt-candidate" -and
+            @($_.semanticPathCandidates).Count -gt 0
+        } |
+        Sort-Object @{ Expression = { -1 * $_.writes } }, @{ Expression = { $_.node } } |
+        ForEach-Object {
+            [ordered]@{
+                node = $_.node
+                writes = $_.writes
+                kinds = @($_.kinds)
+                semanticValueNames = @($_.semanticValueNames)
+                semanticPathCandidates = @($_.semanticPathCandidates)
+                firstFrame = $_.firstFrame
+                lastFrame = $_.lastFrame
+                nodeJoinStatus = "setter-node-address-join-pending"
+            }
+        }
+)
+if ($summary.gaugeDrawPathGroups.Count -gt 0) {
+    $summary.gaugeChildPathStatus = "runtime-draw-list-exact-child-paths;setter-node-address-join-pending"
+}
 
 if (
     $summary.textWrites -gt 0 -or
@@ -416,6 +542,26 @@ Write-Output (
         $summary.semanticBoundGroups |
             ForEach-Object { "{0}:{1}={2}" -f $_.path, $_.semanticValueName, $_.writes }
     ) $CandidateValueLimit))
+Write-Output (
+    "gauge_draw_path_groups={0}" -f
+    (Format-CandidateList (
+        $summary.gaugeDrawPathGroups |
+            ForEach-Object { "{0}:{1}={2}" -f $_.path, $_.semanticValueName, $_.draws }
+    ) $CandidateValueLimit))
+Write-Output (
+    "gauge_setter_node_candidates={0}" -f
+    (Format-CandidateList (
+        $summary.gaugeSetterNodeCandidates |
+            ForEach-Object {
+                "{0}:{1}:{2}:{3}={4}" -f
+                    $_.node,
+                    (Format-CandidateList $_.semanticValueNames $CandidateValueLimit),
+                    (Format-CandidateList $_.kinds $CandidateValueLimit),
+                    (Format-CandidateList $_.semanticPathCandidates $CandidateValueLimit),
+                    $_.writes
+            }
+    ) $CandidateValueLimit))
+Write-Output ("gauge_child_path_status={0}" -f $summary.gaugeChildPathStatus)
 foreach ($candidate in $summary.unresolvedNodeCandidates) {
     Write-Output (
         "node_candidate node={0} writes={1} kinds={2} values={3} frames={4}-{5} likely={6} sources={7}" -f

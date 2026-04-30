@@ -383,6 +383,28 @@ std::vector<SonicDayHudRuntimeSemanticPathCandidateObservation> makeRuntimePhase
     };
 }
 
+std::vector<SonicDayHudRuntimeGaugeChildPathResolution> makeRuntimePhase194GaugeChildPathResolutions()
+{
+    return {
+        {
+            "boostGauge",
+            "ui_playscreen/so_speed_gauge/position/speed_gauge_color",
+            "ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506",
+            20,
+            "live-bridge/ui-draw-list",
+            "setter-node-address-join-pending",
+        },
+        {
+            "ringEnergyGauge",
+            "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color",
+            "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483",
+            20,
+            "live-bridge/ui-draw-list",
+            "setter-node-address-join-pending",
+        },
+    };
+}
+
 bool isSemanticBoundRuntimeObservation(const SonicDayHudRuntimeSemanticPathCandidateObservation& observation)
 {
     return observation.bindingStatus == "semantic-bound-pending-exact-child-node-resolution";
@@ -1411,6 +1433,21 @@ std::string formatSonicDayHudRuntimeSemanticPathCandidateObservation(
     return out.str();
 }
 
+std::string formatSonicDayHudRuntimeGaugeChildPathResolution(
+    const SonicDayHudRuntimeGaugeChildPathResolution& resolution)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_gauge_child_path="
+        << "value=" << resolution.valueName
+        << ":exact_parent=" << resolution.exactParentPath
+        << ":representative_child=" << resolution.representativeChildPath
+        << ":draw_layers=" << resolution.runtimeDrawLayerCount
+        << ":resolution=" << resolution.pathResolutionSource
+        << ":node_join=" << resolution.setterNodeJoinStatus
+        << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage)
 {
     std::ostringstream out;
@@ -1676,6 +1713,21 @@ std::string formatSonicDayHudRuntimeBindingPhase193SmokeSequence()
         << "elapsedFrames/speed/tutorial:semantic-bound-pending-exact-child-node-resolution,"
         << "boost/energy:semantic-candidate-only-pending-runtime-bound,"
         << "exact-child-node-resolution:pending,"
+        << "audio:pending-exact-sfx-id"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase194SmokeSequence()
+{
+    std::ostringstream out;
+    for (const auto& resolution : makeRuntimePhase194GaugeChildPathResolutions())
+        out << formatSonicDayHudRuntimeGaugeChildPathResolution(resolution);
+
+    out << "gameplay_numeric_binding="
+        << "boost/energy:exact-runtime-draw-child-paths-known,"
+        << "setter-node-address-join:pending,"
+        << "controller-value-update:still-requires-setter-node-match,"
         << "audio:pending-exact-sfx-id"
         << '\n';
     return out.str();

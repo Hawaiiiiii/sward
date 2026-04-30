@@ -1007,6 +1007,40 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("sonic_day_hud_state=phase=phase192-strict-semantic-bound:rings=000:score=000000000:time=00:00:02:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=pattern-1:visible:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
         self.assertIn("gameplay_numeric_binding=elapsedFrames/speed/tutorial:semantic-bound-pending-exact-child-node-resolution,boost/energy:semantic-candidate-only-pending-runtime-bound,exact-child-node-resolution:pending,audio:pending-exact-sfx-id", completed.stdout)
 
+    def test_phase194_sonic_day_hud_controller_reports_exact_gauge_child_paths_separately(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+        report = self.read(REPORT)
+
+        for token in [
+            "SonicDayHudRuntimeGaugeChildPathResolution",
+            "formatSonicDayHudRuntimeGaugeChildPathResolution",
+            "formatSonicDayHudRuntimeBindingPhase194SmokeSequence",
+            "setter-node-address-join-pending",
+        ]:
+            self.assertIn(token, header + source)
+
+        self.assertIn("--phase194-sonic-hud-gauge-child-path-smoke", example)
+        self.assertIn("Phase 194", report)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase194-sonic-hud-gauge-child-path-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase194 sonic hud gauge child path smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_gauge_child_path=value=boostGauge:exact_parent=ui_playscreen/so_speed_gauge/position/speed_gauge_color:representative_child=ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506:draw_layers=20:resolution=live-bridge/ui-draw-list:node_join=setter-node-address-join-pending", completed.stdout)
+        self.assertIn("sonic_day_hud_gauge_child_path=value=ringEnergyGauge:exact_parent=ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color:representative_child=ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483:draw_layers=20:resolution=live-bridge/ui-draw-list:node_join=setter-node-address-join-pending", completed.stdout)
+        self.assertIn("gameplay_numeric_binding=boost/energy:exact-runtime-draw-child-paths-known,setter-node-address-join:pending,controller-value-update:still-requires-setter-node-match,audio:pending-exact-sfx-id", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

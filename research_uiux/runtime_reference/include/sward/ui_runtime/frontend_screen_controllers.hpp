@@ -119,6 +119,16 @@ struct SonicDayHudRuntimeSemanticPathCandidateObservation
     std::string source;
 };
 
+struct SonicDayHudRuntimeGaugeChildPathResolution
+{
+    std::string valueName;
+    std::string exactParentPath;
+    std::string representativeChildPath;
+    int runtimeDrawLayerCount = 0;
+    std::string pathResolutionSource = "live-bridge/ui-draw-list";
+    std::string setterNodeJoinStatus = "setter-node-address-join-pending";
+};
+
 struct SonicDayHudRuntimeDrawListCoverage
 {
     std::string source = "live-bridge/ui-draw-list";
@@ -298,6 +308,8 @@ private:
     const SonicDayHudRuntimeGaugePromptWriteObservation& observation);
 [[nodiscard]] std::string formatSonicDayHudRuntimeSemanticPathCandidateObservation(
     const SonicDayHudRuntimeSemanticPathCandidateObservation& observation);
+[[nodiscard]] std::string formatSonicDayHudRuntimeGaugeChildPathResolution(
+    const SonicDayHudRuntimeGaugeChildPathResolution& resolution);
 [[nodiscard]] std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage);
 [[nodiscard]] SonicDayHudRuntimeCallsiteClassification classifySonicDayHudRuntimeCallsiteSample(
     const SonicDayHudRuntimeCallsiteSample& sample);
@@ -313,5 +325,6 @@ private:
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase180SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase191SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase193SmokeSequence();
+[[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase194SmokeSequence();
 [[nodiscard]] std::string frontendControllerInputName(FrontendControllerInput input);
 } // namespace sward::ui_runtime

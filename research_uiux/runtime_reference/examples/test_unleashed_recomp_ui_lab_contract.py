@@ -1,3 +1,4 @@
+import json
 import subprocess
 import tempfile
 import unittest
@@ -2385,6 +2386,105 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("semantic_bound_groups=ui_playscreen/add/u_info:tutorialPrompt=2", completed.stdout)
         self.assertIn("semantic_bound_paths=ui_playscreen/add/u_info", completed.stdout)
         self.assertIn("paths=", completed.stdout)
+
+    def test_ui_lab_phase194_summarizes_gauge_draw_child_paths_without_claiming_setter_resolution(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "DrawListPath",
+            "gaugeDrawPathGroups",
+            "gaugeSetterNodeCandidates",
+            "gauge_draw_path_groups=",
+            "gauge_setter_node_candidates=",
+            "setter-node-address-join-pending",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 194",
+            "gauge draw child paths",
+            "setter-node-address-join-pending",
+            "ui_playscreen/so_speed_gauge/position/speed_gauge_color",
+            "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            events = tmp_path / "ui_lab_events.jsonl"
+            draw_list = tmp_path / "ui_draw_list.json"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":10,"event":"sonic-hud-node-write-unresolved","detail":"kind=scale node=0x2222 value=\\"0.650\\" source=CSD::CNode::SetScale/sub_830BF090 reason=ui_playscreen-active-path-unresolved callsiteCandidate=boost-ring-energy semanticPathCandidate=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge semanticValueName=boostGauge|ringEnergyGauge pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                        '{"time":1.1,"frame":10,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=text node=0x9999 value=\\"357\\" valueCandidate=boost-ring-energy semanticValueName=boostGauge semanticPathCandidate=ui_playscreen/so_speed_gauge source=same-frame-hud-update-context:sub_824D6C18 pathResolutionSource=generated-PPC-callsite-semantic-candidate pathResolved=false"}',
+                        '{"time":1.2,"frame":10,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=text node=0x9999 value=\\"357\\" valueCandidate=boost-ring-energy semanticValueName=ringEnergyGauge semanticPathCandidate=ui_playscreen/so_ringenagy_gauge source=same-frame-hud-update-context:sub_824D6C18 pathResolutionSource=generated-PPC-callsite-semantic-candidate pathResolved=false"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            draw_list.write_text(
+                json.dumps(
+                    {
+                        "uiDrawListOracle": {
+                            "drawCalls": [
+                                {
+                                    "layerPath": "ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506",
+                                    "layerAddress": "0xAAAA",
+                                    "castNodeAddress": "0xBBBB",
+                                },
+                                {
+                                    "layerPath": "ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0507",
+                                    "layerAddress": "0xAAAB",
+                                    "castNodeAddress": "0xBBBB",
+                                },
+                                {
+                                    "layerPath": "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483",
+                                    "layerAddress": "0xCCCC",
+                                    "castNodeAddress": "0xDDDD",
+                                },
+                            ]
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                    "-DrawListPath",
+                    str(draw_list),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn(
+            "gauge_draw_path_groups=ui_playscreen/so_speed_gauge/position/speed_gauge_color:boostGauge=2,ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color:ringEnergyGauge=1",
+            completed.stdout,
+        )
+        self.assertIn(
+            "gauge_setter_node_candidates=0x2222:boostGauge|ringEnergyGauge:scale:ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge=1",
+            completed.stdout,
+        )
+        self.assertIn(
+            "gauge_child_path_status=runtime-draw-list-exact-child-paths;setter-node-address-join-pending",
+            completed.stdout,
+        )
 
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
