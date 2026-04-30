@@ -69,6 +69,57 @@ function New-UnresolvedNodeCandidate([string]$Node) {
     }
 }
 
+function New-SemanticPathCandidateGroup([string]$Path, [string]$ValueName) {
+    return [ordered]@{
+        path = $Path
+        semanticValueName = $ValueName
+        writes = 0
+        nodes = [System.Collections.Generic.SortedSet[string]]::new()
+        kinds = [System.Collections.Generic.SortedSet[string]]::new()
+        values = [System.Collections.Generic.SortedSet[string]]::new()
+        sources = [System.Collections.Generic.SortedSet[string]]::new()
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Add-SemanticPathCandidateGroup($Groups, [string]$Detail, $EventObject) {
+    $path = Get-DetailToken $Detail "semanticPathCandidate"
+    if ([string]::IsNullOrWhiteSpace($path)) {
+        return
+    }
+
+    $valueName = Get-DetailToken $Detail "semanticValueName"
+    if ([string]::IsNullOrWhiteSpace($valueName)) {
+        $valueName = Get-DetailToken $Detail "valueCandidate"
+    }
+    if ([string]::IsNullOrWhiteSpace($valueName)) {
+        $valueName = "unknown"
+    }
+
+    $key = "{0}:{1}" -f $path, $valueName
+    if (-not $Groups.ContainsKey($key)) {
+        $Groups[$key] = New-SemanticPathCandidateGroup $path $valueName
+    }
+
+    $group = $Groups[$key]
+    $group.writes++
+    Add-UniqueSorted $group.nodes (Get-DetailToken $Detail "node")
+    Add-UniqueSorted $group.kinds (Get-DetailToken $Detail "kind")
+    Add-UniqueSorted $group.values (Get-DetailToken $Detail "value")
+    Add-UniqueSorted $group.sources (Get-DetailToken $Detail "source")
+
+    $frame = Get-EventFrame $EventObject
+    if ($null -ne $frame) {
+        if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+            $group.firstFrame = $frame
+        }
+        if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+            $group.lastFrame = $frame
+        }
+    }
+}
+
 function Get-UnresolvedNodeCandidateLabel($Candidate) {
     $kindList = @($Candidate.kinds)
     if (
@@ -116,6 +167,7 @@ $values = [System.Collections.Generic.SortedSet[string]]::new()
 $sources = [System.Collections.Generic.SortedSet[string]]::new()
 $semanticPathCandidates = [System.Collections.Generic.SortedSet[string]]::new()
 $unresolvedNodeCandidatesByNode = @{}
+$semanticPathCandidateGroupsByKey = @{}
 $manualObserverHudPaths = @(
     "ui_playscreen/so_speed_gauge",
     "ui_playscreen/so_ringenagy_gauge",
@@ -139,6 +191,7 @@ $summary = [ordered]@{
     unresolvedNodeCandidateCount = 0
     semanticPathCandidateWrites = 0
     semanticPathCandidates = @()
+    semanticPathCandidateGroups = @()
     unresolvedNodeCandidates = @()
     paths = @()
     values = @()
@@ -196,6 +249,7 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
         "sonic-hud-node-write-semantic-path-candidate" {
             $summary.semanticPathCandidateWrites++
             Add-UniqueSorted $semanticPathCandidates (Get-DetailToken $detail "semanticPathCandidate")
+            Add-SemanticPathCandidateGroup $semanticPathCandidateGroupsByKey $detail $eventObject
         }
         "sonic-hud-node-write-unresolved" {
             $summary.unresolvedNodeWrites++
@@ -237,6 +291,24 @@ $summary.paths = @($paths)
 $summary.values = @($values)
 $summary.sources = @($sources)
 $summary.semanticPathCandidates = @($semanticPathCandidates)
+$summary.semanticPathCandidateGroups = @(
+    $semanticPathCandidateGroupsByKey.Keys |
+        Sort-Object @{ Expression = { -1 * $semanticPathCandidateGroupsByKey[$_].writes } }, @{ Expression = { $_ } } |
+        ForEach-Object {
+            $group = $semanticPathCandidateGroupsByKey[$_]
+            [ordered]@{
+                path = $group.path
+                semanticValueName = $group.semanticValueName
+                writes = $group.writes
+                nodes = @($group.nodes)
+                kinds = @($group.kinds)
+                values = @($group.values)
+                sources = @($group.sources)
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
 $summary.unresolvedNodeCandidates = @(
     $unresolvedNodeCandidatesByNode.Keys |
         Sort-Object @{ Expression = { -1 * $unresolvedNodeCandidatesByNode[$_].writes } }, @{ Expression = { $_ } } |
@@ -294,6 +366,12 @@ Write-Output (
     $summary.unresolvedNodeCandidateCount)
 Write-Output ("semantic_path_candidates={0}" -f $summary.semanticPathCandidateWrites)
 Write-Output ("semantic_candidate_paths={0}" -f (Format-CandidateList $summary.semanticPathCandidates $CandidateValueLimit))
+Write-Output (
+    "semantic_candidate_groups={0}" -f
+    (Format-CandidateList (
+        $summary.semanticPathCandidateGroups |
+            ForEach-Object { "{0}:{1}={2}" -f $_.path, $_.semanticValueName, $_.writes }
+    ) $CandidateValueLimit))
 foreach ($candidate in $summary.unresolvedNodeCandidates) {
     Write-Output (
         "node_candidate node={0} writes={1} kinds={2} values={3} frames={4}-{5} likely={6} sources={7}" -f

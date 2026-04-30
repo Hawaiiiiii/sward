@@ -2246,6 +2246,59 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertNotIn("UnleashedRecomp_sward_ui_lab", script)
 
+    def test_ui_lab_phase190_groups_semantic_hud_path_candidate_stability(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "semanticPathCandidateGroups",
+            "Add-SemanticPathCandidateGroup",
+            "semantic_candidate_groups=",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 190",
+            "semantic candidate stability groups",
+            "semantic_candidate_groups",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":10,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=text node=0x1111 value=\\"042\\" valueCandidate=speed semanticValueName=speedKmh semanticPathCandidate=ui_playscreen/add/speed_count/position/num_speed source=same-frame-hud-update-context:sub_824D6418 pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                        '{"time":2.0,"frame":20,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=text node=0x2222 value=\\"043\\" valueCandidate=speed semanticValueName=speedKmh semanticPathCandidate=ui_playscreen/add/speed_count/position/num_speed source=same-frame-hud-update-context:sub_824D6418 pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                        '{"time":3.0,"frame":30,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=pattern-index node=0x3333 value=\\"1\\" valueCandidate=tutorial semanticValueName=tutorialPrompt semanticPathCandidate=ui_playscreen/add/u_info source=same-frame-hud-update-context:sub_824D7100 pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("semantic_candidate_groups=ui_playscreen/add/speed_count/position/num_speed:speedKmh=2,ui_playscreen/add/u_info:tutorialPrompt=1", completed.stdout)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
