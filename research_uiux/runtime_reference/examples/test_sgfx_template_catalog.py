@@ -1041,6 +1041,42 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("sonic_day_hud_gauge_child_path=value=ringEnergyGauge:exact_parent=ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color:representative_child=ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483:draw_layers=20:resolution=live-bridge/ui-draw-list:node_join=setter-node-address-join-pending", completed.stdout)
         self.assertIn("gameplay_numeric_binding=boost/energy:exact-runtime-draw-child-paths-known,setter-node-address-join:pending,controller-value-update:still-requires-setter-node-match,audio:pending-exact-sfx-id", completed.stdout)
 
+    def test_phase195_sonic_day_hud_controller_binds_gauge_setter_child_path_joins(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+        report = self.read(REPORT)
+
+        for token in [
+            "SonicDayHudRuntimeGaugeSetterChildPathJoin",
+            "applyRuntimeGaugeSetterChildPathJoin",
+            "formatSonicDayHudRuntimeGaugeSetterChildPathJoin",
+            "formatSonicDayHudRuntimeBindingPhase195SmokeSequence",
+            "setter-node-address-join-runtime-proven",
+        ]:
+            self.assertIn(token, header + source)
+
+        self.assertIn("--phase195-sonic-hud-gauge-setter-join-smoke", example)
+        self.assertIn("Phase 195", report)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase195-sonic-hud-gauge-setter-join-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase195 sonic hud gauge setter join smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_gauge_setter_child_join=value=boostGauge:node=0xEA09708:kind=scale:value=0.650:exact_parent=ui_playscreen/so_speed_gauge/position/speed_gauge_color:exact_child=ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506:join=runtime-draw-list-cast-node-match:binding_status=setter-node-address-join-runtime-proven", completed.stdout)
+        self.assertIn("sonic_day_hud_gauge_setter_child_join=value=ringEnergyGauge:node=0xEA0A990:kind=scale:value=0.425:exact_parent=ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color:exact_child=ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483:join=runtime-draw-list-cast-node-match:binding_status=setter-node-address-join-runtime-proven", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=phase195-gauge-setter-child-join:rings=000:score=000000000:time=00:00:00:speed=000:boost=0.650:energy=0.425:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
+        self.assertIn("gameplay_numeric_binding=boost/energy:setter-node-address-join-runtime-proven,controller-value-update:runtime-proven-via-exact-gauge-child-path,audio:pending-exact-sfx-id", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

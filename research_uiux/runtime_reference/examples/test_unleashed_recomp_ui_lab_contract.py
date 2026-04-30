@@ -2486,6 +2486,98 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             completed.stdout,
         )
 
+    def test_ui_lab_phase195_joins_gauge_setter_nodes_to_exact_draw_child_paths(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "gaugeSetterChildPathJoins",
+            "gauge_setter_child_path_joins=",
+            "runtime-draw-list-setter-node-joined",
+            "setter-node-address-join-runtime-proven",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 195",
+            "setter-node address join",
+            "runtime-draw-list-setter-node-joined",
+            "ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506",
+            "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            events = tmp_path / "ui_lab_events.jsonl"
+            draw_list = tmp_path / "ui_draw_list.json"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":10,"event":"sonic-hud-node-write-unresolved","detail":"kind=scale node=0xBBBB value=\\"0.650\\" source=CSD::CNode::SetScale/sub_830BF090 reason=ui_playscreen-active-path-unresolved callsiteCandidate=boost-ring-energy semanticPathCandidate=ui_playscreen/so_speed_gauge semanticValueName=boostGauge pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                        '{"time":1.1,"frame":10,"event":"sonic-hud-node-write-unresolved","detail":"kind=scale node=0xDDDD value=\\"0.425\\" source=CSD::CNode::SetScale/sub_830BF090 reason=ui_playscreen-active-path-unresolved callsiteCandidate=boost-ring-energy semanticPathCandidate=ui_playscreen/so_ringenagy_gauge semanticValueName=ringEnergyGauge pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                        '{"time":1.2,"frame":10,"event":"sonic-hud-node-write-unresolved","detail":"kind=pattern-index node=0x9999 value=\\"1\\" source=CSD::CNode::SetPatternIndex/sub_830BF300 reason=ui_playscreen-active-path-unresolved callsiteCandidate=boost-ring-energy semanticPathCandidate=ui_playscreen/so_speed_gauge semanticValueName=boostGauge pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            draw_list.write_text(
+                json.dumps(
+                    {
+                        "uiDrawListOracle": {
+                            "drawCalls": [
+                                {
+                                    "layerPath": "ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506",
+                                    "layerAddress": "0xAAAA",
+                                    "castNodeAddress": "0xBBBB",
+                                },
+                                {
+                                    "layerPath": "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483",
+                                    "layerAddress": "0xCCCC",
+                                    "castNodeAddress": "0xDDDD",
+                                },
+                            ]
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                    "-DrawListPath",
+                    str(draw_list),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn(
+            "gauge_setter_child_path_joins=0xBBBB:boostGauge:scale:cast-node:ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506=1,0xDDDD:ringEnergyGauge:scale:cast-node:ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483=1",
+            completed.stdout,
+        )
+        self.assertIn(
+            "gauge_setter_node_candidates=0xBBBB:boostGauge:scale:ui_playscreen/so_speed_gauge=1,0xDDDD:ringEnergyGauge:scale:ui_playscreen/so_ringenagy_gauge=1,0x9999:boostGauge:pattern-index:ui_playscreen/so_speed_gauge=1",
+            completed.stdout,
+        )
+        self.assertIn(
+            "gauge_child_path_status=runtime-draw-list-setter-node-joined",
+            completed.stdout,
+        )
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")

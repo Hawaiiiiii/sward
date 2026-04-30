@@ -153,6 +153,26 @@ function Get-GaugeDrawPathInfo([string]$LayerPath) {
     return $null
 }
 
+function New-GaugeDrawCallRecord($DrawCall) {
+    $layerPath = [string]$DrawCall.layerPath
+    if ([string]::IsNullOrWhiteSpace($layerPath)) {
+        return $null
+    }
+
+    $info = Get-GaugeDrawPathInfo $layerPath
+    if ($null -eq $info) {
+        return $null
+    }
+
+    return [ordered]@{
+        parentPath = $info.parent
+        semanticValueName = $info.semanticValueName
+        childPath = $layerPath
+        layerAddress = [string]$DrawCall.layerAddress
+        castNodeAddress = [string]$DrawCall.castNodeAddress
+    }
+}
+
 function Add-GaugeDrawPathGroup($Groups, $DrawCall) {
     $layerPath = [string]$DrawCall.layerPath
     if ([string]::IsNullOrWhiteSpace($layerPath)) {
@@ -186,6 +206,55 @@ function Get-DrawListCalls($DrawListObject) {
     }
 
     return @()
+}
+
+function Get-CompositeTokens($Values) {
+    $tokens = [System.Collections.Generic.List[string]]::new()
+    foreach ($value in @($Values)) {
+        foreach ($part in ([string]$value -split "\|")) {
+            $trimmed = $part.Trim()
+            if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
+                [void]$tokens.Add($trimmed)
+            }
+        }
+    }
+    return @($tokens)
+}
+
+function Test-SemanticPathCandidateMatchesGaugeDraw([string[]]$SemanticPathCandidates, [string]$GaugeParentPath) {
+    foreach ($candidatePath in (Get-CompositeTokens $SemanticPathCandidates)) {
+        if ($candidatePath -eq $GaugeParentPath) {
+            return $true
+        }
+
+        if ($GaugeParentPath.StartsWith($candidatePath + "/")) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-SemanticValueNameMatchesGaugeDraw([string[]]$SemanticValueNames, [string]$DrawValueName) {
+    $tokens = @(Get-CompositeTokens $SemanticValueNames)
+    if ($tokens.Count -eq 0) {
+        return $false
+    }
+
+    return $tokens -contains $DrawValueName
+}
+
+function New-GaugeSetterChildPathJoin($Candidate, $DrawCall, [string]$AddressMatchKind) {
+    return [ordered]@{
+        node = $Candidate.node
+        writes = $Candidate.writes
+        kinds = @($Candidate.kinds)
+        semanticValueName = $DrawCall.semanticValueName
+        exactParentPath = $DrawCall.parentPath
+        exactChildPath = $DrawCall.childPath
+        addressMatchKind = $AddressMatchKind
+        nodeJoinStatus = "setter-node-address-join-runtime-proven"
+    }
 }
 
 function Get-UnresolvedNodeCandidateLabel($Candidate) {
@@ -239,6 +308,9 @@ $unresolvedNodeCandidatesByNode = @{}
 $semanticPathCandidateGroupsByKey = @{}
 $semanticBoundGroupsByKey = @{}
 $gaugeDrawPathGroupsByKey = @{}
+$gaugeDrawCalls = @()
+$gaugeDrawCastNodeAddresses = [System.Collections.Generic.SortedSet[string]]::new()
+$gaugeDrawLayerAddresses = [System.Collections.Generic.SortedSet[string]]::new()
 $manualObserverHudPaths = @(
     "ui_playscreen/so_speed_gauge",
     "ui_playscreen/so_ringenagy_gauge",
@@ -269,6 +341,7 @@ $summary = [ordered]@{
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
+    gaugeSetterChildPathJoins = @()
     gaugeChildPathStatus = "pending-runtime-ui-draw-list"
     unresolvedNodeCandidates = @()
     paths = @()
@@ -382,6 +455,12 @@ if (-not [string]::IsNullOrWhiteSpace($DrawListPath)) {
         $drawListObject = Get-Content -Raw -LiteralPath $resolvedDrawListPath.Path | ConvertFrom-Json
         foreach ($drawCall in (Get-DrawListCalls $drawListObject)) {
             Add-GaugeDrawPathGroup $gaugeDrawPathGroupsByKey $drawCall
+            $drawRecord = New-GaugeDrawCallRecord $drawCall
+            if ($null -ne $drawRecord) {
+                $gaugeDrawCalls += $drawRecord
+                Add-UniqueSorted $gaugeDrawLayerAddresses $drawRecord.layerAddress
+                Add-UniqueSorted $gaugeDrawCastNodeAddresses $drawRecord.castNodeAddress
+            }
         }
     }
     catch {
@@ -472,8 +551,12 @@ $summary.gaugeSetterNodeCandidates = @(
             $_.likely -eq "gauge-or-prompt-candidate" -and
             @($_.semanticPathCandidates).Count -gt 0
         } |
-        Sort-Object @{ Expression = { -1 * $_.writes } }, @{ Expression = { $_.node } } |
         ForEach-Object {
+            $joinStatus = "setter-node-address-join-pending"
+            if ($gaugeDrawCastNodeAddresses.Contains($_.node) -or $gaugeDrawLayerAddresses.Contains($_.node)) {
+                $joinStatus = "setter-node-address-join-runtime-proven"
+            }
+
             [ordered]@{
                 node = $_.node
                 writes = $_.writes
@@ -482,11 +565,45 @@ $summary.gaugeSetterNodeCandidates = @(
                 semanticPathCandidates = @($_.semanticPathCandidates)
                 firstFrame = $_.firstFrame
                 lastFrame = $_.lastFrame
-                nodeJoinStatus = "setter-node-address-join-pending"
+                nodeJoinStatus = $joinStatus
             }
-        }
+        } |
+        Sort-Object `
+            @{ Expression = { if ($_.nodeJoinStatus -eq "setter-node-address-join-runtime-proven") { 0 } else { 1 } } }, `
+            @{ Expression = { -1 * $_.writes } }, `
+            @{ Expression = { $_.node } }
 )
-if ($summary.gaugeDrawPathGroups.Count -gt 0) {
+$summary.gaugeSetterChildPathJoins = @(
+    foreach ($candidate in $summary.gaugeSetterNodeCandidates) {
+        foreach ($drawCall in $gaugeDrawCalls) {
+            $addressMatchKind = ""
+            if ($candidate.node -eq $drawCall.castNodeAddress) {
+                $addressMatchKind = "cast-node"
+            }
+            elseif ($candidate.node -eq $drawCall.layerAddress) {
+                $addressMatchKind = "layer"
+            }
+
+            if ([string]::IsNullOrWhiteSpace($addressMatchKind)) {
+                continue
+            }
+
+            if (-not (Test-SemanticValueNameMatchesGaugeDraw $candidate.semanticValueNames $drawCall.semanticValueName)) {
+                continue
+            }
+
+            if (-not (Test-SemanticPathCandidateMatchesGaugeDraw $candidate.semanticPathCandidates $drawCall.parentPath)) {
+                continue
+            }
+
+            New-GaugeSetterChildPathJoin $candidate $drawCall $addressMatchKind
+        }
+    }
+)
+if ($summary.gaugeSetterChildPathJoins.Count -gt 0) {
+    $summary.gaugeChildPathStatus = "runtime-draw-list-setter-node-joined"
+}
+elseif ($summary.gaugeDrawPathGroups.Count -gt 0) {
     $summary.gaugeChildPathStatus = "runtime-draw-list-exact-child-paths;setter-node-address-join-pending"
 }
 
@@ -558,6 +675,20 @@ Write-Output (
                     (Format-CandidateList $_.semanticValueNames $CandidateValueLimit),
                     (Format-CandidateList $_.kinds $CandidateValueLimit),
                     (Format-CandidateList $_.semanticPathCandidates $CandidateValueLimit),
+                    $_.writes
+            }
+    ) $CandidateValueLimit))
+Write-Output (
+    "gauge_setter_child_path_joins={0}" -f
+    (Format-CandidateList (
+        $summary.gaugeSetterChildPathJoins |
+            ForEach-Object {
+                "{0}:{1}:{2}:{3}:{4}={5}" -f
+                    $_.node,
+                    $_.semanticValueName,
+                    (Format-CandidateList $_.kinds $CandidateValueLimit),
+                    $_.addressMatchKind,
+                    $_.exactChildPath,
                     $_.writes
             }
     ) $CandidateValueLimit))

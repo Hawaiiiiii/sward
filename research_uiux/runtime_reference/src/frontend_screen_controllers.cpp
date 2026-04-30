@@ -405,6 +405,34 @@ std::vector<SonicDayHudRuntimeGaugeChildPathResolution> makeRuntimePhase194Gauge
     };
 }
 
+std::vector<SonicDayHudRuntimeGaugeSetterChildPathJoin> makeRuntimePhase195GaugeSetterChildPathJoins()
+{
+    return {
+        {
+            "boostGauge",
+            "0xEA09708",
+            "scale",
+            0.650,
+            true,
+            "ui_playscreen/so_speed_gauge/position/speed_gauge_color",
+            "ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506",
+            "runtime-draw-list-cast-node-match",
+            "setter-node-address-join-runtime-proven",
+        },
+        {
+            "ringEnergyGauge",
+            "0xEA0A990",
+            "scale",
+            0.425,
+            true,
+            "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color",
+            "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483",
+            "runtime-draw-list-cast-node-match",
+            "setter-node-address-join-runtime-proven",
+        },
+    };
+}
+
 bool isSemanticBoundRuntimeObservation(const SonicDayHudRuntimeSemanticPathCandidateObservation& observation)
 {
     return observation.bindingStatus == "semantic-bound-pending-exact-child-node-resolution";
@@ -1066,6 +1094,56 @@ FrontendControllerFrame SonicDayHudController::applyRuntimeSemanticPathCandidate
     return frame_;
 }
 
+FrontendControllerFrame SonicDayHudController::applyRuntimeGaugeSetterChildPathJoin(
+    const SonicDayHudRuntimeGaugeSetterChildPathJoin& observation)
+{
+    if (!observation.numericValueKnown || observation.bindingStatus != "setter-node-address-join-runtime-proven")
+        return frame_;
+
+    bool applied = false;
+    if (
+        observation.writeKind == "scale" &&
+        observation.valueName == "boostGauge" &&
+        observation.exactParentPath == "ui_playscreen/so_speed_gauge/position/speed_gauge_color")
+    {
+        gameplayState_.boostGauge = std::clamp(observation.numericValue, 0.0, 1.0);
+        gameplayState_.provenance.boostGauge = observation.exactChildPath;
+        applied = true;
+    }
+    else if (
+        observation.writeKind == "scale" &&
+        observation.valueName == "ringEnergyGauge" &&
+        observation.exactParentPath == "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color")
+    {
+        gameplayState_.ringEnergyGauge = std::clamp(observation.numericValue, 0.0, 1.0);
+        gameplayState_.provenance.ringEnergyGauge = observation.exactChildPath;
+        applied = true;
+    }
+
+    if (!applied)
+        return frame_;
+
+    gameplayState_.provenance.valueSource =
+        observation.addressJoinSource + ":" + observation.nodeAddress +
+        "@" + observation.exactChildPath +
+        ":status=" + observation.bindingStatus;
+    gameplayState_.lastSfxHook = "none";
+    gameplayState_.sfxCueId = "audio-id-pending";
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        frame_.frame + 1,
+        "runtime-gauge-setter-child-join",
+        observation.addressJoinSource,
+        false,
+        0,
+        "none",
+        "none",
+        "none",
+        sonicHudSceneNames(gameplayState_.tutorialVisible));
+    return frame_;
+}
+
 FrontendControllerFrame SonicDayHudController::applyRuntimeCallsiteSample(
     const SonicDayHudRuntimeCallsiteSample& sample)
 {
@@ -1448,6 +1526,23 @@ std::string formatSonicDayHudRuntimeGaugeChildPathResolution(
     return out.str();
 }
 
+std::string formatSonicDayHudRuntimeGaugeSetterChildPathJoin(
+    const SonicDayHudRuntimeGaugeSetterChildPathJoin& observation)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_gauge_setter_child_join="
+        << "value=" << observation.valueName
+        << ":node=" << observation.nodeAddress
+        << ":kind=" << observation.writeKind
+        << ":value=" << std::fixed << std::setprecision(3) << observation.numericValue
+        << ":exact_parent=" << observation.exactParentPath
+        << ":exact_child=" << observation.exactChildPath
+        << ":join=" << observation.addressJoinSource
+        << ":binding_status=" << observation.bindingStatus
+        << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage)
 {
     std::ostringstream out;
@@ -1728,6 +1823,27 @@ std::string formatSonicDayHudRuntimeBindingPhase194SmokeSequence()
         << "boost/energy:exact-runtime-draw-child-paths-known,"
         << "setter-node-address-join:pending,"
         << "controller-value-update:still-requires-setter-node-match,"
+        << "audio:pending-exact-sfx-id"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase195SmokeSequence()
+{
+    SonicDayHudController hud;
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+
+    std::ostringstream out;
+    for (const auto& observation : makeRuntimePhase195GaugeSetterChildPathJoins())
+    {
+        out << formatSonicDayHudRuntimeGaugeSetterChildPathJoin(observation);
+        (void)hud.applyRuntimeGaugeSetterChildPathJoin(observation);
+    }
+
+    out << formatSonicDayHudGameplayState("phase195-gauge-setter-child-join", hud.gameplayState());
+    out << "gameplay_numeric_binding="
+        << "boost/energy:setter-node-address-join-runtime-proven,"
+        << "controller-value-update:runtime-proven-via-exact-gauge-child-path,"
         << "audio:pending-exact-sfx-id"
         << '\n';
     return out.str();
