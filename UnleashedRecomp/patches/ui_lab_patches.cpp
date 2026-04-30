@@ -440,6 +440,8 @@ namespace UiLab
         std::string callsiteCorrelationSource;
         std::string callsiteCorrelationStatus;
         int32_t callsiteCorrelationFrameDelta = 0;
+        std::string semanticPathCandidate;
+        std::string semanticValueName;
         uint64_t frame = 0;
     };
 
@@ -450,6 +452,12 @@ namespace UiLab
         std::string source;
         std::string status;
         int32_t frameDelta = 0;
+    };
+
+    struct SonicHudSemanticPathCandidate
+    {
+        std::string path;
+        std::string valueName;
     };
 
     struct HudRenderGateCorrelationSnapshot
@@ -3307,6 +3315,86 @@ namespace UiLab
         return {};
     }
 
+    static std::vector<SonicHudSemanticPathCandidate> ResolveSonicHudSemanticPathCandidateFromCallsiteCorrelation(
+        std::string_view writeKind,
+        std::string_view valueCandidate)
+    {
+        std::string baseKind(writeKind);
+        constexpr std::string_view unresolvedSuffix = "-unresolved";
+        if (
+            baseKind.size() > unresolvedSuffix.size() &&
+            std::string_view(baseKind).substr(baseKind.size() - unresolvedSuffix.size()) == unresolvedSuffix)
+        {
+            baseKind.resize(baseKind.size() - unresolvedSuffix.size());
+        }
+        std::vector<SonicHudSemanticPathCandidate> candidates;
+
+        if (valueCandidate == "timer")
+        {
+            candidates.push_back({ "ui_playscreen/time_count/time001", "elapsedFrames" });
+            return candidates;
+        }
+
+        if (valueCandidate == "speed")
+        {
+            candidates.push_back({ "ui_playscreen/add/speed_count/position/num_speed", "speedKmh" });
+            return candidates;
+        }
+
+        if (valueCandidate == "boost-ring-energy")
+        {
+            // sub_824D6C18 touches the shared rolling counter/gauge lane. Keep
+            // both stable scene candidates until an exact child-node path proves
+            // whether this sample is the boost meter or the ring-energy meter.
+            if (baseKind == "scale" || baseKind == "text" || baseKind == "pattern-index")
+            {
+                candidates.push_back({ "ui_playscreen/so_speed_gauge", "boostGauge" });
+                candidates.push_back({ "ui_playscreen/so_ringenagy_gauge", "ringEnergyGauge" });
+            }
+            return candidates;
+        }
+
+        if (valueCandidate == "tutorial")
+        {
+            candidates.push_back({ "ui_playscreen/add/u_info", "tutorialPrompt" });
+            return candidates;
+        }
+
+        return candidates;
+    }
+
+    static std::string JoinSonicHudSemanticPathCandidates(
+        const std::vector<SonicHudSemanticPathCandidate>& candidates)
+    {
+        std::string joined;
+        for (const auto& candidate : candidates)
+        {
+            if (candidate.path.empty())
+                continue;
+
+            if (!joined.empty())
+                joined += "|";
+            joined += candidate.path;
+        }
+        return joined;
+    }
+
+    static std::string JoinSonicHudSemanticValueNames(
+        const std::vector<SonicHudSemanticPathCandidate>& candidates)
+    {
+        std::string joined;
+        for (const auto& candidate : candidates)
+        {
+            if (candidate.valueName.empty())
+                continue;
+
+            if (!joined.empty())
+                joined += "|";
+            joined += candidate.valueName;
+        }
+        return joined;
+    }
+
     static std::string SonicHudHookNameFromUpdateContext(std::string_view hookSource)
     {
         if (hookSource.find("sub_824D6048") != std::string_view::npos)
@@ -3557,7 +3645,9 @@ namespace UiLab
         std::string_view logValue,
         bool pathResolved,
         std::string_view pathResolutionSource,
-        const SonicHudNodeWriteCallsiteCorrelation* callsiteCorrelation = nullptr)
+        const SonicHudNodeWriteCallsiteCorrelation* callsiteCorrelation = nullptr,
+        std::string_view semanticPathCandidate = {},
+        std::string_view semanticValueName = {})
     {
         std::string logKey =
             std::string(writeKind) + "|" + std::string(path) + "|" + std::string(logValue) +
@@ -3588,6 +3678,8 @@ namespace UiLab
             observation.callsiteCorrelationStatus = callsiteCorrelation->status;
             observation.callsiteCorrelationFrameDelta = callsiteCorrelation->frameDelta;
         }
+        observation.semanticPathCandidate = std::string(semanticPathCandidate);
+        observation.semanticValueName = std::string(semanticValueName);
         observation.frame = g_presentedFrameCount;
 
         auto existing = std::find_if(
@@ -3636,6 +3728,15 @@ namespace UiLab
         const std::string unresolvedKind = std::string(writeKind) + "-unresolved";
         const SonicHudNodeWriteCallsiteCorrelation callsiteCorrelation =
             CorrelateUnresolvedSonicHudNodeWriteWithCallsite(writeKind, nodeAddress);
+        const auto semanticCandidates = callsiteCorrelation.known
+            ? ResolveSonicHudSemanticPathCandidateFromCallsiteCorrelation(
+                writeKind,
+                callsiteCorrelation.valueCandidate)
+            : std::vector<SonicHudSemanticPathCandidate>{};
+        const std::string semanticPathCandidate =
+            JoinSonicHudSemanticPathCandidates(semanticCandidates);
+        const std::string semanticValueName =
+            JoinSonicHudSemanticValueNames(semanticCandidates);
         const bool shouldLog = RecordSonicHudNodeWriteObservation(
             unresolvedKind,
             "unknown",
@@ -3649,7 +3750,9 @@ namespace UiLab
             valueText,
             false,
             "pending-ui-draw-list-late-resolve",
-            &callsiteCorrelation);
+            &callsiteCorrelation,
+            semanticPathCandidate,
+            semanticValueName);
 
         if (shouldLog)
         {
@@ -3657,7 +3760,12 @@ namespace UiLab
                 ? " callsiteCandidate=" + callsiteCorrelation.valueCandidate +
                     " callsiteSource=" + callsiteCorrelation.source +
                     " callsiteStatus=" + callsiteCorrelation.status +
-                    " callsiteFrameDelta=" + std::to_string(callsiteCorrelation.frameDelta)
+                    " callsiteFrameDelta=" + std::to_string(callsiteCorrelation.frameDelta) +
+                    (semanticPathCandidate.empty()
+                        ? std::string()
+                        : " semanticPathCandidate=" + semanticPathCandidate +
+                            " semanticValueName=" + semanticValueName +
+                            " pathResolutionSource=generated-PPC-callsite-semantic-candidate")
                 : std::string();
 
             WriteEvidenceEvent(
@@ -3678,6 +3786,23 @@ namespace UiLab
                     " source=" + callsiteCorrelation.source +
                     " status=" + callsiteCorrelation.status +
                     " frameDelta=" + std::to_string(callsiteCorrelation.frameDelta));
+
+                for (const auto& candidate : semanticCandidates)
+                {
+                    WriteEvidenceEvent(
+                        "sonic-hud-node-write-semantic-path-candidate",
+                        "kind=" + std::string(writeKind) +
+                        " node=" + HexU32(nodeAddress) +
+                        " value=\"" + std::string(valueText) + "\"" +
+                        " valueCandidate=" + callsiteCorrelation.valueCandidate +
+                        " semanticValueName=" + candidate.valueName +
+                        " semanticPathCandidate=" + candidate.path +
+                        " source=" + callsiteCorrelation.source +
+                        " status=" + callsiteCorrelation.status +
+                        " frameDelta=" + std::to_string(callsiteCorrelation.frameDelta) +
+                        " pathResolutionSource=generated-PPC-callsite-semantic-candidate" +
+                        " pathResolved=false");
+                }
             }
             WriteLiveStateSnapshot();
         }
@@ -3886,6 +4011,10 @@ namespace UiLab
                     << JsonEscape(observation.callsiteCorrelationStatus) << "\","
                 << "\"callsiteCorrelationFrameDelta\":"
                     << observation.callsiteCorrelationFrameDelta << ","
+                << "\"semanticPathCandidate\":\""
+                    << JsonEscape(observation.semanticPathCandidate) << "\","
+                << "\"semanticValueName\":\""
+                    << JsonEscape(observation.semanticValueName) << "\","
                 << "\"frame\":" << observation.frame
                 << "}";
         }

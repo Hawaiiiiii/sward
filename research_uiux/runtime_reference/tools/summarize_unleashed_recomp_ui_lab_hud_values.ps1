@@ -114,6 +114,7 @@ $resolvedEventsPath = Resolve-HudValueEventsPath $EventsPath $EvidenceDir
 $paths = [System.Collections.Generic.SortedSet[string]]::new()
 $values = [System.Collections.Generic.SortedSet[string]]::new()
 $sources = [System.Collections.Generic.SortedSet[string]]::new()
+$semanticPathCandidates = [System.Collections.Generic.SortedSet[string]]::new()
 $unresolvedNodeCandidatesByNode = @{}
 $manualObserverHudPaths = @(
     "ui_playscreen/so_speed_gauge",
@@ -136,6 +137,8 @@ $summary = [ordered]@{
     callsiteClassifications = 0
     unresolvedNodeWrites = 0
     unresolvedNodeCandidateCount = 0
+    semanticPathCandidateWrites = 0
+    semanticPathCandidates = @()
     unresolvedNodeCandidates = @()
     paths = @()
     values = @()
@@ -190,6 +193,10 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
         "sonic-hud-callsite-value-classified" {
             $summary.callsiteClassifications++
         }
+        "sonic-hud-node-write-semantic-path-candidate" {
+            $summary.semanticPathCandidateWrites++
+            Add-UniqueSorted $semanticPathCandidates (Get-DetailToken $detail "semanticPathCandidate")
+        }
         "sonic-hud-node-write-unresolved" {
             $summary.unresolvedNodeWrites++
 
@@ -222,12 +229,14 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
         Add-UniqueSorted $paths (Get-DetailToken $detail "path")
         Add-UniqueSorted $values (Get-DetailToken $detail "value")
         Add-UniqueSorted $sources (Get-DetailToken $detail "source")
+        Add-UniqueSorted $semanticPathCandidates (Get-DetailToken $detail "semanticPathCandidate")
     }
 }
 
 $summary.paths = @($paths)
 $summary.values = @($values)
 $summary.sources = @($sources)
+$summary.semanticPathCandidates = @($semanticPathCandidates)
 $summary.unresolvedNodeCandidates = @(
     $unresolvedNodeCandidatesByNode.Keys |
         Sort-Object @{ Expression = { -1 * $unresolvedNodeCandidatesByNode[$_].writes } }, @{ Expression = { $_ } } |
@@ -255,6 +264,7 @@ if (
     $summary.gameplayUpdates -gt 0 -or
     $summary.gameplayValueSnapshots -gt 0 -or
     $summary.callsiteClassifications -gt 0 -or
+    $summary.semanticPathCandidateWrites -gt 0 -or
     $summary.unresolvedNodeWrites -gt 0)
 {
     $summary.status = "sonic-hud-value-events-found"
@@ -282,6 +292,8 @@ Write-Output (
     "unresolved_node_writes={0}:node_candidates={1}" -f
     $summary.unresolvedNodeWrites,
     $summary.unresolvedNodeCandidateCount)
+Write-Output ("semantic_path_candidates={0}" -f $summary.semanticPathCandidateWrites)
+Write-Output ("semantic_candidate_paths={0}" -f (Format-CandidateList $summary.semanticPathCandidates $CandidateValueLimit))
 foreach ($candidate in $summary.unresolvedNodeCandidates) {
     Write-Output (
         "node_candidate node={0} writes={1} kinds={2} values={3} frames={4}-{5} likely={6} sources={7}" -f

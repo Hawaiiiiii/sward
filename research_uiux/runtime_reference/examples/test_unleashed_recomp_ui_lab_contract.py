@@ -2150,6 +2150,102 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("Phase 187 moves F2 closer to the OG Profiler style", pivot)
 
+    def test_ui_lab_phase188_promotes_correlated_hud_nodes_to_semantic_path_candidates(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        pivot = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
+
+        for token in [
+            "SonicHudSemanticPathCandidate",
+            "ResolveSonicHudSemanticPathCandidateFromCallsiteCorrelation",
+            "semanticPathCandidate",
+            "semanticValueName",
+            "generated-PPC-callsite-semantic-candidate",
+            "sonic-hud-node-write-semantic-path-candidate",
+            "ui_playscreen/add/speed_count/position/num_speed",
+            "ui_playscreen/so_speed_gauge",
+            "ui_playscreen/so_ringenagy_gauge",
+            "ui_playscreen/add/u_info",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "semanticPathCandidates",
+            "sonic-hud-node-write-semantic-path-candidate",
+            "semantic_candidate_paths=",
+            "semantic_path_candidates=",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 188",
+            "semantic path candidates",
+            "ui_playscreen/add/speed_count/position/num_speed",
+            "ui_playscreen/so_speed_gauge",
+            "ui_playscreen/so_ringenagy_gauge",
+            "ui_playscreen/add/u_info",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 188", pivot)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":10,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=text node=0x1111 value=\\"042\\" valueCandidate=speed semanticValueName=speedKmh semanticPathCandidate=ui_playscreen/add/speed_count/position/num_speed source=same-frame-hud-update-context:sub_824D6418 pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                        '{"time":2.0,"frame":20,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=scale node=0x2222 value=\\"0.500\\" valueCandidate=boost-ring-energy semanticValueName=boostGauge semanticPathCandidate=ui_playscreen/so_speed_gauge source=same-frame-hud-update-context:sub_824D6C18 pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                        '{"time":3.0,"frame":30,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=scale node=0x3333 value=\\"0.750\\" valueCandidate=boost-ring-energy semanticValueName=ringEnergyGauge semanticPathCandidate=ui_playscreen/so_ringenagy_gauge source=same-frame-hud-update-context:sub_824D6C18 pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                        '{"time":4.0,"frame":40,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=pattern-index node=0x4444 value=\\"1\\" valueCandidate=tutorial semanticValueName=tutorialPrompt semanticPathCandidate=ui_playscreen/add/u_info source=same-frame-hud-update-context:sub_824D7100 pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("semantic_path_candidates=4", completed.stdout)
+        self.assertIn(
+            "semantic_candidate_paths=ui_playscreen/add/speed_count/position/num_speed,ui_playscreen/add/u_info,ui_playscreen/so_ringenagy_gauge,ui_playscreen/so_speed_gauge",
+            completed.stdout,
+        )
+
+    def test_ui_lab_manual_launcher_uses_complete_install_root_and_cwd_mode(self):
+        script = self.read("research_uiux/runtime_reference/tools/launch_unleashed_recomp_ui_lab_manual.ps1")
+
+        for token in [
+            "Unleashed Recomp - Windows (Complete Installation) 1.0.3",
+            "sward_ui_lab_runtime_manual",
+            "--use-cwd",
+            "--ui-lab-observer",
+            "--ui-lab-live-bridge",
+            "Start-Process",
+            "$installRootResolved",
+            "$sidecarRoot",
+            "Copy-Item",
+        ]:
+            self.assertIn(token, script)
+
+        self.assertNotIn("UnleashedRecomp_sward_ui_lab", script)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
