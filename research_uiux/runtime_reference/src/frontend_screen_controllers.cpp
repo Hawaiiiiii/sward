@@ -433,6 +433,34 @@ std::vector<SonicDayHudRuntimeGaugeSetterChildPathJoin> makeRuntimePhase195Gauge
     };
 }
 
+std::vector<SonicDayHudRuntimeRollingGaugeCounterObservation> makeRuntimePhase196RollingGaugeCounterObservations()
+{
+    return {
+        {
+            "boostGauge",
+            "0x82914B0",
+            "ui_playscreen/so_speed_gauge",
+            "text",
+            "530",
+            "sub_824D6C18",
+            2,
+            "rolling-counter-text-candidate-pending-gauge-state-normalization",
+            "phase196-live:sonic-hud-node-write-semantic-path-candidate:same-frame-hud-update-context:sub_824D6C18",
+        },
+        {
+            "ringEnergyGauge",
+            "0x82914B0",
+            "ui_playscreen/so_ringenagy_gauge",
+            "text",
+            "530",
+            "sub_824D6C18",
+            1,
+            "rolling-counter-text-candidate-pending-gauge-state-normalization",
+            "phase196-live:sonic-hud-node-write-semantic-path-candidate:same-frame-hud-update-context:sub_824D6C18",
+        },
+    };
+}
+
 bool isSemanticBoundRuntimeObservation(const SonicDayHudRuntimeSemanticPathCandidateObservation& observation)
 {
     return observation.bindingStatus == "semantic-bound-pending-exact-child-node-resolution";
@@ -1144,6 +1172,34 @@ FrontendControllerFrame SonicDayHudController::applyRuntimeGaugeSetterChildPathJ
     return frame_;
 }
 
+FrontendControllerFrame SonicDayHudController::applyRuntimeRollingGaugeCounterObservation(
+    const SonicDayHudRuntimeRollingGaugeCounterObservation& observation)
+{
+    if (observation.callsite != "sub_824D6C18" || observation.writeKind != "text")
+        return frame_;
+
+    if (observation.valueName != "boostGauge" && observation.valueName != "ringEnergyGauge")
+        return frame_;
+
+    gameplayState_.provenance.valueSource =
+        observation.source + ":" + observation.nodeAddress +
+        "@" + observation.path +
+        ":status=" + observation.bindingStatus;
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        frame_.frame + 1,
+        "runtime-rolling-counter-candidate",
+        observation.source.empty() ? "sonic-hud-node-write-semantic-path-candidate" : observation.source,
+        false,
+        0,
+        "none",
+        "none",
+        "none",
+        sonicHudSceneNames(gameplayState_.tutorialVisible));
+    return frame_;
+}
+
 FrontendControllerFrame SonicDayHudController::applyRuntimeCallsiteSample(
     const SonicDayHudRuntimeCallsiteSample& sample)
 {
@@ -1543,6 +1599,23 @@ std::string formatSonicDayHudRuntimeGaugeSetterChildPathJoin(
     return out.str();
 }
 
+std::string formatSonicDayHudRuntimeRollingGaugeCounterObservation(
+    const SonicDayHudRuntimeRollingGaugeCounterObservation& observation)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_rolling_gauge_counter="
+        << "value=" << observation.valueName
+        << ":node=" << observation.nodeAddress
+        << ":path=" << observation.path
+        << ":kind=" << observation.writeKind
+        << ":text=" << observation.textUtf8
+        << ":callsite=" << observation.callsite
+        << ":counter_writes=" << observation.counterWriteCount
+        << ":status=" << observation.bindingStatus
+        << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage)
 {
     std::ostringstream out;
@@ -1844,6 +1917,27 @@ std::string formatSonicDayHudRuntimeBindingPhase195SmokeSequence()
     out << "gameplay_numeric_binding="
         << "boost/energy:setter-node-address-join-runtime-proven,"
         << "controller-value-update:runtime-proven-via-exact-gauge-child-path,"
+        << "audio:pending-exact-sfx-id"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase196SmokeSequence()
+{
+    SonicDayHudController hud;
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+
+    std::ostringstream out;
+    for (const auto& observation : makeRuntimePhase196RollingGaugeCounterObservations())
+    {
+        out << formatSonicDayHudRuntimeRollingGaugeCounterObservation(observation);
+        (void)hud.applyRuntimeRollingGaugeCounterObservation(observation);
+    }
+
+    out << formatSonicDayHudGameplayState("phase196-rolling-counter-candidate", hud.gameplayState());
+    out << "gameplay_numeric_binding="
+        << "boost/energy:rolling-counter-text-candidate-pending-gauge-state-normalization,"
+        << "setter-node-address-join:still-required-for-final-gauge-values,"
         << "audio:pending-exact-sfx-id"
         << '\n';
     return out.str();

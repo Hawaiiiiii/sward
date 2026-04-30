@@ -2578,6 +2578,73 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             completed.stdout,
         )
 
+    def test_ui_lab_phase196_groups_sub_824d6c18_rolling_counter_text_candidates(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "rollingCounterSemanticGroups",
+            "rolling_counter_semantic_groups=",
+            "boost_ring_energy_status=",
+            "rolling-counter-text-candidate-pending-gauge-state-normalization",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 196",
+            "sub_824D6C18",
+            "rolling counter",
+            "pending gauge-state normalization",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":10,"event":"sonic-hud-node-write-unresolved","detail":"kind=text node=0x82914B0 value=\\"530\\" source=CSD::CNode::SetText/sub_830BF640 reason=ui_playscreen-active-path-unresolved callsiteCandidate=boost-ring-energy callsiteSource=same-frame-hud-update-context:sub_824D6C18 semanticPathCandidate=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge semanticValueName=boostGauge|ringEnergyGauge pathResolutionSource=generated-PPC-callsite-semantic-candidate"}',
+                        '{"time":1.1,"frame":10,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=text node=0x82914B0 value=\\"530\\" valueCandidate=boost-ring-energy semanticValueName=boostGauge semanticPathCandidate=ui_playscreen/so_speed_gauge source=same-frame-hud-update-context:sub_824D6C18 status=timer/speed/boost-ring-energy/tutorial pathResolutionSource=generated-PPC-callsite-semantic-candidate pathResolved=false"}',
+                        '{"time":1.2,"frame":10,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=text node=0x82914B0 value=\\"530\\" valueCandidate=boost-ring-energy semanticValueName=ringEnergyGauge semanticPathCandidate=ui_playscreen/so_ringenagy_gauge source=same-frame-hud-update-context:sub_824D6C18 status=timer/speed/boost-ring-energy/tutorial pathResolutionSource=generated-PPC-callsite-semantic-candidate pathResolved=false"}',
+                        '{"time":2.1,"frame":11,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=text node=0x96C6E70 value=\\"531\\" valueCandidate=boost-ring-energy semanticValueName=boostGauge semanticPathCandidate=ui_playscreen/so_speed_gauge source=same-frame-hud-update-context:sub_824D6C18 status=timer/speed/boost-ring-energy/tutorial pathResolutionSource=generated-PPC-callsite-semantic-candidate pathResolved=false"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn(
+            "rolling_counter_semantic_groups=ui_playscreen/so_speed_gauge:boostGauge:text:sub_824D6C18=2,ui_playscreen/so_ringenagy_gauge:ringEnergyGauge:text:sub_824D6C18=1",
+            completed.stdout,
+        )
+        self.assertIn(
+            "boost_ring_energy_status=rolling-counter-text-candidate-pending-gauge-state-normalization",
+            completed.stdout,
+        )
+        self.assertIn(
+            "gauge_child_path_status=pending-runtime-ui-draw-list",
+            completed.stdout,
+        )
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")

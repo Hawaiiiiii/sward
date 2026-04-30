@@ -1077,6 +1077,42 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("sonic_day_hud_state=phase=phase195-gauge-setter-child-join:rings=000:score=000000000:time=00:00:00:speed=000:boost=0.650:energy=0.425:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
         self.assertIn("gameplay_numeric_binding=boost/energy:setter-node-address-join-runtime-proven,controller-value-update:runtime-proven-via-exact-gauge-child-path,audio:pending-exact-sfx-id", completed.stdout)
 
+    def test_phase196_sonic_day_hud_controller_reports_rolling_counter_candidates_without_binding_values(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+        report = self.read(REPORT)
+
+        for token in [
+            "SonicDayHudRuntimeRollingGaugeCounterObservation",
+            "applyRuntimeRollingGaugeCounterObservation",
+            "formatSonicDayHudRuntimeRollingGaugeCounterObservation",
+            "formatSonicDayHudRuntimeBindingPhase196SmokeSequence",
+            "rolling-counter-text-candidate-pending-gauge-state-normalization",
+        ]:
+            self.assertIn(token, header + source)
+
+        self.assertIn("--phase196-sonic-hud-rolling-counter-smoke", example)
+        self.assertIn("Phase 196", report)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase196-sonic-hud-rolling-counter-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase196 sonic hud rolling counter smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_rolling_gauge_counter=value=boostGauge:node=0x82914B0:path=ui_playscreen/so_speed_gauge:kind=text:text=530:callsite=sub_824D6C18:counter_writes=2:status=rolling-counter-text-candidate-pending-gauge-state-normalization", completed.stdout)
+        self.assertIn("sonic_day_hud_rolling_gauge_counter=value=ringEnergyGauge:node=0x82914B0:path=ui_playscreen/so_ringenagy_gauge:kind=text:text=530:callsite=sub_824D6C18:counter_writes=1:status=rolling-counter-text-candidate-pending-gauge-state-normalization", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=phase196-rolling-counter-candidate:rings=000:score=000000000:time=00:00:00:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
+        self.assertIn("gameplay_numeric_binding=boost/energy:rolling-counter-text-candidate-pending-gauge-state-normalization,setter-node-address-join:still-required-for-final-gauge-values,audio:pending-exact-sfx-id", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

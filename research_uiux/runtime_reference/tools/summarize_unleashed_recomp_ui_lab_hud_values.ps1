@@ -127,6 +127,73 @@ function Add-SemanticBoundGroup($Groups, [string]$Detail, $EventObject) {
     Add-SemanticPathCandidateGroup $Groups $Detail $EventObject
 }
 
+function New-RollingCounterSemanticGroup([string]$Path, [string]$ValueName, [string]$Kind, [string]$Callsite) {
+    return [ordered]@{
+        path = $Path
+        semanticValueName = $ValueName
+        kind = $Kind
+        callsite = $Callsite
+        writes = 0
+        nodes = [System.Collections.Generic.SortedSet[string]]::new()
+        values = [System.Collections.Generic.SortedSet[string]]::new()
+        sources = [System.Collections.Generic.SortedSet[string]]::new()
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Get-CallsiteFromSource([string]$Source) {
+    $match = [regex]::Match($Source, "sub_[0-9A-Fa-f]+")
+    if ($match.Success) {
+        return $match.Value
+    }
+    return ""
+}
+
+function Add-RollingCounterSemanticGroup($Groups, [string]$Detail, $EventObject) {
+    $kind = Get-DetailToken $Detail "kind"
+    if ($kind -ne "text") {
+        return
+    }
+
+    $source = Get-DetailToken $Detail "source"
+    $callsite = Get-CallsiteFromSource $source
+    if ($callsite -ne "sub_824D6C18") {
+        return
+    }
+
+    $path = Get-DetailToken $Detail "semanticPathCandidate"
+    $valueName = Get-DetailToken $Detail "semanticValueName"
+    if (
+        [string]::IsNullOrWhiteSpace($path) -or
+        [string]::IsNullOrWhiteSpace($valueName) -or
+        ($valueName -ne "boostGauge" -and $valueName -ne "ringEnergyGauge"))
+    {
+        return
+    }
+
+    $key = "{0}:{1}:{2}:{3}" -f $path, $valueName, $kind, $callsite
+    if (-not $Groups.ContainsKey($key)) {
+        $Groups[$key] = New-RollingCounterSemanticGroup $path $valueName $kind $callsite
+    }
+
+    $group = $Groups[$key]
+    $group.writes++
+    Add-UniqueSorted $group.nodes (Get-DetailToken $Detail "node")
+    Add-UniqueSorted $group.values (Get-DetailToken $Detail "value")
+    Add-UniqueSorted $group.sources $source
+
+    $frame = Get-EventFrame $EventObject
+    if ($null -ne $frame) {
+        if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+            $group.firstFrame = $frame
+        }
+        if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+            $group.lastFrame = $frame
+        }
+    }
+}
+
 function New-GaugeDrawPathGroup([string]$Path, [string]$ValueName) {
     return [ordered]@{
         path = $Path
@@ -307,6 +374,7 @@ $semanticBoundPaths = [System.Collections.Generic.SortedSet[string]]::new()
 $unresolvedNodeCandidatesByNode = @{}
 $semanticPathCandidateGroupsByKey = @{}
 $semanticBoundGroupsByKey = @{}
+$rollingCounterSemanticGroupsByKey = @{}
 $gaugeDrawPathGroupsByKey = @{}
 $gaugeDrawCalls = @()
 $gaugeDrawCastNodeAddresses = [System.Collections.Generic.SortedSet[string]]::new()
@@ -338,6 +406,8 @@ $summary = [ordered]@{
     semanticPathCandidateGroups = @()
     semanticBoundPaths = @()
     semanticBoundGroups = @()
+    rollingCounterSemanticGroups = @()
+    boostRingEnergyStatus = "pending-runtime-rolling-counter-evidence"
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
@@ -401,6 +471,7 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
             $summary.semanticPathCandidateWrites++
             Add-UniqueSorted $semanticPathCandidates (Get-DetailToken $detail "semanticPathCandidate")
             Add-SemanticPathCandidateGroup $semanticPathCandidateGroupsByKey $detail $eventObject
+            Add-RollingCounterSemanticGroup $rollingCounterSemanticGroupsByKey $detail $eventObject
         }
         "sonic-hud-node-write-semantic-bound" {
             $summary.semanticBoundWrites++
@@ -509,6 +580,25 @@ $summary.semanticBoundGroups = @(
             }
         }
 )
+$summary.rollingCounterSemanticGroups = @(
+    $rollingCounterSemanticGroupsByKey.Keys |
+        Sort-Object @{ Expression = { -1 * $rollingCounterSemanticGroupsByKey[$_].writes } }, @{ Expression = { $_ } } |
+        ForEach-Object {
+            $group = $rollingCounterSemanticGroupsByKey[$_]
+            [ordered]@{
+                path = $group.path
+                semanticValueName = $group.semanticValueName
+                kind = $group.kind
+                callsite = $group.callsite
+                writes = $group.writes
+                nodes = @($group.nodes)
+                values = @($group.values)
+                sources = @($group.sources)
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
 $summary.gaugeDrawPathGroups = @(
     $gaugeDrawPathGroupsByKey.Keys |
         Sort-Object @{ Expression = { -1 * $gaugeDrawPathGroupsByKey[$_].draws } }, @{ Expression = { $_ } } |
@@ -607,6 +697,13 @@ elseif ($summary.gaugeDrawPathGroups.Count -gt 0) {
     $summary.gaugeChildPathStatus = "runtime-draw-list-exact-child-paths;setter-node-address-join-pending"
 }
 
+if ($summary.rollingCounterSemanticGroups.Count -gt 0 -and $summary.gaugeSetterChildPathJoins.Count -eq 0) {
+    $summary.boostRingEnergyStatus = "rolling-counter-text-candidate-pending-gauge-state-normalization"
+}
+elseif ($summary.gaugeSetterChildPathJoins.Count -gt 0) {
+    $summary.boostRingEnergyStatus = "setter-node-address-join-runtime-proven"
+}
+
 if (
     $summary.textWrites -gt 0 -or
     $summary.gaugeWrites -gt 0 -or
@@ -660,6 +757,12 @@ Write-Output (
             ForEach-Object { "{0}:{1}={2}" -f $_.path, $_.semanticValueName, $_.writes }
     ) $CandidateValueLimit))
 Write-Output (
+    "rolling_counter_semantic_groups={0}" -f
+    (Format-CandidateList (
+        $summary.rollingCounterSemanticGroups |
+            ForEach-Object { "{0}:{1}:{2}:{3}={4}" -f $_.path, $_.semanticValueName, $_.kind, $_.callsite, $_.writes }
+    ) $CandidateValueLimit))
+Write-Output (
     "gauge_draw_path_groups={0}" -f
     (Format-CandidateList (
         $summary.gaugeDrawPathGroups |
@@ -693,6 +796,7 @@ Write-Output (
             }
     ) $CandidateValueLimit))
 Write-Output ("gauge_child_path_status={0}" -f $summary.gaugeChildPathStatus)
+Write-Output ("boost_ring_energy_status={0}" -f $summary.boostRingEnergyStatus)
 foreach ($candidate in $summary.unresolvedNodeCandidates) {
     Write-Output (
         "node_candidate node={0} writes={1} kinds={2} values={3} frames={4}-{5} likely={6} sources={7}" -f
