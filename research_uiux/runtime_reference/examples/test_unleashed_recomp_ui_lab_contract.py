@@ -2299,6 +2299,32 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("semantic_candidate_groups=ui_playscreen/add/speed_count/position/num_speed:speedKmh=2,ui_playscreen/add/u_info:tutorialPrompt=1", completed.stdout)
 
+    def test_ui_lab_phase191_binds_semantic_candidates_without_claiming_exact_node_resolution(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "ApplySonicHudSemanticPathCandidateToGameplayValues",
+            "sonic-hud-node-write-semantic-bound",
+            "semanticBindingStatus=stable-candidate-bound-pending-exact-child-node-resolution",
+            "generated-PPC-callsite-semantic-candidate",
+            "pathResolved=false",
+            "ui_playscreen/add/speed_count/position/num_speed",
+            "ui_playscreen/so_speed_gauge",
+            "ui_playscreen/so_ringenagy_gauge",
+            "ui_playscreen/add/u_info",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 191",
+            "semantic-bound",
+            "semantic-candidate-bound-pending-exact-child-node-resolution",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")

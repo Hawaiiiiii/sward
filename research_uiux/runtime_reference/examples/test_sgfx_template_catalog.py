@@ -925,6 +925,53 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("sonic_day_hud_state=phase=gauge-prompt-write:rings=000:score=000000000:time=00:00:00:speed=000:boost=0.650:energy=0.720:lives=3:tutorial=pattern-3:visible:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
         self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,timer:runtime-proven-via-chud-update-callsite-sample,ring/speed/lives:csd-text-write-ready,boost/energy/tutorial:runtime-proven-via-csd-gauge-prompt-write,audio:pending-exact-sfx-id", completed.stdout)
 
+    def test_phase191_sonic_day_hud_controller_consumes_semantic_path_candidates(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+        report = self.read(REPORT)
+
+        for token in [
+            "struct SonicDayHudRuntimeSemanticPathCandidateObservation",
+            "applyRuntimeSemanticPathCandidate",
+            "formatSonicDayHudRuntimeSemanticPathCandidateObservation",
+            "formatSonicDayHudRuntimeBindingPhase191SmokeSequence",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "generated-PPC-callsite-semantic-candidate",
+            "semantic-candidate-bound-pending-exact-child-node-resolution",
+            "ui_playscreen/add/speed_count/position/num_speed",
+            "ui_playscreen/so_speed_gauge",
+            "ui_playscreen/so_ringenagy_gauge",
+            "ui_playscreen/add/u_info",
+        ]:
+            self.assertIn(token, source)
+
+        self.assertIn("--phase191-sonic-hud-semantic-candidate-smoke", example)
+        self.assertIn("Phase 191", report)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase191-sonic-hud-semantic-candidate-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase191 sonic hud semantic candidate smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_semantic_path_candidate=value=speedKmh:path=ui_playscreen/add/speed_count/position/num_speed:kind=text:text=042:candidate_writes=2:resolution=generated-PPC-callsite-semantic-candidate", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_semantic_path_candidate=value=boostGauge:path=ui_playscreen/so_speed_gauge:kind=scale:value=0.650:candidate_writes=121:resolution=generated-PPC-callsite-semantic-candidate", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_semantic_path_candidate=value=ringEnergyGauge:path=ui_playscreen/so_ringenagy_gauge:kind=scale:value=0.720:candidate_writes=121:resolution=generated-PPC-callsite-semantic-candidate", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_semantic_path_candidate=value=tutorialPrompt:path=ui_playscreen/add/u_info:kind=pattern-index:value=3.000:candidate_writes=80:resolution=generated-PPC-callsite-semantic-candidate", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=semantic-candidate-binding:rings=000:score=000000000:time=00:00:00:speed=042:boost=0.650:energy=0.720:lives=3:tutorial=pattern-3:visible:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
+        self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,speed/boost/energy/tutorial:semantic-candidate-bound-pending-exact-child-node-resolution,timer/ring/lives:exact-csd-text-write-or-callsite-lanes,audio:pending-exact-sfx-id", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

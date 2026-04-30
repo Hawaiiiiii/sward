@@ -3247,6 +3247,60 @@ namespace UiLab
         return changed;
     }
 
+    static bool ApplySonicHudSemanticPathCandidateToGameplayValues(
+        const SonicHudSemanticPathCandidate& candidate,
+        std::string_view writeKind,
+        std::string_view valueText,
+        bool numericValueKnown,
+        double numericValue,
+        std::string_view hookSource,
+        const SonicHudNodeWriteCallsiteCorrelation& callsiteCorrelation)
+    {
+        const std::string baseKind = BaseSonicHudWriteKind(writeKind);
+        const std::string source =
+            "generated-PPC-callsite-semantic-candidate:" +
+            callsiteCorrelation.source +
+            ":" + std::string(hookSource) +
+            ":semanticValueName=" + candidate.valueName +
+            ":semanticBindingStatus=stable-candidate-bound-pending-exact-child-node-resolution";
+
+        if (
+            baseKind == "text" &&
+            (candidate.valueName == "elapsedFrames" || candidate.valueName == "speedKmh"))
+        {
+            return ApplySonicHudTextWriteToGameplayValues(
+                candidate.path,
+                valueText,
+                source);
+        }
+
+        if (
+            baseKind == "scale" &&
+            (candidate.valueName == "boostGauge" || candidate.valueName == "ringEnergyGauge"))
+        {
+            return ApplySonicHudGaugeOrPromptWriteToGameplayValues(
+                candidate.path,
+                baseKind,
+                numericValueKnown,
+                numericValue,
+                source);
+        }
+
+        if (
+            candidate.valueName == "tutorialPrompt" &&
+            (baseKind == "pattern-index" || baseKind == "hide-flag"))
+        {
+            return ApplySonicHudGaugeOrPromptWriteToGameplayValues(
+                candidate.path,
+                baseKind,
+                numericValueKnown,
+                numericValue,
+                source);
+        }
+
+        return false;
+    }
+
     static bool ClassifySonicHudUpdateCallsiteSample(
         const SonicHudUpdateCallsiteSample& sample,
         std::string& valueName,
@@ -3789,6 +3843,15 @@ namespace UiLab
 
                 for (const auto& candidate : semanticCandidates)
                 {
+                    const bool semanticBound = ApplySonicHudSemanticPathCandidateToGameplayValues(
+                        candidate,
+                        writeKind,
+                        valueText,
+                        numericValueKnown,
+                        numericValue,
+                        hookSource,
+                        callsiteCorrelation);
+
                     WriteEvidenceEvent(
                         "sonic-hud-node-write-semantic-path-candidate",
                         "kind=" + std::string(writeKind) +
@@ -3802,6 +3865,22 @@ namespace UiLab
                         " frameDelta=" + std::to_string(callsiteCorrelation.frameDelta) +
                         " pathResolutionSource=generated-PPC-callsite-semantic-candidate" +
                         " pathResolved=false");
+
+                    if (semanticBound)
+                    {
+                        WriteEvidenceEvent(
+                            "sonic-hud-node-write-semantic-bound",
+                            "kind=" + std::string(writeKind) +
+                            " node=" + HexU32(nodeAddress) +
+                            " value=\"" + std::string(valueText) + "\"" +
+                            " semanticValueName=" + candidate.valueName +
+                            " semanticPathCandidate=" + candidate.path +
+                            " source=" + callsiteCorrelation.source +
+                            " status=" + callsiteCorrelation.status +
+                            " pathResolutionSource=generated-PPC-callsite-semantic-candidate" +
+                            " pathResolved=false" +
+                            " semanticBindingStatus=stable-candidate-bound-pending-exact-child-node-resolution");
+                    }
                 }
             }
             WriteLiveStateSnapshot();

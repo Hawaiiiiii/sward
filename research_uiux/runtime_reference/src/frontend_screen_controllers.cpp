@@ -263,6 +263,56 @@ std::vector<SonicDayHudRuntimeGaugePromptWriteObservation> makeRuntimeGaugePromp
     };
 }
 
+std::vector<SonicDayHudRuntimeSemanticPathCandidateObservation> makeRuntimeSemanticPathCandidateObservations()
+{
+    return {
+        {
+            "speedKmh",
+            "ui_playscreen/add/speed_count/position/num_speed",
+            "text",
+            "042",
+            0.0,
+            false,
+            2,
+            "generated-PPC-callsite-semantic-candidate",
+            "sonic-hud-node-write-semantic-bound:same-frame-hud-update-context:sub_824D6418",
+        },
+        {
+            "boostGauge",
+            "ui_playscreen/so_speed_gauge",
+            "scale",
+            "",
+            0.650,
+            true,
+            121,
+            "generated-PPC-callsite-semantic-candidate",
+            "sonic-hud-node-write-semantic-bound:same-frame-hud-update-context:sub_824D6C18",
+        },
+        {
+            "ringEnergyGauge",
+            "ui_playscreen/so_ringenagy_gauge",
+            "scale",
+            "",
+            0.720,
+            true,
+            121,
+            "generated-PPC-callsite-semantic-candidate",
+            "sonic-hud-node-write-semantic-bound:same-frame-hud-update-context:sub_824D6C18",
+        },
+        {
+            "tutorialPrompt",
+            "ui_playscreen/add/u_info",
+            "pattern-index",
+            "",
+            3.0,
+            true,
+            80,
+            "generated-PPC-callsite-semantic-candidate",
+            "sonic-hud-node-write-semantic-bound:same-frame-hud-update-context:sub_824D7100",
+        },
+    };
+}
+
 SonicDayHudRuntimeCallsiteSample makeRuntimeTimerCallsiteSample()
 {
     SonicDayHudRuntimeCallsiteSample sample;
@@ -821,6 +871,104 @@ FrontendControllerFrame SonicDayHudController::applyRuntimeGaugePromptWrite(
     return frame_;
 }
 
+FrontendControllerFrame SonicDayHudController::applyRuntimeSemanticPathCandidate(
+    const SonicDayHudRuntimeSemanticPathCandidateObservation& observation)
+{
+    const std::string source =
+        observation.source + "@" + observation.path +
+        ":writeKind=" + observation.writeKind +
+        ":pathResolutionSource=" + observation.pathResolutionSource +
+        ":status=semantic-candidate-bound-pending-exact-child-node-resolution";
+
+    bool applied = false;
+    if (observation.writeKind == "text")
+    {
+        int parsedValue = 0;
+        if (!parseUnsignedRuntimeText(observation.textUtf8, parsedValue))
+            return frame_;
+
+        if (
+            observation.valueName == "speedKmh" &&
+            observation.path == "ui_playscreen/add/speed_count/position/num_speed")
+        {
+            gameplayState_.speedKmh = parsedValue;
+            gameplayState_.provenance.speedKmh = observation.path;
+            applied = true;
+        }
+        else if (
+            observation.valueName == "elapsedFrames" &&
+            (observation.path == "ui_playscreen/time_count/time001" ||
+                observation.path == "ui_playscreen/time_count/time010" ||
+                observation.path == "ui_playscreen/time_count/time100"))
+        {
+            gameplayState_.elapsedFrames = parsedValue;
+            gameplayState_.provenance.elapsedFrames = observation.path;
+            applied = true;
+        }
+    }
+    else if (observation.numericValueKnown)
+    {
+        if (
+            observation.writeKind == "scale" &&
+            observation.valueName == "boostGauge" &&
+            observation.path == "ui_playscreen/so_speed_gauge")
+        {
+            gameplayState_.boostGauge = std::clamp(observation.numericValue, 0.0, 1.0);
+            gameplayState_.provenance.boostGauge = observation.path;
+            applied = true;
+        }
+        else if (
+            observation.writeKind == "scale" &&
+            observation.valueName == "ringEnergyGauge" &&
+            observation.path == "ui_playscreen/so_ringenagy_gauge")
+        {
+            gameplayState_.ringEnergyGauge = std::clamp(observation.numericValue, 0.0, 1.0);
+            gameplayState_.provenance.ringEnergyGauge = observation.path;
+            applied = true;
+        }
+        else if (
+            observation.valueName == "tutorialPrompt" &&
+            observation.path == "ui_playscreen/add/u_info")
+        {
+            if (observation.writeKind == "pattern-index")
+            {
+                const int promptIndex = std::max(0, static_cast<int>(observation.numericValue));
+                gameplayState_.tutorialPromptId = "pattern-" + std::to_string(promptIndex);
+                gameplayState_.tutorialVisible = true;
+                applied = true;
+            }
+            else if (observation.writeKind == "hide-flag")
+            {
+                gameplayState_.tutorialVisible = observation.numericValue == 0.0;
+                applied = true;
+            }
+
+            if (applied)
+                gameplayState_.provenance.tutorialPrompt = observation.path;
+        }
+    }
+
+    if (!applied)
+        return frame_;
+
+    gameplayState_.provenance.valueSource = source;
+    gameplayState_.lastSfxHook = "none";
+    gameplayState_.sfxCueId = "audio-id-pending";
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        frame_.frame + 1,
+        "runtime-semantic-candidate",
+        observation.source.empty() ? "sonic-hud-node-write-semantic-bound" : observation.source,
+        false,
+        0,
+        "none",
+        "none",
+        "none",
+        sonicHudSceneNames(gameplayState_.tutorialVisible));
+    return frame_;
+}
+
 FrontendControllerFrame SonicDayHudController::applyRuntimeCallsiteSample(
     const SonicDayHudRuntimeCallsiteSample& sample)
 {
@@ -1168,6 +1316,25 @@ std::string formatSonicDayHudRuntimeGaugePromptWriteObservation(
     return out.str();
 }
 
+std::string formatSonicDayHudRuntimeSemanticPathCandidateObservation(
+    const SonicDayHudRuntimeSemanticPathCandidateObservation& observation)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_runtime_semantic_path_candidate="
+        << "value=" << observation.valueName
+        << ":path=" << observation.path
+        << ":kind=" << observation.writeKind;
+    if (observation.writeKind == "text")
+        out << ":text=" << observation.textUtf8;
+    else
+        out << ":value=" << std::fixed << std::setprecision(3) << observation.numericValue;
+    out << ":candidate_writes=" << observation.candidateWriteCount
+        << ":resolution=" << observation.pathResolutionSource
+        << ":source=" << observation.source
+        << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage)
 {
     std::ostringstream out;
@@ -1389,6 +1556,27 @@ std::string formatSonicDayHudRuntimeBindingPhase180SmokeSequence()
         << "timer:runtime-proven-via-chud-update-callsite-sample,"
         << "ring/speed/lives:csd-text-write-ready,"
         << "boost/energy/tutorial:runtime-proven-via-csd-gauge-prompt-write,"
+        << "audio:pending-exact-sfx-id"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase191SmokeSequence()
+{
+    SonicDayHudController hud;
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+
+    std::ostringstream out;
+    for (const auto& observation : makeRuntimeSemanticPathCandidateObservations())
+    {
+        out << formatSonicDayHudRuntimeSemanticPathCandidateObservation(observation);
+        (void)hud.applyRuntimeSemanticPathCandidate(observation);
+    }
+
+    out << formatSonicDayHudGameplayState("semantic-candidate-binding", hud.gameplayState());
+    out << "gameplay_numeric_binding=score:known,scoreinfo:known,"
+        << "speed/boost/energy/tutorial:semantic-candidate-bound-pending-exact-child-node-resolution,"
+        << "timer/ring/lives:exact-csd-text-write-or-callsite-lanes,"
         << "audio:pending-exact-sfx-id"
         << '\n';
     return out.str();

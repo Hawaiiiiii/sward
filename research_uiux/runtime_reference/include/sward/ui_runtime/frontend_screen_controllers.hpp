@@ -105,6 +105,19 @@ struct SonicDayHudRuntimeGaugePromptWriteObservation
     std::string source;
 };
 
+struct SonicDayHudRuntimeSemanticPathCandidateObservation
+{
+    std::string valueName;
+    std::string path;
+    std::string writeKind;
+    std::string textUtf8;
+    double numericValue = 0.0;
+    bool numericValueKnown = false;
+    int candidateWriteCount = 0;
+    std::string pathResolutionSource = "generated-PPC-callsite-semantic-candidate";
+    std::string source;
+};
+
 struct SonicDayHudRuntimeDrawListCoverage
 {
     std::string source = "live-bridge/ui-draw-list";
@@ -253,6 +266,8 @@ public:
     [[nodiscard]] FrontendControllerFrame applyRuntimeTextWrite(const SonicDayHudRuntimeTextWriteObservation& observation);
     [[nodiscard]] FrontendControllerFrame applyRuntimeGaugePromptWrite(
         const SonicDayHudRuntimeGaugePromptWriteObservation& observation);
+    [[nodiscard]] FrontendControllerFrame applyRuntimeSemanticPathCandidate(
+        const SonicDayHudRuntimeSemanticPathCandidateObservation& observation);
     [[nodiscard]] FrontendControllerFrame applyRuntimeCallsiteSample(
         const SonicDayHudRuntimeCallsiteSample& sample);
     [[nodiscard]] FrontendControllerFrame applyRingPickup(int ringDelta, int scoreDelta);
@@ -280,6 +295,8 @@ private:
 [[nodiscard]] std::string formatSonicDayHudRuntimeTextWriteObservation(const SonicDayHudRuntimeTextWriteObservation& observation);
 [[nodiscard]] std::string formatSonicDayHudRuntimeGaugePromptWriteObservation(
     const SonicDayHudRuntimeGaugePromptWriteObservation& observation);
+[[nodiscard]] std::string formatSonicDayHudRuntimeSemanticPathCandidateObservation(
+    const SonicDayHudRuntimeSemanticPathCandidateObservation& observation);
 [[nodiscard]] std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage);
 [[nodiscard]] SonicDayHudRuntimeCallsiteClassification classifySonicDayHudRuntimeCallsiteSample(
     const SonicDayHudRuntimeCallsiteSample& sample);
@@ -293,5 +310,6 @@ private:
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase173SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase175SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase180SmokeSequence();
+[[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase191SmokeSequence();
 [[nodiscard]] std::string frontendControllerInputName(FrontendControllerInput input);
 } // namespace sward::ui_runtime
