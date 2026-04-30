@@ -2111,6 +2111,45 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("F2 panel now contains the old embedded-profiler SWARD UI Lab tab", pivot)
 
+    def test_ui_lab_phase187_native_profiler_style_and_node_callsite_correlation(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        pivot = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
+
+        for token in [
+            "PushSwardNativeProfilerFont",
+            "PopSwardNativeProfilerFont",
+            "ImFontAtlasSnapshot::GetFont(\"FOT-SeuratPro-M.otf\")",
+            "DrawSwardNativeProfilerFrameTimePlot",
+            "ImPlot::BeginPlot(\"Frame Time\")",
+            "ImPlot::PlotLine<float>(\"Application\"",
+            "SWARD UI Lab###SWARD Operator Profiler",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "struct SonicHudNodeWriteCallsiteCorrelation",
+            "CorrelateUnresolvedSonicHudNodeWriteWithCallsite",
+            "callsiteCorrelationKnown",
+            "callsiteValueCandidate",
+            "same-frame-hud-update-context",
+            "nearest-generated-PPC-callsite-sample",
+            "timer/speed/boost-ring-energy/tutorial",
+            "sonic-hud-node-write-callsite-correlated",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 187",
+            "native Profiler font and ImPlot frame-time style",
+            "unresolved Sonic HUD node writes",
+            "timer/speed/boost-ring-energy/tutorial",
+            "sonic-hud-node-write-callsite-correlated",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 187 moves F2 closer to the OG Profiler style", pivot)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")

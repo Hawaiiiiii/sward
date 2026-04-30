@@ -2,6 +2,7 @@
 #include <app.h>
 #include <api/SWA.h>
 #include <gpu/imgui/imgui_common.h>
+#include <gpu/imgui/imgui_snapshot.h>
 #include <kernel/memory.h>
 #include <os/logger.h>
 #include <user/config.h>
@@ -434,7 +435,21 @@ namespace UiLab
         bool numericValueKnown = false;
         double numericValue = 0.0;
         std::string hookSource;
+        bool callsiteCorrelationKnown = false;
+        std::string callsiteValueCandidate;
+        std::string callsiteCorrelationSource;
+        std::string callsiteCorrelationStatus;
+        int32_t callsiteCorrelationFrameDelta = 0;
         uint64_t frame = 0;
+    };
+
+    struct SonicHudNodeWriteCallsiteCorrelation
+    {
+        bool known = false;
+        std::string valueCandidate;
+        std::string source;
+        std::string status;
+        int32_t frameDelta = 0;
     };
 
     struct HudRenderGateCorrelationSnapshot
@@ -820,6 +835,9 @@ namespace UiLab
     static float g_operatorProfilerFrameMs[kOperatorProfilerFrameHistoryCount] = {};
     static int g_operatorProfilerFrameMsIndex = 0;
     static uint64_t g_operatorProfilerLastFrame = 0;
+    static ImFont* g_swardNativeProfilerFont = nullptr;
+    static float g_swardNativeProfilerFontDefaultScale = 1.0f;
+    static bool g_swardNativeProfilerFontPushed = false;
     static RoutePolicy g_routePolicy = RoutePolicy::InputInjection;
     static ScreenId g_target = ScreenId::TitleLoop;
     static bool g_liveBridgeEnabled = true;
@@ -934,6 +952,9 @@ namespace UiLab
     static SonicHudLastClassifiedCallsiteValue g_lastSonicHudClassifiedCallsiteValue;
     static std::unordered_map<std::string, std::string> g_lastSonicHudUpdateCallsiteSampleDetails;
     static constexpr uint64_t kSonicHudUpdateCallsiteMinEvidenceIntervalFrames = 600;
+    static constexpr uint64_t kSonicHudNodeCallsiteCorrelationFrameWindow = 120;
+    static constexpr std::string_view kSonicHudNodeWriteCandidateSetLabel =
+        "timer/speed/boost-ring-energy/tutorial";
     static uint64_t g_lastSonicHudUpdateCallsiteSampleFrame = 0;
     static std::unordered_map<std::string, std::string> g_lastSonicHudUpdateCallsiteStableSignatures;
     static std::unordered_map<std::string, uint64_t> g_lastSonicHudUpdateCallsiteEvidenceFrames;
@@ -1038,6 +1059,11 @@ namespace UiLab
         std::string& source,
         uint32_t& normalizedValue,
         bool& normalizedValueKnown);
+    static std::string SonicHudCallsiteCandidateFromValueName(std::string_view valueName);
+    static std::string SonicHudHookNameFromUpdateContext(std::string_view hookSource);
+    static SonicHudNodeWriteCallsiteCorrelation CorrelateUnresolvedSonicHudNodeWriteWithCallsite(
+        std::string_view writeKind,
+        uint32_t nodeAddress);
     static std::string ResolveSonicHudValuePathFromCsdNode(uint32_t nodeAddress);
     static bool ApplySonicHudTextWriteToGameplayValues(
         std::string_view path,
@@ -3264,6 +3290,126 @@ namespace UiLab
         return false;
     }
 
+    static std::string SonicHudCallsiteCandidateFromValueName(std::string_view valueName)
+    {
+        if (valueName == "elapsedFrames")
+            return "timer";
+
+        if (valueName == "speedKmh")
+            return "speed";
+
+        if (valueName == "rollingCounterGaugeState")
+            return "boost-ring-energy";
+
+        if (valueName == "tutorialPrompt")
+            return "tutorial";
+
+        return {};
+    }
+
+    static std::string SonicHudHookNameFromUpdateContext(std::string_view hookSource)
+    {
+        if (hookSource.find("sub_824D6048") != std::string_view::npos)
+            return "sub_824D6048";
+
+        if (hookSource.find("sub_824D6418") != std::string_view::npos)
+            return "sub_824D6418";
+
+        if (hookSource.find("sub_824D69B0") != std::string_view::npos)
+            return "sub_824D69B0";
+
+        if (hookSource.find("sub_824D6C18") != std::string_view::npos)
+            return "sub_824D6C18";
+
+        if (hookSource.find("sub_824D7100") != std::string_view::npos)
+            return "sub_824D7100";
+
+        return {};
+    }
+
+    static SonicHudNodeWriteCallsiteCorrelation CorrelateUnresolvedSonicHudNodeWriteWithCallsite(
+        std::string_view writeKind,
+        uint32_t nodeAddress)
+    {
+        (void)writeKind;
+        (void)nodeAddress;
+
+        SonicHudNodeWriteCallsiteCorrelation correlation;
+        const auto updateContext = CurrentSonicHudUpdateContext();
+        const std::string contextHook =
+            SonicHudHookNameFromUpdateContext(updateContext.hookSource);
+
+        if (!contextHook.empty())
+        {
+            if (contextHook == "sub_824D6048")
+                correlation.valueCandidate = "timer";
+            else if (contextHook == "sub_824D6418")
+                correlation.valueCandidate = "speed";
+            else if (contextHook == "sub_824D69B0" || contextHook == "sub_824D6C18")
+                correlation.valueCandidate = "boost-ring-energy";
+            else if (contextHook == "sub_824D7100")
+                correlation.valueCandidate = "tutorial";
+
+            if (!correlation.valueCandidate.empty())
+            {
+                correlation.known = true;
+                correlation.source = "same-frame-hud-update-context:" + contextHook;
+                correlation.status = std::string(kSonicHudNodeWriteCandidateSetLabel);
+                correlation.frameDelta =
+                    static_cast<int32_t>(g_presentedFrameCount - updateContext.frame);
+                return correlation;
+            }
+        }
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        for (auto it = g_sonicHudUpdateCallsiteSamples.rbegin();
+            it != g_sonicHudUpdateCallsiteSamples.rend();
+            ++it)
+        {
+            const SonicHudUpdateCallsiteSample& sample = *it;
+            const uint64_t frameDelta =
+                sample.frame > g_presentedFrameCount
+                    ? sample.frame - g_presentedFrameCount
+                    : g_presentedFrameCount - sample.frame;
+
+            if (frameDelta > kSonicHudNodeCallsiteCorrelationFrameWindow)
+                continue;
+
+            std::string valueName;
+            std::string status;
+            std::string source;
+            uint32_t normalizedValue = 0;
+            bool normalizedValueKnown = false;
+
+            if (!ClassifySonicHudUpdateCallsiteSample(
+                    sample,
+                    valueName,
+                    status,
+                    source,
+                    normalizedValue,
+                    normalizedValueKnown))
+            {
+                continue;
+            }
+
+            const std::string candidate =
+                SonicHudCallsiteCandidateFromValueName(valueName);
+            if (candidate.empty())
+                continue;
+
+            correlation.known = true;
+            correlation.valueCandidate = candidate;
+            correlation.source = "nearest-generated-PPC-callsite-sample:" + source;
+            correlation.status = status + ":" + std::string(kSonicHudNodeWriteCandidateSetLabel);
+            correlation.frameDelta =
+                static_cast<int32_t>(g_presentedFrameCount) -
+                static_cast<int32_t>(sample.frame);
+            return correlation;
+        }
+
+        return correlation;
+    }
+
     static std::string BuildSonicHudUpdateCallsiteStableSignature(
         const SonicHudUpdateCallsiteSample& sample)
     {
@@ -3410,12 +3556,15 @@ namespace UiLab
         std::string_view hookSource,
         std::string_view logValue,
         bool pathResolved,
-        std::string_view pathResolutionSource)
+        std::string_view pathResolutionSource,
+        const SonicHudNodeWriteCallsiteCorrelation* callsiteCorrelation = nullptr)
     {
-        const std::string logKey =
+        std::string logKey =
             std::string(writeKind) + "|" + std::string(path) + "|" + std::string(logValue) +
             "|" + (pathResolved ? std::string("resolved") : HexU32(nodeAddress)) +
             "|" + std::to_string(g_routeGeneration);
+        if (callsiteCorrelation != nullptr && callsiteCorrelation->known)
+            logKey += "|callsite=" + callsiteCorrelation->valueCandidate;
 
         std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
 
@@ -3431,6 +3580,14 @@ namespace UiLab
         observation.numericValueKnown = numericValueKnown;
         observation.numericValue = numericValue;
         observation.hookSource = std::string(hookSource);
+        if (callsiteCorrelation != nullptr)
+        {
+            observation.callsiteCorrelationKnown = callsiteCorrelation->known;
+            observation.callsiteValueCandidate = callsiteCorrelation->valueCandidate;
+            observation.callsiteCorrelationSource = callsiteCorrelation->source;
+            observation.callsiteCorrelationStatus = callsiteCorrelation->status;
+            observation.callsiteCorrelationFrameDelta = callsiteCorrelation->frameDelta;
+        }
         observation.frame = g_presentedFrameCount;
 
         auto existing = std::find_if(
@@ -3477,6 +3634,8 @@ namespace UiLab
         }
 
         const std::string unresolvedKind = std::string(writeKind) + "-unresolved";
+        const SonicHudNodeWriteCallsiteCorrelation callsiteCorrelation =
+            CorrelateUnresolvedSonicHudNodeWriteWithCallsite(writeKind, nodeAddress);
         const bool shouldLog = RecordSonicHudNodeWriteObservation(
             unresolvedKind,
             "unknown",
@@ -3489,17 +3648,37 @@ namespace UiLab
             hookSource,
             valueText,
             false,
-            "pending-ui-draw-list-late-resolve");
+            "pending-ui-draw-list-late-resolve",
+            &callsiteCorrelation);
 
         if (shouldLog)
         {
+            const std::string candidateDetail = callsiteCorrelation.known
+                ? " callsiteCandidate=" + callsiteCorrelation.valueCandidate +
+                    " callsiteSource=" + callsiteCorrelation.source +
+                    " callsiteStatus=" + callsiteCorrelation.status +
+                    " callsiteFrameDelta=" + std::to_string(callsiteCorrelation.frameDelta)
+                : std::string();
+
             WriteEvidenceEvent(
                 "sonic-hud-node-write-unresolved",
                 "kind=" + std::string(writeKind) +
                 " node=" + HexU32(nodeAddress) +
                 " value=\"" + std::string(valueText) + "\"" +
                 " source=" + std::string(hookSource) +
-                " reason=ui_playscreen-active-path-unresolved");
+                " reason=ui_playscreen-active-path-unresolved" +
+                candidateDetail);
+            if (callsiteCorrelation.known)
+            {
+                WriteEvidenceEvent(
+                    "sonic-hud-node-write-callsite-correlated",
+                    "kind=" + std::string(writeKind) +
+                    " node=" + HexU32(nodeAddress) +
+                    " valueCandidate=" + callsiteCorrelation.valueCandidate +
+                    " source=" + callsiteCorrelation.source +
+                    " status=" + callsiteCorrelation.status +
+                    " frameDelta=" + std::to_string(callsiteCorrelation.frameDelta));
+            }
             WriteLiveStateSnapshot();
         }
 
@@ -3697,6 +3876,16 @@ namespace UiLab
                 << "\"numericValueKnown\":" << (observation.numericValueKnown ? "true" : "false") << ","
                 << "\"numericValue\":" << observation.numericValue << ","
                 << "\"hookSource\":\"" << JsonEscape(observation.hookSource) << "\","
+                << "\"callsiteCorrelationKnown\":"
+                    << (observation.callsiteCorrelationKnown ? "true" : "false") << ","
+                << "\"callsiteValueCandidate\":\""
+                    << JsonEscape(observation.callsiteValueCandidate) << "\","
+                << "\"callsiteCorrelationSource\":\""
+                    << JsonEscape(observation.callsiteCorrelationSource) << "\","
+                << "\"callsiteCorrelationStatus\":\""
+                    << JsonEscape(observation.callsiteCorrelationStatus) << "\","
+                << "\"callsiteCorrelationFrameDelta\":"
+                    << observation.callsiteCorrelationFrameDelta << ","
                 << "\"frame\":" << observation.frame
                 << "}";
         }
@@ -9872,6 +10061,34 @@ namespace UiLab
         }
     }
 
+    static bool PushSwardNativeProfilerFont()
+    {
+        ImFont* font = ImFontAtlasSnapshot::GetFont("FOT-SeuratPro-M.otf");
+        if (font == nullptr)
+            return false;
+
+        g_swardNativeProfilerFont = font;
+        g_swardNativeProfilerFontDefaultScale = font->Scale;
+        font->Scale = ImGui::GetDefaultFont()->FontSize / font->FontSize;
+        ImGui::PushFont(font);
+        g_swardNativeProfilerFontPushed = true;
+        return true;
+    }
+
+    static void PopSwardNativeProfilerFont()
+    {
+        if (!g_swardNativeProfilerFontPushed)
+            return;
+
+        ImGui::PopFont();
+        if (g_swardNativeProfilerFont != nullptr)
+            g_swardNativeProfilerFont->Scale = g_swardNativeProfilerFontDefaultScale;
+
+        g_swardNativeProfilerFont = nullptr;
+        g_swardNativeProfilerFontDefaultScale = 1.0f;
+        g_swardNativeProfilerFontPushed = false;
+    }
+
     static void UpdateOperatorProfilerFrameHistory()
     {
         if (g_operatorProfilerLastFrame == g_presentedFrameCount)
@@ -9882,6 +10099,26 @@ namespace UiLab
             static_cast<float>(App::s_deltaTime * 1000.0);
         g_operatorProfilerFrameMsIndex =
             (g_operatorProfilerFrameMsIndex + 1) % kOperatorProfilerFrameHistoryCount;
+    }
+
+    static void DrawSwardNativeProfilerFrameTimePlot()
+    {
+        UpdateOperatorProfilerFrameHistory();
+
+        // Phase 179 used ImGui::PlotLines("Frame Time"); Phase 187 uses the native Profiler ImPlot path.
+        if (ImPlot::BeginPlot("Frame Time"))
+        {
+            ImPlot::SetupAxisLimits(ImAxis_Y1, 0.0, 20.0);
+            ImPlot::SetupAxis(ImAxis_Y1, "ms", ImPlotAxisFlags_None);
+            ImPlot::PlotLine<float>("Application",
+                g_operatorProfilerFrameMs,
+                kOperatorProfilerFrameHistoryCount,
+                1.0,
+                0.0,
+                ImPlotLineFlags_None,
+                g_operatorProfilerFrameMsIndex);
+            ImPlot::EndPlot();
+        }
     }
 
     static void DrawOperatorProfilerSummary()
@@ -9905,15 +10142,7 @@ namespace UiLab
         if (averageFrameCount > 0)
             averageFrameMs /= static_cast<float>(averageFrameCount);
 
-        ImGui::TextUnformatted("Frame Time");
-        ImGui::PlotLines("Frame Time",
-            g_operatorProfilerFrameMs,
-            kOperatorProfilerFrameHistoryCount,
-            g_operatorProfilerFrameMsIndex,
-            nullptr,
-            0.0f,
-            33.33f,
-            ImVec2(360.0f, 118.0f));
+        DrawSwardNativeProfilerFrameTimePlot();
         ImGui::Text("Current Application: %.3f ms (%.2f FPS)", frameMs, fps);
         ImGui::Text(
             "Average Application: %.3f ms (%.2f FPS)",
@@ -10143,7 +10372,7 @@ namespace UiLab
             return;
 
         ImGui::SetNextWindowPos(ImVec2(96.0f, 118.0f), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(500.0f, 640.0f), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(430.0f, 700.0f), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowBgAlpha(0.86f);
 
         constexpr ImGuiWindowFlags flags =
@@ -10151,11 +10380,13 @@ namespace UiLab
             ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_NoFocusOnAppearing;
 
-        if (ImGui::Begin("SWARD Operator Profiler", nullptr, flags))
+        const bool nativeFontPushed = PushSwardNativeProfilerFont();
+
+        if (ImGui::Begin("SWARD UI Lab###SWARD Operator Profiler", nullptr, flags))
         {
             DrawOperatorProfilerSummary();
-            ImGui::TextUnformatted("F2 toggles SWARD UI Lab");
-            ImGui::TextUnformatted("F1 remains native Profiler");
+            ImGui::TextDisabled("F2 toggles detached SWARD UI Lab; F2 toggles SWARD UI Lab");
+            ImGui::TextDisabled("F1 remains native Profiler");
             ImGui::Separator();
 
             if (ImGui::BeginTabBar("sward-operator-profiler-tabs"))
@@ -10221,6 +10452,9 @@ namespace UiLab
         }
 
         ImGui::End();
+
+        if (nativeFontPushed)
+            PopSwardNativeProfilerFont();
     }
 
     static void DrawOperatorDebugIcon()
