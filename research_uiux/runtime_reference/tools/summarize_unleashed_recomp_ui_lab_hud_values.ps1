@@ -120,6 +120,10 @@ function Add-SemanticPathCandidateGroup($Groups, [string]$Detail, $EventObject) 
     }
 }
 
+function Add-SemanticBoundGroup($Groups, [string]$Detail, $EventObject) {
+    Add-SemanticPathCandidateGroup $Groups $Detail $EventObject
+}
+
 function Get-UnresolvedNodeCandidateLabel($Candidate) {
     $kindList = @($Candidate.kinds)
     if (
@@ -166,8 +170,10 @@ $paths = [System.Collections.Generic.SortedSet[string]]::new()
 $values = [System.Collections.Generic.SortedSet[string]]::new()
 $sources = [System.Collections.Generic.SortedSet[string]]::new()
 $semanticPathCandidates = [System.Collections.Generic.SortedSet[string]]::new()
+$semanticBoundPaths = [System.Collections.Generic.SortedSet[string]]::new()
 $unresolvedNodeCandidatesByNode = @{}
 $semanticPathCandidateGroupsByKey = @{}
+$semanticBoundGroupsByKey = @{}
 $manualObserverHudPaths = @(
     "ui_playscreen/so_speed_gauge",
     "ui_playscreen/so_ringenagy_gauge",
@@ -190,8 +196,11 @@ $summary = [ordered]@{
     unresolvedNodeWrites = 0
     unresolvedNodeCandidateCount = 0
     semanticPathCandidateWrites = 0
+    semanticBoundWrites = 0
     semanticPathCandidates = @()
     semanticPathCandidateGroups = @()
+    semanticBoundPaths = @()
+    semanticBoundGroups = @()
     unresolvedNodeCandidates = @()
     paths = @()
     values = @()
@@ -251,6 +260,11 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
             Add-UniqueSorted $semanticPathCandidates (Get-DetailToken $detail "semanticPathCandidate")
             Add-SemanticPathCandidateGroup $semanticPathCandidateGroupsByKey $detail $eventObject
         }
+        "sonic-hud-node-write-semantic-bound" {
+            $summary.semanticBoundWrites++
+            Add-UniqueSorted $semanticBoundPaths (Get-DetailToken $detail "semanticPathCandidate")
+            Add-SemanticBoundGroup $semanticBoundGroupsByKey $detail $eventObject
+        }
         "sonic-hud-node-write-unresolved" {
             $summary.unresolvedNodeWrites++
 
@@ -283,7 +297,9 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
         Add-UniqueSorted $paths (Get-DetailToken $detail "path")
         Add-UniqueSorted $values (Get-DetailToken $detail "value")
         Add-UniqueSorted $sources (Get-DetailToken $detail "source")
-        Add-UniqueSorted $semanticPathCandidates (Get-DetailToken $detail "semanticPathCandidate")
+        if ($eventName -ne "sonic-hud-node-write-semantic-bound") {
+            Add-UniqueSorted $semanticPathCandidates (Get-DetailToken $detail "semanticPathCandidate")
+        }
     }
 }
 
@@ -291,11 +307,30 @@ $summary.paths = @($paths)
 $summary.values = @($values)
 $summary.sources = @($sources)
 $summary.semanticPathCandidates = @($semanticPathCandidates)
+$summary.semanticBoundPaths = @($semanticBoundPaths)
 $summary.semanticPathCandidateGroups = @(
     $semanticPathCandidateGroupsByKey.Keys |
         Sort-Object @{ Expression = { -1 * $semanticPathCandidateGroupsByKey[$_].writes } }, @{ Expression = { $_ } } |
         ForEach-Object {
             $group = $semanticPathCandidateGroupsByKey[$_]
+            [ordered]@{
+                path = $group.path
+                semanticValueName = $group.semanticValueName
+                writes = $group.writes
+                nodes = @($group.nodes)
+                kinds = @($group.kinds)
+                values = @($group.values)
+                sources = @($group.sources)
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
+$summary.semanticBoundGroups = @(
+    $semanticBoundGroupsByKey.Keys |
+        Sort-Object @{ Expression = { -1 * $semanticBoundGroupsByKey[$_].writes } }, @{ Expression = { $_ } } |
+        ForEach-Object {
+            $group = $semanticBoundGroupsByKey[$_]
             [ordered]@{
                 path = $group.path
                 semanticValueName = $group.semanticValueName
@@ -337,6 +372,7 @@ if (
     $summary.gameplayValueSnapshots -gt 0 -or
     $summary.callsiteClassifications -gt 0 -or
     $summary.semanticPathCandidateWrites -gt 0 -or
+    $summary.semanticBoundWrites -gt 0 -or
     $summary.unresolvedNodeWrites -gt 0)
 {
     $summary.status = "sonic-hud-value-events-found"
@@ -365,11 +401,19 @@ Write-Output (
     $summary.unresolvedNodeWrites,
     $summary.unresolvedNodeCandidateCount)
 Write-Output ("semantic_path_candidates={0}" -f $summary.semanticPathCandidateWrites)
+Write-Output ("semantic_bound={0}" -f $summary.semanticBoundWrites)
 Write-Output ("semantic_candidate_paths={0}" -f (Format-CandidateList $summary.semanticPathCandidates $CandidateValueLimit))
 Write-Output (
     "semantic_candidate_groups={0}" -f
     (Format-CandidateList (
         $summary.semanticPathCandidateGroups |
+            ForEach-Object { "{0}:{1}={2}" -f $_.path, $_.semanticValueName, $_.writes }
+    ) $CandidateValueLimit))
+Write-Output ("semantic_bound_paths={0}" -f (Format-CandidateList $summary.semanticBoundPaths $CandidateValueLimit))
+Write-Output (
+    "semantic_bound_groups={0}" -f
+    (Format-CandidateList (
+        $summary.semanticBoundGroups |
             ForEach-Object { "{0}:{1}={2}" -f $_.path, $_.semanticValueName, $_.writes }
     ) $CandidateValueLimit))
 foreach ($candidate in $summary.unresolvedNodeCandidates) {

@@ -2325,6 +2325,67 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, report)
             self.assertIn(token, checklist)
 
+    def test_ui_lab_phase192_summarizes_semantic_bound_hud_evidence_separately(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "semanticBoundWrites",
+            "semanticBoundGroups",
+            "Add-SemanticBoundGroup",
+            "sonic-hud-node-write-semantic-bound",
+            "semantic_bound_groups=",
+            "semantic_bound_paths=",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 192",
+            "semantic_bound_groups",
+            "semantic-bound tutorial",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":10,"event":"sonic-hud-node-write-semantic-path-candidate","detail":"kind=pattern-index node=0x1111 value=\\"1\\" valueCandidate=tutorial semanticValueName=tutorialPrompt semanticPathCandidate=ui_playscreen/add/u_info source=same-frame-hud-update-context:sub_824D7100 pathResolutionSource=generated-PPC-callsite-semantic-candidate pathResolved=false"}',
+                        '{"time":2.0,"frame":20,"event":"sonic-hud-node-write-semantic-bound","detail":"kind=hide-flag node=0x2222 value=\\"0\\" semanticValueName=tutorialPrompt semanticPathCandidate=ui_playscreen/add/u_info source=nearest-generated-PPC-callsite-sample:generated-PPC:sub_824D7100 status=classified-via-generated-PPC-callsite-candidate pathResolutionSource=generated-PPC-callsite-semantic-candidate pathResolved=false semanticBindingStatus=stable-candidate-bound-pending-exact-child-node-resolution"}',
+                        '{"time":3.0,"frame":30,"event":"sonic-hud-node-write-semantic-bound","detail":"kind=pattern-index node=0x3333 value=\\"1\\" semanticValueName=tutorialPrompt semanticPathCandidate=ui_playscreen/add/u_info source=nearest-generated-PPC-callsite-sample:generated-PPC:sub_824D7100 status=classified-via-generated-PPC-callsite-candidate pathResolutionSource=generated-PPC-callsite-semantic-candidate pathResolved=false semanticBindingStatus=stable-candidate-bound-pending-exact-child-node-resolution"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("semantic_path_candidates=1", completed.stdout)
+        self.assertIn("semantic_bound=2", completed.stdout)
+        self.assertIn("semantic_candidate_groups=ui_playscreen/add/u_info:tutorialPrompt=1", completed.stdout)
+        self.assertIn("semantic_bound_groups=ui_playscreen/add/u_info:tutorialPrompt=2", completed.stdout)
+        self.assertIn("semantic_bound_paths=ui_playscreen/add/u_info", completed.stdout)
+        self.assertIn("paths=", completed.stdout)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
