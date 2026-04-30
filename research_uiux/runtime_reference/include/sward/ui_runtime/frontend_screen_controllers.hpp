@@ -115,6 +115,7 @@ struct SonicDayHudRuntimeSemanticPathCandidateObservation
     bool numericValueKnown = false;
     int candidateWriteCount = 0;
     std::string pathResolutionSource = "generated-PPC-callsite-semantic-candidate";
+    std::string bindingStatus = "semantic-candidate-only-pending-runtime-bound";
     std::string source;
 };
 
@@ -311,5 +312,6 @@ private:
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase175SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase180SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase191SmokeSequence();
+[[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase193SmokeSequence();
 [[nodiscard]] std::string frontendControllerInputName(FrontendControllerInput input);
 } // namespace sward::ui_runtime

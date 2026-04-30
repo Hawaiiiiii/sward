@@ -275,6 +275,7 @@ std::vector<SonicDayHudRuntimeSemanticPathCandidateObservation> makeRuntimeSeman
             false,
             2,
             "generated-PPC-callsite-semantic-candidate",
+            "semantic-bound-pending-exact-child-node-resolution",
             "sonic-hud-node-write-semantic-bound:same-frame-hud-update-context:sub_824D6418",
         },
         {
@@ -286,7 +287,8 @@ std::vector<SonicDayHudRuntimeSemanticPathCandidateObservation> makeRuntimeSeman
             true,
             121,
             "generated-PPC-callsite-semantic-candidate",
-            "sonic-hud-node-write-semantic-bound:same-frame-hud-update-context:sub_824D6C18",
+            "semantic-candidate-only-pending-runtime-bound",
+            "sonic-hud-node-write-semantic-path-candidate:same-frame-hud-update-context:sub_824D6C18",
         },
         {
             "ringEnergyGauge",
@@ -297,7 +299,8 @@ std::vector<SonicDayHudRuntimeSemanticPathCandidateObservation> makeRuntimeSeman
             true,
             121,
             "generated-PPC-callsite-semantic-candidate",
-            "sonic-hud-node-write-semantic-bound:same-frame-hud-update-context:sub_824D6C18",
+            "semantic-candidate-only-pending-runtime-bound",
+            "sonic-hud-node-write-semantic-path-candidate:same-frame-hud-update-context:sub_824D6C18",
         },
         {
             "tutorialPrompt",
@@ -308,9 +311,81 @@ std::vector<SonicDayHudRuntimeSemanticPathCandidateObservation> makeRuntimeSeman
             true,
             80,
             "generated-PPC-callsite-semantic-candidate",
+            "semantic-bound-pending-exact-child-node-resolution",
             "sonic-hud-node-write-semantic-bound:same-frame-hud-update-context:sub_824D7100",
         },
     };
+}
+
+std::vector<SonicDayHudRuntimeSemanticPathCandidateObservation> makeRuntimePhase193SemanticBindingObservations()
+{
+    return {
+        {
+            "elapsedFrames",
+            "ui_playscreen/time_count/time001",
+            "text",
+            "02",
+            0.0,
+            false,
+            10,
+            "generated-PPC-callsite-semantic-candidate",
+            "semantic-bound-pending-exact-child-node-resolution",
+            "phase192-live:sonic-hud-node-write-semantic-bound:same-frame-hud-update-context:sub_824D6048",
+        },
+        {
+            "speedKmh",
+            "ui_playscreen/add/speed_count/position/num_speed",
+            "text",
+            "00",
+            0.0,
+            false,
+            2,
+            "generated-PPC-callsite-semantic-candidate",
+            "semantic-bound-pending-exact-child-node-resolution",
+            "phase192-live:sonic-hud-node-write-semantic-bound:same-frame-hud-update-context:sub_824D6418",
+        },
+        {
+            "tutorialPrompt",
+            "ui_playscreen/add/u_info",
+            "pattern-index",
+            "",
+            1.0,
+            true,
+            5,
+            "generated-PPC-callsite-semantic-candidate",
+            "semantic-bound-pending-exact-child-node-resolution",
+            "phase192-live:sonic-hud-node-write-semantic-bound:nearest-generated-PPC-callsite-sample:generated-PPC:sub_824D7100",
+        },
+        {
+            "boostGauge",
+            "ui_playscreen/so_speed_gauge",
+            "text",
+            "357",
+            0.0,
+            false,
+            338,
+            "generated-PPC-callsite-semantic-candidate",
+            "semantic-candidate-only-pending-runtime-bound",
+            "phase192-live:sonic-hud-node-write-semantic-path-candidate:same-frame-hud-update-context:sub_824D6C18",
+        },
+        {
+            "ringEnergyGauge",
+            "ui_playscreen/so_ringenagy_gauge",
+            "text",
+            "357",
+            0.0,
+            false,
+            338,
+            "generated-PPC-callsite-semantic-candidate",
+            "semantic-candidate-only-pending-runtime-bound",
+            "phase192-live:sonic-hud-node-write-semantic-path-candidate:same-frame-hud-update-context:sub_824D6C18",
+        },
+    };
+}
+
+bool isSemanticBoundRuntimeObservation(const SonicDayHudRuntimeSemanticPathCandidateObservation& observation)
+{
+    return observation.bindingStatus == "semantic-bound-pending-exact-child-node-resolution";
 }
 
 SonicDayHudRuntimeCallsiteSample makeRuntimeTimerCallsiteSample()
@@ -878,7 +953,7 @@ FrontendControllerFrame SonicDayHudController::applyRuntimeSemanticPathCandidate
         observation.source + "@" + observation.path +
         ":writeKind=" + observation.writeKind +
         ":pathResolutionSource=" + observation.pathResolutionSource +
-        ":status=semantic-candidate-bound-pending-exact-child-node-resolution";
+        ":status=" + observation.bindingStatus;
 
     bool applied = false;
     if (observation.writeKind == "text")
@@ -1330,6 +1405,7 @@ std::string formatSonicDayHudRuntimeSemanticPathCandidateObservation(
         out << ":value=" << std::fixed << std::setprecision(3) << observation.numericValue;
     out << ":candidate_writes=" << observation.candidateWriteCount
         << ":resolution=" << observation.pathResolutionSource
+        << ":binding_status=" << observation.bindingStatus
         << ":source=" << observation.source
         << '\n';
     return out.str();
@@ -1577,6 +1653,29 @@ std::string formatSonicDayHudRuntimeBindingPhase191SmokeSequence()
     out << "gameplay_numeric_binding=score:known,scoreinfo:known,"
         << "speed/boost/energy/tutorial:semantic-candidate-bound-pending-exact-child-node-resolution,"
         << "timer/ring/lives:exact-csd-text-write-or-callsite-lanes,"
+        << "audio:pending-exact-sfx-id"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase193SmokeSequence()
+{
+    SonicDayHudController hud;
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+
+    std::ostringstream out;
+    for (const auto& observation : makeRuntimePhase193SemanticBindingObservations())
+    {
+        out << formatSonicDayHudRuntimeSemanticPathCandidateObservation(observation);
+        if (isSemanticBoundRuntimeObservation(observation))
+            (void)hud.applyRuntimeSemanticPathCandidate(observation);
+    }
+
+    out << formatSonicDayHudGameplayState("phase192-strict-semantic-bound", hud.gameplayState());
+    out << "gameplay_numeric_binding="
+        << "elapsedFrames/speed/tutorial:semantic-bound-pending-exact-child-node-resolution,"
+        << "boost/energy:semantic-candidate-only-pending-runtime-bound,"
+        << "exact-child-node-resolution:pending,"
         << "audio:pending-exact-sfx-id"
         << '\n';
     return out.str();

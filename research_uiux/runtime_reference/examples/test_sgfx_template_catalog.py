@@ -972,6 +972,41 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("sonic_day_hud_state=phase=semantic-candidate-binding:rings=000:score=000000000:time=00:00:00:speed=042:boost=0.650:energy=0.720:lives=3:tutorial=pattern-3:visible:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
         self.assertIn("gameplay_numeric_binding=score:known,scoreinfo:known,speed/boost/energy/tutorial:semantic-candidate-bound-pending-exact-child-node-resolution,timer/ring/lives:exact-csd-text-write-or-callsite-lanes,audio:pending-exact-sfx-id", completed.stdout)
 
+    def test_phase193_sonic_day_hud_controller_keeps_bound_and_candidate_lanes_separate(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+        report = self.read(REPORT)
+
+        for token in [
+            "bindingStatus",
+            "semantic-candidate-only-pending-runtime-bound",
+            "formatSonicDayHudRuntimeBindingPhase193SmokeSequence",
+        ]:
+            self.assertIn(token, header + source)
+
+        self.assertIn("--phase193-sonic-hud-semantic-bound-smoke", example)
+        self.assertIn("Phase 193", report)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase193-sonic-hud-semantic-bound-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("sward_frontend_screen_controller_catalog phase193 sonic hud semantic bound smoke ok", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_semantic_path_candidate=value=elapsedFrames:path=ui_playscreen/time_count/time001:kind=text:text=02:candidate_writes=10:resolution=generated-PPC-callsite-semantic-candidate:binding_status=semantic-bound-pending-exact-child-node-resolution", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_semantic_path_candidate=value=speedKmh:path=ui_playscreen/add/speed_count/position/num_speed:kind=text:text=00:candidate_writes=2:resolution=generated-PPC-callsite-semantic-candidate:binding_status=semantic-bound-pending-exact-child-node-resolution", completed.stdout)
+        self.assertIn("sonic_day_hud_runtime_semantic_path_candidate=value=boostGauge:path=ui_playscreen/so_speed_gauge:kind=text:text=357:candidate_writes=338:resolution=generated-PPC-callsite-semantic-candidate:binding_status=semantic-candidate-only-pending-runtime-bound", completed.stdout)
+        self.assertIn("sonic_day_hud_state=phase=phase192-strict-semantic-bound:rings=000:score=000000000:time=00:00:02:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=pattern-1:visible:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
+        self.assertIn("gameplay_numeric_binding=elapsedFrames/speed/tutorial:semantic-bound-pending-exact-child-node-resolution,boost/energy:semantic-candidate-only-pending-runtime-bound,exact-child-node-resolution:pending,audio:pending-exact-sfx-id", completed.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
