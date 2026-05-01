@@ -122,6 +122,12 @@ int main(int argc, char** argv)
         std::cout << formatSonicDayHudRuntimeBindingPhase198SmokeSequence();
         return 0;
     }
+    if (hasArg(argc, argv, "--phase199-sonic-hud-owner-field-offset-classification-smoke"))
+    {
+        std::cout << "sward_frontend_screen_controller_catalog phase199 sonic hud owner field offset classification smoke ok\n";
+        std::cout << formatSonicDayHudRuntimeBindingPhase199SmokeSequence();
+        return 0;
+    }
 
     if (hasArg(argc, argv, "--catalog") || argc == 1)
     {
@@ -130,6 +136,6 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    std::cerr << "Usage: sward_frontend_screen_controller_catalog [--catalog] [--phase163-smoke] [--phase164-sonic-hud-smoke] [--phase165-sonic-hud-state-smoke] [--phase166-sonic-hud-runtime-binding-smoke] [--phase167-sonic-hud-runtime-field-path-smoke] [--phase168-sonic-hud-runtime-write-path-smoke] [--phase169-sonic-hud-draw-list-coverage-smoke] [--phase173-sonic-hud-live-text-write-smoke] [--phase175-sonic-hud-callsite-sample-smoke] [--phase180-sonic-hud-gauge-prompt-write-smoke] [--phase191-sonic-hud-semantic-candidate-smoke] [--phase193-sonic-hud-semantic-bound-smoke] [--phase194-sonic-hud-gauge-child-path-smoke] [--phase195-sonic-hud-gauge-setter-join-smoke] [--phase196-sonic-hud-rolling-counter-smoke] [--phase197-sonic-hud-owner-field-rolling-counter-smoke] [--phase198-sonic-hud-owner-field-gauge-scale-correlation-smoke]\n";
+    std::cerr << "Usage: sward_frontend_screen_controller_catalog [--catalog] [--phase163-smoke] [--phase164-sonic-hud-smoke] [--phase165-sonic-hud-state-smoke] [--phase166-sonic-hud-runtime-binding-smoke] [--phase167-sonic-hud-runtime-field-path-smoke] [--phase168-sonic-hud-runtime-write-path-smoke] [--phase169-sonic-hud-draw-list-coverage-smoke] [--phase173-sonic-hud-live-text-write-smoke] [--phase175-sonic-hud-callsite-sample-smoke] [--phase180-sonic-hud-gauge-prompt-write-smoke] [--phase191-sonic-hud-semantic-candidate-smoke] [--phase193-sonic-hud-semantic-bound-smoke] [--phase194-sonic-hud-gauge-child-path-smoke] [--phase195-sonic-hud-gauge-setter-join-smoke] [--phase196-sonic-hud-rolling-counter-smoke] [--phase197-sonic-hud-owner-field-rolling-counter-smoke] [--phase198-sonic-hud-owner-field-gauge-scale-correlation-smoke] [--phase199-sonic-hud-owner-field-offset-classification-smoke]\n";
     return 2;
 }

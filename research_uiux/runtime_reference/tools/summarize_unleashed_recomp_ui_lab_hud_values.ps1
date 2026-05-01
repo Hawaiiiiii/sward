@@ -194,6 +194,74 @@ function Add-RollingCounterSemanticGroup($Groups, [string]$Detail, $EventObject)
     }
 }
 
+function Resolve-OwnerFieldOffsetCandidateLabel([int]$Cardinality, [int]$ObservedMin, [int]$ObservedMax) {
+    # Phase 199: shape candidate labels, evaluated in narrowest-first order so
+    # the smallest concrete shape wins. These are *shapes*, not formulas; the
+    # label says nothing definitive about the offset's per-frame meaning, only
+    # what the observed integer distribution looks like across Phase 197/198
+    # evidence.
+    [void]$ObservedMin
+    if ($Cardinality -le 2 -and $ObservedMax -le 8) {
+        return "low-cardinality-narrow-range-candidate"
+    }
+    if ($Cardinality -le 8 -and $ObservedMax -le 16) {
+        return "moderate-cardinality-narrow-range-candidate"
+    }
+    if ($Cardinality -ge 4 -and $ObservedMax -ge 32 -and $ObservedMax -le 256) {
+        return "high-cardinality-narrow-range-candidate"
+    }
+    if ($Cardinality -ge 4 -and $ObservedMax -gt 256) {
+        return "high-cardinality-wide-range-candidate"
+    }
+    return "unclassified-pending-more-evidence"
+}
+
+function New-OwnerFieldOffsetClassification([string]$OwnerAddress, [int]$FieldOffset) {
+    return [ordered]@{
+        ownerAddress = $OwnerAddress
+        fieldOffset = $FieldOffset
+        observedCardinality = 0
+        observedMin = 0
+        observedMax = 0
+        joinCount = 0
+        snapshotCount = 0
+        observedValueSet = [System.Collections.Generic.SortedSet[int]]::new()
+        candidateLabel = "unclassified-pending-more-evidence"
+    }
+}
+
+function Add-OwnerFieldOffsetClassification(
+    $Classifications,
+    [string]$OwnerAddress,
+    [int]$FieldOffset,
+    $ObservedValueStrings,
+    [int]$JoinDelta,
+    [int]$SnapshotDelta)
+{
+    if ([string]::IsNullOrWhiteSpace($OwnerAddress) -or $FieldOffset -le 0) {
+        return
+    }
+    $key = "{0}:{1}" -f $OwnerAddress, $FieldOffset
+    if (-not $Classifications.ContainsKey($key)) {
+        $Classifications[$key] = New-OwnerFieldOffsetClassification $OwnerAddress $FieldOffset
+    }
+    $entry = $Classifications[$key]
+    if ($JoinDelta -gt 0) {
+        $entry.joinCount += $JoinDelta
+    }
+    if ($SnapshotDelta -gt $entry.snapshotCount) {
+        $entry.snapshotCount = $SnapshotDelta
+    }
+    if ($null -ne $ObservedValueStrings) {
+        foreach ($valueText in $ObservedValueStrings) {
+            $parsed = 0
+            if ([int]::TryParse($valueText, [ref]$parsed)) {
+                [void]$entry.observedValueSet.Add($parsed)
+            }
+        }
+    }
+}
+
 function New-OwnerFieldGaugeScaleCorrelationGroup([string]$Path, [string]$OwnerAddress, [int]$FieldOffset) {
     return [ordered]@{
         path = $Path
@@ -556,6 +624,7 @@ $semanticBoundGroupsByKey = @{}
 $rollingCounterSemanticGroupsByKey = @{}
 $ownerFieldRollingCounterGroupsByKey = @{}
 $ownerFieldGaugeScaleCorrelationGroupsByKey = @{}
+$ownerFieldOffsetClassificationsByKey = @{}
 $gaugeDrawPathGroupsByKey = @{}
 $gaugeDrawCalls = @()
 $gaugeDrawCastNodeAddresses = [System.Collections.Generic.SortedSet[string]]::new()
@@ -593,6 +662,8 @@ $summary = [ordered]@{
     ownerFieldRollingCounterStatus = "pending-runtime-owner-field-rolling-counter-evidence"
     ownerFieldGaugeScaleCorrelationGroups = @()
     ownerFieldGaugeScaleCorrelationStatus = "pending-runtime-owner-field-gauge-scale-correlation-evidence"
+    ownerFieldOffsetClassifications = @()
+    ownerFieldOffsetClassificationStatus = "pending-runtime-owner-field-offset-classification-evidence"
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
@@ -834,6 +905,58 @@ $summary.ownerFieldGaugeScaleCorrelationGroups = @(
             }
         }
 )
+# Phase 199: aggregate Phase 197 snapshot evidence + Phase 198 SetScale-join
+# evidence into a per-(owner,offset) shape classification entry. Pure
+# post-processing — no new event source — so the classifier can never
+# disagree with what the runtime already emitted.
+foreach ($group in $ownerFieldRollingCounterGroupsByKey.Values) {
+    Add-OwnerFieldOffsetClassification `
+        $ownerFieldOffsetClassificationsByKey `
+        $group.ownerAddress `
+        $group.fieldOffset `
+        $group.observedValues `
+        0 `
+        $group.samples
+}
+foreach ($group in $ownerFieldGaugeScaleCorrelationGroupsByKey.Values) {
+    Add-OwnerFieldOffsetClassification `
+        $ownerFieldOffsetClassificationsByKey `
+        $group.ownerAddress `
+        $group.fieldOffset `
+        $group.observedFieldValues `
+        $group.joins `
+        0
+}
+foreach ($entry in $ownerFieldOffsetClassificationsByKey.Values) {
+    $entry.observedCardinality = $entry.observedValueSet.Count
+    if ($entry.observedCardinality -gt 0) {
+        $entry.observedMin = $entry.observedValueSet.Min
+        $entry.observedMax = $entry.observedValueSet.Max
+    }
+    $entry.candidateLabel = Resolve-OwnerFieldOffsetCandidateLabel `
+        $entry.observedCardinality `
+        $entry.observedMin `
+        $entry.observedMax
+}
+$summary.ownerFieldOffsetClassifications = @(
+    $ownerFieldOffsetClassificationsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { $ownerFieldOffsetClassificationsByKey[$_].ownerAddress } }, `
+            @{ Expression = { $ownerFieldOffsetClassificationsByKey[$_].fieldOffset } } |
+        ForEach-Object {
+            $entry = $ownerFieldOffsetClassificationsByKey[$_]
+            [ordered]@{
+                ownerAddress = $entry.ownerAddress
+                fieldOffset = $entry.fieldOffset
+                observedCardinality = $entry.observedCardinality
+                observedMin = $entry.observedMin
+                observedMax = $entry.observedMax
+                joinCount = $entry.joinCount
+                snapshotCount = $entry.snapshotCount
+                candidateLabel = $entry.candidateLabel
+            }
+        }
+)
 $summary.gaugeDrawPathGroups = @(
     $gaugeDrawPathGroupsByKey.Keys |
         Sort-Object @{ Expression = { -1 * $gaugeDrawPathGroupsByKey[$_].draws } }, @{ Expression = { $_ } } |
@@ -948,6 +1071,10 @@ elseif ($summary.gaugeSetterChildPathJoins.Count -gt 0) {
 
 if ($summary.ownerFieldGaugeScaleCorrelationGroups.Count -gt 0) {
     $summary.ownerFieldGaugeScaleCorrelationStatus = "owner-field-gauge-scale-correlation-pending-formula-proof"
+}
+
+if ($summary.ownerFieldOffsetClassifications.Count -gt 0) {
+    $summary.ownerFieldOffsetClassificationStatus = "owner-field-offset-classification-pending-formula-proof"
 }
 
 if (
@@ -1069,6 +1196,22 @@ Write-Output (
             }
     ) $CandidateValueLimit))
 Write-Output ("owner_field_gauge_scale_correlation_status={0}" -f $summary.ownerFieldGaugeScaleCorrelationStatus)
+Write-Output (
+    "owner_field_offset_classifications={0}" -f
+    (Format-CandidateList (
+        $summary.ownerFieldOffsetClassifications |
+            ForEach-Object {
+                "owner={0}:field+{1}:cardinality={2}:min={3}:max={4}:joins={5}:candidate={6}" -f
+                    $_.ownerAddress,
+                    $_.fieldOffset,
+                    $_.observedCardinality,
+                    $_.observedMin,
+                    $_.observedMax,
+                    $_.joinCount,
+                    $_.candidateLabel
+            }
+    ) $CandidateValueLimit))
+Write-Output ("owner_field_offset_classification_status={0}" -f $summary.ownerFieldOffsetClassificationStatus)
 foreach ($candidate in $summary.unresolvedNodeCandidates) {
     Write-Output (
         "node_candidate node={0} writes={1} kinds={2} values={3} frames={4}-{5} likely={6} sources={7}" -f

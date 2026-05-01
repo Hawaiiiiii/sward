@@ -545,6 +545,47 @@ std::vector<SonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation> makeRuntimePhase1
     };
 }
 
+// Phase 199: shape candidate label resolver. Heuristics ordered so the
+// narrowest, most concrete shapes match first; anything that doesn't fit
+// stays explicitly unclassified so the controller smoke shows pending.
+std::string resolveOwnerFieldOffsetCandidateLabel(int cardinality, int observedMin, int observedMax)
+{
+    (void)observedMin;
+    if (cardinality <= 2 && observedMax <= 8)
+        return "low-cardinality-narrow-range-candidate";
+    if (cardinality <= 8 && observedMax <= 16)
+        return "moderate-cardinality-narrow-range-candidate";
+    if (cardinality >= 4 && observedMax >= 32 && observedMax <= 256)
+        return "high-cardinality-narrow-range-candidate";
+    if (cardinality >= 4 && observedMax > 256)
+        return "high-cardinality-wide-range-candidate";
+    return "unclassified-pending-more-evidence";
+}
+
+std::vector<SonicDayHudRuntimeOwnerFieldOffsetClassification> makeRuntimePhase199OwnerFieldOffsetClassifications()
+{
+    auto build = [](int fieldOffset, int cardinality, int observedMin, int observedMax, int joins, int snapshots) {
+        SonicDayHudRuntimeOwnerFieldOffsetClassification entry;
+        entry.ownerAddress = "0xCE2D6B0";
+        entry.fieldOffset = fieldOffset;
+        entry.observedCardinality = cardinality;
+        entry.observedMin = observedMin;
+        entry.observedMax = observedMax;
+        entry.joinCount = joins;
+        entry.snapshotCount = snapshots;
+        entry.candidateLabel = resolveOwnerFieldOffsetCandidateLabel(cardinality, observedMin, observedMax);
+        return entry;
+    };
+
+    return {
+        build(460, 4, 64, 255, 4, 5),
+        build(464, 2, 0, 1, 4, 5),
+        build(468, 4, 0, 15, 4, 5),
+        build(472, 1, 100, 100, 4, 5),
+        build(480, 5, 100, 999, 4, 5),
+    };
+}
+
 bool isSemanticBoundRuntimeObservation(const SonicDayHudRuntimeSemanticPathCandidateObservation& observation)
 {
     return observation.bindingStatus == "semantic-bound-pending-exact-child-node-resolution";
@@ -1316,6 +1357,44 @@ FrontendControllerFrame SonicDayHudController::applyRuntimeOwnerFieldRollingCoun
     return frame_;
 }
 
+FrontendControllerFrame SonicDayHudController::applyRuntimeOwnerFieldOffsetClassification(
+    const SonicDayHudRuntimeOwnerFieldOffsetClassification& classification)
+{
+    if (classification.fieldOffset <= 0)
+        return frame_;
+    if (classification.ownerAddress.empty())
+        return frame_;
+
+    std::ostringstream provenance;
+    provenance << classification.source
+               << ":owner=" << classification.ownerAddress
+               << ":field+" << classification.fieldOffset
+               << ":cardinality=" << classification.observedCardinality
+               << ":min=" << classification.observedMin
+               << ":max=" << classification.observedMax
+               << ":joins=" << classification.joinCount
+               << ":snapshots=" << classification.snapshotCount
+               << ":candidate=" << classification.candidateLabel
+               << ":status=" << classification.bindingStatus;
+    gameplayState_.provenance.valueSource = provenance.str();
+
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        frame_.frame + 1,
+        "runtime-owner-field-offset-classification-candidate",
+        classification.source.empty()
+            ? "runtime-owner-field-offset-shape-classifier:phase197-snapshots+phase198-joins"
+            : classification.source,
+        false,
+        0,
+        "none",
+        "none",
+        "none",
+        sonicHudSceneNames(gameplayState_.tutorialVisible));
+    return frame_;
+}
+
 FrontendControllerFrame SonicDayHudController::applyRuntimeOwnerFieldGaugeScaleCorrelation(
     const SonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation& correlation)
 {
@@ -1808,6 +1887,24 @@ std::string formatSonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation(
     return out.str();
 }
 
+std::string formatSonicDayHudRuntimeOwnerFieldOffsetClassification(
+    const SonicDayHudRuntimeOwnerFieldOffsetClassification& classification)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_owner_field_offset_classification="
+        << "owner=" << classification.ownerAddress
+        << ":field_offset=" << classification.fieldOffset
+        << ":cardinality=" << classification.observedCardinality
+        << ":min=" << classification.observedMin
+        << ":max=" << classification.observedMax
+        << ":joins=" << classification.joinCount
+        << ":snapshots=" << classification.snapshotCount
+        << ":candidate=" << classification.candidateLabel
+        << ":status=" << classification.bindingStatus
+        << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage)
 {
     std::ostringstream out;
@@ -2171,6 +2268,27 @@ std::string formatSonicDayHudRuntimeBindingPhase198SmokeSequence()
     out << formatSonicDayHudGameplayState("phase198-owner-field-gauge-scale-correlation-candidate", hud.gameplayState());
     out << "gameplay_numeric_binding="
         << "boost/energy:owner-field-gauge-scale-correlation-pending-formula-proof,"
+        << "setter-node-address-join:still-required-for-final-gauge-values,"
+        << "audio:pending-exact-sfx-id"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase199SmokeSequence()
+{
+    SonicDayHudController hud;
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+
+    std::ostringstream out;
+    for (const auto& classification : makeRuntimePhase199OwnerFieldOffsetClassifications())
+    {
+        out << formatSonicDayHudRuntimeOwnerFieldOffsetClassification(classification);
+        (void)hud.applyRuntimeOwnerFieldOffsetClassification(classification);
+    }
+
+    out << formatSonicDayHudGameplayState("phase199-owner-field-offset-classification-candidate", hud.gameplayState());
+    out << "gameplay_numeric_binding="
+        << "boost/energy:owner-field-offset-classification-pending-formula-proof,"
         << "setter-node-address-join:still-required-for-final-gauge-values,"
         << "audio:pending-exact-sfx-id"
         << '\n';

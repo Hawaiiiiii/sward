@@ -2799,6 +2799,98 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         )
         self.assertNotIn("boost_ring_energy_status=resolved", completed.stdout)
 
+    def test_ui_lab_phase199_classifies_owner_field_offset_shapes(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "ownerFieldOffsetClassifications",
+            "New-OwnerFieldOffsetClassification",
+            "Add-OwnerFieldOffsetClassification",
+            "Resolve-OwnerFieldOffsetCandidateLabel",
+            "owner_field_offset_classifications=",
+            "owner_field_offset_classification_status=",
+            "owner-field-offset-classification-pending-formula-proof",
+            "low-cardinality-narrow-range-candidate",
+            "moderate-cardinality-narrow-range-candidate",
+            "high-cardinality-narrow-range-candidate",
+            "high-cardinality-wide-range-candidate",
+            "unclassified-pending-more-evidence",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 199",
+            "owner-field offset classification",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":10,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=64,0,0,100,100 fieldValueHexes=0x40,0x0,0x0,0x64,0x64 candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":1.5,"frame":70,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=128,1,1,100,500 fieldValueHexes=0x80,0x1,0x1,0x64,0x1F4 candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":2.0,"frame":130,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=192,0,2,100,800 fieldValueHexes=0xC0,0x0,0x2,0x64,0x320 candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":2.5,"frame":190,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=255,1,15,100,200 fieldValueHexes=0xFF,0x1,0xF,0x64,0xC8 candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":3.0,"frame":250,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=128,0,2,100,999 fieldValueHexes=0x80,0x0,0x2,0x64,0x3E7 candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":3.1,"frame":260,"event":"sonic-hud-gauge-scale-owner-correlated","detail":"path=ui_playscreen/so_speed_gauge/position/speed_gauge_color node=0xEA09708 scale=0.250 ownerAddress=0xCE2D6B0 ownerField460=64 ownerField464=0 ownerField468=0 ownerField472=100 ownerField480=100 frameDelta=2 source=runtime-csd-node-set-scale-owner-field-join:sub_830BF090"}',
+                        '{"time":3.2,"frame":270,"event":"sonic-hud-gauge-scale-owner-correlated","detail":"path=ui_playscreen/so_speed_gauge/position/speed_gauge_color node=0xEA09708 scale=0.500 ownerAddress=0xCE2D6B0 ownerField460=128 ownerField464=1 ownerField468=1 ownerField472=100 ownerField480=500 frameDelta=2 source=runtime-csd-node-set-scale-owner-field-join:sub_830BF090"}',
+                        '{"time":3.3,"frame":280,"event":"sonic-hud-gauge-scale-owner-correlated","detail":"path=ui_playscreen/so_speed_gauge/position/speed_gauge_color node=0xEA09708 scale=0.750 ownerAddress=0xCE2D6B0 ownerField460=192 ownerField464=0 ownerField468=2 ownerField472=100 ownerField480=800 frameDelta=2 source=runtime-csd-node-set-scale-owner-field-join:sub_830BF090"}',
+                        '{"time":3.4,"frame":290,"event":"sonic-hud-gauge-scale-owner-correlated","detail":"path=ui_playscreen/so_speed_gauge/position/speed_gauge_color node=0xEA09708 scale=1.000 ownerAddress=0xCE2D6B0 ownerField460=255 ownerField464=1 ownerField468=15 ownerField472=100 ownerField480=200 frameDelta=2 source=runtime-csd-node-set-scale-owner-field-join:sub_830BF090"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn(
+            "owner_field_offset_classifications=owner=0xCE2D6B0:field+460:cardinality=4:min=64:max=255:joins=4:candidate=high-cardinality-narrow-range-candidate",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner=0xCE2D6B0:field+464:cardinality=2:min=0:max=1:joins=4:candidate=low-cardinality-narrow-range-candidate",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner=0xCE2D6B0:field+468:cardinality=4:min=0:max=15:joins=4:candidate=moderate-cardinality-narrow-range-candidate",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner=0xCE2D6B0:field+472:cardinality=1:min=100:max=100:joins=4:candidate=unclassified-pending-more-evidence",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner=0xCE2D6B0:field+480:cardinality=5:min=100:max=999:joins=4:candidate=high-cardinality-wide-range-candidate",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner_field_offset_classification_status=owner-field-offset-classification-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertNotIn("boost_ring_energy_status=resolved", completed.stdout)
+        self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")

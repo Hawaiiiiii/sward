@@ -183,6 +183,24 @@ struct SonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation
     std::string source = "runtime-csd-node-set-scale-owner-field-join:sub_830BF090";
 };
 
+// Phase 199: an honest *shape* candidate for one CHudSonicStage owner-field
+// offset, derived from Phase 197 snapshot cardinality/range plus Phase 198
+// SetScale-join count. The candidateLabel is a shape, not a formula; final
+// boost/ring-energy values must not be derived from this struct.
+struct SonicDayHudRuntimeOwnerFieldOffsetClassification
+{
+    std::string ownerAddress;
+    int fieldOffset = 0;
+    int observedCardinality = 0;
+    int observedMin = 0;
+    int observedMax = 0;
+    int joinCount = 0;
+    int snapshotCount = 0;
+    std::string candidateLabel = "unclassified-pending-more-evidence";
+    std::string bindingStatus = "owner-field-offset-classification-pending-formula-proof";
+    std::string source = "runtime-owner-field-offset-shape-classifier:phase197-snapshots+phase198-joins";
+};
+
 struct SonicDayHudRuntimeDrawListCoverage
 {
     std::string source = "live-bridge/ui-draw-list";
@@ -341,6 +359,8 @@ public:
         const SonicDayHudRuntimeOwnerFieldRollingCounterObservation& observation);
     [[nodiscard]] FrontendControllerFrame applyRuntimeOwnerFieldGaugeScaleCorrelation(
         const SonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation& correlation);
+    [[nodiscard]] FrontendControllerFrame applyRuntimeOwnerFieldOffsetClassification(
+        const SonicDayHudRuntimeOwnerFieldOffsetClassification& classification);
     [[nodiscard]] FrontendControllerFrame applyRuntimeCallsiteSample(
         const SonicDayHudRuntimeCallsiteSample& sample);
     [[nodiscard]] FrontendControllerFrame applyRingPickup(int ringDelta, int scoreDelta);
@@ -380,6 +400,8 @@ private:
     const SonicDayHudRuntimeOwnerFieldRollingCounterObservation& observation);
 [[nodiscard]] std::string formatSonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation(
     const SonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation& correlation);
+[[nodiscard]] std::string formatSonicDayHudRuntimeOwnerFieldOffsetClassification(
+    const SonicDayHudRuntimeOwnerFieldOffsetClassification& classification);
 [[nodiscard]] std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage);
 [[nodiscard]] SonicDayHudRuntimeCallsiteClassification classifySonicDayHudRuntimeCallsiteSample(
     const SonicDayHudRuntimeCallsiteSample& sample);
@@ -400,5 +422,6 @@ private:
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase196SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase197SmokeSequence();
 [[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase198SmokeSequence();
+[[nodiscard]] std::string formatSonicDayHudRuntimeBindingPhase199SmokeSequence();
 [[nodiscard]] std::string frontendControllerInputName(FrontendControllerInput input);
 } // namespace sward::ui_runtime

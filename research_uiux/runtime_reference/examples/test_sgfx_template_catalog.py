@@ -1227,6 +1227,76 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
             completed.stdout,
         )
 
+    def test_phase199_sonic_day_hud_controller_classifies_owner_field_offsets_without_binding_values(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+        report = self.read(REPORT)
+        checklist = self.read(REPO_ROOT / "research_uiux" / "TODO_CHECKLIST.md")
+
+        for token in [
+            "SonicDayHudRuntimeOwnerFieldOffsetClassification",
+            "applyRuntimeOwnerFieldOffsetClassification",
+            "formatSonicDayHudRuntimeOwnerFieldOffsetClassification",
+            "formatSonicDayHudRuntimeBindingPhase199SmokeSequence",
+            "owner-field-offset-classification-pending-formula-proof",
+            "low-cardinality-narrow-range-candidate",
+            "moderate-cardinality-narrow-range-candidate",
+            "high-cardinality-narrow-range-candidate",
+            "high-cardinality-wide-range-candidate",
+            "unclassified-pending-more-evidence",
+        ]:
+            self.assertIn(token, header + source)
+
+        self.assertIn("--phase199-sonic-hud-owner-field-offset-classification-smoke", example)
+        self.assertIn("Phase 199", report)
+        self.assertIn("Phase 199", checklist)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase199-sonic-hud-owner-field-offset-classification-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn(
+            "sward_frontend_screen_controller_catalog phase199 sonic hud owner field offset classification smoke ok",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_owner_field_offset_classification=owner=0xCE2D6B0:field_offset=460:cardinality=4:min=64:max=255:joins=4:snapshots=5:candidate=high-cardinality-narrow-range-candidate:status=owner-field-offset-classification-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_owner_field_offset_classification=owner=0xCE2D6B0:field_offset=464:cardinality=2:min=0:max=1:joins=4:snapshots=5:candidate=low-cardinality-narrow-range-candidate:status=owner-field-offset-classification-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_owner_field_offset_classification=owner=0xCE2D6B0:field_offset=468:cardinality=4:min=0:max=15:joins=4:snapshots=5:candidate=moderate-cardinality-narrow-range-candidate:status=owner-field-offset-classification-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_owner_field_offset_classification=owner=0xCE2D6B0:field_offset=472:cardinality=1:min=100:max=100:joins=4:snapshots=5:candidate=unclassified-pending-more-evidence:status=owner-field-offset-classification-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_owner_field_offset_classification=owner=0xCE2D6B0:field_offset=480:cardinality=5:min=100:max=999:joins=4:snapshots=5:candidate=high-cardinality-wide-range-candidate:status=owner-field-offset-classification-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_state=phase=phase199-owner-field-offset-classification-candidate:rings=000:score=000000000:time=00:00:00:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending",
+            completed.stdout,
+        )
+        self.assertIn(
+            "gameplay_numeric_binding=boost/energy:owner-field-offset-classification-pending-formula-proof,setter-node-address-join:still-required-for-final-gauge-values,audio:pending-exact-sfx-id",
+            completed.stdout,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
