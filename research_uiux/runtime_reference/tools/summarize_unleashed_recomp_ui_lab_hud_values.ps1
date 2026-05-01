@@ -194,6 +194,185 @@ function Add-RollingCounterSemanticGroup($Groups, [string]$Detail, $EventObject)
     }
 }
 
+function New-OwnerFieldGaugeScaleCorrelationGroup([string]$Path, [string]$OwnerAddress, [int]$FieldOffset) {
+    return [ordered]@{
+        path = $Path
+        ownerAddress = $OwnerAddress
+        fieldOffset = $FieldOffset
+        joins = 0
+        observedScales = [System.Collections.Generic.SortedSet[string]]::new()
+        observedFieldValues = [System.Collections.Generic.SortedSet[string]]::new()
+        sources = [System.Collections.Generic.SortedSet[string]]::new()
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Add-OwnerFieldGaugeScaleCorrelationGroup($Groups, [string]$Detail, $EventObject) {
+    $path = Get-DetailToken $Detail "path"
+    $ownerAddress = Get-DetailToken $Detail "ownerAddress"
+    $scale = Get-DetailToken $Detail "scale"
+
+    if ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($ownerAddress)) {
+        return
+    }
+
+    if (-not (
+        $path.StartsWith("ui_playscreen/so_speed_gauge") -or
+        $path.StartsWith("ui_playscreen/so_ringenagy_gauge")))
+    {
+        return
+    }
+
+    $offsetFields = @(
+        @{ Token = "ownerField460"; Offset = 460 },
+        @{ Token = "ownerField464"; Offset = 464 },
+        @{ Token = "ownerField468"; Offset = 468 },
+        @{ Token = "ownerField472"; Offset = 472 },
+        @{ Token = "ownerField480"; Offset = 480 }
+    )
+
+    $source = Get-DetailToken $Detail "source"
+    $frame = Get-EventFrame $EventObject
+
+    foreach ($entry in $offsetFields) {
+        $rawValue = Get-DetailToken $Detail $entry.Token
+        if ([string]::IsNullOrWhiteSpace($rawValue)) {
+            continue
+        }
+
+        $key = "{0}:{1}:{2}" -f $path, $ownerAddress, $entry.Offset
+        if (-not $Groups.ContainsKey($key)) {
+            $Groups[$key] = New-OwnerFieldGaugeScaleCorrelationGroup $path $ownerAddress $entry.Offset
+        }
+
+        $group = $Groups[$key]
+        $group.joins++
+        Add-UniqueSorted $group.observedFieldValues $rawValue
+        if (-not [string]::IsNullOrWhiteSpace($scale)) {
+            Add-UniqueSorted $group.observedScales $scale
+        }
+        if (-not [string]::IsNullOrWhiteSpace($source)) {
+            Add-UniqueSorted $group.sources $source
+        }
+
+        if ($null -ne $frame) {
+            if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+                $group.firstFrame = $frame
+            }
+            if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+                $group.lastFrame = $frame
+            }
+        }
+    }
+}
+
+function New-OwnerFieldRollingCounterGroup([string]$OwnerAddress, [int]$FieldOffset, [string]$ValueName, [string]$Callsite) {
+    return [ordered]@{
+        ownerAddress = $OwnerAddress
+        fieldOffset = $FieldOffset
+        semanticValueName = $ValueName
+        callsite = $Callsite
+        samples = 0
+        observedValues = [System.Collections.Generic.SortedSet[string]]::new()
+        observedValueHexes = [System.Collections.Generic.SortedSet[string]]::new()
+        candidatePaths = [System.Collections.Generic.SortedSet[string]]::new()
+        sources = [System.Collections.Generic.SortedSet[string]]::new()
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Add-OwnerFieldRollingCounterGroup($Groups, [string]$Detail, $EventObject) {
+    $callsite = Get-DetailToken $Detail "callsite"
+    if ($callsite -ne "sub_824D6C18") {
+        return
+    }
+
+    $ownerAddress = Get-DetailToken $Detail "ownerAddress"
+    if ([string]::IsNullOrWhiteSpace($ownerAddress)) {
+        return
+    }
+
+    $offsetsRaw = Get-DetailToken $Detail "fieldOffsets"
+    $valuesRaw = Get-DetailToken $Detail "fieldValues"
+    $hexesRaw = Get-DetailToken $Detail "fieldValueHexes"
+    $candidateValueNamesRaw = Get-DetailToken $Detail "candidateValueNames"
+    $candidatePathsRaw = Get-DetailToken $Detail "candidatePaths"
+
+    if ([string]::IsNullOrWhiteSpace($offsetsRaw) -or [string]::IsNullOrWhiteSpace($valuesRaw)) {
+        return
+    }
+
+    $offsets = $offsetsRaw -split ","
+    $values = $valuesRaw -split ","
+    $hexes = if ([string]::IsNullOrWhiteSpace($hexesRaw)) { @() } else { $hexesRaw -split "," }
+
+    if ($offsets.Count -ne $values.Count) {
+        return
+    }
+
+    $candidateValueNames = if ([string]::IsNullOrWhiteSpace($candidateValueNamesRaw)) {
+        @("boostGauge", "ringEnergyGauge")
+    } else {
+        @($candidateValueNamesRaw -split "\|" | Where-Object { $_ -eq "boostGauge" -or $_ -eq "ringEnergyGauge" })
+    }
+    if ($candidateValueNames.Count -eq 0) {
+        return
+    }
+
+    $candidatePaths = if ([string]::IsNullOrWhiteSpace($candidatePathsRaw)) { @() } else { $candidatePathsRaw -split "\|" }
+    $source = Get-DetailToken $Detail "source"
+    $frame = Get-EventFrame $EventObject
+
+    for ($i = 0; $i -lt $offsets.Count; $i++) {
+        $offsetText = $offsets[$i].Trim()
+        $valueText = $values[$i].Trim()
+        if ([string]::IsNullOrWhiteSpace($offsetText)) {
+            continue
+        }
+
+        $offset = 0
+        if (-not [int]::TryParse($offsetText, [ref]$offset)) {
+            continue
+        }
+
+        $hexText = ""
+        if ($i -lt $hexes.Count) {
+            $hexText = $hexes[$i].Trim()
+        }
+
+        foreach ($valueName in $candidateValueNames) {
+            $key = "{0}:{1}:{2}:{3}" -f $ownerAddress, $offset, $valueName, $callsite
+            if (-not $Groups.ContainsKey($key)) {
+                $Groups[$key] = New-OwnerFieldRollingCounterGroup $ownerAddress $offset $valueName $callsite
+            }
+
+            $group = $Groups[$key]
+            $group.samples++
+            Add-UniqueSorted $group.observedValues $valueText
+            if (-not [string]::IsNullOrWhiteSpace($hexText)) {
+                Add-UniqueSorted $group.observedValueHexes $hexText
+            }
+            foreach ($candidatePath in $candidatePaths) {
+                Add-UniqueSorted $group.candidatePaths $candidatePath
+            }
+            if (-not [string]::IsNullOrWhiteSpace($source)) {
+                Add-UniqueSorted $group.sources $source
+            }
+
+            if ($null -ne $frame) {
+                if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+                    $group.firstFrame = $frame
+                }
+                if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+                    $group.lastFrame = $frame
+                }
+            }
+        }
+    }
+}
+
 function New-GaugeDrawPathGroup([string]$Path, [string]$ValueName) {
     return [ordered]@{
         path = $Path
@@ -375,6 +554,8 @@ $unresolvedNodeCandidatesByNode = @{}
 $semanticPathCandidateGroupsByKey = @{}
 $semanticBoundGroupsByKey = @{}
 $rollingCounterSemanticGroupsByKey = @{}
+$ownerFieldRollingCounterGroupsByKey = @{}
+$ownerFieldGaugeScaleCorrelationGroupsByKey = @{}
 $gaugeDrawPathGroupsByKey = @{}
 $gaugeDrawCalls = @()
 $gaugeDrawCastNodeAddresses = [System.Collections.Generic.SortedSet[string]]::new()
@@ -408,6 +589,10 @@ $summary = [ordered]@{
     semanticBoundGroups = @()
     rollingCounterSemanticGroups = @()
     boostRingEnergyStatus = "pending-runtime-rolling-counter-evidence"
+    ownerFieldRollingCounterGroups = @()
+    ownerFieldRollingCounterStatus = "pending-runtime-owner-field-rolling-counter-evidence"
+    ownerFieldGaugeScaleCorrelationGroups = @()
+    ownerFieldGaugeScaleCorrelationStatus = "pending-runtime-owner-field-gauge-scale-correlation-evidence"
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
@@ -472,6 +657,12 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
             Add-UniqueSorted $semanticPathCandidates (Get-DetailToken $detail "semanticPathCandidate")
             Add-SemanticPathCandidateGroup $semanticPathCandidateGroupsByKey $detail $eventObject
             Add-RollingCounterSemanticGroup $rollingCounterSemanticGroupsByKey $detail $eventObject
+        }
+        "sonic-hud-owner-gauge-snapshot" {
+            Add-OwnerFieldRollingCounterGroup $ownerFieldRollingCounterGroupsByKey $detail $eventObject
+        }
+        "sonic-hud-gauge-scale-owner-correlated" {
+            Add-OwnerFieldGaugeScaleCorrelationGroup $ownerFieldGaugeScaleCorrelationGroupsByKey $detail $eventObject
         }
         "sonic-hud-node-write-semantic-bound" {
             $summary.semanticBoundWrites++
@@ -599,6 +790,50 @@ $summary.rollingCounterSemanticGroups = @(
             }
         }
 )
+$summary.ownerFieldRollingCounterGroups = @(
+    $ownerFieldRollingCounterGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { -1 * $ownerFieldRollingCounterGroupsByKey[$_].samples } }, `
+            @{ Expression = { $ownerFieldRollingCounterGroupsByKey[$_].fieldOffset } }, `
+            @{ Expression = { $ownerFieldRollingCounterGroupsByKey[$_].semanticValueName } } |
+        ForEach-Object {
+            $group = $ownerFieldRollingCounterGroupsByKey[$_]
+            [ordered]@{
+                ownerAddress = $group.ownerAddress
+                fieldOffset = $group.fieldOffset
+                semanticValueName = $group.semanticValueName
+                callsite = $group.callsite
+                samples = $group.samples
+                observedValues = @($group.observedValues)
+                observedValueHexes = @($group.observedValueHexes)
+                candidatePaths = @($group.candidatePaths)
+                sources = @($group.sources)
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
+$summary.ownerFieldGaugeScaleCorrelationGroups = @(
+    $ownerFieldGaugeScaleCorrelationGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { -1 * $ownerFieldGaugeScaleCorrelationGroupsByKey[$_].joins } }, `
+            @{ Expression = { $ownerFieldGaugeScaleCorrelationGroupsByKey[$_].path } }, `
+            @{ Expression = { $ownerFieldGaugeScaleCorrelationGroupsByKey[$_].fieldOffset } } |
+        ForEach-Object {
+            $group = $ownerFieldGaugeScaleCorrelationGroupsByKey[$_]
+            [ordered]@{
+                path = $group.path
+                ownerAddress = $group.ownerAddress
+                fieldOffset = $group.fieldOffset
+                joins = $group.joins
+                observedScales = @($group.observedScales)
+                observedFieldValues = @($group.observedFieldValues)
+                sources = @($group.sources)
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
 $summary.gaugeDrawPathGroups = @(
     $gaugeDrawPathGroupsByKey.Keys |
         Sort-Object @{ Expression = { -1 * $gaugeDrawPathGroupsByKey[$_].draws } }, @{ Expression = { $_ } } |
@@ -704,6 +939,17 @@ elseif ($summary.gaugeSetterChildPathJoins.Count -gt 0) {
     $summary.boostRingEnergyStatus = "setter-node-address-join-runtime-proven"
 }
 
+if ($summary.ownerFieldRollingCounterGroups.Count -gt 0 -and $summary.gaugeSetterChildPathJoins.Count -eq 0) {
+    $summary.ownerFieldRollingCounterStatus = "owner-field-rolling-counter-pending-exact-offset-normalization"
+}
+elseif ($summary.gaugeSetterChildPathJoins.Count -gt 0) {
+    $summary.ownerFieldRollingCounterStatus = "owner-field-rolling-counter-correlated-with-setter-node-address-join"
+}
+
+if ($summary.ownerFieldGaugeScaleCorrelationGroups.Count -gt 0) {
+    $summary.ownerFieldGaugeScaleCorrelationStatus = "owner-field-gauge-scale-correlation-pending-formula-proof"
+}
+
 if (
     $summary.textWrites -gt 0 -or
     $summary.gaugeWrites -gt 0 -or
@@ -797,6 +1043,32 @@ Write-Output (
     ) $CandidateValueLimit))
 Write-Output ("gauge_child_path_status={0}" -f $summary.gaugeChildPathStatus)
 Write-Output ("boost_ring_energy_status={0}" -f $summary.boostRingEnergyStatus)
+Write-Output (
+    "owner_field_rolling_counter_groups={0}" -f
+    (Format-CandidateList (
+        $summary.ownerFieldRollingCounterGroups |
+            ForEach-Object {
+                "owner={0}:field+{1}={2}:samples={3}" -f
+                    $_.ownerAddress,
+                    $_.fieldOffset,
+                    $_.semanticValueName,
+                    $_.samples
+            }
+    ) $CandidateValueLimit))
+Write-Output ("owner_field_rolling_counter_status={0}" -f $summary.ownerFieldRollingCounterStatus)
+Write-Output (
+    "owner_field_gauge_scale_correlation_groups={0}" -f
+    (Format-CandidateList (
+        $summary.ownerFieldGaugeScaleCorrelationGroups |
+            ForEach-Object {
+                "path={0}:owner={1}:field+{2}:joins={3}" -f
+                    $_.path,
+                    $_.ownerAddress,
+                    $_.fieldOffset,
+                    $_.joins
+            }
+    ) $CandidateValueLimit))
+Write-Output ("owner_field_gauge_scale_correlation_status={0}" -f $summary.ownerFieldGaugeScaleCorrelationStatus)
 foreach ($candidate in $summary.unresolvedNodeCandidates) {
     Write-Output (
         "node_candidate node={0} writes={1} kinds={2} values={3} frames={4}-{5} likely={6} sources={7}" -f

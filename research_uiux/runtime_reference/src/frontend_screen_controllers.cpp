@@ -461,6 +461,90 @@ std::vector<SonicDayHudRuntimeRollingGaugeCounterObservation> makeRuntimePhase19
     };
 }
 
+std::vector<SonicDayHudRuntimeOwnerFieldRollingCounterObservation> makeRuntimePhase197OwnerFieldRollingCounterObservations()
+{
+    return {
+        {
+            "boostGauge",
+            "0xCE2D6B0",
+            460,
+            "ui_playscreen/so_speed_gauge",
+            "text",
+            "",
+            "sub_824D6C18",
+            2,
+            "owner-field-rolling-counter-pending-exact-offset-normalization",
+            "phase197-live:runtime-owner-field-snapshot:sub_824D6C18",
+        },
+        {
+            "ringEnergyGauge",
+            "0xCE2D6B0",
+            460,
+            "ui_playscreen/so_ringenagy_gauge",
+            "text",
+            "",
+            "sub_824D6C18",
+            2,
+            "owner-field-rolling-counter-pending-exact-offset-normalization",
+            "phase197-live:runtime-owner-field-snapshot:sub_824D6C18",
+        },
+        {
+            "boostGauge",
+            "0xCE2D6B0",
+            480,
+            "ui_playscreen/so_speed_gauge",
+            "text",
+            "",
+            "sub_824D6C18",
+            2,
+            "owner-field-rolling-counter-pending-exact-offset-normalization",
+            "phase197-live:runtime-owner-field-snapshot:sub_824D6C18",
+        },
+        {
+            "ringEnergyGauge",
+            "0xCE2D6B0",
+            480,
+            "ui_playscreen/so_ringenagy_gauge",
+            "text",
+            "",
+            "sub_824D6C18",
+            2,
+            "owner-field-rolling-counter-pending-exact-offset-normalization",
+            "phase197-live:runtime-owner-field-snapshot:sub_824D6C18",
+        },
+    };
+}
+
+std::vector<SonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation> makeRuntimePhase198OwnerFieldGaugeScaleCorrelations()
+{
+    return {
+        {
+            "boostGauge",
+            "0xCE2D6B0",
+            460,
+            "ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506",
+            0.650,
+            true,
+            4,
+            1,
+            "owner-field-gauge-scale-correlation-pending-formula-proof",
+            "phase198-live:runtime-csd-node-set-scale-owner-field-join:sub_830BF090",
+        },
+        {
+            "ringEnergyGauge",
+            "0xCE2D6B0",
+            480,
+            "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483",
+            0.425,
+            true,
+            684,
+            1,
+            "owner-field-gauge-scale-correlation-pending-formula-proof",
+            "phase198-live:runtime-csd-node-set-scale-owner-field-join:sub_830BF090",
+        },
+    };
+}
+
 bool isSemanticBoundRuntimeObservation(const SonicDayHudRuntimeSemanticPathCandidateObservation& observation)
 {
     return observation.bindingStatus == "semantic-bound-pending-exact-child-node-resolution";
@@ -1200,6 +1284,78 @@ FrontendControllerFrame SonicDayHudController::applyRuntimeRollingGaugeCounterOb
     return frame_;
 }
 
+FrontendControllerFrame SonicDayHudController::applyRuntimeOwnerFieldRollingCounterObservation(
+    const SonicDayHudRuntimeOwnerFieldRollingCounterObservation& observation)
+{
+    if (observation.callsite != "sub_824D6C18" || observation.writeKind != "text")
+        return frame_;
+
+    if (observation.valueName != "boostGauge" && observation.valueName != "ringEnergyGauge")
+        return frame_;
+
+    if (observation.fieldOffset <= 0)
+        return frame_;
+
+    gameplayState_.provenance.valueSource =
+        observation.source + ":owner=" + observation.ownerAddress +
+        ":field+" + std::to_string(observation.fieldOffset) +
+        "@" + observation.path +
+        ":status=" + observation.bindingStatus;
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        frame_.frame + 1,
+        "runtime-owner-field-rolling-counter-candidate",
+        observation.source.empty() ? "runtime-owner-field-snapshot:sub_824D6C18" : observation.source,
+        false,
+        0,
+        "none",
+        "none",
+        "none",
+        sonicHudSceneNames(gameplayState_.tutorialVisible));
+    return frame_;
+}
+
+FrontendControllerFrame SonicDayHudController::applyRuntimeOwnerFieldGaugeScaleCorrelation(
+    const SonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation& correlation)
+{
+    if (correlation.valueName != "boostGauge" && correlation.valueName != "ringEnergyGauge")
+        return frame_;
+
+    if (correlation.fieldOffset <= 0)
+        return frame_;
+
+    if (correlation.exactChildPath.empty())
+        return frame_;
+
+    std::ostringstream provenance;
+    provenance << correlation.source
+               << ":owner=" << correlation.ownerAddress
+               << ":field+" << correlation.fieldOffset
+               << "@" << correlation.exactChildPath
+               << ":scale=" << std::fixed << std::setprecision(3)
+               << std::clamp(correlation.scaleValue, 0.0, 1.0)
+               << ":owner_field_value=" << correlation.ownerFieldValue
+               << ":status=" << correlation.bindingStatus;
+    gameplayState_.provenance.valueSource = provenance.str();
+
+    frame_ = makeFrame(
+        "SonicDayHudController",
+        "sonic-day-hud",
+        frame_.frame + 1,
+        "runtime-owner-field-gauge-scale-correlation-candidate",
+        correlation.source.empty()
+            ? "runtime-csd-node-set-scale-owner-field-join:sub_830BF090"
+            : correlation.source,
+        false,
+        0,
+        "none",
+        "none",
+        "none",
+        sonicHudSceneNames(gameplayState_.tutorialVisible));
+    return frame_;
+}
+
 FrontendControllerFrame SonicDayHudController::applyRuntimeCallsiteSample(
     const SonicDayHudRuntimeCallsiteSample& sample)
 {
@@ -1616,6 +1772,42 @@ std::string formatSonicDayHudRuntimeRollingGaugeCounterObservation(
     return out.str();
 }
 
+std::string formatSonicDayHudRuntimeOwnerFieldRollingCounterObservation(
+    const SonicDayHudRuntimeOwnerFieldRollingCounterObservation& observation)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_owner_field_rolling_counter="
+        << "value=" << observation.valueName
+        << ":owner=" << observation.ownerAddress
+        << ":field_offset=" << observation.fieldOffset
+        << ":path=" << observation.path
+        << ":kind=" << observation.writeKind
+        << ":text=" << observation.textUtf8
+        << ":callsite=" << observation.callsite
+        << ":counter_writes=" << observation.counterWriteCount
+        << ":status=" << observation.bindingStatus
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation(
+    const SonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation& correlation)
+{
+    std::ostringstream out;
+    out << "sonic_day_hud_owner_field_gauge_scale_correlation="
+        << "value=" << correlation.valueName
+        << ":owner=" << correlation.ownerAddress
+        << ":field_offset=" << correlation.fieldOffset
+        << ":exact_child=" << correlation.exactChildPath
+        << ":scale=" << std::fixed << std::setprecision(3)
+        << std::clamp(correlation.scaleValue, 0.0, 1.0)
+        << ":owner_field_value=" << correlation.ownerFieldValue
+        << ":joins=" << correlation.joinCount
+        << ":status=" << correlation.bindingStatus
+        << '\n';
+    return out.str();
+}
+
 std::string formatSonicDayHudRuntimeDrawListCoverage(const SonicDayHudRuntimeDrawListCoverage& coverage)
 {
     std::ostringstream out;
@@ -1937,6 +2129,48 @@ std::string formatSonicDayHudRuntimeBindingPhase196SmokeSequence()
     out << formatSonicDayHudGameplayState("phase196-rolling-counter-candidate", hud.gameplayState());
     out << "gameplay_numeric_binding="
         << "boost/energy:rolling-counter-text-candidate-pending-gauge-state-normalization,"
+        << "setter-node-address-join:still-required-for-final-gauge-values,"
+        << "audio:pending-exact-sfx-id"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase197SmokeSequence()
+{
+    SonicDayHudController hud;
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+
+    std::ostringstream out;
+    for (const auto& observation : makeRuntimePhase197OwnerFieldRollingCounterObservations())
+    {
+        out << formatSonicDayHudRuntimeOwnerFieldRollingCounterObservation(observation);
+        (void)hud.applyRuntimeOwnerFieldRollingCounterObservation(observation);
+    }
+
+    out << formatSonicDayHudGameplayState("phase197-owner-field-rolling-counter-candidate", hud.gameplayState());
+    out << "gameplay_numeric_binding="
+        << "boost/energy:owner-field-rolling-counter-pending-exact-offset-normalization,"
+        << "setter-node-address-join:still-required-for-final-gauge-values,"
+        << "audio:pending-exact-sfx-id"
+        << '\n';
+    return out.str();
+}
+
+std::string formatSonicDayHudRuntimeBindingPhase198SmokeSequence()
+{
+    SonicDayHudController hud;
+    (void)hud.handleInput(FrontendControllerInput::StageReady);
+
+    std::ostringstream out;
+    for (const auto& correlation : makeRuntimePhase198OwnerFieldGaugeScaleCorrelations())
+    {
+        out << formatSonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation(correlation);
+        (void)hud.applyRuntimeOwnerFieldGaugeScaleCorrelation(correlation);
+    }
+
+    out << formatSonicDayHudGameplayState("phase198-owner-field-gauge-scale-correlation-candidate", hud.gameplayState());
+    out << "gameplay_numeric_binding="
+        << "boost/energy:owner-field-gauge-scale-correlation-pending-formula-proof,"
         << "setter-node-address-join:still-required-for-final-gauge-values,"
         << "audio:pending-exact-sfx-id"
         << '\n';

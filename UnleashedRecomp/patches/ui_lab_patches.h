@@ -347,6 +347,11 @@ namespace UiLab
         uint32_t playerCountNodeAddress,
         std::string_view hookSource);
     void OnHudSonicStageOwnerFieldSample(uint32_t ownerAddress, std::string_view hookSource);
+    // Phase 197: snapshot CHudSonicStage owner-field dwords at +460/+464/+468/+472/+480
+    // at the sub_824D6C18 callsite so the rolling counter / gauge-state staging block
+    // can be correlated with the same-frame boost/ring-energy text writes. Reuses the
+    // existing 600-frame stable-signature throttle so manual gameplay FPS stays flat.
+    void OnHudSonicStageOwnerFieldGaugeSnapshot(uint32_t ownerAddress, std::string_view callsite);
     void OnSonicHudUpdateCallsiteSample(
         uint32_t ownerAddress,
         std::string_view hookName,

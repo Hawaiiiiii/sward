@@ -948,6 +948,38 @@ namespace UiLab
     static uint64_t g_chudSonicStageOwnerHookLastEvidenceFrame = 0;
     static std::string g_chudSonicStageOwnerFieldSampleStableSignature;
     static uint64_t g_chudSonicStageOwnerFieldSampleLastEvidenceFrame = 0;
+    // Phase 197: parallel throttle/dedup state for the sub_824D6C18 owner-field
+    // gauge-state snapshot. Kept separate from the constructor-time owner-field
+    // sample lane so a stable owner pointer plus a churning rolling counter can
+    // both emit, but neither floods the JSONL.
+    static std::string g_chudSonicStageOwnerFieldGaugeSnapshotStableSignature;
+    static uint64_t g_chudSonicStageOwnerFieldGaugeSnapshotLastEvidenceFrame = 0;
+    // Phase 198: cache the latest owner-field snapshot so the SetScale hook can
+    // read it without re-walking the guest memory. Updated unconditionally on
+    // every Phase 197 snapshot call so the SetScale join sees a fresh value
+    // even when the Phase 197 emission throttle has gated the corresponding
+    // sonic-hud-owner-gauge-snapshot event.
+    struct OwnerFieldGaugeSnapshotCache
+    {
+        uint32_t ownerAddress = 0;
+        uint32_t field460 = 0;
+        uint32_t field464 = 0;
+        uint32_t field468 = 0;
+        uint32_t field472 = 0;
+        uint32_t field480 = 0;
+        uint64_t frame = 0;
+        bool populated = false;
+    };
+    static OwnerFieldGaugeSnapshotCache g_lastOwnerFieldGaugeSnapshot;
+    // Phase 198: dedup gate for the SetScale x owner-field join event. Keyed
+    // on (path, scale, ownerSignature) so steady-state HUD frames do not
+    // reproduce identical joins; one join per material change is the goal.
+    static std::string g_lastOwnerFieldGaugeScaleCorrelationSignature;
+    static uint64_t g_lastOwnerFieldGaugeScaleCorrelationEvidenceFrame = 0;
+    // Phase 198: same-frame join window. Only emit when the cached snapshot
+    // is at most kOwnerFieldGaugeScaleCorrelationFrameWindow frames old, so
+    // SetScale calls long after the last sub_824D6C18 hit are not joined.
+    static constexpr uint64_t kOwnerFieldGaugeScaleCorrelationFrameWindow = 60;
     static bool g_loggedTutorialHudOwnerPathReady = false;
     static uint64_t g_chudSonicStageOwnerFieldSampleCount = 0;
     static std::vector<SonicHudOwnerFieldSample> g_chudSonicStageOwnerFieldSamples;
@@ -7073,6 +7105,11 @@ namespace UiLab
         g_chudSonicStageOwnerHookLastEvidenceFrame = 0;
         g_chudSonicStageOwnerFieldSampleStableSignature.clear();
         g_chudSonicStageOwnerFieldSampleLastEvidenceFrame = 0;
+        g_chudSonicStageOwnerFieldGaugeSnapshotStableSignature.clear();
+        g_chudSonicStageOwnerFieldGaugeSnapshotLastEvidenceFrame = 0;
+        g_lastOwnerFieldGaugeSnapshot = OwnerFieldGaugeSnapshotCache{};
+        g_lastOwnerFieldGaugeScaleCorrelationSignature.clear();
+        g_lastOwnerFieldGaugeScaleCorrelationEvidenceFrame = 0;
         g_loggedTutorialHudOwnerPathReady = false;
         g_chudSonicStageOwnerFieldSampleCount = 0;
         g_lastSonicHudUpdateCallsiteSampleFrame = 0;
@@ -8739,6 +8776,68 @@ namespace UiLab
                 " source=" + source);
         }
 
+        // Phase 198: same-frame join between the Phase 197 owner-field cache
+        // and the SetScale write on a visible boost / ring-energy gauge fill
+        // cast node. Only emit when (a) the path is one of the two gauge
+        // semantic prefixes, (b) the cache is populated and within the
+        // frame window, and (c) the (path, scale, ownerSignature) signature
+        // has changed since the last emission.
+        const bool isGaugeFillPath =
+            path.rfind("ui_playscreen/so_speed_gauge", 0) == 0 ||
+            path.rfind("ui_playscreen/so_ringenagy_gauge", 0) == 0;
+        if (isGaugeFillPath)
+        {
+            OwnerFieldGaugeSnapshotCache snapshot;
+            {
+                std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+                snapshot = g_lastOwnerFieldGaugeSnapshot;
+            }
+            if (snapshot.populated && IsPlausibleGuestPointer(snapshot.ownerAddress))
+            {
+                const uint64_t frameDelta = g_presentedFrameCount >= snapshot.frame
+                    ? g_presentedFrameCount - snapshot.frame
+                    : 0;
+                if (frameDelta <= kOwnerFieldGaugeScaleCorrelationFrameWindow)
+                {
+                    std::ostringstream signatureStream;
+                    signatureStream << path
+                        << "|scale=" << scaleX
+                        << "|owner=" << HexU32(snapshot.ownerAddress)
+                        << "|f460=" << HexU32(snapshot.field460)
+                        << "|f464=" << HexU32(snapshot.field464)
+                        << "|f468=" << HexU32(snapshot.field468)
+                        << "|f472=" << HexU32(snapshot.field472)
+                        << "|f480=" << HexU32(snapshot.field480);
+                    const std::string signature = signatureStream.str();
+
+                    if (signature != g_lastOwnerFieldGaugeScaleCorrelationSignature)
+                    {
+                        std::ostringstream scaleStream;
+                        scaleStream.setf(std::ios::fixed);
+                        scaleStream.precision(3);
+                        scaleStream << scaleX;
+
+                        WriteEvidenceEvent(
+                            "sonic-hud-gauge-scale-owner-correlated",
+                            "path=" + path +
+                            " node=" + HexU32(nodeAddress) +
+                            " scale=" + scaleStream.str() +
+                            " ownerAddress=" + HexU32(snapshot.ownerAddress) +
+                            " ownerField460=" + std::to_string(snapshot.field460) +
+                            " ownerField464=" + std::to_string(snapshot.field464) +
+                            " ownerField468=" + std::to_string(snapshot.field468) +
+                            " ownerField472=" + std::to_string(snapshot.field472) +
+                            " ownerField480=" + std::to_string(snapshot.field480) +
+                            " frameDelta=" + std::to_string(frameDelta) +
+                            " source=runtime-csd-node-set-scale-owner-field-join:sub_830BF090");
+
+                        g_lastOwnerFieldGaugeScaleCorrelationSignature = signature;
+                        g_lastOwnerFieldGaugeScaleCorrelationEvidenceFrame = g_presentedFrameCount;
+                    }
+                }
+            }
+        }
+
         if (shouldLog || changed)
             WriteLiveStateSnapshot();
     }
@@ -9309,6 +9408,118 @@ namespace UiLab
         }
 
         EmitStageTargetReadyIfNeeded();
+    }
+
+    void OnHudSonicStageOwnerFieldGaugeSnapshot(uint32_t ownerAddress, std::string_view callsite)
+    {
+        if (!g_isEnabled || !IsPlausibleGuestPointer(ownerAddress))
+            return;
+
+        // Phase 197: snapshot CHudSonicStage owner-field dwords at the staging
+        // block consumed by the sub_824D6C18 rolling counter / gauge-state path.
+        // Honest scope: these five offsets co-occur with same-frame boost and
+        // ring-energy text writes; their per-offset semantics (integer counter
+        // vs. float fill scale vs. hide/style enum vs. animation phase) are
+        // intentionally NOT claimed here — that classification is left to the
+        // summarizer + reusable controller until the exact semantic is proven.
+        static constexpr int kOwnerFieldOffsets[] = { 460, 464, 468, 472, 480 };
+        constexpr size_t kOwnerFieldCount = sizeof(kOwnerFieldOffsets) / sizeof(kOwnerFieldOffsets[0]);
+
+        uint32_t fieldValues[kOwnerFieldCount] = {};
+        bool fieldReadOk[kOwnerFieldCount] = {};
+        size_t resolvedFieldCount = 0;
+        for (size_t i = 0; i < kOwnerFieldCount; ++i)
+        {
+            uint32_t value = 0;
+            if (TryReadGuestU32(ownerAddress + kOwnerFieldOffsets[i], value))
+            {
+                fieldValues[i] = value;
+                fieldReadOk[i] = true;
+                ++resolvedFieldCount;
+            }
+        }
+
+        if (resolvedFieldCount == 0)
+            return;
+
+        // Phase 198: refresh the cache unconditionally so the SetScale join
+        // can use the freshest owner-field state, independent of the Phase
+        // 197 emission throttle below.
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            g_lastOwnerFieldGaugeSnapshot.ownerAddress = ownerAddress;
+            g_lastOwnerFieldGaugeSnapshot.field460 = fieldReadOk[0] ? fieldValues[0] : 0;
+            g_lastOwnerFieldGaugeSnapshot.field464 = fieldReadOk[1] ? fieldValues[1] : 0;
+            g_lastOwnerFieldGaugeSnapshot.field468 = fieldReadOk[2] ? fieldValues[2] : 0;
+            g_lastOwnerFieldGaugeSnapshot.field472 = fieldReadOk[3] ? fieldValues[3] : 0;
+            g_lastOwnerFieldGaugeSnapshot.field480 = fieldReadOk[4] ? fieldValues[4] : 0;
+            g_lastOwnerFieldGaugeSnapshot.frame = g_presentedFrameCount;
+            g_lastOwnerFieldGaugeSnapshot.populated = true;
+        }
+
+        std::ostringstream signatureStream;
+        signatureStream << "owner=" << HexU32(ownerAddress);
+        for (size_t i = 0; i < kOwnerFieldCount; ++i)
+        {
+            signatureStream << ":+" << kOwnerFieldOffsets[i] << "=";
+            if (fieldReadOk[i])
+                signatureStream << HexU32(fieldValues[i]);
+            else
+                signatureStream << "?";
+        }
+        const std::string stableSignature = signatureStream.str();
+
+        const bool evidenceIntervalElapsed =
+            g_chudSonicStageOwnerFieldGaugeSnapshotLastEvidenceFrame == 0 ||
+            g_presentedFrameCount >=
+                g_chudSonicStageOwnerFieldGaugeSnapshotLastEvidenceFrame +
+                    kSonicHudUpdateCallsiteMinEvidenceIntervalFrames;
+        const bool stableSignatureChanged =
+            g_chudSonicStageOwnerFieldGaugeSnapshotStableSignature != stableSignature;
+
+        if (!stableSignatureChanged || !evidenceIntervalElapsed)
+            return;
+
+        std::ostringstream offsetsStream;
+        std::ostringstream valuesStream;
+        std::ostringstream hexesStream;
+        for (size_t i = 0; i < kOwnerFieldCount; ++i)
+        {
+            if (i != 0)
+            {
+                offsetsStream << ",";
+                valuesStream << ",";
+                hexesStream << ",";
+            }
+            offsetsStream << kOwnerFieldOffsets[i];
+            if (fieldReadOk[i])
+            {
+                valuesStream << fieldValues[i];
+                hexesStream << HexU32(fieldValues[i]);
+            }
+            else
+            {
+                valuesStream << "?";
+                hexesStream << "?";
+            }
+        }
+
+        const std::string callsiteString =
+            callsite.empty() ? std::string("sub_824D6C18") : std::string(callsite);
+
+        WriteEvidenceEvent(
+            "sonic-hud-owner-gauge-snapshot",
+            "ownerAddress=" + HexU32(ownerAddress) +
+            " callsite=" + callsiteString +
+            " fieldOffsets=" + offsetsStream.str() +
+            " fieldValues=" + valuesStream.str() +
+            " fieldValueHexes=" + hexesStream.str() +
+            " candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge"
+            " candidateValueNames=boostGauge|ringEnergyGauge"
+            " source=runtime-owner-field-snapshot:" + callsiteString);
+
+        g_chudSonicStageOwnerFieldGaugeSnapshotStableSignature = stableSignature;
+        g_chudSonicStageOwnerFieldGaugeSnapshotLastEvidenceFrame = g_presentedFrameCount;
     }
 
     void OnSonicHudGameplayValues(

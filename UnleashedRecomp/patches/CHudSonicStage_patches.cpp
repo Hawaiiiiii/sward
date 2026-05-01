@@ -167,6 +167,10 @@ PPC_FUNC(sub_824D6C18)
     // samplePhase=post-original: owner +460/+480 carry staged gauge/counter state in this callsite.
     RecordHudSonicStageCallsiteSample(ownerAddress, "sub_824D6C18", "post-original", ctx);
     RecordHudSonicStageInspector(ownerAddress, "raw CHudSonicStage value update hook sub_824D6C18");
+    // Phase 197: snapshot owner+460/+464/+468/+472/+480 (the staging block read
+    // by this callsite) so the rolling counter / gauge-state lane has its own
+    // evidence channel, parallel to the same-frame text-write candidates.
+    UiLab::OnHudSonicStageOwnerFieldGaugeSnapshot(ownerAddress, "sub_824D6C18");
 }
 
 PPC_FUNC_IMPL(__imp__sub_824D7100);

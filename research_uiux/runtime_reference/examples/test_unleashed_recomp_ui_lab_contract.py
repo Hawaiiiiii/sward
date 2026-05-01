@@ -2645,6 +2645,160 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             completed.stdout,
         )
 
+    def test_ui_lab_phase197_groups_sub_824d6c18_owner_field_rolling_counter(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "ownerFieldRollingCounterGroups",
+            "New-OwnerFieldRollingCounterGroup",
+            "Add-OwnerFieldRollingCounterGroup",
+            "owner_field_rolling_counter_groups=",
+            "owner_field_rolling_counter_status=",
+            "owner-field-rolling-counter-pending-exact-offset-normalization",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 197",
+            "sub_824D6C18",
+            "owner-field rolling counter",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":10,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=100,1,200,0,5000 fieldValueHexes=0x64,0x1,0xC8,0x0,0x1388 candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":2.0,"frame":50,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=110,1,205,0,5005 fieldValueHexes=0x6E,0x1,0xCD,0x0,0x138D candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn(
+            "owner_field_rolling_counter_groups=owner=0xCE2D6B0:field+460=boostGauge:samples=2,owner=0xCE2D6B0:field+460=ringEnergyGauge:samples=2",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner=0xCE2D6B0:field+480=boostGauge:samples=2,owner=0xCE2D6B0:field+480=ringEnergyGauge:samples=2",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner_field_rolling_counter_status=owner-field-rolling-counter-pending-exact-offset-normalization",
+            completed.stdout,
+        )
+        self.assertNotIn("boost_ring_energy_status=resolved", completed.stdout)
+        self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
+
+    def test_ui_lab_phase198_joins_owner_field_snapshot_with_setter_scale(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        ui_lab_h = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+
+        for token in [
+            "ownerFieldGaugeScaleCorrelationGroups",
+            "New-OwnerFieldGaugeScaleCorrelationGroup",
+            "Add-OwnerFieldGaugeScaleCorrelationGroup",
+            "owner_field_gauge_scale_correlation_groups=",
+            "owner_field_gauge_scale_correlation_status=",
+            "owner-field-gauge-scale-correlation-pending-formula-proof",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 198",
+            "owner-field-to-setter-scale",
+            "Cast_0506",
+            "Cast_0483",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        for token in [
+            "OwnerFieldGaugeSnapshotCache",
+            "g_lastOwnerFieldGaugeSnapshot",
+            "sonic-hud-gauge-scale-owner-correlated",
+        ]:
+            self.assertIn(token, ui_lab)
+        self.assertIn(
+            "OnHudSonicStageOwnerFieldGaugeSnapshot",
+            ui_lab_h,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":10,"event":"sonic-hud-gauge-scale-owner-correlated","detail":"path=ui_playscreen/so_speed_gauge/position/speed_gauge_color node=0xEA09708 scale=0.650 ownerAddress=0xDE94C30 ownerField460=4 ownerField464=2 ownerField468=3 ownerField472=3 ownerField480=895 frameDelta=2 source=runtime-csd-node-set-scale-owner-field-join:sub_830BF090"}',
+                        '{"time":1.1,"frame":11,"event":"sonic-hud-gauge-scale-owner-correlated","detail":"path=ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color node=0xEA0A990 scale=0.425 ownerAddress=0xDE94C30 ownerField460=4 ownerField464=7 ownerField468=7 ownerField472=6 ownerField480=684 frameDelta=1 source=runtime-csd-node-set-scale-owner-field-join:sub_830BF090"}',
+                        '{"time":2.0,"frame":70,"event":"sonic-hud-gauge-scale-owner-correlated","detail":"path=ui_playscreen/so_speed_gauge/position/speed_gauge_color node=0xEA09708 scale=0.700 ownerAddress=0xDE94C30 ownerField460=4 ownerField464=3 ownerField468=4 ownerField472=4 ownerField480=910 frameDelta=2 source=runtime-csd-node-set-scale-owner-field-join:sub_830BF090"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn(
+            "owner_field_gauge_scale_correlation_groups=",
+            completed.stdout,
+        )
+        self.assertIn(
+            "path=ui_playscreen/so_speed_gauge/position/speed_gauge_color:owner=0xDE94C30:field+460:joins=2",
+            completed.stdout,
+        )
+        self.assertIn(
+            "path=ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color:owner=0xDE94C30:field+480:joins=1",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner_field_gauge_scale_correlation_status=owner-field-gauge-scale-correlation-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertNotIn("boost_ring_energy_status=resolved", completed.stdout)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")

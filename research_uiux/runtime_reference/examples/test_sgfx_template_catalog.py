@@ -1113,6 +1113,120 @@ class SgfxTemplateCatalogTests(unittest.TestCase):
         self.assertIn("sonic_day_hud_state=phase=phase196-rolling-counter-candidate:rings=000:score=000000000:time=00:00:00:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending", completed.stdout)
         self.assertIn("gameplay_numeric_binding=boost/energy:rolling-counter-text-candidate-pending-gauge-state-normalization,setter-node-address-join:still-required-for-final-gauge-values,audio:pending-exact-sfx-id", completed.stdout)
 
+    def test_phase197_sonic_day_hud_controller_reports_owner_field_rolling_counter_candidates_without_binding_values(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+        report = self.read(REPORT)
+        checklist = self.read(REPO_ROOT / "research_uiux" / "TODO_CHECKLIST.md")
+
+        for token in [
+            "SonicDayHudRuntimeOwnerFieldRollingCounterObservation",
+            "applyRuntimeOwnerFieldRollingCounterObservation",
+            "formatSonicDayHudRuntimeOwnerFieldRollingCounterObservation",
+            "formatSonicDayHudRuntimeBindingPhase197SmokeSequence",
+            "owner-field-rolling-counter-pending-exact-offset-normalization",
+        ]:
+            self.assertIn(token, header + source)
+
+        self.assertIn("--phase197-sonic-hud-owner-field-rolling-counter-smoke", example)
+        self.assertIn("Phase 197", report)
+        self.assertIn("Phase 197", checklist)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase197-sonic-hud-owner-field-rolling-counter-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn(
+            "sward_frontend_screen_controller_catalog phase197 sonic hud owner field rolling counter smoke ok",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_owner_field_rolling_counter=value=boostGauge:owner=0xCE2D6B0:field_offset=460:path=ui_playscreen/so_speed_gauge:kind=text:text=:callsite=sub_824D6C18:counter_writes=2:status=owner-field-rolling-counter-pending-exact-offset-normalization",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_owner_field_rolling_counter=value=ringEnergyGauge:owner=0xCE2D6B0:field_offset=460:path=ui_playscreen/so_ringenagy_gauge:kind=text:text=:callsite=sub_824D6C18:counter_writes=2:status=owner-field-rolling-counter-pending-exact-offset-normalization",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_owner_field_rolling_counter=value=boostGauge:owner=0xCE2D6B0:field_offset=480:path=ui_playscreen/so_speed_gauge:kind=text:text=:callsite=sub_824D6C18:counter_writes=2:status=owner-field-rolling-counter-pending-exact-offset-normalization",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_owner_field_rolling_counter=value=ringEnergyGauge:owner=0xCE2D6B0:field_offset=480:path=ui_playscreen/so_ringenagy_gauge:kind=text:text=:callsite=sub_824D6C18:counter_writes=2:status=owner-field-rolling-counter-pending-exact-offset-normalization",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_state=phase=phase197-owner-field-rolling-counter-candidate:rings=000:score=000000000:time=00:00:00:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending",
+            completed.stdout,
+        )
+        self.assertIn(
+            "gameplay_numeric_binding=boost/energy:owner-field-rolling-counter-pending-exact-offset-normalization,setter-node-address-join:still-required-for-final-gauge-values,audio:pending-exact-sfx-id",
+            completed.stdout,
+        )
+
+    def test_phase198_sonic_day_hud_controller_joins_owner_field_with_setter_scale_without_binding_values(self) -> None:
+        header = self.read(FRONTEND_CONTROLLERS_HEADER)
+        source = self.read(FRONTEND_CONTROLLERS_SOURCE)
+        example = self.read(FRONTEND_CONTROLLERS_EXAMPLE)
+        report = self.read(REPORT)
+        checklist = self.read(REPO_ROOT / "research_uiux" / "TODO_CHECKLIST.md")
+
+        for token in [
+            "SonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation",
+            "applyRuntimeOwnerFieldGaugeScaleCorrelation",
+            "formatSonicDayHudRuntimeOwnerFieldGaugeScaleCorrelation",
+            "formatSonicDayHudRuntimeBindingPhase198SmokeSequence",
+            "owner-field-gauge-scale-correlation-pending-formula-proof",
+        ]:
+            self.assertIn(token, header + source)
+
+        self.assertIn("--phase198-sonic-hud-owner-field-gauge-scale-correlation-smoke", example)
+        self.assertIn("Phase 198", report)
+        self.assertIn("Phase 198", checklist)
+
+        exe = Path(os.environ.get("SWARD_FRONTEND_SCREEN_CONTROLLER_CATALOG_EXE", DEFAULT_FRONTEND_CONTROLLER_EXE))
+        if not exe.exists():
+            self.skipTest(f"Frontend screen controller catalog executable not built: {exe}")
+
+        completed = subprocess.run(
+            [str(exe), "--phase198-sonic-hud-owner-field-gauge-scale-correlation-smoke"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn(
+            "sward_frontend_screen_controller_catalog phase198 sonic hud owner field gauge scale correlation smoke ok",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_owner_field_gauge_scale_correlation=value=boostGauge:owner=0xCE2D6B0:field_offset=460:exact_child=ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506:scale=0.650:owner_field_value=4:joins=1:status=owner-field-gauge-scale-correlation-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_owner_field_gauge_scale_correlation=value=ringEnergyGauge:owner=0xCE2D6B0:field_offset=480:exact_child=ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483:scale=0.425:owner_field_value=684:joins=1:status=owner-field-gauge-scale-correlation-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_day_hud_state=phase=phase198-owner-field-gauge-scale-correlation-candidate:rings=000:score=000000000:time=00:00:00:speed=000:boost=0.000:energy=1.000:lives=3:tutorial=none:hidden:route=stage-hud-ready:sfx=none:sfx_id=audio-id-pending",
+            completed.stdout,
+        )
+        self.assertIn(
+            "gameplay_numeric_binding=boost/energy:owner-field-gauge-scale-correlation-pending-formula-proof,setter-node-address-join:still-required-for-final-gauge-values,audio:pending-exact-sfx-id",
+            completed.stdout,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
