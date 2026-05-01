@@ -526,6 +526,64 @@ function New-GaugeDrawPathGroup([string]$Path, [string]$ValueName) {
     }
 }
 
+function New-OwnerFieldDrawPathBridgeGroup(
+    [string]$Path,
+    [string]$ValueName,
+    [string]$OwnerAddress,
+    [int]$FieldOffset)
+{
+    return [ordered]@{
+        path = $Path
+        semanticValueName = $ValueName
+        ownerAddress = $OwnerAddress
+        fieldOffset = $FieldOffset
+        samples = 0
+        draws = 0
+        observedValues = [System.Collections.Generic.SortedSet[string]]::new()
+        childPaths = [System.Collections.Generic.SortedSet[string]]::new()
+        sources = [System.Collections.Generic.SortedSet[string]]::new()
+    }
+}
+
+function Add-OwnerFieldDrawPathBridgeGroup($Groups, $OwnerFieldGroup, $GaugeDrawGroup) {
+    # Phase 201: bridge the Phase 197 owner-field rolling-counter stream to
+    # Phase 194 exact visible gauge draw paths. This is still not a formula,
+    # not a setter-node join, and not a final gameplay value promotion.
+    if ($OwnerFieldGroup.semanticValueName -ne $GaugeDrawGroup.semanticValueName) {
+        return
+    }
+
+    if (-not (Test-SemanticPathCandidateMatchesGaugeDraw $OwnerFieldGroup.candidatePaths $GaugeDrawGroup.path)) {
+        return
+    }
+
+    $key = "{0}:{1}:{2}:{3}" -f `
+        $GaugeDrawGroup.path,
+        $GaugeDrawGroup.semanticValueName,
+        $OwnerFieldGroup.ownerAddress,
+        $OwnerFieldGroup.fieldOffset
+    if (-not $Groups.ContainsKey($key)) {
+        $Groups[$key] = New-OwnerFieldDrawPathBridgeGroup `
+            $GaugeDrawGroup.path `
+            $GaugeDrawGroup.semanticValueName `
+            $OwnerFieldGroup.ownerAddress `
+            $OwnerFieldGroup.fieldOffset
+    }
+
+    $group = $Groups[$key]
+    $group.samples += $OwnerFieldGroup.samples
+    $group.draws += $GaugeDrawGroup.draws
+    foreach ($value in @($OwnerFieldGroup.observedValues)) {
+        Add-UniqueSorted $group.observedValues $value
+    }
+    foreach ($childPath in @($GaugeDrawGroup.childPaths)) {
+        Add-UniqueSorted $group.childPaths $childPath
+    }
+    foreach ($source in @($OwnerFieldGroup.sources)) {
+        Add-UniqueSorted $group.sources $source
+    }
+}
+
 function Get-GaugeDrawPathInfo([string]$LayerPath) {
     $speedGaugeParent = "ui_playscreen/so_speed_gauge/position/speed_gauge_color"
     $ringEnergyParent = "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color"
@@ -701,6 +759,7 @@ $ownerFieldGaugeScaleCorrelationGroupsByKey = @{}
 $ownerFieldOffsetClassificationsByKey = @{}
 $ownerFieldOffsetTransitionTracksByKey = @{}
 $gaugeDrawPathGroupsByKey = @{}
+$ownerFieldDrawPathBridgeGroupsByKey = @{}
 $gaugeDrawCalls = @()
 $gaugeDrawCastNodeAddresses = [System.Collections.Generic.SortedSet[string]]::new()
 $gaugeDrawLayerAddresses = [System.Collections.Generic.SortedSet[string]]::new()
@@ -741,6 +800,8 @@ $summary = [ordered]@{
     ownerFieldOffsetClassificationStatus = "pending-runtime-owner-field-offset-classification-evidence"
     ownerFieldOffsetTransitionDiagnostics = @()
     ownerFieldOffsetTransitionDiagnosticsStatus = "pending-runtime-owner-field-offset-transition-evidence"
+    ownerFieldDrawPathBridgeGroups = @()
+    ownerFieldDrawPathBridgeStatus = "pending-runtime-owner-field-draw-path-bridge-evidence"
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
@@ -1107,6 +1168,36 @@ $summary.gaugeDrawPathGroups = @(
             }
         }
 )
+foreach ($ownerFieldGroup in $summary.ownerFieldRollingCounterGroups) {
+    foreach ($gaugeDrawGroup in $summary.gaugeDrawPathGroups) {
+        Add-OwnerFieldDrawPathBridgeGroup `
+            $ownerFieldDrawPathBridgeGroupsByKey `
+            $ownerFieldGroup `
+            $gaugeDrawGroup
+    }
+}
+$summary.ownerFieldDrawPathBridgeGroups = @(
+    $ownerFieldDrawPathBridgeGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { $ownerFieldDrawPathBridgeGroupsByKey[$_].semanticValueName } }, `
+            @{ Expression = { $ownerFieldDrawPathBridgeGroupsByKey[$_].path } }, `
+            @{ Expression = { $ownerFieldDrawPathBridgeGroupsByKey[$_].ownerAddress } }, `
+            @{ Expression = { $ownerFieldDrawPathBridgeGroupsByKey[$_].fieldOffset } } |
+        ForEach-Object {
+            $group = $ownerFieldDrawPathBridgeGroupsByKey[$_]
+            [ordered]@{
+                path = $group.path
+                semanticValueName = $group.semanticValueName
+                ownerAddress = $group.ownerAddress
+                fieldOffset = $group.fieldOffset
+                samples = $group.samples
+                draws = $group.draws
+                observedValues = @($group.observedValues)
+                childPaths = @($group.childPaths)
+                sources = @($group.sources)
+            }
+        }
+)
 $summary.unresolvedNodeCandidates = @(
     $unresolvedNodeCandidatesByNode.Keys |
         Sort-Object @{ Expression = { -1 * $unresolvedNodeCandidatesByNode[$_].writes } }, @{ Expression = { $_ } } |
@@ -1216,6 +1307,10 @@ if ($summary.ownerFieldOffsetTransitionDiagnostics.Count -gt 0) {
     $summary.ownerFieldOffsetTransitionDiagnosticsStatus = "owner-field-offset-transition-diagnostics-pending-formula-proof"
 }
 
+if ($summary.ownerFieldDrawPathBridgeGroups.Count -gt 0) {
+    $summary.ownerFieldDrawPathBridgeStatus = "owner-field-draw-path-bridge-pending-formula-proof"
+}
+
 if (
     $summary.textWrites -gt 0 -or
     $summary.gaugeWrites -gt 0 -or
@@ -1322,6 +1417,21 @@ Write-Output (
             }
     ) $CandidateValueLimit))
 Write-Output ("owner_field_rolling_counter_status={0}" -f $summary.ownerFieldRollingCounterStatus)
+Write-Output (
+    "owner_field_draw_path_bridge_groups={0}" -f
+    (Format-CandidateList (
+        $summary.ownerFieldDrawPathBridgeGroups |
+            ForEach-Object {
+                "path={0}:value={1}:owner={2}:field+{3}:samples={4}:draws={5}" -f
+                    $_.path,
+                    $_.semanticValueName,
+                    $_.ownerAddress,
+                    $_.fieldOffset,
+                    $_.samples,
+                    $_.draws
+            }
+    ) $CandidateValueLimit))
+Write-Output ("owner_field_draw_path_bridge_status={0}" -f $summary.ownerFieldDrawPathBridgeStatus)
 Write-Output (
     "owner_field_gauge_scale_correlation_groups={0}" -f
     (Format-CandidateList (

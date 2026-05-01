@@ -2979,6 +2979,103 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
         self.assertNotIn("owner_field_offset_transition_diagnostics_status=resolved", completed.stdout)
 
+    def test_ui_lab_phase201_bridges_owner_fields_to_exact_visible_gauge_paths(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "ownerFieldDrawPathBridgeGroups",
+            "New-OwnerFieldDrawPathBridgeGroup",
+            "Add-OwnerFieldDrawPathBridgeGroup",
+            "owner_field_draw_path_bridge_groups=",
+            "owner_field_draw_path_bridge_status=",
+            "owner-field-draw-path-bridge-pending-formula-proof",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 201",
+            "owner-field-to-visible-gauge-path bridge",
+            "owner-field-draw-path-bridge-pending-formula-proof",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            events = tmp_path / "ui_lab_events.jsonl"
+            draw_list = tmp_path / "ui_draw_list.json"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":10,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=4,2,3,3,895 fieldValueHexes=0x4,0x2,0x3,0x3,0x37F candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":2.0,"frame":70,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=4,3,4,4,910 fieldValueHexes=0x4,0x3,0x4,0x4,0x38E candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            draw_list.write_text(
+                json.dumps(
+                    {
+                        "uiDrawListOracle": {
+                            "drawCalls": [
+                                {
+                                    "layerPath": "ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506",
+                                    "layerAddress": "0xAAAA",
+                                    "castNodeAddress": "0xBBBB",
+                                },
+                                {
+                                    "layerPath": "ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color/Cast_0483",
+                                    "layerAddress": "0xCCCC",
+                                    "castNodeAddress": "0xDDDD",
+                                },
+                            ]
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                    "-DrawListPath",
+                    str(draw_list),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn(
+            "owner_field_draw_path_bridge_groups=path=ui_playscreen/so_speed_gauge/position/speed_gauge_color:value=boostGauge:owner=0xCE2D6B0:field+460:samples=2:draws=1",
+            completed.stdout,
+        )
+        self.assertIn(
+            "path=ui_playscreen/so_ringenagy_gauge/position/ringenagy_gauge_color:value=ringEnergyGauge:owner=0xCE2D6B0:field+480:samples=2:draws=1",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner_field_draw_path_bridge_status=owner-field-draw-path-bridge-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertIn(
+            "boost_ring_energy_status=pending-runtime-rolling-counter-evidence",
+            completed.stdout,
+        )
+        self.assertNotIn("boost_ring_energy_status=resolved", completed.stdout)
+        self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
