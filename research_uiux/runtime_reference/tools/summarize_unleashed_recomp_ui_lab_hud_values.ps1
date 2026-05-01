@@ -194,6 +194,80 @@ function Add-RollingCounterSemanticGroup($Groups, [string]$Detail, $EventObject)
     }
 }
 
+function Resolve-OwnerFieldOffsetMonotonicTrendLabel([int]$IncCount, [int]$DecCount, [int]$EqCount) {
+    # Phase 200: pure-shape trend label over the consecutive-pair transitions
+    # of one (owner, offset). Diagnostic only — does not assert any per-frame
+    # meaning of the transitions, only the direction mix.
+    $total = $IncCount + $DecCount + $EqCount
+    if ($total -le 0) {
+        return "no-transitions"
+    }
+    if ($EqCount -eq $total) {
+        return "stable"
+    }
+    if ($IncCount -gt 0 -and $DecCount -eq 0) {
+        return "increasing"
+    }
+    if ($DecCount -gt 0 -and $IncCount -eq 0) {
+        return "decreasing"
+    }
+    return "non-monotonic"
+}
+
+function New-OwnerFieldOffsetTransitionTrack([string]$OwnerAddress, [int]$FieldOffset) {
+    return [ordered]@{
+        ownerAddress = $OwnerAddress
+        fieldOffset = $FieldOffset
+        # Ordered (frame, value) samples; frame may be $null when the source
+        # event lacks a frame field.
+        samples = New-Object System.Collections.Generic.List[object]
+    }
+}
+
+function Add-OwnerFieldOffsetTransitionSample($Tracks, [string]$Detail, $EventObject) {
+    # Phase 200: append one (frame, value) sample per offset for every
+    # sonic-hud-owner-gauge-snapshot event so the temporal order is
+    # preserved (the existing Phase 197 group only kept a SortedSet).
+    $callsite = Get-DetailToken $Detail "callsite"
+    if ($callsite -ne "sub_824D6C18") {
+        return
+    }
+
+    $ownerAddress = Get-DetailToken $Detail "ownerAddress"
+    if ([string]::IsNullOrWhiteSpace($ownerAddress)) {
+        return
+    }
+
+    $offsetsRaw = Get-DetailToken $Detail "fieldOffsets"
+    $valuesRaw = Get-DetailToken $Detail "fieldValues"
+    if ([string]::IsNullOrWhiteSpace($offsetsRaw) -or [string]::IsNullOrWhiteSpace($valuesRaw)) {
+        return
+    }
+
+    $offsets = $offsetsRaw -split ","
+    $values = $valuesRaw -split ","
+    if ($offsets.Count -ne $values.Count) {
+        return
+    }
+
+    $frame = Get-EventFrame $EventObject
+    for ($i = 0; $i -lt $offsets.Count; $i++) {
+        $offset = 0
+        if (-not [int]::TryParse($offsets[$i].Trim(), [ref]$offset)) {
+            continue
+        }
+        $value = 0
+        if (-not [int]::TryParse($values[$i].Trim(), [ref]$value)) {
+            continue
+        }
+        $key = "{0}:{1}" -f $ownerAddress, $offset
+        if (-not $Tracks.ContainsKey($key)) {
+            $Tracks[$key] = New-OwnerFieldOffsetTransitionTrack $ownerAddress $offset
+        }
+        [void]$Tracks[$key].samples.Add([pscustomobject]@{ frame = $frame; value = $value })
+    }
+}
+
 function Resolve-OwnerFieldOffsetCandidateLabel([int]$Cardinality, [int]$ObservedMin, [int]$ObservedMax) {
     # Phase 199: shape candidate labels, evaluated in narrowest-first order so
     # the smallest concrete shape wins. These are *shapes*, not formulas; the
@@ -625,6 +699,7 @@ $rollingCounterSemanticGroupsByKey = @{}
 $ownerFieldRollingCounterGroupsByKey = @{}
 $ownerFieldGaugeScaleCorrelationGroupsByKey = @{}
 $ownerFieldOffsetClassificationsByKey = @{}
+$ownerFieldOffsetTransitionTracksByKey = @{}
 $gaugeDrawPathGroupsByKey = @{}
 $gaugeDrawCalls = @()
 $gaugeDrawCastNodeAddresses = [System.Collections.Generic.SortedSet[string]]::new()
@@ -664,6 +739,8 @@ $summary = [ordered]@{
     ownerFieldGaugeScaleCorrelationStatus = "pending-runtime-owner-field-gauge-scale-correlation-evidence"
     ownerFieldOffsetClassifications = @()
     ownerFieldOffsetClassificationStatus = "pending-runtime-owner-field-offset-classification-evidence"
+    ownerFieldOffsetTransitionDiagnostics = @()
+    ownerFieldOffsetTransitionDiagnosticsStatus = "pending-runtime-owner-field-offset-transition-evidence"
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
@@ -731,6 +808,7 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
         }
         "sonic-hud-owner-gauge-snapshot" {
             Add-OwnerFieldRollingCounterGroup $ownerFieldRollingCounterGroupsByKey $detail $eventObject
+            Add-OwnerFieldOffsetTransitionSample $ownerFieldOffsetTransitionTracksByKey $detail $eventObject
         }
         "sonic-hud-gauge-scale-owner-correlated" {
             Add-OwnerFieldGaugeScaleCorrelationGroup $ownerFieldGaugeScaleCorrelationGroupsByKey $detail $eventObject
@@ -957,6 +1035,63 @@ $summary.ownerFieldOffsetClassifications = @(
             }
         }
 )
+# Phase 200: walk each (owner, offset) sample track in chronological order
+# and compute consecutive-pair transition diagnostics. Pure post-processing
+# of the Phase 197 snapshot stream — no scale evidence, no controller value
+# promotion. The trend label is descriptive; it does not assert any per-frame
+# meaning of the value sequence.
+$summary.ownerFieldOffsetTransitionDiagnostics = @(
+    $ownerFieldOffsetTransitionTracksByKey.Keys |
+        Sort-Object `
+            @{ Expression = { $ownerFieldOffsetTransitionTracksByKey[$_].ownerAddress } }, `
+            @{ Expression = { $ownerFieldOffsetTransitionTracksByKey[$_].fieldOffset } } |
+        ForEach-Object {
+            $track = $ownerFieldOffsetTransitionTracksByKey[$_]
+            $orderedSamples = @(
+                $track.samples |
+                    Sort-Object @{ Expression = {
+                        if ($null -ne $_.frame) { [int]$_.frame } else { [int]::MaxValue }
+                    }}
+            )
+            $incCount = 0
+            $decCount = 0
+            $eqCount = 0
+            $minDelta = 0
+            $maxDelta = 0
+            $deltaInitialized = $false
+            for ($i = 1; $i -lt $orderedSamples.Count; $i++) {
+                $delta = [int]$orderedSamples[$i].value - [int]$orderedSamples[$i - 1].value
+                $abs = [Math]::Abs($delta)
+                if (-not $deltaInitialized) {
+                    $minDelta = $abs
+                    $maxDelta = $abs
+                    $deltaInitialized = $true
+                }
+                else {
+                    if ($abs -lt $minDelta) { $minDelta = $abs }
+                    if ($abs -gt $maxDelta) { $maxDelta = $abs }
+                }
+                if ($delta -gt 0) { $incCount++ }
+                elseif ($delta -lt 0) { $decCount++ }
+                else { $eqCount++ }
+            }
+            $transitions = $incCount + $decCount + $eqCount
+            $trend = Resolve-OwnerFieldOffsetMonotonicTrendLabel $incCount $decCount $eqCount
+            [ordered]@{
+                ownerAddress = $track.ownerAddress
+                fieldOffset = $track.fieldOffset
+                snapshotCount = $orderedSamples.Count
+                transitionCount = $transitions
+                increasingTransitions = $incCount
+                decreasingTransitions = $decCount
+                equalTransitions = $eqCount
+                minTransitionMagnitude = $minDelta
+                maxTransitionMagnitude = $maxDelta
+                wrapDetected = ($decCount -gt 0)
+                monotonicTrend = $trend
+            }
+        }
+)
 $summary.gaugeDrawPathGroups = @(
     $gaugeDrawPathGroupsByKey.Keys |
         Sort-Object @{ Expression = { -1 * $gaugeDrawPathGroupsByKey[$_].draws } }, @{ Expression = { $_ } } |
@@ -1075,6 +1210,10 @@ if ($summary.ownerFieldGaugeScaleCorrelationGroups.Count -gt 0) {
 
 if ($summary.ownerFieldOffsetClassifications.Count -gt 0) {
     $summary.ownerFieldOffsetClassificationStatus = "owner-field-offset-classification-pending-formula-proof"
+}
+
+if ($summary.ownerFieldOffsetTransitionDiagnostics.Count -gt 0) {
+    $summary.ownerFieldOffsetTransitionDiagnosticsStatus = "owner-field-offset-transition-diagnostics-pending-formula-proof"
 }
 
 if (
@@ -1212,6 +1351,25 @@ Write-Output (
             }
     ) $CandidateValueLimit))
 Write-Output ("owner_field_offset_classification_status={0}" -f $summary.ownerFieldOffsetClassificationStatus)
+Write-Output (
+    "owner_field_offset_transition_diagnostics={0}" -f
+    (Format-CandidateList (
+        $summary.ownerFieldOffsetTransitionDiagnostics |
+            ForEach-Object {
+                "owner={0}:field+{1}:trend={2}:wrap={3}:transitions={4}:inc={5}:dec={6}:eq={7}:min_delta={8}:max_delta={9}" -f
+                    $_.ownerAddress,
+                    $_.fieldOffset,
+                    $_.monotonicTrend,
+                    ($_.wrapDetected.ToString().ToLower()),
+                    $_.transitionCount,
+                    $_.increasingTransitions,
+                    $_.decreasingTransitions,
+                    $_.equalTransitions,
+                    $_.minTransitionMagnitude,
+                    $_.maxTransitionMagnitude
+            }
+    ) $CandidateValueLimit))
+Write-Output ("owner_field_offset_transition_diagnostics_status={0}" -f $summary.ownerFieldOffsetTransitionDiagnosticsStatus)
 foreach ($candidate in $summary.unresolvedNodeCandidates) {
     Write-Output (
         "node_candidate node={0} writes={1} kinds={2} values={3} frames={4}-{5} likely={6} sources={7}" -f

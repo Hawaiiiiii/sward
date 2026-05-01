@@ -2891,6 +2891,94 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertNotIn("boost_ring_energy_status=resolved", completed.stdout)
         self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
 
+    def test_ui_lab_phase200_emits_owner_field_offset_transition_diagnostics(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "ownerFieldOffsetTransitionDiagnostics",
+            "New-OwnerFieldOffsetTransitionTrack",
+            "Add-OwnerFieldOffsetTransitionSample",
+            "Resolve-OwnerFieldOffsetMonotonicTrendLabel",
+            "owner_field_offset_transition_diagnostics=",
+            "owner_field_offset_transition_diagnostics_status=",
+            "owner-field-offset-transition-diagnostics-pending-formula-proof",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 200",
+            "owner-field offset transition diagnostics",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=0,10,5,4,100 fieldValueHexes=0x0,0xA,0x5,0x4,0x64 candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":1.5,"frame":700,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=4,10,5,4,200 fieldValueHexes=0x4,0xA,0x5,0x4,0xC8 candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":2.0,"frame":1300,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=0,10,5,4,900 fieldValueHexes=0x0,0xA,0x5,0x4,0x384 candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":2.5,"frame":1900,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=0,10,5,4,300 fieldValueHexes=0x0,0xA,0x5,0x4,0x12C candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":3.0,"frame":2500,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=4,10,5,4,300 fieldValueHexes=0x4,0xA,0x5,0x4,0x12C candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        # +460 went 0,4,0,0,4: 2 inc, 1 dec, 1 eq, magnitudes all 4 (or 0 for the eq).
+        self.assertIn(
+            "owner=0xCE2D6B0:field+460:trend=non-monotonic:wrap=true:transitions=4:inc=2:dec=1:eq=1:min_delta=0:max_delta=4",
+            completed.stdout,
+        )
+        # +464,+468,+472 stayed flat throughout -> stable, no wrap.
+        self.assertIn(
+            "owner=0xCE2D6B0:field+464:trend=stable:wrap=false:transitions=4:inc=0:dec=0:eq=4:min_delta=0:max_delta=0",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner=0xCE2D6B0:field+468:trend=stable:wrap=false:transitions=4:inc=0:dec=0:eq=4:min_delta=0:max_delta=0",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner=0xCE2D6B0:field+472:trend=stable:wrap=false:transitions=4:inc=0:dec=0:eq=4:min_delta=0:max_delta=0",
+            completed.stdout,
+        )
+        # +480 went 100,200,900,300,300: 2 inc, 1 dec, 1 eq, magnitudes 100,700,600,0.
+        self.assertIn(
+            "owner=0xCE2D6B0:field+480:trend=non-monotonic:wrap=true:transitions=4:inc=2:dec=1:eq=1:min_delta=0:max_delta=700",
+            completed.stdout,
+        )
+        self.assertIn(
+            "owner_field_offset_transition_diagnostics_status=owner-field-offset-transition-diagnostics-pending-formula-proof",
+            completed.stdout,
+        )
+        # Hard guard: Phase 200 must NEVER promote the gauge values to runtime-final.
+        self.assertNotIn("boost_ring_energy_status=resolved", completed.stdout)
+        self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
+        self.assertNotIn("owner_field_offset_transition_diagnostics_status=resolved", completed.stdout)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
