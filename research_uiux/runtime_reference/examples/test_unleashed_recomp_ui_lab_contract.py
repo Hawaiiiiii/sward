@@ -3076,6 +3076,80 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertNotIn("boost_ring_energy_status=resolved", completed.stdout)
         self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
 
+    def test_ui_lab_phase202_preview_build_inventory_reports_repo_safe_metadata(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/inventory_sonic_unleashed_preview_build.ps1"
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+        self.assertTrue(script_path.is_file())
+
+        with tempfile.TemporaryDirectory() as tmp:
+            preview_root = Path(tmp) / "preview"
+            preview_root.mkdir()
+            for relative_path in [
+                "default.xex",
+                "shader.ar",
+                "shader.arl",
+                "Title.ar.00",
+                "Title.arl",
+                "Loading.ar.00",
+                "Loading.arl",
+                "ActionCommon.ar.00",
+                "ActionCommon.arl",
+                "WorldMap.ar.00",
+                "WorldMap.arl",
+                "reddog/debug_icon.dds",
+                "reddog/title_bar.dds",
+                "Sound/bgm_sys_title.csb",
+                "Languages/English/Title.ar.00",
+                "Languages/English/Title.arl",
+            ]:
+                path = preview_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"fixture")
+
+            output_path = Path(tmp) / "preview_inventory.json"
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-PreviewRoot",
+                    str(preview_root),
+                    "-OutputPath",
+                    str(output_path),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertIn("preview_inventory_status=ok", completed.stdout)
+            summary = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(summary["buildKind"], "sonic-unleashed-preview-build-disc1")
+        self.assertTrue(summary["xex"]["present"])
+        self.assertEqual(summary["xex"]["relativePath"], "default.xex")
+        self.assertIn("Title", summary["uiArchiveFamilies"])
+        self.assertIn("Loading", summary["uiArchiveFamilies"])
+        self.assertIn("ActionCommon", summary["uiArchiveFamilies"])
+        self.assertIn("WorldMap", summary["uiArchiveFamilies"])
+        self.assertIn("debug_icon.dds", summary["reddogDebugUiAssets"])
+        self.assertIn("bgm_sys_title.csb", summary["soundBanks"])
+        self.assertIn("Languages/English/Title", summary["localizedArchiveFamilies"])
+        self.assertIn("ui_playscreen", summary["expectedUiPackageNames"])
+        for token in [
+            "Phase 202",
+            "preview build secondary oracle",
+            "metadata-only",
+            "Reddog debug UI assets",
+            "do not replace the retail runtime oracle",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
