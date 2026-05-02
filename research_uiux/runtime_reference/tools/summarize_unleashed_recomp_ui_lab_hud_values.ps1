@@ -703,6 +703,74 @@ function New-GaugeSetterChildPathJoin($Candidate, $DrawCall, [string]$AddressMat
     }
 }
 
+function New-SonicHudRuntimeProofLane(
+    [string]$LaneId,
+    [int]$EvidenceCount,
+    [string]$RuntimeSurface,
+    [string]$PendingReason)
+{
+    $status = "pending"
+    if ($EvidenceCount -gt 0) {
+        $status = "present"
+    }
+
+    return [ordered]@{
+        laneId = $LaneId
+        status = $status
+        evidenceCount = $EvidenceCount
+        runtimeSurface = $RuntimeSurface
+        pendingReason = if ($status -eq "pending") { $PendingReason } else { "" }
+    }
+}
+
+function Resolve-SonicHudRuntimeProofMatrixStatus($Matrix) {
+    $presentLaneIds = @(
+        $Matrix |
+            Where-Object { $_.status -eq "present" } |
+            ForEach-Object { $_.laneId }
+    )
+
+    $requiredGaugeLaneIds = @(
+        "gauge-scale-write",
+        "gauge-pattern-write",
+        "gauge-hide-write",
+        "owner-field-snapshot",
+        "owner-scale-correlation"
+    )
+
+    $hasRequiredGaugeProof = $true
+    foreach ($laneId in $requiredGaugeLaneIds) {
+        if ($presentLaneIds -notcontains $laneId) {
+            $hasRequiredGaugeProof = $false
+            break
+        }
+    }
+
+    $hasAnyGaugeProof = @(
+        $presentLaneIds |
+            Where-Object {
+                $_ -like "gauge-*" -or
+                $_ -like "owner-*" -or
+                $_ -like "setter-*"
+            }
+    ).Count -gt 0
+    $hasAudioProof = $presentLaneIds -contains "audio-callsite"
+
+    if ($hasRequiredGaugeProof -and $hasAudioProof) {
+        return "retail-runtime-gauge-and-audio-proof-ready"
+    }
+    if ($hasRequiredGaugeProof) {
+        return "retail-runtime-gauge-proof-partial-audio-pending"
+    }
+    if ($hasAudioProof -and -not $hasAnyGaugeProof) {
+        return "retail-runtime-audio-proof-partial-gauge-pending"
+    }
+    if ($hasAnyGaugeProof) {
+        return "retail-runtime-gauge-proof-incomplete-audio-pending"
+    }
+    return "pending-retail-runtime-stage-hud-proof"
+}
+
 function Get-UnresolvedNodeCandidateLabel($Candidate) {
     $kindList = @($Candidate.kinds)
     if (
@@ -782,6 +850,9 @@ $summary = [ordered]@{
     gameplayUpdates = 0
     gameplayValueSnapshots = 0
     callsiteClassifications = 0
+    ownerFieldSnapshotEvents = 0
+    ownerScaleCorrelationEvents = 0
+    audioCallsiteEvents = 0
     unresolvedNodeWrites = 0
     unresolvedNodeCandidateCount = 0
     semanticPathCandidateWrites = 0
@@ -802,6 +873,9 @@ $summary = [ordered]@{
     ownerFieldOffsetTransitionDiagnosticsStatus = "pending-runtime-owner-field-offset-transition-evidence"
     ownerFieldDrawPathBridgeGroups = @()
     ownerFieldDrawPathBridgeStatus = "pending-runtime-owner-field-draw-path-bridge-evidence"
+    sonicHudRuntimeProofMatrix = @()
+    sonicHudRuntimeProofMatrixStatus = "pending-retail-runtime-stage-hud-proof"
+    sonicHudAudioCallsiteStatus = "audio-callsite-pending"
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
@@ -868,11 +942,22 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
             Add-RollingCounterSemanticGroup $rollingCounterSemanticGroupsByKey $detail $eventObject
         }
         "sonic-hud-owner-gauge-snapshot" {
+            $summary.ownerFieldSnapshotEvents++
             Add-OwnerFieldRollingCounterGroup $ownerFieldRollingCounterGroupsByKey $detail $eventObject
             Add-OwnerFieldOffsetTransitionSample $ownerFieldOffsetTransitionTracksByKey $detail $eventObject
         }
         "sonic-hud-gauge-scale-owner-correlated" {
+            $summary.ownerScaleCorrelationEvents++
             Add-OwnerFieldGaugeScaleCorrelationGroup $ownerFieldGaugeScaleCorrelationGroupsByKey $detail $eventObject
+        }
+        "sonic-hud-audio-cue-callsite" {
+            $summary.audioCallsiteEvents++
+        }
+        "sonic-hud-sfx-callsite" {
+            $summary.audioCallsiteEvents++
+        }
+        "sonic-hud-audio-id-resolved" {
+            $summary.audioCallsiteEvents++
         }
         "sonic-hud-node-write-semantic-bound" {
             $summary.semanticBoundWrites++
@@ -1311,6 +1396,49 @@ if ($summary.ownerFieldDrawPathBridgeGroups.Count -gt 0) {
     $summary.ownerFieldDrawPathBridgeStatus = "owner-field-draw-path-bridge-pending-formula-proof"
 }
 
+if ($summary.audioCallsiteEvents -gt 0) {
+    $summary.sonicHudAudioCallsiteStatus = "retail-runtime-audio-callsite-evidence-found"
+}
+
+$summary.sonicHudRuntimeProofMatrix = @(
+    New-SonicHudRuntimeProofLane `
+        "gauge-scale-write" `
+        $summary.gaugeScaleWrites `
+        "CSD::CNode::SetScale/sub_830BF090" `
+        "waiting for same-frame retail Sonic Day HUD SetScale evidence"
+    New-SonicHudRuntimeProofLane `
+        "gauge-pattern-write" `
+        $summary.gaugePatternWrites `
+        "CSD::CNode::SetPatternIndex/sub_830BF300" `
+        "waiting for retail Sonic Day HUD SetPatternIndex evidence"
+    New-SonicHudRuntimeProofLane `
+        "gauge-hide-write" `
+        $summary.gaugeHideWrites `
+        "CSD::CNode::SetHideFlag/sub_830BF080" `
+        "waiting for retail Sonic Day HUD SetHideFlag evidence"
+    New-SonicHudRuntimeProofLane `
+        "owner-field-snapshot" `
+        $summary.ownerFieldSnapshotEvents `
+        "CHudSonicStage/sub_824D6C18 owner fields +460/+464/+468/+472/+480" `
+        "waiting for retail Sonic Day HUD owner-field snapshots"
+    New-SonicHudRuntimeProofLane `
+        "owner-scale-correlation" `
+        $summary.ownerScaleCorrelationEvents `
+        "same-frame owner-field snapshot plus CSD::CNode::SetScale join" `
+        "waiting for owner-field to gauge SetScale correlation"
+    New-SonicHudRuntimeProofLane `
+        "setter-child-path-join" `
+        $summary.gaugeSetterChildPathJoins.Count `
+        "runtime ui-draw-list cast/layer address join" `
+        "waiting for setter node to exact gauge child path join"
+    New-SonicHudRuntimeProofLane `
+        "audio-callsite" `
+        $summary.audioCallsiteEvents `
+        "retail Sonic HUD SFX/audio callsite hook" `
+        "exact Sonic HUD SFX/audio IDs pending"
+)
+$summary.sonicHudRuntimeProofMatrixStatus = Resolve-SonicHudRuntimeProofMatrixStatus $summary.sonicHudRuntimeProofMatrix
+
 if (
     $summary.textWrites -gt 0 -or
     $summary.gaugeWrites -gt 0 -or
@@ -1318,6 +1446,7 @@ if (
     $summary.gameplayUpdates -gt 0 -or
     $summary.gameplayValueSnapshots -gt 0 -or
     $summary.callsiteClassifications -gt 0 -or
+    $summary.audioCallsiteEvents -gt 0 -or
     $summary.semanticPathCandidateWrites -gt 0 -or
     $summary.semanticBoundWrites -gt 0 -or
     $summary.unresolvedNodeWrites -gt 0)
@@ -1404,6 +1533,16 @@ Write-Output (
     ) $CandidateValueLimit))
 Write-Output ("gauge_child_path_status={0}" -f $summary.gaugeChildPathStatus)
 Write-Output ("boost_ring_energy_status={0}" -f $summary.boostRingEnergyStatus)
+Write-Output (
+    "sonic_hud_runtime_proof_matrix={0}" -f
+    (Format-CandidateList (
+        $summary.sonicHudRuntimeProofMatrix |
+            ForEach-Object {
+                "{0}:{1}:{2}" -f $_.laneId, $_.status, $_.evidenceCount
+            }
+    ) $CandidateValueLimit))
+Write-Output ("sonic_hud_runtime_proof_matrix_status={0}" -f $summary.sonicHudRuntimeProofMatrixStatus)
+Write-Output ("sonic_hud_audio_callsite_status={0}" -f $summary.sonicHudAudioCallsiteStatus)
 Write-Output (
     "owner_field_rolling_counter_groups={0}" -f
     (Format-CandidateList (

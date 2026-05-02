@@ -3076,6 +3076,79 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertNotIn("boost_ring_energy_status=resolved", completed.stdout)
         self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
 
+    def test_ui_lab_phase206_reports_retail_sonic_hud_gauge_audio_proof_matrix(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "sonicHudRuntimeProofMatrix",
+            "New-SonicHudRuntimeProofLane",
+            "Resolve-SonicHudRuntimeProofMatrixStatus",
+            "sonic_hud_runtime_proof_matrix=",
+            "sonic_hud_runtime_proof_matrix_status=",
+            "sonic_hud_audio_callsite_status=",
+            "retail-runtime-gauge-proof-partial-audio-pending",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 206",
+            "retail-runtime Sonic Day HUD proof matrix",
+            "retail-runtime-gauge-proof-partial-audio-pending",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            events = tmp_path / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-gauge-scale-write","detail":"value=boostGauge path=ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506 node=0xBBBB scale=0.650,1 source=CSD::CNode::SetScale/sub_830BF090"}',
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-gauge-pattern-write","detail":"value=boostGauge path=ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506 node=0xBBBB pattern=3 source=CSD::CNode::SetPatternIndex/sub_830BF300"}',
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-gauge-hide-write","detail":"value=boostGauge path=ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506 node=0xBBBB hidden=0 source=CSD::CNode::SetHideFlag/sub_830BF080"}',
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=4,2,3,3,895 fieldValueHexes=0x4,0x2,0x3,0x3,0x37F candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-gauge-scale-owner-correlated","detail":"value=boostGauge path=ui_playscreen/so_speed_gauge/position/speed_gauge_color/Cast_0506 node=0xBBBB ownerAddress=0xCE2D6B0 ownerField460=4 ownerField464=2 ownerField468=3 ownerField472=3 ownerField480=895 scale=0.650 frameDelta=0 source=runtime-csd-node-set-scale-owner-field-join:sub_830BF090"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("sonic_hud_runtime_proof_matrix=", completed.stdout)
+        self.assertIn("gauge-scale-write:present:1", completed.stdout)
+        self.assertIn("gauge-pattern-write:present:1", completed.stdout)
+        self.assertIn("gauge-hide-write:present:1", completed.stdout)
+        self.assertIn("owner-field-snapshot:present:1", completed.stdout)
+        self.assertIn("owner-scale-correlation:present:1", completed.stdout)
+        self.assertIn("audio-callsite:pending:0", completed.stdout)
+        self.assertIn(
+            "sonic_hud_runtime_proof_matrix_status=retail-runtime-gauge-proof-partial-audio-pending",
+            completed.stdout,
+        )
+        self.assertIn("sonic_hud_audio_callsite_status=audio-callsite-pending", completed.stdout)
+        self.assertNotIn("sonic_hud_runtime_proof_matrix_status=retail-runtime-gauge-and-audio-proof-ready", completed.stdout)
+        self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
+
     def test_ui_lab_phase202_preview_build_inventory_reports_repo_safe_metadata(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/inventory_sonic_unleashed_preview_build.ps1"
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
