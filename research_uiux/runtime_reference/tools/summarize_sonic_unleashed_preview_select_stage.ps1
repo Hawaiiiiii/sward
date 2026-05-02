@@ -322,6 +322,52 @@ $coverageMappingLine = @(
         ForEach-Object { "$($_.screenId):$($_.routeEvidenceStatus):$($_.routeCount)" }
 ) -join ","
 
+$nextSourceRecoveryLane = [ordered]@{
+    laneId = "sonic-day-hud-retail-runtime"
+    screenId = "sonic-day-hud"
+    controller = "SonicDayHudController"
+    decision = "continue-retail-runtime-hud-value-recovery"
+    status = "coverage-matrix-selected-retail-sonic-day-hud"
+    primaryOracle = "retail-runtime-ui-lab"
+    secondaryOracle = "prototype-route-taxonomy"
+    why = "Sonic Day HUD is the nearest starter UI/UX lane to reusable 1:1 source, but boost/ring-energy gauge normalization and exact SFX/audio IDs still block final HUD behavior."
+    blockedBy = @(
+        "boost/ring-energy gauge formula proof",
+        "exact SFX/audio IDs",
+        "SetPatternIndex/SetHideFlag gauge state joins"
+    )
+    sourceRecoveryBeat = "continue retail manual gameplay evidence for owner-field/gauge/audio joins before promoting final boost/ring-energy values"
+    selectedFromCoverageMatrix = $true
+    prototypeBoundary = "prototype routes explain coverage and route taxonomy; they do not replace retail runtime HUD evidence"
+}
+
+$sourceRecoveryLaneQueue = @(
+    [ordered]@{
+        laneId = "world-map-prototype-route"
+        screenId = "world-map"
+        controller = "WorldMapController"
+        priority = "queued-after-sonic-day-hud-value-proof"
+        primaryOracle = "prototype-route-taxonomy-plus-future-retail-runtime-capture"
+        why = "prototype Select.xml proves a WorldMap entry, but retail world-map runtime owner/capture evidence is still pending"
+    }
+    [ordered]@{
+        laneId = "results-prototype-route"
+        screenId = "results"
+        controller = "ResultScreenController"
+        priority = "queued-after-sonic-day-hud-value-proof"
+        primaryOracle = "prototype-route-taxonomy-plus-future-retail-runtime-capture"
+        why = "prototype Ending/result-adjacent route evidence gives a useful package boundary, but final result-screen owner/runtime capture is still pending"
+    }
+    [ordered]@{
+        laneId = "audio-sfx-retail-runtime"
+        screenId = "audio-sfx"
+        controller = "AudioCueCatalog"
+        priority = "parallel-hud-followup"
+        primaryOracle = "retail-audio-callsite-jsonl"
+        why = "exact SFX/audio bank IDs are required before title/loading/pause/HUD controllers can sound 1:1"
+    }
+)
+
 $summary = [ordered]@{
     buildKind = "sonic-unleashed-preview-select-stage"
     selectXmlPath = $resolvedSelectXmlPath
@@ -332,6 +378,8 @@ $summary = [ordered]@{
     typeCounts = $typeCounts
     recoveryTargetMappings = $recoveryTargetMappings
     starterScreenCoverageMatrix = $starterScreenCoverageMatrix
+    nextSourceRecoveryLane = $nextSourceRecoveryLane
+    sourceRecoveryLaneQueue = $sourceRecoveryLaneQueue
     f2PanelStyleReference = [ordered]@{
         localAssetFamily = "Reddog debug/profiler assets from the local preview/debug-menu references"
         intendedUse = "style guide for SWARD F2 profiler panel spacing, title bars, compact status strips, and window-list behavior"
@@ -359,3 +407,5 @@ Write-Output "preview_select_stage_type_counts=$(($typeCounts.GetEnumerator() | 
 Write-Output "preview_select_stage_target_mappings=$targetMappingLine"
 Write-Output "preview_select_stage_coverage_status=starter-uiux-route-coverage-matrix-ready"
 Write-Output "preview_select_stage_coverage_matrix=$coverageMappingLine"
+Write-Output "preview_select_stage_next_lane_status=$($nextSourceRecoveryLane.status)"
+Write-Output "preview_select_stage_next_lane=$($nextSourceRecoveryLane.laneId)"

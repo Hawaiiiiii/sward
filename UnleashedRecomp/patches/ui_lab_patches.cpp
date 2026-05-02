@@ -830,6 +830,17 @@ namespace UiLab
         std::string_view nextEvidenceBeat;
     };
 
+    struct SourceRecoveryLaneRow
+    {
+        std::string_view laneId;
+        std::string_view screenId;
+        std::string_view controller;
+        std::string_view primaryOracle;
+        std::string_view decisionStatus;
+        std::string_view nextEvidenceBeat;
+        bool selected;
+    };
+
     // Phase 204: repo-safe starter UI/UX coverage matrix derived from the prototype route taxonomy.
     // The local-only Reddog style reference guides the F2 surface; no prototype DDS payloads are loaded here.
     static constexpr std::array<StarterUiCoverageRow, 9> kStarterUiCoverageRows =
@@ -843,6 +854,16 @@ namespace UiLab
         { "world-map", "WorldMapController", "pending retail world-map runtime capture", "WorldMap route taxonomy", "map icons/tutorial route/disc indicators to reusable source" },
         { "results", "ResultScreenController", "pending retail result/status capture", "Ending/result package secondary hint", "separate result source from ending/staff-roll boundaries" },
         { "audio-sfx", "AudioCueCatalog", "retail audio callsite/JSONL proof pending", "Sound Test route taxonomy", "recover exact cue IDs/banks for menus/HUD/loading/pause" },
+    }};
+
+    // Phase 205: coverage-matrix-selected source-recovery queue. Sonic Day HUD stays first because
+    // boost/ring-energy and exact SFX/audio IDs are the blocking 1:1 source gaps for the starter set.
+    static constexpr std::array<SourceRecoveryLaneRow, 4> kSourceRecoveryLaneRows =
+    {{
+        { "sonic-day-hud-retail-runtime", "sonic-day-hud", "SonicDayHudController", "retail-runtime-ui-lab", "coverage-matrix-selected-retail-sonic-day-hud", "prove boost/ring-energy formulas, SetPatternIndex/SetHideFlag joins, and exact SFX/audio IDs", true },
+        { "world-map-prototype-route", "world-map", "WorldMapController", "prototype-route-taxonomy-plus-future-retail-runtime-capture", "queued-after-sonic-day-hud-value-proof", "harvest WorldMap route/icon/tutorial/disc-indicator facts after HUD value proof", false },
+        { "results-prototype-route", "results", "ResultScreenController", "prototype-route-taxonomy-plus-future-retail-runtime-capture", "queued-after-sonic-day-hud-value-proof", "split result-screen source from Ending/staff-roll route boundaries", false },
+        { "audio-sfx-retail-runtime", "audio-sfx", "AudioCueCatalog", "retail-audio-callsite-jsonl", "parallel-hud-followup", "recover exact cue IDs and banks for HUD/menu/loading/pause actions", false },
     }};
 
     static bool g_isEnabled = false;
@@ -10747,8 +10768,33 @@ namespace UiLab
             WriteEvidenceEvent("manual-evidence-marker");
     }
 
+    static void DrawOperatorNextSourceRecoveryLane()
+    {
+        DrawSwardReddogStyleSectionHeader("Next source-recovery lane");
+        ImGui::TextWrapped(
+            "Phase 205 uses the coverage matrix to choose the next implementation lane instead of treating every prototype route as equally urgent.");
+
+        for (const auto& row : kSourceRecoveryLaneRows)
+        {
+            DrawSwardReddogStatusPip(row.laneId.data(), row.selected);
+            ImGui::SameLine();
+            ImGui::TextUnformatted(row.selected ? "selected" : "queued");
+            ImGui::Text("screen: %s", row.screenId.data());
+            ImGui::Text("controller: %s", row.controller.data());
+            ImGui::TextWrapped("oracle: %s", row.primaryOracle.data());
+            ImGui::TextWrapped("status: %s", row.decisionStatus.data());
+            ImGui::TextWrapped("next: %s", row.nextEvidenceBeat.data());
+            ImGui::Separator();
+        }
+
+        ImGui::TextWrapped(
+            "Selected reason: Sonic Day HUD is closest to reusable native HUD source, but boost/ring-energy normalization and exact SFX/audio IDs still block 1:1 behavior.");
+    }
+
     static void DrawOperatorCoverageMatrixTab()
     {
+        DrawOperatorNextSourceRecoveryLane();
+        ImGui::Separator();
         DrawSwardReddogStyleSectionHeader("Starter UI/UX coverage matrix");
         ImGui::TextWrapped(
             "Prototype #SelectStage route taxonomy is a secondary oracle. Retail runtime evidence remains primary for 1:1 source recovery.");

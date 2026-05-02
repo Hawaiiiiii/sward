@@ -3385,6 +3385,134 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, report)
             self.assertIn(token, checklist)
 
+    def test_ui_lab_phase205_coverage_matrix_selects_next_source_recovery_lane(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_sonic_unleashed_preview_select_stage.ps1"
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        select_xml = """<?xml version="1.0" encoding="utf-8"?>
+<StageSelect>
+  <Category>
+    <Name>Rom</Name>
+    <Category>
+      <Name>Mykonos</Name>
+      <Stage>
+        <Type>LoadXML</Type>
+        <Name>ActD_MykonosAct1</Name>
+        <Archive>ActD_MykonosAct1</Archive>
+        <AppendArchive>SonicActionCommon_Mykonos</AppendArchive>
+        <IsEvil>false</IsEvil>
+      </Stage>
+    </Category>
+  </Category>
+  <Category>
+    <Name>STAGE_Evil</Name>
+    <Stage>
+      <Type>LoadXML</Type>
+      <Name>MykonosEvil_focus20080423</Name>
+      <Archive>ActN_MykonosEvil</Archive>
+      <AppendArchive>EvilActionCommon_Mykonos</AppendArchive>
+      <IsEvil>true</IsEvil>
+    </Stage>
+  </Category>
+  <Category>
+    <Name>Sound Test</Name>
+    <Stage>
+      <Type>SoundTest</Type>
+      <Name>Sonic SE Test</Name>
+    </Stage>
+  </Category>
+  <Stage>
+    <Type>Title</Type>
+    <Name>Title</Name>
+  </Stage>
+  <Stage>
+    <Type>OldMainMenu</Type>
+    <Name>OldMainMenu</Name>
+  </Stage>
+  <Stage>
+    <Type>WorldMap</Type>
+    <Name>WorldMap</Name>
+  </Stage>
+  <Stage>
+    <Type>Ending</Type>
+    <Name>Ending</Name>
+  </Stage>
+</StageSelect>
+"""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            xml_path = Path(tmp) / "Select.xml"
+            output_path = Path(tmp) / "phase205.json"
+            xml_path.write_text(select_xml, encoding="utf-8")
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-SelectXmlPath",
+                    str(xml_path),
+                    "-OutputPath",
+                    str(output_path),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            summary = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertIn(
+            "preview_select_stage_next_lane_status=coverage-matrix-selected-retail-sonic-day-hud",
+            completed.stdout,
+        )
+        self.assertIn(
+            "preview_select_stage_next_lane=sonic-day-hud-retail-runtime",
+            completed.stdout,
+        )
+
+        next_lane = summary["nextSourceRecoveryLane"]
+        self.assertEqual(next_lane["laneId"], "sonic-day-hud-retail-runtime")
+        self.assertEqual(next_lane["screenId"], "sonic-day-hud")
+        self.assertEqual(next_lane["controller"], "SonicDayHudController")
+        self.assertEqual(next_lane["primaryOracle"], "retail-runtime-ui-lab")
+        self.assertEqual(next_lane["secondaryOracle"], "prototype-route-taxonomy")
+        self.assertEqual(next_lane["decision"], "continue-retail-runtime-hud-value-recovery")
+        self.assertIn("boost/ring-energy", next_lane["why"])
+        self.assertIn("exact SFX/audio IDs", next_lane["blockedBy"])
+        self.assertIn("SetPatternIndex/SetHideFlag gauge state joins", next_lane["blockedBy"])
+
+        queued_lanes = {entry["laneId"]: entry for entry in summary["sourceRecoveryLaneQueue"]}
+        self.assertEqual(queued_lanes["world-map-prototype-route"]["controller"], "WorldMapController")
+        self.assertEqual(queued_lanes["results-prototype-route"]["controller"], "ResultScreenController")
+        self.assertEqual(queued_lanes["audio-sfx-retail-runtime"]["controller"], "AudioCueCatalog")
+
+        for token in [
+            "struct SourceRecoveryLaneRow",
+            "kSourceRecoveryLaneRows",
+            "DrawOperatorNextSourceRecoveryLane",
+            "sonic-day-hud-retail-runtime",
+            "coverage-matrix-selected-retail-sonic-day-hud",
+            "world-map-prototype-route",
+            "results-prototype-route",
+            "audio-sfx-retail-runtime",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 205",
+            "coverage matrix selected Sonic Day HUD retail runtime",
+            "world-map/results prototype lanes queued",
+            "boost/ring-energy",
+            "exact SFX/audio IDs",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
