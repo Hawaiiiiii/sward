@@ -821,6 +821,30 @@ namespace UiLab
         { ScreenId::WorldMap, "world-map", "World Map", "ui_worldmap", "System/GameMode/WorldMap/WorldMapSelect.cpp", false },
     }};
 
+    struct StarterUiCoverageRow
+    {
+        std::string_view screenId;
+        std::string_view controller;
+        std::string_view runtimeOracle;
+        std::string_view prototypeRouteStatus;
+        std::string_view nextEvidenceBeat;
+    };
+
+    // Phase 204: repo-safe starter UI/UX coverage matrix derived from the prototype route taxonomy.
+    // The local-only Reddog style reference guides the F2 surface; no prototype DDS payloads are loaded here.
+    static constexpr std::array<StarterUiCoverageRow, 9> kStarterUiCoverageRows =
+    {{
+        { "title-menu", "TitleMenuController", "retail title/menu JSONL + UI-layer capture", "Title + OldMainMenu route taxonomy", "compare prototype old-main-menu affordances to retail title/options policy" },
+        { "loading", "LoadingScreenController", "retail loading display/CSD/native capture", "package/runtime lane, not Select.xml route", "wire text/glyph/fade/SFX timing against retail loading evidence" },
+        { "options-settings", "OptionsMenuController", "retail title-options route evidence", "OldMainMenu secondary route hint", "split options cursor/input/SFX policy into reusable source" },
+        { "pause", "PauseMenuController", "retail CHudPause owner + ui_pause evidence", "runtime lane, not Select.xml route", "keep pause owner/action/render-gate capture as oracle" },
+        { "sonic-day-hud", "SonicDayHudController", "retail CHudSonicStage/ui_playscreen live bridge", "Sonic day LoadXML route taxonomy", "finish boost/ring-energy formula and exact SFX IDs" },
+        { "werehog-hud", "WerehogHudController", "pending retail night/Evil Sonic HUD capture", "Evil Sonic LoadXML route taxonomy", "apply SonicDayHudController pattern after day HUD stabilizes" },
+        { "world-map", "WorldMapController", "pending retail world-map runtime capture", "WorldMap route taxonomy", "map icons/tutorial route/disc indicators to reusable source" },
+        { "results", "ResultScreenController", "pending retail result/status capture", "Ending/result package secondary hint", "separate result source from ending/staff-roll boundaries" },
+        { "audio-sfx", "AudioCueCatalog", "retail audio callsite/JSONL proof pending", "Sound Test route taxonomy", "recover exact cue IDs/banks for menus/HUD/loading/pause" },
+    }};
+
     static bool g_isEnabled = false;
     static bool g_observerMode = false;
     static bool g_routeTargetExplicit = false;
@@ -10235,6 +10259,27 @@ namespace UiLab
         ImGui::Text("%s: %s", label, HexU32(value).c_str());
     }
 
+    static void DrawSwardReddogStyleSectionHeader(const char* label)
+    {
+        // Phase 204: local-only Reddog style reference, implemented as repo-safe ImGui colors/spacing only.
+        ImGui::Separator();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.78f, 0.93f, 1.0f, 1.0f));
+        ImGui::TextUnformatted(label);
+        ImGui::PopStyleColor();
+        ImGui::Separator();
+    }
+
+    static void DrawSwardReddogStatusPip(const char* label, bool active)
+    {
+        const ImVec4 color = active
+            ? ImVec4(0.28f, 0.72f, 1.0f, 1.0f)
+            : ImVec4(0.48f, 0.52f, 0.54f, 1.0f);
+
+        ImGui::TextColored(color, "%s", active ? "[x]" : "[ ]");
+        ImGui::SameLine();
+        ImGui::TextUnformatted(label);
+    }
+
     static bool ReadGuestBool(uint32_t guestAddress)
     {
         if (g_memory.base == nullptr || guestAddress == 0)
@@ -10702,6 +10747,32 @@ namespace UiLab
             WriteEvidenceEvent("manual-evidence-marker");
     }
 
+    static void DrawOperatorCoverageMatrixTab()
+    {
+        DrawSwardReddogStyleSectionHeader("Starter UI/UX coverage matrix");
+        ImGui::TextWrapped(
+            "Prototype #SelectStage route taxonomy is a secondary oracle. Retail runtime evidence remains primary for 1:1 source recovery.");
+        ImGui::TextDisabled("Reddog/profiler visual language is used as local-only style guidance; no extracted DDS assets are loaded or committed.");
+        ImGui::Separator();
+
+        for (const auto& row : kStarterUiCoverageRows)
+        {
+            const bool runtimeReady =
+                row.screenId == "title-menu" ||
+                row.screenId == "loading" ||
+                row.screenId == "options-settings" ||
+                row.screenId == "pause" ||
+                row.screenId == "sonic-day-hud";
+
+            DrawSwardReddogStatusPip(row.screenId.data(), runtimeReady);
+            ImGui::Text("controller: %s", row.controller.data());
+            ImGui::TextWrapped("retail oracle: %s", row.runtimeOracle.data());
+            ImGui::TextWrapped("prototype route: %s", row.prototypeRouteStatus.data());
+            ImGui::TextWrapped("next: %s", row.nextEvidenceBeat.data());
+            ImGui::Separator();
+        }
+    }
+
     static void DrawProfilerAddonContent()
     {
         if (!ImGui::CollapsingHeader("SWARD UI Lab", ImGuiTreeNodeFlags_DefaultOpen))
@@ -10754,6 +10825,12 @@ namespace UiLab
             if (ImGui::BeginTabItem("Capture"))
             {
                 DrawCaptureInspector();
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Coverage"))
+            {
+                DrawOperatorCoverageMatrixTab();
                 ImGui::EndTabItem();
             }
 
@@ -10851,6 +10928,12 @@ namespace UiLab
                 if (ImGui::BeginTabItem("Capture"))
                 {
                     DrawCaptureInspector();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("Coverage"))
+                {
+                    DrawOperatorCoverageMatrixTab();
                     ImGui::EndTabItem();
                 }
 

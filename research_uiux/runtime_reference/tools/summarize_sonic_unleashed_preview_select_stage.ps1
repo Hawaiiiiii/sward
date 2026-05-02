@@ -194,9 +194,132 @@ $recoveryTargetMappings = @(
     New-RecoveryTargetMapping -TargetId "pause" -Controller "PauseMenuController" -Routes @()
 )
 
+function Get-RecoveryTargetMappingById {
+    param([Parameter(Mandatory = $true)][string]$TargetId)
+
+    foreach ($mapping in $recoveryTargetMappings) {
+        if ($mapping.targetId -eq $TargetId) {
+            return $mapping
+        }
+    }
+
+    return $null
+}
+
+function New-StarterScreenCoverageRow {
+    param(
+        [Parameter(Mandatory = $true)][string]$ScreenId,
+        [Parameter(Mandatory = $true)][string]$Controller,
+        [Parameter(Mandatory = $true)][string[]]$MappingIds,
+        [Parameter(Mandatory = $true)][string]$FallbackStatus,
+        [Parameter(Mandatory = $true)][string]$SourceRecoveryFocus,
+        [Parameter(Mandatory = $true)][string]$NextEvidenceBeat
+    )
+
+    $routeCount = 0
+    $sampleRoutes = @()
+    foreach ($mappingId in $MappingIds) {
+        $mapping = Get-RecoveryTargetMappingById -TargetId $mappingId
+        if ($null -eq $mapping) {
+            continue
+        }
+
+        $routeCount += [int]$mapping.routeCount
+        $sampleRoutes += @($mapping.sampleRoutes)
+    }
+
+    $status = if ($routeCount -gt 0) {
+        "prototype-route-taxonomy-proven"
+    } else {
+        $FallbackStatus
+    }
+
+    return [ordered]@{
+        screenId = $ScreenId
+        controller = $Controller
+        routeEvidenceStatus = $status
+        routeCount = $routeCount
+        sampleRoutes = @($sampleRoutes | Select-Object -First 8)
+        sourceRecoveryFocus = $SourceRecoveryFocus
+        nextEvidenceBeat = $NextEvidenceBeat
+        oracleBoundary = "prototype route taxonomy is secondary; retail runtime evidence remains primary"
+    }
+}
+
+$starterScreenCoverageMatrix = @(
+    New-StarterScreenCoverageRow `
+        -ScreenId "title-menu" `
+        -Controller "TitleMenuController" `
+        -MappingIds @("title", "old-main-menu") `
+        -FallbackStatus "prototype-route-pending" `
+        -SourceRecoveryFocus "title loop, title menu, E3 old-main-menu state-machine comparison" `
+        -NextEvidenceBeat "compare prototype Title/OldMainMenu routes against retail title/menu controller transitions"
+    New-StarterScreenCoverageRow `
+        -ScreenId "loading" `
+        -Controller "LoadingScreenController" `
+        -MappingIds @("loading") `
+        -FallbackStatus "package/runtime-lane-not-select-route" `
+        -SourceRecoveryFocus "ui_loading package, loading display type, text/glyph/fade/SFX timing" `
+        -NextEvidenceBeat "use preview ui_loading package as secondary layout reference; prove behavior in retail runtime"
+    New-StarterScreenCoverageRow `
+        -ScreenId "options-settings" `
+        -Controller "OptionsMenuController" `
+        -MappingIds @("old-main-menu") `
+        -FallbackStatus "prototype-route-pending" `
+        -SourceRecoveryFocus "title/options submenu ownership, cursor policy, input lock, SFX hooks" `
+        -NextEvidenceBeat "map old main menu/options affordances to retail title-options evidence"
+    New-StarterScreenCoverageRow `
+        -ScreenId "pause" `
+        -Controller "PauseMenuController" `
+        -MappingIds @("pause") `
+        -FallbackStatus "retail-runtime-lane-not-select-route" `
+        -SourceRecoveryFocus "ui_pause package, CHudPause owner/action policy, render gate split" `
+        -NextEvidenceBeat "continue retail pause owner/runtime capture; prototype route taxonomy does not expose pause directly"
+    New-StarterScreenCoverageRow `
+        -ScreenId "sonic-day-hud" `
+        -Controller "SonicDayHudController" `
+        -MappingIds @("sonic-day-stage-hud") `
+        -FallbackStatus "prototype-route-pending" `
+        -SourceRecoveryFocus "ui_playscreen, CHudSonicStage, rings/score/timer/speed/boost/ring-energy/tutorial" `
+        -NextEvidenceBeat "join retail owner-field/gauge evidence to exact gameplay-fed values"
+    New-StarterScreenCoverageRow `
+        -ScreenId "werehog-hud" `
+        -Controller "WerehogHudController" `
+        -MappingIds @("werehog-stage-hud") `
+        -FallbackStatus "prototype-route-pending" `
+        -SourceRecoveryFocus "ui_playscreen_evil and night/Evil Sonic HUD ownership" `
+        -NextEvidenceBeat "defer until Sonic Day HUD value model stabilizes, then replicate controller pattern"
+    New-StarterScreenCoverageRow `
+        -ScreenId "world-map" `
+        -Controller "WorldMapController" `
+        -MappingIds @("world-map") `
+        -FallbackStatus "prototype-route-pending" `
+        -SourceRecoveryFocus "world-map icons, route selection, tutorial entry, disc indicators" `
+        -NextEvidenceBeat "harvest prototype world-map route/layout facts and compare to retail runtime coverage"
+    New-StarterScreenCoverageRow `
+        -ScreenId "results" `
+        -Controller "ResultScreenController" `
+        -MappingIds @("result") `
+        -FallbackStatus "prototype-route-pending" `
+        -SourceRecoveryFocus "ui_result, item result/status flow, end/credits overlap boundaries" `
+        -NextEvidenceBeat "separate result screen controller from ending/staff-roll prototype route evidence"
+    New-StarterScreenCoverageRow `
+        -ScreenId "audio-sfx" `
+        -Controller "AudioCueCatalog" `
+        -MappingIds @("sound-test") `
+        -FallbackStatus "prototype-sound-route-pending" `
+        -SourceRecoveryFocus "SFX/audio bank IDs for menus, loading, HUD, pause, result" `
+        -NextEvidenceBeat "use Sound Test route and sound banks as secondary cue-index hints; prove exact IDs in retail runtime"
+)
+
 $targetMappingLine = @(
     $recoveryTargetMappings |
         ForEach-Object { "$($_.targetId):$($_.routeCount)" }
+) -join ","
+
+$coverageMappingLine = @(
+    $starterScreenCoverageMatrix |
+        ForEach-Object { "$($_.screenId):$($_.routeEvidenceStatus):$($_.routeCount)" }
 ) -join ","
 
 $summary = [ordered]@{
@@ -208,6 +331,12 @@ $summary = [ordered]@{
     rootCategories = $rootCategories
     typeCounts = $typeCounts
     recoveryTargetMappings = $recoveryTargetMappings
+    starterScreenCoverageMatrix = $starterScreenCoverageMatrix
+    f2PanelStyleReference = [ordered]@{
+        localAssetFamily = "Reddog debug/profiler assets from the local preview/debug-menu references"
+        intendedUse = "style guide for SWARD F2 profiler panel spacing, title bars, compact status strips, and window-list behavior"
+        publishBoundary = "not committed; use local-only assets as visual reference, then implement repo-safe ImGui style logic"
+    }
     routeTaxonomyUse = "secondary oracle for route/menu taxonomy and source-recovery prioritization; retail runtime evidence remains primary"
     reddogStyleUse = "local-only Reddog debug/profiler assets are style references for the SWARD F2 panel; do not publish extracted DDS payloads"
     publishBoundary = "metadata-only; do not commit prototype Select.xml, extracted archives, XEX, DDS, CSB, CPK, or generated extraction output"
@@ -228,3 +357,5 @@ Write-Output "preview_select_stage_categories=$($summary.categoryCount)"
 Write-Output "preview_select_stage_stages=$($summary.stageCount)"
 Write-Output "preview_select_stage_type_counts=$(($typeCounts.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ',')"
 Write-Output "preview_select_stage_target_mappings=$targetMappingLine"
+Write-Output "preview_select_stage_coverage_status=starter-uiux-route-coverage-matrix-ready"
+Write-Output "preview_select_stage_coverage_matrix=$coverageMappingLine"

@@ -3272,6 +3272,119 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, report)
             self.assertIn(token, checklist)
 
+    def test_ui_lab_phase204_preview_route_taxonomy_feeds_starter_coverage_matrix(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_sonic_unleashed_preview_select_stage.ps1"
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        select_xml = """<?xml version="1.0" encoding="utf-8"?>
+<StageSelect>
+  <Category>
+    <Name>Rom</Name>
+    <Category>
+      <Name>Mykonos</Name>
+      <Stage>
+        <Type>LoadXML</Type>
+        <Name>ActD_MykonosAct1</Name>
+        <Archive>ActD_MykonosAct1</Archive>
+        <AppendArchive>SonicActionCommon_Mykonos</AppendArchive>
+        <IsEvil>false</IsEvil>
+      </Stage>
+    </Category>
+  </Category>
+  <Category>
+    <Name>STAGE_Evil</Name>
+    <Stage>
+      <Type>LoadXML</Type>
+      <Name>MykonosEvil_focus20080423</Name>
+      <Archive>ActN_MykonosEvil</Archive>
+      <AppendArchive>EvilActionCommon_Mykonos</AppendArchive>
+      <IsEvil>true</IsEvil>
+    </Stage>
+  </Category>
+  <Stage>
+    <Type>Title</Type>
+    <Name>Title</Name>
+  </Stage>
+  <Stage>
+    <Type>OldMainMenu</Type>
+    <Name>OldMainMenu</Name>
+  </Stage>
+  <Stage>
+    <Type>WorldMap</Type>
+    <Name>WorldMap</Name>
+  </Stage>
+  <Stage>
+    <Type>Ending</Type>
+    <Name>Ending</Name>
+  </Stage>
+</StageSelect>
+"""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            xml_path = Path(tmp) / "Select.xml"
+            output_path = Path(tmp) / "coverage.json"
+            xml_path.write_text(select_xml, encoding="utf-8")
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-SelectXmlPath",
+                    str(xml_path),
+                    "-OutputPath",
+                    str(output_path),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            summary = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertIn(
+            "preview_select_stage_coverage_status=starter-uiux-route-coverage-matrix-ready",
+            completed.stdout,
+        )
+        coverage = {entry["screenId"]: entry for entry in summary["starterScreenCoverageMatrix"]}
+        self.assertEqual(coverage["title-menu"]["routeCount"], 2)
+        self.assertEqual(coverage["title-menu"]["routeEvidenceStatus"], "prototype-route-taxonomy-proven")
+        self.assertEqual(coverage["loading"]["routeEvidenceStatus"], "package/runtime-lane-not-select-route")
+        self.assertEqual(coverage["pause"]["routeEvidenceStatus"], "retail-runtime-lane-not-select-route")
+        self.assertEqual(coverage["sonic-day-hud"]["controller"], "SonicDayHudController")
+        self.assertEqual(coverage["sonic-day-hud"]["routeCount"], 1)
+        self.assertEqual(coverage["werehog-hud"]["controller"], "WerehogHudController")
+        self.assertEqual(coverage["results"]["controller"], "ResultScreenController")
+        self.assertEqual(coverage["world-map"]["routeEvidenceStatus"], "prototype-route-taxonomy-proven")
+        self.assertIn("runtime evidence remains primary", coverage["sonic-day-hud"]["oracleBoundary"])
+        self.assertIn("Reddog debug/profiler assets", summary["f2PanelStyleReference"]["localAssetFamily"])
+        self.assertIn("not committed", summary["f2PanelStyleReference"]["publishBoundary"])
+
+        for token in [
+            "struct StarterUiCoverageRow",
+            "kStarterUiCoverageRows",
+            "DrawOperatorCoverageMatrixTab",
+            "DrawSwardReddogStyleSectionHeader",
+            "local-only Reddog style reference",
+            "starter UI/UX coverage matrix",
+            "ImGui::BeginTabItem(\"Coverage\")",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 204",
+            "starter UI/UX coverage matrix",
+            "Reddog-style F2 panel",
+            "local-only Reddog assets",
+            "prototype route taxonomy",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
