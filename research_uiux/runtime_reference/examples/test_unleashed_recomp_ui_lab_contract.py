@@ -3150,6 +3150,128 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, report)
             self.assertIn(token, checklist)
 
+    def test_ui_lab_phase203_preview_select_stage_taxonomy_maps_recovery_targets(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_sonic_unleashed_preview_select_stage.ps1"
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+        self.assertTrue(script_path.is_file())
+
+        select_xml = """<?xml version="1.0" encoding="utf-8"?>
+<StageSelect>
+  <Category>
+    <Name>Rom</Name>
+    <Category>
+      <Name>Mykonos</Name>
+      <Stage>
+        <Type>LoadXML</Type>
+        <Name>ActD_MykonosAct1</Name>
+        <Archive>ActD_MykonosAct1</Archive>
+        <AppendArchive>SonicActionCommon_Mykonos</AppendArchive>
+        <IsEvil>false</IsEvil>
+      </Stage>
+    </Category>
+  </Category>
+  <Category>
+    <Name>STAGE_Evil</Name>
+    <Category>
+      <Name>Stage1_Mykonos</Name>
+      <Stage>
+        <Type>LoadXML</Type>
+        <Name>MykonosEvil_focus20080423</Name>
+        <Archive>ActN_MykonosEvil</Archive>
+        <AppendArchive>EvilActionCommon_Mykonos</AppendArchive>
+        <IsEvil>true</IsEvil>
+      </Stage>
+    </Category>
+  </Category>
+  <Category>
+    <Name>Other</Name>
+    <Stage>
+      <Type>OldMainMenu</Type>
+      <Name>OldMainMenu</Name>
+    </Stage>
+  </Category>
+  <Category>
+    <Name>Sound Test</Name>
+    <Stage>
+      <Type>SoundTest</Type>
+      <Name>Sonic SE Test</Name>
+    </Stage>
+  </Category>
+  <Stage>
+    <Type>Title</Type>
+    <Name>Title</Name>
+  </Stage>
+  <Stage>
+    <Type>WorldMap</Type>
+    <Name>WorldMap</Name>
+  </Stage>
+  <Stage>
+    <Type>SequenceEntryPoint</Type>
+    <Name>SequenceEntryPoint</Name>
+  </Stage>
+</StageSelect>
+"""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            xml_path = Path(tmp) / "Select.xml"
+            output_path = Path(tmp) / "preview_select_stage_taxonomy.json"
+            xml_path.write_text(select_xml, encoding="utf-8")
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-SelectXmlPath",
+                    str(xml_path),
+                    "-OutputPath",
+                    str(output_path),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            summary = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertIn("preview_select_stage_status=ok", completed.stdout)
+        self.assertIn("preview_select_stage_target_mappings=", completed.stdout)
+        self.assertEqual(summary["buildKind"], "sonic-unleashed-preview-select-stage")
+        self.assertEqual(summary["stageCount"], 7)
+        self.assertEqual(summary["typeCounts"]["LoadXML"], 2)
+        self.assertIn("Rom", summary["rootCategories"])
+        self.assertIn("STAGE_Evil", summary["rootCategories"])
+
+        mappings = {entry["targetId"]: entry for entry in summary["recoveryTargetMappings"]}
+        self.assertEqual(mappings["title"]["controller"], "TitleMenuController")
+        self.assertEqual(mappings["old-main-menu"]["controller"], "TitleMenuController")
+        self.assertEqual(mappings["world-map"]["controller"], "WorldMapController")
+        self.assertEqual(mappings["sonic-day-stage-hud"]["controller"], "SonicDayHudController")
+        self.assertEqual(mappings["werehog-stage-hud"]["controller"], "WerehogHudController")
+        self.assertEqual(mappings["sound-test"]["controller"], "AudioCueCatalog")
+        self.assertEqual(mappings["sequence-entry-point"]["controller"], "SequenceRouteController")
+        self.assertEqual(mappings["loading"]["status"], "not-present-in-select-xml")
+        self.assertEqual(mappings["pause"]["status"], "not-present-in-select-xml")
+        self.assertIn("ActD_MykonosAct1", mappings["sonic-day-stage-hud"]["sampleRoutes"][0]["name"])
+        self.assertIn("MykonosEvil_focus20080423", mappings["werehog-stage-hud"]["sampleRoutes"][0]["name"])
+        self.assertIn("metadata-only", summary["publishBoundary"])
+
+        for token in [
+            "Phase 203",
+            "#SelectStage/Select.xml",
+            "route taxonomy",
+            "prototype-only secondary oracle",
+            "SonicDayHudController",
+            "WerehogHudController",
+            "Reddog",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
     def test_ui_lab_phase184_promotes_score_csd_text_path_resolution(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
