@@ -2,6 +2,8 @@
 #include <kernel/memory.h>
 #include <api/SWA.h>
 #include <patches/ui_lab_patches.h>
+#include <climits>
+#include <cstring>
 #include <string_view>
 
 static bool IsPlausibleGuestAddress(uint32_t address)
@@ -11,6 +13,32 @@ static bool IsPlausibleGuestAddress(uint32_t address)
 
 static thread_local uint32_t g_sonicHudSpeedReadoutOwnerAddress = 0;
 static thread_local uint32_t g_sonicHudSpeedReadoutCaptureDepth = 0;
+
+static uint32_t ReadGuestU32ForCtWriter(uint8_t* base, uint32_t address)
+{
+    if (!IsPlausibleGuestAddress(address))
+        return 0;
+
+    return PPC_LOAD_U32(address);
+}
+
+static float FloatFromGuestU32(uint32_t value)
+{
+    float result = 0.0f;
+    std::memcpy(&result, &value, sizeof(result));
+    return result;
+}
+
+static int32_t SaturatingSignedDelta(uint32_t previousValue, uint32_t value)
+{
+    const int64_t delta =
+        static_cast<int64_t>(value) - static_cast<int64_t>(previousValue);
+    if (delta > INT32_MAX)
+        return INT32_MAX;
+    if (delta < INT32_MIN)
+        return INT32_MIN;
+    return static_cast<int32_t>(delta);
+}
 
 static void RecordHudSonicStageInspector(
     uint32_t ownerAddress,
@@ -65,6 +93,125 @@ static void RecordHudSonicStageCallsiteSample(
         samplePhase,
         ctx.f1.f64,
         ctx.r4.u32);
+}
+
+// Phase 211: CT-anchored gameplay writer seams. These are not UI nodes by
+// themselves; they anchor the gameplay values that the Sonic HUD later mirrors.
+PPC_FUNC_IMPL(__imp__sub_82519FE8);
+PPC_FUNC(sub_82519FE8)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    uint32_t storageAddress = 0;
+    uint32_t previousValue = 0;
+
+    if (IsPlausibleGuestAddress(ownerAddress))
+    {
+        const uint32_t storageBase = ReadGuestU32ForCtWriter(base, ownerAddress + 148);
+        storageAddress = storageBase + 34216;
+        previousValue = ReadGuestU32ForCtWriter(base, storageAddress);
+    }
+
+    __imp__sub_82519FE8(ctx, base);
+
+    if (!IsPlausibleGuestAddress(storageAddress))
+        return;
+
+    const uint32_t value = ReadGuestU32ForCtWriter(base, storageAddress);
+    UiLab::OnSonicHudCtGameplayWriter(
+        "ringCount",
+        "sub_82519FE8",
+        ownerAddress,
+        storageAddress,
+        previousValue,
+        value,
+        SaturatingSignedDelta(previousValue, value),
+        0.0f,
+        false,
+        "ct-anchored-gameplay-writer:rings");
+}
+
+PPC_FUNC_IMPL(__imp__sub_82A50838);
+PPC_FUNC(sub_82A50838)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    const uint32_t storageAddress = IsPlausibleGuestAddress(ownerAddress)
+        ? ownerAddress + 104
+        : 0;
+    const uint32_t previousValue = ReadGuestU32ForCtWriter(base, storageAddress);
+
+    __imp__sub_82A50838(ctx, base);
+
+    if (!IsPlausibleGuestAddress(storageAddress))
+        return;
+
+    const uint32_t value = ReadGuestU32ForCtWriter(base, storageAddress);
+    UiLab::OnSonicHudCtGameplayWriter(
+        "boostGauge",
+        "sub_82A50838",
+        ownerAddress,
+        storageAddress,
+        previousValue,
+        value,
+        SaturatingSignedDelta(previousValue, value),
+        FloatFromGuestU32(value),
+        true,
+        "ct-anchored-gameplay-writer:day-boost");
+}
+
+PPC_FUNC_IMPL(__imp__sub_82BDBA20);
+PPC_FUNC(sub_82BDBA20)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    const uint32_t storageAddress = IsPlausibleGuestAddress(ownerAddress)
+        ? ownerAddress + 11868
+        : 0;
+    const uint32_t previousValue = ReadGuestU32ForCtWriter(base, storageAddress);
+
+    __imp__sub_82BDBA20(ctx, base);
+
+    if (!IsPlausibleGuestAddress(storageAddress))
+        return;
+
+    const uint32_t value = ReadGuestU32ForCtWriter(base, storageAddress);
+    UiLab::OnSonicHudCtGameplayWriter(
+        "lifeCount",
+        "sub_82BDBA20",
+        ownerAddress,
+        storageAddress,
+        previousValue,
+        value,
+        SaturatingSignedDelta(previousValue, value),
+        0.0f,
+        false,
+        "ct-anchored-gameplay-writer:lives-primary");
+}
+
+PPC_FUNC_IMPL(__imp__sub_82BDBA60);
+PPC_FUNC(sub_82BDBA60)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    const uint32_t storageAddress = IsPlausibleGuestAddress(ownerAddress)
+        ? ownerAddress + 11872
+        : 0;
+    const uint32_t previousValue = ReadGuestU32ForCtWriter(base, storageAddress);
+
+    __imp__sub_82BDBA60(ctx, base);
+
+    if (!IsPlausibleGuestAddress(storageAddress))
+        return;
+
+    const uint32_t value = ReadGuestU32ForCtWriter(base, storageAddress);
+    UiLab::OnSonicHudCtGameplayWriter(
+        "lifeCount",
+        "sub_82BDBA60",
+        ownerAddress,
+        storageAddress,
+        previousValue,
+        value,
+        SaturatingSignedDelta(previousValue, value),
+        0.0f,
+        false,
+        "ct-anchored-gameplay-writer:lives-secondary");
 }
 
 // CHudSonicStage constructor-family seam. It anchors the owner address early;

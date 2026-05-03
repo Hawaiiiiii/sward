@@ -611,6 +611,170 @@ function Add-OwnerSetterCandidateNumericRelationGroup($Groups, [string]$Detail, 
     }
 }
 
+function New-CtGameplayWriterGroup([string]$ValueName, [string]$Callsite) {
+    return [ordered]@{
+        valueName = $ValueName
+        callsite = $Callsite
+        writes = 0
+        minValue = $null
+        maxValue = $null
+        minFloat = $null
+        maxFloat = $null
+        minDelta = $null
+        maxDelta = $null
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Add-CtGameplayWriterGroup($Groups, [string]$Detail, $EventObject) {
+    $valueName = Get-DetailToken $Detail "valueName"
+    $callsite = Get-DetailToken $Detail "callsite"
+    if ([string]::IsNullOrWhiteSpace($valueName) -or [string]::IsNullOrWhiteSpace($callsite)) {
+        return
+    }
+
+    $key = "{0}:{1}" -f $valueName, $callsite
+    if (-not $Groups.ContainsKey($key)) {
+        $Groups[$key] = New-CtGameplayWriterGroup $valueName $callsite
+    }
+
+    $group = $Groups[$key]
+    $group.writes++
+
+    $value = 0L
+    if ([Int64]::TryParse((Get-DetailToken $Detail "value"), [ref]$value)) {
+        if ($null -eq $group.minValue -or $value -lt $group.minValue) {
+            $group.minValue = $value
+        }
+        if ($null -eq $group.maxValue -or $value -gt $group.maxValue) {
+            $group.maxValue = $value
+        }
+    }
+
+    $delta = 0
+    if ([int]::TryParse((Get-DetailToken $Detail "delta"), [ref]$delta)) {
+        if ($null -eq $group.minDelta -or $delta -lt $group.minDelta) {
+            $group.minDelta = $delta
+        }
+        if ($null -eq $group.maxDelta -or $delta -gt $group.maxDelta) {
+            $group.maxDelta = $delta
+        }
+    }
+
+    $floatText = Get-DetailToken $Detail "valueFloat"
+    $floatValue = 0.0
+    if (-not [string]::IsNullOrWhiteSpace($floatText) -and [double]::TryParse($floatText, [ref]$floatValue)) {
+        if ($null -eq $group.minFloat -or $floatValue -lt $group.minFloat) {
+            $group.minFloat = $floatValue
+        }
+        if ($null -eq $group.maxFloat -or $floatValue -gt $group.maxFloat) {
+            $group.maxFloat = $floatValue
+        }
+    }
+
+    $frame = Get-EventFrame $EventObject
+    if ($null -ne $frame) {
+        if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+            $group.firstFrame = $frame
+        }
+        if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+            $group.lastFrame = $frame
+        }
+    }
+}
+
+function New-CtGameplayWriterRecord([string]$Detail, $EventObject) {
+    return [ordered]@{
+        valueName = Get-DetailToken $Detail "valueName"
+        callsite = Get-DetailToken $Detail "callsite"
+        frame = Get-EventFrame $EventObject
+    }
+}
+
+function New-OwnerSetterCandidateRecord([string]$Detail, $EventObject) {
+    return [ordered]@{
+        valueName = Get-DetailToken $Detail "semanticValueName"
+        node = Get-DetailToken $Detail "node"
+        kind = Get-DetailToken $Detail "kind"
+        path = Get-DetailToken $Detail "semanticPathCandidate"
+        frame = Get-EventFrame $EventObject
+    }
+}
+
+function New-CtGameplayWriterOwnerSetterCandidateCorrelationGroup(
+    [string]$ValueName,
+    [string]$WriterCallsite,
+    [string]$SetterNode,
+    [string]$SetterKind,
+    [string]$Path)
+{
+    return [ordered]@{
+        valueName = $ValueName
+        writerCallsite = $WriterCallsite
+        setterNode = $SetterNode
+        setterKind = $SetterKind
+        path = $Path
+        joins = 0
+        minFrameDelta = $null
+        maxFrameDelta = $null
+    }
+}
+
+function Add-CtGameplayWriterOwnerSetterCandidateCorrelationGroups(
+    $Groups,
+    [object[]]$WriterEvents,
+    [object[]]$SetterCandidateEvents)
+{
+    foreach ($writer in @($WriterEvents)) {
+        if ([string]::IsNullOrWhiteSpace($writer.valueName) -or $null -eq $writer.frame) {
+            continue
+        }
+
+        foreach ($setter in @($SetterCandidateEvents)) {
+            if (
+                [string]::IsNullOrWhiteSpace($setter.valueName) -or
+                $null -eq $setter.frame -or
+                $setter.valueName -ne $writer.valueName)
+            {
+                continue
+            }
+
+            $frameDelta = [Math]::Abs([int]$setter.frame - [int]$writer.frame)
+            if ($frameDelta -gt 60) {
+                continue
+            }
+
+            $key = "{0}:{1}:{2}:{3}:{4}" -f $writer.valueName, $writer.callsite, $setter.node, $setter.kind, $setter.path
+            if (-not $Groups.ContainsKey($key)) {
+                $Groups[$key] = New-CtGameplayWriterOwnerSetterCandidateCorrelationGroup `
+                    $writer.valueName `
+                    $writer.callsite `
+                    $setter.node `
+                    $setter.kind `
+                    $setter.path
+            }
+
+            $group = $Groups[$key]
+            $group.joins++
+            if ($null -eq $group.minFrameDelta -or $frameDelta -lt $group.minFrameDelta) {
+                $group.minFrameDelta = $frameDelta
+            }
+            if ($null -eq $group.maxFrameDelta -or $frameDelta -gt $group.maxFrameDelta) {
+                $group.maxFrameDelta = $frameDelta
+            }
+        }
+    }
+}
+
+function Format-RangeValue($Min, $Max, [string]$EmptyValue = "<none>") {
+    if ($null -eq $Min -or $null -eq $Max) {
+        return $EmptyValue
+    }
+
+    return "{0}-{1}" -f $Min, $Max
+}
+
 function Format-OwnerSetterCandidateCorrelationFields($Group, [int]$Limit) {
     return (
         @("460", "464", "468", "472", "480") |
@@ -1037,6 +1201,10 @@ $ownerFieldRollingCounterGroupsByKey = @{}
 $ownerFieldGaugeScaleCorrelationGroupsByKey = @{}
 $ownerSetterCandidateCorrelationGroupsByKey = @{}
 $ownerSetterCandidateNumericRelationGroupsByKey = @{}
+$ctGameplayWriterGroupsByKey = @{}
+$ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey = @{}
+$ctGameplayWriterRecords = New-Object System.Collections.Generic.List[object]
+$ownerSetterCandidateRecords = New-Object System.Collections.Generic.List[object]
 $ownerFieldOffsetClassificationsByKey = @{}
 $ownerFieldOffsetTransitionTracksByKey = @{}
 $gaugeDrawPathGroupsByKey = @{}
@@ -1068,6 +1236,9 @@ $summary = [ordered]@{
     ownerSetterCandidateCorrelationEvents = 0
     ownerSetterCandidateCorrelationGroups = @()
     ownerSetterCandidateNumericRelationGroups = @()
+    ctGameplayWriterEvents = 0
+    ctGameplayWriterGroups = @()
+    ctGameplayWriterOwnerSetterCandidateCorrelationGroups = @()
     audioCallsiteEvents = 0
     unresolvedNodeWrites = 0
     unresolvedNodeCandidateCount = 0
@@ -1093,6 +1264,7 @@ $summary = [ordered]@{
     sonicHudRuntimeProofMatrixStatus = "pending-retail-runtime-stage-hud-proof"
     sonicHudAudioCallsiteStatus = "audio-callsite-pending"
     sonicHudOwnerSetterCandidateCorrelationStatus = "pending-runtime-setter-owner-candidate-correlation-evidence"
+    sonicHudCtGameplayWriterStatus = "pending-ct-anchored-gameplay-writer-evidence"
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
@@ -1171,6 +1343,12 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
             $summary.ownerSetterCandidateCorrelationEvents++
             Add-OwnerSetterCandidateCorrelationGroup $ownerSetterCandidateCorrelationGroupsByKey $detail $eventObject
             Add-OwnerSetterCandidateNumericRelationGroup $ownerSetterCandidateNumericRelationGroupsByKey $detail $eventObject
+            [void]$ownerSetterCandidateRecords.Add((New-OwnerSetterCandidateRecord $detail $eventObject))
+        }
+        "sonic-hud-ct-gameplay-writer" {
+            $summary.ctGameplayWriterEvents++
+            Add-CtGameplayWriterGroup $ctGameplayWriterGroupsByKey $detail $eventObject
+            [void]$ctGameplayWriterRecords.Add((New-CtGameplayWriterRecord $detail $eventObject))
         }
         "sonic-hud-audio-cue-callsite" {
             $summary.audioCallsiteEvents++
@@ -1410,6 +1588,52 @@ $summary.ownerSetterCandidateNumericRelationGroups = @(
                 ownerFieldMax = $group.ownerFieldMax
                 firstFrame = $group.firstFrame
                 lastFrame = $group.lastFrame
+            }
+        }
+)
+Add-CtGameplayWriterOwnerSetterCandidateCorrelationGroups `
+    $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey `
+    ([object[]]$ctGameplayWriterRecords.ToArray()) `
+    ([object[]]$ownerSetterCandidateRecords.ToArray())
+$summary.ctGameplayWriterGroups = @(
+    $ctGameplayWriterGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { $ctGameplayWriterGroupsByKey[$_].valueName } }, `
+            @{ Expression = { $ctGameplayWriterGroupsByKey[$_].callsite } } |
+        ForEach-Object {
+            $group = $ctGameplayWriterGroupsByKey[$_]
+            [ordered]@{
+                valueName = $group.valueName
+                callsite = $group.callsite
+                writes = $group.writes
+                minValue = $group.minValue
+                maxValue = $group.maxValue
+                minFloat = $group.minFloat
+                maxFloat = $group.maxFloat
+                minDelta = $group.minDelta
+                maxDelta = $group.maxDelta
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
+$summary.ctGameplayWriterOwnerSetterCandidateCorrelationGroups = @(
+    $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { -1 * $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey[$_].joins } }, `
+            @{ Expression = { $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey[$_].valueName } }, `
+            @{ Expression = { $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey[$_].writerCallsite } } |
+        ForEach-Object {
+            $group = $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey[$_]
+            [ordered]@{
+                valueName = $group.valueName
+                writerCallsite = $group.writerCallsite
+                setterNode = $group.setterNode
+                setterKind = $group.setterKind
+                path = $group.path
+                joins = $group.joins
+                minFrameDelta = $group.minFrameDelta
+                maxFrameDelta = $group.maxFrameDelta
             }
         }
 )
@@ -1685,6 +1909,11 @@ if ($summary.ownerSetterCandidateCorrelationEvents -gt 0) {
         "retail-runtime-setter-owner-candidate-correlation-pending-exact-child-path"
 }
 
+if ($summary.ctGameplayWriterEvents -gt 0) {
+    $summary.sonicHudCtGameplayWriterStatus =
+        "ct-anchored-gameplay-writer-evidence-present-pending-final-hud-formula"
+}
+
 if ($summary.audioCallsiteEvents -gt 0) {
     $summary.sonicHudAudioCallsiteStatus = "retail-runtime-audio-callsite-evidence-found"
 }
@@ -1726,6 +1955,11 @@ $summary.sonicHudRuntimeProofMatrix = @(
         "unresolved CSD setter node plus owner-field cache candidate join" `
         "waiting for unresolved setter owner-candidate correlation"
     New-SonicHudRuntimeProofLane `
+        "ct-gameplay-writer" `
+        $summary.ctGameplayWriterEvents `
+        "CT-anchored rings/lives/Day boost gameplay writer hooks" `
+        "waiting for CT-anchored gameplay writer evidence"
+    New-SonicHudRuntimeProofLane `
         "audio-callsite" `
         $summary.audioCallsiteEvents `
         "retail Sonic HUD SFX/audio callsite hook" `
@@ -1741,6 +1975,7 @@ if (
     $summary.gameplayValueSnapshots -gt 0 -or
     $summary.callsiteClassifications -gt 0 -or
     $summary.ownerSetterCandidateCorrelationEvents -gt 0 -or
+    $summary.ctGameplayWriterEvents -gt 0 -or
     $summary.audioCallsiteEvents -gt 0 -or
     $summary.semanticPathCandidateWrites -gt 0 -or
     $summary.semanticBoundWrites -gt 0 -or
@@ -1809,6 +2044,39 @@ Write-Output (
                     $_.ownerFieldMax,
                     $_.firstFrame,
                     $_.lastFrame
+            }
+    ) $CandidateValueLimit))
+Write-Output ("ct_gameplay_writer_events={0}" -f $summary.ctGameplayWriterEvents)
+Write-Output (
+    "ct_gameplay_writer_groups={0}" -f
+    (Format-CandidateList (
+        $summary.ctGameplayWriterGroups |
+            ForEach-Object {
+                "{0}:{1}:writes={2}:value={3}:float={4}:delta={5}:frames={6}-{7}" -f
+                    $_.valueName,
+                    $_.callsite,
+                    $_.writes,
+                    (Format-RangeValue $_.minValue $_.maxValue),
+                    (Format-RangeValue $_.minFloat $_.maxFloat),
+                    (Format-RangeValue $_.minDelta $_.maxDelta),
+                    $_.firstFrame,
+                    $_.lastFrame
+            }
+    ) $CandidateValueLimit))
+Write-Output (
+    "ct_gameplay_writer_owner_setter_candidate_correlation_groups={0}" -f
+    (Format-CandidateList (
+        $summary.ctGameplayWriterOwnerSetterCandidateCorrelationGroups |
+            ForEach-Object {
+                "value={0}:writer={1}:setterNode={2}:setterKind={3}:path={4}:joins={5}:frame_delta={6}-{7}" -f
+                    $_.valueName,
+                    $_.writerCallsite,
+                    $_.setterNode,
+                    $_.setterKind,
+                    $_.path,
+                    $_.joins,
+                    $_.minFrameDelta,
+                    $_.maxFrameDelta
             }
     ) $CandidateValueLimit))
 Write-Output (
@@ -1883,6 +2151,7 @@ Write-Output (
 Write-Output ("sonic_hud_runtime_proof_matrix_status={0}" -f $summary.sonicHudRuntimeProofMatrixStatus)
 Write-Output ("sonic_hud_audio_callsite_status={0}" -f $summary.sonicHudAudioCallsiteStatus)
 Write-Output ("sonic_hud_owner_setter_candidate_correlation_status={0}" -f $summary.sonicHudOwnerSetterCandidateCorrelationStatus)
+Write-Output ("sonic_hud_ct_gameplay_writer_status={0}" -f $summary.sonicHudCtGameplayWriterStatus)
 Write-Output (
     "owner_field_rolling_counter_groups={0}" -f
     (Format-CandidateList (

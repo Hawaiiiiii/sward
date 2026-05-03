@@ -3385,6 +3385,96 @@ mov r8d,(int)999999
         self.assertEqual(summary["entries"][0]["scriptConstants"], ["999999"])
         self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
 
+    def test_ui_lab_phase211_hooks_ct_anchored_day_gameplay_writers(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        hud_hook = self.read("UnleashedRecomp/patches/CHudSonicStage_patches.cpp")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "PPC_FUNC_IMPL(__imp__sub_82519FE8)",
+            "PPC_FUNC_IMPL(__imp__sub_82A50838)",
+            "PPC_FUNC_IMPL(__imp__sub_82BDBA20)",
+            "PPC_FUNC_IMPL(__imp__sub_82BDBA60)",
+            "OnSonicHudCtGameplayWriter",
+            "ct-anchored-gameplay-writer",
+        ]:
+            self.assertIn(token, hud_hook)
+
+        self.assertIn("OnSonicHudCtGameplayWriter", header)
+        self.assertIn("sonic-hud-ct-gameplay-writer", ui_lab)
+
+        for token in [
+            "ctGameplayWriterEvents",
+            "ct_gameplay_writer_groups=",
+            "ct_gameplay_writer_owner_setter_candidate_correlation_groups=",
+            "sonic_hud_ct_gameplay_writer_status=",
+            "ct-gameplay-writer",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 211",
+            "ct-anchored gameplay writer",
+            "sonic-hud-ct-gameplay-writer",
+            "ct_gameplay_writer_owner_setter_candidate_correlation_groups=",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-ct-gameplay-writer","detail":"valueName=boostGauge callsite=sub_82A50838 ownerAddress=0xAAAA storageAddress=0xAB12 previousValue=1065353216 value=1073741824 delta=8388608 valueFloat=2 source=ct-anchored-gameplay-writer:day-boost"}',
+                        '{"time":1.1,"frame":101,"event":"sonic-hud-gauge-setter-owner-candidate-correlated","detail":"kind=text node=0xCCCC value=\\"895\\" semanticValueName=boostGauge semanticPathCandidate=ui_playscreen/so_speed_gauge ownerAddress=0xCE2D6B0 ownerField460=4 ownerField464=2 ownerField468=3 ownerField472=5 ownerField480=895 frameDelta=0 callsiteSource=same-frame-hud-update-context:sub_824D6C18 source=runtime-csd-node-setter-owner-field-candidate-join:CSD::CNode::SetText/sub_830BF640 pathResolved=false"}',
+                        '{"time":1.2,"frame":110,"event":"sonic-hud-ct-gameplay-writer","detail":"valueName=ringCount callsite=sub_82519FE8 ownerAddress=0xBBBB storageAddress=0xCDEF previousValue=4 value=5 delta=1 source=ct-anchored-gameplay-writer:rings"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("ct_gameplay_writer_events=2", completed.stdout)
+        self.assertIn(
+            "ct_gameplay_writer_groups=boostGauge:sub_82A50838:writes=1:value=1073741824-1073741824:float=2-2:delta=8388608-8388608:frames=100-100",
+            completed.stdout,
+        )
+        self.assertIn(
+            "ringCount:sub_82519FE8:writes=1:value=5-5:float=<none>:delta=1-1:frames=110-110",
+            completed.stdout,
+        )
+        self.assertIn(
+            "ct_gameplay_writer_owner_setter_candidate_correlation_groups=value=boostGauge:writer=sub_82A50838:setterNode=0xCCCC:setterKind=text:path=ui_playscreen/so_speed_gauge:joins=1:frame_delta=1-1",
+            completed.stdout,
+        )
+        self.assertIn("ct-gameplay-writer:present:2", completed.stdout)
+        self.assertIn(
+            "sonic_hud_ct_gameplay_writer_status=ct-anchored-gameplay-writer-evidence-present-pending-final-hud-formula",
+            completed.stdout,
+        )
+        self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
+
     def test_ui_lab_phase202_preview_build_inventory_reports_repo_safe_metadata(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/inventory_sonic_unleashed_preview_build.ps1"
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")

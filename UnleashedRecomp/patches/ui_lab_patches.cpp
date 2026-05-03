@@ -1022,6 +1022,7 @@ namespace UiLab
     static std::string g_lastOwnerFieldGaugeScaleCorrelationSignature;
     static uint64_t g_lastOwnerFieldGaugeScaleCorrelationEvidenceFrame = 0;
     static std::unordered_set<std::string> g_loggedOwnerFieldGaugeSetterCandidateCorrelationKeys;
+    static std::unordered_set<std::string> g_loggedCtGameplayWriterKeys;
     // Phase 198: same-frame join window. Only emit when the cached snapshot
     // is at most kOwnerFieldGaugeScaleCorrelationFrameWindow frames old, so
     // SetScale calls long after the last sub_824D6C18 hit are not joined.
@@ -7261,6 +7262,7 @@ namespace UiLab
         g_lastOwnerFieldGaugeScaleCorrelationSignature.clear();
         g_lastOwnerFieldGaugeScaleCorrelationEvidenceFrame = 0;
         g_loggedOwnerFieldGaugeSetterCandidateCorrelationKeys.clear();
+        g_loggedCtGameplayWriterKeys.clear();
         g_loggedTutorialHudOwnerPathReady = false;
         g_chudSonicStageOwnerFieldSampleCount = 0;
         g_lastSonicHudUpdateCallsiteSampleFrame = 0;
@@ -8534,6 +8536,61 @@ namespace UiLab
         }
         else if (gameplayChanged && intervalElapsed)
         {
+            WriteLiveStateSnapshot();
+        }
+    }
+
+    void OnSonicHudCtGameplayWriter(
+        std::string_view valueName,
+        std::string_view callsite,
+        uint32_t ownerAddress,
+        uint32_t storageAddress,
+        uint32_t previousValue,
+        uint32_t value,
+        int32_t delta,
+        float valueFloat,
+        bool valueFloatKnown,
+        std::string_view hookSource)
+    {
+        if (!g_isEnabled || valueName.empty() || callsite.empty())
+            return;
+
+        const std::string valueNameText(valueName);
+        const std::string callsiteText(callsite);
+        const std::string source = hookSource.empty()
+            ? std::string("ct-anchored-gameplay-writer")
+            : std::string(hookSource);
+
+        std::ostringstream detail;
+        detail
+            << "valueName=" << valueNameText
+            << " callsite=" << callsiteText
+            << " ownerAddress=" << HexU32(ownerAddress)
+            << " storageAddress=" << HexU32(storageAddress)
+            << " previousValue=" << previousValue
+            << " value=" << value
+            << " delta=" << delta;
+        if (valueFloatKnown)
+            detail << " valueFloat=" << valueFloat;
+        detail << " source=" << source;
+
+        const std::string stableSignature =
+            valueNameText + "|" +
+            callsiteText + "|" +
+            HexU32(ownerAddress) + "|" +
+            HexU32(storageAddress) + "|" +
+            std::to_string(value) + "|" +
+            std::to_string(delta);
+
+        bool shouldLog = false;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            shouldLog = g_loggedCtGameplayWriterKeys.insert(stableSignature).second;
+        }
+
+        if (shouldLog)
+        {
+            WriteEvidenceEvent("sonic-hud-ct-gameplay-writer", detail.str());
             WriteLiveStateSnapshot();
         }
     }

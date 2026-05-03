@@ -362,6 +362,17 @@ namespace UiLab
         uint32_t ownerAddress,
         uint32_t speedKmh,
         std::string_view hookSource);
+    void OnSonicHudCtGameplayWriter(
+        std::string_view valueName,
+        std::string_view callsite,
+        uint32_t ownerAddress,
+        uint32_t storageAddress,
+        uint32_t previousValue,
+        uint32_t value,
+        int32_t delta,
+        float valueFloat,
+        bool valueFloatKnown,
+        std::string_view hookSource);
     void OnSonicHudGameplayValues(
         uint32_t ringCount,
         bool ringCountKnown,
