@@ -726,6 +726,89 @@ function Add-CtGameplayWriterProbeGroup($Groups, [string]$Detail, $EventObject) 
     }
 }
 
+function New-CtCodeEntryGaugeTransitionCandidateGroup([string]$ValueName, [string]$Callsite, [string]$Phase) {
+    return [ordered]@{
+        valueName = $ValueName
+        callsite = $Callsite
+        phase = $Phase
+        events = 0
+        owners = [System.Collections.Generic.SortedSet[string]]::new()
+        storageAddresses = [System.Collections.Generic.SortedSet[string]]::new()
+        minRawValue = $null
+        maxRawValue = $null
+        minFloatValue = $null
+        maxFloatValue = $null
+        minInputFloatValue = $null
+        maxInputFloatValue = $null
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Add-CtCodeEntryGaugeTransitionCandidateGroup($Groups, [string]$Detail, $EventObject) {
+    $valueName = Get-DetailToken $Detail "valueName"
+    $callsite = Get-DetailToken $Detail "callsite"
+    $phase = Get-DetailToken $Detail "phase"
+    if (
+        [string]::IsNullOrWhiteSpace($valueName) -or
+        [string]::IsNullOrWhiteSpace($callsite) -or
+        [string]::IsNullOrWhiteSpace($phase))
+    {
+        return
+    }
+
+    $key = "{0}:{1}:{2}" -f $valueName, $callsite, $phase
+    if (-not $Groups.ContainsKey($key)) {
+        $Groups[$key] = New-CtCodeEntryGaugeTransitionCandidateGroup $valueName $callsite $phase
+    }
+
+    $group = $Groups[$key]
+    $group.events++
+    Add-UniqueSorted $group.owners (Get-DetailToken $Detail "ownerAddress")
+    Add-UniqueSorted $group.storageAddresses (Get-DetailToken $Detail "storageAddress")
+
+    $rawValue = 0L
+    if ([Int64]::TryParse((Get-DetailToken $Detail "rawValue"), [ref]$rawValue)) {
+        if ($null -eq $group.minRawValue -or $rawValue -lt $group.minRawValue) {
+            $group.minRawValue = $rawValue
+        }
+        if ($null -eq $group.maxRawValue -or $rawValue -gt $group.maxRawValue) {
+            $group.maxRawValue = $rawValue
+        }
+    }
+
+    $floatValue = 0.0
+    if ([double]::TryParse((Get-DetailToken $Detail "floatValue"), [ref]$floatValue)) {
+        if ($null -eq $group.minFloatValue -or $floatValue -lt $group.minFloatValue) {
+            $group.minFloatValue = $floatValue
+        }
+        if ($null -eq $group.maxFloatValue -or $floatValue -gt $group.maxFloatValue) {
+            $group.maxFloatValue = $floatValue
+        }
+    }
+
+    $inputFloatText = Get-DetailToken $Detail "inputFloatValue"
+    $inputFloatValue = 0.0
+    if (-not [string]::IsNullOrWhiteSpace($inputFloatText) -and [double]::TryParse($inputFloatText, [ref]$inputFloatValue)) {
+        if ($null -eq $group.minInputFloatValue -or $inputFloatValue -lt $group.minInputFloatValue) {
+            $group.minInputFloatValue = $inputFloatValue
+        }
+        if ($null -eq $group.maxInputFloatValue -or $inputFloatValue -gt $group.maxInputFloatValue) {
+            $group.maxInputFloatValue = $inputFloatValue
+        }
+    }
+
+    $frame = Get-EventFrame $EventObject
+    if ($null -ne $frame) {
+        if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+            $group.firstFrame = $frame
+        }
+        if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+            $group.lastFrame = $frame
+        }
+    }
+}
+
 function New-CtGameplayWriterRecord([string]$Detail, $EventObject) {
     return [ordered]@{
         valueName = Get-DetailToken $Detail "valueName"
@@ -1245,6 +1328,7 @@ $ownerSetterCandidateCorrelationGroupsByKey = @{}
 $ownerSetterCandidateNumericRelationGroupsByKey = @{}
 $ctGameplayWriterGroupsByKey = @{}
 $ctGameplayWriterProbeGroupsByKey = @{}
+$ctCodeEntryGaugeTransitionCandidateGroupsByKey = @{}
 $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey = @{}
 $ctGameplayWriterRecords = New-Object System.Collections.Generic.List[object]
 $ownerSetterCandidateRecords = New-Object System.Collections.Generic.List[object]
@@ -1281,6 +1365,8 @@ $summary = [ordered]@{
     ownerSetterCandidateNumericRelationGroups = @()
     ctGameplayWriterProbeEvents = 0
     ctGameplayWriterProbeGroups = @()
+    ctCodeEntryGaugeTransitionCandidateEvents = 0
+    ctCodeEntryGaugeTransitionCandidateGroups = @()
     ctGameplayWriterEvents = 0
     ctGameplayWriterGroups = @()
     ctGameplayWriterOwnerSetterCandidateCorrelationGroups = @()
@@ -1310,6 +1396,7 @@ $summary = [ordered]@{
     sonicHudAudioCallsiteStatus = "audio-callsite-pending"
     sonicHudOwnerSetterCandidateCorrelationStatus = "pending-runtime-setter-owner-candidate-correlation-evidence"
     sonicHudCtGameplayWriterStatus = "pending-ct-anchored-gameplay-writer-evidence"
+    sonicHudCtCodeEntryGaugeTransitionCandidateStatus = "pending-ct-code-entry-gauge-transition-candidate-evidence"
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
@@ -1398,6 +1485,10 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
         "sonic-hud-ct-gameplay-writer-probe" {
             $summary.ctGameplayWriterProbeEvents++
             Add-CtGameplayWriterProbeGroup $ctGameplayWriterProbeGroupsByKey $detail $eventObject
+        }
+        "sonic-hud-ct-code-entry-gauge-transition-candidate" {
+            $summary.ctCodeEntryGaugeTransitionCandidateEvents++
+            Add-CtCodeEntryGaugeTransitionCandidateGroup $ctCodeEntryGaugeTransitionCandidateGroupsByKey $detail $eventObject
         }
         "sonic-hud-audio-cue-callsite" {
             $summary.audioCallsiteEvents++
@@ -1679,6 +1770,33 @@ $summary.ctGameplayWriterProbeGroups = @(
                 callsite = $group.callsite
                 phase = $group.phase
                 probes = $group.probes
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
+$summary.ctCodeEntryGaugeTransitionCandidateGroups = @(
+    $ctCodeEntryGaugeTransitionCandidateGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { -1 * $ctCodeEntryGaugeTransitionCandidateGroupsByKey[$_].events } }, `
+            @{ Expression = { $ctCodeEntryGaugeTransitionCandidateGroupsByKey[$_].valueName } }, `
+            @{ Expression = { $ctCodeEntryGaugeTransitionCandidateGroupsByKey[$_].callsite } }, `
+            @{ Expression = { $ctCodeEntryGaugeTransitionCandidateGroupsByKey[$_].phase } } |
+        ForEach-Object {
+            $group = $ctCodeEntryGaugeTransitionCandidateGroupsByKey[$_]
+            [ordered]@{
+                valueName = $group.valueName
+                callsite = $group.callsite
+                phase = $group.phase
+                events = $group.events
+                ownerCount = $group.owners.Count
+                storageCount = $group.storageAddresses.Count
+                minRawValue = $group.minRawValue
+                maxRawValue = $group.maxRawValue
+                minFloatValue = $group.minFloatValue
+                maxFloatValue = $group.maxFloatValue
+                minInputFloatValue = $group.minInputFloatValue
+                maxInputFloatValue = $group.maxInputFloatValue
                 firstFrame = $group.firstFrame
                 lastFrame = $group.lastFrame
             }
@@ -1986,6 +2104,11 @@ if ($summary.ctGameplayWriterEvents -gt 0) {
         "ct-anchored-gameplay-writer-evidence-present-pending-final-hud-formula"
 }
 
+if ($summary.ctCodeEntryGaugeTransitionCandidateEvents -gt 0) {
+    $summary.sonicHudCtCodeEntryGaugeTransitionCandidateStatus =
+        "ct-code-entry-gauge-transition-candidate-present-pending-exact-value-identity"
+}
+
 if ($summary.audioCallsiteEvents -gt 0) {
     $summary.sonicHudAudioCallsiteStatus = "retail-runtime-audio-callsite-evidence-found"
 }
@@ -2048,6 +2171,7 @@ if (
     $summary.callsiteClassifications -gt 0 -or
     $summary.ownerSetterCandidateCorrelationEvents -gt 0 -or
     $summary.ctGameplayWriterProbeEvents -gt 0 -or
+    $summary.ctCodeEntryGaugeTransitionCandidateEvents -gt 0 -or
     $summary.ctGameplayWriterEvents -gt 0 -or
     $summary.audioCallsiteEvents -gt 0 -or
     $summary.semanticPathCandidateWrites -gt 0 -or
@@ -2130,6 +2254,26 @@ Write-Output (
                     $_.callsite,
                     $_.phase,
                     $_.probes,
+                    $_.firstFrame,
+                    $_.lastFrame
+            }
+    ) $CandidateValueLimit))
+Write-Output ("ct_code_entry_gauge_transition_candidate_events={0}" -f $summary.ctCodeEntryGaugeTransitionCandidateEvents)
+Write-Output (
+    "ct_code_entry_gauge_transition_candidate_groups={0}" -f
+    (Format-CandidateList (
+        $summary.ctCodeEntryGaugeTransitionCandidateGroups |
+            ForEach-Object {
+                "{0}:{1}:phase={2}:events={3}:owners={4}:storages={5}:raw={6}:float={7}:input={8}:frames={9}-{10}" -f
+                    $_.valueName,
+                    $_.callsite,
+                    $_.phase,
+                    $_.events,
+                    $_.ownerCount,
+                    $_.storageCount,
+                    (Format-RangeValue $_.minRawValue $_.maxRawValue),
+                    (Format-RangeValue $_.minFloatValue $_.maxFloatValue),
+                    (Format-RangeValue $_.minInputFloatValue $_.maxInputFloatValue),
                     $_.firstFrame,
                     $_.lastFrame
             }
@@ -2240,6 +2384,7 @@ Write-Output ("sonic_hud_runtime_proof_matrix_status={0}" -f $summary.sonicHudRu
 Write-Output ("sonic_hud_audio_callsite_status={0}" -f $summary.sonicHudAudioCallsiteStatus)
 Write-Output ("sonic_hud_owner_setter_candidate_correlation_status={0}" -f $summary.sonicHudOwnerSetterCandidateCorrelationStatus)
 Write-Output ("sonic_hud_ct_gameplay_writer_status={0}" -f $summary.sonicHudCtGameplayWriterStatus)
+Write-Output ("sonic_hud_ct_code_entry_gauge_transition_candidate_status={0}" -f $summary.sonicHudCtCodeEntryGaugeTransitionCandidateStatus)
 Write-Output (
     "owner_field_rolling_counter_groups={0}" -f
     (Format-CandidateList (

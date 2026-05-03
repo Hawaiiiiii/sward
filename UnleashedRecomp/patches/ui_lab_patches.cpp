@@ -1056,6 +1056,7 @@ namespace UiLab
     static std::unordered_set<std::string> g_loggedOwnerFieldGaugeSetterCandidateCorrelationKeys;
     static std::unordered_set<std::string> g_loggedCtGameplayWriterKeys;
     static std::unordered_set<std::string> g_loggedCtGameplayWriterProbeKeys;
+    static std::unordered_set<std::string> g_loggedCtCodeEntryGaugeTransitionCandidateKeys;
     // Phase 198: same-frame join window. Only emit when the cached snapshot
     // is at most kOwnerFieldGaugeScaleCorrelationFrameWindow frames old, so
     // SetScale calls long after the last sub_824D6C18 hit are not joined.
@@ -7517,6 +7518,7 @@ namespace UiLab
         g_loggedOwnerFieldGaugeSetterCandidateCorrelationKeys.clear();
         g_loggedCtGameplayWriterKeys.clear();
         g_loggedCtGameplayWriterProbeKeys.clear();
+        g_loggedCtCodeEntryGaugeTransitionCandidateKeys.clear();
         g_loggedTutorialHudOwnerPathReady = false;
         g_chudSonicStageOwnerFieldSampleCount = 0;
         g_lastSonicHudUpdateCallsiteSampleFrame = 0;
@@ -8913,6 +8915,68 @@ namespace UiLab
         if (shouldLog)
         {
             WriteEvidenceEvent("sonic-hud-ct-gameplay-writer-probe", detail.str());
+            WriteLiveStateSnapshot();
+        }
+    }
+
+    void OnSonicHudCtCodeEntryGaugeTransitionCandidate(
+        std::string_view valueName,
+        std::string_view callsite,
+        std::string_view phase,
+        uint32_t ownerAddress,
+        uint32_t storageAddress,
+        uint32_t previousRawValue,
+        uint32_t rawValue,
+        float previousFloatValue,
+        float floatValue,
+        float inputFloatValue,
+        bool inputFloatKnown,
+        std::string_view hookSource)
+    {
+        if (!g_isEnabled || valueName.empty() || callsite.empty() || phase.empty())
+            return;
+
+        const std::string valueNameText(valueName);
+        const std::string callsiteText(callsite);
+        const std::string phaseText(phase);
+        const std::string source = hookSource.empty()
+            ? std::string("ct-code-entry-gauge-transition-candidate")
+            : std::string(hookSource);
+
+        std::ostringstream detail;
+        detail
+            << "valueName=" << valueNameText
+            << " callsite=" << callsiteText
+            << " phase=" << phaseText
+            << " ownerAddress=" << HexU32(ownerAddress)
+            << " storageAddress=" << HexU32(storageAddress)
+            << " previousRawValue=" << previousRawValue
+            << " rawValue=" << rawValue
+            << " previousFloatValue=" << previousFloatValue
+            << " floatValue=" << floatValue;
+        if (inputFloatKnown)
+            detail << " inputFloatValue=" << inputFloatValue;
+        detail << " source=" << source;
+
+        const std::string stableSignature =
+            valueNameText + "|" +
+            callsiteText + "|" +
+            phaseText + "|" +
+            HexU32(ownerAddress) + "|" +
+            HexU32(storageAddress) + "|" +
+            std::to_string(previousRawValue) + "|" +
+            std::to_string(rawValue) + "|" +
+            std::to_string(static_cast<double>(inputFloatValue));
+
+        bool shouldLog = false;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            shouldLog = g_loggedCtCodeEntryGaugeTransitionCandidateKeys.insert(stableSignature).second;
+        }
+
+        if (shouldLog)
+        {
+            WriteEvidenceEvent("sonic-hud-ct-code-entry-gauge-transition-candidate", detail.str());
             WriteLiveStateSnapshot();
         }
     }

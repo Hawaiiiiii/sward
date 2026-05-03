@@ -119,8 +119,123 @@ static void RecordCtGameplayWriterProbe(
         hookSource);
 }
 
+static void RecordCtCodeEntryGaugeTransitionCandidate(
+    const char* valueName,
+    const char* callsite,
+    const char* phase,
+    uint32_t ownerAddress,
+    uint32_t storageAddress,
+    uint32_t previousRawValue,
+    uint32_t rawValue,
+    float inputFloatValue,
+    bool inputFloatKnown,
+    const char* hookSource)
+{
+    UiLab::OnSonicHudCtCodeEntryGaugeTransitionCandidate(
+        valueName,
+        callsite,
+        phase,
+        ownerAddress,
+        storageAddress,
+        previousRawValue,
+        rawValue,
+        FloatFromGuestU32(previousRawValue),
+        FloatFromGuestU32(rawValue),
+        inputFloatValue,
+        inputFloatKnown,
+        hookSource);
+}
+
 // Phase 211/217: CT-anchored gameplay writer seams. These are not UI nodes by
 // themselves; they anchor the gameplay values that the Sonic HUD later mirrors.
+// Phase 219 adds adjacent CT CodeEntry float-gauge candidates separately from
+// writer proof because the CodeEntry windows are more generic than AOB scripts.
+PPC_FUNC_IMPL(__imp__sub_8231C590);
+PPC_FUNC(sub_8231C590)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    const uint32_t storageAddress = IsPlausibleGuestAddress(ownerAddress)
+        ? ownerAddress + 1340
+        : 0;
+    const uint32_t previousRawValue = ReadGuestU32ForCtWriter(base, storageAddress);
+    const float inputFloatValue = static_cast<float>(ctx.f1.f64);
+
+    __imp__sub_8231C590(ctx, base);
+
+    if (!IsPlausibleGuestAddress(storageAddress))
+        return;
+
+    const uint32_t rawValue = ReadGuestU32ForCtWriter(base, storageAddress);
+    RecordCtCodeEntryGaugeTransitionCandidate(
+        "boostGaugeCandidate",
+        "sub_8231C590",
+        "add-clamp",
+        ownerAddress,
+        storageAddress,
+        previousRawValue,
+        rawValue,
+        inputFloatValue,
+        true,
+        "ct-code-entry-gauge-transition-candidate:day-boost-a74bd6");
+}
+
+PPC_FUNC_IMPL(__imp__sub_8231C5F0);
+PPC_FUNC(sub_8231C5F0)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    const uint32_t storageAddress = IsPlausibleGuestAddress(ownerAddress)
+        ? ownerAddress + 1340
+        : 0;
+    const uint32_t previousRawValue = ReadGuestU32ForCtWriter(base, storageAddress);
+
+    __imp__sub_8231C5F0(ctx, base);
+
+    if (!IsPlausibleGuestAddress(storageAddress))
+        return;
+
+    const uint32_t rawValue = ReadGuestU32ForCtWriter(base, storageAddress);
+    RecordCtCodeEntryGaugeTransitionCandidate(
+        "boostGaugeCandidate",
+        "sub_8231C5F0",
+        "ratio-read",
+        ownerAddress,
+        storageAddress,
+        previousRawValue,
+        rawValue,
+        static_cast<float>(ctx.f1.f64),
+        true,
+        "ct-code-entry-gauge-transition-candidate:day-boost-a74bd6");
+}
+
+PPC_FUNC_IMPL(__imp__sub_8231C628);
+PPC_FUNC(sub_8231C628)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    const uint32_t storageAddress = IsPlausibleGuestAddress(ownerAddress)
+        ? ownerAddress + 1340
+        : 0;
+    const uint32_t previousRawValue = ReadGuestU32ForCtWriter(base, storageAddress);
+    const float inputFloatValue = static_cast<float>(ctx.f1.f64);
+
+    __imp__sub_8231C628(ctx, base);
+
+    if (!IsPlausibleGuestAddress(storageAddress))
+        return;
+
+    const uint32_t rawValue = ReadGuestU32ForCtWriter(base, storageAddress);
+    RecordCtCodeEntryGaugeTransitionCandidate(
+        "boostGaugeCandidate",
+        "sub_8231C628",
+        "add-clamp",
+        ownerAddress,
+        storageAddress,
+        previousRawValue,
+        rawValue,
+        inputFloatValue,
+        true,
+        "ct-code-entry-gauge-transition-candidate:day-boost-a74bd6");
+}
+
 PPC_FUNC_IMPL(__imp__sub_82519FE8);
 PPC_FUNC(sub_82519FE8)
 {

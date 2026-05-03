@@ -3601,6 +3601,85 @@ mov r8d,(int)999999
         )
         self.assertNotIn("ct-gameplay-writer:present:1", completed.stdout)
 
+    def test_ui_lab_phase219_reports_ct_code_entry_gauge_candidates_without_writer_proof(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        hud_hook = self.read("UnleashedRecomp/patches/CHudSonicStage_patches.cpp")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "OnSonicHudCtCodeEntryGaugeTransitionCandidate",
+            "ct-code-entry-gauge-transition-candidate",
+            "sub_8231C590",
+            "sub_8231C5F0",
+            "sub_8231C628",
+        ]:
+            self.assertIn(token, hud_hook)
+
+        self.assertIn("OnSonicHudCtCodeEntryGaugeTransitionCandidate", header)
+        self.assertIn("sonic-hud-ct-code-entry-gauge-transition-candidate", ui_lab)
+
+        for token in [
+            "ctCodeEntryGaugeTransitionCandidateEvents",
+            "ct_code_entry_gauge_transition_candidate_events=",
+            "ct_code_entry_gauge_transition_candidate_groups=",
+            "sonic_hud_ct_code_entry_gauge_transition_candidate_status=",
+            "ct-code-entry-gauge-transition-candidate-present-pending-exact-value-identity",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 219",
+            "ct_code_entry_gauge_transition_candidate_events=",
+            "CodeEntry float-gauge candidates",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-ct-code-entry-gauge-transition-candidate","detail":"valueName=boostGaugeCandidate callsite=sub_8231C628 phase=add-clamp ownerAddress=0xAAAA storageAddress=0xAFE6 previousRawValue=1065353216 rawValue=1073741824 previousFloatValue=1 floatValue=2 inputFloatValue=1 source=ct-code-entry-gauge-transition-candidate:day-boost-a74bd6"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("ct_code_entry_gauge_transition_candidate_events=1", completed.stdout)
+        self.assertIn(
+            "ct_code_entry_gauge_transition_candidate_groups=boostGaugeCandidate:sub_8231C628:phase=add-clamp:events=1:owners=1:storages=1:raw=1073741824-1073741824:float=2-2:input=1-1:frames=100-100",
+            completed.stdout,
+        )
+        self.assertIn("ct_gameplay_writer_events=0", completed.stdout)
+        self.assertIn("ct-gameplay-writer:pending:0", completed.stdout)
+        self.assertIn(
+            "sonic_hud_ct_code_entry_gauge_transition_candidate_status=ct-code-entry-gauge-transition-candidate-present-pending-exact-value-identity",
+            completed.stdout,
+        )
+        self.assertNotIn("ct-gameplay-writer:present:1", completed.stdout)
+
     def test_ui_lab_phase212_summarizes_cheat_table_code_entries_as_host_sites(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_sonic_unleashed_cheat_table.ps1"
         script = script_path.read_text(encoding="utf-8")

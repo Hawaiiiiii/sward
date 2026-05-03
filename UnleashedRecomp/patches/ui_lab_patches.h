@@ -387,6 +387,20 @@ namespace UiLab
         uint32_t r9,
         uint32_t r10,
         std::string_view hookSource);
+
+    void OnSonicHudCtCodeEntryGaugeTransitionCandidate(
+        std::string_view valueName,
+        std::string_view callsite,
+        std::string_view phase,
+        uint32_t ownerAddress,
+        uint32_t storageAddress,
+        uint32_t previousRawValue,
+        uint32_t rawValue,
+        float previousFloatValue,
+        float floatValue,
+        float inputFloatValue,
+        bool inputFloatKnown,
+        std::string_view hookSource);
     void OnSonicHudGameplayValues(
         uint32_t ringCount,
         bool ringCountKnown,
