@@ -3909,6 +3909,75 @@ mov r8d,(int)999999
             completed.stdout,
         )
 
+    def test_ui_lab_phase223_correlates_native_ct_ghidra_targets_to_runtime_sources(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+
+        for token in [
+            "Get-StaticRuntimeSourceAlias",
+            "Get-StaticContextTargetCorrelationKeys",
+            "day-boost-a74bd6",
+            "0x140A74BD6",
+        ]:
+            self.assertIn(token, script)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            events = tmp_path / "ui_lab_events.jsonl"
+            events.write_text(
+                '{"time":1.0,"frame":100,"event":"sonic-hud-ct-code-entry-gauge-transition-candidate","detail":"valueName=boostGaugeCandidate callsite=sub_8231C5F0 phase=ratio-read ownerAddress=0xAAAA storageAddress=0x153C previousRawValue=0 rawValue=1120403456 previousFloatValue=0 floatValue=100 inputFloatValue=1 source=ct-code-entry-gauge-transition-candidate:day-boost-a74bd6"}\n',
+                encoding="utf-8",
+            )
+            static_context = tmp_path / "function_context.json"
+            static_context.write_text(
+                json.dumps(
+                    {
+                        "schema": "sward-ghidra-function-context-v1",
+                        "targets": [
+                            {
+                                "query": "0x140A74BD6",
+                                "name": "FUN_140a73d90",
+                                "entry": "0x140A73D90",
+                                "rva": "0xA73D90",
+                                "status": "resolved",
+                                "callers": [{"name": "FUN_1416c0450", "entry": "0x1416C0450"}],
+                                "callees": [{"name": "FUN_140a695c0", "entry": "0x140A695C0"}],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                    "-StaticContextPath",
+                    str(static_context),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("static_function_context_targets=1:resolved=1:unresolved=0", completed.stdout)
+        self.assertIn(
+            "static_runtime_correlation_groups=callsite=ct-source:day-boost-a74bd6:static=resolved:runtime=ct-code-entry-gauge-transition:callers=1:callees=1",
+            completed.stdout,
+        )
+        self.assertIn("target=0x140A74BD6:function=FUN_140a73d90", completed.stdout)
+        self.assertIn(
+            "sonic_hud_static_context_correlation_status=static-ghidra-context-correlated-with-runtime-hud-evidence",
+            completed.stdout,
+        )
+
     def test_ui_lab_phase212_summarizes_cheat_table_code_entries_as_host_sites(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_sonic_unleashed_cheat_table.ps1"
         script = script_path.read_text(encoding="utf-8")

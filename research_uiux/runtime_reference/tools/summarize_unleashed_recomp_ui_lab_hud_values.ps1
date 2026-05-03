@@ -151,6 +151,24 @@ function Get-CallsiteFromSource([string]$Source) {
     return ""
 }
 
+function Get-StaticRuntimeSourceAlias([string]$Source) {
+    if ([string]::IsNullOrWhiteSpace($Source)) {
+        return ""
+    }
+
+    $parts = $Source -split ":"
+    if ($parts.Count -lt 2) {
+        return ""
+    }
+
+    $alias = $parts[$parts.Count - 1]
+    if ($alias -notmatch "^[A-Za-z0-9_.-]+$") {
+        return ""
+    }
+
+    return "ct-source:{0}" -f $alias
+}
+
 function Add-StaticRuntimeCallsiteEvidence($RuntimeCallsitesByKey, [string]$Callsite, [string]$EvidenceKind) {
     if ([string]::IsNullOrWhiteSpace($Callsite) -or [string]::IsNullOrWhiteSpace($EvidenceKind)) {
         return
@@ -160,6 +178,11 @@ function Add-StaticRuntimeCallsiteEvidence($RuntimeCallsitesByKey, [string]$Call
         $RuntimeCallsitesByKey[$Callsite] = [System.Collections.Generic.SortedSet[string]]::new()
     }
     [void]$RuntimeCallsitesByKey[$Callsite].Add($EvidenceKind)
+}
+
+function Add-StaticRuntimeSourceAliasEvidence($RuntimeCallsitesByKey, [string]$Source, [string]$EvidenceKind) {
+    $alias = Get-StaticRuntimeSourceAlias $Source
+    Add-StaticRuntimeCallsiteEvidence $RuntimeCallsitesByKey $alias $EvidenceKind
 }
 
 function Get-StaticContextTargetProperty($Target, [string]$Name) {
@@ -182,6 +205,49 @@ function Get-StaticContextTargetCallsite($Target) {
         }
     }
     return ""
+}
+
+function Get-StaticContextTargetNativeQueryAlias($Target) {
+    $query = [string](Get-StaticContextTargetProperty $Target "query")
+    if ([string]::IsNullOrWhiteSpace($query)) {
+        return ""
+    }
+
+    $aliasByQuery = @{
+        "0x140A74BD6" = "ct-source:day-boost-a74bd6"
+        "0x140A74C79" = "ct-source:day-boost-a74bd6"
+        "0x140A74E4A" = "ct-source:day-boost-a74bd6"
+        "0x14051FE7A" = "ct-source:rings"
+        "0x140DEADEA" = "ct-source:lives"
+        "0x1405208CA" = "ct-source:xp"
+    }
+
+    foreach ($key in $aliasByQuery.Keys) {
+        if ($query.Trim().Equals($key, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $aliasByQuery[$key]
+        }
+    }
+
+    return ""
+}
+
+function Get-StaticContextTargetCorrelationKeys($Target) {
+    $keys = [System.Collections.Generic.SortedSet[string]]::new()
+
+    foreach ($propertyName in @("query", "name", "entry")) {
+        $value = [string](Get-StaticContextTargetProperty $Target $propertyName)
+        if ([string]::IsNullOrWhiteSpace($value)) {
+            continue
+        }
+
+        $match = [regex]::Match($value, "sub_[0-9A-Fa-f]+")
+        if ($match.Success) {
+            Add-UniqueSorted $keys $match.Value
+        }
+    }
+
+    Add-UniqueSorted $keys (Get-StaticContextTargetNativeQueryAlias $Target)
+    return @($keys)
 }
 
 function Get-StaticContextTargetArrayCount($Target, [string]$Name) {
@@ -218,18 +284,21 @@ function Add-StaticFunctionContextSummary($Summary, [string]$ContextPath, $Runti
             $Summary.staticFunctionContextUnresolvedTargets++
         }
 
-        $callsite = Get-StaticContextTargetCallsite $target
-        if ([string]::IsNullOrWhiteSpace($callsite) -or -not $RuntimeCallsitesByKey.ContainsKey($callsite)) {
-            continue
-        }
+        foreach ($callsite in (Get-StaticContextTargetCorrelationKeys $target)) {
+            if ([string]::IsNullOrWhiteSpace($callsite) -or -not $RuntimeCallsitesByKey.ContainsKey($callsite)) {
+                continue
+            }
 
-        [void]$groups.Add([pscustomobject]@{
-            callsite = $callsite
-            staticStatus = $status
-            runtimeEvidence = @($RuntimeCallsitesByKey[$callsite])
-            callerCount = Get-StaticContextTargetArrayCount $target "callers"
-            calleeCount = Get-StaticContextTargetArrayCount $target "callees"
-        })
+            [void]$groups.Add([pscustomobject]@{
+                callsite = $callsite
+                staticStatus = $status
+                runtimeEvidence = @($RuntimeCallsitesByKey[$callsite])
+                callerCount = Get-StaticContextTargetArrayCount $target "callers"
+                calleeCount = Get-StaticContextTargetArrayCount $target "callees"
+                target = [string](Get-StaticContextTargetProperty $target "query")
+                functionName = [string](Get-StaticContextTargetProperty $target "name")
+            })
+        }
     }
 
     $Summary.staticRuntimeCorrelationGroups = @(
@@ -1846,6 +1915,10 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
                 $staticRuntimeCallsitesByKey `
                 $writerRecord.callsite `
                 "ct-gameplay-writer"
+            Add-StaticRuntimeSourceAliasEvidence `
+                $staticRuntimeCallsitesByKey `
+                (Get-DetailToken $detail "source") `
+                "ct-gameplay-writer"
         }
         "sonic-hud-ct-gameplay-writer-probe" {
             $summary.ctGameplayWriterProbeEvents++
@@ -1853,6 +1926,10 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
             Add-StaticRuntimeCallsiteEvidence `
                 $staticRuntimeCallsitesByKey `
                 (Get-DetailToken $detail "callsite") `
+                "ct-gameplay-writer-probe"
+            Add-StaticRuntimeSourceAliasEvidence `
+                $staticRuntimeCallsitesByKey `
+                (Get-DetailToken $detail "source") `
                 "ct-gameplay-writer-probe"
         }
         "sonic-hud-ct-code-entry-gauge-transition-candidate" {
@@ -1863,6 +1940,10 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
             Add-StaticRuntimeCallsiteEvidence `
                 $staticRuntimeCallsitesByKey `
                 $ctCodeEntryRecord.callsite `
+                "ct-code-entry-gauge-transition"
+            Add-StaticRuntimeSourceAliasEvidence `
+                $staticRuntimeCallsitesByKey `
+                (Get-DetailToken $detail "source") `
                 "ct-code-entry-gauge-transition"
         }
         "sonic-hud-audio-cue-callsite" {
@@ -2751,12 +2832,14 @@ Write-Output (
     (Format-CandidateList (
         $summary.staticRuntimeCorrelationGroups |
             ForEach-Object {
-                "callsite={0}:static={1}:runtime={2}:callers={3}:callees={4}" -f
+                "callsite={0}:static={1}:runtime={2}:callers={3}:callees={4}:target={5}:function={6}" -f
                     $_.callsite,
                     $_.staticStatus,
                     (Format-CandidateList $_.runtimeEvidence $CandidateValueLimit),
                     $_.callerCount,
-                    $_.calleeCount
+                    $_.calleeCount,
+                    $_.target,
+                    $_.functionName
             }
     ) $CandidateValueLimit))
 Write-Output ("ct_gameplay_writer_events={0}" -f $summary.ctGameplayWriterEvents)
