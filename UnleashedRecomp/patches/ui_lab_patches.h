@@ -401,6 +401,22 @@ namespace UiLab
         float inputFloatValue,
         bool inputFloatKnown,
         std::string_view hookSource);
+    void OnSonicHudNativeCtDayBoostSite(
+        std::string_view valueName,
+        std::string_view nativeFunction,
+        std::string_view nativeTarget,
+        std::string_view nativeCaller,
+        std::string_view generatedCallsite,
+        std::string_view phase,
+        uint32_t ownerAddress,
+        uint32_t storageAddress,
+        uint32_t previousRawValue,
+        uint32_t rawValue,
+        float previousFloatValue,
+        float floatValue,
+        float inputFloatValue,
+        bool inputFloatKnown,
+        std::string_view hookSource);
     void OnSonicHudGameplayValues(
         uint32_t ringCount,
         bool ringCountKnown,

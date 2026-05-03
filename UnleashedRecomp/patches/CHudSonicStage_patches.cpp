@@ -40,6 +40,14 @@ static int32_t SaturatingSignedDelta(uint32_t previousValue, uint32_t value)
     return static_cast<int32_t>(delta);
 }
 
+static constexpr const char* kNativeDayBoostCtFunction = "FUN_140a73d90";
+static constexpr const char* kNativeDayBoostCtCaller = "FUN_1416c0450";
+static constexpr const char* kNativeDayBoostCtSiteRatioRead = "0x140A74BD6";
+static constexpr const char* kNativeDayBoostCtSiteTransitionWrite = "0x140A74C79";
+static constexpr const char* kNativeDayBoostCtSiteAobWrite = "0x140A74E4A";
+
+// Phase 224: bridge the generated-PPC boost candidates to native
+// sonic-hud-native-ct-day-boost-site evidence for FUN_140a73d90.
 static void RecordHudSonicStageInspector(
     uint32_t ownerAddress,
     const SWA::CHudSonicStage* pHudSonicStage,
@@ -146,6 +154,36 @@ static void RecordCtCodeEntryGaugeTransitionCandidate(
         hookSource);
 }
 
+static void RecordNativeCtDayBoostSite(
+    const char* valueName,
+    const char* nativeTarget,
+    const char* generatedCallsite,
+    const char* phase,
+    uint32_t ownerAddress,
+    uint32_t storageAddress,
+    uint32_t previousRawValue,
+    uint32_t rawValue,
+    float inputFloatValue,
+    bool inputFloatKnown)
+{
+    UiLab::OnSonicHudNativeCtDayBoostSite(
+        valueName,
+        kNativeDayBoostCtFunction,
+        nativeTarget,
+        kNativeDayBoostCtCaller,
+        generatedCallsite,
+        phase,
+        ownerAddress,
+        storageAddress,
+        previousRawValue,
+        rawValue,
+        FloatFromGuestU32(previousRawValue),
+        FloatFromGuestU32(rawValue),
+        inputFloatValue,
+        inputFloatKnown,
+        "native-ct-day-boost:day-boost-a74bd6");
+}
+
 // Phase 211/217: CT-anchored gameplay writer seams. These are not UI nodes by
 // themselves; they anchor the gameplay values that the Sonic HUD later mirrors.
 // Phase 219 adds adjacent CT CodeEntry float-gauge candidates separately from
@@ -177,6 +215,17 @@ PPC_FUNC(sub_8231C590)
         inputFloatValue,
         true,
         "ct-code-entry-gauge-transition-candidate:day-boost-a74bd6");
+    RecordNativeCtDayBoostSite(
+        "boostGaugeCandidate",
+        kNativeDayBoostCtSiteTransitionWrite,
+        "sub_8231C590",
+        "add-clamp",
+        ownerAddress,
+        storageAddress,
+        previousRawValue,
+        rawValue,
+        inputFloatValue,
+        true);
 }
 
 PPC_FUNC_IMPL(__imp__sub_8231C5F0);
@@ -205,6 +254,17 @@ PPC_FUNC(sub_8231C5F0)
         static_cast<float>(ctx.f1.f64),
         true,
         "ct-code-entry-gauge-transition-candidate:day-boost-a74bd6");
+    RecordNativeCtDayBoostSite(
+        "boostGaugeCandidate",
+        kNativeDayBoostCtSiteRatioRead,
+        "sub_8231C5F0",
+        "ratio-read",
+        ownerAddress,
+        storageAddress,
+        previousRawValue,
+        rawValue,
+        static_cast<float>(ctx.f1.f64),
+        true);
 }
 
 PPC_FUNC_IMPL(__imp__sub_8231C628);
@@ -234,6 +294,17 @@ PPC_FUNC(sub_8231C628)
         inputFloatValue,
         true,
         "ct-code-entry-gauge-transition-candidate:day-boost-a74bd6");
+    RecordNativeCtDayBoostSite(
+        "boostGaugeCandidate",
+        kNativeDayBoostCtSiteAobWrite,
+        "sub_8231C628",
+        "add-clamp",
+        ownerAddress,
+        storageAddress,
+        previousRawValue,
+        rawValue,
+        inputFloatValue,
+        true);
 }
 
 PPC_FUNC_IMPL(__imp__sub_82519FE8);

@@ -1014,6 +1014,128 @@ function New-CtCodeEntryGaugeTransitionCandidateRecord([string]$Detail, $EventOb
     }
 }
 
+function New-NativeCtDayBoostSiteGroup(
+    [string]$ValueName,
+    [string]$NativeFunction,
+    [string]$NativeTarget,
+    [string]$GeneratedCallsite,
+    [string]$Phase)
+{
+    return [ordered]@{
+        valueName = $ValueName
+        nativeFunction = $NativeFunction
+        nativeTarget = $NativeTarget
+        generatedCallsite = $GeneratedCallsite
+        phase = $Phase
+        events = 0
+        owners = [System.Collections.Generic.SortedSet[string]]::new()
+        storageAddresses = [System.Collections.Generic.SortedSet[string]]::new()
+        minRawValue = $null
+        maxRawValue = $null
+        minFloatValue = $null
+        maxFloatValue = $null
+        minInputFloatValue = $null
+        maxInputFloatValue = $null
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Add-NativeCtDayBoostSiteGroup($Groups, [string]$Detail, $EventObject) {
+    $valueName = Get-DetailToken $Detail "valueName"
+    $nativeFunction = Get-DetailToken $Detail "nativeFunction"
+    $nativeTarget = Get-DetailToken $Detail "nativeTarget"
+    $generatedCallsite = Get-DetailToken $Detail "generatedCallsite"
+    $phase = Get-DetailToken $Detail "phase"
+    if (
+        [string]::IsNullOrWhiteSpace($valueName) -or
+        [string]::IsNullOrWhiteSpace($nativeFunction) -or
+        [string]::IsNullOrWhiteSpace($nativeTarget) -or
+        [string]::IsNullOrWhiteSpace($generatedCallsite) -or
+        [string]::IsNullOrWhiteSpace($phase))
+    {
+        return
+    }
+
+    $key = "{0}:{1}:{2}:{3}:{4}" -f $valueName, $nativeFunction, $nativeTarget, $generatedCallsite, $phase
+    if (-not $Groups.ContainsKey($key)) {
+        $Groups[$key] = New-NativeCtDayBoostSiteGroup $valueName $nativeFunction $nativeTarget $generatedCallsite $phase
+    }
+
+    $group = $Groups[$key]
+    $group.events++
+    Add-UniqueSorted $group.owners (Get-DetailToken $Detail "ownerAddress")
+    Add-UniqueSorted $group.storageAddresses (Get-DetailToken $Detail "storageAddress")
+
+    $rawValue = 0L
+    if ([Int64]::TryParse((Get-DetailToken $Detail "rawValue"), [ref]$rawValue)) {
+        if ($null -eq $group.minRawValue -or $rawValue -lt $group.minRawValue) {
+            $group.minRawValue = $rawValue
+        }
+        if ($null -eq $group.maxRawValue -or $rawValue -gt $group.maxRawValue) {
+            $group.maxRawValue = $rawValue
+        }
+    }
+
+    $floatValue = 0.0
+    if ([double]::TryParse((Get-DetailToken $Detail "floatValue"), [ref]$floatValue)) {
+        if ($null -eq $group.minFloatValue -or $floatValue -lt $group.minFloatValue) {
+            $group.minFloatValue = $floatValue
+        }
+        if ($null -eq $group.maxFloatValue -or $floatValue -gt $group.maxFloatValue) {
+            $group.maxFloatValue = $floatValue
+        }
+    }
+
+    $inputFloatText = Get-DetailToken $Detail "inputFloatValue"
+    $inputFloatValue = 0.0
+    if (-not [string]::IsNullOrWhiteSpace($inputFloatText) -and [double]::TryParse($inputFloatText, [ref]$inputFloatValue)) {
+        if ($null -eq $group.minInputFloatValue -or $inputFloatValue -lt $group.minInputFloatValue) {
+            $group.minInputFloatValue = $inputFloatValue
+        }
+        if ($null -eq $group.maxInputFloatValue -or $inputFloatValue -gt $group.maxInputFloatValue) {
+            $group.maxInputFloatValue = $inputFloatValue
+        }
+    }
+
+    $frame = Get-EventFrame $EventObject
+    if ($null -ne $frame) {
+        if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+            $group.firstFrame = $frame
+        }
+        if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+            $group.lastFrame = $frame
+        }
+    }
+}
+
+function New-NativeCtDayBoostSiteRecord([string]$Detail, $EventObject) {
+    $floatValue = $null
+    $parsedFloatValue = 0.0
+    if ([double]::TryParse((Get-DetailToken $Detail "floatValue"), [ref]$parsedFloatValue)) {
+        $floatValue = $parsedFloatValue
+    }
+
+    $inputFloatValue = $null
+    $parsedInputFloatValue = 0.0
+    $inputFloatText = Get-DetailToken $Detail "inputFloatValue"
+    if (-not [string]::IsNullOrWhiteSpace($inputFloatText) -and [double]::TryParse($inputFloatText, [ref]$parsedInputFloatValue)) {
+        $inputFloatValue = $parsedInputFloatValue
+    }
+
+    return [ordered]@{
+        valueName = Get-DetailToken $Detail "valueName"
+        nativeFunction = Get-DetailToken $Detail "nativeFunction"
+        nativeTarget = Get-DetailToken $Detail "nativeTarget"
+        nativeCaller = Get-DetailToken $Detail "nativeCaller"
+        generatedCallsite = Get-DetailToken $Detail "generatedCallsite"
+        phase = Get-DetailToken $Detail "phase"
+        floatValue = $floatValue
+        inputFloatValue = $inputFloatValue
+        frame = Get-EventFrame $EventObject
+    }
+}
+
 function New-CtGameplayWriterOwnerSetterCandidateCorrelationGroup(
     [string]$ValueName,
     [string]$WriterCallsite,
@@ -1289,6 +1411,197 @@ function Add-CtCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups(
                     }
 
                     foreach ($frame in @($ct.frame, $setter.frame)) {
+                        if ($null -eq $frame) {
+                            continue
+                        }
+                        if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+                            $group.firstFrame = $frame
+                        }
+                        if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+                            $group.lastFrame = $frame
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+function New-NativeCtDayBoostHudChainGroup(
+    [string]$NativeFunction,
+    [string]$NativeTarget,
+    [string]$GeneratedCallsite,
+    [string]$Phase,
+    [string]$SetterValueName,
+    [string]$SetterNode,
+    [string]$SetterKind,
+    [string]$Path,
+    [int]$FieldOffset)
+{
+    return [ordered]@{
+        nativeFunction = $NativeFunction
+        nativeTarget = $NativeTarget
+        generatedCallsite = $GeneratedCallsite
+        phase = $Phase
+        setterValueName = $SetterValueName
+        setterNode = $SetterNode
+        setterKind = $SetterKind
+        path = $Path
+        fieldOffset = $FieldOffset
+        joins = 0
+        minFrameDelta = $null
+        maxFrameDelta = $null
+        minNativeFloatValue = $null
+        maxNativeFloatValue = $null
+        minInputFloatValue = $null
+        maxInputFloatValue = $null
+        minSetterValue = $null
+        maxSetterValue = $null
+        minOwnerFieldValue = $null
+        maxOwnerFieldValue = $null
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Add-NativeCtDayBoostHudChainGroups(
+    $Groups,
+    [object[]]$NativeEvents,
+    [object[]]$SetterCandidateEvents)
+{
+    $setterCandidatesByValueNameAndFrame = @{}
+    foreach ($setter in @($SetterCandidateEvents)) {
+        if (
+            [string]::IsNullOrWhiteSpace($setter.valueName) -or
+            [string]::IsNullOrWhiteSpace($setter.node) -or
+            [string]::IsNullOrWhiteSpace($setter.kind) -or
+            [string]::IsNullOrWhiteSpace($setter.path) -or
+            $null -eq $setter.frame)
+        {
+            continue
+        }
+
+        $ownerField480 = 0
+        if (-not [int]::TryParse($setter.ownerField480, [ref]$ownerField480)) {
+            continue
+        }
+
+        if (-not $setterCandidatesByValueNameAndFrame.ContainsKey($setter.valueName)) {
+            $setterCandidatesByValueNameAndFrame[$setter.valueName] = @{}
+        }
+
+        $setterFrame = [int]$setter.frame
+        if (-not $setterCandidatesByValueNameAndFrame[$setter.valueName].ContainsKey($setterFrame)) {
+            $setterCandidatesByValueNameAndFrame[$setter.valueName][$setterFrame] = New-Object System.Collections.Generic.List[object]
+        }
+        [void]$setterCandidatesByValueNameAndFrame[$setter.valueName][$setterFrame].Add($setter)
+    }
+
+    foreach ($native in @($NativeEvents)) {
+        if (
+            [string]::IsNullOrWhiteSpace($native.valueName) -or
+            [string]::IsNullOrWhiteSpace($native.nativeFunction) -or
+            [string]::IsNullOrWhiteSpace($native.nativeTarget) -or
+            [string]::IsNullOrWhiteSpace($native.generatedCallsite) -or
+            [string]::IsNullOrWhiteSpace($native.phase) -or
+            $null -eq $native.frame)
+        {
+            continue
+        }
+
+        foreach ($setterValueName in (Get-CtCodeEntryGaugeTransitionCandidateSetterValueNames $native.valueName)) {
+            if (-not $setterCandidatesByValueNameAndFrame.ContainsKey($setterValueName)) {
+                continue
+            }
+
+            $setterCandidatesByFrame = $setterCandidatesByValueNameAndFrame[$setterValueName]
+            $nativeFrame = [int]$native.frame
+            for ($candidateFrame = $nativeFrame - 60; $candidateFrame -le $nativeFrame + 60; $candidateFrame++) {
+                if (-not $setterCandidatesByFrame.ContainsKey($candidateFrame)) {
+                    continue
+                }
+
+                $candidateSetters = $setterCandidatesByFrame[$candidateFrame]
+                for ($setterIndex = 0; $setterIndex -lt $candidateSetters.Count; $setterIndex++) {
+                    $setter = $candidateSetters[$setterIndex]
+                    if (-not (Test-CtCodeEntryGaugeTransitionCandidateMatchesSetterValue $native.valueName $setter.valueName)) {
+                        continue
+                    }
+
+                    $ownerField480 = 0
+                    if (-not [int]::TryParse($setter.ownerField480, [ref]$ownerField480)) {
+                        continue
+                    }
+
+                    $frameDelta = [Math]::Abs([int]$setter.frame - [int]$native.frame)
+                    $key = "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}:480" -f `
+                        $native.nativeFunction,
+                        $native.nativeTarget,
+                        $native.generatedCallsite,
+                        $native.phase,
+                        $setter.valueName,
+                        $setter.node,
+                        $setter.kind,
+                        $setter.path
+
+                    if (-not $Groups.ContainsKey($key)) {
+                        $Groups[$key] = New-NativeCtDayBoostHudChainGroup `
+                            $native.nativeFunction `
+                            $native.nativeTarget `
+                            $native.generatedCallsite `
+                            $native.phase `
+                            $setter.valueName `
+                            $setter.node `
+                            $setter.kind `
+                            $setter.path `
+                            480
+                    }
+
+                    $group = $Groups[$key]
+                    $group.joins++
+                    if ($null -eq $group.minFrameDelta -or $frameDelta -lt $group.minFrameDelta) {
+                        $group.minFrameDelta = $frameDelta
+                    }
+                    if ($null -eq $group.maxFrameDelta -or $frameDelta -gt $group.maxFrameDelta) {
+                        $group.maxFrameDelta = $frameDelta
+                    }
+
+                    if ($null -ne $native.floatValue) {
+                        if ($null -eq $group.minNativeFloatValue -or $native.floatValue -lt $group.minNativeFloatValue) {
+                            $group.minNativeFloatValue = $native.floatValue
+                        }
+                        if ($null -eq $group.maxNativeFloatValue -or $native.floatValue -gt $group.maxNativeFloatValue) {
+                            $group.maxNativeFloatValue = $native.floatValue
+                        }
+                    }
+
+                    if ($null -ne $native.inputFloatValue) {
+                        if ($null -eq $group.minInputFloatValue -or $native.inputFloatValue -lt $group.minInputFloatValue) {
+                            $group.minInputFloatValue = $native.inputFloatValue
+                        }
+                        if ($null -eq $group.maxInputFloatValue -or $native.inputFloatValue -gt $group.maxInputFloatValue) {
+                            $group.maxInputFloatValue = $native.inputFloatValue
+                        }
+                    }
+
+                    $setterValue = 0
+                    if ([int]::TryParse($setter.setterValue, [ref]$setterValue)) {
+                        if ($null -eq $group.minSetterValue -or $setterValue -lt $group.minSetterValue) {
+                            $group.minSetterValue = $setterValue
+                        }
+                        if ($null -eq $group.maxSetterValue -or $setterValue -gt $group.maxSetterValue) {
+                            $group.maxSetterValue = $setterValue
+                        }
+                    }
+
+                    if ($null -eq $group.minOwnerFieldValue -or $ownerField480 -lt $group.minOwnerFieldValue) {
+                        $group.minOwnerFieldValue = $ownerField480
+                    }
+                    if ($null -eq $group.maxOwnerFieldValue -or $ownerField480 -gt $group.maxOwnerFieldValue) {
+                        $group.maxOwnerFieldValue = $ownerField480
+                    }
+
+                    foreach ($frame in @($native.frame, $setter.frame)) {
                         if ($null -eq $frame) {
                             continue
                         }
@@ -1742,10 +2055,13 @@ $ownerSetterCandidateNumericRelationGroupsByKey = @{}
 $ctGameplayWriterGroupsByKey = @{}
 $ctGameplayWriterProbeGroupsByKey = @{}
 $ctCodeEntryGaugeTransitionCandidateGroupsByKey = @{}
+$nativeCtDayBoostSiteGroupsByKey = @{}
 $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey = @{}
 $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey = @{}
+$nativeCtDayBoostHudChainGroupsByKey = @{}
 $ctGameplayWriterRecords = New-Object System.Collections.Generic.List[object]
 $ctCodeEntryGaugeTransitionCandidateRecords = New-Object System.Collections.Generic.List[object]
+$nativeCtDayBoostSiteRecords = New-Object System.Collections.Generic.List[object]
 $ownerSetterCandidateRecords = New-Object System.Collections.Generic.List[object]
 $staticRuntimeCallsitesByKey = @{}
 $ownerFieldOffsetClassificationsByKey = @{}
@@ -1784,6 +2100,9 @@ $summary = [ordered]@{
     ctCodeEntryGaugeTransitionCandidateEvents = 0
     ctCodeEntryGaugeTransitionCandidateGroups = @()
     ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups = @()
+    nativeCtDayBoostSiteEvents = 0
+    nativeCtDayBoostSiteGroups = @()
+    nativeCtDayBoostHudChainGroups = @()
     ctGameplayWriterEvents = 0
     ctGameplayWriterGroups = @()
     ctGameplayWriterOwnerSetterCandidateCorrelationGroups = @()
@@ -1815,6 +2134,7 @@ $summary = [ordered]@{
     sonicHudCtGameplayWriterStatus = "pending-ct-anchored-gameplay-writer-evidence"
     sonicHudCtCodeEntryGaugeTransitionCandidateStatus = "pending-ct-code-entry-gauge-transition-candidate-evidence"
     sonicHudCtCodeEntryGaugeTransitionCorrelationStatus = "pending-ct-code-entry-gauge-transition-owner-setter-candidate-correlation-evidence"
+    sonicHudNativeCtDayBoostChainStatus = "pending-native-ct-day-boost-site-evidence"
     sonicHudStaticContextCorrelationStatus = "pending-static-ghidra-context-correlation"
     staticContextPath = ""
     staticFunctionContextTargets = 0
@@ -1945,6 +2265,20 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
                 $staticRuntimeCallsitesByKey `
                 (Get-DetailToken $detail "source") `
                 "ct-code-entry-gauge-transition"
+        }
+        "sonic-hud-native-ct-day-boost-site" {
+            $summary.nativeCtDayBoostSiteEvents++
+            Add-NativeCtDayBoostSiteGroup $nativeCtDayBoostSiteGroupsByKey $detail $eventObject
+            $nativeCtDayBoostRecord = New-NativeCtDayBoostSiteRecord $detail $eventObject
+            [void]$nativeCtDayBoostSiteRecords.Add($nativeCtDayBoostRecord)
+            Add-StaticRuntimeCallsiteEvidence `
+                $staticRuntimeCallsitesByKey `
+                $nativeCtDayBoostRecord.generatedCallsite `
+                "native-ct-day-boost-site"
+            Add-StaticRuntimeSourceAliasEvidence `
+                $staticRuntimeCallsitesByKey `
+                (Get-DetailToken $detail "source") `
+                "native-ct-day-boost-site"
         }
         "sonic-hud-audio-cue-callsite" {
             $summary.audioCallsiteEvents++
@@ -2195,6 +2529,10 @@ Add-CtCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups `
     $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey `
     ([object[]]$ctCodeEntryGaugeTransitionCandidateRecords.ToArray()) `
     ([object[]]$ownerSetterCandidateRecords.ToArray())
+Add-NativeCtDayBoostHudChainGroups `
+    $nativeCtDayBoostHudChainGroupsByKey `
+    ([object[]]$nativeCtDayBoostSiteRecords.ToArray()) `
+    ([object[]]$ownerSetterCandidateRecords.ToArray())
 $summary.ctGameplayWriterGroups = @(
     $ctGameplayWriterGroupsByKey.Keys |
         Sort-Object `
@@ -2262,6 +2600,36 @@ $summary.ctCodeEntryGaugeTransitionCandidateGroups = @(
             }
         }
 )
+$summary.nativeCtDayBoostSiteGroups = @(
+    $nativeCtDayBoostSiteGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { -1 * $nativeCtDayBoostSiteGroupsByKey[$_].events } }, `
+            @{ Expression = { $nativeCtDayBoostSiteGroupsByKey[$_].nativeFunction } }, `
+            @{ Expression = { $nativeCtDayBoostSiteGroupsByKey[$_].nativeTarget } }, `
+            @{ Expression = { $nativeCtDayBoostSiteGroupsByKey[$_].generatedCallsite } }, `
+            @{ Expression = { $nativeCtDayBoostSiteGroupsByKey[$_].phase } } |
+        ForEach-Object {
+            $group = $nativeCtDayBoostSiteGroupsByKey[$_]
+            [ordered]@{
+                valueName = $group.valueName
+                nativeFunction = $group.nativeFunction
+                nativeTarget = $group.nativeTarget
+                generatedCallsite = $group.generatedCallsite
+                phase = $group.phase
+                events = $group.events
+                ownerCount = $group.owners.Count
+                storageCount = $group.storageAddresses.Count
+                minRawValue = $group.minRawValue
+                maxRawValue = $group.maxRawValue
+                minFloatValue = $group.minFloatValue
+                maxFloatValue = $group.maxFloatValue
+                minInputFloatValue = $group.minInputFloatValue
+                maxInputFloatValue = $group.maxInputFloatValue
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
 $summary.ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups = @(
     $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey.Keys |
         Sort-Object `
@@ -2302,6 +2670,50 @@ foreach ($group in $summary.ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrel
         $staticRuntimeCallsitesByKey `
         $group.ctCallsite `
         "ct-code-entry-owner-setter-correlation"
+}
+
+$summary.nativeCtDayBoostHudChainGroups = @(
+    $nativeCtDayBoostHudChainGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { -1 * $nativeCtDayBoostHudChainGroupsByKey[$_].joins } }, `
+            @{ Expression = { $nativeCtDayBoostHudChainGroupsByKey[$_].nativeFunction } }, `
+            @{ Expression = { $nativeCtDayBoostHudChainGroupsByKey[$_].nativeTarget } }, `
+            @{ Expression = { $nativeCtDayBoostHudChainGroupsByKey[$_].generatedCallsite } }, `
+            @{ Expression = { $nativeCtDayBoostHudChainGroupsByKey[$_].setterValueName } }, `
+            @{ Expression = { $nativeCtDayBoostHudChainGroupsByKey[$_].setterNode } } |
+        ForEach-Object {
+            $group = $nativeCtDayBoostHudChainGroupsByKey[$_]
+            [ordered]@{
+                nativeFunction = $group.nativeFunction
+                nativeTarget = $group.nativeTarget
+                generatedCallsite = $group.generatedCallsite
+                phase = $group.phase
+                setterValueName = $group.setterValueName
+                setterNode = $group.setterNode
+                setterKind = $group.setterKind
+                path = $group.path
+                fieldOffset = $group.fieldOffset
+                joins = $group.joins
+                minFrameDelta = $group.minFrameDelta
+                maxFrameDelta = $group.maxFrameDelta
+                minNativeFloatValue = $group.minNativeFloatValue
+                maxNativeFloatValue = $group.maxNativeFloatValue
+                minInputFloatValue = $group.minInputFloatValue
+                maxInputFloatValue = $group.maxInputFloatValue
+                minSetterValue = $group.minSetterValue
+                maxSetterValue = $group.maxSetterValue
+                minOwnerFieldValue = $group.minOwnerFieldValue
+                maxOwnerFieldValue = $group.maxOwnerFieldValue
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
+foreach ($group in $summary.nativeCtDayBoostHudChainGroups) {
+    Add-StaticRuntimeCallsiteEvidence `
+        $staticRuntimeCallsitesByKey `
+        $group.generatedCallsite `
+        "native-ct-day-boost-hud-chain"
 }
 
 $summary.ctGameplayWriterOwnerSetterCandidateCorrelationGroups = @(
@@ -2618,6 +3030,16 @@ if ($summary.ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups.Cou
         "ct-code-entry-gauge-transition-owner-setter-candidate-correlation-present-pending-formula-proof"
 }
 
+if ($summary.nativeCtDayBoostSiteEvents -gt 0) {
+    $summary.sonicHudNativeCtDayBoostChainStatus =
+        "native-ct-day-boost-site-present-pending-hud-chain"
+}
+
+if ($summary.nativeCtDayBoostHudChainGroups.Count -gt 0) {
+    $summary.sonicHudNativeCtDayBoostChainStatus =
+        "native-ct-day-boost-chain-present-pending-formula-proof"
+}
+
 if ($summary.staticRuntimeCorrelationGroups.Count -gt 0) {
     $summary.sonicHudStaticContextCorrelationStatus =
         "static-ghidra-context-correlated-with-runtime-hud-evidence"
@@ -2673,6 +3095,11 @@ $summary.sonicHudRuntimeProofMatrix = @(
         "CT-anchored rings/lives/Day boost gameplay writer hooks" `
         "waiting for CT-anchored gameplay writer evidence"
     New-SonicHudRuntimeProofLane `
+        "native-ct-day-boost-chain" `
+        $summary.nativeCtDayBoostHudChainGroups.Count `
+        "native FUN_140a73d90 CT-site rows joined to generated-PPC boost candidates and HUD SetText owner field +480" `
+        "waiting for native Day boost CT site to HUD SetText chain evidence"
+    New-SonicHudRuntimeProofLane `
         "audio-callsite" `
         $summary.audioCallsiteEvents `
         "retail Sonic HUD SFX/audio callsite hook" `
@@ -2690,6 +3117,7 @@ if (
     $summary.ownerSetterCandidateCorrelationEvents -gt 0 -or
     $summary.ctGameplayWriterProbeEvents -gt 0 -or
     $summary.ctCodeEntryGaugeTransitionCandidateEvents -gt 0 -or
+    $summary.nativeCtDayBoostSiteEvents -gt 0 -or
     $summary.ctGameplayWriterEvents -gt 0 -or
     $summary.audioCallsiteEvents -gt 0 -or
     $summary.semanticPathCandidateWrites -gt 0 -or
@@ -2796,6 +3224,27 @@ Write-Output (
                     $_.lastFrame
             }
     ) $CandidateValueLimit))
+Write-Output ("native_ct_day_boost_site_events={0}" -f $summary.nativeCtDayBoostSiteEvents)
+Write-Output (
+    "native_ct_day_boost_site_groups={0}" -f
+    (Format-CandidateList (
+        $summary.nativeCtDayBoostSiteGroups |
+            ForEach-Object {
+                "{0}:{1}:{2}:phase={3}:events={4}:owners={5}:storages={6}:raw={7}:float={8}:input={9}:frames={10}-{11}" -f
+                    $_.nativeFunction,
+                    $_.nativeTarget,
+                    $_.generatedCallsite,
+                    $_.phase,
+                    $_.events,
+                    $_.ownerCount,
+                    $_.storageCount,
+                    (Format-RangeValue $_.minRawValue $_.maxRawValue),
+                    (Format-RangeValue $_.minFloatValue $_.maxFloatValue),
+                    (Format-RangeValue $_.minInputFloatValue $_.maxInputFloatValue),
+                    $_.firstFrame,
+                    $_.lastFrame
+            }
+    ) $CandidateValueLimit))
 Write-Output (
     "ct_code_entry_gauge_transition_owner_setter_candidate_correlation_groups={0}" -f
     (Format-CandidateList (
@@ -2814,6 +3263,32 @@ Write-Output (
                     $_.minFrameDelta,
                     $_.maxFrameDelta,
                     (Format-RangeValue $_.minCtFloatValue $_.maxCtFloatValue),
+                    (Format-RangeValue $_.minInputFloatValue $_.maxInputFloatValue),
+                    (Format-RangeValue $_.minSetterValue $_.maxSetterValue),
+                    (Format-RangeValue $_.minOwnerFieldValue $_.maxOwnerFieldValue),
+                    $_.firstFrame,
+                    $_.lastFrame
+            }
+    ) $CandidateValueLimit))
+Write-Output (
+    "native_ct_day_boost_hud_chain_groups={0}" -f
+    (Format-CandidateList (
+        $summary.nativeCtDayBoostHudChainGroups |
+            ForEach-Object {
+                "native={0}:target={1}:generated={2}:phase={3}:setterValue={4}:setterNode={5}:setterKind={6}:path={7}:field+{8}:joins={9}:frame_delta={10}-{11}:native_float={12}:input={13}:setter={14}:owner_field={15}:frames={16}-{17}" -f
+                    $_.nativeFunction,
+                    $_.nativeTarget,
+                    $_.generatedCallsite,
+                    $_.phase,
+                    $_.setterValueName,
+                    $_.setterNode,
+                    $_.setterKind,
+                    $_.path,
+                    $_.fieldOffset,
+                    $_.joins,
+                    $_.minFrameDelta,
+                    $_.maxFrameDelta,
+                    (Format-RangeValue $_.minNativeFloatValue $_.maxNativeFloatValue),
                     (Format-RangeValue $_.minInputFloatValue $_.maxInputFloatValue),
                     (Format-RangeValue $_.minSetterValue $_.maxSetterValue),
                     (Format-RangeValue $_.minOwnerFieldValue $_.maxOwnerFieldValue),
@@ -2950,6 +3425,7 @@ Write-Output ("sonic_hud_owner_setter_candidate_correlation_status={0}" -f $summ
 Write-Output ("sonic_hud_ct_gameplay_writer_status={0}" -f $summary.sonicHudCtGameplayWriterStatus)
 Write-Output ("sonic_hud_ct_code_entry_gauge_transition_candidate_status={0}" -f $summary.sonicHudCtCodeEntryGaugeTransitionCandidateStatus)
 Write-Output ("sonic_hud_ct_code_entry_gauge_transition_correlation_status={0}" -f $summary.sonicHudCtCodeEntryGaugeTransitionCorrelationStatus)
+Write-Output ("sonic_hud_native_ct_day_boost_chain_status={0}" -f $summary.sonicHudNativeCtDayBoostChainStatus)
 Write-Output ("sonic_hud_static_context_correlation_status={0}" -f $summary.sonicHudStaticContextCorrelationStatus)
 Write-Output (
     "owner_field_rolling_counter_groups={0}" -f

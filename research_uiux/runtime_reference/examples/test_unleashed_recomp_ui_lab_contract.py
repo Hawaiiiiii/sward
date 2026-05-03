@@ -3978,6 +3978,134 @@ mov r8d,(int)999999
             completed.stdout,
         )
 
+    def test_ui_lab_phase224_correlates_native_day_boost_site_to_hud_settext_chain(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        hud_hook = self.read("UnleashedRecomp/patches/CHudSonicStage_patches.cpp")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "OnSonicHudNativeCtDayBoostSite",
+            "sonic-hud-native-ct-day-boost-site",
+            "FUN_140a73d90",
+            "0x140A74BD6",
+            "0x140A74C79",
+            "0x140A74E4A",
+            "sub_8231C590",
+            "sub_8231C5F0",
+            "sub_8231C628",
+            "native-ct-day-boost:day-boost-a74bd6",
+        ]:
+            self.assertIn(token, hud_hook)
+
+        self.assertIn("OnSonicHudNativeCtDayBoostSite", header)
+        self.assertIn("sonic-hud-native-ct-day-boost-site", ui_lab)
+
+        for token in [
+            "nativeCtDayBoostSiteEvents",
+            "native_ct_day_boost_site_events=",
+            "native_ct_day_boost_site_groups=",
+            "native_ct_day_boost_hud_chain_groups=",
+            "sonic_hud_native_ct_day_boost_chain_status=",
+            "native-ct-day-boost-chain-present-pending-formula-proof",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 224",
+            "native_ct_day_boost_site_events=",
+            "native_ct_day_boost_hud_chain_groups=",
+            "FUN_140a73d90",
+            "field +480",
+            "rolling-counter SetText",
+            "not final boost/ring-energy formula proof",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            events = tmp_path / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-native-ct-day-boost-site","detail":"valueName=boostGaugeCandidate nativeFunction=FUN_140a73d90 nativeTarget=0x140A74BD6 nativeCaller=FUN_1416c0450 generatedCallsite=sub_8231C5F0 phase=ratio-read ownerAddress=0xAAAA storageAddress=0x153C previousRawValue=0 rawValue=1120403456 previousFloatValue=0 floatValue=100 inputFloatValue=1 source=native-ct-day-boost:day-boost-a74bd6"}',
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-ct-code-entry-gauge-transition-candidate","detail":"valueName=boostGaugeCandidate callsite=sub_8231C5F0 phase=ratio-read ownerAddress=0xAAAA storageAddress=0x153C previousRawValue=0 rawValue=1120403456 previousFloatValue=0 floatValue=100 inputFloatValue=1 source=ct-code-entry-gauge-transition-candidate:day-boost-a74bd6"}',
+                        '{"time":1.1,"frame":101,"event":"sonic-hud-gauge-setter-owner-candidate-correlated","detail":"kind=text node=0xCCCC value=\\"573\\" semanticValueName=boostGauge semanticPathCandidate=ui_playscreen/so_speed_gauge ownerAddress=0x759FE30 ownerField460=0 ownerField464=7 ownerField468=3 ownerField472=5 ownerField480=573 frameDelta=0 callsiteSource=same-frame-hud-update-context:sub_824D6C18 source=runtime-csd-node-setter-owner-field-candidate-join:CSD::CNode::SetText/sub_830BF640 pathResolved=false"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            static_context = tmp_path / "function_context.json"
+            static_context.write_text(
+                json.dumps(
+                    {
+                        "schema": "sward-ghidra-function-context-v1",
+                        "targets": [
+                            {
+                                "query": "0x140A74BD6",
+                                "name": "FUN_140a73d90",
+                                "entry": "0x140A73D90",
+                                "rva": "0xA73D90",
+                                "status": "resolved",
+                                "callers": [{"name": "FUN_1416c0450", "entry": "0x1416C0450"}],
+                                "callees": [{"name": "FUN_140a695c0", "entry": "0x140A695C0"}],
+                            },
+                            {
+                                "query": "sub_8231C5F0",
+                                "name": "sub_8231C5F0",
+                                "entry": "0x8231C5F0",
+                                "status": "resolved",
+                                "callers": [{"name": "sub_8231C628", "entry": "0x8231C628"}],
+                                "callees": [{"name": "sub_830BF640", "entry": "0x830BF640"}],
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                    "-StaticContextPath",
+                    str(static_context),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("native_ct_day_boost_site_events=1", completed.stdout)
+        self.assertIn(
+            "native_ct_day_boost_site_groups=FUN_140a73d90:0x140A74BD6:sub_8231C5F0:phase=ratio-read:events=1:owners=1:storages=1:raw=1120403456-1120403456:float=100-100:input=1-1:frames=100-100",
+            completed.stdout,
+        )
+        self.assertIn(
+            "native_ct_day_boost_hud_chain_groups=native=FUN_140a73d90:target=0x140A74BD6:generated=sub_8231C5F0:phase=ratio-read:setterValue=boostGauge:setterNode=0xCCCC:setterKind=text:path=ui_playscreen/so_speed_gauge:field+480:joins=1:frame_delta=1-1:native_float=100-100:input=1-1:setter=573-573:owner_field=573-573:frames=100-101",
+            completed.stdout,
+        )
+        self.assertIn(
+            "callsite=ct-source:day-boost-a74bd6:static=resolved:runtime=ct-code-entry-gauge-transition,native-ct-day-boost-site:callers=1:callees=1:target=0x140A74BD6:function=FUN_140a73d90",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_hud_native_ct_day_boost_chain_status=native-ct-day-boost-chain-present-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertNotIn("final-formula", completed.stdout)
+
     def test_ui_lab_phase212_summarizes_cheat_table_code_entries_as_host_sites(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_sonic_unleashed_cheat_table.ps1"
         script = script_path.read_text(encoding="utf-8")
