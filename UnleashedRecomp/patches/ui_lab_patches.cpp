@@ -1687,13 +1687,17 @@ namespace UiLab
 
     static bool IsPassiveObservedCsdProject(std::string_view project)
     {
-        static constexpr std::array<std::string_view, 10> kPassiveProjects =
+        static constexpr std::array<std::string_view, 14> kPassiveProjects =
         {
             "ui_saveicon",
             "ui_general",
             "ui_gate",
             "ui_help",
             "ui_balloon",
+            "ui_itembox",
+            "ui_qte",
+            "ui_lcursor",
+            "ui_lcursor_enemy",
             "ui_shop",
             "ui_townscreen",
             "ui_missionscreen",
@@ -1707,6 +1711,11 @@ namespace UiLab
     static ObservedRuntimeScreen BuildObservedRuntimeScreen()
     {
         const auto& target = TargetFor(g_target);
+        const std::string_view project(g_lastCsdProjectName.data(), g_lastCsdProjectName.size());
+        const bool projectCanDeferToTarget =
+            project.empty() ||
+            IsPassiveObservedCsdProject(project) ||
+            project == target.primaryCsdScene;
 
         if (g_loadingDisplayWasActive)
         {
@@ -1731,7 +1740,9 @@ namespace UiLab
         }
 
         if (g_targetCsdObserved && (!target.requiresStageContext ||
-            (g_stageContextObserved && WasObservedFrameRecent(g_lastStageContextFrame))))
+            g_loggedStageTargetReady ||
+            (g_stageContextObserved && WasObservedFrameRecent(g_lastStageContextFrame))) &&
+            projectCanDeferToTarget)
         {
             return {
                 target.token,
@@ -1766,7 +1777,6 @@ namespace UiLab
             };
         }
 
-        const std::string_view project(g_lastCsdProjectName.data(), g_lastCsdProjectName.size());
         if (!project.empty() && !IsPassiveObservedCsdProject(project))
         {
             if (project == "ui_itemresult")

@@ -733,6 +733,20 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, ui_lab)
 
+        for passive_overlay in [
+            '"ui_itembox"',
+            '"ui_qte"',
+            '"ui_lcursor"',
+            '"ui_lcursor_enemy"',
+        ]:
+            self.assertIn(passive_overlay, ui_lab)
+
+        for stage_ready_guard in [
+            "g_loggedStageTargetReady",
+            "project == target.primaryCsdScene",
+        ]:
+            self.assertIn(stage_ready_guard, ui_lab)
+
         for mapping in [
             '{ "ui_title", "title-runtime"',
             '{ "ui_loading", "loading"',
