@@ -373,6 +373,20 @@ namespace UiLab
         float valueFloat,
         bool valueFloatKnown,
         std::string_view hookSource);
+    void OnSonicHudCtGameplayWriterProbe(
+        std::string_view valueName,
+        std::string_view callsite,
+        std::string_view phase,
+        uint32_t ownerAddress,
+        uint32_t r3,
+        uint32_t r4,
+        uint32_t r5,
+        uint32_t r6,
+        uint32_t r7,
+        uint32_t r8,
+        uint32_t r9,
+        uint32_t r10,
+        std::string_view hookSource);
     void OnSonicHudGameplayValues(
         uint32_t ringCount,
         bool ringCountKnown,

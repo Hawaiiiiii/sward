@@ -684,6 +684,48 @@ function Add-CtGameplayWriterGroup($Groups, [string]$Detail, $EventObject) {
     }
 }
 
+function New-CtGameplayWriterProbeGroup([string]$ValueName, [string]$Callsite, [string]$Phase) {
+    return [ordered]@{
+        valueName = $ValueName
+        callsite = $Callsite
+        phase = $Phase
+        probes = 0
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Add-CtGameplayWriterProbeGroup($Groups, [string]$Detail, $EventObject) {
+    $valueName = Get-DetailToken $Detail "valueName"
+    $callsite = Get-DetailToken $Detail "callsite"
+    $phase = Get-DetailToken $Detail "phase"
+    if (
+        [string]::IsNullOrWhiteSpace($valueName) -or
+        [string]::IsNullOrWhiteSpace($callsite) -or
+        [string]::IsNullOrWhiteSpace($phase))
+    {
+        return
+    }
+
+    $key = "{0}:{1}:{2}" -f $valueName, $callsite, $phase
+    if (-not $Groups.ContainsKey($key)) {
+        $Groups[$key] = New-CtGameplayWriterProbeGroup $valueName $callsite $phase
+    }
+
+    $group = $Groups[$key]
+    $group.probes++
+
+    $frame = Get-EventFrame $EventObject
+    if ($null -ne $frame) {
+        if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+            $group.firstFrame = $frame
+        }
+        if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+            $group.lastFrame = $frame
+        }
+    }
+}
+
 function New-CtGameplayWriterRecord([string]$Detail, $EventObject) {
     return [ordered]@{
         valueName = Get-DetailToken $Detail "valueName"
@@ -1202,6 +1244,7 @@ $ownerFieldGaugeScaleCorrelationGroupsByKey = @{}
 $ownerSetterCandidateCorrelationGroupsByKey = @{}
 $ownerSetterCandidateNumericRelationGroupsByKey = @{}
 $ctGameplayWriterGroupsByKey = @{}
+$ctGameplayWriterProbeGroupsByKey = @{}
 $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey = @{}
 $ctGameplayWriterRecords = New-Object System.Collections.Generic.List[object]
 $ownerSetterCandidateRecords = New-Object System.Collections.Generic.List[object]
@@ -1236,6 +1279,8 @@ $summary = [ordered]@{
     ownerSetterCandidateCorrelationEvents = 0
     ownerSetterCandidateCorrelationGroups = @()
     ownerSetterCandidateNumericRelationGroups = @()
+    ctGameplayWriterProbeEvents = 0
+    ctGameplayWriterProbeGroups = @()
     ctGameplayWriterEvents = 0
     ctGameplayWriterGroups = @()
     ctGameplayWriterOwnerSetterCandidateCorrelationGroups = @()
@@ -1349,6 +1394,10 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
             $summary.ctGameplayWriterEvents++
             Add-CtGameplayWriterGroup $ctGameplayWriterGroupsByKey $detail $eventObject
             [void]$ctGameplayWriterRecords.Add((New-CtGameplayWriterRecord $detail $eventObject))
+        }
+        "sonic-hud-ct-gameplay-writer-probe" {
+            $summary.ctGameplayWriterProbeEvents++
+            Add-CtGameplayWriterProbeGroup $ctGameplayWriterProbeGroupsByKey $detail $eventObject
         }
         "sonic-hud-audio-cue-callsite" {
             $summary.audioCallsiteEvents++
@@ -1612,6 +1661,24 @@ $summary.ctGameplayWriterGroups = @(
                 maxFloat = $group.maxFloat
                 minDelta = $group.minDelta
                 maxDelta = $group.maxDelta
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
+$summary.ctGameplayWriterProbeGroups = @(
+    $ctGameplayWriterProbeGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { $ctGameplayWriterProbeGroupsByKey[$_].valueName } }, `
+            @{ Expression = { $ctGameplayWriterProbeGroupsByKey[$_].callsite } }, `
+            @{ Expression = { $ctGameplayWriterProbeGroupsByKey[$_].phase } } |
+        ForEach-Object {
+            $group = $ctGameplayWriterProbeGroupsByKey[$_]
+            [ordered]@{
+                valueName = $group.valueName
+                callsite = $group.callsite
+                phase = $group.phase
+                probes = $group.probes
                 firstFrame = $group.firstFrame
                 lastFrame = $group.lastFrame
             }
@@ -1909,6 +1976,11 @@ if ($summary.ownerSetterCandidateCorrelationEvents -gt 0) {
         "retail-runtime-setter-owner-candidate-correlation-pending-exact-child-path"
 }
 
+if ($summary.ctGameplayWriterProbeEvents -gt 0) {
+    $summary.sonicHudCtGameplayWriterStatus =
+        "ct-anchored-gameplay-writer-probe-evidence-present-writer-mutation-pending"
+}
+
 if ($summary.ctGameplayWriterEvents -gt 0) {
     $summary.sonicHudCtGameplayWriterStatus =
         "ct-anchored-gameplay-writer-evidence-present-pending-final-hud-formula"
@@ -1975,6 +2047,7 @@ if (
     $summary.gameplayValueSnapshots -gt 0 -or
     $summary.callsiteClassifications -gt 0 -or
     $summary.ownerSetterCandidateCorrelationEvents -gt 0 -or
+    $summary.ctGameplayWriterProbeEvents -gt 0 -or
     $summary.ctGameplayWriterEvents -gt 0 -or
     $summary.audioCallsiteEvents -gt 0 -or
     $summary.semanticPathCandidateWrites -gt 0 -or
@@ -2042,6 +2115,21 @@ Write-Output (
                     $_.setterMax,
                     $_.ownerFieldMin,
                     $_.ownerFieldMax,
+                    $_.firstFrame,
+                    $_.lastFrame
+            }
+    ) $CandidateValueLimit))
+Write-Output ("ct_gameplay_writer_probe_events={0}" -f $summary.ctGameplayWriterProbeEvents)
+Write-Output (
+    "ct_gameplay_writer_probe_groups={0}" -f
+    (Format-CandidateList (
+        $summary.ctGameplayWriterProbeGroups |
+            ForEach-Object {
+                "{0}:{1}:phase={2}:probes={3}:frames={4}-{5}" -f
+                    $_.valueName,
+                    $_.callsite,
+                    $_.phase,
+                    $_.probes,
                     $_.firstFrame,
                     $_.lastFrame
             }

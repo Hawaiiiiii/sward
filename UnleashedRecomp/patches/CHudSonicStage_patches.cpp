@@ -95,12 +95,44 @@ static void RecordHudSonicStageCallsiteSample(
         ctx.r4.u32);
 }
 
-// Phase 211: CT-anchored gameplay writer seams. These are not UI nodes by
+static void RecordCtGameplayWriterProbe(
+    const char* valueName,
+    const char* callsite,
+    const char* phase,
+    uint32_t ownerAddress,
+    const PPCContext& ctx,
+    const char* hookSource)
+{
+    UiLab::OnSonicHudCtGameplayWriterProbe(
+        valueName,
+        callsite,
+        phase,
+        ownerAddress,
+        ctx.r3.u32,
+        ctx.r4.u32,
+        ctx.r5.u32,
+        ctx.r6.u32,
+        ctx.r7.u32,
+        ctx.r8.u32,
+        ctx.r9.u32,
+        ctx.r10.u32,
+        hookSource);
+}
+
+// Phase 211/217: CT-anchored gameplay writer seams. These are not UI nodes by
 // themselves; they anchor the gameplay values that the Sonic HUD later mirrors.
 PPC_FUNC_IMPL(__imp__sub_82519FE8);
 PPC_FUNC(sub_82519FE8)
 {
     const uint32_t ownerAddress = ctx.r3.u32;
+    RecordCtGameplayWriterProbe(
+        "ringCount",
+        "sub_82519FE8",
+        "entry",
+        ownerAddress,
+        ctx,
+        "ct-anchored-gameplay-writer-probe:rings");
+
     uint32_t storageAddress = 0;
     uint32_t previousValue = 0;
 
@@ -134,6 +166,14 @@ PPC_FUNC_IMPL(__imp__sub_82A50838);
 PPC_FUNC(sub_82A50838)
 {
     const uint32_t ownerAddress = ctx.r3.u32;
+    RecordCtGameplayWriterProbe(
+        "boostGauge",
+        "sub_82A50838",
+        "entry",
+        ownerAddress,
+        ctx,
+        "ct-anchored-gameplay-writer-probe:day-boost-code-entry");
+
     const uint32_t storageAddress = IsPlausibleGuestAddress(ownerAddress)
         ? ownerAddress + 104
         : 0;
@@ -158,10 +198,32 @@ PPC_FUNC(sub_82A50838)
         "ct-anchored-gameplay-writer:day-boost");
 }
 
+PPC_FUNC_IMPL(__imp__sub_82FE41C0);
+PPC_FUNC(sub_82FE41C0)
+{
+    const uint32_t ownerAddress = ctx.r3.u32;
+    RecordCtGameplayWriterProbe(
+        "boostGauge",
+        "sub_82FE41C0",
+        "entry",
+        ownerAddress,
+        ctx,
+        "ct-anchored-gameplay-writer-probe:day-boost-aob");
+    __imp__sub_82FE41C0(ctx, base);
+}
+
 PPC_FUNC_IMPL(__imp__sub_82BDBA20);
 PPC_FUNC(sub_82BDBA20)
 {
     const uint32_t ownerAddress = ctx.r3.u32;
+    RecordCtGameplayWriterProbe(
+        "lifeCount",
+        "sub_82BDBA20",
+        "entry",
+        ownerAddress,
+        ctx,
+        "ct-anchored-gameplay-writer-probe:lives-primary");
+
     const uint32_t storageAddress = IsPlausibleGuestAddress(ownerAddress)
         ? ownerAddress + 11868
         : 0;
@@ -190,6 +252,14 @@ PPC_FUNC_IMPL(__imp__sub_82BDBA60);
 PPC_FUNC(sub_82BDBA60)
 {
     const uint32_t ownerAddress = ctx.r3.u32;
+    RecordCtGameplayWriterProbe(
+        "lifeCount",
+        "sub_82BDBA60",
+        "entry",
+        ownerAddress,
+        ctx,
+        "ct-anchored-gameplay-writer-probe:lives-secondary");
+
     const uint32_t storageAddress = IsPlausibleGuestAddress(ownerAddress)
         ? ownerAddress + 11872
         : 0;
