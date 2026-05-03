@@ -3293,6 +3293,98 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         )
         self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
 
+    def test_ui_lab_phase210_summarizes_local_cheat_table_anchors_without_committing_ct(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_sonic_unleashed_cheat_table.ps1"
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+        self.assertTrue(script_path.is_file())
+
+        script = script_path.read_text(encoding="utf-8")
+        for token in [
+            "CheatTablePath",
+            "RuntimeExePath",
+            "CheatEngineTableVersion",
+            "aobscanmodule",
+            "runtime_hits=",
+            "ct_entry id=",
+            "local CT evidence lane",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 210",
+            "local CT evidence lane",
+            "summarize_sonic_unleashed_cheat_table.ps1",
+            "CT file stays local-only",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cheat_table = Path(tmp) / "local_test.ct"
+            runtime = Path(tmp) / "UnleashedRecomp.exe"
+            output = Path(tmp) / "ct_summary.json"
+
+            cheat_table.write_text(
+                """<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="42">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>337</ID>
+      <Description>&quot;Collect A Ring For Infinite Rings&quot;</Description>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>369</ID>
+          <Description>&quot;Infinite Boost&quot;</Description>
+          <AssemblerScript>[ENABLE]
+aobscanmodule(INJECT,UnleashedRecomp.exe,46 89 04 0A 44 8B 01)
+// UnleashedRecomp.exe+51FE7A
+mov r8d,(int)999999
+[DISABLE]
+</AssemblerScript>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+  </CheatEntries>
+</CheatTable>
+""",
+                encoding="utf-8",
+            )
+            runtime.write_bytes(bytes.fromhex("00 11 22 46 89 04 0A 44 8B 01 33 44"))
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-CheatTablePath",
+                    str(cheat_table),
+                    "-RuntimeExePath",
+                    str(runtime),
+                    "-OutputPath",
+                    str(output),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            summary = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertIn("cheat_table_version=42", completed.stdout)
+        self.assertIn("ct_entries_with_aob=1", completed.stdout)
+        self.assertIn("ct_entry id=369", completed.stdout)
+        self.assertIn("path=Collect A Ring For Infinite Rings/Infinite Boost", completed.stdout)
+        self.assertIn("runtime_hits=1", completed.stdout)
+        self.assertIn("file_offsets=0x3", completed.stdout)
+        self.assertIn("old_injection_points=UnleashedRecomp.exe+51FE7A", completed.stdout)
+        self.assertEqual(summary["entries"][0]["runtimeHits"][0]["fileOffset"], 3)
+        self.assertEqual(summary["entries"][0]["scriptConstants"], ["999999"])
+        self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
+
     def test_ui_lab_phase202_preview_build_inventory_reports_repo_safe_metadata(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/inventory_sonic_unleashed_preview_build.ps1"
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
