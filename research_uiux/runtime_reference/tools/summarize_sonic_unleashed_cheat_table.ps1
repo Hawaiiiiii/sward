@@ -121,6 +121,43 @@ function Get-AutoAssemblerConstants {
     return [string[]]$constants.ToArray()
 }
 
+function Get-CodeEntryByteValues {
+    param(
+        [Parameter(Mandatory = $true)]$Node,
+        [Parameter(Mandatory = $true)][string]$XPath
+    )
+
+    $bytes = New-Object System.Collections.Generic.List[int]
+    foreach ($byteNode in @($Node.SelectNodes($XPath))) {
+        if ($null -eq $byteNode -or $null -eq $byteNode.InnerText) {
+            continue
+        }
+
+        $text = $byteNode.InnerText.Trim()
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            continue
+        }
+
+        if ($text -notmatch '^[0-9A-Fa-f]{2}$') {
+            throw "Unsupported Cheat Engine CodeEntry byte '$text'"
+        }
+
+        $bytes.Add([Convert]::ToInt32($text, 16))
+    }
+
+    return [int[]]$bytes.ToArray()
+}
+
+function Get-ModuleNameFromAddressString {
+    param([string]$AddressString)
+
+    if ($AddressString -match '^(?<module>[^+]+)\+[0-9A-Fa-f]+$') {
+        return $Matches["module"].Trim()
+    }
+
+    return ""
+}
+
 function Add-CheatEntryAnchors {
     param(
         [Parameter(Mandatory = $true)]$Nodes,
@@ -165,6 +202,7 @@ function Add-CheatEntryAnchors {
                 $scriptConstants = [string[]]@(Get-AutoAssemblerConstants -ScriptText $scriptText)
 
                 $Anchors.Add([ordered]@{
+                    entryKind = "auto-assembler-aob"
                     id = $id
                     path = $path
                     description = $description
@@ -176,6 +214,7 @@ function Add-CheatEntryAnchors {
                     oldInjectionPoints = $oldInjectionPoints
                     referencedInjectionPoints = $referencedInjectionPoints
                     scriptConstants = $scriptConstants
+                    runtimeHitFileOffsetDelta = 0
                     runtimeHitCount = 0
                     runtimeHits = @()
                 }) | Out-Null
@@ -186,6 +225,57 @@ function Add-CheatEntryAnchors {
         if ($children.Count -gt 0) {
             Add-CheatEntryAnchors -Nodes $children -ParentPath $pathParts -Anchors $Anchors
         }
+    }
+}
+
+function Add-CodeEntryAnchors {
+    param(
+        [Parameter(Mandatory = $true)]$Nodes,
+        [Parameter(Mandatory = $true)]$Anchors
+    )
+
+    foreach ($node in @($Nodes)) {
+        if ($null -eq $node) {
+            continue
+        }
+
+        $description = Normalize-CheatDescription (Get-XmlChildText -Node $node -XPath "./Description")
+        $addressString = Get-XmlChildText -Node $node -XPath "./AddressString"
+        $beforeBytes = [int[]]@(Get-CodeEntryByteValues -Node $node -XPath "./Before/Byte")
+        $actualBytes = [int[]]@(Get-CodeEntryByteValues -Node $node -XPath "./Actual/Byte")
+        $afterBytes = [int[]]@(Get-CodeEntryByteValues -Node $node -XPath "./After/Byte")
+        if ($actualBytes.Count -eq 0) {
+            continue
+        }
+
+        $patternBytes = [int[]]@($beforeBytes + $actualBytes + $afterBytes)
+        $oldInjectionPointList = New-Object System.Collections.Generic.List[string]
+        if (![string]::IsNullOrWhiteSpace($addressString)) {
+            $oldInjectionPointList.Add($addressString) | Out-Null
+        }
+        $oldInjectionPoints = [string[]]$oldInjectionPointList.ToArray()
+
+        $Anchors.Add([ordered]@{
+            entryKind = "ce-code-entry"
+            id = ""
+            path = "CheatCodes/$description"
+            description = $description
+            aobLabel = ""
+            module = Get-ModuleNameFromAddressString -AddressString $addressString
+            aobPattern = Convert-AobBytesToText -PatternBytes $patternBytes
+            aobByteCount = $patternBytes.Count
+            aobPatternBytes = $patternBytes
+            codeEntryAddressString = $addressString
+            codeEntryBeforeByteCount = $beforeBytes.Count
+            codeEntryActualByteCount = $actualBytes.Count
+            codeEntryAfterByteCount = $afterBytes.Count
+            oldInjectionPoints = [string[]]$oldInjectionPoints
+            referencedInjectionPoints = [string[]]$oldInjectionPoints
+            scriptConstants = @()
+            runtimeHitFileOffsetDelta = $beforeBytes.Count
+            runtimeHitCount = 0
+            runtimeHits = @()
+        }) | Out-Null
     }
 }
 
@@ -438,6 +528,17 @@ if ([string]::IsNullOrWhiteSpace($cheatTableVersion)) {
 $anchors = New-Object System.Collections.Generic.List[object]
 $rootEntries = @($document.SelectNodes("/CheatTable/CheatEntries/CheatEntry"))
 Add-CheatEntryAnchors -Nodes $rootEntries -Anchors $anchors
+$codeEntryAnchors = New-Object System.Collections.Generic.List[object]
+$rootCodeEntries = @($document.SelectNodes("/CheatTable/CheatCodes/CodeEntry"))
+Add-CodeEntryAnchors -Nodes $rootCodeEntries -Anchors $codeEntryAnchors
+
+$scanEntries = New-Object System.Collections.Generic.List[object]
+foreach ($entry in @($anchors.ToArray())) {
+    $scanEntries.Add($entry) | Out-Null
+}
+foreach ($entry in @($codeEntryAnchors.ToArray())) {
+    $scanEntries.Add($entry) | Out-Null
+}
 
 $resolvedRuntimeExePath = ""
 $runtimeScanStatus = "not-requested"
@@ -457,15 +558,24 @@ if (![string]::IsNullOrWhiteSpace($RuntimeExePath)) {
     $peImageMap = Get-PeImageMap -Bytes $runtimeBytes
     Ensure-AobScannerType
 
-    foreach ($entry in [object[]]$anchors.ToArray()) {
+    foreach ($entry in [object[]]$scanEntries.ToArray()) {
         $patternBytes = [int[]]@($entry.aobPatternBytes | ForEach-Object { [int]$_ })
         $offsets = [Sward.UiLab.AobScanner]::Find($runtimeBytes, $patternBytes)
         $hits = New-Object System.Collections.Generic.List[object]
         foreach ($offset in @($offsets)) {
-            $address = Convert-FileOffsetToImageAddress -ImageMap $peImageMap -FileOffset ([int64]$offset)
+            $hitDelta = if ($null -ne $entry.runtimeHitFileOffsetDelta) {
+                [int64]$entry.runtimeHitFileOffsetDelta
+            } else {
+                [int64]0
+            }
+            $scanFileOffset = [int64]$offset
+            $actualFileOffset = $scanFileOffset + $hitDelta
+            $address = Convert-FileOffsetToImageAddress -ImageMap $peImageMap -FileOffset $actualFileOffset
             $hits.Add([ordered]@{
-                fileOffset = [int64]$offset
-                fileOffsetHex = Format-HexInt $offset
+                fileOffset = $actualFileOffset
+                fileOffsetHex = Format-HexInt $actualFileOffset
+                scanFileOffset = $scanFileOffset
+                scanFileOffsetHex = Format-HexInt $scanFileOffset
                 section = $address.section
                 rva = $address.rva
                 rvaHex = Format-HexInt $address.rva
@@ -490,22 +600,26 @@ if (![string]::IsNullOrWhiteSpace($RuntimeExePath)) {
     $symbolizerStatus = Resolve-HitSymbols `
         -ExecutablePath $resolvedRuntimeExePath `
         -ResolvedSymbolizerPath $SymbolizerPath `
-        -Entries ([object[]]$anchors.ToArray()) `
+        -Entries ([object[]]$scanEntries.ToArray()) `
         -Limit $MaxSymbolHits
     $runtimeScanStatus = "scanned;$($peImageMap.status);$symbolizerStatus"
 }
 
 $entries = @($anchors.ToArray())
+$codeEntries = @($codeEntryAnchors.ToArray())
 $summary = [ordered]@{
     evidenceLane = "local CT evidence lane"
     status = "ct-gameplay-value-anchors-not-ui-source-proof"
     cheatTablePath = $resolvedCheatTablePath
     cheatTableVersion = $cheatTableVersion
     entriesWithAob = $entries.Count
+    codeEntriesWithBytes = $codeEntries.Count
+    hostNativeSites = $entries.Count + $codeEntries.Count
     runtimeExePath = $resolvedRuntimeExePath
     runtimeScanStatus = $runtimeScanStatus
     peStatus = $peImageMap.status
     entries = $entries
+    codeEntries = $codeEntries
 }
 
 if (![string]::IsNullOrWhiteSpace($OutputPath)) {
@@ -529,6 +643,8 @@ $lines.Add("local_ct_evidence_lane=runtime-gameplay-value-anchors") | Out-Null
 $lines.Add("cheat_table_path=$resolvedCheatTablePath") | Out-Null
 $lines.Add("cheat_table_version=$cheatTableVersion") | Out-Null
 $lines.Add("ct_entries_with_aob=$($entries.Count)") | Out-Null
+$lines.Add("ct_code_entries=$($codeEntries.Count)") | Out-Null
+$lines.Add("ct_host_native_sites=$($entries.Count + $codeEntries.Count)") | Out-Null
 $lines.Add("runtime_exe_path=$resolvedRuntimeExePath") | Out-Null
 $lines.Add("runtime_scan_status=$runtimeScanStatus") | Out-Null
 $lines.Add("pe_status=$($peImageMap.status)") | Out-Null
@@ -578,6 +694,63 @@ foreach ($entry in $entries) {
         $entry.aobPattern,
         $oldInjectionPoints,
         $referencedPointCount,
+        $entry.runtimeHitCount,
+        $fileOffsets
+
+    if (![string]::IsNullOrWhiteSpace($rvas)) {
+        $line += " rvas=$rvas"
+    }
+    if (![string]::IsNullOrWhiteSpace($virtualAddresses)) {
+        $line += " vas=$virtualAddresses"
+    }
+    if (![string]::IsNullOrWhiteSpace($symbols)) {
+        $line += " symbols=$symbols"
+    }
+
+    $lines.Add($line) | Out-Null
+}
+
+foreach ($entry in $codeEntries) {
+    $fileOffsets = if ($entry.runtimeHits.Count -gt 0) {
+        (@($entry.runtimeHits) | ForEach-Object { $_.fileOffsetHex }) -join ","
+    } else {
+        "<none>"
+    }
+    $rvas = if ($entry.runtimeHits.Count -gt 0) {
+        (@($entry.runtimeHits) | Where-Object { -not [string]::IsNullOrWhiteSpace($_.rvaHex) } | ForEach-Object { $_.rvaHex }) -join ","
+    } else {
+        ""
+    }
+    $virtualAddresses = if ($entry.runtimeHits.Count -gt 0) {
+        (@($entry.runtimeHits) | Where-Object { -not [string]::IsNullOrWhiteSpace($_.virtualAddressHex) } | ForEach-Object { $_.virtualAddressHex }) -join ","
+    } else {
+        ""
+    }
+    $symbols = if ($entry.runtimeHits.Count -gt 0) {
+        (@($entry.runtimeHits) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_.symbol) } |
+            ForEach-Object {
+                if ([string]::IsNullOrWhiteSpace($_.source)) {
+                    $_.symbol
+                } else {
+                    "$($_.symbol)@$($_.source)"
+                }
+            }) -join ","
+    } else {
+        ""
+    }
+    $oldInjectionPoints = if ($entry.oldInjectionPoints.Count -gt 0) {
+        $entry.oldInjectionPoints -join ","
+    } else {
+        "<none>"
+    }
+
+    $line = "ct_code_entry description={0} address={1} module={2} bytes={3} old_injection_points={4} runtime_hits={5} file_offsets={6}" -f `
+        $entry.description,
+        $entry.codeEntryAddressString,
+        $entry.module,
+        $entry.aobPattern,
+        $oldInjectionPoints,
         $entry.runtimeHitCount,
         $fileOffsets
 

@@ -3475,6 +3475,115 @@ mov r8d,(int)999999
         )
         self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
 
+    def test_ui_lab_phase212_summarizes_cheat_table_code_entries_as_host_sites(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_sonic_unleashed_cheat_table.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "CheatCodes/CodeEntry",
+            "ce-code-entry",
+            "ct_code_entries=",
+            "ct_host_native_sites=",
+            "codeEntries",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 212",
+            "CheatCodes",
+            "CodeEntry",
+            "ct_host_native_sites",
+            "ce-code-entry",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cheat_table = Path(tmp) / "local_code_entries.ct"
+            runtime = Path(tmp) / "UnleashedRecomp.exe"
+            output = Path(tmp) / "ct_code_summary.json"
+
+            cheat_table.write_text(
+                """<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="42">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>369</ID>
+      <Description>&quot;Infinite Boost&quot;</Description>
+      <AssemblerScript>[ENABLE]
+aobscanmodule(INJECT,UnleashedRecomp.exe,89 04 1E 48 89 F9)
+// ORIGINAL CODE - INJECTION POINT: UnleashedRecomp.exe+A74E4A
+[DISABLE]
+</AssemblerScript>
+    </CheatEntry>
+  </CheatEntries>
+  <CheatCodes>
+    <CodeEntry>
+      <Description>Change of mov [rsi+rbx],eax</Description>
+      <AddressString>UnleashedRecomp.exe+A6974D</AddressString>
+      <Before>
+        <Byte>F9</Byte>
+        <Byte>7E</Byte>
+        <Byte>C0</Byte>
+        <Byte>0F</Byte>
+        <Byte>C8</Byte>
+      </Before>
+      <Actual>
+        <Byte>89</Byte>
+        <Byte>04</Byte>
+        <Byte>1E</Byte>
+      </Actual>
+      <After>
+        <Byte>48</Byte>
+        <Byte>8B</Byte>
+        <Byte>47</Byte>
+        <Byte>08</Byte>
+        <Byte>48</Byte>
+      </After>
+    </CodeEntry>
+  </CheatCodes>
+</CheatTable>
+""",
+                encoding="utf-8",
+            )
+            runtime.write_bytes(bytes.fromhex("AA F9 7E C0 0F C8 89 04 1E 48 8B 47 08 48 BB"))
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-CheatTablePath",
+                    str(cheat_table),
+                    "-RuntimeExePath",
+                    str(runtime),
+                    "-OutputPath",
+                    str(output),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            summary = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertIn("ct_code_entries=1", completed.stdout)
+        self.assertIn("ct_host_native_sites=2", completed.stdout)
+        self.assertIn("ct_code_entry description=Change of mov [rsi+rbx],eax", completed.stdout)
+        self.assertIn("old_injection_points=UnleashedRecomp.exe+A6974D", completed.stdout)
+        self.assertIn("runtime_hits=1", completed.stdout)
+        self.assertIn("file_offsets=0x6", completed.stdout)
+        self.assertEqual(summary["codeEntries"][0]["entryKind"], "ce-code-entry")
+        self.assertEqual(summary["codeEntries"][0]["runtimeHits"][0]["fileOffset"], 6)
+        self.assertEqual(summary["codeEntries"][0]["codeEntryBeforeByteCount"], 5)
+        self.assertEqual(summary["codeEntries"][0]["codeEntryActualByteCount"], 3)
+        self.assertEqual(summary["codeEntries"][0]["oldInjectionPoints"], ["UnleashedRecomp.exe+A6974D"])
+
     def test_ui_lab_phase202_preview_build_inventory_reports_repo_safe_metadata(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/inventory_sonic_unleashed_preview_build.ps1"
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
