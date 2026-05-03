@@ -818,11 +818,40 @@ function New-CtGameplayWriterRecord([string]$Detail, $EventObject) {
 }
 
 function New-OwnerSetterCandidateRecord([string]$Detail, $EventObject) {
+    $callsiteSource = Get-DetailToken $Detail "callsiteSource"
     return [ordered]@{
         valueName = Get-DetailToken $Detail "semanticValueName"
         node = Get-DetailToken $Detail "node"
         kind = Get-DetailToken $Detail "kind"
         path = Get-DetailToken $Detail "semanticPathCandidate"
+        ownerAddress = Get-DetailToken $Detail "ownerAddress"
+        setterValue = Get-DetailToken $Detail "value"
+        ownerField480 = Get-DetailToken $Detail "ownerField480"
+        callsite = Get-CallsiteFromSource $callsiteSource
+        frame = Get-EventFrame $EventObject
+    }
+}
+
+function New-CtCodeEntryGaugeTransitionCandidateRecord([string]$Detail, $EventObject) {
+    $floatValue = $null
+    $parsedFloatValue = 0.0
+    if ([double]::TryParse((Get-DetailToken $Detail "floatValue"), [ref]$parsedFloatValue)) {
+        $floatValue = $parsedFloatValue
+    }
+
+    $inputFloatValue = $null
+    $parsedInputFloatValue = 0.0
+    $inputFloatText = Get-DetailToken $Detail "inputFloatValue"
+    if (-not [string]::IsNullOrWhiteSpace($inputFloatText) -and [double]::TryParse($inputFloatText, [ref]$parsedInputFloatValue)) {
+        $inputFloatValue = $parsedInputFloatValue
+    }
+
+    return [ordered]@{
+        valueName = Get-DetailToken $Detail "valueName"
+        callsite = Get-DetailToken $Detail "callsite"
+        phase = Get-DetailToken $Detail "phase"
+        floatValue = $floatValue
+        inputFloatValue = $inputFloatValue
         frame = Get-EventFrame $EventObject
     }
 }
@@ -887,6 +916,232 @@ function Add-CtGameplayWriterOwnerSetterCandidateCorrelationGroups(
             }
             if ($null -eq $group.maxFrameDelta -or $frameDelta -gt $group.maxFrameDelta) {
                 $group.maxFrameDelta = $frameDelta
+            }
+        }
+    }
+}
+
+function Test-CtCodeEntryGaugeTransitionCandidateMatchesSetterValue([string]$CtValueName, [string]$SetterValueName) {
+    if ([string]::IsNullOrWhiteSpace($CtValueName) -or [string]::IsNullOrWhiteSpace($SetterValueName)) {
+        return $false
+    }
+
+    if ($CtValueName -eq $SetterValueName -or $CtValueName -eq ("{0}Candidate" -f $SetterValueName)) {
+        return $true
+    }
+
+    if ($CtValueName -eq "boostGaugeCandidate" -and ($SetterValueName -eq "boostGauge" -or $SetterValueName -eq "ringEnergyGauge")) {
+        return $true
+    }
+
+    return $false
+}
+
+function Get-CtCodeEntryGaugeTransitionCandidateSetterValueNames([string]$CtValueName) {
+    $matches = New-Object System.Collections.Generic.List[string]
+    if ([string]::IsNullOrWhiteSpace($CtValueName)) {
+        return @()
+    }
+
+    if ($CtValueName.EndsWith("Candidate")) {
+        $baseName = $CtValueName.Substring(0, $CtValueName.Length - "Candidate".Length)
+        if (-not [string]::IsNullOrWhiteSpace($baseName)) {
+            [void]$matches.Add($baseName)
+        }
+    }
+    else {
+        [void]$matches.Add($CtValueName)
+    }
+
+    if ($CtValueName -eq "boostGaugeCandidate") {
+        [void]$matches.Add("boostGauge")
+        [void]$matches.Add("ringEnergyGauge")
+    }
+
+    return @($matches | Sort-Object -Unique)
+}
+
+function New-CtCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroup(
+    [string]$CtValueName,
+    [string]$CtCallsite,
+    [string]$CtPhase,
+    [string]$SetterValueName,
+    [string]$SetterNode,
+    [string]$SetterKind,
+    [string]$Path,
+    [int]$FieldOffset)
+{
+    return [ordered]@{
+        ctValueName = $CtValueName
+        ctCallsite = $CtCallsite
+        ctPhase = $CtPhase
+        setterValueName = $SetterValueName
+        setterNode = $SetterNode
+        setterKind = $SetterKind
+        path = $Path
+        fieldOffset = $FieldOffset
+        joins = 0
+        minFrameDelta = $null
+        maxFrameDelta = $null
+        minCtFloatValue = $null
+        maxCtFloatValue = $null
+        minInputFloatValue = $null
+        maxInputFloatValue = $null
+        minSetterValue = $null
+        maxSetterValue = $null
+        minOwnerFieldValue = $null
+        maxOwnerFieldValue = $null
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Add-CtCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups(
+    $Groups,
+    [object[]]$CtEvents,
+    [object[]]$SetterCandidateEvents)
+{
+    $setterCandidatesByValueNameAndFrame = @{}
+    foreach ($setter in @($SetterCandidateEvents)) {
+        if (
+            [string]::IsNullOrWhiteSpace($setter.valueName) -or
+            [string]::IsNullOrWhiteSpace($setter.node) -or
+            [string]::IsNullOrWhiteSpace($setter.kind) -or
+            [string]::IsNullOrWhiteSpace($setter.path) -or
+            $null -eq $setter.frame)
+        {
+            continue
+        }
+
+        $ownerField480 = 0
+        if (-not [int]::TryParse($setter.ownerField480, [ref]$ownerField480)) {
+            continue
+        }
+
+        if (-not $setterCandidatesByValueNameAndFrame.ContainsKey($setter.valueName)) {
+            $setterCandidatesByValueNameAndFrame[$setter.valueName] = @{}
+        }
+
+        $setterFrame = [int]$setter.frame
+        if (-not $setterCandidatesByValueNameAndFrame[$setter.valueName].ContainsKey($setterFrame)) {
+            $setterCandidatesByValueNameAndFrame[$setter.valueName][$setterFrame] = New-Object System.Collections.Generic.List[object]
+        }
+        [void]$setterCandidatesByValueNameAndFrame[$setter.valueName][$setterFrame].Add($setter)
+    }
+
+    foreach ($ct in @($CtEvents)) {
+        if (
+            [string]::IsNullOrWhiteSpace($ct.valueName) -or
+            [string]::IsNullOrWhiteSpace($ct.callsite) -or
+            [string]::IsNullOrWhiteSpace($ct.phase) -or
+            $null -eq $ct.frame)
+        {
+            continue
+        }
+
+        foreach ($setterValueName in (Get-CtCodeEntryGaugeTransitionCandidateSetterValueNames $ct.valueName)) {
+            if (-not $setterCandidatesByValueNameAndFrame.ContainsKey($setterValueName)) {
+                continue
+            }
+
+            $setterCandidatesByFrame = $setterCandidatesByValueNameAndFrame[$setterValueName]
+            $ctFrame = [int]$ct.frame
+            for ($candidateFrame = $ctFrame - 60; $candidateFrame -le $ctFrame + 60; $candidateFrame++) {
+                if (-not $setterCandidatesByFrame.ContainsKey($candidateFrame)) {
+                    continue
+                }
+
+                $candidateSetters = $setterCandidatesByFrame[$candidateFrame]
+                for ($setterIndex = 0; $setterIndex -lt $candidateSetters.Count; $setterIndex++) {
+                    $setter = $candidateSetters[$setterIndex]
+                    if (-not (Test-CtCodeEntryGaugeTransitionCandidateMatchesSetterValue $ct.valueName $setter.valueName)) {
+                        continue
+                    }
+
+                    $ownerField480 = 0
+                    if (-not [int]::TryParse($setter.ownerField480, [ref]$ownerField480)) {
+                        continue
+                    }
+
+                    $frameDelta = [Math]::Abs([int]$setter.frame - [int]$ct.frame)
+
+                    $key = "{0}:{1}:{2}:{3}:{4}:{5}:{6}:480" -f `
+                        $ct.valueName,
+                        $ct.callsite,
+                        $ct.phase,
+                        $setter.valueName,
+                        $setter.node,
+                        $setter.kind,
+                        $setter.path
+
+                    if (-not $Groups.ContainsKey($key)) {
+                        $Groups[$key] = New-CtCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroup `
+                            $ct.valueName `
+                            $ct.callsite `
+                            $ct.phase `
+                            $setter.valueName `
+                            $setter.node `
+                            $setter.kind `
+                            $setter.path `
+                            480
+                    }
+
+                    $group = $Groups[$key]
+                    $group.joins++
+                    if ($null -eq $group.minFrameDelta -or $frameDelta -lt $group.minFrameDelta) {
+                        $group.minFrameDelta = $frameDelta
+                    }
+                    if ($null -eq $group.maxFrameDelta -or $frameDelta -gt $group.maxFrameDelta) {
+                        $group.maxFrameDelta = $frameDelta
+                    }
+
+                    if ($null -ne $ct.floatValue) {
+                        if ($null -eq $group.minCtFloatValue -or $ct.floatValue -lt $group.minCtFloatValue) {
+                            $group.minCtFloatValue = $ct.floatValue
+                        }
+                        if ($null -eq $group.maxCtFloatValue -or $ct.floatValue -gt $group.maxCtFloatValue) {
+                            $group.maxCtFloatValue = $ct.floatValue
+                        }
+                    }
+
+                    if ($null -ne $ct.inputFloatValue) {
+                        if ($null -eq $group.minInputFloatValue -or $ct.inputFloatValue -lt $group.minInputFloatValue) {
+                            $group.minInputFloatValue = $ct.inputFloatValue
+                        }
+                        if ($null -eq $group.maxInputFloatValue -or $ct.inputFloatValue -gt $group.maxInputFloatValue) {
+                            $group.maxInputFloatValue = $ct.inputFloatValue
+                        }
+                    }
+
+                    $setterValue = 0
+                    if ([int]::TryParse($setter.setterValue, [ref]$setterValue)) {
+                        if ($null -eq $group.minSetterValue -or $setterValue -lt $group.minSetterValue) {
+                            $group.minSetterValue = $setterValue
+                        }
+                        if ($null -eq $group.maxSetterValue -or $setterValue -gt $group.maxSetterValue) {
+                            $group.maxSetterValue = $setterValue
+                        }
+                    }
+
+                    if ($null -eq $group.minOwnerFieldValue -or $ownerField480 -lt $group.minOwnerFieldValue) {
+                        $group.minOwnerFieldValue = $ownerField480
+                    }
+                    if ($null -eq $group.maxOwnerFieldValue -or $ownerField480 -gt $group.maxOwnerFieldValue) {
+                        $group.maxOwnerFieldValue = $ownerField480
+                    }
+
+                    foreach ($frame in @($ct.frame, $setter.frame)) {
+                        if ($null -eq $frame) {
+                            continue
+                        }
+                        if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+                            $group.firstFrame = $frame
+                        }
+                        if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+                            $group.lastFrame = $frame
+                        }
+                    }
+                }
             }
         }
     }
@@ -1330,7 +1585,9 @@ $ctGameplayWriterGroupsByKey = @{}
 $ctGameplayWriterProbeGroupsByKey = @{}
 $ctCodeEntryGaugeTransitionCandidateGroupsByKey = @{}
 $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey = @{}
+$ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey = @{}
 $ctGameplayWriterRecords = New-Object System.Collections.Generic.List[object]
+$ctCodeEntryGaugeTransitionCandidateRecords = New-Object System.Collections.Generic.List[object]
 $ownerSetterCandidateRecords = New-Object System.Collections.Generic.List[object]
 $ownerFieldOffsetClassificationsByKey = @{}
 $ownerFieldOffsetTransitionTracksByKey = @{}
@@ -1367,6 +1624,7 @@ $summary = [ordered]@{
     ctGameplayWriterProbeGroups = @()
     ctCodeEntryGaugeTransitionCandidateEvents = 0
     ctCodeEntryGaugeTransitionCandidateGroups = @()
+    ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups = @()
     ctGameplayWriterEvents = 0
     ctGameplayWriterGroups = @()
     ctGameplayWriterOwnerSetterCandidateCorrelationGroups = @()
@@ -1397,6 +1655,7 @@ $summary = [ordered]@{
     sonicHudOwnerSetterCandidateCorrelationStatus = "pending-runtime-setter-owner-candidate-correlation-evidence"
     sonicHudCtGameplayWriterStatus = "pending-ct-anchored-gameplay-writer-evidence"
     sonicHudCtCodeEntryGaugeTransitionCandidateStatus = "pending-ct-code-entry-gauge-transition-candidate-evidence"
+    sonicHudCtCodeEntryGaugeTransitionCorrelationStatus = "pending-ct-code-entry-gauge-transition-owner-setter-candidate-correlation-evidence"
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
@@ -1489,6 +1748,7 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
         "sonic-hud-ct-code-entry-gauge-transition-candidate" {
             $summary.ctCodeEntryGaugeTransitionCandidateEvents++
             Add-CtCodeEntryGaugeTransitionCandidateGroup $ctCodeEntryGaugeTransitionCandidateGroupsByKey $detail $eventObject
+            [void]$ctCodeEntryGaugeTransitionCandidateRecords.Add((New-CtCodeEntryGaugeTransitionCandidateRecord $detail $eventObject))
         }
         "sonic-hud-audio-cue-callsite" {
             $summary.audioCallsiteEvents++
@@ -1735,6 +1995,10 @@ Add-CtGameplayWriterOwnerSetterCandidateCorrelationGroups `
     $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey `
     ([object[]]$ctGameplayWriterRecords.ToArray()) `
     ([object[]]$ownerSetterCandidateRecords.ToArray())
+Add-CtCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups `
+    $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey `
+    ([object[]]$ctCodeEntryGaugeTransitionCandidateRecords.ToArray()) `
+    ([object[]]$ownerSetterCandidateRecords.ToArray())
 $summary.ctGameplayWriterGroups = @(
     $ctGameplayWriterGroupsByKey.Keys |
         Sort-Object `
@@ -1797,6 +2061,41 @@ $summary.ctCodeEntryGaugeTransitionCandidateGroups = @(
                 maxFloatValue = $group.maxFloatValue
                 minInputFloatValue = $group.minInputFloatValue
                 maxInputFloatValue = $group.maxInputFloatValue
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
+$summary.ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups = @(
+    $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { -1 * $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey[$_].joins } }, `
+            @{ Expression = { $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey[$_].ctValueName } }, `
+            @{ Expression = { $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey[$_].ctCallsite } }, `
+            @{ Expression = { $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey[$_].setterValueName } }, `
+            @{ Expression = { $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey[$_].setterNode } } |
+        ForEach-Object {
+            $group = $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey[$_]
+            [ordered]@{
+                ctValueName = $group.ctValueName
+                ctCallsite = $group.ctCallsite
+                ctPhase = $group.ctPhase
+                setterValueName = $group.setterValueName
+                setterNode = $group.setterNode
+                setterKind = $group.setterKind
+                path = $group.path
+                fieldOffset = $group.fieldOffset
+                joins = $group.joins
+                minFrameDelta = $group.minFrameDelta
+                maxFrameDelta = $group.maxFrameDelta
+                minCtFloatValue = $group.minCtFloatValue
+                maxCtFloatValue = $group.maxCtFloatValue
+                minInputFloatValue = $group.minInputFloatValue
+                maxInputFloatValue = $group.maxInputFloatValue
+                minSetterValue = $group.minSetterValue
+                maxSetterValue = $group.maxSetterValue
+                minOwnerFieldValue = $group.minOwnerFieldValue
+                maxOwnerFieldValue = $group.maxOwnerFieldValue
                 firstFrame = $group.firstFrame
                 lastFrame = $group.lastFrame
             }
@@ -2109,6 +2408,11 @@ if ($summary.ctCodeEntryGaugeTransitionCandidateEvents -gt 0) {
         "ct-code-entry-gauge-transition-candidate-present-pending-exact-value-identity"
 }
 
+if ($summary.ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups.Count -gt 0) {
+    $summary.sonicHudCtCodeEntryGaugeTransitionCorrelationStatus =
+        "ct-code-entry-gauge-transition-owner-setter-candidate-correlation-present-pending-formula-proof"
+}
+
 if ($summary.audioCallsiteEvents -gt 0) {
     $summary.sonicHudAudioCallsiteStatus = "retail-runtime-audio-callsite-evidence-found"
 }
@@ -2278,6 +2582,31 @@ Write-Output (
                     $_.lastFrame
             }
     ) $CandidateValueLimit))
+Write-Output (
+    "ct_code_entry_gauge_transition_owner_setter_candidate_correlation_groups={0}" -f
+    (Format-CandidateList (
+        $summary.ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups |
+            ForEach-Object {
+                "ctValue={0}:ctCallsite={1}:ctPhase={2}:setterValue={3}:setterNode={4}:setterKind={5}:path={6}:field+{7}:joins={8}:frame_delta={9}-{10}:ct_float={11}:input={12}:setter={13}:owner_field={14}:frames={15}-{16}" -f
+                    $_.ctValueName,
+                    $_.ctCallsite,
+                    $_.ctPhase,
+                    $_.setterValueName,
+                    $_.setterNode,
+                    $_.setterKind,
+                    $_.path,
+                    $_.fieldOffset,
+                    $_.joins,
+                    $_.minFrameDelta,
+                    $_.maxFrameDelta,
+                    (Format-RangeValue $_.minCtFloatValue $_.maxCtFloatValue),
+                    (Format-RangeValue $_.minInputFloatValue $_.maxInputFloatValue),
+                    (Format-RangeValue $_.minSetterValue $_.maxSetterValue),
+                    (Format-RangeValue $_.minOwnerFieldValue $_.maxOwnerFieldValue),
+                    $_.firstFrame,
+                    $_.lastFrame
+            }
+    ) $CandidateValueLimit))
 Write-Output ("ct_gameplay_writer_events={0}" -f $summary.ctGameplayWriterEvents)
 Write-Output (
     "ct_gameplay_writer_groups={0}" -f
@@ -2385,6 +2714,7 @@ Write-Output ("sonic_hud_audio_callsite_status={0}" -f $summary.sonicHudAudioCal
 Write-Output ("sonic_hud_owner_setter_candidate_correlation_status={0}" -f $summary.sonicHudOwnerSetterCandidateCorrelationStatus)
 Write-Output ("sonic_hud_ct_gameplay_writer_status={0}" -f $summary.sonicHudCtGameplayWriterStatus)
 Write-Output ("sonic_hud_ct_code_entry_gauge_transition_candidate_status={0}" -f $summary.sonicHudCtCodeEntryGaugeTransitionCandidateStatus)
+Write-Output ("sonic_hud_ct_code_entry_gauge_transition_correlation_status={0}" -f $summary.sonicHudCtCodeEntryGaugeTransitionCorrelationStatus)
 Write-Output (
     "owner_field_rolling_counter_groups={0}" -f
     (Format-CandidateList (

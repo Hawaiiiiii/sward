@@ -3680,6 +3680,72 @@ mov r8d,(int)999999
         )
         self.assertNotIn("ct-gameplay-writer:present:1", completed.stdout)
 
+    def test_ui_lab_phase221_correlates_ct_code_entry_gauge_candidates_to_owner_setters(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups",
+            "ct_code_entry_gauge_transition_owner_setter_candidate_correlation_groups=",
+            "sonic_hud_ct_code_entry_gauge_transition_correlation_status=",
+            "ct-code-entry-gauge-transition-owner-setter-candidate-correlation-present-pending-formula-proof",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 221",
+            "ct_code_entry_gauge_transition_owner_setter_candidate_correlation_groups=",
+            "field+480",
+            "rolling-counter",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-ct-code-entry-gauge-transition-candidate","detail":"valueName=boostGaugeCandidate callsite=sub_8231C5F0 phase=ratio-read ownerAddress=0xAAAA storageAddress=0x153C previousRawValue=0 rawValue=1120403456 previousFloatValue=0 floatValue=100 inputFloatValue=1 source=ct-code-entry-gauge-transition-candidate:day-boost-a74bd6"}',
+                        '{"time":1.1,"frame":101,"event":"sonic-hud-gauge-setter-owner-candidate-correlated","detail":"kind=text node=0xCCCC value=\\"573\\" semanticValueName=boostGauge semanticPathCandidate=ui_playscreen/so_speed_gauge ownerAddress=0x759FE30 ownerField460=0 ownerField464=7 ownerField468=3 ownerField472=5 ownerField480=573 frameDelta=0 callsiteSource=same-frame-hud-update-context:sub_824D6C18 source=runtime-csd-node-setter-owner-field-candidate-join:CSD::CNode::SetText/sub_830BF640 pathResolved=false"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("ct_code_entry_gauge_transition_candidate_events=1", completed.stdout)
+        self.assertIn("owner_setter_candidate_correlations=1", completed.stdout)
+        self.assertIn(
+            "ct_code_entry_gauge_transition_owner_setter_candidate_correlation_groups=ctValue=boostGaugeCandidate:ctCallsite=sub_8231C5F0:ctPhase=ratio-read:setterValue=boostGauge:setterNode=0xCCCC:setterKind=text:path=ui_playscreen/so_speed_gauge:field+480:joins=1:frame_delta=1-1:ct_float=100-100:input=1-1:setter=573-573:owner_field=573-573:frames=100-101",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_hud_ct_code_entry_gauge_transition_correlation_status=ct-code-entry-gauge-transition-owner-setter-candidate-correlation-present-pending-formula-proof",
+            completed.stdout,
+        )
+        self.assertIn("ct_gameplay_writer_events=0", completed.stdout)
+        self.assertIn("ct-gameplay-writer:pending:0", completed.stdout)
+        self.assertNotIn("ct-gameplay-writer:present:1", completed.stdout)
+
     def test_ui_lab_phase212_summarizes_cheat_table_code_entries_as_host_sites(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_sonic_unleashed_cheat_table.ps1"
         script = script_path.read_text(encoding="utf-8")
