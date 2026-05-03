@@ -158,6 +158,16 @@ function Get-ModuleNameFromAddressString {
     return ""
 }
 
+function Get-RvaFromInjectionPoint {
+    param([string]$InjectionPoint)
+
+    if ($InjectionPoint -match '\+(?<hex>[0-9A-Fa-f]+)$') {
+        return [int64]([Convert]::ToInt64($Matches["hex"], 16))
+    }
+
+    return $null
+}
+
 function Add-CheatEntryAnchors {
     param(
         [Parameter(Mandatory = $true)]$Nodes,
@@ -215,6 +225,9 @@ function Add-CheatEntryAnchors {
                     referencedInjectionPoints = $referencedInjectionPoints
                     scriptConstants = $scriptConstants
                     runtimeHitFileOffsetDelta = 0
+                    oldInjectionPointRuntimeRvaMatches = @()
+                    oldInjectionPointRuntimeRvaMatchCount = 0
+                    oldInjectionPointRuntimeRvaStatus = "not-scanned"
                     runtimeHitCount = 0
                     runtimeHits = @()
                 }) | Out-Null
@@ -273,6 +286,9 @@ function Add-CodeEntryAnchors {
             referencedInjectionPoints = [string[]]$oldInjectionPoints
             scriptConstants = @()
             runtimeHitFileOffsetDelta = $beforeBytes.Count
+            oldInjectionPointRuntimeRvaMatches = @()
+            oldInjectionPointRuntimeRvaMatchCount = 0
+            oldInjectionPointRuntimeRvaStatus = "not-scanned"
             runtimeHitCount = 0
             runtimeHits = @()
         }) | Out-Null
@@ -401,6 +417,51 @@ function Convert-FileOffsetToImageAddress {
         section = ""
         rva = $null
         virtualAddress = $null
+    }
+}
+
+function Resolve-OldInjectionPointRuntimeRvaAlignment {
+    param(
+        [Parameter(Mandatory = $true)]$Entry,
+        [Parameter(Mandatory = $true)][string]$PeStatus
+    )
+
+    $matches = New-Object System.Collections.Generic.List[string]
+    $oldPoints = @($Entry.oldInjectionPoints)
+    if ($oldPoints.Count -eq 0) {
+        $Entry.oldInjectionPointRuntimeRvaMatches = @()
+        $Entry.oldInjectionPointRuntimeRvaMatchCount = 0
+        $Entry.oldInjectionPointRuntimeRvaStatus = "no-old-injection-point"
+        return
+    }
+
+    if ($PeStatus -ne "pe-rva-available") {
+        $Entry.oldInjectionPointRuntimeRvaMatches = @()
+        $Entry.oldInjectionPointRuntimeRvaMatchCount = 0
+        $Entry.oldInjectionPointRuntimeRvaStatus = "pe-rva-unavailable"
+        return
+    }
+
+    $hitRvas = New-Object System.Collections.Generic.HashSet[int64]
+    foreach ($hit in @($Entry.runtimeHits)) {
+        if ($null -ne $hit.rva) {
+            [void]$hitRvas.Add([int64]$hit.rva)
+        }
+    }
+
+    foreach ($point in $oldPoints) {
+        $oldRva = Get-RvaFromInjectionPoint -InjectionPoint $point
+        if ($null -ne $oldRva -and $hitRvas.Contains([int64]$oldRva)) {
+            $matches.Add($point) | Out-Null
+        }
+    }
+
+    $Entry.oldInjectionPointRuntimeRvaMatches = [string[]]$matches.ToArray()
+    $Entry.oldInjectionPointRuntimeRvaMatchCount = $Entry.oldInjectionPointRuntimeRvaMatches.Count
+    $Entry.oldInjectionPointRuntimeRvaStatus = if ($Entry.oldInjectionPointRuntimeRvaMatchCount -gt 0) {
+        "exact-rva-match"
+    } else {
+        "shifted-or-no-exact-rva-match"
     }
 }
 
@@ -588,6 +649,7 @@ if (![string]::IsNullOrWhiteSpace($RuntimeExePath)) {
 
         $entry.runtimeHits = [object[]]$hits.ToArray()
         $entry.runtimeHitCount = $entry.runtimeHits.Count
+        Resolve-OldInjectionPointRuntimeRvaAlignment -Entry $entry -PeStatus $peImageMap.status
     }
 
     if ([string]::IsNullOrWhiteSpace($SymbolizerPath)) {
@@ -607,6 +669,12 @@ if (![string]::IsNullOrWhiteSpace($RuntimeExePath)) {
 
 $entries = @($anchors.ToArray())
 $codeEntries = @($codeEntryAnchors.ToArray())
+$oldInjectionPointRuntimeRvaMatchCount = 0
+foreach ($entry in @($scanEntries.ToArray())) {
+    if ($null -ne $entry.oldInjectionPointRuntimeRvaMatchCount) {
+        $oldInjectionPointRuntimeRvaMatchCount += [int]$entry.oldInjectionPointRuntimeRvaMatchCount
+    }
+}
 $summary = [ordered]@{
     evidenceLane = "local CT evidence lane"
     status = "ct-gameplay-value-anchors-not-ui-source-proof"
@@ -615,6 +683,7 @@ $summary = [ordered]@{
     entriesWithAob = $entries.Count
     codeEntriesWithBytes = $codeEntries.Count
     hostNativeSites = $entries.Count + $codeEntries.Count
+    oldInjectionPointRuntimeRvaMatchCount = $oldInjectionPointRuntimeRvaMatchCount
     runtimeExePath = $resolvedRuntimeExePath
     runtimeScanStatus = $runtimeScanStatus
     peStatus = $peImageMap.status
@@ -645,6 +714,7 @@ $lines.Add("cheat_table_version=$cheatTableVersion") | Out-Null
 $lines.Add("ct_entries_with_aob=$($entries.Count)") | Out-Null
 $lines.Add("ct_code_entries=$($codeEntries.Count)") | Out-Null
 $lines.Add("ct_host_native_sites=$($entries.Count + $codeEntries.Count)") | Out-Null
+$lines.Add("old_ct_injection_point_rva_matches=$oldInjectionPointRuntimeRvaMatchCount") | Out-Null
 $lines.Add("runtime_exe_path=$resolvedRuntimeExePath") | Out-Null
 $lines.Add("runtime_scan_status=$runtimeScanStatus") | Out-Null
 $lines.Add("pe_status=$($peImageMap.status)") | Out-Null
@@ -683,9 +753,14 @@ foreach ($entry in $entries) {
     } else {
         "<none>"
     }
+    $oldInjectionPointRuntimeRvaMatches = if ($entry.oldInjectionPointRuntimeRvaMatches.Count -gt 0) {
+        $entry.oldInjectionPointRuntimeRvaMatches -join ","
+    } else {
+        "<none>"
+    }
 
     $referencedPointCount = if ($entry.referencedInjectionPoints) { $entry.referencedInjectionPoints.Count } else { 0 }
-    $line = "ct_entry id={0} path={1} description={2} aob_label={3} module={4} aob_bytes={5} old_injection_points={6} referenced_points={7} runtime_hits={8} file_offsets={9}" -f `
+    $line = "ct_entry id={0} path={1} description={2} aob_label={3} module={4} aob_bytes={5} old_injection_points={6} old_point_rva_status={7} old_point_rva_matches={8} referenced_points={9} runtime_hits={10} file_offsets={11}" -f `
         $entry.id,
         $entry.path,
         $entry.description,
@@ -693,6 +768,8 @@ foreach ($entry in $entries) {
         $entry.module,
         $entry.aobPattern,
         $oldInjectionPoints,
+        $entry.oldInjectionPointRuntimeRvaStatus,
+        $oldInjectionPointRuntimeRvaMatches,
         $referencedPointCount,
         $entry.runtimeHitCount,
         $fileOffsets
@@ -744,13 +821,20 @@ foreach ($entry in $codeEntries) {
     } else {
         "<none>"
     }
+    $oldInjectionPointRuntimeRvaMatches = if ($entry.oldInjectionPointRuntimeRvaMatches.Count -gt 0) {
+        $entry.oldInjectionPointRuntimeRvaMatches -join ","
+    } else {
+        "<none>"
+    }
 
-    $line = "ct_code_entry description={0} address={1} module={2} bytes={3} old_injection_points={4} runtime_hits={5} file_offsets={6}" -f `
+    $line = "ct_code_entry description={0} address={1} module={2} bytes={3} old_injection_points={4} old_point_rva_status={5} old_point_rva_matches={6} runtime_hits={7} file_offsets={8}" -f `
         $entry.description,
         $entry.codeEntryAddressString,
         $entry.module,
         $entry.aobPattern,
         $oldInjectionPoints,
+        $entry.oldInjectionPointRuntimeRvaStatus,
+        $oldInjectionPointRuntimeRvaMatches,
         $entry.runtimeHitCount,
         $fileOffsets
 

@@ -3584,6 +3584,124 @@ aobscanmodule(INJECT,UnleashedRecomp.exe,89 04 1E 48 89 F9)
         self.assertEqual(summary["codeEntries"][0]["codeEntryActualByteCount"], 3)
         self.assertEqual(summary["codeEntries"][0]["oldInjectionPoints"], ["UnleashedRecomp.exe+A6974D"])
 
+    def test_ui_lab_phase213_reports_ct_old_rva_alignment_against_runtime_binary(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_sonic_unleashed_cheat_table.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "old_ct_injection_point_rva_matches=",
+            "oldInjectionPointRuntimeRvaStatus",
+            "Resolve-OldInjectionPointRuntimeRvaAlignment",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 213",
+            "old CT RVA",
+            "retail binary layout",
+            "patched UI Lab binary layout",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        def minimal_pe_with_pattern(pattern: bytes, pattern_file_offset: int = 0x210) -> bytes:
+            data = bytearray(b"\x00" * 0x400)
+            data[0:2] = b"MZ"
+            data[0x3C:0x40] = (0x80).to_bytes(4, "little")
+            data[0x80:0x84] = b"PE\x00\x00"
+            data[0x84:0x86] = (0x8664).to_bytes(2, "little")
+            data[0x86:0x88] = (1).to_bytes(2, "little")
+            data[0x94:0x96] = (0xF0).to_bytes(2, "little")
+            data[0x98:0x9A] = (0x20B).to_bytes(2, "little")
+            data[0x98 + 24:0x98 + 32] = (0x140000000).to_bytes(8, "little")
+            section = 0x80 + 24 + 0xF0
+            data[section:section + 8] = b".text\x00\x00\x00"
+            data[section + 8:section + 12] = (0x200).to_bytes(4, "little")
+            data[section + 12:section + 16] = (0x1000).to_bytes(4, "little")
+            data[section + 16:section + 20] = (0x200).to_bytes(4, "little")
+            data[section + 20:section + 24] = (0x200).to_bytes(4, "little")
+            data[pattern_file_offset:pattern_file_offset + len(pattern)] = pattern
+            return bytes(data)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cheat_table = Path(tmp) / "old_rva_alignment.ct"
+            runtime = Path(tmp) / "UnleashedRecomp.exe"
+            output = Path(tmp) / "ct_alignment_summary.json"
+
+            cheat_table.write_text(
+                """<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="42">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>369</ID>
+      <Description>&quot;Infinite Boost&quot;</Description>
+      <AssemblerScript>[ENABLE]
+aobscanmodule(INJECT,UnleashedRecomp.exe,89 04 1E 48 89 F9)
+// ORIGINAL CODE - INJECTION POINT: UnleashedRecomp.exe+1010
+[DISABLE]
+</AssemblerScript>
+    </CheatEntry>
+  </CheatEntries>
+  <CheatCodes>
+    <CodeEntry>
+      <Description>Change of mov [rsi+rbx],eax</Description>
+      <AddressString>UnleashedRecomp.exe+1012</AddressString>
+      <Before>
+        <Byte>F9</Byte>
+        <Byte>7E</Byte>
+      </Before>
+      <Actual>
+        <Byte>89</Byte>
+        <Byte>04</Byte>
+        <Byte>1E</Byte>
+      </Actual>
+      <After>
+        <Byte>48</Byte>
+        <Byte>89</Byte>
+      </After>
+    </CodeEntry>
+  </CheatCodes>
+</CheatTable>
+""",
+                encoding="utf-8",
+            )
+            runtime.write_bytes(minimal_pe_with_pattern(bytes.fromhex("F9 7E 89 04 1E 48 89")))
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-CheatTablePath",
+                    str(cheat_table),
+                    "-RuntimeExePath",
+                    str(runtime),
+                    "-OutputPath",
+                    str(output),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            summary = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertIn("old_ct_injection_point_rva_matches=1", completed.stdout)
+        self.assertIn("old_point_rva_status=shifted-or-no-exact-rva-match", completed.stdout)
+        self.assertIn("old_point_rva_matches=UnleashedRecomp.exe+1012", completed.stdout)
+        self.assertEqual(summary["oldInjectionPointRuntimeRvaMatchCount"], 1)
+        self.assertEqual(summary["entries"][0]["oldInjectionPointRuntimeRvaStatus"], "shifted-or-no-exact-rva-match")
+        self.assertEqual(summary["codeEntries"][0]["oldInjectionPointRuntimeRvaStatus"], "exact-rva-match")
+        self.assertEqual(
+            summary["codeEntries"][0]["oldInjectionPointRuntimeRvaMatches"],
+            ["UnleashedRecomp.exe+1012"],
+        )
+
     def test_ui_lab_phase202_preview_build_inventory_reports_repo_safe_metadata(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/inventory_sonic_unleashed_preview_build.ps1"
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
