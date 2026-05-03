@@ -409,6 +409,217 @@ function Add-OwnerFieldGaugeScaleCorrelationGroup($Groups, [string]$Detail, $Eve
     }
 }
 
+function New-OwnerSetterCandidateCorrelationGroup(
+    [string]$Node,
+    [string]$SemanticValueName,
+    [string]$Kind,
+    [string]$SemanticPathCandidate,
+    [string]$OwnerAddress)
+{
+    return [ordered]@{
+        node = $Node
+        semanticValueName = $SemanticValueName
+        kind = $Kind
+        semanticPathCandidate = $SemanticPathCandidate
+        ownerAddress = $OwnerAddress
+        joins = 0
+        observedSetterValues = [System.Collections.Generic.SortedSet[string]]::new()
+        ownerFieldValuesByOffset = [ordered]@{
+            "460" = [System.Collections.Generic.SortedSet[string]]::new()
+            "464" = [System.Collections.Generic.SortedSet[string]]::new()
+            "468" = [System.Collections.Generic.SortedSet[string]]::new()
+            "472" = [System.Collections.Generic.SortedSet[string]]::new()
+            "480" = [System.Collections.Generic.SortedSet[string]]::new()
+        }
+        frameDeltas = [System.Collections.Generic.SortedSet[string]]::new()
+        callsites = [System.Collections.Generic.SortedSet[string]]::new()
+        sources = [System.Collections.Generic.SortedSet[string]]::new()
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Add-OwnerSetterCandidateCorrelationGroup($Groups, [string]$Detail, $EventObject) {
+    $node = Get-DetailToken $Detail "node"
+    $semanticValueName = Get-DetailToken $Detail "semanticValueName"
+    $kind = Get-DetailToken $Detail "kind"
+    $semanticPathCandidate = Get-DetailToken $Detail "semanticPathCandidate"
+    $ownerAddress = Get-DetailToken $Detail "ownerAddress"
+
+    if (
+        [string]::IsNullOrWhiteSpace($node) -or
+        [string]::IsNullOrWhiteSpace($semanticValueName) -or
+        [string]::IsNullOrWhiteSpace($kind) -or
+        [string]::IsNullOrWhiteSpace($semanticPathCandidate) -or
+        [string]::IsNullOrWhiteSpace($ownerAddress))
+    {
+        return
+    }
+
+    $key = "{0}:{1}:{2}:{3}:{4}" -f $node, $semanticValueName, $kind, $semanticPathCandidate, $ownerAddress
+    if (-not $Groups.ContainsKey($key)) {
+        $Groups[$key] = New-OwnerSetterCandidateCorrelationGroup `
+            $node `
+            $semanticValueName `
+            $kind `
+            $semanticPathCandidate `
+            $ownerAddress
+    }
+
+    $group = $Groups[$key]
+    $group.joins++
+    Add-UniqueSorted $group.observedSetterValues (Get-DetailToken $Detail "value")
+    Add-UniqueSorted $group.frameDeltas (Get-DetailToken $Detail "frameDelta")
+
+    $callsiteSource = Get-DetailToken $Detail "callsiteSource"
+    $callsite = Get-CallsiteFromSource $callsiteSource
+    if (-not [string]::IsNullOrWhiteSpace($callsite)) {
+        Add-UniqueSorted $group.callsites $callsite
+    }
+    Add-UniqueSorted $group.sources (Get-DetailToken $Detail "source")
+
+    foreach ($offset in @("460", "464", "468", "472", "480")) {
+        $fieldValue = Get-DetailToken $Detail ("ownerField{0}" -f $offset)
+        if (-not [string]::IsNullOrWhiteSpace($fieldValue)) {
+            Add-UniqueSorted $group.ownerFieldValuesByOffset[$offset] $fieldValue
+        }
+    }
+
+    $frame = Get-EventFrame $EventObject
+    if ($null -ne $frame) {
+        if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+            $group.firstFrame = $frame
+        }
+        if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+            $group.lastFrame = $frame
+        }
+    }
+}
+
+function New-OwnerSetterCandidateNumericRelationGroup(
+    [string]$Node,
+    [string]$SemanticValueName,
+    [string]$Kind,
+    [string]$SemanticPathCandidate,
+    [string]$OwnerAddress,
+    [int]$FieldOffset)
+{
+    return [ordered]@{
+        node = $Node
+        semanticValueName = $SemanticValueName
+        kind = $Kind
+        semanticPathCandidate = $SemanticPathCandidate
+        ownerAddress = $OwnerAddress
+        fieldOffset = $FieldOffset
+        pairs = 0
+        exactNumericMatches = 0
+        minAbsDelta = $null
+        maxAbsDelta = $null
+        setterMin = $null
+        setterMax = $null
+        ownerFieldMin = $null
+        ownerFieldMax = $null
+        firstFrame = $null
+        lastFrame = $null
+    }
+}
+
+function Add-OwnerSetterCandidateNumericRelationGroup($Groups, [string]$Detail, $EventObject) {
+    $setterValueText = Get-DetailToken $Detail "value"
+    if ($setterValueText -notmatch '^[0-9]+$') {
+        return
+    }
+
+    $setterValue = 0
+    if (-not [int]::TryParse($setterValueText, [ref]$setterValue)) {
+        return
+    }
+
+    $node = Get-DetailToken $Detail "node"
+    $semanticValueName = Get-DetailToken $Detail "semanticValueName"
+    $kind = Get-DetailToken $Detail "kind"
+    $semanticPathCandidate = Get-DetailToken $Detail "semanticPathCandidate"
+    $ownerAddress = Get-DetailToken $Detail "ownerAddress"
+
+    if (
+        [string]::IsNullOrWhiteSpace($node) -or
+        [string]::IsNullOrWhiteSpace($semanticValueName) -or
+        [string]::IsNullOrWhiteSpace($kind) -or
+        [string]::IsNullOrWhiteSpace($semanticPathCandidate) -or
+        [string]::IsNullOrWhiteSpace($ownerAddress))
+    {
+        return
+    }
+
+    $frame = Get-EventFrame $EventObject
+    foreach ($offset in @(460, 464, 468, 472, 480)) {
+        $ownerValueText = Get-DetailToken $Detail ("ownerField{0}" -f $offset)
+        if ($ownerValueText -notmatch '^-?[0-9]+$') {
+            continue
+        }
+
+        $ownerValue = 0
+        if (-not [int]::TryParse($ownerValueText, [ref]$ownerValue)) {
+            continue
+        }
+
+        $key = "{0}:{1}:{2}:{3}:{4}:{5}" -f $node, $semanticValueName, $kind, $semanticPathCandidate, $ownerAddress, $offset
+        if (-not $Groups.ContainsKey($key)) {
+            $Groups[$key] = New-OwnerSetterCandidateNumericRelationGroup `
+                $node `
+                $semanticValueName `
+                $kind `
+                $semanticPathCandidate `
+                $ownerAddress `
+                $offset
+        }
+
+        $group = $Groups[$key]
+        $group.pairs++
+        if ($setterValue -eq $ownerValue) {
+            $group.exactNumericMatches++
+        }
+
+        $absDelta = [Math]::Abs($setterValue - $ownerValue)
+        if ($null -eq $group.minAbsDelta -or $absDelta -lt $group.minAbsDelta) {
+            $group.minAbsDelta = $absDelta
+        }
+        if ($null -eq $group.maxAbsDelta -or $absDelta -gt $group.maxAbsDelta) {
+            $group.maxAbsDelta = $absDelta
+        }
+        if ($null -eq $group.setterMin -or $setterValue -lt $group.setterMin) {
+            $group.setterMin = $setterValue
+        }
+        if ($null -eq $group.setterMax -or $setterValue -gt $group.setterMax) {
+            $group.setterMax = $setterValue
+        }
+        if ($null -eq $group.ownerFieldMin -or $ownerValue -lt $group.ownerFieldMin) {
+            $group.ownerFieldMin = $ownerValue
+        }
+        if ($null -eq $group.ownerFieldMax -or $ownerValue -gt $group.ownerFieldMax) {
+            $group.ownerFieldMax = $ownerValue
+        }
+
+        if ($null -ne $frame) {
+            if ($null -eq $group.firstFrame -or $frame -lt $group.firstFrame) {
+                $group.firstFrame = $frame
+            }
+            if ($null -eq $group.lastFrame -or $frame -gt $group.lastFrame) {
+                $group.lastFrame = $frame
+            }
+        }
+    }
+}
+
+function Format-OwnerSetterCandidateCorrelationFields($Group, [int]$Limit) {
+    return (
+        @("460", "464", "468", "472", "480") |
+            ForEach-Object {
+                "{0}={1}" -f $_, (Format-CandidateList $Group.ownerFieldValuesByOffset[$_] $Limit)
+            }
+    ) -join "|"
+}
+
 function New-OwnerFieldRollingCounterGroup([string]$OwnerAddress, [int]$FieldOffset, [string]$ValueName, [string]$Callsite) {
     return [ordered]@{
         ownerAddress = $OwnerAddress
@@ -824,6 +1035,8 @@ $semanticBoundGroupsByKey = @{}
 $rollingCounterSemanticGroupsByKey = @{}
 $ownerFieldRollingCounterGroupsByKey = @{}
 $ownerFieldGaugeScaleCorrelationGroupsByKey = @{}
+$ownerSetterCandidateCorrelationGroupsByKey = @{}
+$ownerSetterCandidateNumericRelationGroupsByKey = @{}
 $ownerFieldOffsetClassificationsByKey = @{}
 $ownerFieldOffsetTransitionTracksByKey = @{}
 $gaugeDrawPathGroupsByKey = @{}
@@ -853,6 +1066,8 @@ $summary = [ordered]@{
     ownerFieldSnapshotEvents = 0
     ownerScaleCorrelationEvents = 0
     ownerSetterCandidateCorrelationEvents = 0
+    ownerSetterCandidateCorrelationGroups = @()
+    ownerSetterCandidateNumericRelationGroups = @()
     audioCallsiteEvents = 0
     unresolvedNodeWrites = 0
     unresolvedNodeCandidateCount = 0
@@ -954,6 +1169,8 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
         }
         "sonic-hud-gauge-setter-owner-candidate-correlated" {
             $summary.ownerSetterCandidateCorrelationEvents++
+            Add-OwnerSetterCandidateCorrelationGroup $ownerSetterCandidateCorrelationGroupsByKey $detail $eventObject
+            Add-OwnerSetterCandidateNumericRelationGroup $ownerSetterCandidateNumericRelationGroupsByKey $detail $eventObject
         }
         "sonic-hud-audio-cue-callsite" {
             $summary.audioCallsiteEvents++
@@ -1129,6 +1346,68 @@ $summary.ownerFieldGaugeScaleCorrelationGroups = @(
                 observedScales = @($group.observedScales)
                 observedFieldValues = @($group.observedFieldValues)
                 sources = @($group.sources)
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
+$summary.ownerSetterCandidateCorrelationGroups = @(
+    $ownerSetterCandidateCorrelationGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { -1 * $ownerSetterCandidateCorrelationGroupsByKey[$_].joins } }, `
+            @{ Expression = { $ownerSetterCandidateCorrelationGroupsByKey[$_].node } }, `
+            @{ Expression = { $ownerSetterCandidateCorrelationGroupsByKey[$_].semanticValueName } }, `
+            @{ Expression = { $ownerSetterCandidateCorrelationGroupsByKey[$_].semanticPathCandidate } } |
+        ForEach-Object {
+            $group = $ownerSetterCandidateCorrelationGroupsByKey[$_]
+            [ordered]@{
+                node = $group.node
+                semanticValueName = $group.semanticValueName
+                kind = $group.kind
+                semanticPathCandidate = $group.semanticPathCandidate
+                ownerAddress = $group.ownerAddress
+                joins = $group.joins
+                observedSetterValues = @($group.observedSetterValues)
+                ownerFieldValuesByOffset = [ordered]@{
+                    "460" = @($group.ownerFieldValuesByOffset["460"])
+                    "464" = @($group.ownerFieldValuesByOffset["464"])
+                    "468" = @($group.ownerFieldValuesByOffset["468"])
+                    "472" = @($group.ownerFieldValuesByOffset["472"])
+                    "480" = @($group.ownerFieldValuesByOffset["480"])
+                }
+                frameDeltas = @($group.frameDeltas)
+                callsites = @($group.callsites)
+                sources = @($group.sources)
+                firstFrame = $group.firstFrame
+                lastFrame = $group.lastFrame
+            }
+        }
+)
+$summary.ownerSetterCandidateNumericRelationGroups = @(
+    $ownerSetterCandidateNumericRelationGroupsByKey.Keys |
+        Sort-Object `
+            @{ Expression = { -1 * $ownerSetterCandidateNumericRelationGroupsByKey[$_].exactNumericMatches } }, `
+            @{ Expression = { $ownerSetterCandidateNumericRelationGroupsByKey[$_].minAbsDelta } }, `
+            @{ Expression = { -1 * $ownerSetterCandidateNumericRelationGroupsByKey[$_].pairs } }, `
+            @{ Expression = { $ownerSetterCandidateNumericRelationGroupsByKey[$_].node } }, `
+            @{ Expression = { $ownerSetterCandidateNumericRelationGroupsByKey[$_].fieldOffset } } |
+        ForEach-Object {
+            $group = $ownerSetterCandidateNumericRelationGroupsByKey[$_]
+            [ordered]@{
+                node = $group.node
+                semanticValueName = $group.semanticValueName
+                kind = $group.kind
+                semanticPathCandidate = $group.semanticPathCandidate
+                ownerAddress = $group.ownerAddress
+                fieldOffset = $group.fieldOffset
+                pairs = $group.pairs
+                exactNumericMatches = $group.exactNumericMatches
+                minAbsDelta = $group.minAbsDelta
+                maxAbsDelta = $group.maxAbsDelta
+                setterMin = $group.setterMin
+                setterMax = $group.setterMax
+                ownerFieldMin = $group.ownerFieldMin
+                ownerFieldMax = $group.ownerFieldMax
                 firstFrame = $group.firstFrame
                 lastFrame = $group.lastFrame
             }
@@ -1489,6 +1768,49 @@ Write-Output (
     $summary.gameplayValueSnapshots,
     $summary.callsiteClassifications)
 Write-Output ("owner_setter_candidate_correlations={0}" -f $summary.ownerSetterCandidateCorrelationEvents)
+Write-Output (
+    "owner_setter_candidate_correlation_groups={0}" -f
+    (Format-CandidateList (
+        $summary.ownerSetterCandidateCorrelationGroups |
+            ForEach-Object {
+                "node={0}:{1}:{2}:{3}:owner={4}:joins={5}:values={6}:fields={7}:frames={8}-{9}:frame_deltas={10}" -f
+                    $_.node,
+                    $_.semanticValueName,
+                    $_.kind,
+                    $_.semanticPathCandidate,
+                    $_.ownerAddress,
+                    $_.joins,
+                    (Format-CandidateList $_.observedSetterValues $CandidateValueLimit),
+                    (Format-OwnerSetterCandidateCorrelationFields $_ $CandidateValueLimit),
+                    $_.firstFrame,
+                    $_.lastFrame,
+                    (Format-CandidateList $_.frameDeltas $CandidateValueLimit)
+            }
+    ) $CandidateValueLimit))
+Write-Output (
+    "owner_setter_candidate_numeric_relation_groups={0}" -f
+    (Format-CandidateList (
+        $summary.ownerSetterCandidateNumericRelationGroups |
+            ForEach-Object {
+                "node={0}:{1}:{2}:{3}:owner={4}:field+{5}:pairs={6}:matches={7}:min_delta={8}:max_delta={9}:setter={10}-{11}:owner_field={12}-{13}:frames={14}-{15}" -f
+                    $_.node,
+                    $_.semanticValueName,
+                    $_.kind,
+                    $_.semanticPathCandidate,
+                    $_.ownerAddress,
+                    $_.fieldOffset,
+                    $_.pairs,
+                    $_.exactNumericMatches,
+                    $_.minAbsDelta,
+                    $_.maxAbsDelta,
+                    $_.setterMin,
+                    $_.setterMax,
+                    $_.ownerFieldMin,
+                    $_.ownerFieldMax,
+                    $_.firstFrame,
+                    $_.lastFrame
+            }
+    ) $CandidateValueLimit))
 Write-Output (
     "unresolved_node_writes={0}:node_candidates={1}" -f
     $summary.unresolvedNodeWrites,

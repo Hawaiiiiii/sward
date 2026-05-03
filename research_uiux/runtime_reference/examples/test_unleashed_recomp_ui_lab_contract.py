@@ -3167,6 +3167,8 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         for token in [
             "sonic-hud-gauge-setter-owner-candidate-correlated",
             "ownerSetterCandidateCorrelationEvents",
+            "ownerSetterCandidateCorrelationGroups",
+            "owner_setter_candidate_correlation_groups=",
             "owner-setter-candidate-correlation",
             "sonic_hud_owner_setter_candidate_correlation_status=",
             "retail-runtime-setter-owner-candidate-correlation-pending-exact-child-path",
@@ -3177,6 +3179,14 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "Phase 207",
             "unresolved setter owner-candidate correlation",
             "retail-runtime-setter-owner-candidate-correlation-pending-exact-child-path",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        for token in [
+            "Phase 208",
+            "owner-setter candidate correlation groups",
+            "owner_setter_candidate_correlation_groups=",
         ]:
             self.assertIn(token, report)
             self.assertIn(token, checklist)
@@ -3212,6 +3222,11 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("owner-setter-candidate-correlation:present:1", completed.stdout)
         self.assertIn(
+            "owner_setter_candidate_correlation_groups=node=0xBBBB:boostGauge:scale:ui_playscreen/so_speed_gauge:owner=0xCE2D6B0:joins=1",
+            completed.stdout,
+        )
+        self.assertIn("fields=460=4|464=2|468=3|472=3|480=895", completed.stdout)
+        self.assertIn(
             "sonic_hud_owner_setter_candidate_correlation_status=retail-runtime-setter-owner-candidate-correlation-pending-exact-child-path",
             completed.stdout,
         )
@@ -3220,6 +3235,62 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             completed.stdout,
         )
         self.assertNotIn("sonic_hud_runtime_proof_matrix_status=retail-runtime-gauge-and-audio-proof-ready", completed.stdout)
+        self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
+
+    def test_ui_lab_phase209_reports_owner_setter_candidate_numeric_relations(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "ownerSetterCandidateNumericRelationGroups",
+            "owner_setter_candidate_numeric_relation_groups=",
+            "New-OwnerSetterCandidateNumericRelationGroup",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 209",
+            "owner-setter candidate numeric relation groups",
+            "owner_setter_candidate_numeric_relation_groups=",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-gauge-setter-owner-candidate-correlated","detail":"kind=text node=0xCCCC value=\\"895\\" semanticValueName=boostGauge semanticPathCandidate=ui_playscreen/so_speed_gauge ownerAddress=0xCE2D6B0 ownerField460=4 ownerField464=2 ownerField468=3 ownerField472=5 ownerField480=895 frameDelta=0 callsiteSource=same-frame-hud-update-context:sub_824D6C18 source=runtime-csd-node-setter-owner-field-candidate-join:CSD::CNode::SetText/sub_830BF640 pathResolved=false"}',
+                        '{"time":1.1,"frame":101,"event":"sonic-hud-gauge-setter-owner-candidate-correlated","detail":"kind=text node=0xCCCC value=\\"551\\" semanticValueName=boostGauge semanticPathCandidate=ui_playscreen/so_speed_gauge ownerAddress=0xCE2D6B0 ownerField460=4 ownerField464=2 ownerField468=3 ownerField472=5 ownerField480=895 frameDelta=1 callsiteSource=same-frame-hud-update-context:sub_824D6C18 source=runtime-csd-node-setter-owner-field-candidate-join:CSD::CNode::SetText/sub_830BF640 pathResolved=false"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn(
+            "owner_setter_candidate_numeric_relation_groups=node=0xCCCC:boostGauge:text:ui_playscreen/so_speed_gauge:owner=0xCE2D6B0:field+480:pairs=2:matches=1:min_delta=0:max_delta=344:setter=551-895:owner_field=895-895:frames=100-101",
+            completed.stdout,
+        )
         self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
 
     def test_ui_lab_phase202_preview_build_inventory_reports_repo_safe_metadata(self):
