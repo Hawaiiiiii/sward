@@ -821,6 +821,37 @@ namespace UiLab
         { ScreenId::WorldMap, "world-map", "World Map", "ui_worldmap", "System/GameMode/WorldMap/WorldMapSelect.cpp", false },
     }};
 
+    struct ObservedRuntimeScreen
+    {
+        std::string_view token;
+        std::string_view label;
+        std::string_view csdProject;
+        std::string_view sourceFamily;
+        std::string source;
+    };
+
+    struct ObservedCsdProjectMapRow
+    {
+        std::string_view project;
+        std::string_view token;
+        std::string_view label;
+        std::string_view sourceFamily;
+    };
+
+    static constexpr std::array<ObservedCsdProjectMapRow, 10> kObservedCsdProjectMap =
+    {{
+        { "ui_title", "title-runtime", "Title Runtime", "System/GameMode/Title/TitleStateIntro.cpp|TitleMenu.cpp" },
+        { "ui_loading", "loading", "Loading / Miles Electric", "System/Loading.cpp" },
+        { "ui_playscreen", "sonic-hud", "Sonic Stage HUD", "Player/Character/Sonic/Hud/SonicMainDisplay.cpp" },
+        { "ui_prov_playscreen", "extra-stage-hud", "Extra Stage / Tornado HUD", "ExtraStage/Tails/Hud/HudExQte.cpp" },
+        { "ui_pause", "pause", "Pause Menu", "HUD/Pause/HudPause.cpp" },
+        { "ui_status", "status", "Status / Skill Upgrade", "HUD/Status/Status.cpp" },
+        { "ui_result", "result", "Stage Result", "HUD/Result/Result.cpp" },
+        { "ui_itemresult", "item-result", "Item Result Runtime", "CSD/ui_itemresult runtime project (source file pending)" },
+        { "ui_worldmap", "world-map", "World Map", "System/GameMode/WorldMap/WorldMapSelect.cpp" },
+        { "ui_worldmap_help", "world-map-help", "World Map Help", "System/GameMode/WorldMap/WorldMapTutorial.cpp" },
+    }};
+
     struct StarterUiCoverageRow
     {
         std::string_view screenId;
@@ -1646,6 +1677,116 @@ namespace UiLab
         return kRuntimeTargets.front();
     }
 
+    static ObservedRuntimeScreen BuildObservedRuntimeScreen()
+    {
+        const auto& target = TargetFor(g_target);
+
+        if (g_loadingDisplayWasActive)
+        {
+            return {
+                "loading",
+                "Loading / Miles Electric",
+                "ui_loading",
+                "System/Loading.cpp",
+                "loading-display-live-inspector"
+            };
+        }
+
+        const std::string_view project(g_lastCsdProjectName.data(), g_lastCsdProjectName.size());
+        if (!project.empty())
+        {
+            if (project == "ui_itemresult")
+            {
+                return {
+                    "item-result",
+                    "Item Result Runtime",
+                    "ui_itemresult",
+                    "CSD/ui_itemresult runtime project (source file pending)",
+                    "runtime-csd-project:ui_itemresult"
+                };
+            }
+
+            for (const auto& row : kObservedCsdProjectMap)
+            {
+                if (project == row.project)
+                {
+                    if (project == "ui_title" &&
+                        (g_titleMenuVisualReady || g_titleMenuInspector.postPressStartMenuReady))
+                    {
+                        return {
+                            "title-menu",
+                            "Title Menu",
+                            "ui_title",
+                            "System/GameMode/Title/TitleMenu.cpp",
+                            "title-menu-live-inspector"
+                        };
+                    }
+
+                    return {
+                        row.token,
+                        row.label,
+                        row.project,
+                        row.sourceFamily,
+                        "runtime-csd-project:" + std::string(row.project)
+                    };
+                }
+            }
+
+            return {
+                "unknown-csd-runtime",
+                "Unknown CSD Runtime",
+                project,
+                "pending-runtime-source-family-classification",
+                "runtime-csd-project:" + std::string(project)
+            };
+        }
+
+        if (g_stageContextObserved && !g_lastStageTitleContextDetail.empty())
+        {
+            return {
+                "stage-title-runtime",
+                "Stage Title/Menu Runtime",
+                "ui_title",
+                "System/GameMode/GameModeStageTitle.cpp",
+                "stage-title-context-live-inspector"
+            };
+        }
+
+        if (g_targetCsdObserved)
+        {
+            return {
+                target.token,
+                target.label,
+                target.primaryCsdScene,
+                target.sourceFamily,
+                "target-csd-observed"
+            };
+        }
+
+        return {
+            target.token,
+            target.label,
+            target.primaryCsdScene,
+            target.sourceFamily,
+            "requested-target-fallback"
+        };
+    }
+
+    static void AppendObservedRuntimeScreenFields(
+        std::ostringstream& out,
+        const ObservedRuntimeScreen& observed,
+        const RuntimeTarget& target,
+        std::string_view indent = "  ")
+    {
+        out
+            << indent << "\"observedScreen\": \"" << JsonEscape(observed.token) << "\",\n"
+            << indent << "\"observedScreenLabel\": \"" << JsonEscape(observed.label) << "\",\n"
+            << indent << "\"observedCsdProject\": \"" << JsonEscape(observed.csdProject) << "\",\n"
+            << indent << "\"observedSourceFamily\": \"" << JsonEscape(observed.sourceFamily) << "\",\n"
+            << indent << "\"observedScreenSource\": \"" << JsonEscape(observed.source) << "\",\n"
+            << indent << "\"targetObservedMismatch\": " << (observed.token != target.token ? "true" : "false");
+    }
+
     static size_t TargetIndexFor(ScreenId id)
     {
         for (size_t i = 0; i < kRuntimeTargets.size(); ++i)
@@ -1971,6 +2112,15 @@ namespace UiLab
     static constexpr std::string_view kLiveStateStageGameModeAddressFieldName = R"("stageGameModeAddress")";
     static constexpr std::string_view kLiveStateNativeCaptureStatusFieldName = R"("nativeCaptureStatus")";
     static constexpr std::string_view kLiveStateTypedInspectorsFieldName = R"("typedInspectors")";
+    [[maybe_unused]] static constexpr std::string_view kObservedRuntimeScreenJsonFields[] =
+    {
+        R"("observedScreen")",
+        R"("observedScreenLabel")",
+        R"("observedCsdProject")",
+        R"("observedSourceFamily")",
+        R"("observedScreenSource")",
+        R"("targetObservedMismatch")"
+    };
     static constexpr std::string_view kUiOracleJsonFields[] =
     {
         R"("uiLayerOracle")",
@@ -5821,6 +5971,7 @@ namespace UiLab
     static std::string BuildRuntimeVendorCommandResourceDumpJson()
     {
         const auto& target = TargetFor(g_target);
+        const auto observed = BuildObservedRuntimeScreen();
 
         std::vector<RuntimeRawBackendCommand> rawBackendCommands;
         std::vector<RuntimeBackendResolvedSubmit> backendResolvedSubmits;
@@ -5871,7 +6022,11 @@ namespace UiLab
             << "  \"version\": 1,\n"
             << "  \"frame\": " << frame << ",\n"
             << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
-            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(observed.token) << "\",\n";
+        AppendObservedRuntimeScreenFields(out, observed, target);
+        out
+            << ",\n"
             << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
             << "  \"vendorCommandResourceDumpPolicy\": \"raw-backend-command-plus-resource-view-dump\",\n"
             << "  \"vendorCommandResourceDumpStatus\": \"" << JsonEscape(status) << "\",\n"
@@ -5919,6 +6074,7 @@ namespace UiLab
     static std::string BuildRuntimeUiOnlyRenderTargetCaptureJson()
     {
         const auto& target = TargetFor(g_target);
+        const auto observed = BuildObservedRuntimeScreen();
 
         std::vector<RuntimeUiDrawCall> drawCalls;
         std::vector<RuntimeGpuSubmitCall> gpuSubmitCalls;
@@ -5950,7 +6106,11 @@ namespace UiLab
             << "  \"version\": 1,\n"
             << "  \"frame\": " << frame << ",\n"
             << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
-            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(observed.token) << "\",\n";
+        AppendObservedRuntimeScreenFields(out, observed, target);
+        out
+            << ",\n"
             << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
             << "  \"uiOnlyRenderTargetCapturePolicy\": \"copy-active-ui-render-target-before-imgui-present\",\n"
             << "  \"uiOnlyRenderTargetCaptureStatus\": \"" << JsonEscape(status) << "\",\n"
@@ -5995,6 +6155,7 @@ namespace UiLab
     static std::string BuildRuntimeBackendResolvedJson()
     {
         const auto& target = TargetFor(g_target);
+        const auto observed = BuildObservedRuntimeScreen();
 
         std::vector<RuntimeBackendResolvedSubmit> submits;
         std::vector<RuntimeUiDrawCall> drawCalls;
@@ -6070,7 +6231,11 @@ namespace UiLab
             << "  \"version\": 1,\n"
             << "  \"frame\": " << frame << ",\n"
             << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
-            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(observed.token) << "\",\n";
+        AppendObservedRuntimeScreenFields(out, observed, target);
+        out
+            << ",\n"
             << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
             << "  \"resolvedBackendStatus\": \"" << JsonEscape(status) << "\",\n"
             << "  \"backendResolvedSubmitCount\": " << submits.size() << ",\n"
@@ -6137,6 +6302,7 @@ namespace UiLab
     static std::string BuildRuntimeGpuSubmitJson()
     {
         const auto& target = TargetFor(g_target);
+        const auto observed = BuildObservedRuntimeScreen();
 
         std::vector<RuntimeGpuSubmitCall> calls;
         uint64_t frame = 0;
@@ -6173,7 +6339,11 @@ namespace UiLab
             << "  \"version\": 1,\n"
             << "  \"frame\": " << frame << ",\n"
             << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
-            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(observed.token) << "\",\n";
+        AppendObservedRuntimeScreenFields(out, observed, target);
+        out
+            << ",\n"
             << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
             << "  \"backendSubmitStatus\": \"" << JsonEscape(status) << "\",\n"
             << "  \"backendSubmitCallCount\": " << calls.size() << ",\n"
@@ -6205,6 +6375,7 @@ namespace UiLab
     static std::string BuildRuntimeMaterialCorrelationJson()
     {
         const auto& target = TargetFor(g_target);
+        const auto observed = BuildObservedRuntimeScreen();
 
         std::vector<RuntimeUiDrawCall> drawCalls;
         std::vector<RuntimeGpuSubmitCall> submitCalls;
@@ -6260,7 +6431,11 @@ namespace UiLab
             << "  \"version\": 1,\n"
             << "  \"frame\": " << frame << ",\n"
             << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
-            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(observed.token) << "\",\n";
+        AppendObservedRuntimeScreenFields(out, observed, target);
+        out
+            << ",\n"
             << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
             << "  \"correlationStatus\": \"same-frame-order-window active; raw D3D12/Vulkan command capture pending\",\n"
             << "  \"backendSubmitStatus\": \"" << JsonEscape(backendSubmitStatus) << "\",\n"
@@ -6304,6 +6479,7 @@ namespace UiLab
     static std::string BuildRuntimeUiDrawListJson()
     {
         const auto& target = TargetFor(g_target);
+        const auto observed = BuildObservedRuntimeScreen();
 
         std::vector<RuntimeUiDrawCall> calls;
         uint64_t frame = 0;
@@ -6337,7 +6513,11 @@ namespace UiLab
             << "  \"version\": 1,\n"
             << "  \"frame\": " << frame << ",\n"
             << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
-            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(observed.token) << "\",\n";
+        AppendObservedRuntimeScreenFields(out, observed, target);
+        out
+            << ",\n"
             << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
             << "  \"runtimeDrawListStatus\": \"" << JsonEscape(status) << "\",\n"
             << "  \"gpuDrawListStatus\": \"GPU backend submit pending\",\n"
@@ -6369,6 +6549,7 @@ namespace UiLab
     static std::string BuildUiOracleJson()
     {
         const auto& target = TargetFor(g_target);
+        const auto observed = BuildObservedRuntimeScreen();
         const auto csd = BuildCsdLiveInspectorSnapshot();
         const auto csdProjectTree = BuildCsdProjectTreeInspectorSnapshot();
         const auto loading = BuildLoadingLiveInspectorSnapshot();
@@ -6399,7 +6580,11 @@ namespace UiLab
             << "  \"version\": 1,\n"
             << "  \"frame\": " << g_presentedFrameCount << ",\n"
             << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
-            << "  \"activeScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(observed.token) << "\",\n";
+        AppendObservedRuntimeScreenFields(out, observed, target);
+        out
+            << ",\n"
             << "  \"activeProject\": \"" << JsonEscape(csdProjectTree.activeProject) << "\",\n"
             << "  \"targetProject\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
             << "  \"route\": \"" << JsonEscape(g_routeStatus) << "\",\n"
@@ -6493,6 +6678,7 @@ namespace UiLab
     std::string BuildLiveStateJson()
     {
         const auto& target = TargetFor(g_target);
+        const auto observed = BuildObservedRuntimeScreen();
         std::ostringstream out;
 
         out
@@ -6503,6 +6689,10 @@ namespace UiLab
             << "  \"targetLabel\": \"" << JsonEscape(target.label) << "\",\n"
             << "  \"targetCsd\": \"" << JsonEscape(target.primaryCsdScene) << "\",\n"
             << "  \"sourceFamily\": \"" << JsonEscape(target.sourceFamily) << "\",\n"
+            << "  \"targetScreen\": \"" << JsonEscape(target.token) << "\",\n";
+        AppendObservedRuntimeScreenFields(out, observed, target);
+        out
+            << ",\n"
             << "  " << kLiveStateRouteFieldName << ": \"" << JsonEscape(g_routeStatus) << "\",\n"
             << "  \"routePending\": " << (g_routePending ? "true" : "false") << ",\n"
             << "  \"routeGeneration\": " << g_routeGeneration << ",\n"
@@ -10173,6 +10363,7 @@ namespace UiLab
     static std::string BuildRouteStatusJson()
     {
         const auto& target = TargetFor(g_target);
+        const auto observed = BuildObservedRuntimeScreen();
         std::ostringstream out;
 
         out
@@ -10180,6 +10371,13 @@ namespace UiLab
             << "\"ok\":true"
             << ",\"target\":\"" << JsonEscape(target.token) << "\""
             << ",\"targetLabel\":\"" << JsonEscape(target.label) << "\""
+            << ",\"targetScreen\":\"" << JsonEscape(target.token) << "\""
+            << ",\"observedScreen\":\"" << JsonEscape(observed.token) << "\""
+            << ",\"observedScreenLabel\":\"" << JsonEscape(observed.label) << "\""
+            << ",\"observedCsdProject\":\"" << JsonEscape(observed.csdProject) << "\""
+            << ",\"observedSourceFamily\":\"" << JsonEscape(observed.sourceFamily) << "\""
+            << ",\"observedScreenSource\":\"" << JsonEscape(observed.source) << "\""
+            << ",\"targetObservedMismatch\":" << (observed.token != target.token ? "true" : "false")
             << ",\"route\":\"" << JsonEscape(g_routeStatus) << "\""
             << ",\"routePending\":" << (g_routePending ? "true" : "false")
             << ",\"routePolicy\":\"" << JsonEscape(RoutePolicyLabel()) << "\""

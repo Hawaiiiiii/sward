@@ -711,6 +711,37 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("--ui-lab-live-bridge-name", script)
         self.assertIn("liveBridgeName =", script)
 
+    def test_ui_lab_live_bridge_reports_dynamic_observed_screen_apart_from_requested_target(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+
+        for token in [
+            "ObservedRuntimeScreen",
+            "BuildObservedRuntimeScreen",
+            '"observedScreen"',
+            '"observedScreenLabel"',
+            '"observedCsdProject"',
+            '"observedSourceFamily"',
+            '"observedScreenSource"',
+            '"targetObservedMismatch"',
+            'project == "ui_itemresult"',
+            'observed.token != target.token',
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for mapping in [
+            '{ "ui_title", "title-runtime"',
+            '{ "ui_loading", "loading"',
+            '{ "ui_playscreen", "sonic-hud"',
+            '{ "ui_prov_playscreen", "extra-stage-hud"',
+            '{ "ui_pause", "pause"',
+            '{ "ui_status", "status"',
+            '{ "ui_result", "result"',
+            '{ "ui_itemresult", "item-result"',
+            '{ "ui_worldmap", "world-map"',
+            '{ "ui_worldmap_help", "world-map-help"',
+        ]:
+            self.assertIn(mapping, ui_lab)
+
     def test_ui_lab_phase145_exposes_runtime_ui_oracle_bridge_command(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         client = self.read("research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1")
