@@ -627,6 +627,29 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("DIRECTX_DXIL_LIBRARY", script)
         self.assertIn("Patch-SdlPrefetchShim", script)
 
+    def test_ui_lab_runtime_build_helper_uses_transient_short_drive_only(self):
+        build_script = self.read("research_uiux/runtime_reference/tools/build_unleashed_recomp_ui_lab.ps1")
+        capture_script = self.read("research_uiux/runtime_reference/tools/capture_unleashed_recomp_ui_lab.ps1")
+        manual_script = self.read("research_uiux/runtime_reference/tools/launch_unleashed_recomp_ui_lab_manual.ps1")
+
+        self.assertIn("[switch]$KeepSubstDrive", build_script)
+        self.assertIn("$createdSubstDrive = $false", build_script)
+        self.assertIn("Remove-TransientSubstDrive", build_script)
+        self.assertIn("if ($createdSubstDrive -and -not $KeepSubstDrive)", build_script)
+        self.assertIn('cmd /c "subst $drive /D"', build_script)
+        self.assertIn("$hostBuildPath = Join-Path $root $BuildDir", build_script)
+        self.assertIn("Built UI Lab runtime: $hostExe", build_script)
+        self.assertIn(
+            '[string]$ExePath = "local_build_env\\ur103clean\\b\\ui_lab_runtime\\UnleashedRecomp\\UnleashedRecomp.exe"',
+            capture_script,
+        )
+        self.assertIn(
+            '[string]$BuildExePath = "local_build_env\\ur103clean\\b\\ui_lab_runtime\\UnleashedRecomp\\UnleashedRecomp.exe"',
+            manual_script,
+        )
+        self.assertNotIn('[string]$ExePath = "W:\\', capture_script)
+        self.assertNotIn('[string]$BuildExePath = "W:\\', manual_script)
+
     def test_ui_lab_is_documented_as_primary_parity_lane(self):
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
         self.assertIn("UnleashedRecomp UI Lab", report)
@@ -3745,6 +3768,146 @@ mov r8d,(int)999999
         self.assertIn("ct_gameplay_writer_events=0", completed.stdout)
         self.assertIn("ct-gameplay-writer:pending:0", completed.stdout)
         self.assertNotIn("ct-gameplay-writer:present:1", completed.stdout)
+
+    def test_ui_lab_phase222_exports_ghidra_context_for_ct_and_hud_candidates(self):
+        java_script = self.read("research_uiux/runtime_reference/ghidra_scripts/SwardExportFunctionContext.java")
+        wrapper = self.read("research_uiux/runtime_reference/tools/export_unleashed_recomp_ghidra_context.ps1")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "SwardExportFunctionContext",
+            "schema",
+            "sward-ghidra-function-context-v1",
+            "callers",
+            "callees",
+            "referencesTo",
+            "referencesFrom",
+            "sub_824D6C18",
+            "sub_8231C590",
+            "sub_8231C5F0",
+            "sub_8231C628",
+            "sub_82519FE8",
+            "sub_82BDBA20",
+            "sub_82BDBA60",
+            "sub_830BF640",
+            "sub_830BF090",
+            "sub_830BF300",
+            "sub_830BF080",
+        ]:
+            self.assertIn(token, java_script)
+
+        for token in [
+            "SWARD_GHIDRA_HOME",
+            "manifest.json",
+            "javaHome",
+            "$env:JAVA_HOME",
+            "analyzeHeadless",
+            "SwardExportFunctionContext.java",
+            "out\\ui_lab_static_re\\ghidra",
+            "local_build_env\\ur103clean\\b\\ui_lab_runtime\\UnleashedRecomp\\UnleashedRecomp.exe",
+            "New-Item -ItemType HardLink",
+            "New-Item -ItemType Directory -Force -Path $resolvedProjectRoot",
+            "-postScript",
+        ]:
+            self.assertIn(token, wrapper)
+
+        for token in [
+            "Phase 222",
+            "Ghidra headless",
+            "static_function_context_targets=",
+            "static_runtime_correlation_groups=",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+    def test_ui_lab_phase222_correlates_static_ghidra_context_to_runtime_hud_rows(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+
+        for token in [
+            "StaticContextPath",
+            "staticFunctionContextTargets",
+            "staticRuntimeCorrelationGroups",
+            "static_function_context_targets=",
+            "static_runtime_correlation_groups=",
+            "sonic_hud_static_context_correlation_status=",
+            "static-ghidra-context-correlated-with-runtime-hud-evidence",
+        ]:
+            self.assertIn(token, script)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            events = tmp_path / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-ct-code-entry-gauge-transition-candidate","detail":"valueName=boostGaugeCandidate callsite=sub_8231C5F0 phase=ratio-read ownerAddress=0xAAAA storageAddress=0x153C previousRawValue=0 rawValue=1120403456 previousFloatValue=0 floatValue=100 inputFloatValue=1 source=ct-code-entry-gauge-transition-candidate:day-boost-a74bd6"}',
+                        '{"time":1.1,"frame":101,"event":"sonic-hud-gauge-setter-owner-candidate-correlated","detail":"kind=text node=0xCCCC value=\\"573\\" semanticValueName=boostGauge semanticPathCandidate=ui_playscreen/so_speed_gauge ownerAddress=0x759FE30 ownerField460=0 ownerField464=7 ownerField468=3 ownerField472=5 ownerField480=573 frameDelta=0 callsiteSource=same-frame-hud-update-context:sub_824D6C18 source=runtime-csd-node-setter-owner-field-candidate-join:CSD::CNode::SetText/sub_830BF640 pathResolved=false"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            static_context = tmp_path / "function_context.json"
+            static_context.write_text(
+                json.dumps(
+                    {
+                        "schema": "sward-ghidra-function-context-v1",
+                        "targets": [
+                            {
+                                "query": "sub_8231C5F0",
+                                "name": "sub_8231C5F0",
+                                "entry": "0x8231C5F0",
+                                "status": "resolved",
+                                "callers": [{"name": "sub_8231C628", "entry": "0x8231C628"}],
+                                "callees": [{"name": "sub_830BF640", "entry": "0x830BF640"}],
+                            },
+                            {
+                                "query": "sub_824D6C18",
+                                "name": "sub_824D6C18",
+                                "entry": "0x824D6C18",
+                                "status": "resolved",
+                                "callers": [{"name": "sub_824D69B0", "entry": "0x824D69B0"}],
+                                "callees": [{"name": "sub_830BF640", "entry": "0x830BF640"}],
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                    "-StaticContextPath",
+                    str(static_context),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("static_function_context_targets=2:resolved=2:unresolved=0", completed.stdout)
+        self.assertIn(
+            "static_runtime_correlation_groups=callsite=sub_8231C5F0:static=resolved:runtime=ct-code-entry-gauge-transition,ct-code-entry-owner-setter-correlation:callers=1:callees=1",
+            completed.stdout,
+        )
+        self.assertIn(
+            "callsite=sub_824D6C18:static=resolved:runtime=owner-setter-candidate-correlation:callers=1:callees=1",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_hud_static_context_correlation_status=static-ghidra-context-correlated-with-runtime-hud-evidence",
+            completed.stdout,
+        )
 
     def test_ui_lab_phase212_summarizes_cheat_table_code_entries_as_host_sites(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_sonic_unleashed_cheat_table.ps1"

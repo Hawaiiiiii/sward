@@ -2,7 +2,7 @@ param(
     [string[]]$Targets = @(),
     [ValidateSet("early-game", "frontend", "all", "custom")]
     [string]$TargetSet = "early-game",
-    [string]$ExePath = "W:\b\ui_lab_runtime\UnleashedRecomp\UnleashedRecomp.exe",
+    [string]$ExePath = "local_build_env\ur103clean\b\ui_lab_runtime\UnleashedRecomp\UnleashedRecomp.exe",
     [string]$InstallRoot = "Unleashed Recomp - Windows (Complete Installation) 1.0.3",
     [string]$OutputRoot = "out\ui_lab_runtime_evidence",
     [int]$InitialWaitSeconds = 8,

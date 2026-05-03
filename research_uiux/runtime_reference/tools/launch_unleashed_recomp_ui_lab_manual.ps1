@@ -1,5 +1,5 @@
 param(
-    [string]$BuildExePath = "W:\b\ui_lab_runtime\UnleashedRecomp\UnleashedRecomp.exe",
+    [string]$BuildExePath = "local_build_env\ur103clean\b\ui_lab_runtime\UnleashedRecomp\UnleashedRecomp.exe",
     [string]$InstallRoot = "Unleashed Recomp - Windows (Complete Installation) 1.0.3",
     [string]$SidecarName = "sward_ui_lab_runtime_manual",
     [string]$OutputRoot = "out\ui_lab_runtime_evidence",

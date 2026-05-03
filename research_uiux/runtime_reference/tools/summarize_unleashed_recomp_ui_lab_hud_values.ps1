@@ -2,6 +2,7 @@ param(
     [string]$EventsPath = "",
     [string]$EvidenceDir = "",
     [string]$DrawListPath = "",
+    [string]$StaticContextPath = "",
     [int]$CandidateValueLimit = 32,
     [switch]$AsJson
 )
@@ -148,6 +149,94 @@ function Get-CallsiteFromSource([string]$Source) {
         return $match.Value
     }
     return ""
+}
+
+function Add-StaticRuntimeCallsiteEvidence($RuntimeCallsitesByKey, [string]$Callsite, [string]$EvidenceKind) {
+    if ([string]::IsNullOrWhiteSpace($Callsite) -or [string]::IsNullOrWhiteSpace($EvidenceKind)) {
+        return
+    }
+
+    if (-not $RuntimeCallsitesByKey.ContainsKey($Callsite)) {
+        $RuntimeCallsitesByKey[$Callsite] = [System.Collections.Generic.SortedSet[string]]::new()
+    }
+    [void]$RuntimeCallsitesByKey[$Callsite].Add($EvidenceKind)
+}
+
+function Get-StaticContextTargetProperty($Target, [string]$Name) {
+    if ($null -eq $Target -or -not ($Target.PSObject.Properties.Name -contains $Name)) {
+        return $null
+    }
+    return $Target.$Name
+}
+
+function Get-StaticContextTargetCallsite($Target) {
+    foreach ($propertyName in @("query", "name", "entry")) {
+        $value = [string](Get-StaticContextTargetProperty $Target $propertyName)
+        if ([string]::IsNullOrWhiteSpace($value)) {
+            continue
+        }
+
+        $match = [regex]::Match($value, "sub_[0-9A-Fa-f]+")
+        if ($match.Success) {
+            return $match.Value
+        }
+    }
+    return ""
+}
+
+function Get-StaticContextTargetArrayCount($Target, [string]$Name) {
+    $value = Get-StaticContextTargetProperty $Target $Name
+    if ($null -eq $value) {
+        return 0
+    }
+    return @($value).Count
+}
+
+function Add-StaticFunctionContextSummary($Summary, [string]$ContextPath, $RuntimeCallsitesByKey) {
+    if ([string]::IsNullOrWhiteSpace($ContextPath)) {
+        return
+    }
+
+    $resolvedStaticContextPath = Resolve-Path -LiteralPath $ContextPath -ErrorAction Stop
+    $Summary.staticContextPath = $resolvedStaticContextPath.Path
+
+    $staticContext = Get-Content -Raw -LiteralPath $resolvedStaticContextPath.Path | ConvertFrom-Json
+    $targets = @($staticContext.targets)
+    $Summary.staticFunctionContextTargets = $targets.Count
+
+    $groups = New-Object System.Collections.Generic.List[object]
+    foreach ($target in $targets) {
+        $status = [string](Get-StaticContextTargetProperty $target "status")
+        if ([string]::IsNullOrWhiteSpace($status)) {
+            $status = "unknown"
+        }
+
+        if ($status -eq "resolved") {
+            $Summary.staticFunctionContextResolvedTargets++
+        }
+        else {
+            $Summary.staticFunctionContextUnresolvedTargets++
+        }
+
+        $callsite = Get-StaticContextTargetCallsite $target
+        if ([string]::IsNullOrWhiteSpace($callsite) -or -not $RuntimeCallsitesByKey.ContainsKey($callsite)) {
+            continue
+        }
+
+        [void]$groups.Add([pscustomobject]@{
+            callsite = $callsite
+            staticStatus = $status
+            runtimeEvidence = @($RuntimeCallsitesByKey[$callsite])
+            callerCount = Get-StaticContextTargetArrayCount $target "callers"
+            calleeCount = Get-StaticContextTargetArrayCount $target "callees"
+        })
+    }
+
+    $Summary.staticRuntimeCorrelationGroups = @(
+        $groups | Sort-Object `
+            @{ Expression = { $_.callsite } }, `
+            @{ Expression = { $_.staticStatus } }
+    )
 }
 
 function Add-RollingCounterSemanticGroup($Groups, [string]$Detail, $EventObject) {
@@ -1589,6 +1678,7 @@ $ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroupsByKey = @{}
 $ctGameplayWriterRecords = New-Object System.Collections.Generic.List[object]
 $ctCodeEntryGaugeTransitionCandidateRecords = New-Object System.Collections.Generic.List[object]
 $ownerSetterCandidateRecords = New-Object System.Collections.Generic.List[object]
+$staticRuntimeCallsitesByKey = @{}
 $ownerFieldOffsetClassificationsByKey = @{}
 $ownerFieldOffsetTransitionTracksByKey = @{}
 $gaugeDrawPathGroupsByKey = @{}
@@ -1656,6 +1746,12 @@ $summary = [ordered]@{
     sonicHudCtGameplayWriterStatus = "pending-ct-anchored-gameplay-writer-evidence"
     sonicHudCtCodeEntryGaugeTransitionCandidateStatus = "pending-ct-code-entry-gauge-transition-candidate-evidence"
     sonicHudCtCodeEntryGaugeTransitionCorrelationStatus = "pending-ct-code-entry-gauge-transition-owner-setter-candidate-correlation-evidence"
+    sonicHudStaticContextCorrelationStatus = "pending-static-ghidra-context-correlation"
+    staticContextPath = ""
+    staticFunctionContextTargets = 0
+    staticFunctionContextResolvedTargets = 0
+    staticFunctionContextUnresolvedTargets = 0
+    staticRuntimeCorrelationGroups = @()
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
@@ -1734,21 +1830,40 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
             $summary.ownerSetterCandidateCorrelationEvents++
             Add-OwnerSetterCandidateCorrelationGroup $ownerSetterCandidateCorrelationGroupsByKey $detail $eventObject
             Add-OwnerSetterCandidateNumericRelationGroup $ownerSetterCandidateNumericRelationGroupsByKey $detail $eventObject
-            [void]$ownerSetterCandidateRecords.Add((New-OwnerSetterCandidateRecord $detail $eventObject))
+            $ownerSetterRecord = New-OwnerSetterCandidateRecord $detail $eventObject
+            [void]$ownerSetterCandidateRecords.Add($ownerSetterRecord)
+            Add-StaticRuntimeCallsiteEvidence `
+                $staticRuntimeCallsitesByKey `
+                $ownerSetterRecord.callsite `
+                "owner-setter-candidate-correlation"
         }
         "sonic-hud-ct-gameplay-writer" {
             $summary.ctGameplayWriterEvents++
             Add-CtGameplayWriterGroup $ctGameplayWriterGroupsByKey $detail $eventObject
-            [void]$ctGameplayWriterRecords.Add((New-CtGameplayWriterRecord $detail $eventObject))
+            $writerRecord = New-CtGameplayWriterRecord $detail $eventObject
+            [void]$ctGameplayWriterRecords.Add($writerRecord)
+            Add-StaticRuntimeCallsiteEvidence `
+                $staticRuntimeCallsitesByKey `
+                $writerRecord.callsite `
+                "ct-gameplay-writer"
         }
         "sonic-hud-ct-gameplay-writer-probe" {
             $summary.ctGameplayWriterProbeEvents++
             Add-CtGameplayWriterProbeGroup $ctGameplayWriterProbeGroupsByKey $detail $eventObject
+            Add-StaticRuntimeCallsiteEvidence `
+                $staticRuntimeCallsitesByKey `
+                (Get-DetailToken $detail "callsite") `
+                "ct-gameplay-writer-probe"
         }
         "sonic-hud-ct-code-entry-gauge-transition-candidate" {
             $summary.ctCodeEntryGaugeTransitionCandidateEvents++
             Add-CtCodeEntryGaugeTransitionCandidateGroup $ctCodeEntryGaugeTransitionCandidateGroupsByKey $detail $eventObject
-            [void]$ctCodeEntryGaugeTransitionCandidateRecords.Add((New-CtCodeEntryGaugeTransitionCandidateRecord $detail $eventObject))
+            $ctCodeEntryRecord = New-CtCodeEntryGaugeTransitionCandidateRecord $detail $eventObject
+            [void]$ctCodeEntryGaugeTransitionCandidateRecords.Add($ctCodeEntryRecord)
+            Add-StaticRuntimeCallsiteEvidence `
+                $staticRuntimeCallsitesByKey `
+                $ctCodeEntryRecord.callsite `
+                "ct-code-entry-gauge-transition"
         }
         "sonic-hud-audio-cue-callsite" {
             $summary.audioCallsiteEvents++
@@ -2101,6 +2216,13 @@ $summary.ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups = @(
             }
         }
 )
+foreach ($group in $summary.ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups) {
+    Add-StaticRuntimeCallsiteEvidence `
+        $staticRuntimeCallsitesByKey `
+        $group.ctCallsite `
+        "ct-code-entry-owner-setter-correlation"
+}
+
 $summary.ctGameplayWriterOwnerSetterCandidateCorrelationGroups = @(
     $ctGameplayWriterOwnerSetterCandidateCorrelationGroupsByKey.Keys |
         Sort-Object `
@@ -2351,6 +2473,8 @@ $summary.gaugeSetterChildPathJoins = @(
         }
     }
 )
+Add-StaticFunctionContextSummary $summary $StaticContextPath $staticRuntimeCallsitesByKey
+
 if ($summary.gaugeSetterChildPathJoins.Count -gt 0) {
     $summary.gaugeChildPathStatus = "runtime-draw-list-setter-node-joined"
 }
@@ -2411,6 +2535,15 @@ if ($summary.ctCodeEntryGaugeTransitionCandidateEvents -gt 0) {
 if ($summary.ctCodeEntryGaugeTransitionOwnerSetterCandidateCorrelationGroups.Count -gt 0) {
     $summary.sonicHudCtCodeEntryGaugeTransitionCorrelationStatus =
         "ct-code-entry-gauge-transition-owner-setter-candidate-correlation-present-pending-formula-proof"
+}
+
+if ($summary.staticRuntimeCorrelationGroups.Count -gt 0) {
+    $summary.sonicHudStaticContextCorrelationStatus =
+        "static-ghidra-context-correlated-with-runtime-hud-evidence"
+}
+elseif (-not [string]::IsNullOrWhiteSpace($summary.staticContextPath)) {
+    $summary.sonicHudStaticContextCorrelationStatus =
+        "static-ghidra-context-loaded-runtime-correlation-pending"
 }
 
 if ($summary.audioCallsiteEvents -gt 0) {
@@ -2607,6 +2740,25 @@ Write-Output (
                     $_.lastFrame
             }
     ) $CandidateValueLimit))
+Write-Output ("static_context_path={0}" -f $summary.staticContextPath)
+Write-Output (
+    "static_function_context_targets={0}:resolved={1}:unresolved={2}" -f
+    $summary.staticFunctionContextTargets,
+    $summary.staticFunctionContextResolvedTargets,
+    $summary.staticFunctionContextUnresolvedTargets)
+Write-Output (
+    "static_runtime_correlation_groups={0}" -f
+    (Format-CandidateList (
+        $summary.staticRuntimeCorrelationGroups |
+            ForEach-Object {
+                "callsite={0}:static={1}:runtime={2}:callers={3}:callees={4}" -f
+                    $_.callsite,
+                    $_.staticStatus,
+                    (Format-CandidateList $_.runtimeEvidence $CandidateValueLimit),
+                    $_.callerCount,
+                    $_.calleeCount
+            }
+    ) $CandidateValueLimit))
 Write-Output ("ct_gameplay_writer_events={0}" -f $summary.ctGameplayWriterEvents)
 Write-Output (
     "ct_gameplay_writer_groups={0}" -f
@@ -2715,6 +2867,7 @@ Write-Output ("sonic_hud_owner_setter_candidate_correlation_status={0}" -f $summ
 Write-Output ("sonic_hud_ct_gameplay_writer_status={0}" -f $summary.sonicHudCtGameplayWriterStatus)
 Write-Output ("sonic_hud_ct_code_entry_gauge_transition_candidate_status={0}" -f $summary.sonicHudCtCodeEntryGaugeTransitionCandidateStatus)
 Write-Output ("sonic_hud_ct_code_entry_gauge_transition_correlation_status={0}" -f $summary.sonicHudCtCodeEntryGaugeTransitionCorrelationStatus)
+Write-Output ("sonic_hud_static_context_correlation_status={0}" -f $summary.sonicHudStaticContextCorrelationStatus)
 Write-Output (
     "owner_field_rolling_counter_groups={0}" -f
     (Format-CandidateList (

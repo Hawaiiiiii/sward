@@ -3,7 +3,8 @@ param(
     [string]$DriveLetter = "W",
     [string]$BuildDir = "b\ui_lab_runtime",
     [string]$Configuration = "RelWithDebInfo",
-    [string]$Target = "UnleashedRecomp"
+    [string]$Target = "UnleashedRecomp",
+    [switch]$KeepSubstDrive
 )
 
 $ErrorActionPreference = "Stop"
@@ -72,6 +73,15 @@ function Invoke-DevCmd([string]$Command) {
     }
 }
 
+function Remove-TransientSubstDrive([string]$Drive, [bool]$createdSubstDrive, [bool]$KeepSubstDrive) {
+    if ($createdSubstDrive -and -not $KeepSubstDrive) {
+        cmd /c "subst $drive /D"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to unmount transient build drive $Drive"
+        }
+    }
+}
+
 $root = Resolve-RequiredPath $GeneratedRoot "Generated UnleashedRecomp root"
 
 @(
@@ -96,6 +106,7 @@ $root = Resolve-RequiredPath $GeneratedRoot "Generated UnleashedRecomp root"
 
 $drive = "$DriveLetter`:"
 $shortRoot = "$drive\"
+$createdSubstDrive = $false
 
 $existingSubst = cmd /c "subst"
 $existingMapping = $existingSubst | Where-Object { $_ -like "$drive\:*" } | Select-Object -First 1
@@ -111,42 +122,50 @@ else {
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to mount $root on $drive"
     }
+    $createdSubstDrive = $true
 }
-
-Patch-SdlPrefetchShim $shortRoot
-
-$buildPath = Join-Path $shortRoot $BuildDir
-$toolchain = Join-Path $shortRoot "thirdparty\vcpkg\scripts\buildsystems\vcpkg.cmake"
-$dxilPath = Join-Path $buildPath "vcpkg_installed\x64-windows-static\bin\dxil.dll"
-
-$configureBase = "cmake -S $shortRoot -B $buildPath -G Ninja " +
-    "-DCMAKE_BUILD_TYPE=$Configuration " +
-    "-DCMAKE_C_COMPILER=clang-cl.exe " +
-    "-DCMAKE_CXX_COMPILER=clang-cl.exe " +
-    "-DCMAKE_LINKER=lld-link.exe " +
-    "-DCMAKE_TOOLCHAIN_FILE=$toolchain " +
-    "-DVCPKG_TARGET_TRIPLET=x64-windows-static"
 
 try {
-    Invoke-DevCmd $configureBase
-}
-catch {
-    if (-not (Test-Path -LiteralPath $dxilPath)) {
-        throw
+    Patch-SdlPrefetchShim $shortRoot
+
+    $buildPath = Join-Path $shortRoot $BuildDir
+    $hostBuildPath = Join-Path $root $BuildDir
+    $toolchain = Join-Path $shortRoot "thirdparty\vcpkg\scripts\buildsystems\vcpkg.cmake"
+    $dxilPath = Join-Path $buildPath "vcpkg_installed\x64-windows-static\bin\dxil.dll"
+
+    $configureBase = "cmake -S $shortRoot -B $buildPath -G Ninja " +
+        "-DCMAKE_BUILD_TYPE=$Configuration " +
+        "-DCMAKE_C_COMPILER=clang-cl.exe " +
+        "-DCMAKE_CXX_COMPILER=clang-cl.exe " +
+        "-DCMAKE_LINKER=lld-link.exe " +
+        "-DCMAKE_TOOLCHAIN_FILE=$toolchain " +
+        "-DVCPKG_TARGET_TRIPLET=x64-windows-static"
+
+    try {
+        Invoke-DevCmd $configureBase
+    }
+    catch {
+        if (-not (Test-Path -LiteralPath $dxilPath)) {
+            throw
+        }
+
+        Invoke-DevCmd "$configureBase -DDIRECTX_DXIL_LIBRARY=$dxilPath"
     }
 
-    Invoke-DevCmd "$configureBase -DDIRECTX_DXIL_LIBRARY=$dxilPath"
+    if (Test-Path -LiteralPath $dxilPath) {
+        Invoke-DevCmd "$configureBase -DDIRECTX_DXIL_LIBRARY=$dxilPath"
+    }
+
+    Invoke-DevCmd "cmake --build $buildPath --target $Target -j 4"
+
+    $exe = Join-Path $buildPath "UnleashedRecomp\UnleashedRecomp.exe"
+    $hostExe = Join-Path $hostBuildPath "UnleashedRecomp\UnleashedRecomp.exe"
+    if (-not (Test-Path -LiteralPath $exe)) {
+        throw "Build finished but executable was not found: $exe"
+    }
+
+    Write-Host "Built UI Lab runtime: $hostExe"
 }
-
-if (Test-Path -LiteralPath $dxilPath) {
-    Invoke-DevCmd "$configureBase -DDIRECTX_DXIL_LIBRARY=$dxilPath"
+finally {
+    Remove-TransientSubstDrive $drive $createdSubstDrive ([bool]$KeepSubstDrive)
 }
-
-Invoke-DevCmd "cmake --build $buildPath --target $Target -j 4"
-
-$exe = Join-Path $buildPath "UnleashedRecomp\UnleashedRecomp.exe"
-if (-not (Test-Path -LiteralPath $exe)) {
-    throw "Build finished but executable was not found: $exe"
-}
-
-Write-Host "Built UI Lab runtime: $exe"
