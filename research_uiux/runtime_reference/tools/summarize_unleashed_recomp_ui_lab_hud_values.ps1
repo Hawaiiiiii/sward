@@ -852,6 +852,7 @@ $summary = [ordered]@{
     callsiteClassifications = 0
     ownerFieldSnapshotEvents = 0
     ownerScaleCorrelationEvents = 0
+    ownerSetterCandidateCorrelationEvents = 0
     audioCallsiteEvents = 0
     unresolvedNodeWrites = 0
     unresolvedNodeCandidateCount = 0
@@ -876,6 +877,7 @@ $summary = [ordered]@{
     sonicHudRuntimeProofMatrix = @()
     sonicHudRuntimeProofMatrixStatus = "pending-retail-runtime-stage-hud-proof"
     sonicHudAudioCallsiteStatus = "audio-callsite-pending"
+    sonicHudOwnerSetterCandidateCorrelationStatus = "pending-runtime-setter-owner-candidate-correlation-evidence"
     drawListPath = ""
     gaugeDrawPathGroups = @()
     gaugeSetterNodeCandidates = @()
@@ -949,6 +951,9 @@ Get-Content -LiteralPath $resolvedEventsPath | ForEach-Object {
         "sonic-hud-gauge-scale-owner-correlated" {
             $summary.ownerScaleCorrelationEvents++
             Add-OwnerFieldGaugeScaleCorrelationGroup $ownerFieldGaugeScaleCorrelationGroupsByKey $detail $eventObject
+        }
+        "sonic-hud-gauge-setter-owner-candidate-correlated" {
+            $summary.ownerSetterCandidateCorrelationEvents++
         }
         "sonic-hud-audio-cue-callsite" {
             $summary.audioCallsiteEvents++
@@ -1396,6 +1401,11 @@ if ($summary.ownerFieldDrawPathBridgeGroups.Count -gt 0) {
     $summary.ownerFieldDrawPathBridgeStatus = "owner-field-draw-path-bridge-pending-formula-proof"
 }
 
+if ($summary.ownerSetterCandidateCorrelationEvents -gt 0) {
+    $summary.sonicHudOwnerSetterCandidateCorrelationStatus =
+        "retail-runtime-setter-owner-candidate-correlation-pending-exact-child-path"
+}
+
 if ($summary.audioCallsiteEvents -gt 0) {
     $summary.sonicHudAudioCallsiteStatus = "retail-runtime-audio-callsite-evidence-found"
 }
@@ -1432,6 +1442,11 @@ $summary.sonicHudRuntimeProofMatrix = @(
         "runtime ui-draw-list cast/layer address join" `
         "waiting for setter node to exact gauge child path join"
     New-SonicHudRuntimeProofLane `
+        "owner-setter-candidate-correlation" `
+        $summary.ownerSetterCandidateCorrelationEvents `
+        "unresolved CSD setter node plus owner-field cache candidate join" `
+        "waiting for unresolved setter owner-candidate correlation"
+    New-SonicHudRuntimeProofLane `
         "audio-callsite" `
         $summary.audioCallsiteEvents `
         "retail Sonic HUD SFX/audio callsite hook" `
@@ -1446,6 +1461,7 @@ if (
     $summary.gameplayUpdates -gt 0 -or
     $summary.gameplayValueSnapshots -gt 0 -or
     $summary.callsiteClassifications -gt 0 -or
+    $summary.ownerSetterCandidateCorrelationEvents -gt 0 -or
     $summary.audioCallsiteEvents -gt 0 -or
     $summary.semanticPathCandidateWrites -gt 0 -or
     $summary.semanticBoundWrites -gt 0 -or
@@ -1472,6 +1488,7 @@ Write-Output (
     $summary.gameplayUpdates,
     $summary.gameplayValueSnapshots,
     $summary.callsiteClassifications)
+Write-Output ("owner_setter_candidate_correlations={0}" -f $summary.ownerSetterCandidateCorrelationEvents)
 Write-Output (
     "unresolved_node_writes={0}:node_candidates={1}" -f
     $summary.unresolvedNodeWrites,
@@ -1543,6 +1560,7 @@ Write-Output (
     ) $CandidateValueLimit))
 Write-Output ("sonic_hud_runtime_proof_matrix_status={0}" -f $summary.sonicHudRuntimeProofMatrixStatus)
 Write-Output ("sonic_hud_audio_callsite_status={0}" -f $summary.sonicHudAudioCallsiteStatus)
+Write-Output ("sonic_hud_owner_setter_candidate_correlation_status={0}" -f $summary.sonicHudOwnerSetterCandidateCorrelationStatus)
 Write-Output (
     "owner_field_rolling_counter_groups={0}" -f
     (Format-CandidateList (

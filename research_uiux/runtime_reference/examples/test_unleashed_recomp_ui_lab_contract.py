@@ -3149,6 +3149,79 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertNotIn("sonic_hud_runtime_proof_matrix_status=retail-runtime-gauge-and-audio-proof-ready", completed.stdout)
         self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
 
+    def test_ui_lab_phase207_reports_unresolved_setter_owner_candidate_correlation(self):
+        script_path = ROOT / "research_uiux/runtime_reference/tools/summarize_unleashed_recomp_ui_lab_hud_values.ps1"
+        script = script_path.read_text(encoding="utf-8")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")
+        checklist = self.read("research_uiux/TODO_CHECKLIST.md")
+
+        for token in [
+            "sonic-hud-gauge-setter-owner-candidate-correlated",
+            "EmitSonicHudGaugeSetterOwnerCandidateCorrelation",
+            "g_loggedOwnerFieldGaugeSetterCandidateCorrelationKeys",
+            'writeKind == "text" ||',
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "sonic-hud-gauge-setter-owner-candidate-correlated",
+            "ownerSetterCandidateCorrelationEvents",
+            "owner-setter-candidate-correlation",
+            "sonic_hud_owner_setter_candidate_correlation_status=",
+            "retail-runtime-setter-owner-candidate-correlation-pending-exact-child-path",
+        ]:
+            self.assertIn(token, script)
+
+        for token in [
+            "Phase 207",
+            "unresolved setter owner-candidate correlation",
+            "retail-runtime-setter-owner-candidate-correlation-pending-exact-child-path",
+        ]:
+            self.assertIn(token, report)
+            self.assertIn(token, checklist)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events = Path(tmp) / "ui_lab_events.jsonl"
+            events.write_text(
+                "\n".join(
+                    [
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-owner-gauge-snapshot","detail":"ownerAddress=0xCE2D6B0 callsite=sub_824D6C18 fieldOffsets=460,464,468,472,480 fieldValues=4,2,3,3,895 fieldValueHexes=0x4,0x2,0x3,0x3,0x37F candidatePaths=ui_playscreen/so_speed_gauge|ui_playscreen/so_ringenagy_gauge candidateValueNames=boostGauge|ringEnergyGauge source=runtime-owner-field-snapshot:sub_824D6C18"}',
+                        '{"time":1.0,"frame":100,"event":"sonic-hud-gauge-setter-owner-candidate-correlated","detail":"kind=scale node=0xBBBB value=\\"0.650,1\\" semanticValueName=boostGauge semanticPathCandidate=ui_playscreen/so_speed_gauge ownerAddress=0xCE2D6B0 ownerField460=4 ownerField464=2 ownerField468=3 ownerField472=3 ownerField480=895 frameDelta=0 source=runtime-csd-node-setter-owner-field-candidate-join:CSD::CNode::SetScale/sub_830BF090 pathResolved=false"}',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script_path),
+                    "-EventsPath",
+                    str(events),
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("owner-setter-candidate-correlation:present:1", completed.stdout)
+        self.assertIn(
+            "sonic_hud_owner_setter_candidate_correlation_status=retail-runtime-setter-owner-candidate-correlation-pending-exact-child-path",
+            completed.stdout,
+        )
+        self.assertIn(
+            "sonic_hud_runtime_proof_matrix_status=retail-runtime-gauge-proof-incomplete-audio-pending",
+            completed.stdout,
+        )
+        self.assertNotIn("sonic_hud_runtime_proof_matrix_status=retail-runtime-gauge-and-audio-proof-ready", completed.stdout)
+        self.assertNotIn("boost_ring_energy_status=runtime-final", completed.stdout)
+
     def test_ui_lab_phase202_preview_build_inventory_reports_repo_safe_metadata(self):
         script_path = ROOT / "research_uiux/runtime_reference/tools/inventory_sonic_unleashed_preview_build.ps1"
         report = self.read("research_uiux/DEBUG_MENU_FORK_HARVEST_AND_LIVE_BRIDGE.md")

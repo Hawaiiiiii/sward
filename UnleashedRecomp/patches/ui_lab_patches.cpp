@@ -1021,6 +1021,7 @@ namespace UiLab
     // reproduce identical joins; one join per material change is the goal.
     static std::string g_lastOwnerFieldGaugeScaleCorrelationSignature;
     static uint64_t g_lastOwnerFieldGaugeScaleCorrelationEvidenceFrame = 0;
+    static std::unordered_set<std::string> g_loggedOwnerFieldGaugeSetterCandidateCorrelationKeys;
     // Phase 198: same-frame join window. Only emit when the cached snapshot
     // is at most kOwnerFieldGaugeScaleCorrelationFrameWindow frames old, so
     // SetScale calls long after the last sub_824D6C18 hit are not joined.
@@ -3839,6 +3840,98 @@ namespace UiLab
         return g_loggedSonicHudValueTextWriteKeys.insert(logKey).second;
     }
 
+    static bool IsSonicHudGaugeSetterOwnerCandidateKind(std::string_view writeKind)
+    {
+        return writeKind == "text" ||
+            writeKind == "scale" ||
+            writeKind == "pattern-index" ||
+            writeKind == "hide-flag";
+    }
+
+    static bool EmitSonicHudGaugeSetterOwnerCandidateCorrelation(
+        std::string_view writeKind,
+        uint32_t nodeAddress,
+        std::string_view valueText,
+        std::string_view hookSource,
+        const SonicHudNodeWriteCallsiteCorrelation& callsiteCorrelation,
+        const std::vector<SonicHudSemanticPathCandidate>& semanticCandidates)
+    {
+        if (
+            !IsSonicHudGaugeSetterOwnerCandidateKind(writeKind) ||
+            !callsiteCorrelation.known ||
+            semanticCandidates.empty())
+        {
+            return false;
+        }
+
+        OwnerFieldGaugeSnapshotCache snapshot;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            snapshot = g_lastOwnerFieldGaugeSnapshot;
+        }
+        if (!snapshot.populated || !IsPlausibleGuestPointer(snapshot.ownerAddress))
+            return false;
+
+        const uint64_t frameDelta = g_presentedFrameCount >= snapshot.frame
+            ? g_presentedFrameCount - snapshot.frame
+            : 0;
+        if (frameDelta > kOwnerFieldGaugeScaleCorrelationFrameWindow)
+            return false;
+
+        bool wroteAny = false;
+        for (const auto& candidate : semanticCandidates)
+        {
+            if (candidate.valueName != "boostGauge" && candidate.valueName != "ringEnergyGauge")
+                continue;
+
+            std::ostringstream signatureStream;
+            signatureStream
+                << writeKind
+                << "|node=" << HexU32(nodeAddress)
+                << "|value=" << valueText
+                << "|candidate=" << candidate.valueName
+                << "|path=" << candidate.path
+                << "|owner=" << HexU32(snapshot.ownerAddress)
+                << "|f460=" << HexU32(snapshot.field460)
+                << "|f464=" << HexU32(snapshot.field464)
+                << "|f468=" << HexU32(snapshot.field468)
+                << "|f472=" << HexU32(snapshot.field472)
+                << "|f480=" << HexU32(snapshot.field480);
+            const std::string signature = signatureStream.str();
+
+            bool shouldLog = false;
+            {
+                std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+                shouldLog = g_loggedOwnerFieldGaugeSetterCandidateCorrelationKeys.insert(signature).second;
+            }
+            if (!shouldLog)
+                continue;
+
+            WriteEvidenceEvent(
+                "sonic-hud-gauge-setter-owner-candidate-correlated",
+                "kind=" + std::string(writeKind) +
+                " node=" + HexU32(nodeAddress) +
+                " value=\"" + std::string(valueText) + "\"" +
+                " semanticValueName=" + candidate.valueName +
+                " semanticPathCandidate=" + candidate.path +
+                " ownerAddress=" + HexU32(snapshot.ownerAddress) +
+                " ownerField460=" + std::to_string(snapshot.field460) +
+                " ownerField464=" + std::to_string(snapshot.field464) +
+                " ownerField468=" + std::to_string(snapshot.field468) +
+                " ownerField472=" + std::to_string(snapshot.field472) +
+                " ownerField480=" + std::to_string(snapshot.field480) +
+                " frameDelta=" + std::to_string(frameDelta) +
+                " callsiteSource=" + callsiteCorrelation.source +
+                " callsiteStatus=" + callsiteCorrelation.status +
+                " pathResolved=false" +
+                " source=runtime-csd-node-setter-owner-field-candidate-join:" +
+                    std::string(hookSource));
+            wroteAny = true;
+        }
+
+        return wroteAny;
+    }
+
     static bool RecordUnresolvedSonicHudNodeWrite(
         std::string_view writeKind,
         uint32_t nodeAddress,
@@ -3959,11 +4052,23 @@ namespace UiLab
                             " semanticBindingStatus=stable-candidate-bound-pending-exact-child-node-resolution");
                     }
                 }
+
             }
             WriteLiveStateSnapshot();
         }
 
-        return shouldLog;
+        const bool wroteSetterOwnerCandidateCorrelation =
+            EmitSonicHudGaugeSetterOwnerCandidateCorrelation(
+                writeKind,
+                nodeAddress,
+                valueText,
+                hookSource,
+                callsiteCorrelation,
+                semanticCandidates);
+        if (wroteSetterOwnerCandidateCorrelation && !shouldLog)
+            WriteLiveStateSnapshot();
+
+        return shouldLog || wroteSetterOwnerCandidateCorrelation;
     }
 
     static std::vector<LateResolvedSonicHudNodeWrite> TryLateResolveSonicHudNodeWriteObservations(
@@ -7155,6 +7260,7 @@ namespace UiLab
         g_lastOwnerFieldGaugeSnapshot = OwnerFieldGaugeSnapshotCache{};
         g_lastOwnerFieldGaugeScaleCorrelationSignature.clear();
         g_lastOwnerFieldGaugeScaleCorrelationEvidenceFrame = 0;
+        g_loggedOwnerFieldGaugeSetterCandidateCorrelationKeys.clear();
         g_loggedTutorialHudOwnerPathReady = false;
         g_chudSonicStageOwnerFieldSampleCount = 0;
         g_lastSonicHudUpdateCallsiteSampleFrame = 0;
