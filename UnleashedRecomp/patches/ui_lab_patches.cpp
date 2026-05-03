@@ -7,6 +7,7 @@
 #include <os/logger.h>
 #include <user/config.h>
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <climits>
@@ -1677,6 +1678,32 @@ namespace UiLab
         return kRuntimeTargets.front();
     }
 
+    static bool WasObservedFrameRecent(uint64_t frame, uint64_t window = 180)
+    {
+        return frame != 0 &&
+            frame <= g_presentedFrameCount &&
+            (g_presentedFrameCount - frame) <= window;
+    }
+
+    static bool IsPassiveObservedCsdProject(std::string_view project)
+    {
+        static constexpr std::array<std::string_view, 10> kPassiveProjects =
+        {
+            "ui_saveicon",
+            "ui_general",
+            "ui_gate",
+            "ui_help",
+            "ui_balloon",
+            "ui_shop",
+            "ui_townscreen",
+            "ui_missionscreen",
+            "ui_misson",
+            "ui_start"
+        };
+
+        return std::find(kPassiveProjects.begin(), kPassiveProjects.end(), project) != kPassiveProjects.end();
+    }
+
     static ObservedRuntimeScreen BuildObservedRuntimeScreen()
     {
         const auto& target = TargetFor(g_target);
@@ -1692,8 +1719,55 @@ namespace UiLab
             };
         }
 
+        if (g_titleMenuVisualReady || g_titleMenuInspector.postPressStartMenuReady)
+        {
+            return {
+                "title-menu",
+                "Title Menu",
+                "ui_title",
+                "System/GameMode/Title/TitleMenu.cpp",
+                "title-menu-live-inspector"
+            };
+        }
+
+        if (g_targetCsdObserved && (!target.requiresStageContext ||
+            (g_stageContextObserved && WasObservedFrameRecent(g_lastStageContextFrame))))
+        {
+            return {
+                target.token,
+                target.label,
+                target.primaryCsdScene,
+                target.sourceFamily,
+                target.requiresStageContext ? "stage-target-live-inspector" : "target-csd-observed"
+            };
+        }
+
+        if (g_titleIntroInspector.valid && WasObservedFrameRecent(g_titleIntroInspector.frame))
+        {
+            return {
+                "title-runtime",
+                "Title Runtime",
+                "ui_title",
+                "System/GameMode/Title/TitleStateIntro.cpp",
+                "title-intro-live-inspector"
+            };
+        }
+
+        if (g_stageContextObserved &&
+            WasObservedFrameRecent(g_lastStageContextFrame) &&
+            !g_lastStageTitleContextDetail.empty())
+        {
+            return {
+                "stage-title-runtime",
+                "Stage Title/Menu Runtime",
+                "ui_title",
+                "System/GameMode/GameModeStageTitle.cpp",
+                "stage-title-context-live-inspector"
+            };
+        }
+
         const std::string_view project(g_lastCsdProjectName.data(), g_lastCsdProjectName.size());
-        if (!project.empty())
+        if (!project.empty() && !IsPassiveObservedCsdProject(project))
         {
             if (project == "ui_itemresult")
             {
@@ -1738,28 +1812,6 @@ namespace UiLab
                 project,
                 "pending-runtime-source-family-classification",
                 "runtime-csd-project:" + std::string(project)
-            };
-        }
-
-        if (g_stageContextObserved && !g_lastStageTitleContextDetail.empty())
-        {
-            return {
-                "stage-title-runtime",
-                "Stage Title/Menu Runtime",
-                "ui_title",
-                "System/GameMode/GameModeStageTitle.cpp",
-                "stage-title-context-live-inspector"
-            };
-        }
-
-        if (g_targetCsdObserved)
-        {
-            return {
-                target.token,
-                target.label,
-                target.primaryCsdScene,
-                target.sourceFamily,
-                "target-csd-observed"
             };
         }
 

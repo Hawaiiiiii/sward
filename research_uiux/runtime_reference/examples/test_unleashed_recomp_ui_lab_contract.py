@@ -717,6 +717,8 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         for token in [
             "ObservedRuntimeScreen",
             "BuildObservedRuntimeScreen",
+            "IsPassiveObservedCsdProject",
+            "WasObservedFrameRecent",
             '"observedScreen"',
             '"observedScreenLabel"',
             '"observedCsdProject"',
@@ -724,6 +726,9 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             '"observedScreenSource"',
             '"targetObservedMismatch"',
             'project == "ui_itemresult"',
+            '"ui_saveicon"',
+            "stage-target-live-inspector",
+            "requested-target-fallback",
             'observed.token != target.token',
         ]:
             self.assertIn(token, ui_lab)
