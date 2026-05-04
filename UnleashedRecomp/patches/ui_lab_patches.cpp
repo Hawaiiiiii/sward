@@ -3508,11 +3508,28 @@ namespace UiLab
             uint32_t fieldOffset;
             std::string_view slotName;
         };
+        // Phase 261: cover every CHudSonicStage owner slot we can name with
+        // runtime evidence. Helper-related fields keep their argR5=110/121
+        // role labels (Phase 256/257). Renderable scenes use the SWA HUD
+        // class field naming convention (`m_rc*`) where the constructor
+        // expected-fields table already names them; the deep `+0x1958/
+        // +0x1B58/+0x1E40` clusters use descriptive names derived from the
+        // Phase 260 sweep correlations (medal_get_m / speed_count /
+        // score_count).
         static constexpr HudOwnerSlotSpec kHudOwnerSlotSpecs[] = {
-            { 0xD8, "owner+0xD8 attachSourceScene" },
-            { 0xE0, "owner+0xE0 attachTargetScene" },
-            { 0xF0, "owner+0xF0 activeUpdateScenePrimary" },
-            { 0xF4, "owner+0xF4 activeUpdateSceneCompanion" },
+            { 0xD8, "owner+0xD8 helperAttachR6Field" },
+            { 0xE0, "owner+0xE0 helperAttachReturnField" },
+            { 0xEC, "owner+0xEC m_rcSpeedGauge" },
+            { 0xF0, "owner+0xF0 helperUpdateScenePrimaryField" },
+            { 0xF4, "owner+0xF4 m_rcRingEnergyGauge" },
+            { 0xFC, "owner+0xFC m_rcGaugeFrame" },
+            { 0x1958, "owner+0x1958 medalGetSceneRef0" },
+            { 0x1964, "owner+0x1964 medalGetSceneRef1" },
+            { 0x19C4, "owner+0x19C4 medalGetSceneRef2" },
+            { 0x1B58, "owner+0x1B58 speedCountSceneRef0" },
+            { 0x1B64, "owner+0x1B64 speedCountSceneRef1" },
+            { 0x1BC4, "owner+0x1BC4 speedCountSceneRef2" },
+            { 0x1E40, "owner+0x1E40 scoreCountManagerScenePointer" },
         };
 
         // Phase 260: kick the bounded owner-range sweep at most once per
@@ -3619,6 +3636,23 @@ namespace UiLab
     // dereference) resolves to a live manager CScene. Runs at most once per
     // unique owner address per session so steady-state HUD frames pay no
     // recurring cost. Read-only — never writes to owner fields.
+    //
+    // Phase 261: each renderable-slot find is also cross-validated against
+    // `kChudSonicStageExpectedOwnerFields`; when the sweep offset matches the
+    // expected `rcObjectOffset` of a known SWA HUD field a paired
+    // `native-hud-owner-field-cross-validated` event names the field, giving
+    // independent runtime confirmation of the SWA HUD class layout.
+    static const ChudSonicStageExpectedOwnerField*
+    FindChudSonicStageExpectedOwnerFieldByRcObjectOffset(uint32_t fieldOffset)
+    {
+        for (const auto& field : kChudSonicStageExpectedOwnerFields)
+        {
+            if (field.rcObjectOffset == fieldOffset)
+                return &field;
+        }
+        return nullptr;
+    }
+
     static void TryRunOpportunisticHudOwnerLayoutSweep(
         uint32_t ownerAddress,
         std::string_view ownerSource)
@@ -3633,6 +3667,7 @@ namespace UiLab
         static constexpr uint32_t kHudOwnerSweepIndirectBytes = 0x80;
         size_t directHits = 0;
         size_t indirectHits = 0;
+        size_t crossValidatedHits = 0;
 
         for (uint32_t offset = 0;
              offset + sizeof(uint32_t) <= kHudOwnerSweepBytes;
@@ -3683,6 +3718,24 @@ namespace UiLab
                         "|managerScene=" + HexU32(slot.managerSceneAddress) +
                         "|resourceScene=" + HexU32(slot.resourceSceneAddress) +
                         "|status=read-only renderable HUD owner slot discovered; inspect before any guarded native foreground attach");
+                }
+                if (const auto* expected =
+                        FindChudSonicStageExpectedOwnerFieldByRcObjectOffset(slot.fieldOffset))
+                {
+                    ++crossValidatedHits;
+                    WriteEvidenceEvent(
+                        "native-hud-owner-field-cross-validated",
+                        "ownerSource=" + slot.ownerSource +
+                        "|owner=" + HexU32(slot.ownerAddress) +
+                        "|fieldOffset=" + HexU32(slot.fieldOffset) +
+                        "|expectedField=" + std::string(expected->field) +
+                        "|expectedRcPtrOffset=" + HexU32(expected->rcPtrOffset) +
+                        "|expectedRcObjectOffset=" + HexU32(expected->rcObjectOffset) +
+                        "|matchKind=" + slot.matchKind +
+                        "|project=" + slot.projectName +
+                        "|scenePath=" + slot.scenePath +
+                        "|managerScene=" + HexU32(slot.managerSceneAddress) +
+                        "|status=runtime-confirmed: Phase 260 sweep agrees with kChudSonicStageExpectedOwnerFields entry for this offset");
                 }
                 continue;
             }
@@ -3739,6 +3792,24 @@ namespace UiLab
                         "|resourceScene=" + HexU32(slot.resourceSceneAddress) +
                         "|status=read-only renderable HUD owner slot discovered; inspect before any guarded native foreground attach");
                 }
+                if (const auto* expected =
+                        FindChudSonicStageExpectedOwnerFieldByRcObjectOffset(slot.fieldOffset))
+                {
+                    ++crossValidatedHits;
+                    WriteEvidenceEvent(
+                        "native-hud-owner-field-cross-validated",
+                        "ownerSource=" + slot.ownerSource +
+                        "|owner=" + HexU32(slot.ownerAddress) +
+                        "|fieldOffset=" + HexU32(slot.fieldOffset) +
+                        "|expectedField=" + std::string(expected->field) +
+                        "|expectedRcPtrOffset=" + HexU32(expected->rcPtrOffset) +
+                        "|expectedRcObjectOffset=" + HexU32(expected->rcObjectOffset) +
+                        "|matchKind=" + slot.matchKind +
+                        "|project=" + slot.projectName +
+                        "|scenePath=" + slot.scenePath +
+                        "|managerScene=" + HexU32(slot.managerSceneAddress) +
+                        "|status=runtime-confirmed: Phase 260 sweep agrees with kChudSonicStageExpectedOwnerFields entry for this offset");
+                }
                 break;
             }
         }
@@ -3750,6 +3821,8 @@ namespace UiLab
             "|sweepBytes=" + HexU32(kHudOwnerSweepBytes) +
             "|directHits=" + std::to_string(directHits) +
             "|indirectHits=" + std::to_string(indirectHits) +
+            "|crossValidatedHits=" + std::to_string(crossValidatedHits) +
+            "|expectedFieldTableSize=" + std::to_string(kChudSonicStageExpectedOwnerFields.size()) +
             "|status=read-only HUD owner layout sweep complete");
     }
 
@@ -4050,63 +4123,182 @@ namespace UiLab
             semantic.ghidraXref =
                 "HUD owner layout pending runtime gameplay evidence; sub_824D89B0/sub_824D9308/sub_824D95F8";
 
-            // Phase 257: HUD owner attach/scene-update offsets named by the
-            // generated callsite analysis backing the native owner setter
-            // probe. owner+0xD8 is read by argR5=110 helper as the source
-            // attach scene, owner+0xE0 receives the helper's returned scene
-            // slot, and owner+0xF0/+0xF4 form the active scene update path
-            // that argR5=121 helper snapshots.
+            // Phase 257 + 261: HUD owner attach/scene-update offsets named
+            // from the combined evidence of (a) the generated callsite
+            // analysis behind sub_82E5FCD0/sub_82E61A78 and (b) the Phase
+            // 260 sweep that confirmed which offsets actually hold live
+            // manager CScene wrappers vs. helper-only / static-module
+            // pointers. Renderable scenes use the SWA HUD class field name
+            // (`m_rc*` matching `kChudSonicStageExpectedOwnerFields`) when
+            // available; helper-only fields keep their argR5 role labels.
             if (fieldOffset == 0xD8)
             {
                 semantic.semanticName = inferredOwnerSource
-                    ? "hudOwnerInferred.attachSourceScene"
-                    : "hudOwner.attachSourceScene";
-                semantic.semanticRole = "hud-owner-attach-source-scene";
+                    ? "hudOwnerInferred.helperAttachR6Field"
+                    : "hudOwner.helperAttachR6Field";
+                semantic.semanticRole = "hud-owner-helper-attach-r6-field";
                 semantic.attachSetterCandidate =
-                    "owner+0xD8 source attach scene read by sub_82E5FCD0 (CHudSonicStage::sub_824D9308 argR5=110); inspect before any native foreground attach write";
+                    "owner+0xD8 source field read into r6 by sub_82E5FCD0 (CHudSonicStage::sub_824D9308 argR5=110); Phase 260 sweep showed this slot does not hold a live manager CScene at sample time";
                 semantic.ghidraXrefStatus =
-                    "runtime-confirmed: argR5=110 helper reads owner+0xD8 into r6; pending Ghidra xref oracle for setter caller";
+                    "runtime-confirmed: argR5=110 helper reads owner+0xD8 into r6; Ghidra xref oracle still pending for the helper caller";
                 semantic.ghidraXref =
                     "CHudSonicStage::sub_824D9308 argR5=110; pending Ghidra xref oracle";
             }
             else if (fieldOffset == 0xE0)
             {
                 semantic.semanticName = inferredOwnerSource
-                    ? "hudOwnerInferred.attachTargetScene"
-                    : "hudOwner.attachTargetScene";
-                semantic.semanticRole = "hud-owner-attach-target-scene";
+                    ? "hudOwnerInferred.helperAttachReturnField"
+                    : "hudOwner.helperAttachReturnField";
+                semantic.semanticRole = "hud-owner-helper-attach-return-field";
                 semantic.attachSetterCandidate =
-                    "owner+0xE0 target attach scene populated by sub_82E5FCD0 (CHudSonicStage::sub_824D9308 argR5=110); the proven HUD attach setter writes here";
+                    "owner+0xE0 written by sub_82E5FCD0 (CHudSonicStage::sub_824D9308 argR5=110); Phase 260 sweep observed a static-module pointer here, not a manager CScene";
                 semantic.ghidraXrefStatus =
-                    "runtime-confirmed: argR5=110 helper assigns its returned scene slot to owner+0xE0; pending Ghidra xref oracle for caller";
+                    "runtime-confirmed: argR5=110 helper assigns its returned slot to owner+0xE0; Ghidra xref oracle still pending for the caller";
                 semantic.ghidraXref =
                     "CHudSonicStage::sub_824D9308 argR5=110 owner+0xD8 -> owner+0xE0 setter; pending Ghidra xref oracle";
+            }
+            else if (fieldOffset == 0xEC)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.m_rcSpeedGauge"
+                    : "hudOwner.m_rcSpeedGauge";
+                semantic.semanticRole = "hud-owner-speed-gauge-rcobject-memory-field";
+                semantic.attachSetterCandidate =
+                    "owner+0xEC m_rcSpeedGauge.m_pMemory; Phase 260 sweep + constructor expected-fields agree this is the live SpeedGauge scene wrapper for ui_playscreen/so_speed_gauge";
+                semantic.ghidraXrefStatus =
+                    "runtime-confirmed: SWA expected-fields table lists m_rcSpeedGauge at 0xE8/0xEC and the sweep finds the manager CScene through a single +4 indirect dereference";
+                semantic.ghidraXref =
+                    "api/SWA/HUD/Sonic/HudSonicStage.h m_rcSpeedGauge";
             }
             else if (fieldOffset == 0xF0)
             {
                 semantic.semanticName = inferredOwnerSource
-                    ? "hudOwnerInferred.activeUpdateScenePrimary"
-                    : "hudOwner.activeUpdateScenePrimary";
-                semantic.semanticRole = "hud-owner-active-update-scene-primary";
+                    ? "hudOwnerInferred.helperUpdateScenePrimaryField"
+                    : "hudOwner.helperUpdateScenePrimaryField";
+                semantic.semanticRole = "hud-owner-helper-update-scene-primary-field";
                 semantic.attachSetterCandidate =
-                    "owner+0xF0 active scene-update slot snapshotted by sub_82E61A78 (CHudSonicStage::sub_824D9308 argR5=121); read-only until lifecycle is proven";
+                    "owner+0xF0 snapshotted by sub_82E61A78 (CHudSonicStage::sub_824D9308 argR5=121); Phase 260 sweep observed a static-module pointer here, not a manager CScene";
                 semantic.ghidraXrefStatus =
-                    "runtime-confirmed: argR5=121 helper reads owner+0xF0/+0xF4 scene update path; pending Ghidra xref oracle for setter caller";
+                    "runtime-confirmed: argR5=121 helper snapshots owner+0xF0/+0xF4; Ghidra xref oracle still pending for the caller";
                 semantic.ghidraXref =
                     "CHudSonicStage::sub_824D9308 argR5=121 owner+0xF0/+0xF4 scene update path; pending Ghidra xref oracle";
             }
             else if (fieldOffset == 0xF4)
             {
                 semantic.semanticName = inferredOwnerSource
-                    ? "hudOwnerInferred.activeUpdateSceneCompanion"
-                    : "hudOwner.activeUpdateSceneCompanion";
-                semantic.semanticRole = "hud-owner-active-update-scene-companion";
+                    ? "hudOwnerInferred.m_rcRingEnergyGauge"
+                    : "hudOwner.m_rcRingEnergyGauge";
+                semantic.semanticRole = "hud-owner-ring-energy-gauge-rcobject-memory-field";
                 semantic.attachSetterCandidate =
-                    "owner+0xF4 companion of the owner+0xF0 active scene-update slot snapshotted by sub_82E61A78 (CHudSonicStage::sub_824D9308 argR5=121); read-only until lifecycle is proven";
+                    "owner+0xF4 m_rcRingEnergyGauge.m_pMemory; Phase 260 sweep + constructor expected-fields agree this is the live RingEnergyGauge scene wrapper for ui_playscreen/so_ringenagy_gauge; also snapshotted by sub_82E61A78 argR5=121";
                 semantic.ghidraXrefStatus =
-                    "runtime-confirmed: argR5=121 helper reads owner+0xF0/+0xF4 scene update path; pending Ghidra xref oracle for setter caller";
+                    "runtime-confirmed: SWA expected-fields table lists m_rcRingEnergyGauge at 0xF0/0xF4, the sweep finds the manager CScene through a single +4 indirect dereference, and argR5=121 helper observes this same slot";
                 semantic.ghidraXref =
-                    "CHudSonicStage::sub_824D9308 argR5=121 owner+0xF0/+0xF4 scene update path; pending Ghidra xref oracle";
+                    "api/SWA/HUD/Sonic/HudSonicStage.h m_rcRingEnergyGauge; CHudSonicStage::sub_824D9308 argR5=121";
+            }
+            else if (fieldOffset == 0xFC)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.m_rcGaugeFrame"
+                    : "hudOwner.m_rcGaugeFrame";
+                semantic.semanticRole = "hud-owner-gauge-frame-rcobject-memory-field";
+                semantic.attachSetterCandidate =
+                    "owner+0xFC m_rcGaugeFrame.m_pMemory; Phase 260 sweep + constructor expected-fields agree this is the live GaugeFrame scene wrapper for ui_playscreen/gauge_frame";
+                semantic.ghidraXrefStatus =
+                    "runtime-confirmed: SWA expected-fields table lists m_rcGaugeFrame at 0xF8/0xFC and the sweep finds the manager CScene through a single +4 indirect dereference";
+                semantic.ghidraXref =
+                    "api/SWA/HUD/Sonic/HudSonicStage.h m_rcGaugeFrame";
+            }
+            else if (fieldOffset == 0x1958)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.medalGetSceneRef0"
+                    : "hudOwner.medalGetSceneRef0";
+                semantic.semanticRole = "hud-owner-medal-get-scene-ref";
+                semantic.attachSetterCandidate =
+                    "owner+0x1958 medal-get scene reference; Phase 260 sweep saw three RCPtr-style slots at 0x1958/0x1964/0x19C4 dereferencing into a shared backing block whose nested CScene resolves to ui_playscreen/add/medal_get_m";
+                semantic.ghidraXrefStatus =
+                    "runtime-discovered: triplet of medal-get scene references not present in the existing expected-fields table; Ghidra xref oracle still pending for the owning HUD subobject";
+                semantic.ghidraXref =
+                    "Phase 260 sweep: ui_playscreen/add/medal_get_m";
+            }
+            else if (fieldOffset == 0x1964)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.medalGetSceneRef1"
+                    : "hudOwner.medalGetSceneRef1";
+                semantic.semanticRole = "hud-owner-medal-get-scene-ref";
+                semantic.attachSetterCandidate =
+                    "owner+0x1964 medal-get scene reference; Phase 260 sweep saw three RCPtr-style slots at 0x1958/0x1964/0x19C4 dereferencing into a shared backing block whose nested CScene resolves to ui_playscreen/add/medal_get_m";
+                semantic.ghidraXrefStatus =
+                    "runtime-discovered: triplet of medal-get scene references not present in the existing expected-fields table; Ghidra xref oracle still pending for the owning HUD subobject";
+                semantic.ghidraXref =
+                    "Phase 260 sweep: ui_playscreen/add/medal_get_m";
+            }
+            else if (fieldOffset == 0x19C4)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.medalGetSceneRef2"
+                    : "hudOwner.medalGetSceneRef2";
+                semantic.semanticRole = "hud-owner-medal-get-scene-ref";
+                semantic.attachSetterCandidate =
+                    "owner+0x19C4 medal-get scene reference; Phase 260 sweep saw three RCPtr-style slots at 0x1958/0x1964/0x19C4 dereferencing into a shared backing block whose nested CScene resolves to ui_playscreen/add/medal_get_m";
+                semantic.ghidraXrefStatus =
+                    "runtime-discovered: triplet of medal-get scene references not present in the existing expected-fields table; Ghidra xref oracle still pending for the owning HUD subobject";
+                semantic.ghidraXref =
+                    "Phase 260 sweep: ui_playscreen/add/medal_get_m";
+            }
+            else if (fieldOffset == 0x1B58)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.speedCountSceneRef0"
+                    : "hudOwner.speedCountSceneRef0";
+                semantic.semanticRole = "hud-owner-speed-count-scene-ref";
+                semantic.attachSetterCandidate =
+                    "owner+0x1B58 speed-count scene reference; Phase 260 sweep saw three RCPtr-style slots at 0x1B58/0x1B64/0x1BC4 dereferencing into a shared backing block whose nested CScene resolves to ui_playscreen/add/speed_count";
+                semantic.ghidraXrefStatus =
+                    "runtime-discovered: triplet of speed-count scene references not present in the existing expected-fields table; Ghidra xref oracle still pending for the owning HUD subobject";
+                semantic.ghidraXref =
+                    "Phase 260 sweep: ui_playscreen/add/speed_count";
+            }
+            else if (fieldOffset == 0x1B64)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.speedCountSceneRef1"
+                    : "hudOwner.speedCountSceneRef1";
+                semantic.semanticRole = "hud-owner-speed-count-scene-ref";
+                semantic.attachSetterCandidate =
+                    "owner+0x1B64 speed-count scene reference; Phase 260 sweep saw three RCPtr-style slots at 0x1B58/0x1B64/0x1BC4 dereferencing into a shared backing block whose nested CScene resolves to ui_playscreen/add/speed_count";
+                semantic.ghidraXrefStatus =
+                    "runtime-discovered: triplet of speed-count scene references not present in the existing expected-fields table; Ghidra xref oracle still pending for the owning HUD subobject";
+                semantic.ghidraXref =
+                    "Phase 260 sweep: ui_playscreen/add/speed_count";
+            }
+            else if (fieldOffset == 0x1BC4)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.speedCountSceneRef2"
+                    : "hudOwner.speedCountSceneRef2";
+                semantic.semanticRole = "hud-owner-speed-count-scene-ref";
+                semantic.attachSetterCandidate =
+                    "owner+0x1BC4 speed-count scene reference; Phase 260 sweep saw three RCPtr-style slots at 0x1B58/0x1B64/0x1BC4 dereferencing into a shared backing block whose nested CScene resolves to ui_playscreen/add/speed_count";
+                semantic.ghidraXrefStatus =
+                    "runtime-discovered: triplet of speed-count scene references not present in the existing expected-fields table; Ghidra xref oracle still pending for the owning HUD subobject";
+                semantic.ghidraXref =
+                    "Phase 260 sweep: ui_playscreen/add/speed_count";
+            }
+            else if (fieldOffset == 0x1E40)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.scoreCountManagerScenePointer"
+                    : "hudOwner.scoreCountManagerScenePointer";
+                semantic.semanticRole = "hud-owner-score-count-direct-manager-scene-pointer";
+                semantic.attachSetterCandidate =
+                    "owner+0x1E40 cached direct CScene pointer to ui_playscreen/score_count; the SWA expected-fields table also references score_count via m_rcScoreCount at 0x128/0x12C, so this slot looks like a fast-path cached pointer";
+                semantic.ghidraXrefStatus =
+                    "runtime-discovered: direct manager CScene pointer not present in the existing expected-fields table; Ghidra xref oracle still pending for the cache writer";
+                semantic.ghidraXref =
+                    "Phase 260 sweep: ui_playscreen/score_count direct manager CScene cache";
             }
 
             return semantic;

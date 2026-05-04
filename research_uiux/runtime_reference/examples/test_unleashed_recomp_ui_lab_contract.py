@@ -1051,26 +1051,35 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             # Phase 257 plumbing into the bounded owner-layout scan ranges.
             "inferred CHudSonicStage owner",
             "inferred CHudSonicStage owner; argR3 == owner+0x28 helper object",
-            # Phase 257 HUD owner field semantic names.
-            "hudOwner.attachSourceScene",
-            "hudOwner.attachTargetScene",
-            "hudOwner.activeUpdateScenePrimary",
-            "hudOwner.activeUpdateSceneCompanion",
-            "hudOwnerInferred.attachSourceScene",
-            "hudOwnerInferred.attachTargetScene",
-            "hudOwnerInferred.activeUpdateScenePrimary",
-            "hudOwnerInferred.activeUpdateSceneCompanion",
-            # Phase 257 HUD owner field semantic roles.
-            "hud-owner-attach-source-scene",
-            "hud-owner-attach-target-scene",
-            "hud-owner-active-update-scene-primary",
-            "hud-owner-active-update-scene-companion",
-            # Phase 257 attach setter narratives keep writes disabled but call
-            # out the real source/target slots.
-            "owner+0xD8 source attach scene read by sub_82E5FCD0",
-            "owner+0xE0 target attach scene populated by sub_82E5FCD0",
-            "owner+0xF0 active scene-update slot snapshotted by sub_82E61A78",
-            "owner+0xF4 companion of the owner+0xF0 active scene-update slot",
+            # Phase 257 + 261 HUD owner field semantic names. Helper-related
+            # fields keep their argR5 role labels; renderable scenes use the
+            # SWA HUD class field naming convention.
+            "hudOwner.helperAttachR6Field",
+            "hudOwner.helperAttachReturnField",
+            "hudOwner.helperUpdateScenePrimaryField",
+            "hudOwner.m_rcSpeedGauge",
+            "hudOwner.m_rcRingEnergyGauge",
+            "hudOwner.m_rcGaugeFrame",
+            "hudOwnerInferred.helperAttachR6Field",
+            "hudOwnerInferred.helperAttachReturnField",
+            "hudOwnerInferred.helperUpdateScenePrimaryField",
+            "hudOwnerInferred.m_rcSpeedGauge",
+            "hudOwnerInferred.m_rcRingEnergyGauge",
+            "hudOwnerInferred.m_rcGaugeFrame",
+            # Phase 257 + 261 HUD owner field semantic roles.
+            "hud-owner-helper-attach-r6-field",
+            "hud-owner-helper-attach-return-field",
+            "hud-owner-helper-update-scene-primary-field",
+            "hud-owner-speed-gauge-rcobject-memory-field",
+            "hud-owner-ring-energy-gauge-rcobject-memory-field",
+            "hud-owner-gauge-frame-rcobject-memory-field",
+            # Phase 257 + 261 attach-setter narratives still surface the
+            # argR5 helper roles even when the slot turns out to hold a
+            # static-module pointer or non-scene field at sample time.
+            "owner+0xD8 source field read into r6 by sub_82E5FCD0",
+            "owner+0xE0 written by sub_82E5FCD0",
+            "owner+0xF0 snapshotted by sub_82E61A78",
+            "owner+0xF4 m_rcRingEnergyGauge.m_pMemory",
             # Phase 257 live-state JSON snapshot exposes the inferred owner.
             "inferredChudSonicStageOwnerAddress",
             "inferredChudSonicStageOwnerSource",
@@ -1088,10 +1097,6 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "owner+0xE0",
             "owner+0xF0",
             "owner+0xF4",
-            "hudOwner.attachSourceScene",
-            "hudOwner.attachTargetScene",
-            "hudOwner.activeUpdateScenePrimary",
-            "hudOwner.activeUpdateSceneCompanion",
         ]:
             self.assertIn(token, report)
 
@@ -1112,11 +1117,21 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             # Phase 258 sampler entry points.
             "BuildHudOwnerSlotReadout",
             "SampleHudOwnerSlotReadouts",
-            # Phase 258 slot specs cover the four proven HUD owner offsets.
-            "owner+0xD8 attachSourceScene",
-            "owner+0xE0 attachTargetScene",
-            "owner+0xF0 activeUpdateScenePrimary",
-            "owner+0xF4 activeUpdateSceneCompanion",
+            # Phase 258 + 261 slot specs cover all 13 named CHudSonicStage
+            # owner offsets we have runtime evidence for.
+            "owner+0xD8 helperAttachR6Field",
+            "owner+0xE0 helperAttachReturnField",
+            "owner+0xEC m_rcSpeedGauge",
+            "owner+0xF0 helperUpdateScenePrimaryField",
+            "owner+0xF4 m_rcRingEnergyGauge",
+            "owner+0xFC m_rcGaugeFrame",
+            "owner+0x1958 medalGetSceneRef0",
+            "owner+0x1964 medalGetSceneRef1",
+            "owner+0x19C4 medalGetSceneRef2",
+            "owner+0x1B58 speedCountSceneRef0",
+            "owner+0x1B64 speedCountSceneRef1",
+            "owner+0x1BC4 speedCountSceneRef2",
+            "owner+0x1E40 scoreCountManagerScenePointer",
             # Phase 258 classification labels.
             "live-manager-scene: HUD owner slot directly references a live manager CScene",
             "resource-scene: HUD owner slot directly references a resource Scene",
@@ -1221,6 +1236,56 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, report)
 
         self.assertIn("Phase 260", generator)
+
+    def test_ui_lab_cross_validates_hud_owner_field_names(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            # Phase 261 cross-validation lookup helper + event.
+            "FindChudSonicStageExpectedOwnerFieldByRcObjectOffset",
+            "native-hud-owner-field-cross-validated",
+            "runtime-confirmed: Phase 260 sweep agrees with kChudSonicStageExpectedOwnerFields entry for this offset",
+            # Phase 261 sweep summary surfaces cross-validated count.
+            "crossValidatedHits",
+            "expectedFieldTableSize",
+            # Phase 261 deep-cluster semantic names from sweep evidence.
+            "hudOwner.medalGetSceneRef0",
+            "hudOwner.medalGetSceneRef1",
+            "hudOwner.medalGetSceneRef2",
+            "hudOwner.speedCountSceneRef0",
+            "hudOwner.speedCountSceneRef1",
+            "hudOwner.speedCountSceneRef2",
+            "hudOwner.scoreCountManagerScenePointer",
+            "hudOwnerInferred.medalGetSceneRef0",
+            "hudOwnerInferred.scoreCountManagerScenePointer",
+            # Phase 261 deep-cluster semantic roles.
+            "hud-owner-medal-get-scene-ref",
+            "hud-owner-speed-count-scene-ref",
+            "hud-owner-score-count-direct-manager-scene-pointer",
+            # Phase 261 attach-setter narratives reference the sweep
+            # evidence backing each runtime-discovered field.
+            "Phase 260 sweep saw three RCPtr-style slots at 0x1958/0x1964/0x19C4 dereferencing into a shared backing block",
+            "Phase 260 sweep saw three RCPtr-style slots at 0x1B58/0x1B64/0x1BC4 dereferencing into a shared backing block",
+            "Phase 260 sweep + constructor expected-fields agree this is the live SpeedGauge scene wrapper",
+            "Phase 260 sweep + constructor expected-fields agree this is the live RingEnergyGauge scene wrapper",
+            "Phase 260 sweep + constructor expected-fields agree this is the live GaugeFrame scene wrapper",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 261",
+            "HUD Owner Field Naming + Cross-Validation",
+            "native-hud-owner-field-cross-validated",
+            "kChudSonicStageExpectedOwnerFields",
+            "medal_get_m",
+            "speed_count",
+            "score_count",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 261", generator)
 
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
