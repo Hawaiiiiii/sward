@@ -866,6 +866,54 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("0x1E4", report)
         self.assertIn("Phase 253", generator)
 
+    def test_ui_lab_names_owner_layout_fields_with_ghidra_xref_targets(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        wrapper = self.read("research_uiux/runtime_reference/tools/export_unleashed_recomp_ghidra_context.ps1")
+        java_script = self.read("research_uiux/runtime_reference/ghidra_scripts/SwardExportFunctionContext.java")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            "struct CsdOwnerLayoutSemantic",
+            "ResolveCsdOwnerLayoutSemantic",
+            "ApplyCsdOwnerLayoutSemantic",
+            "native-csd-owner-layout-semantic",
+            "\\\"semanticName\\\"",
+            "\\\"semanticRole\\\"",
+            "\\\"ownerLifecycle\\\"",
+            "\\\"attachSetterCandidate\\\"",
+            "\\\"ghidraXrefStatus\\\"",
+            "\\\"ghidraXref\\\"",
+            "titleContext.m_rcTitleManager",
+            "titleContext.m_rcTitleResource",
+            "title-owner-context+0x1E4",
+            "CGameModeStageTitle::Update",
+            "HUD owner layout pending runtime gameplay evidence",
+            "Ghidra xref oracle",
+            "owner attach setter path",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "sub_825518B8",
+            "sub_824D89B0",
+            "sub_824D9308",
+            "sub_824D95F8",
+        ]:
+            self.assertIn(token, wrapper)
+            self.assertIn(token, java_script)
+
+        for token in [
+            "Phase 254",
+            "Owner Layout Semantic Naming",
+            "Ghidra xref oracle",
+            "titleContext.m_rcTitleManager",
+            "HUD owner layout pending runtime gameplay evidence",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 254", generator)
+
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")

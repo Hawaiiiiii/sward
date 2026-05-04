@@ -394,6 +394,16 @@ namespace UiLab
         uint64_t frame = 0;
     };
 
+    struct CsdOwnerLayoutSemantic
+    {
+        std::string semanticName;
+        std::string semanticRole;
+        std::string ownerLifecycle;
+        std::string attachSetterCandidate;
+        std::string ghidraXrefStatus;
+        std::string ghidraXref;
+    };
+
     struct CsdOwnerLayoutFieldCandidate
     {
         uint32_t ownerAddress = 0;
@@ -409,6 +419,7 @@ namespace UiLab
         std::string ownerSource;
         std::string matchKind;
         std::string confidence;
+        CsdOwnerLayoutSemantic semantic;
         uint64_t frame = 0;
     };
 
@@ -3025,6 +3036,155 @@ namespace UiLab
                 "|source=" + candidate.ownerSource);
     }
 
+    static CsdOwnerLayoutSemantic ResolveCsdOwnerLayoutSemantic(
+        std::string_view ownerSource,
+        uint32_t fieldOffset,
+        uint32_t sourceCandidateFieldOffset,
+        std::string_view matchKind)
+    {
+        const std::string ownerSourceLower = ToLower(ownerSource);
+        const std::string fieldOffsetText = HexU32(fieldOffset);
+        const std::string sourceCandidateText = HexU32(sourceCandidateFieldOffset);
+
+        CsdOwnerLayoutSemantic semantic;
+        semantic.semanticName =
+            std::string(ownerSource) + ".ownerCsdField+" + fieldOffsetText;
+        semantic.semanticRole = "unclassified-owner-csd-field";
+        semantic.ownerLifecycle =
+            "owner layout field discovered from live native CSD manager/resource correlation";
+        semantic.attachSetterCandidate =
+            "owner attach setter path pending Ghidra xref oracle before any foreground owner write";
+        semantic.ghidraXrefStatus =
+            "pending: Ghidra xref oracle has not confirmed this owner setter path yet";
+        semantic.ghidraXref = "pending static caller/callee export";
+
+        if (ownerSourceLower.find("title owner context") != std::string::npos)
+        {
+            semantic.ownerLifecycle =
+                "title owner context foreground CSD lifecycle; first map sibling fields, then prove setter path";
+            semantic.attachSetterCandidate =
+                "title-owner-context+0x1E4 owner attach setter path candidate; verify writes in CGameModeStageTitle::Update before attaching";
+            semantic.ghidraXrefStatus =
+                "pending-export: CGameModeStageTitle::Update/sub_825518B8 Ghidra xref oracle";
+            semantic.ghidraXref = "CGameModeStageTitle::Update/sub_825518B8";
+
+            if (fieldOffset == 0x1E4)
+            {
+                semantic.semanticName = "titleContext.m_rcTitleManager";
+                semantic.semanticRole = "native-manager-scene-owner-slot";
+                semantic.attachSetterCandidate =
+                    "title-owner-context+0x1E4 probable manager CScene owner slot; attach only through the proven CGameModeStageTitle::Update setter path";
+            }
+            else if (fieldOffset == 0x1E8)
+            {
+                semantic.semanticName = "titleContext.m_rcTitleResource";
+                semantic.semanticRole = "native-resource-scene-pointer";
+                semantic.attachSetterCandidate =
+                    "title-owner-context+0x1E8 resource Scene pointer observed by title direct-state probes; not the render owner by itself";
+            }
+            else if (fieldOffset == 0x180)
+            {
+                semantic.semanticName = "titleContext.requestState";
+                semantic.semanticRole = "title-request-state";
+            }
+            else if (fieldOffset == 0x181)
+            {
+                semantic.semanticName = "titleContext.requestDirty";
+                semantic.semanticRole = "title-request-dirty-flag";
+            }
+            else if (fieldOffset == 0x1D1)
+            {
+                semantic.semanticName = "titleContext.ownerOutputReady";
+                semantic.semanticRole = "title-owner-output-ready-flag";
+            }
+            else if (fieldOffset == 0x238)
+            {
+                semantic.semanticName = "titleContext.transitionArmed";
+                semantic.semanticRole = "title-transition-arm-field";
+            }
+            else if (fieldOffset == 0x244)
+            {
+                semantic.semanticName = "titleContext.flag580";
+                semantic.semanticRole = "title-context-flag580";
+            }
+            else if (sourceCandidateFieldOffset == 0x1E4)
+            {
+                semantic.semanticName =
+                    "titleContext.siblingCsdField+" + fieldOffsetText;
+                semantic.semanticRole =
+                    std::string(matchKind).find("manager") != std::string::npos
+                        ? "title-sibling-manager-scene-candidate"
+                        : "title-sibling-resource-scene-candidate";
+            }
+
+            return semantic;
+        }
+
+        if (ownerSourceLower.find("chudsonicstage owner") != std::string::npos)
+        {
+            semantic.semanticName = "hudOwner.rcSceneCandidate+" + fieldOffsetText;
+            semantic.semanticRole =
+                std::string(matchKind).find("manager") != std::string::npos
+                    ? "hud-owner-manager-scene-candidate"
+                    : "hud-owner-resource-scene-candidate";
+            semantic.ownerLifecycle =
+                "HUD owner layout pending runtime gameplay evidence before native foreground attach";
+            semantic.attachSetterCandidate =
+                "CHudSonicStage owner attach setter path pending sub_824D89B0/sub_824D9308/sub_824D95F8 Ghidra xrefs";
+            semantic.ghidraXrefStatus =
+                "pending-export: CHudSonicStage constructor/stage-bind/runtime-control xref oracle";
+            semantic.ghidraXref =
+                "HUD owner layout pending runtime gameplay evidence; sub_824D89B0/sub_824D9308/sub_824D95F8";
+            return semantic;
+        }
+
+        if (ownerSourceLower.find("chudpause owner") != std::string::npos)
+        {
+            semantic.semanticName = "pauseOwner.rcSceneCandidate+" + fieldOffsetText;
+            semantic.semanticRole = "pause-owner-csd-scene-candidate";
+            semantic.ownerLifecycle =
+                "pause foreground owner layout candidate; compare against CHudPause.m_rcPause/m_rcBg before writes";
+            semantic.attachSetterCandidate =
+                "pause owner attach setter path pending pause/HUD Ghidra xref oracle";
+            return semantic;
+        }
+
+        if (ownerSourceLower.find("cgeneralwindow owner") != std::string::npos)
+        {
+            semantic.semanticName = "generalWindowOwner.rcSceneCandidate+" + fieldOffsetText;
+            semantic.semanticRole = "general-window-csd-scene-candidate";
+            semantic.ownerLifecycle =
+                "general window owner layout candidate for modal foreground UI";
+            semantic.attachSetterCandidate =
+                "general window attach setter path pending Ghidra xref oracle";
+            return semantic;
+        }
+
+        if (ownerSourceLower.find("csaveicon owner") != std::string::npos)
+        {
+            semantic.semanticName = "saveIconOwner.rcSceneCandidate+" + fieldOffsetText;
+            semantic.semanticRole = "save-icon-csd-scene-candidate";
+            semantic.ownerLifecycle =
+                "save icon owner layout candidate for tiny foreground UI";
+            semantic.attachSetterCandidate =
+                "save icon attach setter path pending Ghidra xref oracle";
+            return semantic;
+        }
+
+        semantic.semanticName =
+            std::string(ownerSource) + ".anchor+" + sourceCandidateText + ".field+" + fieldOffsetText;
+        return semantic;
+    }
+
+    static void ApplyCsdOwnerLayoutSemantic(CsdOwnerLayoutFieldCandidate& candidate)
+    {
+        candidate.semantic = ResolveCsdOwnerLayoutSemantic(
+            candidate.ownerSource,
+            candidate.fieldOffset,
+            candidate.sourceCandidateFieldOffset,
+            candidate.matchKind);
+    }
+
     static CsdOwnerLayoutFieldCandidate BuildCsdOwnerLayoutFieldCandidate(
         const CsdManagerSceneOwnerCandidate& sourceCandidate,
         const CsdManagerSceneCorrelation& correlation,
@@ -3049,6 +3209,7 @@ namespace UiLab
         candidate.matchKind = std::move(matchKind);
         candidate.confidence = std::move(confidence);
         candidate.frame = g_presentedFrameCount;
+        ApplyCsdOwnerLayoutSemantic(candidate);
         return candidate;
     }
 
@@ -3079,6 +3240,20 @@ namespace UiLab
                 "|resolvedResourceScene=" + HexU32(candidate.resolvedResourceScene) +
                 "|matchKind=" + candidate.matchKind +
                 "|confidence=" + candidate.confidence +
+                "|source=" + candidate.ownerSource);
+
+        WriteEvidenceEvent(
+            "native-csd-owner-layout-semantic",
+            "project=" + candidate.projectName +
+                "|path=" + candidate.scenePath +
+                "|owner=" + HexU32(candidate.ownerAddress) +
+                "|fieldOffset=" + HexU32(candidate.fieldOffset) +
+                "|semanticName=" + candidate.semantic.semanticName +
+                "|semanticRole=" + candidate.semantic.semanticRole +
+                "|ownerLifecycle=" + candidate.semantic.ownerLifecycle +
+                "|attachSetterCandidate=" + candidate.semantic.attachSetterCandidate +
+                "|ghidraXrefStatus=" + candidate.semantic.ghidraXrefStatus +
+                "|ghidraXref=" + candidate.semantic.ghidraXref +
                 "|source=" + candidate.ownerSource);
     }
 
@@ -7932,6 +8107,12 @@ namespace UiLab
                 << "\"ownerSource\":\"" << JsonEscape(field.ownerSource) << "\","
                 << "\"matchKind\":\"" << JsonEscape(field.matchKind) << "\","
                 << "\"confidence\":\"" << JsonEscape(field.confidence) << "\","
+                << "\"semanticName\":\"" << JsonEscape(field.semantic.semanticName) << "\","
+                << "\"semanticRole\":\"" << JsonEscape(field.semantic.semanticRole) << "\","
+                << "\"ownerLifecycle\":\"" << JsonEscape(field.semantic.ownerLifecycle) << "\","
+                << "\"attachSetterCandidate\":\"" << JsonEscape(field.semantic.attachSetterCandidate) << "\","
+                << "\"ghidraXrefStatus\":\"" << JsonEscape(field.semantic.ghidraXrefStatus) << "\","
+                << "\"ghidraXref\":\"" << JsonEscape(field.semantic.ghidraXref) << "\","
                 << "\"frame\":" << field.frame
                 << "}";
             ++emitted;
@@ -15647,6 +15828,7 @@ namespace UiLab
             ImGui::TextWrapped("owner layout map: %s", g_csdOwnerLayoutStatus.c_str());
             ImGui::Text("layoutFieldCount: %zu", g_csdOwnerLayoutFieldCandidates.size());
             ImGui::TextDisabled("title owner layout and HUD owner layout are read-only sibling owner CSD fields until attach is explicitly armed.");
+            ImGui::TextDisabled("Ghidra xref oracle names sibling fields and proves the owner attach setter path before any owner write.");
             for (size_t index = 0; index < std::min<size_t>(g_csdOwnerLayoutFieldCandidates.size(), 6); ++index)
             {
                 const auto& field = g_csdOwnerLayoutFieldCandidates[index];
@@ -15658,6 +15840,11 @@ namespace UiLab
                     HexU32(field.slotValue).c_str(),
                     field.matchKind.c_str(),
                     field.scenePath.c_str());
+                ImGui::TextWrapped(
+                    "  %s | %s | %s",
+                    field.semantic.semanticName.c_str(),
+                    field.semantic.semanticRole.c_str(),
+                    field.semantic.ghidraXrefStatus.c_str());
             }
 
             if (ImGui::Button("Attach Native Scene"))

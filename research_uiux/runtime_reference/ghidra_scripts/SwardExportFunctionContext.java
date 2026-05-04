@@ -32,6 +32,10 @@ public class SwardExportFunctionContext extends GhidraScript {
     private static final int MAX_REFERENCES = 64;
     private static final String[] DEFAULT_TARGETS = new String[] {
         "sub_824D6C18",
+        "sub_825518B8",
+        "sub_824D89B0",
+        "sub_824D9308",
+        "sub_824D95F8",
         "sub_8231C590",
         "sub_8231C5F0",
         "sub_8231C628",

@@ -4,6 +4,10 @@ param(
     [string]$Label = "ui_lab_runtime",
     [string[]]$Targets = @(
         "sub_824D6C18",
+        "sub_825518B8",
+        "sub_824D89B0",
+        "sub_824D9308",
+        "sub_824D95F8",
         "sub_8231C590",
         "sub_8231C5F0",
         "sub_8231C628",

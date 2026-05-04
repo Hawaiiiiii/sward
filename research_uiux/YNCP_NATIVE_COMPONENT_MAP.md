@@ -34,6 +34,8 @@ Phase 252 adds Foreground Owner/Host Attach Discovery. The live bridge can run `
 
 Phase 253 adds Owner Layout Mapping. Once the title owner context exposes the observed `0x1E4` CSD field, the bridge can run `native-owner-layout` to map sibling owner CSD fields around that anchor and record read-only layout evidence for title owner layout first, then HUD owner layout when the CHudSonicStage owner range is live. This keeps native foreground attach on the real owner path instead of guessing render calls.
 
+Phase 254 adds Owner Layout Semantic Naming. The owner layout map now annotates each sibling field with a semantic name/role, owner lifecycle note, attach setter candidate, and Ghidra xref oracle status. Title mapping starts with `titleContext.m_rcTitleManager` at `0x1E4` and `titleContext.m_rcTitleResource` at `0x1E8`; HUD owner layout stays `HUD owner layout pending runtime gameplay evidence` until gameplay samples prove the same attach/setter path.
+
 - Input root: `C:/Users/DavidErikGarciaArena/Downloads/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/full_install_archives`
 - Project files parsed: `41`
 - Preview draw commands: `1888` real-yncp-subimage-dds-rect rows.
