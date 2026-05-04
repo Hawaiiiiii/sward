@@ -120,6 +120,12 @@ Supported commands:
 - `state`
 - `events`
 - `route-status`
+- `native-foreground-status`
+- `native-foreground-attach`
+- `native-foreground-detach`
+- `native-motion-play`
+- `native-motion-stop`
+- `native-motion-scrub <frame>`
 - `ui-oracle`
 - `ui-draw-list`
 - `ui-gpu-submit`
@@ -135,6 +141,7 @@ The bridge exposes:
 - route/event latch
 - title/menu/loading/stage/HUD readiness
 - CSD project and stage pointers already known to the UI Lab
+- native CSD Make/foreground probe pointers, motion frame state, and render-pass status
 - SGlobals values and addresses
 - debug-menu fork-derived typed fields
 - recent JSONL events
@@ -423,6 +430,7 @@ Local-only evidence, not committed:
   - Phase 185 detaches SWARD from the native profiler for practical gameplay observation. F1 remains the native Recomp Profiler, F2 toggles SWARD UI Lab as a separate profiler-style panel, and the panel now carries its own `HUD Switches` tab for `SGlobals HUD/render switches`. ms_IsRenderHud is the whole UI/UX render gate, while `ms_IsRenderGameMainHud` and `ms_IsRenderHudPause` isolate the in-game HUD and pause lanes; this makes them useful parent/child render-gate evidence for later readable controller/source recovery, not a source-code replacement by themselves.
   - Phase 186 restores the old embedded-profiler SWARD UI Lab content inside the detached F2 panel instead of putting it back into the native F1 Profiler. The same old `SWARD UI Lab` tab now reports target/route/live-bridge/UI-layer state with the familiar profiler-addon tab bar, while `hudRenderGateCorrelation` exports the `ms_IsRenderHud / ms_IsRenderGameMainHud / ms_IsRenderHudPause` render-gate state, known caller groups (`frontend_listener.cpp`, `options_menu.cpp::SetOptionsMenuVisible`, `CHudPause_patches.cpp`), and unresolved ui_playscreen node writes. The runtime emits `sonic-hud-render-gate-correlated` whenever those gates or unresolved write counts change, so the switches become a live isolation oracle for the remaining anonymous Sonic HUD node writes.
   - Phase 187 moves F2 closer to the OG Profiler surface with the native Profiler font and ImPlot frame-time style while keeping the SWARD UI Lab as its own detached tab/panel. It also emits `sonic-hud-node-write-callsite-correlated` so unresolved Sonic HUD node writes can be labeled against nearby generated-PPC HUD callsite samples as `timer/speed/boost-ring-energy/tutorial` candidates before final `ui_playscreen/...` path resolution.
+  - Phase 233 supersedes the temporary detached-panel split by making the Profiler and SWARD UI Lab a single native in-game workspace. While UI Lab is enabled, the right-side panel defaults open in the game window, carries the native frame-time graph plus compact profiler summary, embeds the SWARD tabs including the runtime-backed Console tab, and F2 is no longer used. F1 can hide/show the merged panel, the initial right-rail placement uses the game window size but remains movable/resizable during the run, and `Full profiler details` keeps the long native profiler readout available behind an opt-in control. No companion console is required for normal manual observer runs, while the live bridge and `ms_IsRenderHud is the whole UI/UX render gate` evidence remain available inside the merged surface.
   - Phase 188 promotes those correlated writes into explicit semantic path candidates without pretending they are exact child-node resolutions. Unresolved `timer/speed/boost-ring-energy/tutorial` writes can now emit `sonic-hud-node-write-semantic-path-candidate` with stable `ui_playscreen/...` candidates such as `ui_playscreen/add/speed_count/position/num_speed`, `ui_playscreen/so_speed_gauge`, `ui_playscreen/so_ringenagy_gauge`, and `ui_playscreen/add/u_info`, while the summarizer reports those semantic path candidates separately from true resolved paths.
   - Phase 189 hardens manual runtime launching so SWARD UI Lab cannot accidentally boot the installer/config flow. `launch_unleashed_recomp_ui_lab_manual.ps1` defaults to the real `Unleashed Recomp - Windows (Complete Installation) 1.0.3` folder, copies the patched build plus matching DXC/D3D12 runtime DLLs into an ignored sidecar runtime, launches from the Complete Installation root, and always passes `--use-cwd` so UnleashedRecomp keeps the real game folder as its current directory.
   - Phase 190 upgrades the manual Sonic HUD value summarizer with semantic candidate stability groups. `semantic_candidate_groups` reports each `semanticPathCandidate:semanticValueName=count` pair, so manual gameplay evidence can distinguish "speed repeatedly maps to `ui_playscreen/add/speed_count/position/num_speed`" from one-off unresolved node noise while still keeping exact resolved paths separate.

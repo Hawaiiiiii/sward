@@ -185,11 +185,14 @@ void MakeCsdProjectMidAsmHook(PPCRegister& r3, PPCRegister& r29)
     uint8_t* base = g_memory.base;
     const uint32_t csdProjectAddress = PPC_LOAD_U32(PPC_LOAD_U32(r3.u32 + 16) + 4);
     auto csdProject = reinterpret_cast<Chao::CSD::CProject*>(base + csdProjectAddress);
-    auto name = reinterpret_cast<const char*>(base + PPC_LOAD_U32(r29.u32));
+    auto name = UiLab::NativeCsdMakeProbeProjectNameForTraversal(csdProjectAddress);
+    if (name == nullptr)
+        name = reinterpret_cast<const char*>(base + PPC_LOAD_U32(r29.u32));
     auto rootNode = csdProject->m_pResource->pRootNode.get();
     UiLab::OnCsdProjectMade(name);
     UiLab::OnCsdProjectTreeMade(name, csdProjectAddress, GuestAddressOf(rootNode));
     TraverseSceneNode(name, rootNode, name);
+    UiLab::OnCsdProjectTreeTraversalFinished(name);
 }
 
 // Chao::CSD::CMemoryAlloc::Free
@@ -855,29 +858,64 @@ static bool g_cornerExtract;
 // This is required for the medal info in pause menu.
 static float g_scenePositionX;
 static float g_scenePositionY;
+static bool g_nativeForegroundCsdRenderInProgress;
 
 // Chao::CSD::CScene::Render
 PPC_FUNC_IMPL(__imp__sub_830BC640);
 PPC_FUNC(sub_830BC640)
 {
-    g_scenePositionX = 0.0f;
-    g_scenePositionY = 0.0f;
-
-    uint32_t motionPattern = PPC_LOAD_U32(ctx.r3.u32 + 0x98);
-    if (motionPattern != NULL)
+    auto updateScenePositionFromMotionPattern = [&](uint32_t sceneAddress)
     {
-        uint32_t member = PPC_LOAD_U32(motionPattern + 0xC);
-        if (member != NULL)
-        {
-            uint32_t x = PPC_LOAD_U32(member + 0x2C);
-            uint32_t y = PPC_LOAD_U32(member + 0x30);
+        g_scenePositionX = 0.0f;
+        g_scenePositionY = 0.0f;
 
-            g_scenePositionX = 1280.0f * reinterpret_cast<float&>(x);
-            g_scenePositionY = 720.0f * reinterpret_cast<float&>(y);
+        uint32_t motionPattern = PPC_LOAD_U32(sceneAddress + 0x98);
+        if (motionPattern != NULL)
+        {
+            uint32_t member = PPC_LOAD_U32(motionPattern + 0xC);
+            if (member != NULL)
+            {
+                uint32_t x = PPC_LOAD_U32(member + 0x2C);
+                uint32_t y = PPC_LOAD_U32(member + 0x30);
+
+                g_scenePositionX = 1280.0f * reinterpret_cast<float&>(x);
+                g_scenePositionY = 720.0f * reinterpret_cast<float&>(y);
+            }
+        }
+    };
+
+    const PPCContext hostCtx = ctx;
+    UiLab::OnCsdManagerSceneRender(hostCtx.r3.u32);
+    updateScenePositionFromMotionPattern(ctx.r3.u32);
+    __imp__sub_830BC640(ctx, base);
+
+    // native foreground CScene::Render piggyback: render the selected native
+    // scene during an already-valid CSD pass, with no owner pointer hijack.
+    if (!g_nativeForegroundCsdRenderInProgress)
+    {
+        const uint32_t nativeForegroundScene =
+            UiLab::ConsumeNativeForegroundSceneRenderAddress(hostCtx.r3.u32);
+        if (nativeForegroundScene != 0)
+        {
+            const PPCContext postHostCtx = ctx;
+            const float hostScenePositionX = g_scenePositionX;
+            const float hostScenePositionY = g_scenePositionY;
+
+            PPCContext foregroundCtx = hostCtx;
+            foregroundCtx.r3.u32 = nativeForegroundScene;
+
+            g_nativeForegroundCsdRenderInProgress = true;
+            updateScenePositionFromMotionPattern(nativeForegroundScene);
+            __imp__sub_830BC640(foregroundCtx, base);
+            g_nativeForegroundCsdRenderInProgress = false;
+
+            UiLab::OnNativeForegroundSceneRendered(hostCtx.r3.u32, nativeForegroundScene, true);
+
+            g_scenePositionX = hostScenePositionX;
+            g_scenePositionY = hostScenePositionY;
+            ctx = postHostCtx;
         }
     }
-
-    __imp__sub_830BC640(ctx, base);
 }
 
 // Chao::CSD::Scene::Render

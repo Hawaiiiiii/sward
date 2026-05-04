@@ -1,4 +1,4 @@
-import json
+﻿import json
 import subprocess
 import tempfile
 import unittest
@@ -263,10 +263,21 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("SWARD Exports", ui_lab)
         self.assertIn("SWARD Debug Draw", ui_lab)
         self.assertIn("UiLab::ShouldReserveF1DebugToggle()", video)
-        self.assertIn("SDL_SCANCODE_F2", video)
-        self.assertIn("UiLab::UpdateOperatorShellToggle(toggleOperator)", video)
+        self.assertIn("uiLabDockedProfiler", video)
+        self.assertIn("g_uiLabProfilerWasEnabled", video)
+        self.assertIn("uiLabDockedProfiler && !g_uiLabProfilerWasEnabled", video)
+        self.assertIn("g_profilerVisible = !g_profilerVisible;", video)
+        self.assertIn("ImGuiCond_FirstUseEver", video)
+        self.assertIn("Full profiler details", video)
+        self.assertIn("UiLab::DrawProfilerAddon();", video)
+        self.assertNotIn("ImGuiWindowFlags_NoMove", video)
+        self.assertNotIn("SDL_SCANCODE_F2", video)
+        self.assertNotIn("UiLab::UpdateOperatorShellToggle(toggleOperator)", video)
         self.assertNotIn("UiLab::UpdateOperatorShellToggle(toggleProfiler)", video)
         self.assertIn("return false; // Leave F1 to DrawProfiler().", ui_lab)
+        self.assertIn("This native Profiler + SWARD UI Lab workspace stays visible", ui_lab)
+        self.assertIn("AnyOperatorFloatingPaneVisible", ui_lab)
+        self.assertIn("ImGui::Checkbox(\"Window List\"", ui_lab)
         self.assertIn("F1 remains reserved for the native Recomp Profiler", report)
         self.assertIn("profiler-style SWARD operator panel", report)
         self.assertIn("counter/view/export/debug-draw windows", report)
@@ -292,6 +303,534 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("SWARD Stage / HUD", ui_lab)
         self.assertIn("SWARD Live API", ui_lab)
         self.assertIn("profiler-style SWARD operator panel", report)
+
+    def test_ui_lab_embeds_yncp_native_component_map_browser(self):
+        header_path = ROOT / "UnleashedRecomp/patches/ui_lab_yncp_native_component_map.generated.h"
+        self.assertTrue(header_path.is_file())
+        header = header_path.read_text(encoding="utf-8")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        build_script = self.read("research_uiux/runtime_reference/tools/build_unleashed_recomp_ui_lab.ps1")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+
+        for token in [
+            "namespace UiLab::GeneratedYncPNativeComponentMap",
+            "struct Project",
+            "struct Scene",
+            "kProjects",
+            "kScenes",
+            "kGeneratedAt",
+            "ui_title",
+            "game/Title/ui_title.yncp",
+            "ui_playscreen",
+            "game/Sonic/ui_playscreen.yncp",
+            "so_speed_gauge",
+            "ui_worldmap",
+            "game/WorldMap/ui_worldmap.yncp",
+            "sfx-correlation-pending",
+            "runtime-derived-native-reconstruction",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            '#include "ui_lab_yncp_native_component_map.generated.h"',
+            "DrawOperatorUiProjectsBrowserTab",
+            'ImGui::BeginTabItem("UI Projects")',
+            "UI project browser",
+            "Timeline scrub",
+            "Animation playback",
+            "SFX correlation",
+            "SGFX export provenance",
+            "GeneratedYncPNativeComponentMap::kProjects",
+            "GeneratedYncPNativeComponentMap::kScenes",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn("build_yncp_native_component_map.py", build_script)
+        self.assertIn("ui_lab_yncp_native_component_map.generated.h", build_script)
+        self.assertIn("--output-header", generator)
+        self.assertIn("Phase 236", report)
+
+    def test_ui_lab_draws_independent_yncp_preview_lane_with_sfx_correlation(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+
+        for token in [
+            "g_uiProjectBrowserPreviewPinned = true",
+            "DrawYncScenePreviewCanvas",
+            "DrawYncTimelineLane",
+            "DrawYncSfxCorrelationLane",
+            "Force selected scene preview",
+            "Independent preview",
+            "selected YNCP scene, not current runtime route",
+            "keyframe tick",
+            "audio-bank correlation",
+            "runtime hooks",
+            "Ghidra xrefs",
+            "ui-project-preview-forced",
+            "ui-project-sfx-correlation-marker",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 237",
+            "independent drawable/keyframe preview lane",
+            "audio-bank correlation lane",
+            "not tied to the current gameplay/title/loading route",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_binds_yncp_subimages_to_texture_backed_preview_commands(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_yncp_native_component_map.generated.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+
+        for token in [
+            "struct PreviewDrawCommand",
+            "struct SceneDrawCommand",
+            "kPreviewDrawCommands",
+            "kSceneDrawCommands",
+            "textureName",
+            "textureRelativePath",
+            "subimageIndex",
+            "sourceTextureWidth",
+            "sourceTextureHeight",
+            "sourceX",
+            "sourceY",
+            "sceneLeft",
+            "sceneTop",
+            "sceneWidth",
+            "sceneHeight",
+            "baseTranslationX",
+            "baseTranslationY",
+            "normalizedCastLeft",
+            "normalizedCastTop",
+            "real-yncp-subimage-dds-rect",
+            "real-yncp-cast-tree-subimage-scene-rect",
+            "ui_playscreen",
+            ".dds",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "extract_preview_draw_commands",
+            "extract_scene_draw_commands",
+            "composed_cast_rect",
+            "build_group_global_transforms",
+            "read_dds_dimensions",
+            "used_subimage_indices",
+            "texture_relative_path",
+            "real-yncp-subimage-dds-rect",
+            "real-yncp-cast-tree-subimage-scene-rect",
+        ]:
+            self.assertIn(token, generator)
+
+        for token in [
+            "FindYncPreviewDrawCommands",
+            "FindYncSceneDrawCommands",
+            "DrawYncComposedScenePreview",
+            "LoadYncPreviewTexture",
+            "DrawYncTextureBackedSubimagePreview",
+            "AddYncPreviewSubimageRect",
+            "GeneratedYncPNativeComponentMap::kInputRoot",
+            "LoadTexture",
+            "AddImage",
+            "composed YNCP scene",
+            "cast-tree scene placement",
+            "texture-backed cast/subimage",
+            "src=",
+            "dst=",
+            "real DDS/subimage rectangles",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 238",
+            "texture-backed cast/subimage preview",
+            "real DDS/subimage rectangles",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_starts_exact_sfx_cue_candidate_join_for_ui_projects(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_yncp_native_component_map.generated.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+
+        for token in [
+            "struct SfxCueCandidate",
+            "kSfxCueCandidates",
+            "bankName",
+            "cueName",
+            "runtimeHook",
+            "ghidraXref",
+            "se_system_worldmap",
+            "sys_worldmap_window",
+            "sys_worldmap_decide",
+            "sys_worldmap_cansel",
+            "CTitleStateMenu::Update",
+            "Game_PlaySound",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "FindYncSfxCueCandidates",
+            "DrawYncSfxCueCandidates",
+            "runtime hook hits + Ghidra xrefs",
+            "exact cue candidate",
+            "se_system_worldmap",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "runtime-hook + Ghidra xref SFX candidates",
+            "se_system_worldmap",
+            "sys_worldmap_decide",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_samples_yncp_animation_keyframes_into_composed_scene_preview(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_yncp_native_component_map.generated.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+
+        for token in [
+            "struct AnimationTrackKeyframe",
+            "kAnimationTrackKeyframes",
+            "animationName",
+            "trackType",
+            "keyframeIndex",
+            "frame",
+            "value",
+            "inTangent",
+            "outTangent",
+            "interpolationType",
+            "real-yncp-animation-keyframe",
+            "Usual_Anim",
+            "XPosition",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "extract_animation_track_keyframes",
+            "is_animation_track_supported_for_preview",
+            "real-yncp-animation-keyframe",
+            "animation_keyframe_data_list",
+            "animation_frame_data_list",
+            "keyframes",
+        ]:
+            self.assertIn(token, generator)
+
+        for token in [
+            "FindYncAnimationTrackKeyframes",
+            "SampleYncAnimationTrack",
+            "SampleYncSceneAnimationState",
+            "ApplyYncAnimationToSceneDraw",
+            "animated keyframe sample",
+            "YNCP animation scrub",
+            "real authored animation tracks",
+            "Hermite",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 240",
+            "keyframe interpolation",
+            "real authored animation tracks",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_invokes_selected_yncp_scene_as_foreground_projection(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+
+        for token in [
+            "g_yncForegroundInvokeVisible",
+            "g_yncForegroundProjectIndex",
+            "g_yncForegroundSceneIndex",
+            "DrawYncForegroundInvokedScene",
+            "Invoke Selected Scene",
+            "Close Invoked Scene",
+            "ui-project-foreground-invoke",
+            "foreground invoked YNCP scene",
+            "pause-menu-style foreground projection",
+            "summoned UI surface",
+            "FindYncAnimationTrackKeyframes(project, scene)",
+            "SampleYncSceneAnimationState",
+            "ApplyYncAnimationToSceneDraw",
+            "FindYncSfxCueCandidates(project, scene)",
+            "DrawYncForegroundInvokedScene();",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        overlay_order = ui_lab.index("DrawYncForegroundInvokedScene();")
+        shell_gate = ui_lab.index("if (!g_operatorShellVisible && !AnyOperatorFloatingPaneVisible())")
+        self.assertLess(overlay_order, shell_gate)
+
+        for token in [
+            "Phase 241",
+            "foreground invoke mode",
+            "summoned UI surface",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("foreground invoke mode", generator)
+
+    def test_ui_lab_can_probe_native_csd_make_for_selected_yncp_project(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        ui_lab_header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        aspect = self.read("UnleashedRecomp/patches/aspect_ratio_patches.cpp")
+        resident = self.read("UnleashedRecomp/patches/resident_patches.cpp")
+        generated = self.read("UnleashedRecomp/patches/ui_lab_yncp_native_component_map.generated.h")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+
+        for token in [
+            "struct NativeCsdMakeProbeState",
+            "g_nativeCsdMakeProbe",
+            "RequestNativeCsdMakeProbe",
+            "RunNativeCsdMakeProbe",
+            "ResolveNativeCsdSceneForSelectedProject",
+            "WriteNativeCsdSceneMotionFrame",
+            "Copy selected YNCP bytes into guest heap",
+            "ValidateNativeCsdPackageBytes",
+            "GuestToHostCsdMakeWithProbeContext",
+            "PPCContext newCtx = currentCtx",
+            "NativeCsdMakeProbeProjectNameForTraversal",
+            "OnNativeCsdMakeCallContext",
+            "OnCsdProjectTreeTraversalFinished",
+            "TryResolveQueuedNativeCsdMakeProbeFromObservedTree",
+            "g_nativeCsdMakeLastContextAddress",
+            "g_nativeCsdMakeProbeExecuteExperimentalMake",
+            "cloned real-call r6 context",
+            "danger: execute Make",
+            "native-csd-observe-succeeded",
+            "CPAF",
+            "experimental any CSD",
+            "sub_825E4068",
+            "g_userHeap.Alloc",
+            "g_userHeap.Free",
+            "CCsdProject::Make",
+            "MakeCsdProjectMidAsmHook",
+            "Native CSD Make Probe",
+            "Probe Native CSD Make",
+            "native-csd-make-probe-requested",
+            "native-csd-make-probe-succeeded",
+            "native project pointer",
+            "root node",
+            "scene count",
+            "Native scene motion scrub",
+            "m_MotionFrame",
+            "0x64",
+            "m_MotionRepeatType",
+            "0x94",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn("NativeCsdMakeProbeProjectNameForTraversal", ui_lab_header)
+        self.assertIn("OnNativeCsdMakeCallContext", ui_lab_header)
+        self.assertIn("OnCsdProjectTreeTraversalFinished", ui_lab_header)
+        self.assertIn("NativeCsdMakeProbeProjectNameForTraversal", aspect)
+        self.assertIn("OnCsdProjectTreeTraversalFinished", aspect)
+
+        for token in [
+            "SWA::CCsdProject::Make",
+            "sub_825E4068",
+            "UiLab::RunNativeCsdMakeProbe",
+            "UiLab::OnNativeCsdMakeCallContext",
+        ]:
+            self.assertIn(token, resident)
+
+        for token in [
+            "ui_loading.yncp",
+            "ui_worldmap_help.yncp",
+            "relativePath",
+            "kInputRoot",
+        ]:
+            self.assertIn(token, generated)
+
+        for token in [
+            "Phase 242",
+            "Phase 243",
+            "Phase 244",
+            "Native CSD Make Probe",
+            "CCsdProject::Make",
+            "r6",
+            "danger: execute Make",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Native CSD Make Probe", generator)
+
+    def test_ui_lab_can_attach_observed_native_csd_scene_as_foreground_render_probe(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        ui_lab_header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        aspect = self.read("UnleashedRecomp/patches/aspect_ratio_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+
+        for token in [
+            "struct NativeCsdForegroundRenderProbeState",
+            "g_nativeCsdForegroundRenderProbe",
+            "RequestNativeForegroundRenderProbe",
+            "DetachNativeForegroundRenderProbe",
+            "ConsumeNativeForegroundSceneRenderAddress",
+            "OnNativeForegroundSceneRendered",
+            "UpdateNativeCsdSceneMotionPlayback",
+            "TryFindNativeCsdMakeProbeScene",
+            "piggyback on active CSD render pass",
+            "no owner pointer hijack",
+            "native foreground render host",
+            "CsdManagerSceneCorrelation",
+            "OnCsdManagerSceneRender",
+            "TryCorrelateCsdManagerSceneToResourceScene",
+            "nativeManagerScenePointer",
+            "nativeResourceScenePointer",
+            "managerSceneResourceOffset",
+            "native-csd-manager-scene-correlated",
+            "Attach Native Scene",
+            "Spawn Native Foreground",
+            "Detach Native Foreground",
+            "native-csd-foreground-render-probe-requested",
+            "native-csd-foreground-rendered",
+            "nativeSceneMotionLastUpdateFrame",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "ConsumeNativeForegroundSceneRenderAddress",
+            "OnNativeForegroundSceneRendered",
+            "OnCsdManagerSceneRender",
+        ]:
+            self.assertIn(token, ui_lab_header)
+
+        for token in [
+            "ConsumeNativeForegroundSceneRenderAddress",
+            "OnNativeForegroundSceneRendered",
+            "OnCsdManagerSceneRender(hostCtx.r3.u32)",
+            "PPCContext foregroundCtx",
+            "__imp__sub_830BC640(foregroundCtx, base)",
+            "native foreground CScene::Render piggyback",
+        ]:
+            self.assertIn(token, aspect)
+
+        for token in [
+            "Phase 245",
+            "Native Foreground Render Probe",
+            "piggyback",
+            "owner pointer hijack",
+        ]:
+            self.assertIn(token, report)
+
+    def test_ui_lab_bridge_reports_native_foreground_probe_status(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        query_script = self.read("research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1")
+
+        for token in [
+            "BuildNativeForegroundStatusJson",
+            "AppendNativeCsdMakeProbeStatusJson",
+            "AppendNativeCsdForegroundRenderProbeStatusJson",
+            "HandleNativeForegroundBridgeControlCommand",
+            "HandleNativeMakeProbeBridgeCommand",
+            "FindCsdProjectTreeRecordBySceneAddress",
+            "host CSD project mismatch",
+            "same CSD project render host required",
+            "no correlated live manager CScene instance",
+            "\\\"nativeManagerScenePointer\\\"",
+            "\\\"nativeResourceScenePointer\\\"",
+            "\\\"managerSceneResourceOffset\\\"",
+            "\\\"nativeCsdMakeProbe\\\"",
+            "\\\"nativeCsdForegroundRenderProbe\\\"",
+            "\\\"nativeSceneMotion\\\"",
+            "\\\"ownerHijackUsed\\\"",
+            "\\\"renderPassSeen\\\"",
+            "\\\"lastRenderedScenePointer\\\"",
+            "\"native-foreground-status\"",
+            "\"native-make-observe\"",
+            "\"native-foreground-attach\"",
+            "\"native-foreground-detach\"",
+            "\"native-motion-play\"",
+            "\"native-motion-stop\"",
+            "\"native-motion-scrub\"",
+            "native-csd-make-probe-requested-by-live-bridge",
+            "native-csd-make-probe-live-bridge-immediate-resolve-check",
+            "native-csd-foreground-control",
+            "native-csd-motion-control",
+            "native foreground render probe status",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn("native-foreground-status", query_script)
+        self.assertIn("native-make-observe", query_script)
+        self.assertIn("native-foreground-attach", query_script)
+        self.assertIn("native-motion-scrub", query_script)
+        self.assertIn("[string]$Project", query_script)
+        self.assertIn("[string]$Scene", query_script)
+        self.assertIn("[string]$Frame", query_script)
+        self.assertIn("[string]$MotionFrame", query_script)
+
+    def test_ui_lab_discovers_native_csd_foreground_owner_hosts_before_hijack(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        query_script = self.read("research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            "struct CsdManagerSceneOwnerCandidate",
+            "g_csdManagerSceneOwnerCandidates",
+            "TryDiscoverCsdManagerSceneOwnerCandidates",
+            "ScanCsdOwnerCandidateRange",
+            "AppendNativeCsdOwnerDiscoveryJson",
+            "\\\"nativeCsdOwnerDiscovery\\\"",
+            "\\\"ownerCandidates\\\"",
+            "\\\"ownerAddress\\\"",
+            "\\\"fieldOffset\\\"",
+            "\\\"fieldAddress\\\"",
+            "\\\"matchKind\\\"",
+            "\\\"confidence\\\"",
+            "native-csd-owner-candidate",
+            "native-owner-discovery",
+            "owner/host attach discovery",
+            "direct-manager-scene-pointer",
+            "indirect-manager-scene-pointer",
+            "known UI owner scan range",
+            "CHudPause owner",
+            "CHudSonicStage owner",
+            "title owner context",
+            "foreground owner attach discovery",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "native-owner-discovery",
+            "native-owner-scan",
+        ]:
+            self.assertIn(token, query_script)
+
+        for token in [
+            "Phase 252",
+            "Foreground Owner/Host Attach Discovery",
+            "owner/host attach",
+            "manager CScene",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 252", generator)
+
+    def test_ui_lab_bounds_checks_guest_reads_used_by_owner_discovery(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+
+        for token in [
+            "IsReadableGuestRange",
+            "PPC_MEMORY_SIZE",
+            "guestEnd",
+            "TryReadGuestU32",
+            "TryWriteGuestU32",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn("if (!IsReadableGuestRange(guestAddress, sizeof(uint32_t)))", ui_lab)
 
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
@@ -805,7 +1344,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, ui_lab)
 
-        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
         self.assertIn("ui-oracle", harvest)
 
     def test_ui_lab_phase148_exposes_runtime_csd_platform_draw_list_bridge_command(self):
@@ -836,7 +1375,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("UiLab::OnCsdPlatformDraw", aspect)
         self.assertIn("SWA::CCsdPlatformMirage::Draw", aspect)
         self.assertIn("SWA::CCsdPlatformMirage::DrawNoTex", aspect)
-        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
         self.assertIn("Phase 148", harvest)
         self.assertIn("runtime CSD platform draw hook", harvest)
         self.assertIn("GPU backend submit pending", harvest)
@@ -871,7 +1410,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("ProcDrawPrimitive", video)
         self.assertIn("ProcDrawIndexedPrimitive", video)
         self.assertIn("ProcDrawPrimitiveUP", video)
-        self.assertIn('[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
         self.assertIn("Phase 150", harvest)
         self.assertIn("render-thread material submit hook", harvest)
         self.assertIn("raw D3D12/Vulkan backend capture pending", harvest)
@@ -924,7 +1463,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("UiLab::OnRawBackendCommand", video)
         self.assertIn('"RHI command-list boundary"', video)
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
         self.assertIn("Phase 151", harvest)
@@ -976,7 +1515,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("uiLabRenderTargetFormat0", vulkan_header)
         self.assertIn("activeGraphicsPipeline", vulkan_header)
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
         self.assertIn("Phase 152", harvest)
@@ -1186,7 +1725,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, ui_lab)
 
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
 
@@ -1240,7 +1779,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, video)
 
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
 
@@ -1324,7 +1863,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "sward_ui_lab_live",
             "Invoke-UiLabBridgeCommand",
             "Read-UiLabBridgeResponse",
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             "route <target>",
             "set-global <name> <0|1>",
             "Connect($TimeoutMilliseconds)",
@@ -1387,7 +1926,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, ui_lab)
 
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
 
@@ -2111,7 +2650,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("native Recomp Profiler is the primary operator surface", pivot)
 
-    def test_ui_lab_phase185_splits_sward_operator_to_f2(self):
+    def test_ui_lab_phase233_merges_sward_operator_into_single_native_workspace(self):
         header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         video = self.read("UnleashedRecomp/gpu/video.cpp")
@@ -2119,16 +2658,26 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         pivot = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
 
         self.assertIn("void UpdateOperatorShellToggle(bool toggleDown)", header)
-        self.assertIn("SDL_SCANCODE_F2", video)
-        self.assertIn("toggleOperator", video)
-        self.assertIn("UiLab::UpdateOperatorShellToggle(toggleOperator)", video)
+        self.assertNotIn("SDL_SCANCODE_F2", video)
+        self.assertNotIn("toggleOperator", video)
+        self.assertNotIn("UiLab::UpdateOperatorShellToggle(toggleOperator)", video)
         self.assertIn("SDL_SCANCODE_F1", video)
         self.assertIn("DrawProfiler()", video)
-        self.assertNotIn("UiLab::DrawProfilerAddon();", video)
+        self.assertIn("uiLabDockedProfiler", video)
+        self.assertIn("uiLabDockedProfiler && !g_uiLabProfilerWasEnabled", video)
+        self.assertIn("profilerPlotSize", video)
+        self.assertIn("ImGuiCond_FirstUseEver", video)
+        self.assertIn("Full profiler details", video)
+        self.assertNotIn("ImGuiWindowFlags_NoMove", video)
+        self.assertIn("UiLab::DrawProfilerAddon();", video)
 
         for token in [
-            "F2 toggles SWARD UI Lab",
-            "F1 remains native Profiler",
+            "This native Profiler + SWARD UI Lab workspace stays visible",
+            "F2 is no longer used by UI Lab",
+            "DrawOperatorInGameConsoleTab",
+            "ImGui::BeginTabItem(\"Console\")",
+            "AnyOperatorFloatingPaneVisible",
+            "ImGui::Checkbox(\"Window List\"",
             "SGlobals HUD/render switches",
             "DrawOperatorHudSwitchesPanel",
             "ImGui::BeginTabItem(\"HUD Switches\")",
@@ -2138,14 +2687,14 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, ui_lab)
 
         for token in [
-            "Phase 185",
-            "F2 toggles SWARD UI Lab",
-            "F1 remains the native Recomp Profiler",
+            "Phase 233",
+            "single native in-game workspace",
+            "F2 is no longer used",
             "ms_IsRenderHud is the whole UI/UX render gate",
         ]:
             self.assertIn(token, report)
 
-        self.assertIn("F2 toggles the detached SWARD UI Lab panel", pivot)
+        self.assertIn("Phase 233 merges the profiler and SWARD UI Lab", pivot)
 
     def test_ui_lab_phase186_restores_f2_embedded_style_and_hud_gate_correlation(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
@@ -2157,8 +2706,8 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "DrawDetachedProfilerAddonTab",
             "ImGui::BeginTabItem(\"SWARD UI Lab\")",
             "sward-profiler-addon-tabs",
-            "F2 toggles detached SWARD UI Lab",
-            "F1 remains native Profiler",
+            "This native Profiler + SWARD UI Lab workspace stays visible",
+            "F2 is no longer used by UI Lab",
         ]:
             self.assertIn(token, ui_lab)
 
@@ -5286,3 +5835,4 @@ aobscanmodule(INJECT,UnleashedRecomp.exe,89 04 1E 48 89 F9)
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -284,6 +284,8 @@ static Profiler g_swapChainAcquireProfiler;
 
 static bool g_profilerVisible;
 static bool g_profilerWasToggled;
+static bool g_uiLabProfilerWasEnabled;
+static bool g_uiLabNativeProfilerDetailsVisible;
 
 #ifdef UNLEASHED_RECOMP_D3D12
 static bool g_vulkan = false;
@@ -2371,14 +2373,17 @@ static const char *DeviceTypeName(RenderDeviceType type)
 
 static void DrawProfiler()
 {
-    bool toggleOperator = SDL_GetKeyboardState(nullptr)[SDL_SCANCODE_F2] != 0;
-    UiLab::UpdateOperatorShellToggle(toggleOperator);
-
     bool toggleProfiler = SDL_GetKeyboardState(nullptr)[SDL_SCANCODE_F1] != 0;
+    const bool uiLabDockedProfiler = UiLab::IsEnabled();
 
     if (UiLab::ShouldReserveF1DebugToggle())
     {
         toggleProfiler = false;
+    }
+
+    if (uiLabDockedProfiler && !g_uiLabProfilerWasEnabled)
+    {
+        g_profilerVisible = true;
     }
 
     if (!g_profilerWasToggled && toggleProfiler)
@@ -2389,16 +2394,50 @@ static void DrawProfiler()
     }
 
     g_profilerWasToggled = toggleProfiler;
+    g_uiLabProfilerWasEnabled = uiLabDockedProfiler;
 
     if (!g_profilerVisible)
         return;
+
+    if (uiLabDockedProfiler)
+        GameWindow::SetFullscreenCursorVisibility(true);
 
     ImFont* font = ImFontAtlasSnapshot::GetFont("FOT-SeuratPro-M.otf");
     float defaultScale = font->Scale;
     font->Scale = ImGui::GetDefaultFont()->FontSize / font->FontSize;
     ImGui::PushFont(font);
 
-    if (ImGui::Begin("Profiler", &g_profilerVisible))
+    ImGuiWindowFlags profilerWindowFlags = 0;
+    const char* profilerWindowTitle = "Profiler";
+    bool* profilerOpen = &g_profilerVisible;
+
+    if (uiLabDockedProfiler)
+    {
+        const ImGuiIO& io = ImGui::GetIO();
+        const float margin = 14.0f;
+        const float top = io.DisplaySize.y >= 720.0f ? 188.0f : 96.0f;
+        float width = io.DisplaySize.x * 0.25f;
+        if (width < 430.0f)
+            width = 430.0f;
+        if (width > 540.0f)
+            width = 540.0f;
+        if (width > io.DisplaySize.x - (margin * 2.0f))
+            width = std::max(300.0f, io.DisplaySize.x - (margin * 2.0f));
+
+        const float height = std::max(360.0f, io.DisplaySize.y - top - margin);
+        ImGui::SetNextWindowPos(ImVec2(std::max(margin, io.DisplaySize.x - width - margin), top), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowBgAlpha(0.86f);
+
+        profilerWindowFlags =
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoFocusOnAppearing;
+        profilerWindowTitle = "SWARD UI Lab###Profiler";
+        profilerOpen = &g_profilerVisible;
+    }
+
+    if (ImGui::Begin(profilerWindowTitle, profilerOpen, profilerWindowFlags))
     {
         g_applicationValues[g_profilerValueIndex] = App::s_deltaTime * 1000.0;
 
@@ -2411,7 +2450,8 @@ static void DrawProfiler()
         double presentWaitAvg = g_presentWaitProfiler.UpdateAndReturnAverage();
         double swapChainAcquireAvg = g_swapChainAcquireProfiler.UpdateAndReturnAverage();
 
-        if (ImPlot::BeginPlot("Frame Time"))
+        const ImVec2 profilerPlotSize = uiLabDockedProfiler ? ImVec2(-1.0f, 250.0f) : ImVec2(-1.0f, 0.0f);
+        if (ImPlot::BeginPlot("Frame Time", profilerPlotSize))
         {
             ImPlot::SetupAxisLimits(ImAxis_Y1, 0.0, 20.0);
             ImPlot::SetupAxis(ImAxis_Y1, "ms", ImPlotAxisFlags_None);
@@ -2428,6 +2468,32 @@ static void DrawProfiler()
 
         g_profilerValueIndex = (g_profilerValueIndex + 1) % PROFILER_VALUE_COUNT;
 
+        if (uiLabDockedProfiler)
+        {
+            ImGui::Text("Current Application: %.3f ms (%.2f FPS)", App::s_deltaTime * 1000.0, 1.0 / App::s_deltaTime);
+            ImGui::Text("Average Application: %.3f ms (%.2f FPS)", applicationAvg, 1000.0 / applicationAvg);
+            ImGui::TextWrapped(
+                "GPU %.3f ms avg %.3f ms | Present %.3f ms avg %.3f ms",
+                g_gpuFrameProfiler.value.load(),
+                gpuFrameAvg,
+                g_presentProfiler.value.load(),
+                presentAvg);
+            ImGui::Checkbox("Show FPS", &Config::ShowFPS.Value);
+            ImGui::SameLine();
+            ImGui::Checkbox("Full profiler details", &g_uiLabNativeProfilerDetailsVisible);
+            UiLab::DrawProfilerAddon();
+        }
+
+        const bool showNativeProfilerDetails =
+            !uiLabDockedProfiler || g_uiLabNativeProfilerDetailsVisible;
+
+        if (showNativeProfilerDetails)
+        {
+        if (uiLabDockedProfiler)
+        {
+            ImGui::Separator();
+            ImGui::TextUnformatted("Native profiler details");
+        }
         ImGui::Text("Current Application: %g ms (%g FPS)", App::s_deltaTime * 1000.0, 1.0 / App::s_deltaTime);
         ImGui::Text("Current GPU Frame: %g ms (%g FPS)", g_gpuFrameProfiler.value.load(), 1000.0 / g_gpuFrameProfiler.value.load());
         ImGui::Text("Current Present: %g ms (%g FPS)", g_presentProfiler.value.load(), 1000.0 / g_presentProfiler.value.load());
@@ -2479,7 +2545,7 @@ static void DrawProfiler()
         ImGui::NewLine();
 
         ImGui::Text("API: %s", g_vulkan ? "Vulkan" : "D3D12");
-        ImGui::Text("Device: %s", g_device->getDescription().name.c_str());
+        ImGui::TextWrapped("Device: %s", g_device->getDescription().name.c_str());
         ImGui::Text("Device Type: %s", DeviceTypeName(g_device->getDescription().type));
         ImGui::Text("VRAM: %.2f MiB", (double)(g_device->getDescription().dedicatedVideoMemory) / (1024.0 * 1024.0));
         ImGui::Text("UMA: %s", g_capabilities.uma ? "Supported" : "Unsupported");
@@ -2505,6 +2571,7 @@ static void DrawProfiler()
 
             ImGui::Unindent();
             ImGui::TreePop();
+        }
         }
     }
     ImGui::End();

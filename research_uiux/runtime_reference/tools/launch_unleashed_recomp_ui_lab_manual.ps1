@@ -8,7 +8,9 @@ param(
     [switch]$NoBuild,
     [switch]$NoCopy,
     [switch]$NoConsole,
-    [switch]$HideOverlay
+    [switch]$HideOverlay,
+    [switch]$UseWindowsTerminal,
+    [switch]$NoWindowsTerminal
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,6 +27,14 @@ function Resolve-UiLabPath([string]$Path) {
 
 function Quote-UiLabArgument([string]$Value) {
     return "'" + ($Value -replace "'", "''") + "'"
+}
+
+function Quote-NativeArgument([string]$Value) {
+    if ($Value -notmatch '[\s"]') {
+        return $Value
+    }
+
+    return '"' + ($Value -replace '"', '\"') + '"'
 }
 
 if (-not $NoBuild) {
@@ -86,6 +96,8 @@ if ($HideOverlay) {
     $args += @("--ui-lab-overlay", "off")
 }
 
+$runtimeArgumentLine = ($args | ForEach-Object { Quote-NativeArgument $_ }) -join " "
+
 Write-Host "[*] SWARD UI Lab manual launch root: $installRootResolved"
 Write-Host "[*] SWARD UI Lab sidecar runtime: $sidecarExe"
 Write-Host "[*] SWARD UI Lab evidence dir: $targetDir"
@@ -93,12 +105,112 @@ Write-Host "[*] SWARD UI Lab live bridge: \\.\pipe\$LiveBridgeName"
 Write-Host "[*] SWARD UI Lab args: $($args -join ' ')"
 
 if ($NoConsole) {
-    return Start-Process -FilePath $sidecarExe -WorkingDirectory $installRootResolved -ArgumentList $args -PassThru
+    $process = Start-Process -FilePath $sidecarExe -WorkingDirectory $installRootResolved -ArgumentList $runtimeArgumentLine -PassThru
+    $processCompanionPath = Join-Path $targetDir "process-companion.json"
+    $processRecord = [ordered]@{
+        pid = $process.Id
+        processName = $process.ProcessName
+        exe = $sidecarExe
+        arguments = $runtimeArgumentLine
+        evidenceDir = $targetDir
+        liveBridge = "\\.\pipe\$LiveBridgeName"
+        presentation = "game-window-native-overlay"
+        companionConsolePid = $null
+        companionTitle = $null
+        launchedAt = (Get-Date).ToString('o')
+    }
+    $processRecord | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $processCompanionPath -Encoding UTF8
+    Write-Host "[*] Attached UnleashedRecomp PID: $($process.Id)"
+    Write-Host "[*] Process companion record: $processCompanionPath"
+    Write-Host "[*] Presentation: game-window native SWARD UI Lab overlay; no companion console"
+    return $process
 }
 
 $quotedExe = Quote-UiLabArgument $sidecarExe
 $quotedInstall = Quote-UiLabArgument $installRootResolved
-$quotedArgs = ($args | ForEach-Object { Quote-UiLabArgument $_ }) -join ", "
-$command = "Set-Location -LiteralPath $quotedInstall; Write-Host '[*] SWARD UI Lab manual runtime console'; & $quotedExe @($quotedArgs)"
+$quotedEvidence = Quote-UiLabArgument $targetDir
+$quotedBridge = Quote-UiLabArgument $LiveBridgeName
+$quotedRuntimeArgumentLine = Quote-UiLabArgument $runtimeArgumentLine
+$processCompanionPath = Join-Path $targetDir "process-companion.json"
+$quotedProcessCompanionPath = Quote-UiLabArgument $processCompanionPath
+$consoleTitle = "SWARD UI Lab - UnleashedRecomp manual observer"
+$escapedConsoleTitle = $consoleTitle -replace "'", "''"
+$runnerScript = Join-Path $sessionDir "run_manual_observer.ps1"
+$runnerContent = @"
+`$Host.UI.RawUI.WindowTitle = '$escapedConsoleTitle'
+`$runtimeExe = $quotedExe
+`$installRoot = $quotedInstall
+`$evidenceDir = $quotedEvidence
+`$liveBridgeName = $quotedBridge
+`$runtimeArgumentLine = $quotedRuntimeArgumentLine
+`$processCompanionPath = $quotedProcessCompanionPath
+Set-Location -LiteralPath `$installRoot
+Write-Host '[*] SWARD UI Lab manual runtime console'
+Write-Host ('[*] Runtime exe: {0}' -f `$runtimeExe)
+Write-Host ('[*] Evidence dir: {0}' -f `$evidenceDir)
+Write-Host ('[*] Live bridge: \\.\pipe\{0}' -f `$liveBridgeName)
+Write-Host '[*] Launch mode: manual observer; no control automation'
+`$process = Start-Process -FilePath `$runtimeExe -WorkingDirectory `$installRoot -ArgumentList `$runtimeArgumentLine -NoNewWindow -PassThru
+`$pidTitle = 'SWARD UI Lab - UnleashedRecomp PID {0}' -f `$process.Id
+`$Host.UI.RawUI.WindowTitle = `$pidTitle
+Write-Host ('[*] Attached UnleashedRecomp PID: {0}' -f `$process.Id)
+Write-Host ('[*] Companion console PID: {0}' -f `$PID)
+`$processRecord = [ordered]@{
+    pid = `$process.Id
+    processName = `$process.ProcessName
+    exe = `$runtimeExe
+    arguments = `$runtimeArgumentLine
+    evidenceDir = `$evidenceDir
+    liveBridge = ('\\.\pipe\{0}' -f `$liveBridgeName)
+    companionConsolePid = `$PID
+    companionTitle = `$pidTitle
+    launchedAt = (Get-Date).ToString('o')
+}
+`$processRecord | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath `$processCompanionPath -Encoding UTF8
+while (-not `$process.HasExited) {
+    Start-Sleep -Seconds 2
+    try { `$process.Refresh() } catch { break }
+}
+try { `$exitCode = `$process.ExitCode } catch { `$exitCode = `$null }
+Write-Host ''
+Write-Host ('[*] UnleashedRecomp PID {0} exited with code: {1}' -f `$process.Id, `$exitCode)
+Write-Host ('[*] Process companion record: {0}' -f `$processCompanionPath)
+Write-Host '[*] Console kept open for evidence review.'
+"@
+Set-Content -LiteralPath $runnerScript -Value $runnerContent -Encoding UTF8
 
-return Start-Process -FilePath "powershell" -WorkingDirectory $installRootResolved -ArgumentList @("-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $command) -PassThru
+$powerShellArgs = @("-NoExit", "-ExecutionPolicy", "Bypass", "-File", $runnerScript)
+$powerShellArgumentLine = ($powerShellArgs | ForEach-Object { Quote-NativeArgument $_ }) -join " "
+$wt = Get-Command "wt.exe" -ErrorAction SilentlyContinue
+if ($UseWindowsTerminal -and $wt -and -not $NoWindowsTerminal) {
+    $wtArgs = @(
+        "new-window",
+        "--title", $consoleTitle,
+        "--icon", $sidecarExe,
+        "powershell"
+    ) + $powerShellArgs
+    $wtArgumentLine = ($wtArgs | ForEach-Object { Quote-NativeArgument $_ }) -join " "
+
+    return Start-Process -FilePath $wt.Source -WorkingDirectory $installRootResolved -ArgumentList $wtArgumentLine -PassThru
+}
+
+try {
+    $shortcutPath = Join-Path $sessionDir "SWARD UI Lab Manual Observer.lnk"
+    $powerShellPath = (Get-Command "powershell.exe" -ErrorAction Stop).Source
+    $wshShell = New-Object -ComObject WScript.Shell
+    $shortcut = $wshShell.CreateShortcut($shortcutPath)
+    $shortcut.TargetPath = $powerShellPath
+    $shortcut.Arguments = $powerShellArgumentLine
+    $shortcut.WorkingDirectory = $installRootResolved
+    $shortcut.IconLocation = "$sidecarExe,0"
+    $shortcut.Description = "SWARD UI Lab manual observer for UnleashedRecomp"
+    $shortcut.WindowStyle = 1
+    $shortcut.Save()
+
+    return Start-Process -FilePath $shortcutPath -WorkingDirectory $installRootResolved -PassThru
+}
+catch {
+    Write-Warning "Unable to create icon shortcut for manual console: $($_.Exception.Message)"
+}
+
+return Start-Process -FilePath "powershell" -WorkingDirectory $installRootResolved -ArgumentList $powerShellArgumentLine -PassThru

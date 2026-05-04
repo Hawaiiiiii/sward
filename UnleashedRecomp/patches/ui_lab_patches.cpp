@@ -1,8 +1,11 @@
 #include <patches/ui_lab_patches.h>
 #include <app.h>
 #include <api/SWA.h>
+#include <gpu/video.h>
 #include <gpu/imgui/imgui_common.h>
 #include <gpu/imgui/imgui_snapshot.h>
+#include <kernel/function.h>
+#include <kernel/heap.h>
 #include <kernel/memory.h>
 #include <os/logger.h>
 #include <user/config.h>
@@ -11,13 +14,17 @@
 #include <atomic>
 #include <chrono>
 #include <climits>
+#include <cmath>
 #include <cctype>
 #include <cstring>
 #include <cstdlib>
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <memory>
 #include <mutex>
+#include <new>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -25,12 +32,17 @@
 #include <unordered_set>
 #include <vector>
 
+#include "ui_lab_runtime_screen_index.generated.h"
+#include "ui_lab_yncp_native_component_map.generated.h"
+
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <windows.h>
 #endif
+
+extern void sub_825E4068(PPCContext& ctx, uint8_t* base);
 
 namespace UiLab
 {
@@ -352,6 +364,101 @@ namespace UiLab
         std::vector<CsdTreeEntry> nodes;
         std::vector<CsdTreeEntry> layers;
         std::string source;
+    };
+
+    struct CsdManagerSceneCorrelation
+    {
+        uint32_t managerSceneAddress = 0;
+        uint32_t resourceSceneAddress = 0;
+        uint32_t resourcePointerOffset = UINT32_MAX;
+        uint32_t motionPatternAddress = 0;
+        std::string projectName;
+        std::string scenePath;
+        uint64_t frame = 0;
+    };
+
+    struct CsdManagerSceneOwnerCandidate
+    {
+        uint32_t ownerAddress = 0;
+        uint32_t fieldOffset = UINT32_MAX;
+        uint32_t fieldAddress = 0;
+        uint32_t slotValue = 0;
+        uint32_t indirectAddress = 0;
+        uint32_t managerSceneAddress = 0;
+        uint32_t resourceSceneAddress = 0;
+        std::string projectName;
+        std::string scenePath;
+        std::string ownerSource;
+        std::string matchKind;
+        std::string confidence;
+        uint64_t frame = 0;
+    };
+
+    struct CsdOwnerScanRange
+    {
+        uint32_t ownerAddress = 0;
+        uint32_t byteSize = 0;
+        std::string source;
+    };
+
+    struct NativeCsdMakeProbeState
+    {
+        bool requested = false;
+        bool running = false;
+        bool attempted = false;
+        bool succeeded = false;
+        bool sceneResolved = false;
+        bool sceneMotionKnown = false;
+        bool sceneMotionPlaying = false;
+        std::string projectName;
+        std::string fileName;
+        std::string relativePath;
+        std::string selectedScene;
+        std::string selectedNodePath;
+        std::string status = "idle";
+        std::string sourcePath;
+        uint32_t ownerGuestAddress = 0;
+        uint32_t bytesGuestAddress = 0;
+        uint32_t bytesSize = 0;
+        uint32_t nativeProjectPointer = 0;
+        uint32_t nativeRootNode = 0;
+        uint32_t nativeScenePointer = 0;
+        uint32_t nativeResourceScenePointer = 0;
+        uint32_t nativeManagerScenePointer = 0;
+        uint32_t managerSceneResourceOffset = UINT32_MAX;
+        uint32_t nativeSceneCount = 0;
+        uint32_t nativeNodeCount = 0;
+        float nativeSceneMotionFrame = 0.0f;
+        uint32_t nativeSceneMotionRepeatType = UINT32_MAX;
+        uint64_t nativeSceneMotionLastUpdateFrame = UINT64_MAX;
+        uint64_t requestedFrame = 0;
+        uint64_t completedFrame = 0;
+        void* ownerHost = nullptr;
+        void* bytesHost = nullptr;
+        bool ownerConstructed = false;
+    };
+
+    struct NativeCsdForegroundRenderProbeState
+    {
+        bool enabled = false;
+        bool renderPassSeen = false;
+        bool rendered = false;
+        bool ownerHijackUsed = false;
+        bool evidenceWritten = false;
+        std::string status = "idle";
+        std::string hostMode = "piggyback on active CSD render pass";
+        std::string projectName;
+        std::string selectedScene;
+        std::string relativePath;
+        uint32_t nativeScenePointer = 0;
+        uint32_t nativeResourceScenePointer = 0;
+        uint32_t nativeManagerScenePointer = 0;
+        uint32_t managerSceneResourceOffset = UINT32_MAX;
+        uint32_t lastHostScenePointer = 0;
+        uint32_t lastRenderedScenePointer = 0;
+        uint64_t requestedFrame = 0;
+        uint64_t lastRenderFrame = UINT64_MAX;
+        uint64_t renderCount = 0;
     };
 
     struct LoadingLiveInspectorSnapshot
@@ -829,6 +936,9 @@ namespace UiLab
         std::string_view csdProject;
         std::string_view sourceFamily;
         std::string source;
+        std::string_view systemId = "";
+        std::string_view systemName = "";
+        std::string_view dataSource = "";
     };
 
     struct ObservedCsdProjectMapRow
@@ -853,6 +963,42 @@ namespace UiLab
         { "ui_worldmap_help", "world-map-help", "World Map Help", "System/GameMode/WorldMap/WorldMapTutorial.cpp" },
     }};
 
+    static const GeneratedRuntimeScreenIndex::Row* FindRuntimeScreenIndexRow(std::string_view project)
+    {
+        for (const auto& row : GeneratedRuntimeScreenIndex::kRows)
+        {
+            if (project == row.project)
+                return &row;
+        }
+
+        return nullptr;
+    }
+
+    static ObservedRuntimeScreen MakeObservedRuntimeScreen(
+        std::string_view token,
+        std::string_view label,
+        std::string_view csdProject,
+        std::string_view sourceFamily,
+        std::string source)
+    {
+        ObservedRuntimeScreen observed{
+            token,
+            label,
+            csdProject,
+            sourceFamily,
+            source
+        };
+
+        if (const auto* row = FindRuntimeScreenIndexRow(csdProject))
+        {
+            observed.systemId = row->systemId;
+            observed.systemName = row->systemName;
+            observed.dataSource = row->dataSource;
+        }
+
+        return observed;
+    }
+
     struct StarterUiCoverageRow
     {
         std::string_view screenId;
@@ -874,7 +1020,7 @@ namespace UiLab
     };
 
     // Phase 204: repo-safe starter UI/UX coverage matrix derived from the prototype route taxonomy.
-    // The local-only Reddog style reference guides the F2 surface; no prototype DDS payloads are loaded here.
+    // The local-only Reddog style reference guides the native UI Lab surface; no prototype DDS payloads are loaded here.
     static constexpr std::array<StarterUiCoverageRow, 9> kStarterUiCoverageRows =
     {{
         { "title-menu", "TitleMenuController", "retail title/menu JSONL + UI-layer capture", "Title + OldMainMenu route taxonomy", "compare prototype old-main-menu affordances to retail title/options policy" },
@@ -920,6 +1066,25 @@ namespace UiLab
     static float g_operatorProfilerFrameMs[kOperatorProfilerFrameHistoryCount] = {};
     static int g_operatorProfilerFrameMsIndex = 0;
     static uint64_t g_operatorProfilerLastFrame = 0;
+    static int g_uiProjectBrowserProjectIndex = 0;
+    static int g_uiProjectBrowserSceneIndex = 0;
+    static bool g_uiProjectBrowserAnimationPlaying = false;
+    static bool g_uiProjectBrowserPreviewPinned = true;
+    static float g_uiProjectBrowserTimelineFrame = 0.0f;
+    static bool g_yncForegroundInvokeVisible = false;
+    static int g_yncForegroundProjectIndex = 0;
+    static int g_yncForegroundSceneIndex = 0;
+    static bool g_yncForegroundAnimationPlaying = true;
+    static float g_yncForegroundTimelineFrame = 0.0f;
+    static NativeCsdMakeProbeState g_nativeCsdMakeProbe;
+    static NativeCsdForegroundRenderProbeState g_nativeCsdForegroundRenderProbe;
+    static bool g_nativeCsdMakeProbeAllowExperimentalProjects = false;
+    static bool g_nativeCsdMakeProbeExecuteExperimentalMake = false;
+    static uint32_t g_nativeCsdMakeLastOwnerAddress = 0;
+    static uint32_t g_nativeCsdMakeLastBytesAddress = 0;
+    static uint32_t g_nativeCsdMakeLastBytesSize = 0;
+    static uint32_t g_nativeCsdMakeLastContextAddress = 0;
+    static uint64_t g_nativeCsdMakeLastContextFrame = 0;
     static ImFont* g_swardNativeProfilerFont = nullptr;
     static float g_swardNativeProfilerFontDefaultScale = 1.0f;
     static bool g_swardNativeProfilerFontPushed = false;
@@ -1104,6 +1269,16 @@ namespace UiLab
     static std::unordered_set<std::string> g_loggedCsdProjects;
     static std::vector<std::string> g_observedCsdProjectOrder;
     static std::vector<CsdProjectTreeRecord> g_csdProjectTrees;
+    static constexpr size_t kCsdManagerSceneCorrelationLimit = 512;
+    static std::vector<CsdManagerSceneCorrelation> g_csdManagerSceneCorrelations;
+    static std::unordered_set<std::string> g_loggedCsdManagerSceneCorrelationKeys;
+    static constexpr size_t kCsdManagerSceneOwnerCandidateLimit = 256;
+    static std::vector<CsdManagerSceneOwnerCandidate> g_csdManagerSceneOwnerCandidates;
+    static std::unordered_set<std::string> g_loggedCsdManagerSceneOwnerCandidateKeys;
+    static std::string g_csdManagerSceneOwnerDiscoveryStatus =
+        "idle: foreground owner attach discovery has not scanned known UI owner ranges";
+    static uint32_t g_csdManagerSceneOwnerDiscoveryLastManagerScene = 0;
+    static uint64_t g_csdManagerSceneOwnerDiscoveryLastScanFrame = UINT64_MAX;
     static constexpr size_t kRuntimeUiDrawCallSampleLimit = 96;
     static std::vector<RuntimeUiDrawCall> g_runtimeUiDrawCalls;
     static uint64_t g_runtimeUiDrawListFrame = UINT64_MAX;
@@ -1155,6 +1330,22 @@ namespace UiLab
     static uint64_t TitleMenuStableFrames();
     static bool TryReadGuestU32(uint32_t guestAddress, uint32_t& value);
     static bool TryReadGuestFloat(uint32_t guestAddress, float& value);
+    static bool TryFindNativeCsdMakeProbeScene(
+        const GeneratedYncPNativeComponentMap::Project*& project,
+        const GeneratedYncPNativeComponentMap::Scene*& scene);
+    static bool ResolveNativeCsdSceneForSelectedProject(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene);
+    static bool TryCorrelateCsdManagerSceneToResourceScene(
+        uint32_t managerSceneAddress,
+        CsdManagerSceneCorrelation& correlation);
+    static bool TryApplyStoredManagerCorrelationToNativeCsdMakeProbe();
+    static bool TryDiscoverCsdManagerSceneOwnerCandidates(
+        const CsdManagerSceneCorrelation& correlation,
+        bool force);
+    static bool DiscoverOwnerCandidatesForResolvedNativeProbe(bool force);
+    static void AppendNativeCsdOwnerDiscoveryJson(std::ostringstream& out);
+    static void UpdateNativeCsdSceneMotionPlayback();
     static std::string_view MotionRepeatTypeLabel(uint32_t repeatType);
     static std::string_view LoadingDisplayTypeLabel(uint32_t displayType);
     static std::string_view PauseActionTypeLabel(uint32_t action);
@@ -1225,6 +1416,20 @@ namespace UiLab
     static void AppendSonicHudUpdateCallsiteSamples(
         std::ostringstream& out,
         const std::vector<SonicHudUpdateCallsiteSample>& samples);
+    static void AppendNativeCsdMakeProbeStatusJson(std::ostringstream& out);
+    static void AppendNativeCsdForegroundRenderProbeStatusJson(std::ostringstream& out);
+    static std::string BuildNativeForegroundStatusJson();
+    static std::string HandleNativeMakeProbeBridgeCommand(std::istringstream& input);
+    static std::string HandleNativeForegroundBridgeControlCommand(
+        std::string_view verb,
+        std::istringstream& input);
+    static bool WriteNativeCsdSceneMotionFrame(float frame);
+    static void RequestNativeCsdMakeProbe(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene,
+        float selectedFrame);
+    static void RequestNativeForegroundRenderProbe();
+    static void DetachNativeForegroundRenderProbe(std::string_view status);
     static void AppendTypedInspectors(std::ostringstream& out);
 
     static std::string_view RoutePolicyLabel()
@@ -1306,6 +1511,20 @@ namespace UiLab
             { "Stage / HUD", "Stage harness, HUD CSD binding, and target-ready latches", &g_operatorStageHudVisible },
             { "Live API", "Machine-readable live-state-json snapshot path and current values", &g_operatorLiveApiVisible },
         }};
+    }
+
+    static bool AnyOperatorFloatingPaneVisible()
+    {
+        if (g_operatorWindowListVisible)
+            return true;
+
+        for (const auto& entry : GetOperatorWindowEntries())
+        {
+            if (entry.visible != nullptr && *entry.visible)
+                return true;
+        }
+
+        return false;
     }
 
     bool ShouldReserveF1DebugToggle()
@@ -1394,14 +1613,25 @@ namespace UiLab
         return out.str();
     }
 
+    static bool IsReadableGuestRange(uint32_t guestAddress, size_t byteCount)
+    {
+        if (g_memory.base == nullptr || guestAddress == 0 || byteCount == 0)
+            return false;
+
+        const uint64_t guestEnd = static_cast<uint64_t>(guestAddress) + byteCount;
+        return guestEnd <= static_cast<uint64_t>(PPC_MEMORY_SIZE);
+    }
+
     static bool IsPlausibleGuestPointer(uint32_t value)
     {
-        return value >= 0x10000;
+        return value >= 0x10000 && IsReadableGuestRange(value, sizeof(uint32_t));
     }
+
+    static bool TryResolveQueuedNativeCsdMakeProbeFromObservedTree(std::string_view projectName);
 
     static bool TryReadGuestU32(uint32_t guestAddress, uint32_t& value)
     {
-        if (g_memory.base == nullptr || guestAddress == 0)
+        if (!IsReadableGuestRange(guestAddress, sizeof(uint32_t)))
             return false;
 
         const auto* bytes = reinterpret_cast<const uint8_t*>(g_memory.Translate(guestAddress));
@@ -1421,6 +1651,26 @@ namespace UiLab
 
         std::memcpy(&value, &bits, sizeof(value));
         return true;
+    }
+
+    static bool TryWriteGuestU32(uint32_t guestAddress, uint32_t value)
+    {
+        if (!IsReadableGuestRange(guestAddress, sizeof(uint32_t)))
+            return false;
+
+        auto* bytes = reinterpret_cast<uint8_t*>(g_memory.Translate(guestAddress));
+        bytes[0] = static_cast<uint8_t>((value >> 24) & 0xFF);
+        bytes[1] = static_cast<uint8_t>((value >> 16) & 0xFF);
+        bytes[2] = static_cast<uint8_t>((value >> 8) & 0xFF);
+        bytes[3] = static_cast<uint8_t>(value & 0xFF);
+        return true;
+    }
+
+    static bool TryWriteGuestFloat(uint32_t guestAddress, float value)
+    {
+        uint32_t bits = 0;
+        std::memcpy(&bits, &value, sizeof(bits));
+        return TryWriteGuestU32(guestAddress, bits);
     }
 
     static std::string_view MotionRepeatTypeLabel(uint32_t repeatType)
@@ -1711,6 +1961,31 @@ namespace UiLab
         return std::find(kPassiveProjects.begin(), kPassiveProjects.end(), project) != kPassiveProjects.end();
     }
 
+    static bool HasRecentSonicHudRuntimeEvidence(uint64_t window = 240)
+    {
+        if (WasObservedFrameRecent(g_chudSonicStageRawHookFrame, window) ||
+            WasObservedFrameRecent(g_lastOwnerFieldGaugeSnapshot.frame, window) ||
+            WasObservedFrameRecent(g_lastSonicHudUpdateCallsiteSampleFrame, window) ||
+            WasObservedFrameRecent(g_sonicHudGameplayValues.frame, window) ||
+            WasObservedFrameRecent(g_lastSonicHudClassifiedCallsiteValue.lastClassifiedCallsiteValueFrame, window))
+        {
+            return true;
+        }
+
+        std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+        return !g_sonicHudValueWriteObservations.empty() &&
+            WasObservedFrameRecent(g_sonicHudValueWriteObservations.back().frame, window);
+    }
+
+    static uint32_t CurrentProcessIdForOverlay()
+    {
+#ifdef _WIN32
+        return static_cast<uint32_t>(GetCurrentProcessId());
+#else
+        return 0;
+#endif
+    }
+
     static ObservedRuntimeScreen BuildObservedRuntimeScreen()
     {
         const auto& target = TargetFor(g_target);
@@ -1722,24 +1997,35 @@ namespace UiLab
 
         if (g_loadingDisplayWasActive)
         {
-            return {
+            return MakeObservedRuntimeScreen(
                 "loading",
                 "Loading / Miles Electric",
                 "ui_loading",
                 "System/Loading.cpp",
                 "loading-display-live-inspector"
-            };
+            );
         }
 
         if (g_titleMenuVisualReady || g_titleMenuInspector.postPressStartMenuReady)
         {
-            return {
+            return MakeObservedRuntimeScreen(
                 "title-menu",
                 "Title Menu",
                 "ui_title",
                 "System/GameMode/Title/TitleMenu.cpp",
                 "title-menu-live-inspector"
-            };
+            );
+        }
+
+        if (HasRecentSonicHudRuntimeEvidence())
+        {
+            return MakeObservedRuntimeScreen(
+                "sonic-hud",
+                "Sonic Stage HUD",
+                "ui_playscreen",
+                "Player/Character/Sonic/Hud/SonicMainDisplay.cpp",
+                "sonic-hud-live-inspector"
+            );
         }
 
         if (g_targetCsdObserved && (!target.requiresStageContext ||
@@ -1747,50 +2033,61 @@ namespace UiLab
             (g_stageContextObserved && WasObservedFrameRecent(g_lastStageContextFrame))) &&
             projectCanDeferToTarget)
         {
-            return {
+            return MakeObservedRuntimeScreen(
                 target.token,
                 target.label,
                 target.primaryCsdScene,
                 target.sourceFamily,
                 target.requiresStageContext ? "stage-target-live-inspector" : "target-csd-observed"
-            };
+            );
         }
 
         if (g_titleIntroInspector.valid && WasObservedFrameRecent(g_titleIntroInspector.frame))
         {
-            return {
+            return MakeObservedRuntimeScreen(
                 "title-runtime",
                 "Title Runtime",
                 "ui_title",
                 "System/GameMode/Title/TitleStateIntro.cpp",
                 "title-intro-live-inspector"
-            };
+            );
         }
 
         if (g_stageContextObserved &&
             WasObservedFrameRecent(g_lastStageContextFrame) &&
             !g_lastStageTitleContextDetail.empty())
         {
-            return {
+            return MakeObservedRuntimeScreen(
                 "stage-title-runtime",
                 "Stage Title/Menu Runtime",
                 "ui_title",
                 "System/GameMode/GameModeStageTitle.cpp",
                 "stage-title-context-live-inspector"
-            };
+            );
         }
 
         if (!project.empty() && !IsPassiveObservedCsdProject(project))
         {
+            if (const auto* generatedRow = FindRuntimeScreenIndexRow(project))
+            {
+                return MakeObservedRuntimeScreen(
+                    generatedRow->token,
+                    generatedRow->label,
+                    generatedRow->project,
+                    generatedRow->sourceFamily,
+                    "runtime-csd-project:" + std::string(generatedRow->project)
+                );
+            }
+
             if (project == "ui_itemresult")
             {
-                return {
+                return MakeObservedRuntimeScreen(
                     "item-result",
                     "Item Result Runtime",
                     "ui_itemresult",
                     "CSD/ui_itemresult runtime project (source file pending)",
                     "runtime-csd-project:ui_itemresult"
-                };
+                );
             }
 
             for (const auto& row : kObservedCsdProjectMap)
@@ -1800,41 +2097,41 @@ namespace UiLab
                     if (project == "ui_title" &&
                         (g_titleMenuVisualReady || g_titleMenuInspector.postPressStartMenuReady))
                     {
-                        return {
+                        return MakeObservedRuntimeScreen(
                             "title-menu",
                             "Title Menu",
                             "ui_title",
                             "System/GameMode/Title/TitleMenu.cpp",
                             "title-menu-live-inspector"
-                        };
+                        );
                     }
 
-                    return {
+                    return MakeObservedRuntimeScreen(
                         row.token,
                         row.label,
                         row.project,
                         row.sourceFamily,
                         "runtime-csd-project:" + std::string(row.project)
-                    };
+                    );
                 }
             }
 
-            return {
+            return MakeObservedRuntimeScreen(
                 "unknown-csd-runtime",
                 "Unknown CSD Runtime",
                 project,
                 "pending-runtime-source-family-classification",
                 "runtime-csd-project:" + std::string(project)
-            };
+            );
         }
 
-        return {
+        return MakeObservedRuntimeScreen(
             target.token,
             target.label,
             target.primaryCsdScene,
             target.sourceFamily,
             "requested-target-fallback"
-        };
+        );
     }
 
     static void AppendObservedRuntimeScreenFields(
@@ -1849,6 +2146,10 @@ namespace UiLab
             << indent << "\"observedCsdProject\": \"" << JsonEscape(observed.csdProject) << "\",\n"
             << indent << "\"observedSourceFamily\": \"" << JsonEscape(observed.sourceFamily) << "\",\n"
             << indent << "\"observedScreenSource\": \"" << JsonEscape(observed.source) << "\",\n"
+            << indent << "\"observedSystemId\": \"" << JsonEscape(observed.systemId) << "\",\n"
+            << indent << "\"observedSystemName\": \"" << JsonEscape(observed.systemName) << "\",\n"
+            << indent << "\"observedDataSource\": \"" << JsonEscape(observed.dataSource) << "\",\n"
+            << indent << "\"runtimeScreenIndexAssetEntryCount\": " << GeneratedRuntimeScreenIndex::kAssetEntryCount << ",\n"
             << indent << "\"targetObservedMismatch\": " << (observed.token != target.token ? "true" : "false");
     }
 
@@ -2184,6 +2485,10 @@ namespace UiLab
         R"("observedCsdProject")",
         R"("observedSourceFamily")",
         R"("observedScreenSource")",
+        R"("observedSystemId")",
+        R"("observedSystemName")",
+        R"("observedDataSource")",
+        R"("runtimeScreenIndexAssetEntryCount")",
         R"("targetObservedMismatch")"
     };
     static constexpr std::string_view kUiOracleJsonFields[] =
@@ -2454,6 +2759,389 @@ namespace UiLab
         }
 
         return nullptr;
+    }
+
+    static const CsdProjectTreeRecord* FindCsdProjectTreeRecordByProjectAddress(
+        const std::vector<CsdProjectTreeRecord>& records,
+        uint32_t projectAddress)
+    {
+        if (projectAddress == 0)
+            return nullptr;
+
+        for (const auto& record : records)
+        {
+            if (record.projectAddress == projectAddress)
+                return &record;
+        }
+
+        return nullptr;
+    }
+
+    static const CsdProjectTreeRecord* FindCsdProjectTreeRecordBySceneAddress(
+        const std::vector<CsdProjectTreeRecord>& records,
+        uint32_t sceneAddress)
+    {
+        if (sceneAddress == 0)
+            return nullptr;
+
+        for (const auto& record : records)
+        {
+            for (const auto& scene : record.scenes)
+            {
+                if (scene.address == sceneAddress)
+                    return &record;
+            }
+        }
+
+        return nullptr;
+    }
+
+    static const CsdManagerSceneCorrelation* FindCsdManagerSceneCorrelationByManagerAddress(
+        uint32_t managerSceneAddress)
+    {
+        if (managerSceneAddress == 0)
+            return nullptr;
+
+        for (const auto& correlation : g_csdManagerSceneCorrelations)
+        {
+            if (correlation.managerSceneAddress == managerSceneAddress)
+                return &correlation;
+        }
+
+        return nullptr;
+    }
+
+    static const CsdManagerSceneCorrelation* FindCsdManagerSceneCorrelationByResourceAddress(
+        uint32_t resourceSceneAddress)
+    {
+        if (resourceSceneAddress == 0)
+            return nullptr;
+
+        for (const auto& correlation : g_csdManagerSceneCorrelations)
+        {
+            if (correlation.resourceSceneAddress == resourceSceneAddress)
+                return &correlation;
+        }
+
+        return nullptr;
+    }
+
+    static void StoreCsdManagerSceneCorrelation(const CsdManagerSceneCorrelation& correlation)
+    {
+        for (auto& existing : g_csdManagerSceneCorrelations)
+        {
+            if (existing.managerSceneAddress == correlation.managerSceneAddress)
+            {
+                existing = correlation;
+                return;
+            }
+        }
+
+        if (g_csdManagerSceneCorrelations.size() >= kCsdManagerSceneCorrelationLimit)
+            g_csdManagerSceneCorrelations.erase(g_csdManagerSceneCorrelations.begin());
+
+        g_csdManagerSceneCorrelations.push_back(correlation);
+    }
+
+    static void StoreCsdManagerSceneOwnerCandidate(const CsdManagerSceneOwnerCandidate& candidate)
+    {
+        for (auto& existing : g_csdManagerSceneOwnerCandidates)
+        {
+            if (existing.ownerAddress == candidate.ownerAddress &&
+                existing.fieldOffset == candidate.fieldOffset &&
+                existing.managerSceneAddress == candidate.managerSceneAddress &&
+                existing.resourceSceneAddress == candidate.resourceSceneAddress &&
+                existing.matchKind == candidate.matchKind)
+            {
+                existing = candidate;
+                return;
+            }
+        }
+
+        if (g_csdManagerSceneOwnerCandidates.size() >= kCsdManagerSceneOwnerCandidateLimit)
+            g_csdManagerSceneOwnerCandidates.erase(g_csdManagerSceneOwnerCandidates.begin());
+
+        g_csdManagerSceneOwnerCandidates.push_back(candidate);
+    }
+
+    static void AddCsdOwnerScanRange(
+        std::vector<CsdOwnerScanRange>& ranges,
+        uint32_t ownerAddress,
+        uint32_t byteSize,
+        std::string source)
+    {
+        if (!IsPlausibleGuestPointer(ownerAddress) || byteSize == 0)
+            return;
+
+        for (const auto& range : ranges)
+        {
+            if (range.ownerAddress == ownerAddress && range.source == source)
+                return;
+        }
+
+        CsdOwnerScanRange range;
+        range.ownerAddress = ownerAddress;
+        range.byteSize = byteSize;
+        range.source = std::move(source);
+        ranges.push_back(std::move(range));
+    }
+
+    static std::vector<CsdOwnerScanRange> BuildKnownCsdOwnerScanRanges()
+    {
+        // known UI owner scan range: keep this deliberately bounded. This is
+        // owner/host attach discovery only; it never writes or replaces fields.
+        std::vector<CsdOwnerScanRange> ranges;
+
+        AddCsdOwnerScanRange(
+            ranges,
+            g_titleOwnerInspector.titleContextAddress,
+            0x700,
+            "title owner context");
+        AddCsdOwnerScanRange(
+            ranges,
+            g_chudSonicStageOwnerAddress,
+            0x3000,
+            "CHudSonicStage owner");
+        AddCsdOwnerScanRange(
+            ranges,
+            g_pauseGeneralSaveInspector.pauseAddress,
+            0x900,
+            "CHudPause owner");
+        AddCsdOwnerScanRange(
+            ranges,
+            g_pauseGeneralSaveInspector.generalWindowAddress,
+            0x900,
+            "CGeneralWindow owner");
+        AddCsdOwnerScanRange(
+            ranges,
+            g_pauseGeneralSaveInspector.saveIconAddress,
+            0x400,
+            "CSaveIcon owner");
+
+        return ranges;
+    }
+
+    static CsdManagerSceneOwnerCandidate BuildCsdOwnerCandidate(
+        const CsdManagerSceneCorrelation& correlation,
+        const CsdOwnerScanRange& range,
+        uint32_t fieldOffset,
+        uint32_t slotValue,
+        uint32_t indirectAddress,
+        std::string matchKind,
+        std::string confidence)
+    {
+        CsdManagerSceneOwnerCandidate candidate;
+        candidate.ownerAddress = range.ownerAddress;
+        candidate.fieldOffset = fieldOffset;
+        candidate.fieldAddress = range.ownerAddress + fieldOffset;
+        candidate.slotValue = slotValue;
+        candidate.indirectAddress = indirectAddress;
+        candidate.managerSceneAddress = correlation.managerSceneAddress;
+        candidate.resourceSceneAddress = correlation.resourceSceneAddress;
+        candidate.projectName = correlation.projectName;
+        candidate.scenePath = correlation.scenePath;
+        candidate.ownerSource = range.source;
+        candidate.matchKind = std::move(matchKind);
+        candidate.confidence = std::move(confidence);
+        candidate.frame = g_presentedFrameCount;
+        return candidate;
+    }
+
+    static void RecordCsdOwnerCandidateIfNew(const CsdManagerSceneOwnerCandidate& candidate)
+    {
+        StoreCsdManagerSceneOwnerCandidate(candidate);
+
+        const std::string key =
+            HexU32(candidate.ownerAddress) + "|" +
+            HexU32(candidate.fieldOffset) + "|" +
+            HexU32(candidate.managerSceneAddress) + "|" +
+            candidate.matchKind;
+        if (!g_loggedCsdManagerSceneOwnerCandidateKeys.insert(key).second)
+            return;
+
+        WriteEvidenceEvent(
+            "native-csd-owner-candidate",
+            "project=" + candidate.projectName +
+                "|path=" + candidate.scenePath +
+                "|owner=" + HexU32(candidate.ownerAddress) +
+                "|fieldOffset=" + HexU32(candidate.fieldOffset) +
+                "|fieldAddress=" + HexU32(candidate.fieldAddress) +
+                "|slotValue=" + HexU32(candidate.slotValue) +
+                "|indirect=" + HexU32(candidate.indirectAddress) +
+                "|managerScene=" + HexU32(candidate.managerSceneAddress) +
+                "|resourceScene=" + HexU32(candidate.resourceSceneAddress) +
+                "|matchKind=" + candidate.matchKind +
+                "|confidence=" + candidate.confidence +
+                "|source=" + candidate.ownerSource);
+    }
+
+    static bool ScanCsdOwnerCandidateRange(
+        const CsdManagerSceneCorrelation& correlation,
+        const CsdOwnerScanRange& range)
+    {
+        if (!IsPlausibleGuestPointer(correlation.managerSceneAddress) ||
+            !IsPlausibleGuestPointer(range.ownerAddress))
+        {
+            return false;
+        }
+
+        bool found = false;
+        const uint32_t scanBytes = std::min<uint32_t>(range.byteSize, 0x3000);
+        for (uint32_t offset = 0; offset + sizeof(uint32_t) <= scanBytes; offset += sizeof(uint32_t))
+        {
+            uint32_t slotValue = 0;
+            if (!TryReadGuestU32(range.ownerAddress + offset, slotValue))
+                continue;
+
+            if (slotValue == correlation.managerSceneAddress)
+            {
+                RecordCsdOwnerCandidateIfNew(BuildCsdOwnerCandidate(
+                    correlation,
+                    range,
+                    offset,
+                    slotValue,
+                    0,
+                    "direct-manager-scene-pointer",
+                    "high: owner field directly points at live manager CScene"));
+                found = true;
+                continue;
+            }
+
+            if (slotValue == correlation.resourceSceneAddress)
+            {
+                RecordCsdOwnerCandidateIfNew(BuildCsdOwnerCandidate(
+                    correlation,
+                    range,
+                    offset,
+                    slotValue,
+                    0,
+                    "direct-resource-scene-pointer",
+                    "medium: owner field points at resource Scene, not render manager CScene"));
+                found = true;
+                continue;
+            }
+
+            if (!IsPlausibleGuestPointer(slotValue))
+                continue;
+
+            static constexpr uint32_t kIndirectObjectScanBytes = 0x80;
+            for (uint32_t nestedOffset = 0; nestedOffset <= kIndirectObjectScanBytes; nestedOffset += sizeof(uint32_t))
+            {
+                uint32_t nestedValue = 0;
+                if (!TryReadGuestU32(slotValue + nestedOffset, nestedValue))
+                    continue;
+
+                if (nestedValue == correlation.managerSceneAddress)
+                {
+                    RecordCsdOwnerCandidateIfNew(BuildCsdOwnerCandidate(
+                        correlation,
+                        range,
+                        offset,
+                        slotValue,
+                        slotValue + nestedOffset,
+                        "indirect-manager-scene-pointer",
+                        "medium-high: owner field points at object containing live manager CScene"));
+                    found = true;
+                    break;
+                }
+
+                if (nestedValue == correlation.resourceSceneAddress)
+                {
+                    RecordCsdOwnerCandidateIfNew(BuildCsdOwnerCandidate(
+                        correlation,
+                        range,
+                        offset,
+                        slotValue,
+                        slotValue + nestedOffset,
+                        "indirect-resource-scene-pointer",
+                        "medium: owner field points at object containing resource Scene"));
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        return found;
+    }
+
+    static bool TryDiscoverCsdManagerSceneOwnerCandidates(
+        const CsdManagerSceneCorrelation& correlation,
+        bool force)
+    {
+        if (!IsPlausibleGuestPointer(correlation.managerSceneAddress))
+        {
+            g_csdManagerSceneOwnerDiscoveryStatus =
+                "blocked: no correlated live manager CScene for owner/host attach discovery";
+            return false;
+        }
+
+        if (!force)
+        {
+            for (const auto& candidate : g_csdManagerSceneOwnerCandidates)
+            {
+                if (candidate.managerSceneAddress == correlation.managerSceneAddress)
+                    return true;
+            }
+
+            if (g_csdManagerSceneOwnerDiscoveryLastManagerScene == correlation.managerSceneAddress &&
+                g_csdManagerSceneOwnerDiscoveryLastScanFrame != UINT64_MAX &&
+                g_presentedFrameCount <
+                    g_csdManagerSceneOwnerDiscoveryLastScanFrame + 30)
+            {
+                return false;
+            }
+        }
+
+        const auto ranges = BuildKnownCsdOwnerScanRanges();
+        if (ranges.empty())
+        {
+            g_csdManagerSceneOwnerDiscoveryStatus =
+                "pending: no known UI owner scan range is live yet";
+            return false;
+        }
+
+        bool found = false;
+        g_csdManagerSceneOwnerDiscoveryLastManagerScene = correlation.managerSceneAddress;
+        g_csdManagerSceneOwnerDiscoveryLastScanFrame = g_presentedFrameCount;
+        for (const auto& range : ranges)
+            found = ScanCsdOwnerCandidateRange(correlation, range) || found;
+
+        const size_t candidateCount = std::count_if(
+            g_csdManagerSceneOwnerCandidates.begin(),
+            g_csdManagerSceneOwnerCandidates.end(),
+            [&correlation](const auto& candidate)
+            {
+                return candidate.managerSceneAddress == correlation.managerSceneAddress;
+            });
+
+        g_csdManagerSceneOwnerDiscoveryStatus = found || candidateCount != 0
+            ? "owner/host attach discovery: candidate owner fields found; inspect before any hijack"
+            : "owner/host attach discovery: known UI owner scan range checked; no field match yet";
+        return found || candidateCount != 0;
+    }
+
+    static bool DiscoverOwnerCandidatesForResolvedNativeProbe(bool force)
+    {
+        if (!IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+            TryApplyStoredManagerCorrelationToNativeCsdMakeProbe();
+
+        if (!IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+        {
+            g_csdManagerSceneOwnerDiscoveryStatus =
+                "blocked: selected scene has no live manager CScene correlation yet";
+            return false;
+        }
+
+        const CsdManagerSceneCorrelation* correlation =
+            FindCsdManagerSceneCorrelationByManagerAddress(g_nativeCsdMakeProbe.nativeManagerScenePointer);
+        if (correlation == nullptr)
+        {
+            g_csdManagerSceneOwnerDiscoveryStatus =
+                "blocked: selected manager CScene has no resource correlation record";
+            return false;
+        }
+
+        return TryDiscoverCsdManagerSceneOwnerCandidates(*correlation, force);
     }
 
     static CsdLiveInspectorSnapshot BuildCsdLiveInspectorSnapshot()
@@ -6740,6 +7428,388 @@ namespace UiLab
         out << "]";
     }
 
+    static void AppendNativeCsdMakeProbeStatusJson(std::ostringstream& out)
+    {
+        out
+            << "{\n"
+            << "    \"requested\": " << (g_nativeCsdMakeProbe.requested ? "true" : "false") << ",\n"
+            << "    \"running\": " << (g_nativeCsdMakeProbe.running ? "true" : "false") << ",\n"
+            << "    \"attempted\": " << (g_nativeCsdMakeProbe.attempted ? "true" : "false") << ",\n"
+            << "    \"succeeded\": " << (g_nativeCsdMakeProbe.succeeded ? "true" : "false") << ",\n"
+            << "    \"sceneResolved\": " << (g_nativeCsdMakeProbe.sceneResolved ? "true" : "false") << ",\n"
+            << "    \"status\": \"" << JsonEscape(g_nativeCsdMakeProbe.status) << "\",\n"
+            << "    \"project\": \"" << JsonEscape(g_nativeCsdMakeProbe.projectName) << "\",\n"
+            << "    \"file\": \"" << JsonEscape(g_nativeCsdMakeProbe.fileName) << "\",\n"
+            << "    \"relativePath\": \"" << JsonEscape(g_nativeCsdMakeProbe.relativePath) << "\",\n"
+            << "    \"sourcePath\": \"" << JsonEscape(g_nativeCsdMakeProbe.sourcePath) << "\",\n"
+            << "    \"selectedScene\": \"" << JsonEscape(g_nativeCsdMakeProbe.selectedScene) << "\",\n"
+            << "    \"selectedNodePath\": \"" << JsonEscape(g_nativeCsdMakeProbe.selectedNodePath) << "\",\n"
+            << "    \"ownerGuestAddress\": \"" << JsonEscape(HexU32(g_nativeCsdMakeProbe.ownerGuestAddress)) << "\",\n"
+            << "    \"bytesGuestAddress\": \"" << JsonEscape(HexU32(g_nativeCsdMakeProbe.bytesGuestAddress)) << "\",\n"
+            << "    \"bytesSize\": " << g_nativeCsdMakeProbe.bytesSize << ",\n"
+            << "    \"nativeProjectPointer\": \"" << JsonEscape(HexU32(g_nativeCsdMakeProbe.nativeProjectPointer)) << "\",\n"
+            << "    \"nativeRootNode\": \"" << JsonEscape(HexU32(g_nativeCsdMakeProbe.nativeRootNode)) << "\",\n"
+            << "    \"nativeScenePointer\": \"" << JsonEscape(HexU32(g_nativeCsdMakeProbe.nativeScenePointer)) << "\",\n"
+            << "    \"nativeResourceScenePointer\": \"" << JsonEscape(HexU32(g_nativeCsdMakeProbe.nativeResourceScenePointer)) << "\",\n"
+            << "    \"nativeManagerScenePointer\": \"" << JsonEscape(HexU32(g_nativeCsdMakeProbe.nativeManagerScenePointer)) << "\",\n"
+            << "    \"managerSceneResourceOffset\": "
+            << (g_nativeCsdMakeProbe.managerSceneResourceOffset == UINT32_MAX
+                ? -1
+                : static_cast<int32_t>(g_nativeCsdMakeProbe.managerSceneResourceOffset))
+            << ",\n"
+            << "    \"nativeSceneCount\": " << g_nativeCsdMakeProbe.nativeSceneCount << ",\n"
+            << "    \"nativeNodeCount\": " << g_nativeCsdMakeProbe.nativeNodeCount << ",\n"
+            << "    \"requestedFrame\": " << g_nativeCsdMakeProbe.requestedFrame << ",\n"
+            << "    \"completedFrame\": " << g_nativeCsdMakeProbe.completedFrame << ",\n"
+            << "    \"nativeSceneMotion\": {\n"
+            << "      \"known\": " << (g_nativeCsdMakeProbe.sceneMotionKnown ? "true" : "false") << ",\n"
+            << "      \"playing\": " << (g_nativeCsdMakeProbe.sceneMotionPlaying ? "true" : "false") << ",\n"
+            << "      \"frame\": " << g_nativeCsdMakeProbe.nativeSceneMotionFrame << ",\n"
+            << "      \"repeatType\": \"" << JsonEscape(std::string(MotionRepeatTypeLabel(g_nativeCsdMakeProbe.nativeSceneMotionRepeatType))) << "\",\n"
+            << "      \"repeatTypeRaw\": "
+            << (g_nativeCsdMakeProbe.nativeSceneMotionRepeatType == UINT32_MAX
+                ? -1
+                : static_cast<int32_t>(g_nativeCsdMakeProbe.nativeSceneMotionRepeatType))
+            << ",\n"
+            << "      \"lastUpdateFrame\": "
+            << (g_nativeCsdMakeProbe.nativeSceneMotionLastUpdateFrame == UINT64_MAX
+                ? -1
+                : static_cast<int64_t>(g_nativeCsdMakeProbe.nativeSceneMotionLastUpdateFrame))
+            << "\n"
+            << "    }\n"
+            << "  }";
+    }
+
+    static void AppendNativeCsdForegroundRenderProbeStatusJson(std::ostringstream& out)
+    {
+        out
+            << "{\n"
+            << "    \"enabled\": " << (g_nativeCsdForegroundRenderProbe.enabled ? "true" : "false") << ",\n"
+            << "    \"renderPassSeen\": " << (g_nativeCsdForegroundRenderProbe.renderPassSeen ? "true" : "false") << ",\n"
+            << "    \"rendered\": " << (g_nativeCsdForegroundRenderProbe.rendered ? "true" : "false") << ",\n"
+            << "    \"ownerHijackUsed\": " << (g_nativeCsdForegroundRenderProbe.ownerHijackUsed ? "true" : "false") << ",\n"
+            << "    \"status\": \"" << JsonEscape(g_nativeCsdForegroundRenderProbe.status) << "\",\n"
+            << "    \"hostMode\": \"" << JsonEscape(g_nativeCsdForegroundRenderProbe.hostMode) << "\",\n"
+            << "    \"project\": \"" << JsonEscape(g_nativeCsdForegroundRenderProbe.projectName) << "\",\n"
+            << "    \"selectedScene\": \"" << JsonEscape(g_nativeCsdForegroundRenderProbe.selectedScene) << "\",\n"
+            << "    \"relativePath\": \"" << JsonEscape(g_nativeCsdForegroundRenderProbe.relativePath) << "\",\n"
+            << "    \"nativeScenePointer\": \"" << JsonEscape(HexU32(g_nativeCsdForegroundRenderProbe.nativeScenePointer)) << "\",\n"
+            << "    \"nativeResourceScenePointer\": \"" << JsonEscape(HexU32(g_nativeCsdForegroundRenderProbe.nativeResourceScenePointer)) << "\",\n"
+            << "    \"nativeManagerScenePointer\": \"" << JsonEscape(HexU32(g_nativeCsdForegroundRenderProbe.nativeManagerScenePointer)) << "\",\n"
+            << "    \"managerSceneResourceOffset\": "
+            << (g_nativeCsdForegroundRenderProbe.managerSceneResourceOffset == UINT32_MAX
+                ? -1
+                : static_cast<int32_t>(g_nativeCsdForegroundRenderProbe.managerSceneResourceOffset))
+            << ",\n"
+            << "    \"lastHostScenePointer\": \"" << JsonEscape(HexU32(g_nativeCsdForegroundRenderProbe.lastHostScenePointer)) << "\",\n"
+            << "    \"lastRenderedScenePointer\": \"" << JsonEscape(HexU32(g_nativeCsdForegroundRenderProbe.lastRenderedScenePointer)) << "\",\n"
+            << "    \"requestedFrame\": " << g_nativeCsdForegroundRenderProbe.requestedFrame << ",\n"
+            << "    \"lastRenderFrame\": "
+            << (g_nativeCsdForegroundRenderProbe.lastRenderFrame == UINT64_MAX
+                ? -1
+                : static_cast<int64_t>(g_nativeCsdForegroundRenderProbe.lastRenderFrame))
+            << ",\n"
+            << "    \"renderCount\": " << g_nativeCsdForegroundRenderProbe.renderCount << "\n"
+            << "  }";
+    }
+
+    static void AppendNativeCsdOwnerDiscoveryJson(std::ostringstream& out)
+    {
+        const uint32_t selectedManagerScene =
+            g_nativeCsdMakeProbe.nativeManagerScenePointer != 0
+                ? g_nativeCsdMakeProbe.nativeManagerScenePointer
+                : g_nativeCsdForegroundRenderProbe.nativeManagerScenePointer;
+
+        const size_t selectedCandidateCount = std::count_if(
+            g_csdManagerSceneOwnerCandidates.begin(),
+            g_csdManagerSceneOwnerCandidates.end(),
+            [selectedManagerScene](const auto& candidate)
+            {
+                return selectedManagerScene != 0 &&
+                    candidate.managerSceneAddress == selectedManagerScene;
+            });
+
+        out
+            << "{\n"
+            << "    \"status\": \"" << JsonEscape(g_csdManagerSceneOwnerDiscoveryStatus) << "\",\n"
+            << "    \"selectedManagerScenePointer\": \"" << JsonEscape(HexU32(selectedManagerScene)) << "\",\n"
+            << "    \"candidateCount\": " << g_csdManagerSceneOwnerCandidates.size() << ",\n"
+            << "    \"selectedCandidateCount\": " << selectedCandidateCount << ",\n"
+            << "    \"ownerCandidates\": [";
+
+        size_t emitted = 0;
+        for (const auto& candidate : g_csdManagerSceneOwnerCandidates)
+        {
+            if (selectedManagerScene != 0 &&
+                candidate.managerSceneAddress != selectedManagerScene)
+            {
+                continue;
+            }
+
+            if (emitted >= 24)
+                break;
+
+            if (emitted != 0)
+                out << ",";
+
+            out
+                << "{"
+                << "\"ownerAddress\":\"" << JsonEscape(HexU32(candidate.ownerAddress)) << "\","
+                << "\"fieldOffset\":\"" << JsonEscape(HexU32(candidate.fieldOffset)) << "\","
+                << "\"fieldAddress\":\"" << JsonEscape(HexU32(candidate.fieldAddress)) << "\","
+                << "\"slotValue\":\"" << JsonEscape(HexU32(candidate.slotValue)) << "\","
+                << "\"indirectAddress\":\"" << JsonEscape(HexU32(candidate.indirectAddress)) << "\","
+                << "\"managerSceneAddress\":\"" << JsonEscape(HexU32(candidate.managerSceneAddress)) << "\","
+                << "\"resourceSceneAddress\":\"" << JsonEscape(HexU32(candidate.resourceSceneAddress)) << "\","
+                << "\"project\":\"" << JsonEscape(candidate.projectName) << "\","
+                << "\"scenePath\":\"" << JsonEscape(candidate.scenePath) << "\","
+                << "\"ownerSource\":\"" << JsonEscape(candidate.ownerSource) << "\","
+                << "\"matchKind\":\"" << JsonEscape(candidate.matchKind) << "\","
+                << "\"confidence\":\"" << JsonEscape(candidate.confidence) << "\","
+                << "\"frame\":" << candidate.frame
+                << "}";
+            ++emitted;
+        }
+
+        out
+            << "]\n"
+            << "  }";
+    }
+
+    static std::string BuildNativeForegroundStatusJson()
+    {
+        const auto& target = TargetFor(g_target);
+        const auto observed = BuildObservedRuntimeScreen();
+        std::ostringstream out;
+
+        out
+            << "{\n"
+            << "  \"ok\": true,\n"
+            << "  \"source\": \"native foreground render probe status\",\n"
+            << "  \"version\": 1,\n"
+            << "  \"frame\": " << g_presentedFrameCount << ",\n"
+            << "  \"target\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"targetScreen\": \"" << JsonEscape(target.token) << "\",\n"
+            << "  \"activeScreen\": \"" << JsonEscape(observed.token) << "\",\n";
+        AppendObservedRuntimeScreenFields(out, observed, target);
+        out
+            << ",\n"
+            << "  \"nativeCsdMakeProbe\": ";
+        AppendNativeCsdMakeProbeStatusJson(out);
+        out
+            << ",\n"
+            << "  \"nativeCsdForegroundRenderProbe\": ";
+        AppendNativeCsdForegroundRenderProbeStatusJson(out);
+        out
+            << ",\n"
+            << "  \"nativeCsdOwnerDiscovery\": ";
+        AppendNativeCsdOwnerDiscoveryJson(out);
+        out
+            << "\n"
+            << "}\n";
+
+        return out.str();
+    }
+
+    static std::string HandleNativeMakeProbeBridgeCommand(std::istringstream& input)
+    {
+        std::string projectToken;
+        std::string sceneToken;
+        std::string frameToken;
+        input >> projectToken >> sceneToken >> frameToken;
+
+        if (projectToken.empty() || sceneToken.empty())
+        {
+            g_nativeCsdMakeProbe.status =
+                "native make observe blocked: expected native-make-observe <project-or-path> <scene> [frame]";
+            return BuildNativeForegroundStatusJson();
+        }
+
+        const GeneratedYncPNativeComponentMap::Project* selectedProject = nullptr;
+        for (const auto& project : GeneratedYncPNativeComponentMap::kProjects)
+        {
+            if (projectToken == project.project ||
+                projectToken == project.projectName ||
+                projectToken == project.fileName ||
+                projectToken == project.relativePath)
+            {
+                selectedProject = &project;
+                break;
+            }
+        }
+
+        if (selectedProject == nullptr)
+        {
+            g_nativeCsdMakeProbe.status =
+                "native make observe blocked: project not found for bridge token " + projectToken;
+            return BuildNativeForegroundStatusJson();
+        }
+
+        const GeneratedYncPNativeComponentMap::Scene* selectedScene = nullptr;
+        const size_t firstScene = selectedProject->firstScene;
+        const size_t sceneEnd = std::min(
+            GeneratedYncPNativeComponentMap::kScenes.size(),
+            firstScene + selectedProject->sceneCount);
+        for (size_t i = firstScene; i < sceneEnd; ++i)
+        {
+            const auto& scene = GeneratedYncPNativeComponentMap::kScenes[i];
+            if (sceneToken == scene.scene ||
+                sceneToken == scene.nodePath ||
+                sceneToken == std::string(scene.project) + "/" + std::string(scene.scene))
+            {
+                selectedScene = &scene;
+                break;
+            }
+        }
+
+        if (selectedScene == nullptr)
+        {
+            g_nativeCsdMakeProbe.status =
+                "native make observe blocked: scene not found in " +
+                std::string(selectedProject->project) +
+                " for bridge token " + sceneToken;
+            return BuildNativeForegroundStatusJson();
+        }
+
+        float selectedFrame = selectedScene->frameMin;
+        if (!frameToken.empty())
+        {
+            char* end = nullptr;
+            const float parsed = std::strtof(frameToken.c_str(), &end);
+            if (end == frameToken.c_str())
+            {
+                g_nativeCsdMakeProbe.status =
+                    "native make observe blocked: frame token was not numeric: " + frameToken;
+                return BuildNativeForegroundStatusJson();
+            }
+
+            selectedFrame = parsed;
+        }
+
+        RequestNativeCsdMakeProbe(*selectedProject, *selectedScene, selectedFrame);
+        WriteEvidenceEvent(
+            "native-csd-make-probe-requested-by-live-bridge",
+            std::string(selectedProject->relativePath) + "|" +
+                std::string(selectedScene->scene) +
+                "|frame=" + std::to_string(selectedFrame));
+
+        const bool resolvedImmediately =
+            TryResolveQueuedNativeCsdMakeProbeFromObservedTree(selectedProject->project);
+        WriteEvidenceEvent(
+            "native-csd-make-probe-live-bridge-immediate-resolve-check",
+            std::string(selectedProject->relativePath) + "|" +
+                std::string(selectedScene->scene) +
+                "|resolved=" + (resolvedImmediately ? std::string("1") : std::string("0")));
+        return BuildNativeForegroundStatusJson();
+    }
+
+    static std::string HandleNativeForegroundBridgeControlCommand(
+        std::string_view verb,
+        std::istringstream& input)
+    {
+        if (verb == "native-owner-discovery" ||
+            verb == "native-owner-scan")
+        {
+            const bool discovered = DiscoverOwnerCandidatesForResolvedNativeProbe(true);
+            WriteEvidenceEvent(
+                "native-csd-foreground-control",
+                "command=owner-discovery discovered=" + std::string(discovered ? "1" : "0") +
+                    " status=" + g_csdManagerSceneOwnerDiscoveryStatus);
+            return BuildNativeForegroundStatusJson();
+        }
+
+        if (verb == "native-foreground-attach" ||
+            verb == "native-foreground-arm" ||
+            verb == "native-foreground-spawn")
+        {
+            RequestNativeForegroundRenderProbe();
+            WriteEvidenceEvent(
+                "native-csd-foreground-control",
+                "command=attach status=" + g_nativeCsdForegroundRenderProbe.status);
+            return BuildNativeForegroundStatusJson();
+        }
+
+        if (verb == "native-foreground-detach")
+        {
+            DetachNativeForegroundRenderProbe("detached by live bridge command");
+            WriteEvidenceEvent("native-csd-foreground-control", "command=detach");
+            return BuildNativeForegroundStatusJson();
+        }
+
+        if (verb == "native-motion-play")
+        {
+            if (!IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+                TryApplyStoredManagerCorrelationToNativeCsdMakeProbe();
+
+            if (!g_nativeCsdMakeProbe.sceneResolved ||
+                !IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+            {
+                g_nativeCsdMakeProbe.status =
+                    "native motion play blocked: no correlated live manager CScene instance for selected resource scene";
+            }
+            else
+            {
+                g_nativeCsdMakeProbe.sceneMotionPlaying = true;
+                g_nativeCsdMakeProbe.status =
+                    "native motion playback armed by live bridge command";
+                WriteEvidenceEvent(
+                    "native-csd-motion-control",
+                    "command=play managerScene=" + HexU32(g_nativeCsdMakeProbe.nativeManagerScenePointer) +
+                        " resourceScene=" + HexU32(g_nativeCsdMakeProbe.nativeResourceScenePointer));
+            }
+
+            return BuildNativeForegroundStatusJson();
+        }
+
+        if (verb == "native-motion-stop")
+        {
+            g_nativeCsdMakeProbe.sceneMotionPlaying = false;
+            g_nativeCsdMakeProbe.status = "native motion playback stopped by live bridge command";
+            WriteEvidenceEvent("native-csd-motion-control", "command=stop");
+            return BuildNativeForegroundStatusJson();
+        }
+
+        if (verb == "native-motion-scrub")
+        {
+            std::string frameText;
+            input >> frameText;
+            if (frameText.empty())
+            {
+                g_nativeCsdMakeProbe.status =
+                    "native motion scrub blocked: command needs a frame value";
+                return BuildNativeForegroundStatusJson();
+            }
+
+            char* end = nullptr;
+            const float frame = std::strtof(frameText.c_str(), &end);
+            if (end == frameText.c_str())
+            {
+                g_nativeCsdMakeProbe.status =
+                    "native motion scrub blocked: frame value was not numeric";
+                return BuildNativeForegroundStatusJson();
+            }
+
+            g_nativeCsdMakeProbe.sceneMotionPlaying = false;
+            if (!WriteNativeCsdSceneMotionFrame(frame))
+            {
+                g_nativeCsdMakeProbe.status =
+                    "native motion scrub blocked: no writable resolved native CSD scene";
+                return BuildNativeForegroundStatusJson();
+            }
+
+            g_nativeCsdMakeProbe.status =
+                "native motion frame scrubbed by live bridge command";
+            WriteEvidenceEvent(
+                "native-csd-motion-control",
+                "command=scrub frame=" + frameText +
+                    " managerScene=" + HexU32(g_nativeCsdMakeProbe.nativeManagerScenePointer) +
+                    " resourceScene=" + HexU32(g_nativeCsdMakeProbe.nativeResourceScenePointer));
+            return BuildNativeForegroundStatusJson();
+        }
+
+        return BuildNativeForegroundStatusJson();
+    }
+
     std::string BuildLiveStateJson()
     {
         const auto& target = TargetFor(g_target);
@@ -6819,10 +7889,18 @@ namespace UiLab
             << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
             << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
             << "    \"commands\": ";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "native-foreground-status", "native-make-observe <project> <scene> [frame]", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub <frame>", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out
             << "\n"
             << "  },\n"
+            << "  \"nativeCsdMakeProbe\": ";
+        AppendNativeCsdMakeProbeStatusJson(out);
+        out
+            << ",\n"
+            << "  \"nativeCsdForegroundRenderProbe\": ";
+        AppendNativeCsdForegroundRenderProbeStatusJson(out);
+        out
+            << ",\n"
             << "  \"capabilities\": ";
         AppendStringArray(out, {
             "current target",
@@ -7526,6 +8604,12 @@ namespace UiLab
         g_lastSonicHudUpdateCallsiteSampleFrame = 0;
         g_lastCsdProjectName.clear();
         g_lastCsdProjectFrame = 0;
+        g_csdManagerSceneOwnerCandidates.clear();
+        g_loggedCsdManagerSceneOwnerCandidateKeys.clear();
+        g_csdManagerSceneOwnerDiscoveryStatus =
+            "idle: foreground owner attach discovery has not scanned known UI owner ranges";
+        g_csdManagerSceneOwnerDiscoveryLastManagerScene = 0;
+        g_csdManagerSceneOwnerDiscoveryLastScanFrame = UINT64_MAX;
         g_lastTitleIntroContextDetail.clear();
         g_lastStageTitleContextDetail.clear();
         g_lastTitleMenuContextDetail.clear();
@@ -7827,6 +8911,7 @@ namespace UiLab
         g_titleOwnerInspector.csdByte160 = csdByte160;
         g_titleOwnerInspector.ownerReady = ownerReady;
         g_titleOwnerInspector.frame = g_presentedFrameCount;
+        DiscoverOwnerCandidatesForResolvedNativeProbe(false);
 
         if (g_target != ScreenId::TitleMenu || g_titleMenuVisualReady)
             return;
@@ -8147,6 +9232,7 @@ namespace UiLab
             WriteEvidenceEvent("presented-frame");
 
         UpdateHudRenderGateCorrelation();
+        UpdateNativeCsdSceneMotionPlayback();
 
         if ((g_presentedFrameCount % 30) == 0 && g_lastLiveStateSnapshotFrame != g_presentedFrameCount)
             WriteLiveStateSnapshot();
@@ -8414,6 +9500,22 @@ namespace UiLab
         MarkTargetCsdProjectLive(projectName);
     }
 
+    void OnNativeCsdMakeCallContext(
+        uint32_t ownerAddress,
+        uint32_t bytesAddress,
+        uint32_t bytesSize,
+        uint32_t makeContextAddress)
+    {
+        if (!g_isEnabled)
+            return;
+
+        g_nativeCsdMakeLastOwnerAddress = ownerAddress;
+        g_nativeCsdMakeLastBytesAddress = bytesAddress;
+        g_nativeCsdMakeLastBytesSize = bytesSize;
+        g_nativeCsdMakeLastContextAddress = makeContextAddress;
+        g_nativeCsdMakeLastContextFrame = g_presentedFrameCount;
+    }
+
     void OnCsdProjectTreeMade(std::string_view projectName, uint32_t projectAddress, uint32_t rootNodeAddress)
     {
         if (!g_isEnabled || projectName.empty())
@@ -8438,6 +9540,55 @@ namespace UiLab
             record.nodes.clear();
             record.layers.clear();
             record.frame = g_presentedFrameCount;
+        }
+
+        g_csdManagerSceneCorrelations.erase(
+            std::remove_if(
+                g_csdManagerSceneCorrelations.begin(),
+                g_csdManagerSceneCorrelations.end(),
+                [&project](const auto& correlation)
+                {
+                    return correlation.projectName == project;
+                }),
+            g_csdManagerSceneCorrelations.end());
+    }
+
+    void OnCsdProjectTreeTraversalFinished(std::string_view projectName)
+    {
+        if (!g_isEnabled || projectName.empty())
+            return;
+
+        TryResolveQueuedNativeCsdMakeProbeFromObservedTree(projectName);
+
+        if (g_nativeCsdForegroundRenderProbe.enabled &&
+            projectName == g_nativeCsdMakeProbe.projectName)
+        {
+            const GeneratedYncPNativeComponentMap::Project* project = nullptr;
+            const GeneratedYncPNativeComponentMap::Scene* scene = nullptr;
+            if (TryFindNativeCsdMakeProbeScene(project, scene) &&
+                project != nullptr &&
+                scene != nullptr &&
+                ResolveNativeCsdSceneForSelectedProject(*project, *scene))
+            {
+                if (IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+                {
+                    g_nativeCsdForegroundRenderProbe.nativeScenePointer =
+                        g_nativeCsdMakeProbe.nativeManagerScenePointer;
+                    g_nativeCsdForegroundRenderProbe.nativeManagerScenePointer =
+                        g_nativeCsdMakeProbe.nativeManagerScenePointer;
+                    g_nativeCsdForegroundRenderProbe.nativeResourceScenePointer =
+                        g_nativeCsdMakeProbe.nativeResourceScenePointer;
+                    g_nativeCsdForegroundRenderProbe.managerSceneResourceOffset =
+                        g_nativeCsdMakeProbe.managerSceneResourceOffset;
+                    g_nativeCsdForegroundRenderProbe.status =
+                        "refreshed: matching game-created CSD tree updated native manager CScene pointer";
+                }
+                else
+                {
+                    g_nativeCsdForegroundRenderProbe.status =
+                        "refreshed: matching game-created CSD tree updated resource scene; waiting for live manager CScene correlation";
+                }
+            }
         }
     }
 
@@ -9999,6 +11150,8 @@ namespace UiLab
             g_chudSonicStageOwnerHookLastEvidenceFrame = g_presentedFrameCount;
             WriteLiveStateSnapshot();
         }
+
+        DiscoverOwnerCandidatesForResolvedNativeProbe(false);
     }
 
     void OnHudSonicStageOwnerFieldSample(uint32_t ownerAddress, std::string_view hookSource)
@@ -10375,6 +11528,7 @@ namespace UiLab
 
         EmitStageTargetReadyIfNeeded();
         WriteLiveStateSnapshot();
+        DiscoverOwnerCandidatesForResolvedNativeProbe(false);
     }
 
     void OnGeneralWindowUpdate(
@@ -10397,6 +11551,7 @@ namespace UiLab
         g_pauseGeneralSaveInspector.generalCursorIndex = cursorIndex;
         g_pauseGeneralSaveInspector.generalSelectedIndex = selectedIndex;
         g_pauseGeneralSaveInspector.generalFrame = g_presentedFrameCount;
+        DiscoverOwnerCandidatesForResolvedNativeProbe(false);
     }
 
     void OnSaveIconUpdate(uint32_t saveIconAddress, bool isVisible)
@@ -10409,6 +11564,7 @@ namespace UiLab
         g_pauseGeneralSaveInspector.saveIconAddress = saveIconAddress;
         g_pauseGeneralSaveInspector.saveIconVisible = isVisible;
         g_pauseGeneralSaveInspector.saveIconFrame = g_presentedFrameCount;
+        DiscoverOwnerCandidatesForResolvedNativeProbe(false);
     }
 
     bool ApplyTitleIntroStateForcing(float elapsedSeconds, bool& directState)
@@ -10656,6 +11812,11 @@ namespace UiLab
             << ",\"observedCsdProject\":\"" << JsonEscape(observed.csdProject) << "\""
             << ",\"observedSourceFamily\":\"" << JsonEscape(observed.sourceFamily) << "\""
             << ",\"observedScreenSource\":\"" << JsonEscape(observed.source) << "\""
+            << ",\"observedSystemId\":\"" << JsonEscape(observed.systemId) << "\""
+            << ",\"observedSystemName\":\"" << JsonEscape(observed.systemName) << "\""
+            << ",\"observedDataSource\":\"" << JsonEscape(observed.dataSource) << "\""
+            << ",\"runtimeScreenIndexAssetEntryCount\":" << GeneratedRuntimeScreenIndex::kAssetEntryCount
+            << ",\"runtimeScreenIndexAssetIndex\":\"" << JsonEscape(GeneratedRuntimeScreenIndex::kAssetIndexPath) << "\""
             << ",\"targetObservedMismatch\":" << (observed.token != target.token ? "true" : "false")
             << ",\"route\":\"" << JsonEscape(g_routeStatus) << "\""
             << ",\"routePending\":" << (g_routePending ? "true" : "false")
@@ -10691,7 +11852,7 @@ namespace UiLab
     {
         std::ostringstream out;
         out << "{\"ok\":true,\"commands\":";
-        AppendStringArray(out, { "state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "native-foreground-status", "native-make-observe <project> <scene> [frame]", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub <frame>", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out << "}\n";
         return out.str();
     }
@@ -10724,6 +11885,33 @@ namespace UiLab
 
         if (verb == "route-status" || verb == "status")
             return BuildRouteStatusJson();
+
+        if (verb == "native-foreground-status" ||
+            verb == "native-csd-foreground-status" ||
+            verb == "native-foreground")
+        {
+            return BuildNativeForegroundStatusJson();
+        }
+
+        if (verb == "native-make-observe" ||
+            verb == "native-csd-make-observe" ||
+            verb == "native-make-probe")
+        {
+            return HandleNativeMakeProbeBridgeCommand(input);
+        }
+
+        if (verb == "native-foreground-attach" ||
+            verb == "native-foreground-arm" ||
+            verb == "native-foreground-spawn" ||
+            verb == "native-foreground-detach" ||
+            verb == "native-owner-discovery" ||
+            verb == "native-owner-scan" ||
+            verb == "native-motion-play" ||
+            verb == "native-motion-stop" ||
+            verb == "native-motion-scrub")
+        {
+            return HandleNativeForegroundBridgeControlCommand(verb, input);
+        }
 
         if (verb == "ui-oracle" || verb == "ui-layer-oracle" || verb == "csd-ui-oracle")
             return BuildUiOracleJson();
@@ -11388,6 +12576,8 @@ namespace UiLab
         ImGui::TextUnformatted("Open focused drill-down windows");
         ImGui::Separator();
 
+        ImGui::Checkbox("Window List", &g_operatorWindowListVisible);
+
         for (const auto& entry : GetOperatorWindowEntries())
         {
             ImGui::Checkbox(entry.name, entry.visible);
@@ -11459,17 +12649,2698 @@ namespace UiLab
         }
     }
 
+    static void DrawOperatorInGameConsoleTab()
+    {
+        ImGui::TextWrapped("Recent SWARD UI Lab runtime/evidence stream mirrored inside the game window.");
+        ImGui::TextWrapped("Bridge: %s", IsLiveBridgeEnabled() ? LiveBridgePipePath().c_str() : "off");
+        ImGui::TextWrapped("Evidence: %s", g_evidenceDirectory.empty() ? "off" : g_evidenceDirectory.string().c_str());
+        ImGui::Separator();
+
+        std::vector<std::string> recentEvents;
+        {
+            std::lock_guard<std::mutex> lock(g_liveBridgeMutex);
+            recentEvents.assign(g_recentEvidenceEvents.begin(), g_recentEvidenceEvents.end());
+        }
+
+        if (recentEvents.empty())
+        {
+            ImGui::TextDisabled("No mirrored runtime events yet.");
+        }
+        else
+        {
+            ImGui::BeginChild("sward-in-game-console-scroll", ImVec2(0.0f, 260.0f), true);
+            for (const auto& line : recentEvents)
+                ImGui::TextWrapped("%s", line.c_str());
+            ImGui::EndChild();
+        }
+
+        if (ImGui::Button("Write Evidence Marker"))
+            WriteEvidenceEvent("manual-evidence-marker");
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Write Live State Snapshot"))
+            WriteLiveStateSnapshot();
+    }
+
+    static std::string YncPreviewShortLabel(std::string_view value, std::string_view fallback, size_t maxLength = 28)
+    {
+        std::string label = Trim(value);
+        if (label.empty())
+            label = std::string(fallback);
+
+        if (label.size() > maxLength && maxLength > 3)
+            label = label.substr(0, maxLength - 3) + "...";
+
+        return label;
+    }
+
+    static std::string YncPreviewCsvToken(std::string_view csv, size_t requestedIndex, std::string_view fallback)
+    {
+        size_t tokenStart = 0;
+        size_t tokenIndex = 0;
+
+        while (tokenStart <= csv.size())
+        {
+            const size_t tokenEnd = csv.find(',', tokenStart);
+            const std::string_view token =
+                tokenEnd == std::string_view::npos
+                    ? csv.substr(tokenStart)
+                    : csv.substr(tokenStart, tokenEnd - tokenStart);
+
+            if (tokenIndex == requestedIndex)
+                return YncPreviewShortLabel(token, fallback);
+
+            if (tokenEnd == std::string_view::npos)
+                break;
+
+            tokenStart = tokenEnd + 1;
+            ++tokenIndex;
+        }
+
+        return YncPreviewShortLabel({}, fallback);
+    }
+
+    static size_t CountYncPreviewCsvTokens(std::string_view csv)
+    {
+        if (Trim(csv).empty())
+            return 0;
+
+        size_t count = 1;
+        for (const char ch : csv)
+        {
+            if (ch == ',')
+                ++count;
+        }
+
+        return count;
+    }
+
+    static ImU32 YncPreviewRoleColor(std::string_view role)
+    {
+        const std::string normalized = ToLower(role);
+        if (normalized.find("hud") != std::string::npos)
+            return IM_COL32(78, 170, 255, 210);
+        if (normalized.find("title") != std::string::npos)
+            return IM_COL32(255, 206, 80, 220);
+        if (normalized.find("menu") != std::string::npos || normalized.find("pause") != std::string::npos)
+            return IM_COL32(132, 220, 154, 215);
+        if (normalized.find("result") != std::string::npos || normalized.find("rank") != std::string::npos)
+            return IM_COL32(245, 130, 196, 215);
+        if (normalized.find("loading") != std::string::npos)
+            return IM_COL32(178, 154, 255, 215);
+
+        return IM_COL32(78, 210, 198, 210);
+    }
+
+    static std::vector<const GeneratedYncPNativeComponentMap::PreviewDrawCommand*> FindYncPreviewDrawCommands(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene)
+    {
+        std::vector<const GeneratedYncPNativeComponentMap::PreviewDrawCommand*> commands;
+        commands.reserve(8);
+
+        for (const auto& command : GeneratedYncPNativeComponentMap::kPreviewDrawCommands)
+        {
+            if (command.project != project.project ||
+                command.projectRelativePath != project.relativePath ||
+                command.scene != scene.scene)
+            {
+                continue;
+            }
+
+            if (!scene.nodePath.empty() && command.nodePath != scene.nodePath)
+                continue;
+
+            commands.push_back(&command);
+            if (commands.size() >= 8)
+                break;
+        }
+
+        if (!commands.empty())
+            return commands;
+
+        for (const auto& command : GeneratedYncPNativeComponentMap::kPreviewDrawCommands)
+        {
+            if (command.project == project.project &&
+                command.projectRelativePath == project.relativePath &&
+                command.scene == scene.scene)
+            {
+                commands.push_back(&command);
+                if (commands.size() >= 8)
+                    break;
+            }
+        }
+
+        return commands;
+    }
+
+    static std::vector<const GeneratedYncPNativeComponentMap::SceneDrawCommand*> FindYncSceneDrawCommands(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene)
+    {
+        constexpr size_t kMaxScenePreviewCommands = 192;
+        std::vector<const GeneratedYncPNativeComponentMap::SceneDrawCommand*> commands;
+        commands.reserve(kMaxScenePreviewCommands);
+
+        for (const auto& command : GeneratedYncPNativeComponentMap::kSceneDrawCommands)
+        {
+            if (command.project != project.project ||
+                command.projectRelativePath != project.relativePath ||
+                command.scene != scene.scene)
+            {
+                continue;
+            }
+
+            if (!scene.nodePath.empty() && command.nodePath != scene.nodePath)
+                continue;
+
+            commands.push_back(&command);
+            if (commands.size() >= kMaxScenePreviewCommands)
+                break;
+        }
+
+        if (!commands.empty())
+            return commands;
+
+        for (const auto& command : GeneratedYncPNativeComponentMap::kSceneDrawCommands)
+        {
+            if (command.project == project.project &&
+                command.projectRelativePath == project.relativePath &&
+                command.scene == scene.scene)
+            {
+                commands.push_back(&command);
+                if (commands.size() >= kMaxScenePreviewCommands)
+                    break;
+            }
+        }
+
+        return commands;
+    }
+
+    static std::vector<const GeneratedYncPNativeComponentMap::SfxCueCandidate*> FindYncSfxCueCandidates(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene)
+    {
+        std::vector<const GeneratedYncPNativeComponentMap::SfxCueCandidate*> candidates;
+        candidates.reserve(4);
+
+        for (const auto& candidate : GeneratedYncPNativeComponentMap::kSfxCueCandidates)
+        {
+            if (candidate.project == project.project && candidate.scene == scene.scene)
+                candidates.push_back(&candidate);
+        }
+
+        if (!candidates.empty())
+            return candidates;
+
+        for (const auto& candidate : GeneratedYncPNativeComponentMap::kSfxCueCandidates)
+        {
+            if (candidate.screenGroup == project.screenGroup || candidate.project == project.project)
+                candidates.push_back(&candidate);
+        }
+
+        return candidates;
+    }
+
+    static std::vector<const GeneratedYncPNativeComponentMap::AnimationTrackKeyframe*> FindYncAnimationTrackKeyframes(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene)
+    {
+        std::vector<const GeneratedYncPNativeComponentMap::AnimationTrackKeyframe*> keyframes;
+        keyframes.reserve(512);
+
+        for (const auto& keyframe : GeneratedYncPNativeComponentMap::kAnimationTrackKeyframes)
+        {
+            if (keyframe.project != project.project ||
+                keyframe.projectRelativePath != project.relativePath ||
+                keyframe.scene != scene.scene)
+            {
+                continue;
+            }
+
+            if (!scene.nodePath.empty() && keyframe.nodePath != scene.nodePath)
+                continue;
+
+            keyframes.push_back(&keyframe);
+        }
+
+        if (!keyframes.empty())
+            return keyframes;
+
+        for (const auto& keyframe : GeneratedYncPNativeComponentMap::kAnimationTrackKeyframes)
+        {
+            if (keyframe.project == project.project &&
+                keyframe.projectRelativePath == project.relativePath &&
+                keyframe.scene == scene.scene)
+            {
+                keyframes.push_back(&keyframe);
+            }
+        }
+
+        return keyframes;
+    }
+
+    static std::string ChooseYncPreviewAnimationName(
+        const GeneratedYncPNativeComponentMap::Scene& scene,
+        const std::vector<const GeneratedYncPNativeComponentMap::AnimationTrackKeyframe*>& keyframes)
+    {
+        const std::string animationList(scene.keyAnimations);
+        if (animationList.find("Usual_Anim") != std::string::npos)
+            return "Usual_Anim";
+        if (animationList.find("Intro_Anim") != std::string::npos)
+            return "Intro_Anim";
+        if (animationList.find("Intro_so_Anim") != std::string::npos)
+            return "Intro_so_Anim";
+        if (animationList.find("Intro_ev_Anim") != std::string::npos)
+            return "Intro_ev_Anim";
+
+        const std::string firstToken = YncPreviewCsvToken(scene.keyAnimations, 0, "");
+        if (!firstToken.empty())
+            return firstToken;
+
+        for (const auto* keyframe : keyframes)
+        {
+            if (keyframe != nullptr && !keyframe->animationName.empty())
+                return std::string(keyframe->animationName);
+        }
+
+        return {};
+    }
+
+    struct YncAnimationTrackSample
+    {
+        bool hasValue = false;
+        float value = 0.0f;
+        std::string_view interpolationType;
+    };
+
+    static float SampleYncHermite(float leftValue, float leftTangent, float rightValue, float rightTangent, float t, float frameSpan)
+    {
+        const float t2 = t * t;
+        const float t3 = t2 * t;
+        const float h00 = 2.0f * t3 - 3.0f * t2 + 1.0f;
+        const float h10 = t3 - 2.0f * t2 + t;
+        const float h01 = -2.0f * t3 + 3.0f * t2;
+        const float h11 = t3 - t2;
+        return h00 * leftValue + h10 * leftTangent * frameSpan + h01 * rightValue + h11 * rightTangent * frameSpan;
+    }
+
+    static YncAnimationTrackSample SampleYncAnimationTrack(
+        const std::vector<const GeneratedYncPNativeComponentMap::AnimationTrackKeyframe*>& trackKeyframes,
+        float timelineFrame)
+    {
+        YncAnimationTrackSample sample;
+        if (trackKeyframes.empty())
+            return sample;
+
+        const GeneratedYncPNativeComponentMap::AnimationTrackKeyframe* left = nullptr;
+        const GeneratedYncPNativeComponentMap::AnimationTrackKeyframe* right = nullptr;
+        for (const auto* keyframe : trackKeyframes)
+        {
+            if (keyframe == nullptr)
+                continue;
+
+            if (keyframe->frame <= timelineFrame)
+                left = keyframe;
+
+            if (keyframe->frame >= timelineFrame)
+            {
+                right = keyframe;
+                break;
+            }
+        }
+
+        if (left == nullptr)
+            left = trackKeyframes.front();
+        if (right == nullptr)
+            right = trackKeyframes.back();
+
+        sample.hasValue = true;
+        sample.interpolationType = left->interpolationType;
+
+        const float frameSpan = std::max(0.0001f, right->frame - left->frame);
+        if (left == right || timelineFrame <= left->frame || frameSpan <= 0.0001f || left->interpolationType == "Const")
+        {
+            sample.value = left->value;
+            return sample;
+        }
+
+        const float t = std::clamp((timelineFrame - left->frame) / frameSpan, 0.0f, 1.0f);
+        if (left->interpolationType == "Hermite" || right->interpolationType == "Hermite")
+            sample.value = SampleYncHermite(left->value, left->outTangent, right->value, right->inTangent, t, frameSpan);
+        else
+            sample.value = left->value + (right->value - left->value) * t;
+
+        return sample;
+    }
+
+    struct YncSceneAnimationState
+    {
+        bool hasX = false;
+        bool hasY = false;
+        bool hasScaleX = false;
+        bool hasScaleY = false;
+        bool hasRotation = false;
+        bool hasHideFlag = false;
+        bool hasSubImage = false;
+        float x = 0.0f;
+        float y = 0.0f;
+        float scaleX = 1.0f;
+        float scaleY = 1.0f;
+        float rotation = 0.0f;
+        float hideFlag = 0.0f;
+        float subImage = 0.0f;
+        size_t sampledTrackCount = 0;
+        size_t keyframeCount = 0;
+        std::string_view interpolationType;
+    };
+
+    static void ApplyYncTrackSampleToState(
+        YncSceneAnimationState& state,
+        std::string_view trackType,
+        const YncAnimationTrackSample& sample,
+        size_t keyframeCount)
+    {
+        if (!sample.hasValue)
+            return;
+
+        state.keyframeCount += keyframeCount;
+        ++state.sampledTrackCount;
+        if (!sample.interpolationType.empty())
+            state.interpolationType = sample.interpolationType;
+
+        if (trackType == "XPosition")
+        {
+            state.hasX = true;
+            state.x = sample.value;
+        }
+        else if (trackType == "YPosition")
+        {
+            state.hasY = true;
+            state.y = sample.value;
+        }
+        else if (trackType == "XScale")
+        {
+            state.hasScaleX = true;
+            state.scaleX = sample.value;
+        }
+        else if (trackType == "YScale")
+        {
+            state.hasScaleY = true;
+            state.scaleY = sample.value;
+        }
+        else if (trackType == "Rotation")
+        {
+            state.hasRotation = true;
+            state.rotation = sample.value;
+        }
+        else if (trackType == "HideFlag")
+        {
+            state.hasHideFlag = true;
+            state.hideFlag = sample.value;
+        }
+        else if (trackType == "SubImage")
+        {
+            state.hasSubImage = true;
+            state.subImage = sample.value;
+        }
+    }
+
+    static YncSceneAnimationState SampleYncSceneAnimationState(
+        const GeneratedYncPNativeComponentMap::SceneDrawCommand& command,
+        const std::vector<const GeneratedYncPNativeComponentMap::AnimationTrackKeyframe*>& sceneKeyframes,
+        std::string_view animationName,
+        float timelineFrame)
+    {
+        static constexpr std::array<std::string_view, 7> kPreviewTracks =
+        {
+            "XPosition",
+            "YPosition",
+            "XScale",
+            "YScale",
+            "Rotation",
+            "HideFlag",
+            "SubImage",
+        };
+
+        YncSceneAnimationState state;
+        for (std::string_view trackType : kPreviewTracks)
+        {
+            std::vector<const GeneratedYncPNativeComponentMap::AnimationTrackKeyframe*> trackKeyframes;
+            trackKeyframes.reserve(8);
+
+            for (const auto* keyframe : sceneKeyframes)
+            {
+                if (keyframe == nullptr ||
+                    keyframe->groupIndex != command.groupIndex ||
+                    keyframe->castIndex != command.castIndex ||
+                    keyframe->trackType != trackType)
+                {
+                    continue;
+                }
+
+                if (!animationName.empty() && keyframe->animationName != animationName)
+                    continue;
+
+                trackKeyframes.push_back(keyframe);
+            }
+
+            ApplyYncTrackSampleToState(
+                state,
+                trackType,
+                SampleYncAnimationTrack(trackKeyframes, timelineFrame),
+                trackKeyframes.size());
+        }
+
+        return state;
+    }
+
+    struct YncAnimatedSceneDrawCommand
+    {
+        float sceneLeft = 0.0f;
+        float sceneTop = 0.0f;
+        float sceneWidth = 0.0f;
+        float sceneHeight = 0.0f;
+        bool hidden = false;
+        size_t sampledTrackCount = 0;
+        size_t keyframeCount = 0;
+        std::string_view interpolationType;
+    };
+
+    static YncAnimatedSceneDrawCommand ApplyYncAnimationToSceneDraw(
+        const GeneratedYncPNativeComponentMap::SceneDrawCommand& command,
+        const YncSceneAnimationState& state)
+    {
+        YncAnimatedSceneDrawCommand animated;
+        animated.sceneLeft = command.sceneLeft;
+        animated.sceneTop = command.sceneTop;
+        animated.sceneWidth = command.sceneWidth;
+        animated.sceneHeight = command.sceneHeight;
+        animated.hidden = command.hideFlag != 0;
+        animated.sampledTrackCount = state.sampledTrackCount;
+        animated.keyframeCount = state.keyframeCount;
+        animated.interpolationType = state.interpolationType;
+
+        if (state.hasX)
+            animated.sceneLeft += state.x - command.baseTranslationX;
+        if (state.hasY)
+            animated.sceneTop += state.y - command.baseTranslationY;
+        if (state.hasScaleX && std::abs(command.baseScaleX) > 0.0001f)
+            animated.sceneWidth *= std::max(0.05f, std::abs(state.scaleX / command.baseScaleX));
+        if (state.hasScaleY && std::abs(command.baseScaleY) > 0.0001f)
+            animated.sceneHeight *= std::max(0.05f, std::abs(state.scaleY / command.baseScaleY));
+        if (state.hasHideFlag)
+            animated.hidden = state.hideFlag >= 0.5f;
+
+        return animated;
+    }
+
+    static std::string YncPreviewRectText(
+        int32_t x,
+        int32_t y,
+        int32_t width,
+        int32_t height)
+    {
+        std::ostringstream text;
+        text << x << "," << y << "," << width << "x" << height;
+        return text.str();
+    }
+
+    static std::string YncPreviewDstText(
+        const GeneratedYncPNativeComponentMap::PreviewDrawCommand& command)
+    {
+        std::ostringstream text;
+        text << std::fixed << std::setprecision(3)
+             << command.normalizedCastLeft << ","
+             << command.normalizedCastTop << ","
+             << command.normalizedCastWidth << "x"
+             << command.normalizedCastHeight;
+        return text.str();
+    }
+
+    static std::unordered_map<std::string, std::unique_ptr<GuestTexture>> g_yncPreviewTextureCache;
+    static std::unordered_set<std::string> g_yncPreviewTextureLoadFailures;
+
+    static std::filesystem::path ResolveYncPreviewTexturePath(std::string_view textureRelativePath)
+    {
+        const std::filesystem::path relativePath{ std::string(textureRelativePath) };
+        if (relativePath.empty())
+            return {};
+
+        if (relativePath.is_absolute())
+            return relativePath;
+
+        std::error_code ec;
+        const std::filesystem::path extractedPath =
+            std::filesystem::path(std::string(GeneratedYncPNativeComponentMap::kInputRoot)) / relativePath;
+        if (std::filesystem::exists(extractedPath, ec))
+            return extractedPath;
+
+        const std::filesystem::path cwdPath = std::filesystem::current_path(ec) / relativePath;
+        if (!ec && std::filesystem::exists(cwdPath, ec))
+            return cwdPath;
+
+        return extractedPath;
+    }
+
+    static std::filesystem::path ResolveYncPreviewTexturePath(
+        const GeneratedYncPNativeComponentMap::PreviewDrawCommand& command)
+    {
+        return ResolveYncPreviewTexturePath(command.textureRelativePath);
+    }
+
+    static std::filesystem::path ResolveYncPreviewTexturePath(
+        const GeneratedYncPNativeComponentMap::SceneDrawCommand& command)
+    {
+        return ResolveYncPreviewTexturePath(command.textureRelativePath);
+    }
+
+    static bool PathEndsWith(std::string_view value, std::string_view suffix)
+    {
+        return value.size() >= suffix.size() &&
+            value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
+    }
+
+    static std::string BuildNativeCsdScenePath(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene)
+    {
+        std::string path(project.project);
+        std::string nodePath(scene.nodePath);
+
+        if (!nodePath.empty() && nodePath != "Root")
+        {
+            if (nodePath.rfind("Root/", 0) == 0)
+                nodePath.erase(0, 5);
+
+            if (!nodePath.empty())
+            {
+                path += "/";
+                path += nodePath;
+            }
+        }
+
+        path += "/";
+        path += std::string(scene.scene);
+        return path;
+    }
+
+    static void ReleaseNativeCsdMakeProbeAllocations()
+    {
+        if (g_nativeCsdMakeProbe.ownerHost != nullptr)
+        {
+            if (g_nativeCsdMakeProbe.ownerConstructed)
+            {
+                auto* owner = static_cast<boost::anonymous_shared_ptr*>(g_nativeCsdMakeProbe.ownerHost);
+                std::destroy_at(owner);
+            }
+
+            g_userHeap.Free(g_nativeCsdMakeProbe.ownerHost);
+        }
+
+        if (g_nativeCsdMakeProbe.bytesHost != nullptr)
+            g_userHeap.Free(g_nativeCsdMakeProbe.bytesHost);
+
+        g_nativeCsdMakeProbe.ownerHost = nullptr;
+        g_nativeCsdMakeProbe.bytesHost = nullptr;
+        g_nativeCsdMakeProbe.ownerConstructed = false;
+        g_nativeCsdMakeProbe.ownerGuestAddress = 0;
+        g_nativeCsdMakeProbe.bytesGuestAddress = 0;
+        g_nativeCsdMakeProbe.bytesSize = 0;
+    }
+
+    static uint32_t ReadBigEndianU32(const std::vector<uint8_t>& bytes, size_t offset)
+    {
+        if (bytes.size() < offset + sizeof(uint32_t))
+            return 0;
+
+        return (static_cast<uint32_t>(bytes[offset + 0]) << 24) |
+            (static_cast<uint32_t>(bytes[offset + 1]) << 16) |
+            (static_cast<uint32_t>(bytes[offset + 2]) << 8) |
+            static_cast<uint32_t>(bytes[offset + 3]);
+    }
+
+    static bool ValidateNativeCsdPackageBytes(
+        const std::vector<uint8_t>& bytes,
+        std::string& error)
+    {
+        static constexpr uint32_t kCpafSignature = 0x43504146; // CPAF
+        static constexpr uint32_t kNyifSignature = 0x4E594946; // NYIF
+        static constexpr uint32_t kNCpjSignature = 0x6E43504A; // nCPJ
+
+        if (bytes.size() < 0x2C)
+        {
+            error = "native-csd-make-probe blocked: selected package is too small for a CSD CPAF header";
+            return false;
+        }
+
+        if (ReadBigEndianU32(bytes, 0x00) != kCpafSignature ||
+            ReadBigEndianU32(bytes, 0x08) != kNyifSignature ||
+            ReadBigEndianU32(bytes, 0x28) != kNCpjSignature)
+        {
+            error = "native-csd-make-probe blocked: selected bytes are not a raw CPAF/NYIF/nCPJ CSD project";
+            return false;
+        }
+
+        return true;
+    }
+
+    static bool IsFirstPassNativeCsdMakeTarget(
+        const GeneratedYncPNativeComponentMap::Project& project)
+    {
+        return project.project == "ui_loading" ||
+            project.project == "ui_worldmap_help";
+    }
+
+    template<typename TFunction, typename... TArgs>
+    static uint32_t GuestToHostCsdMakeWithProbeContext(
+        const TFunction& func,
+        TArgs&&... argv)
+    {
+        auto args = std::make_tuple(std::forward<TArgs>(argv)...);
+        auto& currentCtx = *GetPPCContext();
+
+        // Start from the current guest context instead of an uninitialised
+        // scratch context. The CSD make traversal hook supplies the synthetic
+        // project name separately while this lab-created call is running.
+        PPCContext newCtx = currentCtx;
+        _translate_args_to_guest(newCtx, g_memory.base, args);
+
+        SetPPCContext(newCtx);
+        func(newCtx, g_memory.base);
+
+        currentCtx.fpscr = newCtx.fpscr;
+        SetPPCContext(currentCtx);
+
+        return static_cast<uint32_t>(newCtx.r3.u64);
+    }
+
+    static bool ReadSelectedYncProjectBytes(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        std::vector<uint8_t>& bytes,
+        std::string& sourcePath,
+        std::string& error)
+    {
+        const std::filesystem::path path =
+            ResolveYncPreviewTexturePath(std::string(project.relativePath));
+        sourcePath = path.string();
+
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        if (!file)
+        {
+            error = "native-csd-make-probe failed: selected .yncp/.xncp file not found";
+            return false;
+        }
+
+        const std::streamoff fileSize = file.tellg();
+        if (fileSize <= 0 || fileSize > static_cast<std::streamoff>(UINT32_MAX))
+        {
+            error = "native-csd-make-probe failed: selected project file size is invalid";
+            return false;
+        }
+
+        bytes.resize(static_cast<size_t>(fileSize));
+        file.seekg(0, std::ios::beg);
+        file.read(reinterpret_cast<char*>(bytes.data()), fileSize);
+
+        if (!file)
+        {
+            error = "native-csd-make-probe failed: selected project file could not be read";
+            return false;
+        }
+
+        return true;
+    }
+
+    static bool TryFindNativeCsdMakeProbeScene(
+        const GeneratedYncPNativeComponentMap::Project*& project,
+        const GeneratedYncPNativeComponentMap::Scene*& scene)
+    {
+        namespace YNCP = GeneratedYncPNativeComponentMap;
+
+        project = nullptr;
+        scene = nullptr;
+
+        if constexpr (YNCP::kProjects.empty() || YNCP::kScenes.empty())
+            return false;
+
+        auto projectIt = std::find_if(
+            YNCP::kProjects.begin(),
+            YNCP::kProjects.end(),
+            [](const auto& candidate)
+            {
+                if (!g_nativeCsdMakeProbe.relativePath.empty() &&
+                    std::string(candidate.relativePath) == g_nativeCsdMakeProbe.relativePath)
+                {
+                    return true;
+                }
+
+                return !g_nativeCsdMakeProbe.projectName.empty() &&
+                    std::string(candidate.project) == g_nativeCsdMakeProbe.projectName;
+            });
+
+        if (projectIt == YNCP::kProjects.end())
+            return false;
+
+        project = &(*projectIt);
+
+        const size_t firstScene = project->firstScene;
+        const size_t endScene = std::min(
+            YNCP::kScenes.size(),
+            firstScene + static_cast<size_t>(project->sceneCount));
+
+        for (size_t index = firstScene; index < endScene; ++index)
+        {
+            const auto& candidate = YNCP::kScenes[index];
+            if (std::string(candidate.scene) == g_nativeCsdMakeProbe.selectedScene)
+            {
+                scene = &candidate;
+                return true;
+            }
+        }
+
+        if (firstScene < YNCP::kScenes.size())
+        {
+            scene = &YNCP::kScenes[firstScene];
+            return true;
+        }
+
+        return false;
+    }
+
+    static bool TryCorrelateCsdManagerSceneToResourceScene(
+        uint32_t managerSceneAddress,
+        CsdManagerSceneCorrelation& correlation)
+    {
+        if (!IsPlausibleGuestPointer(managerSceneAddress))
+            return false;
+
+        std::vector<CsdManagerSceneCorrelation> candidates;
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            for (const auto& record : g_csdProjectTrees)
+            {
+                for (const auto& scene : record.scenes)
+                {
+                    if (!IsPlausibleGuestPointer(scene.address))
+                        continue;
+
+                    CsdManagerSceneCorrelation candidate;
+                    candidate.managerSceneAddress = managerSceneAddress;
+                    candidate.resourceSceneAddress = scene.address;
+                    candidate.projectName = record.projectName;
+                    candidate.scenePath = scene.path;
+                    candidates.push_back(std::move(candidate));
+                }
+            }
+        }
+
+        if (candidates.empty())
+            return false;
+
+        static constexpr uint32_t kManagerScenePointerScanBytes = 0x120;
+        for (uint32_t offset = 0; offset <= kManagerScenePointerScanBytes; offset += sizeof(uint32_t))
+        {
+            uint32_t value = 0;
+            if (!TryReadGuestU32(managerSceneAddress + offset, value))
+                continue;
+
+            const auto candidateIt = std::find_if(
+                candidates.begin(),
+                candidates.end(),
+                [value](const auto& candidate)
+                {
+                    return candidate.resourceSceneAddress == value;
+                });
+
+            if (candidateIt == candidates.end())
+                continue;
+
+            correlation = *candidateIt;
+            correlation.resourcePointerOffset = offset;
+            correlation.frame = g_presentedFrameCount;
+            TryReadGuestU32(managerSceneAddress + 0x98, correlation.motionPatternAddress);
+            return true;
+        }
+
+        return false;
+    }
+
+    static void ApplyCsdManagerSceneCorrelationToNativeCsdMakeProbe(
+        const CsdManagerSceneCorrelation& correlation)
+    {
+        if (!g_nativeCsdMakeProbe.sceneResolved)
+            return;
+
+        const uint32_t selectedResourceScene =
+            g_nativeCsdMakeProbe.nativeResourceScenePointer != 0
+                ? g_nativeCsdMakeProbe.nativeResourceScenePointer
+                : g_nativeCsdMakeProbe.nativeScenePointer;
+
+        if (correlation.resourceSceneAddress != selectedResourceScene)
+            return;
+
+        g_nativeCsdMakeProbe.nativeResourceScenePointer = correlation.resourceSceneAddress;
+        g_nativeCsdMakeProbe.nativeManagerScenePointer = correlation.managerSceneAddress;
+        g_nativeCsdMakeProbe.managerSceneResourceOffset = correlation.resourcePointerOffset;
+
+        float motionFrame = 0.0f;
+        uint32_t repeatType = UINT32_MAX;
+        const bool frameKnown = TryReadGuestFloat(
+            correlation.managerSceneAddress + 0x64, // CSD.Manager.CScene.m_MotionFrame
+            motionFrame);
+        const bool repeatKnown = TryReadGuestU32(
+            correlation.managerSceneAddress + 0x94, // CSD.Manager.CScene.m_MotionRepeatType
+            repeatType);
+
+        g_nativeCsdMakeProbe.sceneMotionKnown = frameKnown || repeatKnown;
+        if (frameKnown)
+            g_nativeCsdMakeProbe.nativeSceneMotionFrame = motionFrame;
+
+        if (repeatKnown)
+            g_nativeCsdMakeProbe.nativeSceneMotionRepeatType = repeatType;
+    }
+
+    static bool TryApplyStoredManagerCorrelationToNativeCsdMakeProbe()
+    {
+        if (!g_nativeCsdMakeProbe.sceneResolved)
+            return false;
+
+        const uint32_t selectedResourceScene =
+            g_nativeCsdMakeProbe.nativeResourceScenePointer != 0
+                ? g_nativeCsdMakeProbe.nativeResourceScenePointer
+                : g_nativeCsdMakeProbe.nativeScenePointer;
+
+        const CsdManagerSceneCorrelation* correlation =
+            FindCsdManagerSceneCorrelationByResourceAddress(selectedResourceScene);
+        if (correlation == nullptr)
+            return false;
+
+        ApplyCsdManagerSceneCorrelationToNativeCsdMakeProbe(*correlation);
+        return IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer);
+    }
+
+    static bool ResolveNativeCsdSceneForSelectedProject(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene)
+    {
+        CsdProjectTreeRecord recordCopy;
+        const std::string desiredPath = BuildNativeCsdScenePath(project, scene);
+        const std::string sceneSuffix = "/" + std::string(scene.scene);
+
+        {
+            std::lock_guard<std::mutex> lock(g_typedInspectorMutex);
+            const CsdProjectTreeRecord* record =
+                FindCsdProjectTreeRecordByProjectAddress(
+                    g_csdProjectTrees,
+                    g_nativeCsdMakeProbe.nativeProjectPointer);
+
+            if (record == nullptr)
+                record = FindCsdProjectTreeRecord(g_csdProjectTrees, project.project);
+
+            if (record == nullptr && !g_nativeCsdMakeProbe.projectName.empty())
+                record = FindCsdProjectTreeRecord(g_csdProjectTrees, g_nativeCsdMakeProbe.projectName);
+
+            if (record == nullptr)
+                return false;
+
+            recordCopy = *record;
+        }
+
+        g_nativeCsdMakeProbe.nativeProjectPointer = recordCopy.projectAddress;
+        g_nativeCsdMakeProbe.nativeRootNode = recordCopy.rootNodeAddress;
+        g_nativeCsdMakeProbe.nativeSceneCount = recordCopy.sceneCount;
+        g_nativeCsdMakeProbe.nativeNodeCount = recordCopy.nodeCount;
+        g_nativeCsdMakeProbe.projectName = recordCopy.projectName;
+
+        const CsdTreeEntry* selectedScene = nullptr;
+        for (const auto& entry : recordCopy.scenes)
+        {
+            if (entry.path == desiredPath)
+            {
+                selectedScene = &entry;
+                break;
+            }
+        }
+
+        if (selectedScene == nullptr)
+        {
+            for (const auto& entry : recordCopy.scenes)
+            {
+                if (PathEndsWith(entry.path, sceneSuffix))
+                {
+                    selectedScene = &entry;
+                    break;
+                }
+            }
+        }
+
+        if (selectedScene == nullptr)
+        {
+            g_nativeCsdMakeProbe.sceneResolved = false;
+            g_nativeCsdMakeProbe.nativeScenePointer = 0;
+            g_nativeCsdMakeProbe.nativeResourceScenePointer = 0;
+            g_nativeCsdMakeProbe.nativeManagerScenePointer = 0;
+            g_nativeCsdMakeProbe.managerSceneResourceOffset = UINT32_MAX;
+            g_nativeCsdMakeProbe.sceneMotionKnown = false;
+            return false;
+        }
+
+        g_nativeCsdMakeProbe.sceneResolved = true;
+        g_nativeCsdMakeProbe.nativeScenePointer = selectedScene->address;
+        g_nativeCsdMakeProbe.nativeResourceScenePointer = selectedScene->address;
+        g_nativeCsdMakeProbe.nativeManagerScenePointer = 0;
+        g_nativeCsdMakeProbe.managerSceneResourceOffset = UINT32_MAX;
+        g_nativeCsdMakeProbe.sceneMotionKnown = false;
+        g_nativeCsdMakeProbe.nativeSceneMotionRepeatType = UINT32_MAX;
+        TryApplyStoredManagerCorrelationToNativeCsdMakeProbe();
+
+        return true;
+    }
+
+    static bool WriteNativeCsdSceneMotionFrame(float frame)
+    {
+        static constexpr uint32_t kNativeCsdSceneMotionFrameOffset = 0x64; // m_MotionFrame
+        static constexpr uint32_t kNativeCsdSceneMotionRepeatTypeOffset = 0x94; // m_MotionRepeatType
+
+        if (!g_nativeCsdMakeProbe.sceneResolved)
+        {
+            return false;
+        }
+
+        if (!IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+            TryApplyStoredManagerCorrelationToNativeCsdMakeProbe();
+
+        if (!IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+        {
+            g_nativeCsdMakeProbe.status =
+                "native motion blocked: no correlated live manager CScene instance for selected resource scene";
+            return false;
+        }
+
+        const bool wroteFrame = TryWriteGuestFloat(
+            g_nativeCsdMakeProbe.nativeManagerScenePointer + kNativeCsdSceneMotionFrameOffset,
+            frame);
+
+        if (g_nativeCsdMakeProbe.nativeSceneMotionRepeatType == UINT32_MAX)
+        {
+            uint32_t repeatType = UINT32_MAX;
+            if (TryReadGuestU32(
+                g_nativeCsdMakeProbe.nativeManagerScenePointer + kNativeCsdSceneMotionRepeatTypeOffset,
+                repeatType))
+            {
+                g_nativeCsdMakeProbe.nativeSceneMotionRepeatType = repeatType;
+            }
+        }
+
+        if (wroteFrame)
+        {
+            g_nativeCsdMakeProbe.nativeSceneMotionFrame = frame;
+            g_nativeCsdMakeProbe.sceneMotionKnown = true;
+        }
+
+        return wroteFrame;
+    }
+
+    static void UpdateNativeCsdSceneMotionPlayback()
+    {
+        if (g_nativeCsdMakeProbe.sceneMotionPlaying &&
+            !IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+        {
+            TryApplyStoredManagerCorrelationToNativeCsdMakeProbe();
+        }
+
+        if (!g_nativeCsdMakeProbe.sceneMotionPlaying ||
+            !g_nativeCsdMakeProbe.sceneResolved ||
+            !IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+        {
+            return;
+        }
+
+        if (g_nativeCsdMakeProbe.nativeSceneMotionLastUpdateFrame == g_presentedFrameCount)
+            return;
+
+        const GeneratedYncPNativeComponentMap::Project* project = nullptr;
+        const GeneratedYncPNativeComponentMap::Scene* scene = nullptr;
+        if (!TryFindNativeCsdMakeProbeScene(project, scene) || scene == nullptr)
+            return;
+
+        const float frameMin = scene->frameMin;
+        const float frameMax = std::max(scene->frameMax, frameMin + 1.0f);
+        const float rate = scene->animationFramerate > 0.0f ? scene->animationFramerate : 60.0f;
+
+        g_nativeCsdMakeProbe.nativeSceneMotionFrame += static_cast<float>(App::s_deltaTime) * rate;
+        if (g_nativeCsdMakeProbe.nativeSceneMotionFrame > frameMax)
+            g_nativeCsdMakeProbe.nativeSceneMotionFrame = frameMin;
+
+        if (WriteNativeCsdSceneMotionFrame(g_nativeCsdMakeProbe.nativeSceneMotionFrame))
+            g_nativeCsdMakeProbe.nativeSceneMotionLastUpdateFrame = g_presentedFrameCount;
+    }
+
+    static bool IsNativeCsdScenePointerStillReadable(uint32_t sceneAddress, std::string& reason)
+    {
+        if (!IsPlausibleGuestPointer(sceneAddress))
+        {
+            reason = "blocked: native scene pointer is empty or implausible";
+            return false;
+        }
+
+        uint32_t castNodeCount = 0;
+        uint32_t castNodeArray = 0;
+        uint32_t castCount = 0;
+        if (!TryReadGuestU32(sceneAddress + 0x24, castNodeCount) ||
+            !TryReadGuestU32(sceneAddress + 0x28, castNodeArray) ||
+            !TryReadGuestU32(sceneAddress + 0x2C, castCount))
+        {
+            reason = "blocked: native scene fields could not be read";
+            return false;
+        }
+
+        if (castNodeCount > 4096 || castCount > 65536)
+        {
+            reason =
+                "detached: native scene pointer no longer looks like a live CSD scene after a load transition";
+            return false;
+        }
+
+        if (castNodeCount > 0 && !IsPlausibleGuestPointer(castNodeArray))
+        {
+            reason = "blocked: native scene cast-node array pointer is not plausible";
+            return false;
+        }
+
+        return true;
+    }
+
+    static bool IsNativeCsdManagerScenePointerStillReadable(uint32_t managerSceneAddress, std::string& reason)
+    {
+        if (!IsPlausibleGuestPointer(managerSceneAddress))
+        {
+            reason = "blocked: no correlated live manager CScene instance for selected resource scene";
+            return false;
+        }
+
+        uint32_t motionPatternAddress = 0;
+        if (!TryReadGuestU32(managerSceneAddress + 0x98, motionPatternAddress))
+        {
+            reason = "blocked: native manager CScene fields could not be read";
+            return false;
+        }
+
+        return true;
+    }
+
+    static void DetachNativeForegroundRenderProbe(std::string_view status = "detached by operator")
+    {
+        g_nativeCsdForegroundRenderProbe.enabled = false;
+        g_nativeCsdForegroundRenderProbe.status = std::string(status);
+    }
+
+    static void RequestNativeForegroundRenderProbe()
+    {
+        if (!g_nativeCsdMakeProbe.sceneResolved)
+        {
+            g_nativeCsdForegroundRenderProbe.status =
+                "blocked: Native CSD Make Probe has no resolved selected native scene";
+            return;
+        }
+
+        if (!IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+            TryApplyStoredManagerCorrelationToNativeCsdMakeProbe();
+
+        std::string reason;
+        if (!IsNativeCsdManagerScenePointerStillReadable(
+            g_nativeCsdMakeProbe.nativeManagerScenePointer,
+            reason))
+        {
+            g_nativeCsdForegroundRenderProbe.status = reason;
+            return;
+        }
+
+        g_nativeCsdForegroundRenderProbe = NativeCsdForegroundRenderProbeState{};
+        g_nativeCsdForegroundRenderProbe.enabled = true;
+        g_nativeCsdForegroundRenderProbe.projectName = g_nativeCsdMakeProbe.projectName;
+        g_nativeCsdForegroundRenderProbe.selectedScene = g_nativeCsdMakeProbe.selectedScene;
+        g_nativeCsdForegroundRenderProbe.relativePath = g_nativeCsdMakeProbe.relativePath;
+        g_nativeCsdForegroundRenderProbe.nativeScenePointer = g_nativeCsdMakeProbe.nativeManagerScenePointer;
+        g_nativeCsdForegroundRenderProbe.nativeResourceScenePointer = g_nativeCsdMakeProbe.nativeResourceScenePointer;
+        g_nativeCsdForegroundRenderProbe.nativeManagerScenePointer = g_nativeCsdMakeProbe.nativeManagerScenePointer;
+        g_nativeCsdForegroundRenderProbe.managerSceneResourceOffset = g_nativeCsdMakeProbe.managerSceneResourceOffset;
+        g_nativeCsdForegroundRenderProbe.requestedFrame = g_presentedFrameCount;
+        g_nativeCsdForegroundRenderProbe.status =
+            "armed: native foreground render host will piggyback on active CSD render pass; no owner pointer hijack";
+
+        WriteEvidenceEvent(
+            "native-csd-foreground-render-probe-requested",
+            g_nativeCsdForegroundRenderProbe.relativePath + "|" +
+                g_nativeCsdForegroundRenderProbe.selectedScene +
+                "|managerScene=" + HexU32(g_nativeCsdForegroundRenderProbe.nativeManagerScenePointer) +
+                "|resourceScene=" + HexU32(g_nativeCsdForegroundRenderProbe.nativeResourceScenePointer));
+    }
+
+    void OnCsdManagerSceneRender(uint32_t managerSceneAddress)
+    {
+        if (!g_isEnabled || !IsPlausibleGuestPointer(managerSceneAddress))
+            return;
+
+        if (FindCsdManagerSceneCorrelationByManagerAddress(managerSceneAddress) != nullptr)
+        {
+            const auto* correlation = FindCsdManagerSceneCorrelationByManagerAddress(managerSceneAddress);
+            if (correlation != nullptr)
+            {
+                ApplyCsdManagerSceneCorrelationToNativeCsdMakeProbe(*correlation);
+                TryDiscoverCsdManagerSceneOwnerCandidates(*correlation, false);
+            }
+            return;
+        }
+
+        CsdManagerSceneCorrelation correlation;
+        if (!TryCorrelateCsdManagerSceneToResourceScene(managerSceneAddress, correlation))
+            return;
+
+        StoreCsdManagerSceneCorrelation(correlation);
+        ApplyCsdManagerSceneCorrelationToNativeCsdMakeProbe(correlation);
+        TryDiscoverCsdManagerSceneOwnerCandidates(correlation, false);
+
+        const std::string evidenceKey =
+            HexU32(correlation.managerSceneAddress) + "|" +
+            HexU32(correlation.resourceSceneAddress);
+        if (g_loggedCsdManagerSceneCorrelationKeys.insert(evidenceKey).second)
+        {
+            WriteEvidenceEvent(
+                "native-csd-manager-scene-correlated",
+                "project=" + correlation.projectName +
+                    "|path=" + correlation.scenePath +
+                    "|managerScene=" + HexU32(correlation.managerSceneAddress) +
+                    "|resourceScene=" + HexU32(correlation.resourceSceneAddress) +
+                    "|managerSceneResourceOffset=" + HexU32(correlation.resourcePointerOffset) +
+                    "|motionPattern=" + HexU32(correlation.motionPatternAddress));
+        }
+    }
+
+    uint32_t ConsumeNativeForegroundSceneRenderAddress(uint32_t hostSceneAddress)
+    {
+        if (!g_isEnabled || !g_nativeCsdForegroundRenderProbe.enabled)
+            return 0;
+
+        if (g_nativeCsdForegroundRenderProbe.lastRenderFrame == g_presentedFrameCount)
+            return 0;
+
+        uint32_t sceneAddress = g_nativeCsdForegroundRenderProbe.nativeManagerScenePointer;
+        if (g_nativeCsdMakeProbe.sceneResolved &&
+            IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+        {
+            sceneAddress = g_nativeCsdMakeProbe.nativeManagerScenePointer;
+            g_nativeCsdForegroundRenderProbe.nativeScenePointer = sceneAddress;
+            g_nativeCsdForegroundRenderProbe.nativeManagerScenePointer = sceneAddress;
+            g_nativeCsdForegroundRenderProbe.nativeResourceScenePointer =
+                g_nativeCsdMakeProbe.nativeResourceScenePointer;
+            g_nativeCsdForegroundRenderProbe.managerSceneResourceOffset =
+                g_nativeCsdMakeProbe.managerSceneResourceOffset;
+        }
+
+        std::string reason;
+        if (!IsNativeCsdManagerScenePointerStillReadable(sceneAddress, reason))
+        {
+            DetachNativeForegroundRenderProbe(reason);
+            return 0;
+        }
+
+        const CsdManagerSceneCorrelation* hostCorrelation =
+            FindCsdManagerSceneCorrelationByManagerAddress(hostSceneAddress);
+        const std::string hostProjectName =
+            hostCorrelation != nullptr ? hostCorrelation->projectName : std::string();
+
+        if (hostProjectName.empty())
+        {
+            g_nativeCsdForegroundRenderProbe.renderPassSeen = true;
+            g_nativeCsdForegroundRenderProbe.lastHostScenePointer = hostSceneAddress;
+            g_nativeCsdForegroundRenderProbe.lastRenderFrame = g_presentedFrameCount;
+            g_nativeCsdForegroundRenderProbe.status =
+                "blocked: same CSD project render host required; host manager scene has no resource correlation";
+            return 0;
+        }
+
+        if (hostProjectName != g_nativeCsdForegroundRenderProbe.projectName)
+        {
+            g_nativeCsdForegroundRenderProbe.renderPassSeen = true;
+            g_nativeCsdForegroundRenderProbe.lastHostScenePointer = hostSceneAddress;
+            g_nativeCsdForegroundRenderProbe.lastRenderFrame = g_presentedFrameCount;
+            g_nativeCsdForegroundRenderProbe.status =
+                "blocked: host CSD project mismatch; same CSD project render host required (" +
+                hostProjectName +
+                " != " +
+                g_nativeCsdForegroundRenderProbe.projectName +
+                ")";
+            return 0;
+        }
+
+        if (hostSceneAddress == sceneAddress)
+        {
+            g_nativeCsdForegroundRenderProbe.renderPassSeen = true;
+            g_nativeCsdForegroundRenderProbe.lastHostScenePointer = hostSceneAddress;
+            g_nativeCsdForegroundRenderProbe.lastRenderFrame = g_presentedFrameCount;
+            g_nativeCsdForegroundRenderProbe.status =
+                "active CSD pass is already rendering the selected native scene; extra foreground draw skipped";
+            return 0;
+        }
+
+        g_nativeCsdForegroundRenderProbe.renderPassSeen = true;
+        g_nativeCsdForegroundRenderProbe.lastHostScenePointer = hostSceneAddress;
+        g_nativeCsdForegroundRenderProbe.lastRenderedScenePointer = 0;
+        g_nativeCsdForegroundRenderProbe.lastRenderFrame = g_presentedFrameCount;
+        g_nativeCsdForegroundRenderProbe.status =
+            "ready: correlated live manager CScene found on same CSD project; render call held until foreground owner attach is resolved";
+        return 0;
+    }
+
+    void OnNativeForegroundSceneRendered(
+        uint32_t hostSceneAddress,
+        uint32_t renderedSceneAddress,
+        bool rendered)
+    {
+        if (!g_isEnabled || !g_nativeCsdForegroundRenderProbe.enabled)
+            return;
+
+        g_nativeCsdForegroundRenderProbe.lastHostScenePointer = hostSceneAddress;
+        g_nativeCsdForegroundRenderProbe.lastRenderedScenePointer = renderedSceneAddress;
+        g_nativeCsdForegroundRenderProbe.rendered = rendered;
+
+        if (!rendered)
+            return;
+
+        ++g_nativeCsdForegroundRenderProbe.renderCount;
+        g_nativeCsdForegroundRenderProbe.status =
+            "rendered: native foreground CSD scene piggybacked on active render pass; no owner pointer hijack";
+
+        if (!g_nativeCsdForegroundRenderProbe.evidenceWritten)
+        {
+            g_nativeCsdForegroundRenderProbe.evidenceWritten = true;
+            WriteEvidenceEvent(
+                "native-csd-foreground-rendered",
+                g_nativeCsdForegroundRenderProbe.relativePath + "|" +
+                    g_nativeCsdForegroundRenderProbe.selectedScene +
+                    "|hostScene=" + HexU32(hostSceneAddress) +
+                    "|renderedScene=" + HexU32(renderedSceneAddress));
+        }
+    }
+
+    static bool TryResolveQueuedNativeCsdMakeProbeFromObservedTree(std::string_view projectName)
+    {
+        if (!g_nativeCsdMakeProbe.requested ||
+            g_nativeCsdMakeProbe.running ||
+            projectName != g_nativeCsdMakeProbe.projectName)
+        {
+            return false;
+        }
+
+        const auto projectIt = std::find_if(
+            GeneratedYncPNativeComponentMap::kProjects.begin(),
+            GeneratedYncPNativeComponentMap::kProjects.end(),
+            [](const auto& project)
+            {
+                return std::string(project.relativePath) == g_nativeCsdMakeProbe.relativePath;
+            });
+
+        if (projectIt == GeneratedYncPNativeComponentMap::kProjects.end())
+        {
+            g_nativeCsdMakeProbe.status = "native-csd-observe failed: selected project row vanished";
+            return false;
+        }
+
+        const auto sceneIt = std::find_if(
+            GeneratedYncPNativeComponentMap::kScenes.begin(),
+            GeneratedYncPNativeComponentMap::kScenes.end(),
+            [](const auto& scene)
+            {
+                return std::string(scene.project) == g_nativeCsdMakeProbe.projectName &&
+                    std::string(scene.scene) == g_nativeCsdMakeProbe.selectedScene;
+            });
+
+        const auto& project = *projectIt;
+        const auto& scene =
+            sceneIt != GeneratedYncPNativeComponentMap::kScenes.end()
+                ? *sceneIt
+                : GeneratedYncPNativeComponentMap::kScenes[project.firstScene];
+
+        g_nativeCsdMakeProbe.attempted = true;
+        g_nativeCsdMakeProbe.succeeded = true;
+        g_nativeCsdMakeProbe.completedFrame = g_presentedFrameCount;
+        g_nativeCsdMakeProbe.status =
+            "native-csd-observe-succeeded: game-created project tree captured; force Make not used";
+
+        ResolveNativeCsdSceneForSelectedProject(project, scene);
+
+        std::ostringstream evidence;
+        evidence
+            << g_nativeCsdMakeProbe.relativePath
+            << "|scene=" << g_nativeCsdMakeProbe.selectedScene
+            << "|nativeProject=" << HexU32(g_nativeCsdMakeProbe.nativeProjectPointer)
+            << "|root=" << HexU32(g_nativeCsdMakeProbe.nativeRootNode)
+            << "|sceneCount=" << g_nativeCsdMakeProbe.nativeSceneCount;
+        WriteEvidenceEvent("native-csd-observe-succeeded", evidence.str());
+
+        g_nativeCsdMakeProbe.requested = false;
+        return true;
+    }
+
+    static void RequestNativeCsdMakeProbe(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene,
+        float selectedFrame)
+    {
+        DetachNativeForegroundRenderProbe("detached: native CSD make/observe probe reset");
+        ReleaseNativeCsdMakeProbeAllocations();
+
+        g_nativeCsdMakeProbe = NativeCsdMakeProbeState{};
+        g_nativeCsdMakeProbe.requested = true;
+        g_nativeCsdMakeProbe.projectName = std::string(project.project);
+        g_nativeCsdMakeProbe.fileName = std::string(project.fileName);
+        g_nativeCsdMakeProbe.relativePath = std::string(project.relativePath);
+        g_nativeCsdMakeProbe.selectedScene = std::string(scene.scene);
+        g_nativeCsdMakeProbe.selectedNodePath = scene.nodePath.empty() ? "Root" : std::string(scene.nodePath);
+        g_nativeCsdMakeProbe.nativeSceneMotionFrame = selectedFrame;
+        g_nativeCsdMakeProbe.requestedFrame = g_presentedFrameCount;
+        g_nativeCsdMakeProbe.status =
+            "queued: waiting for the game to create this CSD project natively";
+
+        WriteEvidenceEvent(
+            "native-csd-make-probe-requested",
+            g_nativeCsdMakeProbe.relativePath + "|" + g_nativeCsdMakeProbe.selectedScene);
+    }
+
+    void RunNativeCsdMakeProbe()
+    {
+        if (!g_isEnabled || !g_nativeCsdMakeProbe.requested || g_nativeCsdMakeProbe.running)
+            return;
+
+        if (GetPPCContext() == nullptr)
+        {
+            g_nativeCsdMakeProbe.status = "blocked: no guest PPC context";
+            return;
+        }
+
+        g_nativeCsdMakeProbe.running = true;
+        g_nativeCsdMakeProbe.requested = false;
+        g_nativeCsdMakeProbe.attempted = true;
+        g_nativeCsdMakeProbe.status = "copying selected YNCP bytes into guest heap";
+
+        std::vector<uint8_t> bytes;
+        std::string sourcePath;
+        std::string error;
+
+        const auto projectIt = std::find_if(
+            GeneratedYncPNativeComponentMap::kProjects.begin(),
+            GeneratedYncPNativeComponentMap::kProjects.end(),
+            [](const auto& project)
+            {
+                return std::string(project.relativePath) == g_nativeCsdMakeProbe.relativePath;
+            });
+
+        if (projectIt == GeneratedYncPNativeComponentMap::kProjects.end())
+        {
+            g_nativeCsdMakeProbe.status = "native-csd-make-probe failed: selected project row vanished";
+            g_nativeCsdMakeProbe.running = false;
+            return;
+        }
+
+        const auto sceneIt = std::find_if(
+            GeneratedYncPNativeComponentMap::kScenes.begin(),
+            GeneratedYncPNativeComponentMap::kScenes.end(),
+            [](const auto& scene)
+            {
+                return std::string(scene.project) == g_nativeCsdMakeProbe.projectName &&
+                    std::string(scene.scene) == g_nativeCsdMakeProbe.selectedScene;
+            });
+
+        const auto& project = *projectIt;
+        const auto& scene =
+            sceneIt != GeneratedYncPNativeComponentMap::kScenes.end()
+                ? *sceneIt
+                : GeneratedYncPNativeComponentMap::kScenes[project.firstScene];
+
+        if (!g_nativeCsdMakeProbeAllowExperimentalProjects &&
+            !IsFirstPassNativeCsdMakeTarget(project))
+        {
+            g_nativeCsdMakeProbe.status =
+                "blocked: first native CSD make pass is limited to ui_loading/ui_worldmap_help";
+            g_nativeCsdMakeProbe.running = false;
+            return;
+        }
+
+        if (!g_nativeCsdMakeProbeExecuteExperimentalMake)
+        {
+            g_nativeCsdMakeProbe.attempted = true;
+            g_nativeCsdMakeProbe.status =
+                "queued: observing the next game-created matching CSD project; direct Make disabled after parser-null crash";
+            g_nativeCsdMakeProbe.requested = true;
+            g_nativeCsdMakeProbe.running = false;
+            return;
+        }
+
+        if (!IsPlausibleGuestPointer(g_nativeCsdMakeLastContextAddress))
+        {
+            g_nativeCsdMakeProbe.status =
+                "queued: waiting for a real CCsdProject::Make call context (r6)";
+            g_nativeCsdMakeProbe.requested = true;
+            g_nativeCsdMakeProbe.running = false;
+            return;
+        }
+
+        if (!ReadSelectedYncProjectBytes(project, bytes, sourcePath, error))
+        {
+            g_nativeCsdMakeProbe.status = error;
+            g_nativeCsdMakeProbe.sourcePath = sourcePath;
+            g_nativeCsdMakeProbe.running = false;
+            return;
+        }
+
+        if (!ValidateNativeCsdPackageBytes(bytes, error))
+        {
+            g_nativeCsdMakeProbe.status = error;
+            g_nativeCsdMakeProbe.sourcePath = sourcePath;
+            g_nativeCsdMakeProbe.running = false;
+            return;
+        }
+
+        // Copy selected YNCP bytes into guest heap before calling SWA::CCsdProject::Make/sub_825E4068.
+        g_nativeCsdMakeProbe.bytesHost = g_userHeap.Alloc(bytes.size());
+        g_nativeCsdMakeProbe.ownerHost = g_userHeap.Alloc(sizeof(boost::anonymous_shared_ptr));
+
+        if (g_nativeCsdMakeProbe.bytesHost == nullptr || g_nativeCsdMakeProbe.ownerHost == nullptr)
+        {
+            g_nativeCsdMakeProbe.status = "native-csd-make-probe failed: guest heap allocation failed";
+            ReleaseNativeCsdMakeProbeAllocations();
+            g_nativeCsdMakeProbe.running = false;
+            return;
+        }
+
+        std::memcpy(g_nativeCsdMakeProbe.bytesHost, bytes.data(), bytes.size());
+        new (g_nativeCsdMakeProbe.ownerHost) boost::anonymous_shared_ptr();
+        g_nativeCsdMakeProbe.ownerConstructed = true;
+        g_nativeCsdMakeProbe.bytesSize = static_cast<uint32_t>(bytes.size());
+        g_nativeCsdMakeProbe.bytesGuestAddress = g_memory.MapVirtual(g_nativeCsdMakeProbe.bytesHost);
+        g_nativeCsdMakeProbe.ownerGuestAddress = g_memory.MapVirtual(g_nativeCsdMakeProbe.ownerHost);
+        g_nativeCsdMakeProbe.sourcePath = sourcePath;
+
+        g_nativeCsdMakeProbe.status = "calling CCsdProject::Make via cloned real-call r6 context";
+        const uint32_t makeResult = GuestToHostCsdMakeWithProbeContext(
+            sub_825E4068,
+            static_cast<boost::anonymous_shared_ptr*>(g_nativeCsdMakeProbe.ownerHost),
+            static_cast<uint8_t*>(g_nativeCsdMakeProbe.bytesHost),
+            g_nativeCsdMakeProbe.bytesSize,
+            g_nativeCsdMakeLastContextAddress);
+
+        uint32_t sharedOwner = 0;
+        if (TryReadGuestU32(g_nativeCsdMakeProbe.ownerGuestAddress + 16, sharedOwner))
+            TryReadGuestU32(sharedOwner + 4, g_nativeCsdMakeProbe.nativeProjectPointer);
+
+        g_nativeCsdMakeProbe.succeeded = IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeProjectPointer);
+        g_nativeCsdMakeProbe.completedFrame = g_presentedFrameCount;
+        g_nativeCsdMakeProbe.status = g_nativeCsdMakeProbe.succeeded
+            ? "native-csd-make-probe-succeeded: MakeCsdProjectMidAsmHook traversal pending/checked"
+            : "native-csd-make-probe returned without a native project pointer";
+
+        if (ResolveNativeCsdSceneForSelectedProject(project, scene))
+        {
+            g_nativeCsdMakeProbe.status =
+                "native-csd-make-probe-succeeded: native project tree and selected scene resolved";
+        }
+
+        std::ostringstream evidence;
+        evidence
+            << g_nativeCsdMakeProbe.relativePath
+            << "|scene=" << g_nativeCsdMakeProbe.selectedScene
+            << "|makeResult=" << HexU32(makeResult)
+            << "|nativeProject=" << HexU32(g_nativeCsdMakeProbe.nativeProjectPointer)
+            << "|root=" << HexU32(g_nativeCsdMakeProbe.nativeRootNode)
+            << "|sceneCount=" << g_nativeCsdMakeProbe.nativeSceneCount;
+        WriteEvidenceEvent("native-csd-make-probe-succeeded", evidence.str());
+
+        g_nativeCsdMakeProbe.running = false;
+    }
+
+    const char* NativeCsdMakeProbeProjectNameForTraversal(uint32_t projectAddress)
+    {
+        if (!g_nativeCsdMakeProbe.running)
+            return nullptr;
+
+        if (projectAddress != 0)
+            g_nativeCsdMakeProbe.nativeProjectPointer = projectAddress;
+
+        return g_nativeCsdMakeProbe.projectName.empty()
+            ? "ui_lab_native_probe"
+            : g_nativeCsdMakeProbe.projectName.c_str();
+    }
+
+    static GuestTexture* LoadYncPreviewTexture(
+        std::string_view textureRelativePath,
+        bool hasTexture)
+    {
+        if (!hasTexture || textureRelativePath.empty())
+            return nullptr;
+
+        const std::string cacheKey(textureRelativePath);
+        const auto existing = g_yncPreviewTextureCache.find(cacheKey);
+        if (existing != g_yncPreviewTextureCache.end())
+            return existing->second.get();
+
+        if (g_yncPreviewTextureLoadFailures.find(cacheKey) != g_yncPreviewTextureLoadFailures.end())
+            return nullptr;
+
+        const std::filesystem::path texturePath = ResolveYncPreviewTexturePath(textureRelativePath);
+        std::ifstream textureFile(texturePath, std::ios::binary | std::ios::ate);
+        if (!textureFile)
+        {
+            g_yncPreviewTextureLoadFailures.insert(cacheKey);
+            return nullptr;
+        }
+
+        const std::streamsize textureSize = textureFile.tellg();
+        if (textureSize <= 0)
+        {
+            g_yncPreviewTextureLoadFailures.insert(cacheKey);
+            return nullptr;
+        }
+
+        textureFile.seekg(0, std::ios::beg);
+        std::vector<uint8_t> textureBytes(static_cast<size_t>(textureSize));
+        if (!textureFile.read(reinterpret_cast<char*>(textureBytes.data()), textureSize))
+        {
+            g_yncPreviewTextureLoadFailures.insert(cacheKey);
+            return nullptr;
+        }
+
+        auto texture = LoadTexture(textureBytes.data(), textureBytes.size());
+        if (!texture)
+        {
+            g_yncPreviewTextureLoadFailures.insert(cacheKey);
+            return nullptr;
+        }
+
+        GuestTexture* texturePtr = texture.get();
+        g_yncPreviewTextureCache[cacheKey] = std::move(texture);
+        return texturePtr;
+    }
+
+    static GuestTexture* LoadYncPreviewTexture(
+        const GeneratedYncPNativeComponentMap::PreviewDrawCommand& command)
+    {
+        return LoadYncPreviewTexture(command.textureRelativePath, command.hasTexture);
+    }
+
+    static GuestTexture* LoadYncPreviewTexture(
+        const GeneratedYncPNativeComponentMap::SceneDrawCommand& command)
+    {
+        return LoadYncPreviewTexture(command.textureRelativePath, command.hasTexture);
+    }
+
+    static void DrawYncComposedScenePreview(
+        ImDrawList* drawList,
+        const std::vector<const GeneratedYncPNativeComponentMap::SceneDrawCommand*>& commands,
+        const std::vector<const GeneratedYncPNativeComponentMap::AnimationTrackKeyframe*>& animationKeyframes,
+        std::string_view animationName,
+        float timelineFrame,
+        const ImVec2& canvasPos,
+        const ImVec2& canvasSize,
+        ImU32 accentColor)
+    {
+        const ImU32 textColor = IM_COL32(235, 244, 248, 235);
+        const ImU32 mutedTextColor = IM_COL32(185, 190, 194, 205);
+        const ImU32 stageColor = IM_COL32(5, 8, 13, 238);
+        const ImU32 gridColor = IM_COL32(255, 255, 255, 24);
+        const ImVec2 stageMin(canvasPos.x + 10.0f, canvasPos.y + 48.0f);
+        const float stageWidth = std::max(120.0f, canvasSize.x - 20.0f);
+        const float stageHeight = std::max(72.0f, std::min(176.0f, stageWidth * 9.0f / 16.0f));
+        const ImVec2 stageMax(stageMin.x + stageWidth, stageMin.y + stageHeight);
+
+        drawList->AddText(ImVec2(stageMin.x, canvasPos.y + 27.0f), textColor, "composed YNCP scene");
+        const std::string scrubLabel =
+            "cast-tree scene placement | YNCP animation scrub: " +
+            (animationName.empty() ? std::string("no authored track") : std::string(animationName)) +
+            " frame " + std::to_string(static_cast<int>(timelineFrame));
+        drawList->AddText(ImVec2(stageMin.x + 160.0f, canvasPos.y + 27.0f), mutedTextColor, scrubLabel.c_str());
+        drawList->AddRectFilled(stageMin, stageMax, stageColor, 3.0f);
+        drawList->AddRect(stageMin, stageMax, accentColor, 3.0f, 0, 1.0f);
+
+        for (int i = 1; i < 4; ++i)
+        {
+            const float x = stageMin.x + stageWidth * static_cast<float>(i) / 4.0f;
+            const float y = stageMin.y + stageHeight * static_cast<float>(i) / 4.0f;
+            drawList->AddLine(ImVec2(x, stageMin.y), ImVec2(x, stageMax.y), gridColor, 1.0f);
+            drawList->AddLine(ImVec2(stageMin.x, y), ImVec2(stageMax.x, y), gridColor, 1.0f);
+        }
+
+        if (commands.empty())
+        {
+            drawList->AddText(
+                ImVec2(stageMin.x + 8.0f, stageMin.y + 8.0f),
+                mutedTextColor,
+                "no composed cast-tree draw commands matched this selected YNCP scene yet");
+            return;
+        }
+
+        drawList->PushClipRect(stageMin, stageMax, true);
+        int drawnCount = 0;
+        size_t animatedDrawCount = 0;
+        size_t sampledTrackCount = 0;
+        size_t sampledKeyframeCount = 0;
+        std::string_view sampledInterpolation;
+        for (const auto* command : commands)
+        {
+            if (command == nullptr || command->sceneWidth <= 0.0f || command->sceneHeight <= 0.0f)
+                continue;
+
+            const YncSceneAnimationState state =
+                SampleYncSceneAnimationState(*command, animationKeyframes, animationName, timelineFrame);
+            const YncAnimatedSceneDrawCommand animated = ApplyYncAnimationToSceneDraw(*command, state);
+            if (animated.sampledTrackCount > 0)
+            {
+                ++animatedDrawCount;
+                sampledTrackCount += animated.sampledTrackCount;
+                sampledKeyframeCount += animated.keyframeCount;
+                if (!animated.interpolationType.empty())
+                    sampledInterpolation = animated.interpolationType;
+            }
+
+            const ImVec2 dstMin(
+                stageMin.x + animated.sceneLeft * stageWidth,
+                stageMin.y + animated.sceneTop * stageHeight);
+            const ImVec2 dstMax(
+                dstMin.x + std::max(1.0f, animated.sceneWidth * stageWidth),
+                dstMin.y + std::max(1.0f, animated.sceneHeight * stageHeight));
+
+            if (dstMax.x < stageMin.x || dstMax.y < stageMin.y || dstMin.x > stageMax.x || dstMin.y > stageMax.y)
+                continue;
+
+            const uint8_t alpha = animated.hidden ? 88 : 236;
+            GuestTexture* texture = LoadYncPreviewTexture(*command);
+            if (texture != nullptr)
+            {
+                drawList->AddImage(
+                    texture,
+                    dstMin,
+                    dstMax,
+                    ImVec2(command->uvLeft, command->uvTop),
+                    ImVec2(command->uvRight, command->uvBottom),
+                    IM_COL32(255, 255, 255, alpha));
+            }
+            else
+            {
+                drawList->AddRectFilled(dstMin, dstMax, accentColor & IM_COL32(255, 255, 255, 96), 1.0f);
+            }
+
+            if (drawnCount < 10)
+                drawList->AddRect(dstMin, dstMax, accentColor, 1.0f, 0, 1.0f);
+
+            ++drawnCount;
+        }
+        drawList->PopClipRect();
+
+        const std::string status =
+            "scene display list: " + std::to_string(drawnCount) + "/" + std::to_string(commands.size()) +
+            " cast/subimage draws from " + std::string(GeneratedYncPNativeComponentMap::kSceneDrawCommandPolicy);
+        drawList->AddText(ImVec2(stageMin.x + 8.0f, stageMax.y - 18.0f), mutedTextColor, status.c_str());
+
+        const std::string animationStatus =
+            "animated keyframe sample: " + std::to_string(animatedDrawCount) +
+            " casts, " + std::to_string(sampledTrackCount) +
+            " tracks, " + std::to_string(sampledKeyframeCount) +
+            " real authored animation tracks; " +
+            (sampledInterpolation.empty() ? std::string("Hermite/Linear ready") : std::string(sampledInterpolation));
+        drawList->AddText(ImVec2(stageMin.x + 8.0f, stageMax.y - 36.0f), IM_COL32(255, 226, 130, 230), animationStatus.c_str());
+    }
+
+    static void AddYncPreviewSubimageRect(
+        ImDrawList* drawList,
+        const GeneratedYncPNativeComponentMap::PreviewDrawCommand& command,
+        const ImVec2& cellMin,
+        const ImVec2& cellMax,
+        ImU32 accentColor,
+        int visualIndex)
+    {
+        const ImU32 textColor = IM_COL32(235, 244, 248, 235);
+        const ImU32 mutedTextColor = IM_COL32(180, 190, 198, 210);
+        const float cellWidth = std::max(1.0f, cellMax.x - cellMin.x);
+        const float cellHeight = std::max(1.0f, cellMax.y - cellMin.y);
+        const float atlasWidth = std::max(54.0f, std::min(96.0f, cellWidth * 0.34f));
+        const float atlasHeight = std::max(42.0f, cellHeight - 39.0f);
+        const ImVec2 atlasMin(cellMin.x + 7.0f, cellMin.y + 23.0f);
+        const ImVec2 atlasMax(atlasMin.x + atlasWidth, atlasMin.y + atlasHeight);
+        const ImVec2 destMin(atlasMax.x + 8.0f, atlasMin.y);
+        const ImVec2 destMax(cellMax.x - 7.0f, atlasMax.y);
+
+        drawList->AddRectFilled(cellMin, cellMax, IM_COL32(18, 24, 31, 236), 4.0f);
+        drawList->AddRect(cellMin, cellMax, accentColor, 4.0f, 0, 1.0f);
+
+        const std::string title =
+            "texture-backed cast/subimage " + std::to_string(visualIndex + 1) + ": " +
+            YncPreviewShortLabel(command.castName, "cast", 22);
+        drawList->AddText(ImVec2(cellMin.x + 7.0f, cellMin.y + 5.0f), textColor, title.c_str());
+
+        drawList->AddRectFilled(atlasMin, atlasMax, IM_COL32(8, 10, 14, 238), 2.0f);
+        drawList->AddRect(atlasMin, atlasMax, IM_COL32(95, 126, 150, 190), 2.0f, 0, 1.0f);
+
+        GuestTexture* texture = LoadYncPreviewTexture(command);
+        if (texture != nullptr)
+        {
+            drawList->AddImage(
+                texture,
+                atlasMin,
+                atlasMax,
+                ImVec2(0.0f, 0.0f),
+                ImVec2(1.0f, 1.0f),
+                IM_COL32(255, 255, 255, 205));
+        }
+
+        if (command.hasTexture && command.sourceTextureWidth > 0 && command.sourceTextureHeight > 0)
+        {
+            const float sourceScaleX = atlasWidth / static_cast<float>(command.sourceTextureWidth);
+            const float sourceScaleY = atlasHeight / static_cast<float>(command.sourceTextureHeight);
+            const ImVec2 sourceMin(
+                atlasMin.x + static_cast<float>(command.sourceX) * sourceScaleX,
+                atlasMin.y + static_cast<float>(command.sourceY) * sourceScaleY);
+            const ImVec2 sourceMax(
+                sourceMin.x + std::max(2.0f, static_cast<float>(command.sourceWidth) * sourceScaleX),
+                sourceMin.y + std::max(2.0f, static_cast<float>(command.sourceHeight) * sourceScaleY));
+
+            drawList->AddRectFilled(sourceMin, sourceMax, IM_COL32(255, 222, 95, 95), 1.0f);
+            drawList->AddRect(sourceMin, sourceMax, IM_COL32(255, 226, 95, 245), 1.0f, 0, 1.5f);
+        }
+
+        drawList->AddRectFilled(destMin, destMax, IM_COL32(7, 12, 18, 240), 2.0f);
+        drawList->AddRect(destMin, destMax, IM_COL32(95, 126, 150, 190), 2.0f, 0, 1.0f);
+        const float destWidth = std::max(1.0f, destMax.x - destMin.x);
+        const float destHeight = std::max(1.0f, destMax.y - destMin.y);
+        const ImVec2 rectMin(
+            destMin.x + command.normalizedCastLeft * destWidth,
+            destMin.y + command.normalizedCastTop * destHeight);
+        const ImVec2 rectMax(
+            rectMin.x + std::max(3.0f, command.normalizedCastWidth * destWidth),
+            rectMin.y + std::max(3.0f, command.normalizedCastHeight * destHeight));
+
+        if (texture != nullptr)
+        {
+            drawList->AddImage(
+                texture,
+                rectMin,
+                rectMax,
+                ImVec2(command.uvLeft, command.uvTop),
+                ImVec2(command.uvRight, command.uvBottom),
+                IM_COL32(255, 255, 255, 235));
+        }
+
+        drawList->AddRectFilled(rectMin, rectMax, accentColor & IM_COL32(255, 255, 255, 118), 1.0f);
+        drawList->AddRect(rectMin, rectMax, accentColor, 1.0f, 0, 1.5f);
+
+        const std::string textureLabel = YncPreviewShortLabel(command.textureName, "texture", 24);
+        drawList->AddText(ImVec2(cellMin.x + 7.0f, cellMax.y - 33.0f), textColor, textureLabel.c_str());
+
+        const std::string srcLabel =
+            "src=" + YncPreviewRectText(command.sourceX, command.sourceY, command.sourceWidth, command.sourceHeight);
+        const std::string dstLabel = "dst=" + YncPreviewDstText(command);
+        drawList->AddText(ImVec2(cellMin.x + 7.0f, cellMax.y - 19.0f), mutedTextColor, srcLabel.c_str());
+        drawList->AddText(ImVec2(destMin.x, cellMax.y - 19.0f), mutedTextColor, dstLabel.c_str());
+    }
+
+    static void DrawYncTextureBackedSubimagePreview(
+        ImDrawList* drawList,
+        const std::vector<const GeneratedYncPNativeComponentMap::PreviewDrawCommand*>& commands,
+        const ImVec2& canvasPos,
+        const ImVec2& canvasSize,
+        ImU32 accentColor)
+    {
+        const ImU32 textColor = IM_COL32(235, 244, 248, 235);
+        const ImU32 mutedTextColor = IM_COL32(185, 190, 194, 205);
+        const float stripTop = canvasPos.y + 244.0f;
+        const float stripHeight = canvasSize.y - 254.0f;
+        const ImVec2 stripMin(canvasPos.x + 10.0f, stripTop);
+        const ImVec2 stripMax(canvasPos.x + canvasSize.x - 10.0f, stripTop + stripHeight);
+
+        drawList->AddText(stripMin, textColor, "real DDS/subimage rectangles");
+
+        if (commands.empty())
+        {
+            drawList->AddText(
+                ImVec2(stripMin.x, stripMin.y + 21.0f),
+                mutedTextColor,
+                "texture-backed cast/subimage preview: no drawable subimage command matched this selected scene yet");
+            return;
+        }
+
+        const int visibleCount = static_cast<int>(std::min<size_t>(3, commands.size()));
+        const float gap = 8.0f;
+        const float cellWidth = std::max(88.0f, ((stripMax.x - stripMin.x) - gap * static_cast<float>(visibleCount - 1)) / static_cast<float>(visibleCount));
+        for (int index = 0; index < visibleCount; ++index)
+        {
+            const ImVec2 cellMin(stripMin.x + static_cast<float>(index) * (cellWidth + gap), stripMin.y + 19.0f);
+            const ImVec2 cellMax(cellMin.x + cellWidth, stripMax.y);
+            AddYncPreviewSubimageRect(drawList, *commands[static_cast<size_t>(index)], cellMin, cellMax, accentColor, index);
+        }
+    }
+
+    static void DrawYncScenePreviewCanvas(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene,
+        const std::vector<const GeneratedYncPNativeComponentMap::AnimationTrackKeyframe*>& animationKeyframes,
+        std::string_view animationName,
+        float timelineFrame,
+        bool previewPinned)
+    {
+        const float width = std::max(320.0f, ImGui::GetContentRegionAvail().x);
+        const ImVec2 canvasPos = ImGui::GetCursorScreenPos();
+        const ImVec2 canvasSize(width, 376.0f);
+        const ImVec2 canvasMax(canvasPos.x + canvasSize.x, canvasPos.y + canvasSize.y);
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const auto sceneDrawCommands = FindYncSceneDrawCommands(project, scene);
+        const auto previewDrawCommands = FindYncPreviewDrawCommands(project, scene);
+
+        ImGui::InvisibleButton("yncp-independent-preview-canvas", canvasSize);
+
+        const ImU32 bgColor = previewPinned ? IM_COL32(9, 16, 23, 226) : IM_COL32(20, 20, 20, 180);
+        const ImU32 frameColor = IM_COL32(120, 190, 220, 190);
+        const ImU32 gridColor = IM_COL32(255, 255, 255, 22);
+        const ImU32 textColor = IM_COL32(235, 244, 248, 235);
+        const ImU32 mutedTextColor = IM_COL32(185, 190, 194, 200);
+        const ImU32 accentColor = YncPreviewRoleColor(scene.componentRole);
+
+        drawList->AddRectFilled(canvasPos, canvasMax, bgColor, 4.0f);
+        drawList->AddRect(canvasPos, canvasMax, frameColor, 4.0f, 0, 1.0f);
+
+        for (int i = 1; i < 5; ++i)
+        {
+            const float x = canvasPos.x + (canvasSize.x * static_cast<float>(i) / 5.0f);
+            drawList->AddLine(ImVec2(x, canvasPos.y + 38.0f), ImVec2(x, canvasMax.y - 12.0f), gridColor, 1.0f);
+        }
+
+        const std::string title =
+            "Independent preview: " + std::string(project.project) + "/" + std::string(scene.scene);
+        drawList->AddText(ImVec2(canvasPos.x + 10.0f, canvasPos.y + 8.0f), textColor, title.c_str());
+        drawList->AddText(
+            ImVec2(canvasPos.x + 10.0f, canvasPos.y + 27.0f),
+            mutedTextColor,
+            "selected YNCP scene, not current runtime route");
+
+        const float frameMin = scene.frameMin;
+        const float frameMax = std::max(scene.frameMax, frameMin);
+        const float frameSpan = std::max(1.0f, frameMax - frameMin);
+        const float frameT = std::clamp((timelineFrame - frameMin) / frameSpan, 0.0f, 1.0f);
+
+        DrawYncComposedScenePreview(
+            drawList,
+            sceneDrawCommands,
+            animationKeyframes,
+            animationName,
+            timelineFrame,
+            canvasPos,
+            canvasSize,
+            accentColor);
+
+        const float playheadX = canvasPos.x + 12.0f + frameT * (canvasSize.x - 24.0f);
+        drawList->AddLine(
+            ImVec2(playheadX, canvasPos.y + 50.0f),
+            ImVec2(playheadX, canvasPos.y + 230.0f),
+            IM_COL32(255, 230, 95, 235),
+            2.0f);
+
+        const std::string frameLabel = "frame " + std::to_string(static_cast<int>(timelineFrame));
+        drawList->AddText(ImVec2(playheadX + 5.0f, canvasPos.y + 220.0f), IM_COL32(255, 235, 135, 235), frameLabel.c_str());
+
+        DrawYncTextureBackedSubimagePreview(drawList, previewDrawCommands, canvasPos, canvasSize, accentColor);
+    }
+
+    static void DrawYncTimelineLane(
+        const GeneratedYncPNativeComponentMap::Scene& scene,
+        const std::vector<const GeneratedYncPNativeComponentMap::AnimationTrackKeyframe*>& animationKeyframes,
+        std::string_view animationName,
+        float timelineFrame)
+    {
+        const float width = std::max(320.0f, ImGui::GetContentRegionAvail().x);
+        const ImVec2 lanePos = ImGui::GetCursorScreenPos();
+        const ImVec2 laneSize(width, 92.0f);
+        const ImVec2 laneMax(lanePos.x + laneSize.x, lanePos.y + laneSize.y);
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+        ImGui::InvisibleButton("yncp-keyframe-preview-lane", laneSize);
+
+        const float frameMin = scene.frameMin;
+        const float frameMax = std::max(scene.frameMax, frameMin);
+        const float frameSpan = std::max(1.0f, frameMax - frameMin);
+        const float frameT = std::clamp((timelineFrame - frameMin) / frameSpan, 0.0f, 1.0f);
+        const size_t trackCount = std::max<size_t>(1, std::min<size_t>(4, CountYncPreviewCsvTokens(scene.trackTypes)));
+
+        drawList->AddRectFilled(lanePos, laneMax, IM_COL32(12, 14, 16, 220), 3.0f);
+        drawList->AddRect(lanePos, laneMax, IM_COL32(90, 128, 150, 190), 3.0f, 0, 1.0f);
+        drawList->AddText(ImVec2(lanePos.x + 8.0f, lanePos.y + 7.0f), IM_COL32(235, 242, 248, 230), "Drawable keyframe preview lane");
+        const std::string laneStatus =
+            "real authored animation tracks: " + std::to_string(animationKeyframes.size()) +
+            " keyframes | " + (animationName.empty() ? std::string("no animation") : std::string(animationName)) +
+            " | Hermite/Linear/Const interpolation";
+        drawList->AddText(ImVec2(lanePos.x + 220.0f, lanePos.y + 7.0f), IM_COL32(255, 226, 130, 220), laneStatus.c_str());
+
+        const float axisLeft = lanePos.x + 12.0f;
+        const float axisRight = laneMax.x - 12.0f;
+        const float axisTop = lanePos.y + 34.0f;
+
+        for (size_t lane = 0; lane < trackCount; ++lane)
+        {
+            const float y = axisTop + static_cast<float>(lane) * 13.0f;
+            const std::string label = YncPreviewCsvToken(scene.trackTypes, lane, "track");
+            drawList->AddLine(ImVec2(axisLeft, y), ImVec2(axisRight, y), IM_COL32(255, 255, 255, 34), 1.0f);
+            drawList->AddText(ImVec2(axisLeft + 2.0f, y + 2.0f), IM_COL32(180, 190, 198, 210), label.c_str());
+        }
+
+        size_t tickCount = 0;
+        for (const auto* keyframe : animationKeyframes)
+        {
+            // keyframe tick: exact authored YNCP frame marker for the selected animation lane.
+            if (keyframe == nullptr)
+                continue;
+            if (!animationName.empty() && keyframe->animationName != animationName)
+                continue;
+
+            const float t = std::clamp((keyframe->frame - frameMin) / frameSpan, 0.0f, 1.0f);
+            const float x = axisLeft + t * (axisRight - axisLeft);
+            const float tickHeight = (keyframe->interpolationType == "Hermite") ? 45.0f : 30.0f;
+            const ImU32 tickColor =
+                keyframe->interpolationType == "Hermite"
+                    ? IM_COL32(255, 210, 100, 190)
+                    : IM_COL32(125, 205, 255, 150);
+            drawList->AddLine(ImVec2(x, axisTop - 5.0f), ImVec2(x, axisTop + tickHeight), tickColor, 1.0f);
+
+            const float laneY =
+                axisTop + static_cast<float>(std::min<size_t>(trackCount - 1, tickCount % trackCount)) * 13.0f;
+            drawList->AddCircleFilled(ImVec2(x, laneY), 2.0f, tickColor);
+
+            ++tickCount;
+            if (tickCount >= 160)
+                break;
+        }
+
+        if (tickCount == 0)
+        {
+            drawList->AddText(
+                ImVec2(axisLeft + 2.0f, axisTop + 52.0f),
+                IM_COL32(180, 190, 198, 210),
+                "no exact keyframes matched selected animation; scrub still shows scene frame range");
+        }
+
+        const float playheadX = axisLeft + frameT * (axisRight - axisLeft);
+        drawList->AddLine(
+            ImVec2(playheadX, lanePos.y + 25.0f),
+            ImVec2(playheadX, laneMax.y - 8.0f),
+            IM_COL32(255, 235, 120, 240),
+            2.0f);
+    }
+
+    static void DrawYncSfxCueCandidates(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene)
+    {
+        const auto candidates = FindYncSfxCueCandidates(project, scene);
+        ImGui::TextWrapped("runtime hook hits + Ghidra xrefs");
+        ImGui::TextWrapped("seed bank/callsite: se_system_worldmap via Game_PlaySound");
+
+        if (candidates.empty())
+        {
+            ImGui::TextDisabled("exact cue candidate: no bank/cue row matched this selected project yet");
+            return;
+        }
+
+        for (const auto* candidate : candidates)
+        {
+            if (candidate == nullptr)
+                continue;
+
+            ImGui::Bullet();
+            ImGui::SameLine();
+            ImGui::TextWrapped(
+                "exact cue candidate: %s/%s | %s",
+                std::string(candidate->bankName).c_str(),
+                std::string(candidate->cueName).c_str(),
+                std::string(candidate->action).c_str());
+            ImGui::TextWrapped("  hook: %s", std::string(candidate->runtimeHook).c_str());
+            ImGui::TextWrapped("  xref: %s", std::string(candidate->ghidraXref).c_str());
+        }
+    }
+
+    static void DrawYncSfxCorrelationLane(
+        const GeneratedYncPNativeComponentMap::Project& project,
+        const GeneratedYncPNativeComponentMap::Scene& scene)
+    {
+        const auto candidates = FindYncSfxCueCandidates(project, scene);
+        ImGui::BeginChild("sward-yncp-sfx-correlation-lane", ImVec2(0.0f, 296.0f), true);
+        ImGui::TextUnformatted("audio-bank correlation");
+        ImGui::TextWrapped("Project status: %s", std::string(project.sfxStatus).c_str());
+        ImGui::TextWrapped("Scene: %s / %s", std::string(project.project).c_str(), std::string(scene.scene).c_str());
+        ImGui::TextWrapped(
+            "Same scene row join: exact cue candidates=%zu from runtime hook hits + Ghidra xrefs",
+            candidates.size());
+        ImGui::Separator();
+        ImGui::BulletText("runtime hooks: same-scene UI action evidence stays beside the selected YNCP row");
+        ImGui::BulletText("Ghidra xrefs: static caller/callee proof is carried beside each runtime cue hit");
+        ImGui::BulletText("audio banks/XML: exact bank/cue rows are used when matched, placeholder intent otherwise");
+        ImGui::BulletText("timeline join: pending frame-window match against selected YNCP animation lane");
+        ImGui::Separator();
+        ImGui::TextWrapped(
+            "Until those joins are proven, SGFX export keeps audio as placeholder cue intents with provenance instead of pretending the IDs are final.");
+        ImGui::Separator();
+
+        DrawYncSfxCueCandidates(project, scene);
+
+        if (ImGui::Button("Mark SFX Correlation Evidence"))
+        {
+            WriteEvidenceEvent(
+                "ui-project-sfx-correlation-marker",
+                std::string(project.relativePath) + "|" + std::string(scene.scene));
+        }
+
+        ImGui::EndChild();
+    }
+
+    static void DrawYncForegroundInvokedScene()
+    {
+        namespace YNCP = GeneratedYncPNativeComponentMap;
+
+        if (!g_yncForegroundInvokeVisible)
+            return;
+
+        if constexpr (YNCP::kProjects.empty() || YNCP::kScenes.empty())
+            return;
+
+        g_yncForegroundProjectIndex = std::clamp(
+            g_yncForegroundProjectIndex,
+            0,
+            static_cast<int>(YNCP::kProjects.size() - 1));
+        g_yncForegroundSceneIndex = std::clamp(
+            g_yncForegroundSceneIndex,
+            0,
+            static_cast<int>(YNCP::kScenes.size() - 1));
+
+        const auto& project = YNCP::kProjects[static_cast<size_t>(g_yncForegroundProjectIndex)];
+        const auto& scene = YNCP::kScenes[static_cast<size_t>(g_yncForegroundSceneIndex)];
+        const float frameMin = scene.frameMin;
+        const float frameMax = std::max(scene.frameMax, frameMin);
+
+        if (frameMax > frameMin)
+        {
+            if (g_yncForegroundAnimationPlaying)
+            {
+                const float rate = scene.animationFramerate > 0.0f ? scene.animationFramerate : 60.0f;
+                g_yncForegroundTimelineFrame += static_cast<float>(App::s_deltaTime) * rate;
+                if (g_yncForegroundTimelineFrame > frameMax)
+                    g_yncForegroundTimelineFrame = frameMin;
+            }
+
+            g_yncForegroundTimelineFrame = std::clamp(g_yncForegroundTimelineFrame, frameMin, frameMax);
+        }
+        else
+        {
+            g_yncForegroundAnimationPlaying = false;
+            g_yncForegroundTimelineFrame = frameMin;
+        }
+
+        const auto sceneDrawCommands = FindYncSceneDrawCommands(project, scene);
+        const auto animationKeyframes = FindYncAnimationTrackKeyframes(project, scene);
+        const std::string previewAnimationName = ChooseYncPreviewAnimationName(scene, animationKeyframes);
+        const auto sfxCandidates = FindYncSfxCueCandidates(project, scene);
+        const ImGuiIO& io = ImGui::GetIO();
+        const ImVec2 displayMin(0.0f, 0.0f);
+        const ImVec2 displayMax(io.DisplaySize.x, io.DisplaySize.y);
+
+        ImGui::SetNextWindowPos(displayMin, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.0f);
+
+        constexpr ImGuiWindowFlags flags =
+            ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoFocusOnAppearing;
+
+        const bool nativeFontPushed = PushSwardNativeProfilerFont();
+        if (ImGui::Begin(
+            "SWARD UI Lab Foreground Invoked YNCP Scene###SWARDYncForegroundInvoke",
+            &g_yncForegroundInvokeVisible,
+            flags))
+        {
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            const ImU32 accentColor = YncPreviewRoleColor(scene.componentRole);
+            const ImU32 textColor = IM_COL32(235, 244, 248, 238);
+            const ImU32 mutedTextColor = IM_COL32(190, 198, 205, 218);
+            const ImU32 warningColor = IM_COL32(255, 212, 104, 236);
+
+            drawList->AddRectFilled(displayMin, displayMax, IM_COL32(0, 0, 0, 116));
+
+            const float availableWidth = std::max(320.0f, io.DisplaySize.x - 56.0f);
+            const float panelWidth = std::clamp(io.DisplaySize.x * 0.24f, 280.0f, 430.0f);
+            const float stageWidth = std::min(availableWidth - panelWidth - 22.0f, io.DisplaySize.x * 0.68f);
+            const float stageHeight = std::min(io.DisplaySize.y * 0.66f, stageWidth * 9.0f / 16.0f);
+            const ImVec2 stageMin(
+                28.0f,
+                std::max(72.0f, (io.DisplaySize.y - stageHeight) * 0.46f));
+            const ImVec2 stageMax(stageMin.x + stageWidth, stageMin.y + stageHeight);
+            const ImVec2 infoMin(stageMax.x + 14.0f, stageMin.y);
+            const ImVec2 infoMax(
+                std::min(io.DisplaySize.x - 22.0f, infoMin.x + panelWidth),
+                std::min(io.DisplaySize.y - 28.0f, stageMin.y + stageHeight));
+
+            drawList->AddText(ImVec2(stageMin.x, stageMin.y - 44.0f), textColor, "foreground invoked YNCP scene");
+            drawList->AddText(
+                ImVec2(stageMin.x, stageMin.y - 24.0f),
+                mutedTextColor,
+                "pause-menu-style foreground projection | summoned UI surface | reconstructed render path");
+            drawList->AddRectFilled(stageMin, stageMax, IM_COL32(5, 8, 13, 222), 5.0f);
+            drawList->AddRect(stageMin, stageMax, accentColor, 5.0f, 0, 2.0f);
+
+            for (int i = 1; i < 4; ++i)
+            {
+                const float x = stageMin.x + (stageMax.x - stageMin.x) * static_cast<float>(i) / 4.0f;
+                const float y = stageMin.y + (stageMax.y - stageMin.y) * static_cast<float>(i) / 4.0f;
+                drawList->AddLine(ImVec2(x, stageMin.y), ImVec2(x, stageMax.y), IM_COL32(255, 255, 255, 20), 1.0f);
+                drawList->AddLine(ImVec2(stageMin.x, y), ImVec2(stageMax.x, y), IM_COL32(255, 255, 255, 20), 1.0f);
+            }
+
+            int drawnCount = 0;
+            size_t animatedDrawCount = 0;
+            size_t sampledTrackCount = 0;
+            size_t sampledKeyframeCount = 0;
+            std::string_view sampledInterpolation;
+            const float stageWidthActual = std::max(1.0f, stageMax.x - stageMin.x);
+            const float stageHeightActual = std::max(1.0f, stageMax.y - stageMin.y);
+            drawList->PushClipRect(stageMin, stageMax, true);
+            for (const auto* command : sceneDrawCommands)
+            {
+                if (command == nullptr || command->sceneWidth <= 0.0f || command->sceneHeight <= 0.0f)
+                    continue;
+
+                const YncSceneAnimationState state =
+                    SampleYncSceneAnimationState(*command, animationKeyframes, previewAnimationName, g_yncForegroundTimelineFrame);
+                const YncAnimatedSceneDrawCommand animated = ApplyYncAnimationToSceneDraw(*command, state);
+                if (animated.sampledTrackCount > 0)
+                {
+                    ++animatedDrawCount;
+                    sampledTrackCount += animated.sampledTrackCount;
+                    sampledKeyframeCount += animated.keyframeCount;
+                    if (!animated.interpolationType.empty())
+                        sampledInterpolation = animated.interpolationType;
+                }
+
+                const ImVec2 dstMin(
+                    stageMin.x + animated.sceneLeft * stageWidthActual,
+                    stageMin.y + animated.sceneTop * stageHeightActual);
+                const ImVec2 dstMax(
+                    dstMin.x + std::max(1.0f, animated.sceneWidth * stageWidthActual),
+                    dstMin.y + std::max(1.0f, animated.sceneHeight * stageHeightActual));
+
+                if (dstMax.x < stageMin.x || dstMax.y < stageMin.y || dstMin.x > stageMax.x || dstMin.y > stageMax.y)
+                    continue;
+
+                const uint8_t alpha = animated.hidden ? 72 : 242;
+                GuestTexture* texture = LoadYncPreviewTexture(*command);
+                if (texture != nullptr)
+                {
+                    drawList->AddImage(
+                        texture,
+                        dstMin,
+                        dstMax,
+                        ImVec2(command->uvLeft, command->uvTop),
+                        ImVec2(command->uvRight, command->uvBottom),
+                        IM_COL32(255, 255, 255, alpha));
+                }
+                else
+                {
+                    drawList->AddRectFilled(dstMin, dstMax, accentColor & IM_COL32(255, 255, 255, 92), 2.0f);
+                }
+
+                if (drawnCount < 24)
+                    drawList->AddRect(dstMin, dstMax, accentColor, 1.0f, 0, 1.0f);
+
+                ++drawnCount;
+            }
+            drawList->PopClipRect();
+
+            const float frameSpan = std::max(1.0f, frameMax - frameMin);
+            const float frameT = std::clamp((g_yncForegroundTimelineFrame - frameMin) / frameSpan, 0.0f, 1.0f);
+            const float playheadX = stageMin.x + 12.0f + frameT * (stageWidthActual - 24.0f);
+            drawList->AddLine(
+                ImVec2(playheadX, stageMin.y),
+                ImVec2(playheadX, stageMax.y),
+                IM_COL32(255, 230, 100, 228),
+                2.0f);
+
+            const std::string drawStatus =
+                "scene draws " + std::to_string(drawnCount) + "/" + std::to_string(sceneDrawCommands.size()) +
+                " | frame " + std::to_string(static_cast<int>(g_yncForegroundTimelineFrame));
+            drawList->AddText(ImVec2(stageMin.x + 10.0f, stageMax.y - 24.0f), warningColor, drawStatus.c_str());
+
+            drawList->AddRectFilled(infoMin, infoMax, IM_COL32(9, 11, 14, 222), 4.0f);
+            drawList->AddRect(infoMin, infoMax, IM_COL32(120, 190, 220, 170), 4.0f, 0, 1.0f);
+            drawList->AddText(ImVec2(infoMin.x + 10.0f, infoMin.y + 10.0f), textColor, "SWARD foreground invoke");
+            drawList->AddText(ImVec2(infoMin.x + 10.0f, infoMin.y + 31.0f), mutedTextColor, std::string(project.project).c_str());
+            drawList->AddText(ImVec2(infoMin.x + 10.0f, infoMin.y + 50.0f), mutedTextColor, std::string(scene.scene).c_str());
+
+            ImGui::SetCursorScreenPos(ImVec2(infoMin.x + 10.0f, infoMin.y + 78.0f));
+            ImGui::PushTextWrapPos(infoMax.x - 10.0f);
+            ImGui::TextWrapped("Animation: %s", previewAnimationName.empty() ? "no authored track" : previewAnimationName.c_str());
+            ImGui::TextWrapped(
+                "Sample: %zu animated casts, %zu tracks, %zu keyframes, %s",
+                animatedDrawCount,
+                sampledTrackCount,
+                sampledKeyframeCount,
+                sampledInterpolation.empty() ? "Hermite/Linear ready" : std::string(sampledInterpolation).c_str());
+            ImGui::TextWrapped(
+                "Native CSD spawn: pending Ghidra/runtime call-path proof. This is a foreground invoked preview, not a real game-created CSD instance yet.");
+            ImGui::Separator();
+            ImGui::TextWrapped("SFX row attached: %zu runtime-hook + Ghidra xref candidates", sfxCandidates.size());
+            if (sfxCandidates.empty())
+            {
+                ImGui::TextDisabled("exact cue candidate: pending exact bank/cue match for this selected scene");
+            }
+            else
+            {
+                for (size_t index = 0; index < std::min<size_t>(3, sfxCandidates.size()); ++index)
+                {
+                    const auto* candidate = sfxCandidates[index];
+                    if (candidate == nullptr)
+                        continue;
+                    ImGui::BulletText(
+                        "%s/%s | %s",
+                        std::string(candidate->bankName).c_str(),
+                        std::string(candidate->cueName).c_str(),
+                        std::string(candidate->action).c_str());
+                }
+            }
+            ImGui::PopTextWrapPos();
+
+            ImGui::SetCursorScreenPos(ImVec2(stageMin.x, std::min(io.DisplaySize.y - 60.0f, stageMax.y + 14.0f)));
+            ImGui::Checkbox("Play invoked YNCP scene", &g_yncForegroundAnimationPlaying);
+            ImGui::SameLine();
+            if (ImGui::Button("Close Invoked Scene"))
+                g_yncForegroundInvokeVisible = false;
+            ImGui::SameLine();
+            if (ImGui::Button("Mark Foreground Invoke Evidence"))
+            {
+                WriteEvidenceEvent(
+                    "ui-project-foreground-invoke",
+                    std::string(project.relativePath) + "|" + std::string(scene.scene));
+            }
+
+            ImGui::SetNextItemWidth(std::min(520.0f, stageWidthActual));
+            ImGui::SliderFloat("Invoked timeline scrub", &g_yncForegroundTimelineFrame, frameMin, frameMax, "%.1f");
+        }
+
+        ImGui::End();
+
+        if (nativeFontPushed)
+            PopSwardNativeProfilerFont();
+    }
+
+    static void DrawOperatorUiProjectsBrowserTab()
+    {
+        namespace YNCP = GeneratedYncPNativeComponentMap;
+        // GeneratedYncPNativeComponentMap::kProjects / GeneratedYncPNativeComponentMap::kScenes
+        // are the runtime-derived native reconstruction spine for this UI project browser.
+
+        ImGui::TextWrapped(
+            "UI project browser: parsed .yncp/.xncp projects mapped into reusable native screen/component structure.");
+        ImGui::TextWrapped(
+            "Projects: %zu | Scenes: %zu | generated: %s",
+            YNCP::kProjects.size(),
+            YNCP::kScenes.size(),
+            std::string(YNCP::kGeneratedAt).c_str());
+        ImGui::TextWrapped("Reconstruction policy: %s", std::string(YNCP::kReconstructionPolicy).c_str());
+        ImGui::TextWrapped("SFX correlation: %s", std::string(YNCP::kSfxCorrelationStatus).c_str());
+        ImGui::TextWrapped("SGFX export provenance: %s", std::string(YNCP::kSgfxExportPolicy).c_str());
+        ImGui::Separator();
+
+        if constexpr (YNCP::kProjects.empty())
+        {
+            ImGui::TextDisabled("No YNCP projects were generated into the native component map.");
+            return;
+        }
+
+        g_uiProjectBrowserProjectIndex = std::clamp(
+            g_uiProjectBrowserProjectIndex,
+            0,
+            static_cast<int>(YNCP::kProjects.size() - 1));
+
+        ImGui::TextUnformatted("Screen/project map");
+        ImGui::BeginChild("sward-ui-project-browser-projects", ImVec2(0.0f, 150.0f), true);
+        for (size_t index = 0; index < YNCP::kProjects.size(); ++index)
+        {
+            const auto& project = YNCP::kProjects[index];
+            const std::string label =
+                "[" + std::string(project.screenGroup) + "] " +
+                std::string(project.project) + " - " +
+                std::string(project.fileName);
+            const bool selected = static_cast<int>(index) == g_uiProjectBrowserProjectIndex;
+
+            ImGui::PushID(static_cast<int>(index));
+            if (ImGui::Selectable(label.c_str(), selected))
+            {
+                g_uiProjectBrowserProjectIndex = static_cast<int>(index);
+                g_uiProjectBrowserSceneIndex = 0;
+                g_uiProjectBrowserTimelineFrame = 0.0f;
+                g_uiProjectBrowserAnimationPlaying = false;
+            }
+
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", std::string(project.relativePath).c_str());
+            ImGui::PopID();
+        }
+        ImGui::EndChild();
+
+        const auto& project = YNCP::kProjects[static_cast<size_t>(g_uiProjectBrowserProjectIndex)];
+        ImGui::Separator();
+        ImGui::Text("Project: %s", std::string(project.project).c_str());
+        ImGui::TextWrapped("Path: %s", std::string(project.relativePath).c_str());
+        ImGui::Text(
+            "Group: %s | endian: %s | scenes=%u casts=%u anims=%u textures=%u subimages=%u",
+            std::string(project.screenGroup).c_str(),
+            std::string(project.endianness).c_str(),
+            project.totalScenes,
+            project.totalCasts,
+            project.totalAnimations,
+            project.textureCount,
+            project.totalSubimages);
+        ImGui::TextWrapped("Root scenes: %s", project.rootScenes.empty() ? "none" : std::string(project.rootScenes).c_str());
+        ImGui::TextWrapped("Component roles: %s", project.componentRoles.empty() ? "unclassified" : std::string(project.componentRoles).c_str());
+        ImGui::TextWrapped("Textures: %s", project.textures.empty() ? "none listed" : std::string(project.textures).c_str());
+        ImGui::TextWrapped("Provenance: %s", std::string(project.provenance).c_str());
+        ImGui::TextWrapped("SFX: %s", std::string(project.sfxStatus).c_str());
+
+        if (project.sceneCount == 0)
+        {
+            ImGui::TextDisabled("No scene rows are attached to this project.");
+            return;
+        }
+
+        g_uiProjectBrowserSceneIndex = std::clamp(
+            g_uiProjectBrowserSceneIndex,
+            0,
+            static_cast<int>(project.sceneCount - 1));
+
+        ImGui::Separator();
+        ImGui::TextUnformatted("Scenes / components");
+        ImGui::BeginChild("sward-ui-project-browser-scenes", ImVec2(0.0f, 170.0f), true);
+        for (size_t localIndex = 0; localIndex < project.sceneCount; ++localIndex)
+        {
+            const size_t sceneIndex = project.firstScene + localIndex;
+            if (sceneIndex >= YNCP::kScenes.size())
+                break;
+
+            const auto& scene = YNCP::kScenes[sceneIndex];
+            const std::string label =
+                std::string(scene.scene) + " -> " +
+                std::string(scene.componentRole) + " | casts=" +
+                std::to_string(scene.castCount) + " anims=" +
+                std::to_string(scene.animationCount) + " frames=" +
+                std::to_string(static_cast<int>(scene.frameMin)) + ".." +
+                std::to_string(static_cast<int>(scene.frameMax));
+
+            ImGui::PushID(static_cast<int>(sceneIndex));
+            if (ImGui::Selectable(label.c_str(), static_cast<int>(localIndex) == g_uiProjectBrowserSceneIndex))
+            {
+                g_uiProjectBrowserSceneIndex = static_cast<int>(localIndex);
+                g_uiProjectBrowserTimelineFrame = scene.frameMin;
+                g_uiProjectBrowserAnimationPlaying = false;
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndChild();
+
+        const size_t selectedSceneIndex =
+            project.firstScene + static_cast<size_t>(g_uiProjectBrowserSceneIndex);
+        if (selectedSceneIndex >= YNCP::kScenes.size())
+            return;
+
+        const auto& scene = YNCP::kScenes[selectedSceneIndex];
+        ImGui::Separator();
+        ImGui::Text("Selected scene: %s", std::string(scene.scene).c_str());
+        ImGui::TextWrapped("Node path: %s", scene.nodePath.empty() ? "Root" : std::string(scene.nodePath).c_str());
+        ImGui::Text(
+            "Role: %s | casts=%u anims=%u subimages=%u fps=%.1f",
+            std::string(scene.componentRole).c_str(),
+            scene.castCount,
+            scene.animationCount,
+            scene.subimageCount,
+            scene.animationFramerate);
+
+        const float frameMin = scene.frameMin;
+        const float frameMax = std::max(scene.frameMax, frameMin);
+        if (frameMax > frameMin)
+        {
+            if (g_uiProjectBrowserAnimationPlaying)
+            {
+                const float rate = scene.animationFramerate > 0.0f ? scene.animationFramerate : 60.0f;
+                g_uiProjectBrowserTimelineFrame += static_cast<float>(App::s_deltaTime) * rate;
+                if (g_uiProjectBrowserTimelineFrame > frameMax)
+                    g_uiProjectBrowserTimelineFrame = frameMin;
+            }
+
+            g_uiProjectBrowserTimelineFrame = std::clamp(g_uiProjectBrowserTimelineFrame, frameMin, frameMax);
+            ImGui::Checkbox("Animation playback", &g_uiProjectBrowserAnimationPlaying);
+            ImGui::SameLine();
+            if (ImGui::Button("Reset scrub"))
+                g_uiProjectBrowserTimelineFrame = frameMin;
+            ImGui::SliderFloat("Timeline scrub", &g_uiProjectBrowserTimelineFrame, frameMin, frameMax, "%.1f");
+        }
+        else
+        {
+            g_uiProjectBrowserAnimationPlaying = false;
+            g_uiProjectBrowserTimelineFrame = frameMin;
+            ImGui::TextDisabled("Animation playback: static scene or single sampled frame.");
+            ImGui::Text("Timeline scrub: %.1f", frameMin);
+        }
+
+        ImGui::TextWrapped("Animations: %s", scene.keyAnimations.empty() ? "none listed" : std::string(scene.keyAnimations).c_str());
+        ImGui::TextWrapped("Casts: %s", scene.keyCasts.empty() ? "none listed" : std::string(scene.keyCasts).c_str());
+        ImGui::TextWrapped("Textures: %s", scene.textures.empty() ? "none listed" : std::string(scene.textures).c_str());
+        ImGui::TextWrapped("Track types: %s", scene.trackTypes.empty() ? "none listed" : std::string(scene.trackTypes).c_str());
+
+        ImGui::Separator();
+        ImGui::Checkbox("Force selected scene preview", &g_uiProjectBrowserPreviewPinned);
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip(
+                "Keeps this selected YNCP project as an independent preview lane; it is not tied to the current gameplay/title/loading route.");
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Mark Forced Preview Evidence"))
+        {
+            WriteEvidenceEvent(
+                "ui-project-preview-forced",
+                std::string(project.relativePath) + "|" + std::string(scene.scene));
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Invoke Selected Scene"))
+        {
+            g_yncForegroundProjectIndex = g_uiProjectBrowserProjectIndex;
+            g_yncForegroundSceneIndex = static_cast<int>(selectedSceneIndex);
+            g_yncForegroundTimelineFrame = g_uiProjectBrowserTimelineFrame;
+            g_yncForegroundAnimationPlaying = true;
+            g_yncForegroundInvokeVisible = true;
+            WriteEvidenceEvent(
+                "ui-project-foreground-invoke",
+                std::string(project.relativePath) + "|" + std::string(scene.scene));
+        }
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip(
+                "Projects the selected YNCP scene as a pause-menu-style foreground projection over gameplay; this is still reconstructed, not the native CSD spawn path.");
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Probe Native CSD Make"))
+        {
+            RequestNativeCsdMakeProbe(project, scene, g_uiProjectBrowserTimelineFrame);
+        }
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip(
+                "Queues selected .yncp/.xncp bytes and runs the native Make call from the next real CCsdProject::Make context so the required r6 owner pointer is valid.");
+        }
+
+        ImGui::SameLine();
+        ImGui::Checkbox("experimental any CSD", &g_nativeCsdMakeProbeAllowExperimentalProjects);
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip(
+                "Off keeps native make on ui_loading/ui_worldmap_help first-pass targets; on allows any parsed CSD project and may crash.");
+        }
+
+        ImGui::SameLine();
+        ImGui::Checkbox("danger: execute Make", &g_nativeCsdMakeProbeExecuteExperimentalMake);
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip(
+                "Off observes the real game-created CSD tree and cannot force-spawn. On calls CCsdProject::Make directly and may crash if the internal parser returns null.");
+        }
+
+        if (g_nativeCsdMakeProbe.attempted || g_nativeCsdMakeProbe.requested)
+        {
+            ImGui::Separator();
+            ImGui::TextUnformatted("Native CSD Make Probe");
+            ImGui::TextWrapped("spawn status: %s", g_nativeCsdMakeProbe.status.c_str());
+            ImGui::Text("last real Make r6: %s | frame: %llu",
+                HexU32(g_nativeCsdMakeLastContextAddress).c_str(),
+                static_cast<unsigned long long>(g_nativeCsdMakeLastContextFrame));
+            ImGui::TextWrapped("source: %s", g_nativeCsdMakeProbe.sourcePath.empty() ? g_nativeCsdMakeProbe.relativePath.c_str() : g_nativeCsdMakeProbe.sourcePath.c_str());
+            ImGui::Text("native project pointer: %s", HexU32(g_nativeCsdMakeProbe.nativeProjectPointer).c_str());
+            ImGui::Text("root node: %s | scene count: %u | node count: %u",
+                HexU32(g_nativeCsdMakeProbe.nativeRootNode).c_str(),
+                g_nativeCsdMakeProbe.nativeSceneCount,
+                g_nativeCsdMakeProbe.nativeNodeCount);
+            ImGui::Text("selected resource scene: %s", HexU32(g_nativeCsdMakeProbe.nativeResourceScenePointer).c_str());
+            ImGui::Text("live manager CScene: %s | resource offset: %s",
+                HexU32(g_nativeCsdMakeProbe.nativeManagerScenePointer).c_str(),
+                g_nativeCsdMakeProbe.managerSceneResourceOffset == UINT32_MAX
+                    ? "unknown"
+                    : HexU32(g_nativeCsdMakeProbe.managerSceneResourceOffset).c_str());
+            ImGui::Text("motion: %.3f | repeat: %s",
+                g_nativeCsdMakeProbe.nativeSceneMotionFrame,
+                std::string(MotionRepeatTypeLabel(g_nativeCsdMakeProbe.nativeSceneMotionRepeatType)).c_str());
+
+            if (g_nativeCsdMakeProbe.sceneResolved &&
+                IsPlausibleGuestPointer(g_nativeCsdMakeProbe.nativeManagerScenePointer))
+            {
+                const float nativeFrameMin = scene.frameMin;
+                const float nativeFrameMax = std::max(scene.frameMax, nativeFrameMin + 1.0f);
+
+                UpdateNativeCsdSceneMotionPlayback();
+
+                ImGui::Checkbox("Play native scene motion", &g_nativeCsdMakeProbe.sceneMotionPlaying);
+                ImGui::SetNextItemWidth(std::min(520.0f, ImGui::GetContentRegionAvail().x));
+                if (ImGui::SliderFloat(
+                    "Native scene motion scrub",
+                    &g_nativeCsdMakeProbe.nativeSceneMotionFrame,
+                    nativeFrameMin,
+                    nativeFrameMax,
+                    "%.1f"))
+                {
+                    WriteNativeCsdSceneMotionFrame(g_nativeCsdMakeProbe.nativeSceneMotionFrame);
+                }
+            }
+            else
+            {
+                ImGui::TextDisabled("Native scene motion scrub waits for live manager CScene correlation.");
+            }
+
+            ImGui::Separator();
+            ImGui::TextUnformatted("native foreground render host");
+            ImGui::TextWrapped(
+                "Mode: piggyback on active CSD render pass; no owner pointer hijack until this path is stable.");
+            ImGui::TextWrapped("status: %s", g_nativeCsdForegroundRenderProbe.status.c_str());
+            ImGui::Text(
+                "target manager: %s | resource: %s | host scene: %s | renders: %llu | last frame: %llu",
+                HexU32(g_nativeCsdForegroundRenderProbe.nativeManagerScenePointer).c_str(),
+                HexU32(g_nativeCsdForegroundRenderProbe.nativeResourceScenePointer).c_str(),
+                HexU32(g_nativeCsdForegroundRenderProbe.lastHostScenePointer).c_str(),
+                static_cast<unsigned long long>(g_nativeCsdForegroundRenderProbe.renderCount),
+                static_cast<unsigned long long>(g_nativeCsdForegroundRenderProbe.lastRenderFrame));
+            ImGui::TextWrapped("foreground owner attach discovery: %s", g_csdManagerSceneOwnerDiscoveryStatus.c_str());
+            ImGui::Text("ownerCandidates: %zu", g_csdManagerSceneOwnerCandidates.size());
+            for (size_t index = 0; index < std::min<size_t>(g_csdManagerSceneOwnerCandidates.size(), 4); ++index)
+            {
+                const auto& candidate = g_csdManagerSceneOwnerCandidates[index];
+                ImGui::TextWrapped(
+                    "%s +%s -> %s | %s | %s",
+                    candidate.ownerSource.c_str(),
+                    HexU32(candidate.fieldOffset).c_str(),
+                    HexU32(candidate.slotValue).c_str(),
+                    candidate.matchKind.c_str(),
+                    candidate.confidence.c_str());
+            }
+
+            if (ImGui::Button("Attach Native Scene"))
+            {
+                RequestNativeForegroundRenderProbe();
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip(
+                    "Arms the resolved native CSD scene pointer and lets the next active CScene::Render pass render it over gameplay.");
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Spawn Native Foreground"))
+            {
+                RequestNativeForegroundRenderProbe();
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip(
+                    "Same safe render-probe path as Attach Native Scene: no RCPtr/owner replacement yet.");
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Detach Native Foreground"))
+            {
+                DetachNativeForegroundRenderProbe();
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Discover Native Owner Host"))
+            {
+                DiscoverOwnerCandidatesForResolvedNativeProbe(true);
+            }
+        }
+
+        if (g_uiProjectBrowserPreviewPinned)
+        {
+            const auto animationKeyframes = FindYncAnimationTrackKeyframes(project, scene);
+            const std::string previewAnimationName = ChooseYncPreviewAnimationName(scene, animationKeyframes);
+            ImGui::TextWrapped("Independent preview: selected YNCP scene, not current runtime route.");
+            ImGui::Columns(2, "sward-yncp-preview-and-sfx", true);
+            DrawYncScenePreviewCanvas(
+                project,
+                scene,
+                animationKeyframes,
+                previewAnimationName,
+                g_uiProjectBrowserTimelineFrame,
+                g_uiProjectBrowserPreviewPinned);
+            DrawYncTimelineLane(scene, animationKeyframes, previewAnimationName, g_uiProjectBrowserTimelineFrame);
+            ImGui::NextColumn();
+            DrawYncSfxCorrelationLane(project, scene);
+            ImGui::Columns(1);
+        }
+        else
+        {
+            ImGui::TextDisabled("Independent preview lane hidden; metadata remains selectable above.");
+        }
+
+        ImGui::Separator();
+        ImGui::TextWrapped(
+            "SFX correlation: pending audio bank/XML/runtime-hook/Ghidra xref proof before exact cue IDs are exported.");
+        ImGui::TextWrapped(
+            "SGFX export provenance: this row can emit placeholder C++/JSON from parsed project data plus runtime evidence links.");
+
+        if (ImGui::Button("Mark UI Project Evidence"))
+        {
+            WriteEvidenceEvent(
+                "ui-project-browser-marker",
+                std::string(project.relativePath) + "|" + std::string(scene.scene));
+        }
+    }
+
     static void DrawProfilerAddonContent()
     {
         if (!ImGui::CollapsingHeader("SWARD UI Lab", ImGuiTreeNodeFlags_DefaultOpen))
             return;
 
-        ImGui::TextUnformatted("F2 toggles detached SWARD UI Lab; F2 toggles SWARD UI Lab");
-        ImGui::TextUnformatted("F1 remains native Profiler");
-        ImGui::Text("Target: %s", std::string(GetTargetToken()).c_str());
-        ImGui::Text("Route: %s", std::string(GetRouteStatusLabel()).c_str());
-        ImGui::Text("Live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
-        ImGui::Text("UI layer: %s", std::string(UiOnlyLayerIsolationStatusLabel()).c_str());
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextWrapped("This native Profiler + SWARD UI Lab workspace stays visible while UI Lab is enabled. F2 is no longer used by UI Lab.");
+        ImGui::TextWrapped("Target: %s", std::string(GetTargetToken()).c_str());
+        ImGui::TextWrapped("Route: %s", std::string(GetRouteStatusLabel()).c_str());
+        ImGui::TextWrapped("Live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
+        ImGui::TextWrapped("UI layer: %s", std::string(UiOnlyLayerIsolationStatusLabel()).c_str());
 
         const auto observations = BuildSonicHudValueWriteObservations();
         uint64_t resolvedObservations = 0;
@@ -11520,6 +15391,18 @@ namespace UiLab
                 ImGui::EndTabItem();
             }
 
+            if (ImGui::BeginTabItem("UI Projects"))
+            {
+                DrawOperatorUiProjectsBrowserTab();
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Console"))
+            {
+                DrawOperatorInGameConsoleTab();
+                ImGui::EndTabItem();
+            }
+
             if (ImGui::BeginTabItem("Panels"))
             {
                 ImGui::TextUnformatted("Legacy floating panes");
@@ -11530,6 +15413,8 @@ namespace UiLab
 
             ImGui::EndTabBar();
         }
+
+        ImGui::PopTextWrapPos();
     }
 
     static void DrawDetachedProfilerAddonTab()
@@ -11567,8 +15452,8 @@ namespace UiLab
         if (ImGui::Begin("SWARD UI Lab###SWARD Operator Profiler", nullptr, flags))
         {
             DrawOperatorProfilerSummary();
-            ImGui::TextDisabled("F2 toggles detached SWARD UI Lab; F2 toggles SWARD UI Lab");
-            ImGui::TextDisabled("F1 remains native Profiler");
+            ImGui::TextDisabled("Legacy detached panes are dormant during the merged native workspace.");
+            ImGui::TextDisabled("F2 is no longer used by SWARD UI Lab.");
             ImGui::Separator();
 
             if (ImGui::BeginTabBar("sward-operator-profiler-tabs"))
@@ -11620,6 +15505,12 @@ namespace UiLab
                 if (ImGui::BeginTabItem("Coverage"))
                 {
                     DrawOperatorCoverageMatrixTab();
+                    ImGui::EndTabItem();
+                }
+
+                if (ImGui::BeginTabItem("UI Projects"))
+                {
+                    DrawOperatorUiProjectsBrowserTab();
                     ImGui::EndTabItem();
                 }
 
@@ -11868,7 +15759,7 @@ namespace UiLab
             ImGui::Separator();
             ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
-            ImGui::Text("commands: state, events, route-status, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, ui-backend-resolved, ui-vendor-command-capture, ui-layer-capture, ui-layer-status, route, reset, set-global, capture, help");
+            ImGui::Text("commands: state, events, route-status, native-foreground-status, native-make-observe, native-owner-discovery, native-owner-scan, native-foreground-attach, native-foreground-detach, native-motion-play, native-motion-stop, native-motion-scrub, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, ui-backend-resolved, ui-vendor-command-capture, ui-layer-capture, ui-layer-status, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
 
             if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))
@@ -11907,6 +15798,70 @@ namespace UiLab
         }
 
         ImGui::End();
+    }
+
+    static void DrawRuntimeBridgeStatusOverlay()
+    {
+        const ImGuiIO& io = ImGui::GetIO();
+        const float panelWidth = 410.0f;
+        const float margin = 14.0f;
+        const float x = std::max(margin, io.DisplaySize.x - panelWidth - margin);
+
+        ImGui::SetNextWindowPos(ImVec2(x, 14.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.70f);
+
+        constexpr ImGuiWindowFlags flags =
+            ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_AlwaysAutoResize |
+            ImGuiWindowFlags_NoFocusOnAppearing |
+            ImGuiWindowFlags_NoNav |
+            ImGuiWindowFlags_NoInputs;
+
+        const auto& target = TargetFor(g_target);
+        const auto observed = BuildObservedRuntimeScreen();
+        const std::string targetToken(GetTargetToken());
+        const std::string route(GetRouteStatusLabel());
+        const std::string observedToken(observed.token);
+        const std::string observedProject(observed.csdProject);
+        const std::string observedSystem(observed.systemId.empty() ? observed.sourceFamily : observed.systemId);
+        const std::string observedSource(observed.dataSource.empty() ? observed.source : std::string(observed.dataSource));
+        const std::string liveBridge = IsLiveBridgeEnabled() ? LiveBridgePipePath() : "off";
+        const std::string evidence =
+            g_evidenceDirectory.empty()
+                ? "off"
+                : g_evidenceDirectory.filename().string();
+
+        const bool nativeFontPushed = PushSwardNativeProfilerFont();
+
+        if (ImGui::Begin("SWARD UI Lab Runtime Status###SWARDRuntimeBridgeStatus", nullptr, flags))
+        {
+            ImGui::Text("SWARD UI Lab | PID %u", CurrentProcessIdForOverlay());
+            ImGui::Text("target: %s | route: %s", targetToken.c_str(), route.c_str());
+            ImGui::Text("observed: %s | csd: %s", observedToken.c_str(), observedProject.c_str());
+            ImGui::Text("system: %s", observedSystem.c_str());
+            ImGui::Text("source: %s", observedSource.c_str());
+            ImGui::Text("bridge: %s", liveBridge.c_str());
+            ImGui::Text("evidence: %s", evidence.c_str());
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            ImGui::TextWrapped("Merged Profiler + SWARD UI Lab stays in the game window; --ui-lab-overlay off hides this status.");
+            ImGui::PopStyleColor();
+
+            if (target.token != observed.token)
+            {
+                ImGui::TextColored(
+                    ImVec4(1.0f, 0.72f, 0.28f, 1.0f),
+                    "target/observed mismatch: runtime evidence is leading");
+            }
+        }
+
+        ImGui::End();
+
+        if (nativeFontPushed)
+            PopSwardNativeProfilerFont();
     }
 
     static void DrawOperatorDebugDrawLayer()
@@ -11949,10 +15904,15 @@ namespace UiLab
         if (!ShouldDrawOverlay())
             return;
 
-        if (!g_operatorShellVisible)
-            return;
+        DrawRuntimeBridgeStatusOverlay();
 
         DrawOperatorDebugDrawLayer();
+
+        DrawYncForegroundInvokedScene();
+
+        if (!g_operatorShellVisible && !AnyOperatorFloatingPaneVisible())
+            return;
+
         DrawOperatorProfilerPanel();
         DrawOperatorWindowList();
         DrawOperatorWelcomeWindow();

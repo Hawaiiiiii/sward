@@ -140,7 +140,13 @@ namespace UiLab
     void OnLoadingRequest(uint32_t displayType);
     void OnLoadingUpdate(uint32_t displayType);
     void OnCsdProjectMade(std::string_view projectName);
+    void OnNativeCsdMakeCallContext(
+        uint32_t ownerAddress,
+        uint32_t bytesAddress,
+        uint32_t bytesSize,
+        uint32_t makeContextAddress);
     void OnCsdProjectTreeMade(std::string_view projectName, uint32_t projectAddress, uint32_t rootNodeAddress);
+    void OnCsdProjectTreeTraversalFinished(std::string_view projectName);
     void OnCsdSceneNodeTraversed(
         std::string_view projectName,
         std::string_view nodePath,
@@ -172,6 +178,12 @@ namespace UiLab
         float maxX,
         float maxY,
         uint32_t colorSample);
+    uint32_t ConsumeNativeForegroundSceneRenderAddress(uint32_t hostSceneAddress);
+    void OnNativeForegroundSceneRendered(
+        uint32_t hostSceneAddress,
+        uint32_t renderedSceneAddress,
+        bool rendered);
+    void OnCsdManagerSceneRender(uint32_t managerSceneAddress);
     void OnCsdNodeSetText(
         uint32_t nodeAddress,
         uint32_t textAddress,
@@ -444,6 +456,8 @@ namespace UiLab
         uint32_t cursorIndex,
         uint32_t selectedIndex);
     void OnSaveIconUpdate(uint32_t saveIconAddress, bool isVisible);
+    void RunNativeCsdMakeProbe();
+    const char* NativeCsdMakeProbeProjectNameForTraversal(uint32_t projectAddress);
     bool ApplyTitleIntroStateForcing(float elapsedSeconds, bool& directState);
     bool ShouldArmTitleIntroOwnerOutput();
     bool ShouldArmTitleIntroCsdCompletion();

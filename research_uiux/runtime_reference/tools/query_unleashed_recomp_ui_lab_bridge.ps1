@@ -1,9 +1,13 @@
 param(
-    [ValidateSet("state", "events", "route-status", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]
+    [ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]
     [string]$Command = "state",
     [string]$Target = "",
     [string]$GlobalName = "",
     [string]$GlobalValue = "1",
+    [string]$Project = "",
+    [string]$Scene = "",
+    [string]$Frame = "",
+    [string]$MotionFrame = "",
     [string]$PipeName = "sward_ui_lab_live",
     [int]$TimeoutMilliseconds = 3000,
     [switch]$Raw,
@@ -16,7 +20,11 @@ function Get-UiLabBridgeCommandText(
     [string]$Command,
     [string]$Target,
     [string]$GlobalName,
-    [string]$GlobalValue
+    [string]$GlobalValue,
+    [string]$Project,
+    [string]$Scene,
+    [string]$Frame,
+    [string]$MotionFrame
 ) {
     switch ($Command) {
         "route" {
@@ -32,6 +40,24 @@ function Get-UiLabBridgeCommandText(
             }
 
             return "set-global $GlobalName $GlobalValue"
+        }
+        "native-make-observe" {
+            if ([string]::IsNullOrWhiteSpace($Project) -or [string]::IsNullOrWhiteSpace($Scene)) {
+                throw "native-make-observe <project> <scene> [frame] requires -Project and -Scene."
+            }
+
+            if ([string]::IsNullOrWhiteSpace($Frame)) {
+                return "native-make-observe $Project $Scene"
+            }
+
+            return "native-make-observe $Project $Scene $Frame"
+        }
+        "native-motion-scrub" {
+            if ([string]::IsNullOrWhiteSpace($MotionFrame)) {
+                throw "native-motion-scrub <frame> requires -MotionFrame."
+            }
+
+            return "native-motion-scrub $MotionFrame"
         }
         default {
             return $Command
@@ -93,7 +119,7 @@ function Invoke-UiLabBridgeCommand(
     }
 }
 
-$commandText = Get-UiLabBridgeCommandText $Command $Target $GlobalName $GlobalValue
+$commandText = Get-UiLabBridgeCommandText $Command $Target $GlobalName $GlobalValue $Project $Scene $Frame $MotionFrame
 $response = Invoke-UiLabBridgeCommand $commandText $PipeName $TimeoutMilliseconds
 
 if ($Raw) {

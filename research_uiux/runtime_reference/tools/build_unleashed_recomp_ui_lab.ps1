@@ -1,5 +1,6 @@
 param(
     [string]$GeneratedRoot = "local_build_env\ur103clean",
+    [string]$InstallRoot = "Unleashed Recomp - Windows (Complete Installation) 1.0.3",
     [string]$DriveLetter = "W",
     [string]$BuildDir = "b\ui_lab_runtime",
     [string]$Configuration = "RelWithDebInfo",
@@ -55,6 +56,17 @@ function Sync-TrackedRuntimeFile([string]$RelativePath, [string]$GeneratedRoot) 
     Copy-Item -LiteralPath $source -Destination $destination -Force
 }
 
+function Invoke-PythonTool([string]$Script, [string[]]$Arguments, [string]$Label) {
+    if (-not (Test-Path -LiteralPath $Script)) {
+        throw "$Label script not found: $Script"
+    }
+
+    & python $Script @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Label failed with exit code $LASTEXITCODE"
+    }
+}
+
 function Invoke-DevCmd([string]$Command) {
     $vsDevCmd = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"
     $llvmBin = "C:\Program Files\LLVM\bin"
@@ -83,6 +95,43 @@ function Remove-TransientSubstDrive([string]$Drive, [bool]$createdSubstDrive, [b
 }
 
 $root = Resolve-RequiredPath $GeneratedRoot "Generated UnleashedRecomp root"
+$currentInstallRoot = Resolve-RequiredPath (Join-Path $repoRoot.Path $InstallRoot) "Complete Installation root"
+$runtimeBridgeAssetIndex = Join-Path $repoRoot.Path "out\runtime_bridge_asset_index_current_install.json"
+$runtimeBridgeAssetIndexDir = Split-Path -Parent $runtimeBridgeAssetIndex
+New-Item -ItemType Directory -Force -Path $runtimeBridgeAssetIndexDir | Out-Null
+
+$assetRoots = @(
+    (Join-Path $currentInstallRoot "game"),
+    (Join-Path $currentInstallRoot "update"),
+    (Join-Path $currentInstallRoot "dlc"),
+    (Join-Path $repoRoot.Path "extracted_assets")
+)
+
+$scanArgs = @("--repo-root", $repoRoot.Path)
+foreach ($assetRoot in $assetRoots) {
+    $scanArgs += @("--asset-root", $assetRoot)
+}
+$scanArgs += @("--output", $runtimeBridgeAssetIndex)
+
+Invoke-PythonTool `
+    (Join-Path $repoRoot.Path "research_uiux\tools\scan_assets.py") `
+    $scanArgs `
+    "Runtime bridge current install asset scan"
+
+Invoke-PythonTool `
+    (Join-Path $repoRoot.Path "research_uiux\tools\build_runtime_bridge_screen_index.py") `
+    @("--repo-root", $repoRoot.Path, "--asset-index", $runtimeBridgeAssetIndex) `
+    "Runtime bridge screen index generation"
+
+Invoke-PythonTool `
+    (Join-Path $repoRoot.Path "research_uiux\tools\build_yncp_native_component_map.py") `
+    @(
+        "--root", (Join-Path $repoRoot.Path "extracted_assets\full_install_archives"),
+        "--output", (Join-Path $repoRoot.Path "research_uiux\data\yncp_native_component_map.json"),
+        "--markdown", (Join-Path $repoRoot.Path "research_uiux\YNCP_NATIVE_COMPONENT_MAP.md"),
+        "--output-header", (Join-Path $repoRoot.Path "UnleashedRecomp\patches\ui_lab_yncp_native_component_map.generated.h")
+    ) `
+    "YNCP native component map generation"
 
 @(
     "UnleashedRecomp\CMakeLists.txt",
@@ -101,6 +150,8 @@ $root = Resolve-RequiredPath $GeneratedRoot "Generated UnleashedRecomp root"
     "UnleashedRecomp\patches\CsdNodeValue_patches.cpp",
     "UnleashedRecomp\patches\resident_patches.cpp",
     "UnleashedRecomp\patches\ui_lab_patches.cpp",
+    "UnleashedRecomp\patches\ui_lab_runtime_screen_index.generated.h",
+    "UnleashedRecomp\patches\ui_lab_yncp_native_component_map.generated.h",
     "UnleashedRecomp\patches\ui_lab_patches.h"
 ) | ForEach-Object { Sync-TrackedRuntimeFile $_ $root }
 

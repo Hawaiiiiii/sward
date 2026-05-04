@@ -58,6 +58,9 @@ bool LoadingRenderMidAsmHook()
 PPC_FUNC_IMPL(__imp__sub_825E4068);
 PPC_FUNC(sub_825E4068)
 {
+    UiLab::OnNativeCsdMakeCallContext(ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32);
+    UiLab::RunNativeCsdMakeProbe();
+
     if (ctx.r4.u32 != NULL && ctx.r5.u32 == 0x65C0C && XXH3_64bits(base + ctx.r4.u32, ctx.r5.u32) == 0xD4DA1A9BE4D79BED)
     {
         // Keyframe count. First keyframe is at the center of the screen.
