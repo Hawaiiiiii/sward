@@ -394,6 +394,24 @@ namespace UiLab
         uint64_t frame = 0;
     };
 
+    struct CsdOwnerLayoutFieldCandidate
+    {
+        uint32_t ownerAddress = 0;
+        uint32_t sourceCandidateFieldOffset = UINT32_MAX;
+        uint32_t fieldOffset = UINT32_MAX;
+        uint32_t fieldAddress = 0;
+        uint32_t slotValue = 0;
+        uint32_t indirectAddress = 0;
+        uint32_t resolvedManagerScene = 0;
+        uint32_t resolvedResourceScene = 0;
+        std::string projectName;
+        std::string scenePath;
+        std::string ownerSource;
+        std::string matchKind;
+        std::string confidence;
+        uint64_t frame = 0;
+    };
+
     struct CsdOwnerScanRange
     {
         uint32_t ownerAddress = 0;
@@ -1275,8 +1293,13 @@ namespace UiLab
     static constexpr size_t kCsdManagerSceneOwnerCandidateLimit = 256;
     static std::vector<CsdManagerSceneOwnerCandidate> g_csdManagerSceneOwnerCandidates;
     static std::unordered_set<std::string> g_loggedCsdManagerSceneOwnerCandidateKeys;
+    static constexpr size_t kCsdOwnerLayoutFieldCandidateLimit = 512;
+    static std::vector<CsdOwnerLayoutFieldCandidate> g_csdOwnerLayoutFieldCandidates;
+    static std::unordered_set<std::string> g_loggedCsdOwnerLayoutFieldCandidateKeys;
     static std::string g_csdManagerSceneOwnerDiscoveryStatus =
         "idle: foreground owner attach discovery has not scanned known UI owner ranges";
+    static std::string g_csdOwnerLayoutStatus =
+        "idle: owner layout map has not scanned sibling owner CSD fields";
     static uint32_t g_csdManagerSceneOwnerDiscoveryLastManagerScene = 0;
     static uint64_t g_csdManagerSceneOwnerDiscoveryLastScanFrame = UINT64_MAX;
     static constexpr size_t kRuntimeUiDrawCallSampleLimit = 96;
@@ -1344,7 +1367,12 @@ namespace UiLab
         const CsdManagerSceneCorrelation& correlation,
         bool force);
     static bool DiscoverOwnerCandidatesForResolvedNativeProbe(bool force);
+    static bool TryMapCsdOwnerLayoutForCandidate(
+        const CsdManagerSceneOwnerCandidate& candidate,
+        bool force);
+    static bool MapOwnerLayoutsForResolvedNativeProbe(bool force);
     static void AppendNativeCsdOwnerDiscoveryJson(std::ostringstream& out);
+    static void AppendNativeCsdOwnerLayoutJson(std::ostringstream& out);
     static void UpdateNativeCsdSceneMotionPlayback();
     static std::string_view MotionRepeatTypeLabel(uint32_t repeatType);
     static std::string_view LoadingDisplayTypeLabel(uint32_t displayType);
@@ -2864,6 +2892,28 @@ namespace UiLab
         g_csdManagerSceneOwnerCandidates.push_back(candidate);
     }
 
+    static void StoreCsdOwnerLayoutFieldCandidate(const CsdOwnerLayoutFieldCandidate& candidate)
+    {
+        for (auto& existing : g_csdOwnerLayoutFieldCandidates)
+        {
+            if (existing.ownerAddress == candidate.ownerAddress &&
+                existing.sourceCandidateFieldOffset == candidate.sourceCandidateFieldOffset &&
+                existing.fieldOffset == candidate.fieldOffset &&
+                existing.resolvedManagerScene == candidate.resolvedManagerScene &&
+                existing.resolvedResourceScene == candidate.resolvedResourceScene &&
+                existing.matchKind == candidate.matchKind)
+            {
+                existing = candidate;
+                return;
+            }
+        }
+
+        if (g_csdOwnerLayoutFieldCandidates.size() >= kCsdOwnerLayoutFieldCandidateLimit)
+            g_csdOwnerLayoutFieldCandidates.erase(g_csdOwnerLayoutFieldCandidates.begin());
+
+        g_csdOwnerLayoutFieldCandidates.push_back(candidate);
+    }
+
     static void AddCsdOwnerScanRange(
         std::vector<CsdOwnerScanRange>& ranges,
         uint32_t ownerAddress,
@@ -2975,6 +3025,63 @@ namespace UiLab
                 "|source=" + candidate.ownerSource);
     }
 
+    static CsdOwnerLayoutFieldCandidate BuildCsdOwnerLayoutFieldCandidate(
+        const CsdManagerSceneOwnerCandidate& sourceCandidate,
+        const CsdManagerSceneCorrelation& correlation,
+        uint32_t fieldOffset,
+        uint32_t slotValue,
+        uint32_t indirectAddress,
+        std::string matchKind,
+        std::string confidence)
+    {
+        CsdOwnerLayoutFieldCandidate candidate;
+        candidate.ownerAddress = sourceCandidate.ownerAddress;
+        candidate.sourceCandidateFieldOffset = sourceCandidate.fieldOffset;
+        candidate.fieldOffset = fieldOffset;
+        candidate.fieldAddress = sourceCandidate.ownerAddress + fieldOffset;
+        candidate.slotValue = slotValue;
+        candidate.indirectAddress = indirectAddress;
+        candidate.resolvedManagerScene = correlation.managerSceneAddress;
+        candidate.resolvedResourceScene = correlation.resourceSceneAddress;
+        candidate.projectName = correlation.projectName;
+        candidate.scenePath = correlation.scenePath;
+        candidate.ownerSource = sourceCandidate.ownerSource;
+        candidate.matchKind = std::move(matchKind);
+        candidate.confidence = std::move(confidence);
+        candidate.frame = g_presentedFrameCount;
+        return candidate;
+    }
+
+    static void RecordCsdOwnerLayoutFieldIfNew(const CsdOwnerLayoutFieldCandidate& candidate)
+    {
+        StoreCsdOwnerLayoutFieldCandidate(candidate);
+
+        const std::string key =
+            HexU32(candidate.ownerAddress) + "|" +
+            HexU32(candidate.sourceCandidateFieldOffset) + "|" +
+            HexU32(candidate.fieldOffset) + "|" +
+            HexU32(candidate.resolvedManagerScene) + "|" +
+            candidate.matchKind;
+        if (!g_loggedCsdOwnerLayoutFieldCandidateKeys.insert(key).second)
+            return;
+
+        WriteEvidenceEvent(
+            "native-csd-owner-layout-field",
+            "project=" + candidate.projectName +
+                "|path=" + candidate.scenePath +
+                "|owner=" + HexU32(candidate.ownerAddress) +
+                "|sourceCandidateFieldOffset=" + HexU32(candidate.sourceCandidateFieldOffset) +
+                "|fieldOffset=" + HexU32(candidate.fieldOffset) +
+                "|fieldAddress=" + HexU32(candidate.fieldAddress) +
+                "|slotValue=" + HexU32(candidate.slotValue) +
+                "|indirect=" + HexU32(candidate.indirectAddress) +
+                "|resolvedManagerScene=" + HexU32(candidate.resolvedManagerScene) +
+                "|resolvedResourceScene=" + HexU32(candidate.resolvedResourceScene) +
+                "|matchKind=" + candidate.matchKind +
+                "|confidence=" + candidate.confidence +
+                "|source=" + candidate.ownerSource);
+    }
+
     static bool ScanCsdOwnerCandidateRange(
         const CsdManagerSceneCorrelation& correlation,
         const CsdOwnerScanRange& range)
@@ -3062,6 +3169,201 @@ namespace UiLab
         }
 
         return found;
+    }
+
+    static uint32_t OwnerLayoutScanByteSizeForCandidate(
+        const CsdManagerSceneOwnerCandidate& candidate)
+    {
+        for (const auto& range : BuildKnownCsdOwnerScanRanges())
+        {
+            if (range.ownerAddress == candidate.ownerAddress &&
+                (range.source == candidate.ownerSource || candidate.ownerSource.empty()))
+            {
+                return range.byteSize;
+            }
+        }
+
+        const uint32_t minimumAroundSourceField =
+            candidate.fieldOffset == UINT32_MAX ? 0x400 : candidate.fieldOffset + 0x200;
+        return std::min<uint32_t>(std::max<uint32_t>(minimumAroundSourceField, 0x400), 0x1000);
+    }
+
+    static size_t CountOwnerLayoutFieldsForSourceCandidate(
+        const CsdManagerSceneOwnerCandidate& sourceCandidate)
+    {
+        return std::count_if(
+            g_csdOwnerLayoutFieldCandidates.begin(),
+            g_csdOwnerLayoutFieldCandidates.end(),
+            [&sourceCandidate](const auto& field)
+            {
+                return field.ownerAddress == sourceCandidate.ownerAddress &&
+                    field.sourceCandidateFieldOffset == sourceCandidate.fieldOffset;
+            });
+    }
+
+    static bool ScanCsdOwnerLayoutFieldRange(
+        const CsdManagerSceneOwnerCandidate& sourceCandidate,
+        const CsdOwnerScanRange& range)
+    {
+        if (!IsPlausibleGuestPointer(sourceCandidate.ownerAddress) ||
+            sourceCandidate.ownerAddress != range.ownerAddress)
+        {
+            return false;
+        }
+
+        // owner layout map: sibling owner CSD fields are read-only evidence.
+        // The first target is title owner layout around the observed +0x1E4
+        // CSD slot; HUD owner layout uses the same bounded scanner once the
+        // CHudSonicStage owner range is live.
+        bool found = false;
+        const uint32_t scanBytes = std::min<uint32_t>(range.byteSize, 0x3000);
+        for (uint32_t offset = 0; offset + sizeof(uint32_t) <= scanBytes; offset += sizeof(uint32_t))
+        {
+            uint32_t slotValue = 0;
+            if (!TryReadGuestU32(range.ownerAddress + offset, slotValue))
+                continue;
+
+            if (const auto* correlation = FindCsdManagerSceneCorrelationByManagerAddress(slotValue))
+            {
+                RecordCsdOwnerLayoutFieldIfNew(BuildCsdOwnerLayoutFieldCandidate(
+                    sourceCandidate,
+                    *correlation,
+                    offset,
+                    slotValue,
+                    0,
+                    "layout-direct-manager-scene-pointer",
+                    "high: owner layout field directly references a live manager CScene"));
+                found = true;
+                continue;
+            }
+
+            if (const auto* correlation = FindCsdManagerSceneCorrelationByResourceAddress(slotValue))
+            {
+                RecordCsdOwnerLayoutFieldIfNew(BuildCsdOwnerLayoutFieldCandidate(
+                    sourceCandidate,
+                    *correlation,
+                    offset,
+                    slotValue,
+                    0,
+                    "layout-direct-resource-scene-pointer",
+                    "medium: owner layout field directly references a resource Scene"));
+                found = true;
+                continue;
+            }
+
+            if (!IsPlausibleGuestPointer(slotValue))
+                continue;
+
+            static constexpr uint32_t kOwnerLayoutIndirectObjectScanBytes = 0x100;
+            for (uint32_t nestedOffset = 0;
+                 nestedOffset <= kOwnerLayoutIndirectObjectScanBytes;
+                 nestedOffset += sizeof(uint32_t))
+            {
+                uint32_t nestedValue = 0;
+                if (!TryReadGuestU32(slotValue + nestedOffset, nestedValue))
+                    continue;
+
+                if (const auto* correlation = FindCsdManagerSceneCorrelationByManagerAddress(nestedValue))
+                {
+                    RecordCsdOwnerLayoutFieldIfNew(BuildCsdOwnerLayoutFieldCandidate(
+                        sourceCandidate,
+                        *correlation,
+                        offset,
+                        slotValue,
+                        slotValue + nestedOffset,
+                        "layout-indirect-manager-scene-pointer",
+                        "medium-high: owner layout field points at an object containing a live manager CScene"));
+                    found = true;
+                    break;
+                }
+
+                if (const auto* correlation = FindCsdManagerSceneCorrelationByResourceAddress(nestedValue))
+                {
+                    RecordCsdOwnerLayoutFieldIfNew(BuildCsdOwnerLayoutFieldCandidate(
+                        sourceCandidate,
+                        *correlation,
+                        offset,
+                        slotValue,
+                        slotValue + nestedOffset,
+                        "layout-indirect-resource-scene-pointer",
+                        "medium: owner layout field points at an object containing a resource Scene"));
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        return found;
+    }
+
+    static bool TryMapCsdOwnerLayoutForCandidate(
+        const CsdManagerSceneOwnerCandidate& candidate,
+        bool force)
+    {
+        if (!IsPlausibleGuestPointer(candidate.ownerAddress))
+        {
+            g_csdOwnerLayoutStatus =
+                "blocked: owner layout map has no readable owner object";
+            return false;
+        }
+
+        if (!force && CountOwnerLayoutFieldsForSourceCandidate(candidate) != 0)
+            return true;
+
+        CsdOwnerScanRange range;
+        range.ownerAddress = candidate.ownerAddress;
+        range.byteSize = OwnerLayoutScanByteSizeForCandidate(candidate);
+        range.source = candidate.ownerSource;
+
+        const bool found = ScanCsdOwnerLayoutFieldRange(candidate, range);
+        const size_t layoutFieldCount = CountOwnerLayoutFieldsForSourceCandidate(candidate);
+        g_csdOwnerLayoutStatus = found || layoutFieldCount != 0
+            ? "owner layout map: sibling owner CSD fields found; inspect before native foreground attach"
+            : "owner layout map: bounded owner range scanned; no sibling CSD field match yet";
+        return found || layoutFieldCount != 0;
+    }
+
+    static bool MapOwnerLayoutsForResolvedNativeProbe(bool force)
+    {
+        if (g_csdManagerSceneOwnerCandidates.empty() &&
+            !DiscoverOwnerCandidatesForResolvedNativeProbe(false))
+        {
+            g_csdOwnerLayoutStatus =
+                "blocked: owner layout map needs a correlated owner candidate first";
+            return false;
+        }
+
+        if (g_csdManagerSceneOwnerCandidates.empty())
+        {
+            g_csdOwnerLayoutStatus =
+                "blocked: owner layout map has no existing owner candidates to scan";
+            return false;
+        }
+
+        const uint32_t selectedManagerScene =
+            g_nativeCsdMakeProbe.nativeManagerScenePointer != 0
+                ? g_nativeCsdMakeProbe.nativeManagerScenePointer
+                : g_nativeCsdForegroundRenderProbe.nativeManagerScenePointer;
+
+        bool mapped = false;
+        for (const auto& candidate : g_csdManagerSceneOwnerCandidates)
+        {
+            if (selectedManagerScene != 0 &&
+                candidate.managerSceneAddress != selectedManagerScene)
+            {
+                continue;
+            }
+
+            mapped = TryMapCsdOwnerLayoutForCandidate(candidate, force) || mapped;
+        }
+
+        if (!mapped)
+        {
+            g_csdOwnerLayoutStatus =
+                "pending: owner layout map did not resolve sibling owner CSD fields for the selected manager scene";
+        }
+
+        return mapped;
     }
 
     static bool TryDiscoverCsdManagerSceneOwnerCandidates(
@@ -7576,6 +7878,70 @@ namespace UiLab
             << "  }";
     }
 
+    static void AppendNativeCsdOwnerLayoutJson(std::ostringstream& out)
+    {
+        const uint32_t selectedManagerScene =
+            g_nativeCsdMakeProbe.nativeManagerScenePointer != 0
+                ? g_nativeCsdMakeProbe.nativeManagerScenePointer
+                : g_nativeCsdForegroundRenderProbe.nativeManagerScenePointer;
+
+        const size_t selectedLayoutFieldCount = std::count_if(
+            g_csdOwnerLayoutFieldCandidates.begin(),
+            g_csdOwnerLayoutFieldCandidates.end(),
+            [selectedManagerScene](const auto& field)
+            {
+                return selectedManagerScene != 0 &&
+                    field.resolvedManagerScene == selectedManagerScene;
+            });
+
+        out
+            << "{\n"
+            << "    \"status\": \"" << JsonEscape(g_csdOwnerLayoutStatus) << "\",\n"
+            << "    \"selectedManagerScenePointer\": \"" << JsonEscape(HexU32(selectedManagerScene)) << "\",\n"
+            << "    \"layoutFieldCount\": " << g_csdOwnerLayoutFieldCandidates.size() << ",\n"
+            << "    \"selectedLayoutFieldCount\": " << selectedLayoutFieldCount << ",\n"
+            << "    \"layoutFields\": [";
+
+        size_t emitted = 0;
+        for (const auto& field : g_csdOwnerLayoutFieldCandidates)
+        {
+            if (selectedManagerScene != 0 &&
+                field.resolvedManagerScene != selectedManagerScene)
+            {
+                continue;
+            }
+
+            if (emitted >= 32)
+                break;
+
+            if (emitted != 0)
+                out << ",";
+
+            out
+                << "{"
+                << "\"ownerAddress\":\"" << JsonEscape(HexU32(field.ownerAddress)) << "\","
+                << "\"sourceCandidateFieldOffset\":\"" << JsonEscape(HexU32(field.sourceCandidateFieldOffset)) << "\","
+                << "\"fieldOffset\":\"" << JsonEscape(HexU32(field.fieldOffset)) << "\","
+                << "\"fieldAddress\":\"" << JsonEscape(HexU32(field.fieldAddress)) << "\","
+                << "\"slotValue\":\"" << JsonEscape(HexU32(field.slotValue)) << "\","
+                << "\"indirectAddress\":\"" << JsonEscape(HexU32(field.indirectAddress)) << "\","
+                << "\"resolvedManagerScene\":\"" << JsonEscape(HexU32(field.resolvedManagerScene)) << "\","
+                << "\"resolvedResourceScene\":\"" << JsonEscape(HexU32(field.resolvedResourceScene)) << "\","
+                << "\"project\":\"" << JsonEscape(field.projectName) << "\","
+                << "\"scenePath\":\"" << JsonEscape(field.scenePath) << "\","
+                << "\"ownerSource\":\"" << JsonEscape(field.ownerSource) << "\","
+                << "\"matchKind\":\"" << JsonEscape(field.matchKind) << "\","
+                << "\"confidence\":\"" << JsonEscape(field.confidence) << "\","
+                << "\"frame\":" << field.frame
+                << "}";
+            ++emitted;
+        }
+
+        out
+            << "]\n"
+            << "  }";
+    }
+
     static std::string BuildNativeForegroundStatusJson()
     {
         const auto& target = TargetFor(g_target);
@@ -7604,6 +7970,10 @@ namespace UiLab
             << ",\n"
             << "  \"nativeCsdOwnerDiscovery\": ";
         AppendNativeCsdOwnerDiscoveryJson(out);
+        out
+            << ",\n"
+            << "  \"nativeCsdOwnerLayout\": ";
+        AppendNativeCsdOwnerLayoutJson(out);
         out
             << "\n"
             << "}\n";
@@ -7715,6 +8085,16 @@ namespace UiLab
                 "native-csd-foreground-control",
                 "command=owner-discovery discovered=" + std::string(discovered ? "1" : "0") +
                     " status=" + g_csdManagerSceneOwnerDiscoveryStatus);
+            return BuildNativeForegroundStatusJson();
+        }
+
+        if (verb == "native-owner-layout")
+        {
+            const bool mapped = MapOwnerLayoutsForResolvedNativeProbe(true);
+            WriteEvidenceEvent(
+                "native-csd-foreground-control",
+                "command=owner-layout mapped=" + std::string(mapped ? "1" : "0") +
+                    " status=" + g_csdOwnerLayoutStatus);
             return BuildNativeForegroundStatusJson();
         }
 
@@ -7889,7 +8269,7 @@ namespace UiLab
             << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
             << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
             << "    \"commands\": ";
-        AppendStringArray(out, { "state", "events", "route-status", "native-foreground-status", "native-make-observe <project> <scene> [frame]", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub <frame>", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "native-foreground-status", "native-make-observe <project> <scene> [frame]", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub <frame>", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out
             << "\n"
             << "  },\n"
@@ -8606,8 +8986,12 @@ namespace UiLab
         g_lastCsdProjectFrame = 0;
         g_csdManagerSceneOwnerCandidates.clear();
         g_loggedCsdManagerSceneOwnerCandidateKeys.clear();
+        g_csdOwnerLayoutFieldCandidates.clear();
+        g_loggedCsdOwnerLayoutFieldCandidateKeys.clear();
         g_csdManagerSceneOwnerDiscoveryStatus =
             "idle: foreground owner attach discovery has not scanned known UI owner ranges";
+        g_csdOwnerLayoutStatus =
+            "idle: owner layout map has not scanned sibling owner CSD fields";
         g_csdManagerSceneOwnerDiscoveryLastManagerScene = 0;
         g_csdManagerSceneOwnerDiscoveryLastScanFrame = UINT64_MAX;
         g_lastTitleIntroContextDetail.clear();
@@ -11852,7 +12236,7 @@ namespace UiLab
     {
         std::ostringstream out;
         out << "{\"ok\":true,\"commands\":";
-        AppendStringArray(out, { "state", "events", "route-status", "native-foreground-status", "native-make-observe <project> <scene> [frame]", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub <frame>", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "native-foreground-status", "native-make-observe <project> <scene> [frame]", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub <frame>", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out << "}\n";
         return out.str();
     }
@@ -11906,6 +12290,7 @@ namespace UiLab
             verb == "native-foreground-detach" ||
             verb == "native-owner-discovery" ||
             verb == "native-owner-scan" ||
+            verb == "native-owner-layout" ||
             verb == "native-motion-play" ||
             verb == "native-motion-stop" ||
             verb == "native-motion-scrub")
@@ -15259,6 +15644,22 @@ namespace UiLab
                     candidate.confidence.c_str());
             }
 
+            ImGui::TextWrapped("owner layout map: %s", g_csdOwnerLayoutStatus.c_str());
+            ImGui::Text("layoutFieldCount: %zu", g_csdOwnerLayoutFieldCandidates.size());
+            ImGui::TextDisabled("title owner layout and HUD owner layout are read-only sibling owner CSD fields until attach is explicitly armed.");
+            for (size_t index = 0; index < std::min<size_t>(g_csdOwnerLayoutFieldCandidates.size(), 6); ++index)
+            {
+                const auto& field = g_csdOwnerLayoutFieldCandidates[index];
+                ImGui::TextWrapped(
+                    "%s anchor+%s sibling+%s -> %s | %s | %s",
+                    field.ownerSource.c_str(),
+                    HexU32(field.sourceCandidateFieldOffset).c_str(),
+                    HexU32(field.fieldOffset).c_str(),
+                    HexU32(field.slotValue).c_str(),
+                    field.matchKind.c_str(),
+                    field.scenePath.c_str());
+            }
+
             if (ImGui::Button("Attach Native Scene"))
             {
                 RequestNativeForegroundRenderProbe();
@@ -15290,6 +15691,12 @@ namespace UiLab
             if (ImGui::Button("Discover Native Owner Host"))
             {
                 DiscoverOwnerCandidatesForResolvedNativeProbe(true);
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Map Native Owner Layout"))
+            {
+                MapOwnerLayoutsForResolvedNativeProbe(true);
             }
         }
 
@@ -15759,7 +16166,7 @@ namespace UiLab
             ImGui::Separator();
             ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
-            ImGui::Text("commands: state, events, route-status, native-foreground-status, native-make-observe, native-owner-discovery, native-owner-scan, native-foreground-attach, native-foreground-detach, native-motion-play, native-motion-stop, native-motion-scrub, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, ui-backend-resolved, ui-vendor-command-capture, ui-layer-capture, ui-layer-status, route, reset, set-global, capture, help");
+            ImGui::Text("commands: state, events, route-status, native-foreground-status, native-make-observe, native-owner-discovery, native-owner-scan, native-owner-layout, native-foreground-attach, native-foreground-detach, native-motion-play, native-motion-stop, native-motion-scrub, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, ui-backend-resolved, ui-vendor-command-capture, ui-layer-capture, ui-layer-status, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
 
             if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))

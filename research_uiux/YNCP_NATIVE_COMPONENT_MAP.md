@@ -32,6 +32,8 @@ Phase 251 correlates CSD resource `Scene*` records from the native project trave
 
 Phase 252 adds Foreground Owner/Host Attach Discovery. The live bridge can run `native-owner-discovery` / `native-owner-scan` to inspect bounded known UI owner ranges (title owner context, CHudSonicStage owner, CHudPause owner, CGeneralWindow owner, CSaveIcon owner) for direct or indirect references to the correlated manager CScene/resource Scene pair before any owner/host attach or pointer hijack is attempted.
 
+Phase 253 adds Owner Layout Mapping. Once the title owner context exposes the observed `0x1E4` CSD field, the bridge can run `native-owner-layout` to map sibling owner CSD fields around that anchor and record read-only layout evidence for title owner layout first, then HUD owner layout when the CHudSonicStage owner range is live. This keeps native foreground attach on the real owner path instead of guessing render calls.
+
 - Input root: `C:/Users/DavidErikGarciaArena/Downloads/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/full_install_archives`
 - Project files parsed: `41`
 - Preview draw commands: `1888` real-yncp-subimage-dds-rect rows.

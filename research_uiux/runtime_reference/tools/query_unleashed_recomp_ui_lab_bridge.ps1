@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]
+    [ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]
     [string]$Command = "state",
     [string]$Target = "",
     [string]$GlobalName = "",

@@ -832,6 +832,40 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("if (!IsReadableGuestRange(guestAddress, sizeof(uint32_t)))", ui_lab)
 
+    def test_ui_lab_maps_native_csd_owner_layout_sibling_fields(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        query_script = self.read("research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            "struct CsdOwnerLayoutFieldCandidate",
+            "g_csdOwnerLayoutFieldCandidates",
+            "TryMapCsdOwnerLayoutForCandidate",
+            "MapOwnerLayoutsForResolvedNativeProbe",
+            "ScanCsdOwnerLayoutFieldRange",
+            "AppendNativeCsdOwnerLayoutJson",
+            "\\\"nativeCsdOwnerLayout\\\"",
+            "\\\"layoutFields\\\"",
+            "\\\"sourceCandidateFieldOffset\\\"",
+            "\\\"resolvedManagerScene\\\"",
+            "\\\"resolvedResourceScene\\\"",
+            "\\\"layoutFieldCount\\\"",
+            "native-csd-owner-layout-field",
+            "native-owner-layout",
+            "owner layout map",
+            "sibling owner CSD fields",
+            "title owner layout",
+            "HUD owner layout",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        self.assertIn("native-owner-layout", query_script)
+        self.assertIn("Phase 253", report)
+        self.assertIn("Owner Layout Mapping", report)
+        self.assertIn("0x1E4", report)
+        self.assertIn("Phase 253", generator)
+
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
@@ -1344,7 +1378,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, ui_lab)
 
-        self.assertIn('[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
         self.assertIn("ui-oracle", harvest)
 
     def test_ui_lab_phase148_exposes_runtime_csd_platform_draw_list_bridge_command(self):
@@ -1375,7 +1409,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("UiLab::OnCsdPlatformDraw", aspect)
         self.assertIn("SWA::CCsdPlatformMirage::Draw", aspect)
         self.assertIn("SWA::CCsdPlatformMirage::DrawNoTex", aspect)
-        self.assertIn('[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
         self.assertIn("Phase 148", harvest)
         self.assertIn("runtime CSD platform draw hook", harvest)
         self.assertIn("GPU backend submit pending", harvest)
@@ -1410,7 +1444,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("ProcDrawPrimitive", video)
         self.assertIn("ProcDrawIndexedPrimitive", video)
         self.assertIn("ProcDrawPrimitiveUP", video)
-        self.assertIn('[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
+        self.assertIn('[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]', client)
         self.assertIn("Phase 150", harvest)
         self.assertIn("render-thread material submit hook", harvest)
         self.assertIn("raw D3D12/Vulkan backend capture pending", harvest)
@@ -1463,7 +1497,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("UiLab::OnRawBackendCommand", video)
         self.assertIn('"RHI command-list boundary"', video)
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
         self.assertIn("Phase 151", harvest)
@@ -1515,7 +1549,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         self.assertIn("uiLabRenderTargetFormat0", vulkan_header)
         self.assertIn("activeGraphicsPipeline", vulkan_header)
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
         self.assertIn("Phase 152", harvest)
@@ -1725,7 +1759,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, ui_lab)
 
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
 
@@ -1779,7 +1813,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, video)
 
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
 
@@ -1863,7 +1897,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "sward_ui_lab_live",
             "Invoke-UiLabBridgeCommand",
             "Read-UiLabBridgeResponse",
-            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             "route <target>",
             "set-global <name> <0|1>",
             "Connect($TimeoutMilliseconds)",
@@ -1926,7 +1960,7 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, ui_lab)
 
         self.assertIn(
-            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
+            '[ValidateSet("state", "events", "route-status", "native-foreground-status", "native-make-observe", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route", "reset", "set-global", "capture", "help")]',
             client,
         )
 
