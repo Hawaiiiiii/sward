@@ -812,6 +812,11 @@ namespace UiLab
         // resolves to a live manager CScene, discovered by the bounded
         // opportunistic sweep across the owner range.
         std::vector<HudOwnerRenderableSlot> renderableSlots;
+        // Phase 262: where the latest sward-hud-owner-layout-v1 sidecar
+        // was written, plus the frame stamp. Empty until the first sweep
+        // completes for this evidence dir.
+        std::string hudOwnerLayoutSidecarPath;
+        uint64_t hudOwnerLayoutSidecarFrame = 0;
         uint32_t stageGameModeAddress = 0;
         uint32_t rcPlayScreenProjectAddress = 0;
         uint32_t rcSpeedGaugeSceneAddress = 0;
@@ -1348,6 +1353,13 @@ namespace UiLab
     static std::unordered_set<uint32_t> g_sweptHudOwnerAddresses;
     static std::vector<HudOwnerRenderableSlot> g_hudOwnerRenderableSlots;
     static std::unordered_set<std::string> g_loggedHudOwnerRenderableSlotKeys;
+    // Phase 262: persistent sidecar artifact path written after each owner
+    // sweep. Schema `sward-hud-owner-layout-v1` consolidates the runtime-
+    // confirmed CHudSonicStage layout (named slots, sweep finds, cross-
+    // validations, expected-fields table) so downstream SGFX HUD code
+    // generators have a stable, structured input file.
+    static std::string g_lastHudOwnerLayoutSidecarPath;
+    static uint64_t g_lastHudOwnerLayoutSidecarFrame = 0;
     static uint32_t g_chudSonicStagePlayScreenProjectAddress = 0;
     static uint32_t g_chudSonicStageSpeedGaugeSceneAddress = 0;
     static uint32_t g_chudSonicStageRingEnergyGaugeSceneAddress = 0;
@@ -1547,6 +1559,11 @@ namespace UiLab
     // HUD owner field whose value (direct or indirect) resolves to a live
     // manager CScene; runs at most once per unique owner address per session.
     static void TryRunOpportunisticHudOwnerLayoutSweep(
+        uint32_t ownerAddress,
+        std::string_view ownerSource);
+    // Phase 262: persist the runtime-confirmed CHudSonicStage layout to a
+    // sidecar JSON file for SGFX HUD code generation.
+    static void WriteHudOwnerLayoutSidecar(
         uint32_t ownerAddress,
         std::string_view ownerSource);
     static void AppendNativeCsdOwnerDiscoveryJson(std::ostringstream& out);
@@ -3031,6 +3048,17 @@ namespace UiLab
         return g_evidenceDirectory / "ui_lab_live_state.json";
     }
 
+    // Phase 262: where the persistent HUD owner layout sidecar lives. One
+    // file per evidence dir; rewritten on each opportunistic sweep so the
+    // sidecar always reflects the latest runtime-confirmed layout.
+    static std::filesystem::path HudOwnerLayoutSidecarPath()
+    {
+        if (g_evidenceDirectory.empty())
+            return {};
+
+        return g_evidenceDirectory / "hud_owner_layout.json";
+    }
+
     static constexpr std::string_view kLiveStateTargetFieldName = R"("target")";
     static constexpr std::string_view kLiveStateRouteFieldName = R"("route")";
     static constexpr std::string_view kLiveStateStageGameModeAddressFieldName = R"("stageGameModeAddress")";
@@ -3824,6 +3852,122 @@ namespace UiLab
             "|crossValidatedHits=" + std::to_string(crossValidatedHits) +
             "|expectedFieldTableSize=" + std::to_string(kChudSonicStageExpectedOwnerFields.size()) +
             "|status=read-only HUD owner layout sweep complete");
+
+        WriteHudOwnerLayoutSidecar(ownerAddress, ownerSource);
+    }
+
+    // Phase 262: persist the runtime-confirmed CHudSonicStage owner layout
+    // to a stable JSON sidecar file so downstream SGFX HUD code generators
+    // have a single structured artifact to consume. Schema version is
+    // explicitly versioned (`sward-hud-owner-layout-v1`) so future breaking
+    // schema changes are detectable. Rewritten on each opportunistic sweep
+    // so the sidecar always reflects the latest sweep snapshot.
+    static void WriteHudOwnerLayoutSidecar(
+        uint32_t ownerAddress,
+        std::string_view ownerSource)
+    {
+        if (!g_isEnabled || g_evidenceDirectory.empty())
+            return;
+
+        const auto sidecarPath = HudOwnerLayoutSidecarPath();
+        if (sidecarPath.empty())
+            return;
+
+        std::error_code ec;
+        std::filesystem::create_directories(g_evidenceDirectory, ec);
+        if (ec)
+            return;
+
+        std::ostringstream out;
+        out
+            << "{\n"
+            << "  \"schema\": \"sward-hud-owner-layout-v1\",\n"
+            << "  \"ownerClass\": \"CHudSonicStage\",\n"
+            << "  \"ownerSource\": \"" << JsonEscape(std::string(ownerSource)) << "\",\n"
+            << "  \"ownerAddress\": \"" << JsonEscape(HexU32(ownerAddress)) << "\",\n"
+            << "  \"constructorHookSource\": \"sub_824D89B0\",\n"
+            << "  \"sweepFrame\": " << g_presentedFrameCount << ",\n"
+            << "  \"expectedFieldHeaderSource\": \""
+            << JsonEscape(std::string(kChudSonicStageExpectedOwnerFieldSource)) << "\",\n"
+            << "  \"expectedFieldTable\": [\n";
+
+        for (size_t i = 0; i < kChudSonicStageExpectedOwnerFields.size(); ++i)
+        {
+            const auto& field = kChudSonicStageExpectedOwnerFields[i];
+            out
+                << "    {\"field\": \"" << JsonEscape(std::string(field.field)) << "\","
+                << "\"rcPtrOffset\": \"" << JsonEscape(HexU32(field.rcPtrOffset)) << "\","
+                << "\"rcObjectOffset\": \"" << JsonEscape(HexU32(field.rcObjectOffset)) << "\"}"
+                << (i + 1 == kChudSonicStageExpectedOwnerFields.size() ? "\n" : ",\n");
+        }
+        out << "  ],\n";
+
+        out << "  \"namedSlots\": [\n";
+        for (size_t i = 0; i < g_lastHudOwnerSlotReadouts.size(); ++i)
+        {
+            const auto& s = g_lastHudOwnerSlotReadouts[i];
+            out
+                << "    {\"ownerSource\": \"" << JsonEscape(s.ownerSource) << "\","
+                << "\"slotName\": \"" << JsonEscape(s.slotName) << "\","
+                << "\"fieldOffset\": \"" << JsonEscape(HexU32(s.fieldOffset)) << "\","
+                << "\"slotValue\": \"" << JsonEscape(HexU32(s.slotValue)) << "\","
+                << "\"slotKind\": \"" << JsonEscape(s.slotKind) << "\","
+                << "\"indirectAddress\": \"" << JsonEscape(HexU32(s.indirectAddress)) << "\","
+                << "\"indirectOffset\": \"" << JsonEscape(HexU32(s.indirectOffset)) << "\","
+                << "\"projectName\": \"" << JsonEscape(s.projectName) << "\","
+                << "\"scenePath\": \"" << JsonEscape(s.scenePath) << "\","
+                << "\"correlatedManagerSceneAddress\": \"" << JsonEscape(HexU32(s.correlatedManagerSceneAddress)) << "\","
+                << "\"correlatedResourceSceneAddress\": \"" << JsonEscape(HexU32(s.correlatedResourceSceneAddress)) << "\","
+                << "\"frame\": " << s.frame << "}"
+                << (i + 1 == g_lastHudOwnerSlotReadouts.size() ? "\n" : ",\n");
+        }
+        out << "  ],\n";
+
+        out << "  \"renderableSlots\": [\n";
+        for (size_t i = 0; i < g_hudOwnerRenderableSlots.size(); ++i)
+        {
+            const auto& r = g_hudOwnerRenderableSlots[i];
+            const auto* expected =
+                FindChudSonicStageExpectedOwnerFieldByRcObjectOffset(r.fieldOffset);
+            out
+                << "    {\"ownerSource\": \"" << JsonEscape(r.ownerSource) << "\","
+                << "\"ownerAddress\": \"" << JsonEscape(HexU32(r.ownerAddress)) << "\","
+                << "\"fieldOffset\": \"" << JsonEscape(HexU32(r.fieldOffset)) << "\","
+                << "\"fieldAddress\": \"" << JsonEscape(HexU32(r.fieldAddress)) << "\","
+                << "\"slotValue\": \"" << JsonEscape(HexU32(r.slotValue)) << "\","
+                << "\"indirectAddress\": \"" << JsonEscape(HexU32(r.indirectAddress)) << "\","
+                << "\"matchKind\": \"" << JsonEscape(r.matchKind) << "\","
+                << "\"projectName\": \"" << JsonEscape(r.projectName) << "\","
+                << "\"scenePath\": \"" << JsonEscape(r.scenePath) << "\","
+                << "\"managerSceneAddress\": \"" << JsonEscape(HexU32(r.managerSceneAddress)) << "\","
+                << "\"resourceSceneAddress\": \"" << JsonEscape(HexU32(r.resourceSceneAddress)) << "\","
+                << "\"crossValidatedExpectedField\": "
+                << (expected != nullptr
+                        ? std::string("\"") + JsonEscape(std::string(expected->field)) + "\""
+                        : std::string("null"))
+                << ","
+                << "\"frame\": " << r.frame << "}"
+                << (i + 1 == g_hudOwnerRenderableSlots.size() ? "\n" : ",\n");
+        }
+        out << "  ]\n";
+        out << "}\n";
+
+        std::ofstream file(sidecarPath, std::ios::trunc);
+        if (!file)
+            return;
+        file << out.str();
+
+        g_lastHudOwnerLayoutSidecarPath = sidecarPath.string();
+        g_lastHudOwnerLayoutSidecarFrame = g_presentedFrameCount;
+
+        WriteEvidenceEvent(
+            "native-hud-owner-layout-sidecar-written",
+            "ownerSource=" + std::string(ownerSource) +
+            "|owner=" + HexU32(ownerAddress) +
+            "|sidecarPath=" + g_lastHudOwnerLayoutSidecarPath +
+            "|namedSlotCount=" + std::to_string(g_lastHudOwnerSlotReadouts.size()) +
+            "|renderableSlotCount=" + std::to_string(g_hudOwnerRenderableSlots.size()) +
+            "|status=runtime-confirmed HUD owner layout written to sward-hud-owner-layout-v1 sidecar for SGFX HUD code generation");
     }
 
     static void StoreCsdManagerSceneCorrelation(const CsdManagerSceneCorrelation& correlation)
@@ -4905,6 +5049,8 @@ namespace UiLab
         snapshot.recordedHudOwnerSetterProbeCallCount =
             g_recordedHudOwnerSetterProbeCallCount;
         snapshot.renderableSlots = g_hudOwnerRenderableSlots;
+        snapshot.hudOwnerLayoutSidecarPath = g_lastHudOwnerLayoutSidecarPath;
+        snapshot.hudOwnerLayoutSidecarFrame = g_lastHudOwnerLayoutSidecarFrame;
         snapshot.stageGameModeAddress = g_lastStageGameModeAddress;
         snapshot.rcPlayScreenProjectAddress = g_chudSonicStagePlayScreenProjectAddress;
         snapshot.rcSpeedGaugeSceneAddress = g_chudSonicStageSpeedGaugeSceneAddress;
@@ -7227,7 +7373,9 @@ namespace UiLab
                 << "}";
         }
         out
-            << "]\n"
+            << "],\n"
+            << "        \"hudOwnerLayoutSidecarPath\": \"" << JsonEscape(sonicOwnerPath.hudOwnerLayoutSidecarPath) << "\",\n"
+            << "        \"hudOwnerLayoutSidecarFrame\": " << sonicOwnerPath.hudOwnerLayoutSidecarFrame << "\n"
             << "      }\n"
             << "    }\n"
             << "  }";
@@ -10438,6 +10586,8 @@ namespace UiLab
         g_sweptHudOwnerAddresses.clear();
         g_hudOwnerRenderableSlots.clear();
         g_loggedHudOwnerRenderableSlotKeys.clear();
+        g_lastHudOwnerLayoutSidecarPath.clear();
+        g_lastHudOwnerLayoutSidecarFrame = 0;
         g_chudSonicStagePlayScreenProjectAddress = 0;
         g_chudSonicStageSpeedGaugeSceneAddress = 0;
         g_chudSonicStageRingEnergyGaugeSceneAddress = 0;

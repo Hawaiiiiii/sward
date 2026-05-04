@@ -1287,6 +1287,46 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("Phase 261", generator)
 
+    def test_ui_lab_writes_hud_owner_layout_sidecar(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            # Phase 262 globals + path helper.
+            "g_lastHudOwnerLayoutSidecarPath",
+            "g_lastHudOwnerLayoutSidecarFrame",
+            "HudOwnerLayoutSidecarPath",
+            "hud_owner_layout.json",
+            # Phase 262 writer entry point + schema.
+            "WriteHudOwnerLayoutSidecar",
+            "sward-hud-owner-layout-v1",
+            "constructorHookSource",
+            "expectedFieldHeaderSource",
+            "expectedFieldTable",
+            "namedSlots",
+            "renderableSlots",
+            "crossValidatedExpectedField",
+            # Phase 262 evidence event.
+            "native-hud-owner-layout-sidecar-written",
+            "runtime-confirmed HUD owner layout written to sward-hud-owner-layout-v1 sidecar for SGFX HUD code generation",
+            # Phase 262 live-state JSON exposes the sidecar path + frame.
+            "hudOwnerLayoutSidecarPath",
+            "hudOwnerLayoutSidecarFrame",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 262",
+            "HUD Owner Layout JSON Sidecar",
+            "sward-hud-owner-layout-v1",
+            "hud_owner_layout.json",
+            "native-hud-owner-layout-sidecar-written",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 262", generator)
+
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
