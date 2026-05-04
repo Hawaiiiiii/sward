@@ -38,6 +38,8 @@ Phase 254 adds Owner Layout Semantic Naming. The owner layout map now annotates 
 
 Phase 255 adds Native Owner Setter Probe. Read-only wrappers around `sub_8250F2B8`, `sub_82581288/A8/E8`, and HUD helpers `sub_82E5FCD0 / sub_82E61A78` record helper arguments, owner fields, result registers, and DB/XML route evidence beside the native owner layout map. This confirms the real attach/setter path before any foreground owner write or hijack experiment.
 
+Phase 256 adds HUD Owner Setter Field Map. The native owner setter probe now translates HUD helper traffic back to probable owning UI objects when `argR3 == owner+0x28`, falls back to `argR3 - 0x28` inferred owner for the proven HUD stage-bind callsites, and labels the generated `CHudSonicStage::sub_824D9308` callsites where `argR5=110` maps `owner+0xD8 -> owner+0xE0` and `argR5=121` maps the `owner+0xF0/+0xF4` scene update path. This still stays read-only, but it turns anonymous helper calls into attach-path field evidence.
+
 - Input root: `C:/Users/DavidErikGarciaArena/Downloads/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/full_install_archives`
 - Project files parsed: `41`
 - Preview draw commands: `1888` real-yncp-subimage-dds-rect rows.

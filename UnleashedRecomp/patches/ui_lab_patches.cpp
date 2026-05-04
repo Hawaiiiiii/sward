@@ -432,14 +432,30 @@ namespace UiLab
         uint32_t ownerAddress = 0;
         uint32_t fieldOffset = UINT32_MAX;
         uint32_t fieldValue = 0;
+        uint32_t probableOwnerAddress = 0;
+        uint32_t helperObjectOffset = UINT32_MAX;
+        uint32_t sourceFieldOffset = UINT32_MAX;
+        uint32_t targetFieldOffset = UINT32_MAX;
         uint32_t argR3 = 0;
         uint32_t argR4 = 0;
         uint32_t argR5 = 0;
         uint32_t argR6 = 0;
         uint32_t argR7 = 0;
         uint32_t resultR3 = 0;
+        std::string probableOwnerSource;
+        std::string generatedCallsiteDiscriminator;
         std::string attachSetterStatus;
         std::string routeEvidence;
+    };
+
+    struct NativeOwnerSetterProbeOwnerMap
+    {
+        uint32_t probableOwnerAddress = 0;
+        uint32_t helperObjectOffset = UINT32_MAX;
+        uint32_t sourceFieldOffset = UINT32_MAX;
+        uint32_t targetFieldOffset = UINT32_MAX;
+        std::string probableOwnerSource;
+        std::string generatedCallsiteDiscriminator;
     };
 
     struct CsdOwnerScanRange
@@ -2005,6 +2021,130 @@ namespace UiLab
         return out.str();
     }
 
+    static void TryMapNativeOwnerSetterHelperObject(
+        NativeOwnerSetterProbeOwnerMap& map,
+        uint32_t helperObjectAddress,
+        uint32_t probableOwnerAddress,
+        std::string_view probableOwnerSource)
+    {
+        if (!IsPlausibleGuestPointer(helperObjectAddress) ||
+            !IsPlausibleGuestPointer(probableOwnerAddress))
+            return;
+
+        const uint32_t helperObjectOffset =
+            helperObjectAddress >= probableOwnerAddress
+                ? helperObjectAddress - probableOwnerAddress
+                : UINT32_MAX;
+
+        if (helperObjectOffset >= 0x3000)
+            return;
+
+        const bool exactKnownCsdHelperObject =
+            helperObjectOffset == 0x28; // argR3 == owner+0x28 in generated HUD CSD helper callsites.
+        if (!exactKnownCsdHelperObject && map.probableOwnerAddress != 0)
+            return;
+
+        map.probableOwnerAddress = probableOwnerAddress;
+        map.helperObjectOffset = helperObjectOffset;
+        map.probableOwnerSource = std::string(probableOwnerSource);
+    }
+
+    static NativeOwnerSetterProbeOwnerMap ResolveNativeOwnerSetterProbeOwnerMap(
+        std::string_view domain,
+        std::string_view helperName,
+        uint32_t ownerAddress,
+        uint32_t fieldOffset,
+        uint32_t argR3,
+        uint32_t argR5)
+    {
+        NativeOwnerSetterProbeOwnerMap map;
+
+        if (domain == "hud")
+        {
+            TryMapNativeOwnerSetterHelperObject(
+                map,
+                argR3,
+                g_chudSonicStageOwnerAddress,
+                "CHudSonicStage owner; argR3 == owner+0x28 helper object");
+            TryMapNativeOwnerSetterHelperObject(
+                map,
+                argR3,
+                g_pauseGeneralSaveInspector.pauseAddress,
+                "CHudPause owner; argR3 == owner+0x28 helper object");
+            TryMapNativeOwnerSetterHelperObject(
+                map,
+                argR3,
+                g_pauseGeneralSaveInspector.generalWindowAddress,
+                "CGeneralWindow owner; argR3 == owner+0x28 helper object");
+            TryMapNativeOwnerSetterHelperObject(
+                map,
+                argR3,
+                g_pauseGeneralSaveInspector.saveIconAddress,
+                "CSaveIcon owner; argR3 == owner+0x28 helper object");
+
+            for (const auto& candidate : g_csdManagerSceneOwnerCandidates)
+            {
+                if (map.probableOwnerAddress != 0 && map.helperObjectOffset == 0x28)
+                    break;
+
+                TryMapNativeOwnerSetterHelperObject(
+                    map,
+                    argR3,
+                    candidate.ownerAddress,
+                    candidate.ownerSource.empty()
+                        ? "CSD owner candidate; argR3 == owner+0x28 helper object"
+                        : candidate.ownerSource + "; argR3 == owner+0x28 helper object");
+            }
+
+            const bool isChudStageBindCallsite =
+                (helperName == "sub_82E5FCD0" && argR5 == 110) ||
+                (helperName == "sub_82E61A78" && argR5 == 121);
+            if (map.probableOwnerAddress == 0 &&
+                isChudStageBindCallsite &&
+                argR3 > 0x28)
+            {
+                TryMapNativeOwnerSetterHelperObject(
+                    map,
+                    argR3,
+                    argR3 - 0x28,
+                    "CHudSonicStage owner; argR3 - 0x28 inferred owner; infer CHudSonicStage owner from helper argR3");
+            }
+
+            if (helperName == "sub_82E5FCD0" && argR5 == 110)
+            {
+                map.sourceFieldOffset = 0xD8; // CHudSonicStage::sub_824D9308 reads owner+0xD8 into r6.
+                map.targetFieldOffset = 0xE0; // CHudSonicStage::sub_824D9308 copies the returned scene slot to owner+0xE0.
+                map.generatedCallsiteDiscriminator =
+                    "CHudSonicStage::sub_824D9308 argR5=110 owner+0xD8 -> owner+0xE0";
+            }
+            else if (helperName == "sub_82E61A78" && argR5 == 121)
+            {
+                map.sourceFieldOffset = 0xF0; // CHudSonicStage::sub_824D9308 snapshots owner+0xF0/+0xF4 for this helper.
+                map.targetFieldOffset = 0xF0;
+                map.generatedCallsiteDiscriminator =
+                    "CHudSonicStage::sub_824D9308 argR5=121 owner+0xF0/+0xF4 scene update path";
+            }
+            else
+            {
+                map.generatedCallsiteDiscriminator =
+                    std::string("hud helper generated callsite discriminator argR5=") +
+                    std::to_string(argR5);
+            }
+        }
+        else if (domain == "title")
+        {
+            map.probableOwnerAddress = ownerAddress;
+            map.helperObjectOffset = fieldOffset;
+            map.probableOwnerSource = "CGameModeStageTitle title context";
+            map.sourceFieldOffset = fieldOffset;
+            map.targetFieldOffset = fieldOffset;
+            map.generatedCallsiteDiscriminator =
+                std::string("title owner setter helper ") + std::string(helperName);
+        }
+
+        return map;
+    }
+
     static void RecordNativeOwnerSetterProbeSample(
         std::string_view domain,
         std::string_view helperName,
@@ -2036,6 +2176,19 @@ namespace UiLab
         sample.argR6 = argR6;
         sample.argR7 = argR7;
         sample.resultR3 = resultR3;
+        const auto ownerMap = ResolveNativeOwnerSetterProbeOwnerMap(
+            domain,
+            helperName,
+            ownerAddress,
+            fieldOffset,
+            argR3,
+            argR5);
+        sample.probableOwnerAddress = ownerMap.probableOwnerAddress;
+        sample.helperObjectOffset = ownerMap.helperObjectOffset;
+        sample.sourceFieldOffset = ownerMap.sourceFieldOffset;
+        sample.targetFieldOffset = ownerMap.targetFieldOffset;
+        sample.probableOwnerSource = ownerMap.probableOwnerSource;
+        sample.generatedCallsiteDiscriminator = ownerMap.generatedCallsiteDiscriminator;
         sample.attachSetterStatus =
             "read-only probe: setter candidate observed; owner attach writes remain disabled";
         sample.routeEvidence = BuildNativeOwnerSetterRouteEvidence(domain, helperName, fieldOffset);
@@ -2049,7 +2202,10 @@ namespace UiLab
             " " + std::string(helperName) + " " + std::string(phase) +
             " owner=" + HexU32(ownerAddress) +
             " fieldOffset=" + HexU32(fieldOffset) +
-            " fieldValue=" + HexU32(fieldValue);
+            " fieldValue=" + HexU32(fieldValue) +
+            (sample.probableOwnerAddress != 0
+                ? " probableOwner=" + HexU32(sample.probableOwnerAddress)
+                : "");
 
         const std::string evidenceKey =
             std::string(domain) + "|" +
@@ -2062,6 +2218,9 @@ namespace UiLab
             HexU32(argR4) + "|" +
             HexU32(argR5) + "|" +
             HexU32(argR6) + "|" +
+            HexU32(sample.probableOwnerAddress) + "|" +
+            HexU32(sample.sourceFieldOffset) + "|" +
+            HexU32(sample.targetFieldOffset) + "|" +
             HexU32(resultR3);
 
         if (g_loggedNativeOwnerSetterProbeKeys.insert(evidenceKey).second)
@@ -2080,7 +2239,29 @@ namespace UiLab
                 "|argR6=" + HexU32(argR6) +
                 "|argR7=" + HexU32(argR7) +
                 "|resultR3=" + HexU32(resultR3) +
+                "|probableOwnerAddress=" + HexU32(sample.probableOwnerAddress) +
+                "|helperObjectOffset=" + HexU32(sample.helperObjectOffset) +
+                "|probableOwnerSource=" + sample.probableOwnerSource +
+                "|sourceFieldOffset=" + HexU32(sample.sourceFieldOffset) +
+                "|targetFieldOffset=" + HexU32(sample.targetFieldOffset) +
+                "|generatedCallsiteDiscriminator=" + sample.generatedCallsiteDiscriminator +
                 "|routeEvidence=" + sample.routeEvidence);
+
+            if (domain == "hud" &&
+                sample.probableOwnerAddress != 0 &&
+                sample.sourceFieldOffset != UINT32_MAX)
+            {
+                WriteEvidenceEvent(
+                    "native-owner-setter-hud-owner-field-map",
+                    "helper=" + std::string(helperName) +
+                    "|phase=" + std::string(phase) +
+                    "|probableOwnerAddress=" + HexU32(sample.probableOwnerAddress) +
+                    "|helperObjectOffset=" + HexU32(sample.helperObjectOffset) +
+                    "|probableOwnerSource=" + sample.probableOwnerSource +
+                    "|sourceFieldOffset=" + HexU32(sample.sourceFieldOffset) +
+                    "|targetFieldOffset=" + HexU32(sample.targetFieldOffset) +
+                    "|generatedCallsiteDiscriminator=" + sample.generatedCallsiteDiscriminator);
+            }
         }
     }
 
@@ -8281,12 +8462,18 @@ namespace UiLab
                 << "\"ownerAddress\":\"" << JsonEscape(HexU32(sample.ownerAddress)) << "\","
                 << "\"fieldOffset\":\"" << JsonEscape(HexU32(sample.fieldOffset)) << "\","
                 << "\"fieldValue\":\"" << JsonEscape(HexU32(sample.fieldValue)) << "\","
+                << "\"probableOwnerAddress\":\"" << JsonEscape(HexU32(sample.probableOwnerAddress)) << "\","
+                << "\"helperObjectOffset\":\"" << JsonEscape(HexU32(sample.helperObjectOffset)) << "\","
+                << "\"probableOwnerSource\":\"" << JsonEscape(sample.probableOwnerSource) << "\","
+                << "\"sourceFieldOffset\":\"" << JsonEscape(HexU32(sample.sourceFieldOffset)) << "\","
+                << "\"targetFieldOffset\":\"" << JsonEscape(HexU32(sample.targetFieldOffset)) << "\","
                 << "\"argR3\":\"" << JsonEscape(HexU32(sample.argR3)) << "\","
                 << "\"argR4\":\"" << JsonEscape(HexU32(sample.argR4)) << "\","
                 << "\"argR5\":\"" << JsonEscape(HexU32(sample.argR5)) << "\","
                 << "\"argR6\":\"" << JsonEscape(HexU32(sample.argR6)) << "\","
                 << "\"argR7\":\"" << JsonEscape(HexU32(sample.argR7)) << "\","
                 << "\"resultR3\":\"" << JsonEscape(HexU32(sample.resultR3)) << "\","
+                << "\"generatedCallsiteDiscriminator\":\"" << JsonEscape(sample.generatedCallsiteDiscriminator) << "\","
                 << "\"attachSetterStatus\":\"" << JsonEscape(sample.attachSetterStatus) << "\","
                 << "\"routeEvidence\":\"" << JsonEscape(sample.routeEvidence) << "\""
                 << "}";

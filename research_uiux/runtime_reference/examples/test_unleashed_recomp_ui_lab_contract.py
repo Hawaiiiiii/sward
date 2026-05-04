@@ -994,6 +994,45 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("Phase 255", generator)
 
+    def test_ui_lab_maps_hud_owner_setter_helpers_back_to_owner_fields(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            "struct NativeOwnerSetterProbeOwnerMap",
+            "ResolveNativeOwnerSetterProbeOwnerMap",
+            "helperObjectOffset",
+            "probableOwnerAddress",
+            "probableOwnerSource",
+            "sourceFieldOffset",
+            "targetFieldOffset",
+            "generatedCallsiteDiscriminator",
+            "native-owner-setter-hud-owner-field-map",
+            "CHudSonicStage::sub_824D9308",
+            "argR3 == owner+0x28",
+            "argR5=110",
+            "argR5=121",
+            "argR3 - 0x28 inferred owner",
+            "infer CHudSonicStage owner from helper argR3",
+            "owner+0xD8",
+            "owner+0xE0",
+            "owner+0xF0",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 256",
+            "HUD Owner Setter Field Map",
+            "argR3 == owner+0x28",
+            "owner+0xD8",
+            "owner+0xE0",
+            "owner+0xF0",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 256", generator)
+
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
