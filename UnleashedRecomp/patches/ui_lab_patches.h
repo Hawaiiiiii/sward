@@ -105,6 +105,18 @@ namespace UiLab
         uint8_t csdByte84,
         uint8_t csdByte152,
         uint8_t csdByte160);
+    void OnTitleOwnerSetterProbe(
+        std::string_view helperName,
+        std::string_view phase,
+        uint32_t ownerAddress,
+        uint32_t fieldOffset,
+        uint32_t fieldValue,
+        uint32_t argR3,
+        uint32_t argR4,
+        uint32_t argR5,
+        uint32_t argR6,
+        uint32_t argR7,
+        uint32_t resultR3);
     void OnTitleStateMenuUpdate(int32_t cursorIndex);
     void OnTitleMenuContext(
         uint32_t context472,
@@ -358,6 +370,18 @@ namespace UiLab
         uint32_t timeCount3NodeAddress,
         uint32_t playerCountNodeAddress,
         std::string_view hookSource);
+    void OnHudOwnerSetterProbe(
+        std::string_view helperName,
+        std::string_view phase,
+        uint32_t ownerAddress,
+        uint32_t fieldOffset,
+        uint32_t fieldValue,
+        uint32_t argR3,
+        uint32_t argR4,
+        uint32_t argR5,
+        uint32_t argR6,
+        uint32_t argR7,
+        uint32_t resultR3);
     void OnHudSonicStageOwnerFieldSample(uint32_t ownerAddress, std::string_view hookSource);
     // Phase 197: snapshot CHudSonicStage owner-field dwords at +460/+464/+468/+472/+480
     // at the sub_824D6C18 callsite so the rolling counter / gauge-state staging block

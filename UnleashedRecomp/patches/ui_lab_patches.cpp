@@ -423,6 +423,25 @@ namespace UiLab
         uint64_t frame = 0;
     };
 
+    struct NativeOwnerSetterProbeSample
+    {
+        uint64_t frame = 0;
+        std::string domain;
+        std::string helperName;
+        std::string phase;
+        uint32_t ownerAddress = 0;
+        uint32_t fieldOffset = UINT32_MAX;
+        uint32_t fieldValue = 0;
+        uint32_t argR3 = 0;
+        uint32_t argR4 = 0;
+        uint32_t argR5 = 0;
+        uint32_t argR6 = 0;
+        uint32_t argR7 = 0;
+        uint32_t resultR3 = 0;
+        std::string attachSetterStatus;
+        std::string routeEvidence;
+    };
+
     struct CsdOwnerScanRange
     {
         uint32_t ownerAddress = 0;
@@ -1307,10 +1326,15 @@ namespace UiLab
     static constexpr size_t kCsdOwnerLayoutFieldCandidateLimit = 512;
     static std::vector<CsdOwnerLayoutFieldCandidate> g_csdOwnerLayoutFieldCandidates;
     static std::unordered_set<std::string> g_loggedCsdOwnerLayoutFieldCandidateKeys;
+    static constexpr size_t kNativeOwnerSetterProbeSampleLimit = 256;
+    static std::vector<NativeOwnerSetterProbeSample> g_nativeOwnerSetterProbeSamples;
+    static std::unordered_set<std::string> g_loggedNativeOwnerSetterProbeKeys;
     static std::string g_csdManagerSceneOwnerDiscoveryStatus =
         "idle: foreground owner attach discovery has not scanned known UI owner ranges";
     static std::string g_csdOwnerLayoutStatus =
         "idle: owner layout map has not scanned sibling owner CSD fields";
+    static std::string g_nativeOwnerSetterProbeStatus =
+        "native-owner-setter-probe-status: idle; waiting for title/HUD helper xref probes";
     static uint32_t g_csdManagerSceneOwnerDiscoveryLastManagerScene = 0;
     static uint64_t g_csdManagerSceneOwnerDiscoveryLastScanFrame = UINT64_MAX;
     static constexpr size_t kRuntimeUiDrawCallSampleLimit = 96;
@@ -1384,6 +1408,7 @@ namespace UiLab
     static bool MapOwnerLayoutsForResolvedNativeProbe(bool force);
     static void AppendNativeCsdOwnerDiscoveryJson(std::ostringstream& out);
     static void AppendNativeCsdOwnerLayoutJson(std::ostringstream& out);
+    static void AppendNativeOwnerSetterProbeJson(std::ostringstream& out);
     static void UpdateNativeCsdSceneMotionPlayback();
     static std::string_view MotionRepeatTypeLabel(uint32_t repeatType);
     static std::string_view LoadingDisplayTypeLabel(uint32_t displayType);
@@ -1948,6 +1973,114 @@ namespace UiLab
 
             while (g_recentEvidenceEvents.size() > 80)
                 g_recentEvidenceEvents.pop_front();
+        }
+    }
+
+    static std::string BuildNativeOwnerSetterRouteEvidence(
+        std::string_view domain,
+        std::string_view helperName,
+        uint32_t fieldOffset)
+    {
+        std::ostringstream out;
+        out << "asset-db-route-evidence: db-xml-route-candidate ";
+
+        if (domain == "title")
+        {
+            out
+                << "title-loop/title-menu from extracted runtime index; "
+                << "generated-PPC xrefs CGameModeStageTitle::Update/sub_825518B8; "
+                << "titleContext+0x1E8 resource scene pointer; "
+                << "titleContext+0x1D1 output/visibility gate; ";
+        }
+        else
+        {
+            out
+                << "sonic-hud/ui_playscreen from extracted DB/XML/runtime index; "
+                << "CHudSonicStage constructor/bind/setter path sub_824D89B0/sub_824D9308/sub_824D95F8; ";
+        }
+
+        out
+            << "helper=" << helperName
+            << " fieldOffset=" << HexU32(fieldOffset);
+        return out.str();
+    }
+
+    static void RecordNativeOwnerSetterProbeSample(
+        std::string_view domain,
+        std::string_view helperName,
+        std::string_view phase,
+        uint32_t ownerAddress,
+        uint32_t fieldOffset,
+        uint32_t fieldValue,
+        uint32_t argR3,
+        uint32_t argR4,
+        uint32_t argR5,
+        uint32_t argR6,
+        uint32_t argR7,
+        uint32_t resultR3)
+    {
+        if (!g_isEnabled)
+            return;
+
+        NativeOwnerSetterProbeSample sample;
+        sample.frame = g_presentedFrameCount;
+        sample.domain = domain;
+        sample.helperName = helperName;
+        sample.phase = phase;
+        sample.ownerAddress = ownerAddress;
+        sample.fieldOffset = fieldOffset;
+        sample.fieldValue = fieldValue;
+        sample.argR3 = argR3;
+        sample.argR4 = argR4;
+        sample.argR5 = argR5;
+        sample.argR6 = argR6;
+        sample.argR7 = argR7;
+        sample.resultR3 = resultR3;
+        sample.attachSetterStatus =
+            "read-only probe: setter candidate observed; owner attach writes remain disabled";
+        sample.routeEvidence = BuildNativeOwnerSetterRouteEvidence(domain, helperName, fieldOffset);
+
+        g_nativeOwnerSetterProbeSamples.push_back(sample);
+        while (g_nativeOwnerSetterProbeSamples.size() > kNativeOwnerSetterProbeSampleLimit)
+            g_nativeOwnerSetterProbeSamples.erase(g_nativeOwnerSetterProbeSamples.begin());
+
+        g_nativeOwnerSetterProbeStatus =
+            "native-owner-setter-probe-status: captured " + std::string(domain) +
+            " " + std::string(helperName) + " " + std::string(phase) +
+            " owner=" + HexU32(ownerAddress) +
+            " fieldOffset=" + HexU32(fieldOffset) +
+            " fieldValue=" + HexU32(fieldValue);
+
+        const std::string evidenceKey =
+            std::string(domain) + "|" +
+            std::string(helperName) + "|" +
+            std::string(phase) + "|" +
+            HexU32(ownerAddress) + "|" +
+            HexU32(fieldOffset) + "|" +
+            HexU32(fieldValue) + "|" +
+            HexU32(argR3) + "|" +
+            HexU32(argR4) + "|" +
+            HexU32(argR5) + "|" +
+            HexU32(argR6) + "|" +
+            HexU32(resultR3);
+
+        if (g_loggedNativeOwnerSetterProbeKeys.insert(evidenceKey).second)
+        {
+            WriteEvidenceEvent(
+                "native-owner-setter-probe",
+                "domain=" + std::string(domain) +
+                "|helper=" + std::string(helperName) +
+                "|phase=" + std::string(phase) +
+                "|owner=" + HexU32(ownerAddress) +
+                "|fieldOffset=" + HexU32(fieldOffset) +
+                "|fieldValue=" + HexU32(fieldValue) +
+                "|argR3=" + HexU32(argR3) +
+                "|argR4=" + HexU32(argR4) +
+                "|argR5=" + HexU32(argR5) +
+                "|argR6=" + HexU32(argR6) +
+                "|argR7=" + HexU32(argR7) +
+                "|resultR3=" + HexU32(resultR3) +
+                "|routeEvidence=" + sample.routeEvidence);
         }
     }
 
@@ -8123,6 +8256,47 @@ namespace UiLab
             << "  }";
     }
 
+    static void AppendNativeOwnerSetterProbeJson(std::ostringstream& out)
+    {
+        out
+            << "{\n"
+            << "    \"status\": \"" << JsonEscape(g_nativeOwnerSetterProbeStatus) << "\",\n"
+            << "    \"sampleCount\": " << g_nativeOwnerSetterProbeSamples.size() << ",\n"
+            << "    \"samples\": [";
+
+        const size_t count = g_nativeOwnerSetterProbeSamples.size();
+        const size_t begin = count > 32 ? count - 32 : 0;
+        for (size_t index = begin; index < count; ++index)
+        {
+            const auto& sample = g_nativeOwnerSetterProbeSamples[index];
+            if (index != begin)
+                out << ",";
+
+            out
+                << "{"
+                << "\"frame\":" << sample.frame << ","
+                << "\"domain\":\"" << JsonEscape(sample.domain) << "\","
+                << "\"helperName\":\"" << JsonEscape(sample.helperName) << "\","
+                << "\"phase\":\"" << JsonEscape(sample.phase) << "\","
+                << "\"ownerAddress\":\"" << JsonEscape(HexU32(sample.ownerAddress)) << "\","
+                << "\"fieldOffset\":\"" << JsonEscape(HexU32(sample.fieldOffset)) << "\","
+                << "\"fieldValue\":\"" << JsonEscape(HexU32(sample.fieldValue)) << "\","
+                << "\"argR3\":\"" << JsonEscape(HexU32(sample.argR3)) << "\","
+                << "\"argR4\":\"" << JsonEscape(HexU32(sample.argR4)) << "\","
+                << "\"argR5\":\"" << JsonEscape(HexU32(sample.argR5)) << "\","
+                << "\"argR6\":\"" << JsonEscape(HexU32(sample.argR6)) << "\","
+                << "\"argR7\":\"" << JsonEscape(HexU32(sample.argR7)) << "\","
+                << "\"resultR3\":\"" << JsonEscape(HexU32(sample.resultR3)) << "\","
+                << "\"attachSetterStatus\":\"" << JsonEscape(sample.attachSetterStatus) << "\","
+                << "\"routeEvidence\":\"" << JsonEscape(sample.routeEvidence) << "\""
+                << "}";
+        }
+
+        out
+            << "]\n"
+            << "  }";
+    }
+
     static std::string BuildNativeForegroundStatusJson()
     {
         const auto& target = TargetFor(g_target);
@@ -8155,6 +8329,10 @@ namespace UiLab
             << ",\n"
             << "  \"nativeCsdOwnerLayout\": ";
         AppendNativeCsdOwnerLayoutJson(out);
+        out
+            << ",\n"
+            << "  \"nativeOwnerSetterProbes\": ";
+        AppendNativeOwnerSetterProbeJson(out);
         out
             << "\n"
             << "}\n";
@@ -8450,7 +8628,7 @@ namespace UiLab
             << "    \"lastCommand\": \"" << JsonEscape(g_lastLiveBridgeCommand) << "\",\n"
             << "    \"commandCount\": " << g_liveBridgeCommandCount << ",\n"
             << "    \"commands\": ";
-        AppendStringArray(out, { "state", "events", "route-status", "native-foreground-status", "native-make-observe <project> <scene> [frame]", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub <frame>", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "native-foreground-status", "native-make-observe <project> <scene> [frame]", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-owner-setter-probe", "native-owner-setter-status", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub <frame>", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out
             << "\n"
             << "  },\n"
@@ -9516,6 +9694,34 @@ namespace UiLab
         // The owner/CSD bytes prove the post-Press-Start state exists, but they
         // can become true before the menu is a good capture target. The visual
         // latch is completed from CTitleStateMenu context below.
+    }
+
+    void OnTitleOwnerSetterProbe(
+        std::string_view helperName,
+        std::string_view phase,
+        uint32_t ownerAddress,
+        uint32_t fieldOffset,
+        uint32_t fieldValue,
+        uint32_t argR3,
+        uint32_t argR4,
+        uint32_t argR5,
+        uint32_t argR6,
+        uint32_t argR7,
+        uint32_t resultR3)
+    {
+        RecordNativeOwnerSetterProbeSample(
+            "title",
+            helperName,
+            phase,
+            ownerAddress,
+            fieldOffset,
+            fieldValue,
+            argR3,
+            argR4,
+            argR5,
+            argR6,
+            argR7,
+            resultR3);
     }
 
     void OnTitleStateMenuUpdate(int32_t cursorIndex)
@@ -11719,6 +11925,43 @@ namespace UiLab
         DiscoverOwnerCandidatesForResolvedNativeProbe(false);
     }
 
+    void OnHudOwnerSetterProbe(
+        std::string_view helperName,
+        std::string_view phase,
+        uint32_t ownerAddress,
+        uint32_t fieldOffset,
+        uint32_t fieldValue,
+        uint32_t argR3,
+        uint32_t argR4,
+        uint32_t argR5,
+        uint32_t argR6,
+        uint32_t argR7,
+        uint32_t resultR3)
+    {
+        if (g_chudSonicStageOwnerAddress != 0 &&
+            IsPlausibleGuestPointer(argR3) &&
+            argR3 >= g_chudSonicStageOwnerAddress &&
+            argR3 < g_chudSonicStageOwnerAddress + 0x400)
+        {
+            ownerAddress = g_chudSonicStageOwnerAddress;
+            fieldOffset = argR3 - g_chudSonicStageOwnerAddress;
+        }
+
+        RecordNativeOwnerSetterProbeSample(
+            "hud",
+            helperName,
+            phase,
+            ownerAddress,
+            fieldOffset,
+            fieldValue,
+            argR3,
+            argR4,
+            argR5,
+            argR6,
+            argR7,
+            resultR3);
+    }
+
     void OnHudSonicStageOwnerFieldSample(uint32_t ownerAddress, std::string_view hookSource)
     {
         if (!g_isEnabled || !IsPlausibleGuestPointer(ownerAddress))
@@ -12417,7 +12660,7 @@ namespace UiLab
     {
         std::ostringstream out;
         out << "{\"ok\":true,\"commands\":";
-        AppendStringArray(out, { "state", "events", "route-status", "native-foreground-status", "native-make-observe <project> <scene> [frame]", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub <frame>", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
+        AppendStringArray(out, { "state", "events", "route-status", "native-foreground-status", "native-make-observe <project> <scene> [frame]", "native-owner-discovery", "native-owner-scan", "native-owner-layout", "native-owner-setter-probe", "native-owner-setter-status", "native-foreground-attach", "native-foreground-detach", "native-motion-play", "native-motion-stop", "native-motion-scrub <frame>", "ui-oracle", "ui-draw-list", "ui-gpu-submit", "ui-material-correlation", "ui-backend-resolved", "ui-vendor-command-capture", "ui-layer-capture", "ui-layer-status", "route <target>", "reset", "set-global <name> <0|1>", "capture", "help" });
         out << "}\n";
         return out.str();
     }
@@ -12453,7 +12696,9 @@ namespace UiLab
 
         if (verb == "native-foreground-status" ||
             verb == "native-csd-foreground-status" ||
-            verb == "native-foreground")
+            verb == "native-foreground" ||
+            verb == "native-owner-setter-probe" ||
+            verb == "native-owner-setter-status")
         {
             return BuildNativeForegroundStatusJson();
         }
@@ -15847,6 +16092,25 @@ namespace UiLab
                     field.semantic.ghidraXrefStatus.c_str());
             }
 
+            ImGui::TextWrapped("native setter probes: %s", g_nativeOwnerSetterProbeStatus.c_str());
+            ImGui::Text("setterProbeSamples: %zu", g_nativeOwnerSetterProbeSamples.size());
+            const size_t probeCount = g_nativeOwnerSetterProbeSamples.size();
+            const size_t probeBegin = probeCount > 5 ? probeCount - 5 : 0;
+            for (size_t index = probeBegin; index < probeCount; ++index)
+            {
+                const auto& sample = g_nativeOwnerSetterProbeSamples[index];
+                ImGui::TextWrapped(
+                    "%s %s %s owner=%s field=%s value=%s result=%s",
+                    sample.domain.c_str(),
+                    sample.helperName.c_str(),
+                    sample.phase.c_str(),
+                    HexU32(sample.ownerAddress).c_str(),
+                    HexU32(sample.fieldOffset).c_str(),
+                    HexU32(sample.fieldValue).c_str(),
+                    HexU32(sample.resultR3).c_str());
+                ImGui::TextDisabled("%s", sample.routeEvidence.c_str());
+            }
+
             if (ImGui::Button("Attach Native Scene"))
             {
                 RequestNativeForegroundRenderProbe();
@@ -16353,7 +16617,7 @@ namespace UiLab
             ImGui::Separator();
             ImGui::Text("live bridge: %s", IsLiveBridgeEnabled() ? "enabled" : "off");
             ImGui::TextWrapped("pipe: %s", LiveBridgePipePath().c_str());
-            ImGui::Text("commands: state, events, route-status, native-foreground-status, native-make-observe, native-owner-discovery, native-owner-scan, native-owner-layout, native-foreground-attach, native-foreground-detach, native-motion-play, native-motion-stop, native-motion-scrub, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, ui-backend-resolved, ui-vendor-command-capture, ui-layer-capture, ui-layer-status, route, reset, set-global, capture, help");
+            ImGui::Text("commands: state, events, route-status, native-foreground-status, native-make-observe, native-owner-discovery, native-owner-scan, native-owner-layout, native-owner-setter-probe, native-owner-setter-status, native-foreground-attach, native-foreground-detach, native-motion-play, native-motion-stop, native-motion-scrub, ui-oracle, ui-draw-list, ui-gpu-submit, ui-material-correlation, ui-backend-resolved, ui-vendor-command-capture, ui-layer-capture, ui-layer-status, route, reset, set-global, capture, help");
             ImGui::Text("debugForkTypedFields: %zu", kDebugMenuForkTypedFields.size());
 
             if (ImGui::CollapsingHeader("Typed live inspectors", ImGuiTreeNodeFlags_DefaultOpen))

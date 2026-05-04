@@ -141,6 +141,62 @@ static void ArmStageTitleOwnerDirectState(
         titleCsdAddress ? PPC_LOAD_U8(titleCsdAddress + 84) : 0);
 }
 
+static bool IsPlausibleTitleGuestAddress(uint32_t address)
+{
+    return address >= 0x10000;
+}
+
+static uint32_t ReadTitleContextScenePointer(uint8_t* base, uint32_t titleContextGuestAddress)
+{
+    if (!IsPlausibleTitleGuestAddress(titleContextGuestAddress))
+        return 0;
+
+    return PPC_LOAD_U32(titleContextGuestAddress + 0x1E8);
+}
+
+static void RecordTitleOwnerSetterProbe(
+    const char* helperName,
+    const char* phase,
+    uint32_t ownerAddress,
+    uint32_t fieldOffset,
+    uint32_t fieldValue,
+    const PPCContext& ctx,
+    uint32_t resultR3)
+{
+    UiLab::OnTitleOwnerSetterProbe(
+        helperName,
+        phase,
+        ownerAddress,
+        fieldOffset,
+        fieldValue,
+        ctx.r3.u32,
+        ctx.r4.u32,
+        ctx.r5.u32,
+        ctx.r6.u32,
+        ctx.r7.u32,
+        resultR3);
+}
+
+static void RecordTitleContextScenePointerProbe(
+    const char* helperName,
+    const char* phase,
+    const PPCContext& ctx,
+    uint32_t resultR3,
+    uint8_t* base)
+{
+    const uint32_t titleContextGuestAddress = ctx.r3.u32;
+    const uint32_t titleCsdAddress = ReadTitleContextScenePointer(base, titleContextGuestAddress);
+
+    RecordTitleOwnerSetterProbe(
+        helperName,
+        phase,
+        titleContextGuestAddress,
+        0x1E8,
+        titleCsdAddress,
+        ctx,
+        resultR3);
+}
+
 // SWA::CGameModeStageTitle::Update
 PPC_FUNC_IMPL(__imp__sub_825518B8);
 PPC_FUNC(sub_825518B8)
@@ -166,4 +222,62 @@ PPC_FUNC(sub_825518B8)
 
     if (g_quitMessageOpen)
         pGameModeStageTitle->m_AdvertiseMovieWaitTime = 0;
+}
+
+// Title/menu transition helper candidate. Read-only probe for the attach path
+// feeding title scene changes; no owner pointers are modified here.
+PPC_FUNC_IMPL(__imp__sub_8250F2B8);
+PPC_FUNC(sub_8250F2B8)
+{
+    const PPCContext input = ctx;
+    RecordTitleOwnerSetterProbe(
+        "sub_8250F2B8",
+        "pre-original",
+        input.r3.u32,
+        0xFFFFFFFFu,
+        0,
+        input,
+        0);
+
+    __imp__sub_8250F2B8(ctx, base);
+
+    RecordTitleOwnerSetterProbe(
+        "sub_8250F2B8",
+        "post-original",
+        input.r3.u32,
+        0xFFFFFFFFu,
+        0,
+        input,
+        ctx.r3.u32);
+}
+
+// Title context resource scene pointer helper: returns titleContext+0x1E8 + 0x40.
+PPC_FUNC_IMPL(__imp__sub_82581288);
+PPC_FUNC(sub_82581288)
+{
+    const PPCContext input = ctx;
+    RecordTitleContextScenePointerProbe("sub_82581288", "pre-original", input, 0, base);
+    __imp__sub_82581288(ctx, base);
+    RecordTitleContextScenePointerProbe("sub_82581288", "post-original", input, ctx.r3.u32, base);
+}
+
+// Title context resource scene readiness/check helper.
+PPC_FUNC_IMPL(__imp__sub_825812A8);
+PPC_FUNC(sub_825812A8)
+{
+    const PPCContext input = ctx;
+    RecordTitleContextScenePointerProbe("sub_825812A8", "pre-original", input, 0, base);
+    __imp__sub_825812A8(ctx, base);
+    RecordTitleContextScenePointerProbe("sub_825812A8", "post-original", input, ctx.r3.u32, base);
+}
+
+// Title context visibility/output gate helper: combines titleContext+0x1E8 and
+// titleContext+0x1D1. This is still read-only evidence for the real attach path.
+PPC_FUNC_IMPL(__imp__sub_825812E8);
+PPC_FUNC(sub_825812E8)
+{
+    const PPCContext input = ctx;
+    RecordTitleContextScenePointerProbe("sub_825812E8", "pre-original", input, 0, base);
+    __imp__sub_825812E8(ctx, base);
+    RecordTitleContextScenePointerProbe("sub_825812E8", "post-original", input, ctx.r3.u32, base);
 }

@@ -103,6 +103,31 @@ static void RecordHudSonicStageCallsiteSample(
         ctx.r4.u32);
 }
 
+static void RecordHudOwnerSetterProbe(
+    const char* helperName,
+    const char* phase,
+    const PPCContext& ctx,
+    uint32_t resultR3,
+    uint8_t* base)
+{
+    const uint32_t fieldValue = IsPlausibleGuestAddress(ctx.r7.u32)
+        ? ReadGuestU32ForCtWriter(base, ctx.r7.u32)
+        : 0;
+
+    UiLab::OnHudOwnerSetterProbe(
+        helperName,
+        phase,
+        ctx.r3.u32,
+        0xFFFFFFFFu,
+        fieldValue,
+        ctx.r3.u32,
+        ctx.r4.u32,
+        ctx.r5.u32,
+        ctx.r6.u32,
+        ctx.r7.u32,
+        resultR3);
+}
+
 static void RecordCtGameplayWriterProbe(
     const char* valueName,
     const char* callsite,
@@ -496,6 +521,28 @@ PPC_FUNC(sub_824D95F8)
     const uint32_t ownerAddress = ctx.r3.u32;
     __imp__sub_824D95F8(ctx, base);
     RecordHudSonicStageInspector(ownerAddress, "raw CHudSonicStage owner hook sub_824D95F8");
+}
+
+// Generic CSD helper used by HUD binding paths. This is a read-only probe:
+// capture call arguments and the target slot pointer, then let the real helper
+// own allocation/refcount/lifecycle.
+PPC_FUNC_IMPL(__imp__sub_82E5FCD0);
+PPC_FUNC(sub_82E5FCD0)
+{
+    const PPCContext input = ctx;
+    RecordHudOwnerSetterProbe("sub_82E5FCD0", "pre-original", input, 0, base);
+    __imp__sub_82E5FCD0(ctx, base);
+    RecordHudOwnerSetterProbe("sub_82E5FCD0", "post-original", input, ctx.r3.u32, base);
+}
+
+// Generic CSD scene/resource setter helper used by HUD scene switching.
+PPC_FUNC_IMPL(__imp__sub_82E61A78);
+PPC_FUNC(sub_82E61A78)
+{
+    const PPCContext input = ctx;
+    RecordHudOwnerSetterProbe("sub_82E61A78", "pre-original", input, 0, base);
+    __imp__sub_82E61A78(ctx, base);
+    RecordHudOwnerSetterProbe("sub_82E61A78", "post-original", input, ctx.r3.u32, base);
 }
 
 // CHudSonicStage value update hooks. These are deliberately context hooks:

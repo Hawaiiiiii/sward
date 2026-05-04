@@ -914,6 +914,86 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("Phase 254", generator)
 
+    def test_ui_lab_probes_native_owner_attach_setter_candidates(self):
+        header = self.read("UnleashedRecomp/patches/ui_lab_patches.h")
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        title_patch = self.read("UnleashedRecomp/patches/CGameModeStageTitle_patches.cpp")
+        hud_patch = self.read("UnleashedRecomp/patches/CHudSonicStage_patches.cpp")
+        query_script = self.read("research_uiux/runtime_reference/tools/query_unleashed_recomp_ui_lab_bridge.ps1")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            "void OnTitleOwnerSetterProbe(",
+            "void OnHudOwnerSetterProbe(",
+        ]:
+            self.assertIn(token, header)
+
+        for token in [
+            "struct NativeOwnerSetterProbeSample",
+            "g_nativeOwnerSetterProbeSamples",
+            "RecordNativeOwnerSetterProbeSample",
+            "AppendNativeOwnerSetterProbeJson",
+            "\\\"nativeOwnerSetterProbes\\\"",
+            "\\\"helperName\\\"",
+            "\\\"ownerAddress\\\"",
+            "\\\"fieldOffset\\\"",
+            "\\\"fieldValue\\\"",
+            "\\\"argR3\\\"",
+            "\\\"argR4\\\"",
+            "\\\"argR5\\\"",
+            "\\\"argR6\\\"",
+            "\\\"resultR3\\\"",
+            "\\\"routeEvidence\\\"",
+            "native-owner-setter-probe",
+            "native-owner-setter-probe-status",
+            "titleContext+0x1E8",
+            "titleContext+0x1D1",
+            "db-xml-route-candidate",
+            "asset-db-route-evidence",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "PPC_FUNC_IMPL(__imp__sub_8250F2B8);",
+            "PPC_FUNC(sub_8250F2B8)",
+            "PPC_FUNC_IMPL(__imp__sub_82581288);",
+            "PPC_FUNC(sub_82581288)",
+            "PPC_FUNC_IMPL(__imp__sub_825812A8);",
+            "PPC_FUNC(sub_825812A8)",
+            "PPC_FUNC_IMPL(__imp__sub_825812E8);",
+            "PPC_FUNC(sub_825812E8)",
+            "UiLab::OnTitleOwnerSetterProbe",
+        ]:
+            self.assertIn(token, title_patch)
+
+        for token in [
+            "PPC_FUNC_IMPL(__imp__sub_82E5FCD0);",
+            "PPC_FUNC(sub_82E5FCD0)",
+            "PPC_FUNC_IMPL(__imp__sub_82E61A78);",
+            "PPC_FUNC(sub_82E61A78)",
+            "UiLab::OnHudOwnerSetterProbe",
+        ]:
+            self.assertIn(token, hud_patch)
+
+        for token in [
+            "native-owner-setter-probe",
+            "native-owner-setter-status",
+        ]:
+            self.assertIn(token, query_script)
+
+        for token in [
+            "Phase 255",
+            "Native Owner Setter Probe",
+            "sub_8250F2B8",
+            "sub_82581288/A8/E8",
+            "sub_82E5FCD0 / sub_82E61A78",
+            "DB/XML route evidence",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 255", generator)
+
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
