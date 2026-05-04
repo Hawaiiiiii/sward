@@ -479,6 +479,28 @@ namespace UiLab
         uint64_t frame = 0;
     };
 
+    // Phase 260: a discovered HUD owner slot that resolves (directly or via
+    // one indirect dereference) to a live manager CScene. Surfaced from the
+    // bounded owner-layout scanner once the live CHudSonicStage owner is
+    // seeded so the operator sees every renderable slot (not only the four
+    // hardcoded `+0xD8/0xE0/0xF0/0xF4` offsets) and can pick the safest one
+    // before any guarded native foreground attach is attempted.
+    struct HudOwnerRenderableSlot
+    {
+        std::string ownerSource;
+        uint32_t ownerAddress = 0;
+        uint32_t fieldOffset = UINT32_MAX;
+        uint32_t fieldAddress = 0;
+        uint32_t slotValue = 0;
+        uint32_t indirectAddress = 0;
+        std::string matchKind;
+        std::string projectName;
+        std::string scenePath;
+        uint32_t managerSceneAddress = 0;
+        uint32_t resourceSceneAddress = 0;
+        uint64_t frame = 0;
+    };
+
     struct CsdOwnerScanRange
     {
         uint32_t ownerAddress = 0;
@@ -786,6 +808,10 @@ namespace UiLab
         // the last reset. Emitted by `OnHudOwnerSetterProbe`.
         uint64_t skippedHudOwnerSetterProbeCallCount = 0;
         uint64_t recordedHudOwnerSetterProbeCallCount = 0;
+        // Phase 260: every HUD owner slot whose value (direct or indirect)
+        // resolves to a live manager CScene, discovered by the bounded
+        // opportunistic sweep across the owner range.
+        std::vector<HudOwnerRenderableSlot> renderableSlots;
         uint32_t stageGameModeAddress = 0;
         uint32_t rcPlayScreenProjectAddress = 0;
         uint32_t rcSpeedGaugeSceneAddress = 0;
@@ -1315,6 +1341,13 @@ namespace UiLab
         g_loggedHudOwnerSetterProbeFirstSeenKeys;
     static uint64_t g_skippedHudOwnerSetterProbeCallCount = 0;
     static uint64_t g_recordedHudOwnerSetterProbeCallCount = 0;
+    // Phase 260: cache the HUD owner addresses the opportunistic layout
+    // sweep has already covered, so the bounded scan over the owner range
+    // runs at most once per unique owner address per session. The discovered
+    // renderable slots are kept beside the cache for the bridge query.
+    static std::unordered_set<uint32_t> g_sweptHudOwnerAddresses;
+    static std::vector<HudOwnerRenderableSlot> g_hudOwnerRenderableSlots;
+    static std::unordered_set<std::string> g_loggedHudOwnerRenderableSlotKeys;
     static uint32_t g_chudSonicStagePlayScreenProjectAddress = 0;
     static uint32_t g_chudSonicStageSpeedGaugeSceneAddress = 0;
     static uint32_t g_chudSonicStageRingEnergyGaugeSceneAddress = 0;
@@ -1508,6 +1541,12 @@ namespace UiLab
         std::string_view slotName,
         uint32_t fieldOffset);
     static void SampleHudOwnerSlotReadouts(
+        uint32_t ownerAddress,
+        std::string_view ownerSource);
+    // Phase 260: opportunistic owner-range sweep that auto-discovers every
+    // HUD owner field whose value (direct or indirect) resolves to a live
+    // manager CScene; runs at most once per unique owner address per session.
+    static void TryRunOpportunisticHudOwnerLayoutSweep(
         uint32_t ownerAddress,
         std::string_view ownerSource);
     static void AppendNativeCsdOwnerDiscoveryJson(std::ostringstream& out);
@@ -3476,6 +3515,13 @@ namespace UiLab
             { 0xF4, "owner+0xF4 activeUpdateSceneCompanion" },
         };
 
+        // Phase 260: kick the bounded owner-range sweep at most once per
+        // unique owner address per session so renderable slots beyond the
+        // four hardcoded offsets are discovered as soon as the owner is
+        // known. The sweep itself is gated on `g_sweptHudOwnerAddresses`,
+        // so calling it here on every confirmed setter is safe.
+        TryRunOpportunisticHudOwnerLayoutSweep(ownerAddress, ownerSource);
+
         std::vector<HudOwnerSlotReadout> samples;
         samples.reserve(std::size(kHudOwnerSlotSpecs));
         std::string aggregateSignature;
@@ -3563,6 +3609,148 @@ namespace UiLab
                 "native-owner-setter-hud-owner-slot-readout",
                 detail);
         }
+    }
+
+    // Phase 260: opportunistic bounded sweep across the live CHudSonicStage
+    // owner range. The four hardcoded slot readouts only cover the proven
+    // attach/scene-update offsets (`+0xD8/0xE0/0xF0/0xF4`); this sweep walks
+    // the full owner range and emits a `native-hud-owner-renderable-slot`
+    // event for every owner field whose value (directly or after one indirect
+    // dereference) resolves to a live manager CScene. Runs at most once per
+    // unique owner address per session so steady-state HUD frames pay no
+    // recurring cost. Read-only — never writes to owner fields.
+    static void TryRunOpportunisticHudOwnerLayoutSweep(
+        uint32_t ownerAddress,
+        std::string_view ownerSource)
+    {
+        if (!IsPlausibleGuestPointer(ownerAddress))
+            return;
+
+        if (!g_sweptHudOwnerAddresses.insert(ownerAddress).second)
+            return;
+
+        static constexpr uint32_t kHudOwnerSweepBytes = 0x3000;
+        static constexpr uint32_t kHudOwnerSweepIndirectBytes = 0x80;
+        size_t directHits = 0;
+        size_t indirectHits = 0;
+
+        for (uint32_t offset = 0;
+             offset + sizeof(uint32_t) <= kHudOwnerSweepBytes;
+             offset += sizeof(uint32_t))
+        {
+            uint32_t slotValue = 0;
+            if (!TryReadGuestU32(ownerAddress + offset, slotValue))
+                continue;
+
+            if (slotValue == 0)
+                continue;
+
+            const CsdManagerSceneCorrelation* directCorrelation =
+                FindCsdManagerSceneCorrelationByManagerAddress(slotValue);
+            if (directCorrelation != nullptr)
+            {
+                HudOwnerRenderableSlot slot;
+                slot.ownerSource = std::string(ownerSource);
+                slot.ownerAddress = ownerAddress;
+                slot.fieldOffset = offset;
+                slot.fieldAddress = ownerAddress + offset;
+                slot.slotValue = slotValue;
+                slot.indirectAddress = 0;
+                slot.matchKind = "direct-manager-scene";
+                slot.projectName = directCorrelation->projectName;
+                slot.scenePath = directCorrelation->scenePath;
+                slot.managerSceneAddress = directCorrelation->managerSceneAddress;
+                slot.resourceSceneAddress = directCorrelation->resourceSceneAddress;
+                slot.frame = g_presentedFrameCount;
+                g_hudOwnerRenderableSlots.push_back(slot);
+                ++directHits;
+
+                const std::string key =
+                    slot.ownerSource + "|" + HexU32(slot.fieldAddress) +
+                    "|" + slot.matchKind + "|" + HexU32(slot.managerSceneAddress);
+                if (g_loggedHudOwnerRenderableSlotKeys.insert(key).second)
+                {
+                    WriteEvidenceEvent(
+                        "native-hud-owner-renderable-slot",
+                        "ownerSource=" + slot.ownerSource +
+                        "|owner=" + HexU32(slot.ownerAddress) +
+                        "|fieldOffset=" + HexU32(slot.fieldOffset) +
+                        "|fieldAddress=" + HexU32(slot.fieldAddress) +
+                        "|slotValue=" + HexU32(slot.slotValue) +
+                        "|matchKind=" + slot.matchKind +
+                        "|project=" + slot.projectName +
+                        "|scenePath=" + slot.scenePath +
+                        "|managerScene=" + HexU32(slot.managerSceneAddress) +
+                        "|resourceScene=" + HexU32(slot.resourceSceneAddress) +
+                        "|status=read-only renderable HUD owner slot discovered; inspect before any guarded native foreground attach");
+                }
+                continue;
+            }
+
+            if (!IsPlausibleGuestPointer(slotValue))
+                continue;
+
+            for (uint32_t nestedOffset = 0;
+                 nestedOffset <= kHudOwnerSweepIndirectBytes;
+                 nestedOffset += sizeof(uint32_t))
+            {
+                uint32_t nestedValue = 0;
+                if (!TryReadGuestU32(slotValue + nestedOffset, nestedValue))
+                    continue;
+
+                const CsdManagerSceneCorrelation* indirectCorrelation =
+                    FindCsdManagerSceneCorrelationByManagerAddress(nestedValue);
+                if (indirectCorrelation == nullptr)
+                    continue;
+
+                HudOwnerRenderableSlot slot;
+                slot.ownerSource = std::string(ownerSource);
+                slot.ownerAddress = ownerAddress;
+                slot.fieldOffset = offset;
+                slot.fieldAddress = ownerAddress + offset;
+                slot.slotValue = slotValue;
+                slot.indirectAddress = slotValue + nestedOffset;
+                slot.matchKind = "indirect-manager-scene";
+                slot.projectName = indirectCorrelation->projectName;
+                slot.scenePath = indirectCorrelation->scenePath;
+                slot.managerSceneAddress = indirectCorrelation->managerSceneAddress;
+                slot.resourceSceneAddress = indirectCorrelation->resourceSceneAddress;
+                slot.frame = g_presentedFrameCount;
+                g_hudOwnerRenderableSlots.push_back(slot);
+                ++indirectHits;
+
+                const std::string key =
+                    slot.ownerSource + "|" + HexU32(slot.fieldAddress) +
+                    "|" + slot.matchKind + "|" + HexU32(slot.managerSceneAddress);
+                if (g_loggedHudOwnerRenderableSlotKeys.insert(key).second)
+                {
+                    WriteEvidenceEvent(
+                        "native-hud-owner-renderable-slot",
+                        "ownerSource=" + slot.ownerSource +
+                        "|owner=" + HexU32(slot.ownerAddress) +
+                        "|fieldOffset=" + HexU32(slot.fieldOffset) +
+                        "|fieldAddress=" + HexU32(slot.fieldAddress) +
+                        "|slotValue=" + HexU32(slot.slotValue) +
+                        "|indirectAddress=" + HexU32(slot.indirectAddress) +
+                        "|matchKind=" + slot.matchKind +
+                        "|project=" + slot.projectName +
+                        "|scenePath=" + slot.scenePath +
+                        "|managerScene=" + HexU32(slot.managerSceneAddress) +
+                        "|resourceScene=" + HexU32(slot.resourceSceneAddress) +
+                        "|status=read-only renderable HUD owner slot discovered; inspect before any guarded native foreground attach");
+                }
+                break;
+            }
+        }
+
+        WriteEvidenceEvent(
+            "native-hud-owner-layout-sweep-complete",
+            "ownerSource=" + std::string(ownerSource) +
+            "|owner=" + HexU32(ownerAddress) +
+            "|sweepBytes=" + HexU32(kHudOwnerSweepBytes) +
+            "|directHits=" + std::to_string(directHits) +
+            "|indirectHits=" + std::to_string(indirectHits) +
+            "|status=read-only HUD owner layout sweep complete");
     }
 
     static void StoreCsdManagerSceneCorrelation(const CsdManagerSceneCorrelation& correlation)
@@ -4524,6 +4712,7 @@ namespace UiLab
             g_skippedHudOwnerSetterProbeCallCount;
         snapshot.recordedHudOwnerSetterProbeCallCount =
             g_recordedHudOwnerSetterProbeCallCount;
+        snapshot.renderableSlots = g_hudOwnerRenderableSlots;
         snapshot.stageGameModeAddress = g_lastStageGameModeAddress;
         snapshot.rcPlayScreenProjectAddress = g_chudSonicStagePlayScreenProjectAddress;
         snapshot.rcSpeedGaugeSceneAddress = g_chudSonicStageSpeedGaugeSceneAddress;
@@ -6821,7 +7010,32 @@ namespace UiLab
         out
             << "],\n"
             << "        \"skippedHudOwnerSetterProbeCallCount\": " << sonicOwnerPath.skippedHudOwnerSetterProbeCallCount << ",\n"
-            << "        \"recordedHudOwnerSetterProbeCallCount\": " << sonicOwnerPath.recordedHudOwnerSetterProbeCallCount << "\n"
+            << "        \"recordedHudOwnerSetterProbeCallCount\": " << sonicOwnerPath.recordedHudOwnerSetterProbeCallCount << ",\n"
+            << "        \"renderableSlotCount\": " << sonicOwnerPath.renderableSlots.size() << ",\n"
+            << "        \"renderableSlots\": [";
+        for (size_t i = 0; i < sonicOwnerPath.renderableSlots.size(); ++i)
+        {
+            const auto& slot = sonicOwnerPath.renderableSlots[i];
+            if (i != 0)
+                out << ",";
+            out
+                << "{"
+                << "\"ownerSource\":\"" << JsonEscape(slot.ownerSource) << "\","
+                << "\"ownerAddress\":\"" << JsonEscape(HexU32(slot.ownerAddress)) << "\","
+                << "\"fieldOffset\":\"" << JsonEscape(HexU32(slot.fieldOffset)) << "\","
+                << "\"fieldAddress\":\"" << JsonEscape(HexU32(slot.fieldAddress)) << "\","
+                << "\"slotValue\":\"" << JsonEscape(HexU32(slot.slotValue)) << "\","
+                << "\"indirectAddress\":\"" << JsonEscape(HexU32(slot.indirectAddress)) << "\","
+                << "\"matchKind\":\"" << JsonEscape(slot.matchKind) << "\","
+                << "\"projectName\":\"" << JsonEscape(slot.projectName) << "\","
+                << "\"scenePath\":\"" << JsonEscape(slot.scenePath) << "\","
+                << "\"managerSceneAddress\":\"" << JsonEscape(HexU32(slot.managerSceneAddress)) << "\","
+                << "\"resourceSceneAddress\":\"" << JsonEscape(HexU32(slot.resourceSceneAddress)) << "\","
+                << "\"frame\":" << slot.frame
+                << "}";
+        }
+        out
+            << "]\n"
             << "      }\n"
             << "    }\n"
             << "  }";
@@ -10029,6 +10243,9 @@ namespace UiLab
         g_loggedHudOwnerSetterProbeFirstSeenKeys.clear();
         g_skippedHudOwnerSetterProbeCallCount = 0;
         g_recordedHudOwnerSetterProbeCallCount = 0;
+        g_sweptHudOwnerAddresses.clear();
+        g_hudOwnerRenderableSlots.clear();
+        g_loggedHudOwnerRenderableSlotKeys.clear();
         g_chudSonicStagePlayScreenProjectAddress = 0;
         g_chudSonicStageSpeedGaugeSceneAddress = 0;
         g_chudSonicStageRingEnergyGaugeSceneAddress = 0;

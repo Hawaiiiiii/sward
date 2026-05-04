@@ -1183,6 +1183,45 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("Phase 259", generator)
 
+    def test_ui_lab_sweeps_hud_owner_for_renderable_slots(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            # Phase 260 struct + globals.
+            "struct HudOwnerRenderableSlot",
+            "g_sweptHudOwnerAddresses",
+            "g_hudOwnerRenderableSlots",
+            "g_loggedHudOwnerRenderableSlotKeys",
+            # Phase 260 sweep entry point.
+            "TryRunOpportunisticHudOwnerLayoutSweep",
+            "kHudOwnerSweepBytes",
+            "kHudOwnerSweepIndirectBytes",
+            # Phase 260 evidence events.
+            "native-hud-owner-renderable-slot",
+            "native-hud-owner-layout-sweep-complete",
+            "read-only renderable HUD owner slot discovered; inspect before any guarded native foreground attach",
+            "read-only HUD owner layout sweep complete",
+            # Phase 260 match kinds emitted by the sweep.
+            "direct-manager-scene",
+            "indirect-manager-scene",
+            # Phase 260 live-state JSON fields.
+            "renderableSlotCount",
+            "renderableSlots",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 260",
+            "HUD Owner Renderable-Slot Sweep",
+            "native-hud-owner-renderable-slot",
+            "indirect-manager-scene",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 260", generator)
+
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
