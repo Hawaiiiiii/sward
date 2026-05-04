@@ -781,6 +781,11 @@ namespace UiLab
         // attach/scene-update slots, sampled per ownership source so the
         // operator can compare what each slot holds at the same frame.
         std::vector<HudOwnerSlotReadout> ownerSlotReadouts;
+        // Phase 259: hot-path filter perf counters so the operator can see
+        // how many HUD setter helper calls were skipped vs recorded since
+        // the last reset. Emitted by `OnHudOwnerSetterProbe`.
+        uint64_t skippedHudOwnerSetterProbeCallCount = 0;
+        uint64_t recordedHudOwnerSetterProbeCallCount = 0;
         uint32_t stageGameModeAddress = 0;
         uint32_t rcPlayScreenProjectAddress = 0;
         uint32_t rcSpeedGaugeSceneAddress = 0;
@@ -1296,6 +1301,20 @@ namespace UiLab
     static std::unordered_map<std::string, uint64_t>
         g_lastHudOwnerSlotReadoutEvidenceFrames;
     static constexpr uint64_t kHudOwnerSlotReadoutMinEvidenceIntervalFrames = 600;
+    // Phase 259: hot-path filter state for OnHudOwnerSetterProbe. The HUD
+    // setter helpers fire thousands of times per second during gameplay and
+    // only the proven CHudSonicStage::sub_824D9308 stage-bind callsites
+    // (sub_82E5FCD0 argR5=110, sub_82E61A78 argR5=121) carry the attach/
+    // scene-update field-map evidence we actually use; the rest produced 12+
+    // events/sec of dead JSONL traffic that drove gameplay framerate below
+    // 20fps and crashed the runtime. We now skip sample recording for all
+    // other (helper, argR5) tuples and emit a single one-shot breadcrumb the
+    // first time a new tuple is observed so unexpected callsites still leave
+    // a trail.
+    static std::unordered_set<std::string>
+        g_loggedHudOwnerSetterProbeFirstSeenKeys;
+    static uint64_t g_skippedHudOwnerSetterProbeCallCount = 0;
+    static uint64_t g_recordedHudOwnerSetterProbeCallCount = 0;
     static uint32_t g_chudSonicStagePlayScreenProjectAddress = 0;
     static uint32_t g_chudSonicStageSpeedGaugeSceneAddress = 0;
     static uint32_t g_chudSonicStageRingEnergyGaugeSceneAddress = 0;
@@ -4501,6 +4520,10 @@ namespace UiLab
         snapshot.inferredChudSonicStageOwnerSampleCount =
             g_inferredChudSonicStageOwnerSampleCount;
         snapshot.ownerSlotReadouts = g_lastHudOwnerSlotReadouts;
+        snapshot.skippedHudOwnerSetterProbeCallCount =
+            g_skippedHudOwnerSetterProbeCallCount;
+        snapshot.recordedHudOwnerSetterProbeCallCount =
+            g_recordedHudOwnerSetterProbeCallCount;
         snapshot.stageGameModeAddress = g_lastStageGameModeAddress;
         snapshot.rcPlayScreenProjectAddress = g_chudSonicStagePlayScreenProjectAddress;
         snapshot.rcSpeedGaugeSceneAddress = g_chudSonicStageSpeedGaugeSceneAddress;
@@ -6796,7 +6819,9 @@ namespace UiLab
                 << "}";
         }
         out
-            << "]\n"
+            << "],\n"
+            << "        \"skippedHudOwnerSetterProbeCallCount\": " << sonicOwnerPath.skippedHudOwnerSetterProbeCallCount << ",\n"
+            << "        \"recordedHudOwnerSetterProbeCallCount\": " << sonicOwnerPath.recordedHudOwnerSetterProbeCallCount << "\n"
             << "      }\n"
             << "    }\n"
             << "  }";
@@ -10001,6 +10026,9 @@ namespace UiLab
         g_lastHudOwnerSlotReadouts.clear();
         g_lastHudOwnerSlotReadoutStableSignatures.clear();
         g_lastHudOwnerSlotReadoutEvidenceFrames.clear();
+        g_loggedHudOwnerSetterProbeFirstSeenKeys.clear();
+        g_skippedHudOwnerSetterProbeCallCount = 0;
+        g_recordedHudOwnerSetterProbeCallCount = 0;
         g_chudSonicStagePlayScreenProjectAddress = 0;
         g_chudSonicStageSpeedGaugeSceneAddress = 0;
         g_chudSonicStageRingEnergyGaugeSceneAddress = 0;
@@ -12629,6 +12657,34 @@ namespace UiLab
         uint32_t argR7,
         uint32_t resultR3)
     {
+        // Phase 259: hot-path filter. The HUD setter helpers fire thousands
+        // of times per second during gameplay and only the proven
+        // CHudSonicStage::sub_824D9308 stage-bind callsites carry the
+        // attach/scene-update field-map evidence we use. Everything else is
+        // skipped to keep gameplay framerate stable.
+        static constexpr uint32_t kProvenArgR5Sub82E5FCD0 = 110;
+        static constexpr uint32_t kProvenArgR5Sub82E61A78 = 121;
+        const bool isProvenStageBindCallsite =
+            (helperName == "sub_82E5FCD0" && argR5 == kProvenArgR5Sub82E5FCD0) ||
+            (helperName == "sub_82E61A78" && argR5 == kProvenArgR5Sub82E61A78);
+        if (!isProvenStageBindCallsite)
+        {
+            ++g_skippedHudOwnerSetterProbeCallCount;
+            const std::string firstSeenKey =
+                std::string(helperName) + "|argR5=" + HexU32(argR5);
+            if (g_loggedHudOwnerSetterProbeFirstSeenKeys
+                    .insert(firstSeenKey).second)
+            {
+                WriteEvidenceEvent(
+                    "native-owner-setter-hud-helper-first-seen",
+                    "helper=" + std::string(helperName) +
+                    "|argR5=" + HexU32(argR5) +
+                    "|status=non-proven HUD setter helper callsite; sample recording skipped to preserve gameplay framerate");
+            }
+            return;
+        }
+
+        ++g_recordedHudOwnerSetterProbeCallCount;
         if (g_chudSonicStageOwnerAddress != 0 &&
             IsPlausibleGuestPointer(argR3) &&
             argR3 >= g_chudSonicStageOwnerAddress &&

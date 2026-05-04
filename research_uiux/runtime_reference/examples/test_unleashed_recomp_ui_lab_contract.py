@@ -1150,6 +1150,39 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("Phase 258", generator)
 
+    def test_ui_lab_filters_hud_owner_setter_probe_hot_path(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            # Phase 259 hot-path filter constants and globals.
+            "kProvenArgR5Sub82E5FCD0",
+            "kProvenArgR5Sub82E61A78",
+            "isProvenStageBindCallsite",
+            "g_loggedHudOwnerSetterProbeFirstSeenKeys",
+            "g_skippedHudOwnerSetterProbeCallCount",
+            "g_recordedHudOwnerSetterProbeCallCount",
+            # Phase 259 breadcrumb evidence event for non-proven helpers.
+            "native-owner-setter-hud-helper-first-seen",
+            "non-proven HUD setter helper callsite; sample recording skipped to preserve gameplay framerate",
+            # Phase 259 perf counters surfaced in live-state JSON.
+            "skippedHudOwnerSetterProbeCallCount",
+            "recordedHudOwnerSetterProbeCallCount",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 259",
+            "HUD Setter Probe Hot-Path Filter",
+            "argR5=110",
+            "argR5=121",
+            "native-owner-setter-hud-helper-first-seen",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 259", generator)
+
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
