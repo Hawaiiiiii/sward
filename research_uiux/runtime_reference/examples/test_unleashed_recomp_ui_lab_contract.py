@@ -1033,6 +1033,70 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("Phase 256", generator)
 
+    def test_ui_lab_seeds_inferred_chudsonicstage_owner_for_layout_scanning(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            # Phase 257 inferred owner globals.
+            "g_inferredChudSonicStageOwnerAddress",
+            "g_inferredChudSonicStageOwnerSource",
+            "g_inferredChudSonicStageOwnerHelper",
+            "g_inferredChudSonicStageOwnerLastUpdatedFrame",
+            "g_inferredChudSonicStageOwnerSampleCount",
+            # Phase 257 evidence event for the seeded inferred owner.
+            "native-owner-setter-hud-inferred-owner-seeded",
+            "read-only inferred CHudSonicStage owner seeded for owner-layout scanning",
+            # Phase 257 plumbing into the bounded owner-layout scan ranges.
+            "inferred CHudSonicStage owner",
+            "inferred CHudSonicStage owner; argR3 == owner+0x28 helper object",
+            # Phase 257 HUD owner field semantic names.
+            "hudOwner.attachSourceScene",
+            "hudOwner.attachTargetScene",
+            "hudOwner.activeUpdateScenePrimary",
+            "hudOwner.activeUpdateSceneCompanion",
+            "hudOwnerInferred.attachSourceScene",
+            "hudOwnerInferred.attachTargetScene",
+            "hudOwnerInferred.activeUpdateScenePrimary",
+            "hudOwnerInferred.activeUpdateSceneCompanion",
+            # Phase 257 HUD owner field semantic roles.
+            "hud-owner-attach-source-scene",
+            "hud-owner-attach-target-scene",
+            "hud-owner-active-update-scene-primary",
+            "hud-owner-active-update-scene-companion",
+            # Phase 257 attach setter narratives keep writes disabled but call
+            # out the real source/target slots.
+            "owner+0xD8 source attach scene read by sub_82E5FCD0",
+            "owner+0xE0 target attach scene populated by sub_82E5FCD0",
+            "owner+0xF0 active scene-update slot snapshotted by sub_82E61A78",
+            "owner+0xF4 companion of the owner+0xF0 active scene-update slot",
+            # Phase 257 live-state JSON snapshot exposes the inferred owner.
+            "inferredChudSonicStageOwnerAddress",
+            "inferredChudSonicStageOwnerSource",
+            "inferredChudSonicStageOwnerHelper",
+            "inferredChudSonicStageOwnerLastUpdatedFrame",
+            "inferredChudSonicStageOwnerSampleCount",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 257",
+            "HUD Owner Layout Field Map",
+            "inferred CHudSonicStage owner",
+            "owner+0xD8",
+            "owner+0xE0",
+            "owner+0xF0",
+            "owner+0xF4",
+            "hudOwner.attachSourceScene",
+            "hudOwner.attachTargetScene",
+            "hudOwner.activeUpdateScenePrimary",
+            "hudOwner.activeUpdateSceneCompanion",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 257", generator)
+
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")

@@ -747,6 +747,15 @@ namespace UiLab
     struct SonicHudOwnerPathInspectorSnapshot
     {
         uint32_t chudSonicStageOwnerAddress = 0;
+        // Phase 257: inferred CHudSonicStage owner derived from native owner
+        // setter helper traffic; mirrors the constructor-time owner so the
+        // bridge query can see the inferred owner address even when the raw
+        // constructor hook has not landed yet.
+        uint32_t inferredChudSonicStageOwnerAddress = 0;
+        std::string inferredChudSonicStageOwnerSource;
+        std::string inferredChudSonicStageOwnerHelper;
+        uint64_t inferredChudSonicStageOwnerLastUpdatedFrame = 0;
+        uint64_t inferredChudSonicStageOwnerSampleCount = 0;
         uint32_t stageGameModeAddress = 0;
         uint32_t rcPlayScreenProjectAddress = 0;
         uint32_t rcSpeedGaugeSceneAddress = 0;
@@ -1236,6 +1245,20 @@ namespace UiLab
     static bool g_loggedPauseOwnerObserved = false;
     static std::unordered_set<std::string> g_loggedPauseRouteInputSources;
     static uint32_t g_chudSonicStageOwnerAddress = 0;
+    // Phase 257: inferred CHudSonicStage owner derived from native owner setter
+    // helper traffic when the constructor-side owner address is not yet seeded.
+    // The proven HUD stage-bind helpers always pass argR3 == owner+0x28, so
+    // recovering owner = argR3 - 0x28 is a safe read-only inference. Stored
+    // separately from the constructor-time `g_chudSonicStageOwnerAddress` so
+    // the owner-layout scanner can fall back to this inferred owner without
+    // overwriting the raw constructor evidence.
+    static uint32_t g_inferredChudSonicStageOwnerAddress = 0;
+    static std::string g_inferredChudSonicStageOwnerSource;
+    static std::string g_inferredChudSonicStageOwnerHelper;
+    static uint64_t g_inferredChudSonicStageOwnerLastUpdatedFrame = 0;
+    static uint64_t g_inferredChudSonicStageOwnerSampleCount = 0;
+    static bool g_loggedInferredChudSonicStageOwnerSeed = false;
+    static std::string g_inferredChudSonicStageOwnerStableSignature;
     static uint32_t g_chudSonicStagePlayScreenProjectAddress = 0;
     static uint32_t g_chudSonicStageSpeedGaugeSceneAddress = 0;
     static uint32_t g_chudSonicStageRingEnergyGaugeSceneAddress = 0;
@@ -2066,6 +2089,15 @@ namespace UiLab
                 argR3,
                 g_chudSonicStageOwnerAddress,
                 "CHudSonicStage owner; argR3 == owner+0x28 helper object");
+            // Phase 257: re-anchor onto the previously inferred CHudSonicStage
+            // owner so subsequent setter helper traffic stays attributed to the
+            // same owner instead of falling through to a fresh argR3 - 0x28
+            // inference each call.
+            TryMapNativeOwnerSetterHelperObject(
+                map,
+                argR3,
+                g_inferredChudSonicStageOwnerAddress,
+                "inferred CHudSonicStage owner; argR3 == owner+0x28 helper object");
             TryMapNativeOwnerSetterHelperObject(
                 map,
                 argR3,
@@ -2189,6 +2221,53 @@ namespace UiLab
         sample.targetFieldOffset = ownerMap.targetFieldOffset;
         sample.probableOwnerSource = ownerMap.probableOwnerSource;
         sample.generatedCallsiteDiscriminator = ownerMap.generatedCallsiteDiscriminator;
+        // Phase 257: when the HUD setter helper traffic infers a CHudSonicStage
+        // owner via `argR3 - 0x28`, capture it as the inferred owner global so
+        // the bounded owner-layout scanner can map sibling fields around the
+        // proven owner+0xD8/0xE0/0xF0/0xF4 attach/scene-update slots even if
+        // the constructor-side owner hook has not landed yet.
+        if (domain == "hud" &&
+            ownerMap.probableOwnerAddress != 0 &&
+            ownerMap.probableOwnerSource.find("argR3 - 0x28 inferred owner") !=
+                std::string::npos &&
+            (g_chudSonicStageOwnerAddress == 0 ||
+                g_chudSonicStageOwnerAddress != ownerMap.probableOwnerAddress))
+        {
+            const std::string stableSignature =
+                HexU32(ownerMap.probableOwnerAddress) + "|" +
+                std::string(helperName);
+            const bool addressChanged =
+                g_inferredChudSonicStageOwnerAddress !=
+                ownerMap.probableOwnerAddress;
+            const bool helperChanged =
+                g_inferredChudSonicStageOwnerHelper !=
+                std::string(helperName);
+
+            g_inferredChudSonicStageOwnerAddress = ownerMap.probableOwnerAddress;
+            g_inferredChudSonicStageOwnerSource = ownerMap.probableOwnerSource;
+            g_inferredChudSonicStageOwnerHelper = std::string(helperName);
+            g_inferredChudSonicStageOwnerLastUpdatedFrame = g_presentedFrameCount;
+            ++g_inferredChudSonicStageOwnerSampleCount;
+
+            if (!g_loggedInferredChudSonicStageOwnerSeed ||
+                addressChanged ||
+                helperChanged ||
+                g_inferredChudSonicStageOwnerStableSignature != stableSignature)
+            {
+                WriteEvidenceEvent(
+                    "native-owner-setter-hud-inferred-owner-seeded",
+                    "helper=" + std::string(helperName) +
+                    "|phase=" + std::string(phase) +
+                    "|inferredOwner=" + HexU32(ownerMap.probableOwnerAddress) +
+                    "|helperObjectArgR3=" + HexU32(argR3) +
+                    "|helperObjectOffset=" + HexU32(ownerMap.helperObjectOffset) +
+                    "|sampleCount=" + std::to_string(
+                        g_inferredChudSonicStageOwnerSampleCount) +
+                    "|status=read-only inferred CHudSonicStage owner seeded for owner-layout scanning");
+                g_loggedInferredChudSonicStageOwnerSeed = true;
+                g_inferredChudSonicStageOwnerStableSignature = stableSignature;
+            }
+        }
         sample.attachSetterStatus =
             "read-only probe: setter candidate observed; owner attach writes remain disabled";
         sample.routeEvidence = BuildNativeOwnerSetterRouteEvidence(domain, helperName, fieldOffset);
@@ -3277,6 +3356,20 @@ namespace UiLab
             g_chudSonicStageOwnerAddress,
             0x3000,
             "CHudSonicStage owner");
+        // Phase 257: also scan the inferred CHudSonicStage owner derived from
+        // setter helper traffic when the constructor-time owner has not landed
+        // yet or differs from the helper-inferred owner. The bounded layout
+        // scanner only reads, so admitting a second range cannot write through
+        // an inferred pointer.
+        if (g_inferredChudSonicStageOwnerAddress != 0 &&
+            g_inferredChudSonicStageOwnerAddress != g_chudSonicStageOwnerAddress)
+        {
+            AddCsdOwnerScanRange(
+                ranges,
+                g_inferredChudSonicStageOwnerAddress,
+                0x3000,
+                "inferred CHudSonicStage owner");
+        }
         AddCsdOwnerScanRange(
             ranges,
             g_pauseGeneralSaveInspector.pauseAddress,
@@ -3434,21 +3527,93 @@ namespace UiLab
             return semantic;
         }
 
-        if (ownerSourceLower.find("chudsonicstage owner") != std::string::npos)
+        if (ownerSourceLower.find("chudsonicstage owner") != std::string::npos ||
+            ownerSourceLower.find("inferred chudsonicstage owner") != std::string::npos)
         {
-            semantic.semanticName = "hudOwner.rcSceneCandidate+" + fieldOffsetText;
+            // Phase 257: inferred-owner branch is annotated up-front so its
+            // sibling field semantic carries the inferred provenance through
+            // the layout JSON instead of being collapsed back into the raw
+            // constructor-side owner labels.
+            const bool inferredOwnerSource =
+                ownerSourceLower.find("inferred chudsonicstage owner") !=
+                std::string::npos;
+
+            semantic.semanticName = inferredOwnerSource
+                ? "hudOwnerInferred.rcSceneCandidate+" + fieldOffsetText
+                : "hudOwner.rcSceneCandidate+" + fieldOffsetText;
             semantic.semanticRole =
                 std::string(matchKind).find("manager") != std::string::npos
                     ? "hud-owner-manager-scene-candidate"
                     : "hud-owner-resource-scene-candidate";
-            semantic.ownerLifecycle =
-                "HUD owner layout pending runtime gameplay evidence before native foreground attach";
+            semantic.ownerLifecycle = inferredOwnerSource
+                ? "HUD owner layout (inferred from setter helper argR3 - 0x28) pending runtime gameplay evidence before native foreground attach"
+                : "HUD owner layout pending runtime gameplay evidence before native foreground attach";
             semantic.attachSetterCandidate =
                 "CHudSonicStage owner attach setter path pending sub_824D89B0/sub_824D9308/sub_824D95F8 Ghidra xrefs";
             semantic.ghidraXrefStatus =
                 "pending-export: CHudSonicStage constructor/stage-bind/runtime-control xref oracle";
             semantic.ghidraXref =
                 "HUD owner layout pending runtime gameplay evidence; sub_824D89B0/sub_824D9308/sub_824D95F8";
+
+            // Phase 257: HUD owner attach/scene-update offsets named by the
+            // generated callsite analysis backing the native owner setter
+            // probe. owner+0xD8 is read by argR5=110 helper as the source
+            // attach scene, owner+0xE0 receives the helper's returned scene
+            // slot, and owner+0xF0/+0xF4 form the active scene update path
+            // that argR5=121 helper snapshots.
+            if (fieldOffset == 0xD8)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.attachSourceScene"
+                    : "hudOwner.attachSourceScene";
+                semantic.semanticRole = "hud-owner-attach-source-scene";
+                semantic.attachSetterCandidate =
+                    "owner+0xD8 source attach scene read by sub_82E5FCD0 (CHudSonicStage::sub_824D9308 argR5=110); inspect before any native foreground attach write";
+                semantic.ghidraXrefStatus =
+                    "runtime-confirmed: argR5=110 helper reads owner+0xD8 into r6; pending Ghidra xref oracle for setter caller";
+                semantic.ghidraXref =
+                    "CHudSonicStage::sub_824D9308 argR5=110; pending Ghidra xref oracle";
+            }
+            else if (fieldOffset == 0xE0)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.attachTargetScene"
+                    : "hudOwner.attachTargetScene";
+                semantic.semanticRole = "hud-owner-attach-target-scene";
+                semantic.attachSetterCandidate =
+                    "owner+0xE0 target attach scene populated by sub_82E5FCD0 (CHudSonicStage::sub_824D9308 argR5=110); the proven HUD attach setter writes here";
+                semantic.ghidraXrefStatus =
+                    "runtime-confirmed: argR5=110 helper assigns its returned scene slot to owner+0xE0; pending Ghidra xref oracle for caller";
+                semantic.ghidraXref =
+                    "CHudSonicStage::sub_824D9308 argR5=110 owner+0xD8 -> owner+0xE0 setter; pending Ghidra xref oracle";
+            }
+            else if (fieldOffset == 0xF0)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.activeUpdateScenePrimary"
+                    : "hudOwner.activeUpdateScenePrimary";
+                semantic.semanticRole = "hud-owner-active-update-scene-primary";
+                semantic.attachSetterCandidate =
+                    "owner+0xF0 active scene-update slot snapshotted by sub_82E61A78 (CHudSonicStage::sub_824D9308 argR5=121); read-only until lifecycle is proven";
+                semantic.ghidraXrefStatus =
+                    "runtime-confirmed: argR5=121 helper reads owner+0xF0/+0xF4 scene update path; pending Ghidra xref oracle for setter caller";
+                semantic.ghidraXref =
+                    "CHudSonicStage::sub_824D9308 argR5=121 owner+0xF0/+0xF4 scene update path; pending Ghidra xref oracle";
+            }
+            else if (fieldOffset == 0xF4)
+            {
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.activeUpdateSceneCompanion"
+                    : "hudOwner.activeUpdateSceneCompanion";
+                semantic.semanticRole = "hud-owner-active-update-scene-companion";
+                semantic.attachSetterCandidate =
+                    "owner+0xF4 companion of the owner+0xF0 active scene-update slot snapshotted by sub_82E61A78 (CHudSonicStage::sub_824D9308 argR5=121); read-only until lifecycle is proven";
+                semantic.ghidraXrefStatus =
+                    "runtime-confirmed: argR5=121 helper reads owner+0xF0/+0xF4 scene update path; pending Ghidra xref oracle for setter caller";
+                semantic.ghidraXref =
+                    "CHudSonicStage::sub_824D9308 argR5=121 owner+0xF0/+0xF4 scene update path; pending Ghidra xref oracle";
+            }
+
             return semantic;
         }
 
@@ -4037,6 +4202,16 @@ namespace UiLab
     {
         SonicHudOwnerPathInspectorSnapshot snapshot;
         snapshot.chudSonicStageOwnerAddress = g_chudSonicStageOwnerAddress;
+        snapshot.inferredChudSonicStageOwnerAddress =
+            g_inferredChudSonicStageOwnerAddress;
+        snapshot.inferredChudSonicStageOwnerSource =
+            g_inferredChudSonicStageOwnerSource;
+        snapshot.inferredChudSonicStageOwnerHelper =
+            g_inferredChudSonicStageOwnerHelper;
+        snapshot.inferredChudSonicStageOwnerLastUpdatedFrame =
+            g_inferredChudSonicStageOwnerLastUpdatedFrame;
+        snapshot.inferredChudSonicStageOwnerSampleCount =
+            g_inferredChudSonicStageOwnerSampleCount;
         snapshot.stageGameModeAddress = g_lastStageGameModeAddress;
         snapshot.rcPlayScreenProjectAddress = g_chudSonicStagePlayScreenProjectAddress;
         snapshot.rcSpeedGaugeSceneAddress = g_chudSonicStageSpeedGaugeSceneAddress;
@@ -6274,6 +6449,11 @@ namespace UiLab
             << "      },\n"
             << "      \"ownerPath\": {\n"
             << "        \"chudSonicStageOwnerAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.chudSonicStageOwnerAddress)) << "\",\n"
+            << "        \"inferredChudSonicStageOwnerAddress\": \"" << JsonEscape(HexU32(sonicOwnerPath.inferredChudSonicStageOwnerAddress)) << "\",\n"
+            << "        \"inferredChudSonicStageOwnerSource\": \"" << JsonEscape(sonicOwnerPath.inferredChudSonicStageOwnerSource) << "\",\n"
+            << "        \"inferredChudSonicStageOwnerHelper\": \"" << JsonEscape(sonicOwnerPath.inferredChudSonicStageOwnerHelper) << "\",\n"
+            << "        \"inferredChudSonicStageOwnerLastUpdatedFrame\": " << sonicOwnerPath.inferredChudSonicStageOwnerLastUpdatedFrame << ",\n"
+            << "        \"inferredChudSonicStageOwnerSampleCount\": " << sonicOwnerPath.inferredChudSonicStageOwnerSampleCount << ",\n"
             << "        \"ownerPointerStatus\": \"" << JsonEscape(sonicOwnerPath.ownerPointerStatus) << "\",\n"
             << "        \"ownerFieldMaturationStatus\": \"" << JsonEscape(sonicOwnerPath.ownerFieldMaturationStatus) << "\",\n"
             << "        \"rawOwnerKnown\": " << (sonicOwnerPath.rawOwnerKnown ? "true" : "false") << ",\n"
@@ -9497,6 +9677,13 @@ namespace UiLab
         g_loggedPauseOwnerObserved = false;
         g_loggedPauseRouteInputSources.clear();
         g_chudSonicStageOwnerAddress = 0;
+        g_inferredChudSonicStageOwnerAddress = 0;
+        g_inferredChudSonicStageOwnerSource.clear();
+        g_inferredChudSonicStageOwnerHelper.clear();
+        g_inferredChudSonicStageOwnerLastUpdatedFrame = 0;
+        g_inferredChudSonicStageOwnerSampleCount = 0;
+        g_loggedInferredChudSonicStageOwnerSeed = false;
+        g_inferredChudSonicStageOwnerStableSignature.clear();
         g_chudSonicStagePlayScreenProjectAddress = 0;
         g_chudSonicStageSpeedGaugeSceneAddress = 0;
         g_chudSonicStageRingEnergyGaugeSceneAddress = 0;

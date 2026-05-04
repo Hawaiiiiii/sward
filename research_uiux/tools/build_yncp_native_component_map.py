@@ -784,6 +784,8 @@ def write_markdown(payload: dict[str, Any], path: Path) -> None:
         "",
         "Phase 256 adds HUD Owner Setter Field Map. The native owner setter probe now translates HUD helper traffic back to probable owning UI objects when `argR3 == owner+0x28`, falls back to `argR3 - 0x28` inferred owner for the proven HUD stage-bind callsites, and labels the generated `CHudSonicStage::sub_824D9308` callsites where `argR5=110` maps `owner+0xD8 -> owner+0xE0` and `argR5=121` maps the `owner+0xF0/+0xF4` scene update path. This still stays read-only, but it turns anonymous helper calls into attach-path field evidence.",
         "",
+        "Phase 257 adds HUD Owner Layout Field Map. The setter probe seeds an `inferred CHudSonicStage owner` global from the proven `argR3 - 0x28` HUD helper traffic and feeds it into the bounded owner-layout scanner so sibling owner CSD fields can be enumerated even when the constructor-time CHudSonicStage hook has not landed yet. The owner layout semantic resolver now names `hudOwner.attachSourceScene` at `owner+0xD8`, `hudOwner.attachTargetScene` at `owner+0xE0`, `hudOwner.activeUpdateScenePrimary` at `owner+0xF0`, and `hudOwner.activeUpdateSceneCompanion` at `owner+0xF4`, with parallel `hudOwnerInferred.*` names when the inferred owner is the source. The attach setter writes still stay disabled until the lifecycle is proven through Ghidra xref export.",
+        "",
         f"- Input root: `{payload['input_root']}`",
         f"- Project files parsed: `{payload['project_count']}`",
         f"- Preview draw commands: `{payload.get('preview_draw_command_count', 0)}` real-yncp-subimage-dds-rect rows.",
