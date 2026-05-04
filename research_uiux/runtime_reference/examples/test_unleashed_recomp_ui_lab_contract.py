@@ -1401,6 +1401,49 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("Phase 264", generator)
 
+    def test_ui_lab_extends_chudsonic_stage_expected_fields_from_constructor_decode(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            # Phase 265 expanded table size (21 entries).
+            "std::array<ChudSonicStageExpectedOwnerField, 21> kChudSonicStageExpectedOwnerFields",
+            # Phase 265 named constructor-decoded fields beyond the original 9.
+            '{ "m_rcExpCount", 0x100, 0x104 },',
+            '{ "m_rcPtrField108", 0x108, 0x10C },',
+            '{ "m_rcPtrField110", 0x110, 0x114 },',
+            '{ "m_rcPtrField118", 0x118, 0x11C },',
+            '{ "m_rcPtrField120", 0x120, 0x124 },',
+            '{ "m_rcPtrField150", 0x150, 0x154 },',
+            '{ "m_rcPtrField158", 0x158, 0x15C },',
+            '{ "m_rcPtrField160", 0x160, 0x164 },',
+            '{ "m_rcPtrField168", 0x168, 0x16C },',
+            '{ "m_rcPtrField170", 0x170, 0x174 },',
+            '{ "m_rcPtrField178", 0x178, 0x17C },',
+            '{ "m_rcPtrField180", 0x180, 0x184 },',
+            # Phase 265 source attribution string cites the recomp file.
+            "Phase 265 expanded from CHudSonicStage::CHudSonicStage (sub_824D89B0) decoded from local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.28.cpp:61909",
+            # Phase 265 semantic resolver case for m_rcExpCount.
+            "hudOwner.m_rcExpCount",
+            "hudOwnerInferred.m_rcExpCount",
+            "hud-owner-exp-count-rcobject-memory-field",
+            "Phase 265 ppc_recomp.28.cpp constructor decode places an RCPtr at 0x100/0x104",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 265",
+            "CHudSonicStage Constructor Decode",
+            "21 RCPtrs",
+            "m_rcExpCount",
+            "ppc_recomp.28.cpp",
+            "sub_824D89B0",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 265", generator)
+
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")
@@ -2911,7 +2954,10 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "title-menu-direct-context-accept-injected",
             "shouldHoldDirectContext",
             "!g_targetCsdObserved",
-            "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0x14C",
+            # Phase 265: range expanded to 0xE0..0x184 from CHudSonicStage
+            # constructor decode (sub_824D89B0); the older 0xE0..0x14C range
+            # only covered the 9 originally-named SWA HUD fields.
+            "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0x184",
         ]:
             self.assertIn(token, ui_lab)
         self.assertNotIn("title-intro-direct-state-refreshed", ui_lab)

@@ -1042,21 +1042,46 @@ namespace UiLab
         },
     }};
 
-    static constexpr std::array<ChudSonicStageExpectedOwnerField, 9> kChudSonicStageExpectedOwnerFields =
+    // Phase 265: CHudSonicStage constructor (`sub_824D89B0`) decoded from
+    // the recompiled PPC source initializes 21 sequential RCPtr<T> fields
+    // at every 8-byte offset from `this+0xE0` through `this+0x180`. Each
+    // RCPtr is 8 bytes wide (`m_pRCObject` at +0, `m_pMemory` at +4) and
+    // the constructor calls `sub_830BA1C0` (RCPtr default-init) on each in
+    // turn, then stores a class-specific RCObject vtable pointer at +0 and
+    // calls `sub_830BA298` to bump the refcount. The original 9-entry
+    // expected-fields table covered only the named SWA HUD members; this
+    // expansion adds the 12 RCPtrs the constructor confirms exist between
+    // them. `m_rcExpCount` at `0x100/0x104` is named from the Phase 260
+    // sweep evidence (`+0x104` resolved to `ui_playscreen/exp_count`); the
+    // remaining RCPtrs are honestly named by offset (`m_rcPtrFieldXxx`)
+    // until further runtime evidence or Ghidra xrefs name them.
+    static constexpr std::array<ChudSonicStageExpectedOwnerField, 21> kChudSonicStageExpectedOwnerFields =
     {{
         { "m_rcPlayScreen", 0xE0, 0xE4 },
         { "m_rcSpeedGauge", 0xE8, 0xEC },
         { "m_rcRingEnergyGauge", 0xF0, 0xF4 },
         { "m_rcGaugeFrame", 0xF8, 0xFC },
+        { "m_rcExpCount", 0x100, 0x104 },
+        { "m_rcPtrField108", 0x108, 0x10C },
+        { "m_rcPtrField110", 0x110, 0x114 },
+        { "m_rcPtrField118", 0x118, 0x11C },
+        { "m_rcPtrField120", 0x120, 0x124 },
         { "m_rcScoreCount", 0x128, 0x12C },
         { "m_rcTimeCount", 0x130, 0x134 },
         { "m_rcTimeCount2", 0x138, 0x13C },
         { "m_rcTimeCount3", 0x140, 0x144 },
         { "m_rcPlayerCount", 0x148, 0x14C },
+        { "m_rcPtrField150", 0x150, 0x154 },
+        { "m_rcPtrField158", 0x158, 0x15C },
+        { "m_rcPtrField160", 0x160, 0x164 },
+        { "m_rcPtrField168", 0x168, 0x16C },
+        { "m_rcPtrField170", 0x170, 0x174 },
+        { "m_rcPtrField178", 0x178, 0x17C },
+        { "m_rcPtrField180", 0x180, 0x184 },
     }};
 
     static constexpr std::string_view kChudSonicStageExpectedOwnerFieldSource =
-        "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0x14C";
+        "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0x184; Phase 265 expanded from CHudSonicStage::CHudSonicStage (sub_824D89B0) decoded from local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.28.cpp:61909";
 
     static constexpr std::array<RuntimeTarget, 11> kRuntimeTargets =
     {{
@@ -4541,6 +4566,22 @@ namespace UiLab
                     "runtime-confirmed: SWA expected-fields table lists m_rcGaugeFrame at 0xF8/0xFC and the sweep finds the manager CScene through a single +4 indirect dereference";
                 semantic.ghidraXref =
                     "api/SWA/HUD/Sonic/HudSonicStage.h m_rcGaugeFrame";
+            }
+            else if (fieldOffset == 0x104)
+            {
+                // Phase 265: named from Phase 260 sweep (`+0x104` resolves
+                // to `ui_playscreen/exp_count`) AND the constructor decode
+                // (`sub_824D89B0` initializes an RCPtr at this slot).
+                semantic.semanticName = inferredOwnerSource
+                    ? "hudOwnerInferred.m_rcExpCount"
+                    : "hudOwner.m_rcExpCount";
+                semantic.semanticRole = "hud-owner-exp-count-rcobject-memory-field";
+                semantic.attachSetterCandidate =
+                    "owner+0x104 m_rcExpCount.m_pMemory; Phase 260 sweep finds the live exp-count scene wrapper for ui_playscreen/exp_count and Phase 265 constructor decode confirms the RCPtr exists at owner+0x100/+0x104";
+                semantic.ghidraXrefStatus =
+                    "runtime-confirmed: Phase 265 ppc_recomp.28.cpp constructor decode places an RCPtr at 0x100/0x104 and Phase 260 sweep finds the manager CScene through a single +4 indirect dereference";
+                semantic.ghidraXref =
+                    "CHudSonicStage::CHudSonicStage (sub_824D89B0) RCPtr init at this+0x100";
             }
             else if (fieldOffset == 0x1958)
             {
