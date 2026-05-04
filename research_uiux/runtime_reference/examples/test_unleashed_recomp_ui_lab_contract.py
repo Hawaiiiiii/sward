@@ -1204,9 +1204,10 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
 
         for token in [
-            # Phase 260 struct + globals.
+            # Phase 260 struct + globals (Phase 263 replaced the set with a
+            # correlation-aware map, see test_ui_lab_resweeps_when_csd_correlations_grow).
             "struct HudOwnerRenderableSlot",
-            "g_sweptHudOwnerAddresses",
+            "g_lastHudOwnerSweepStates",
             "g_hudOwnerRenderableSlots",
             "g_loggedHudOwnerRenderableSlotKeys",
             # Phase 260 sweep entry point.
@@ -1326,6 +1327,39 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, report)
 
         self.assertIn("Phase 262", generator)
+
+    def test_ui_lab_resweeps_when_csd_correlations_grow(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            # Phase 263 sweep state + thresholds.
+            "struct HudOwnerSweepState",
+            "g_lastHudOwnerSweepStates",
+            "kHudOwnerSweepMinReSweepIntervalFrames",
+            "kHudOwnerSweepMinReSweepCorrelationGrowth",
+            # Phase 263 gating predicates.
+            "firstSweepForOwner",
+            "correlationsGrewEnough",
+            "intervalElapsed",
+            # Phase 263 sweep-complete summary now reports correlation table size + first-sweep flag.
+            "correlationTableSize",
+            "firstSweepForOwner=",
+            # Phase 263 reuses g_csdManagerSceneCorrelations to drive re-sweep.
+            "g_csdManagerSceneCorrelations.size()",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 263",
+            "HUD Owner Sweep Re-run on Correlation Growth",
+            "kHudOwnerSweepMinReSweepIntervalFrames",
+            "kHudOwnerSweepMinReSweepCorrelationGrowth",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 263", generator)
 
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")

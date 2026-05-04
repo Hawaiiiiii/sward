@@ -1350,7 +1350,23 @@ namespace UiLab
     // sweep has already covered, so the bounded scan over the owner range
     // runs at most once per unique owner address per session. The discovered
     // renderable slots are kept beside the cache for the bridge query.
-    static std::unordered_set<uint32_t> g_sweptHudOwnerAddresses;
+    // Phase 260 + 263: per-owner sweep state. The first session-shipping
+    // version of this only tracked the set of addresses ever swept; that
+    // raced against the CSD manager-scene correlation buildup so the early
+    // sweep at constructor-hook time often ran before any scenes were
+    // correlated and never re-ran later. The map now stores the
+    // correlation-table size and frame at the last sweep so subsequent
+    // confirmed-setter samples can re-run the sweep when correlations
+    // have grown enough to discover new renderable slots.
+    struct HudOwnerSweepState
+    {
+        uint64_t lastSweepFrame = 0;
+        size_t lastCorrelationCount = 0;
+    };
+    static std::unordered_map<uint32_t, HudOwnerSweepState>
+        g_lastHudOwnerSweepStates;
+    static constexpr uint64_t kHudOwnerSweepMinReSweepIntervalFrames = 600;
+    static constexpr size_t kHudOwnerSweepMinReSweepCorrelationGrowth = 16;
     static std::vector<HudOwnerRenderableSlot> g_hudOwnerRenderableSlots;
     static std::unordered_set<std::string> g_loggedHudOwnerRenderableSlotKeys;
     // Phase 262: persistent sidecar artifact path written after each owner
@@ -3688,8 +3704,32 @@ namespace UiLab
         if (!IsPlausibleGuestPointer(ownerAddress))
             return;
 
-        if (!g_sweptHudOwnerAddresses.insert(ownerAddress).second)
+        // Phase 263: re-run the sweep when CSD manager-scene correlations
+        // have grown enough since the last sweep for this owner that new
+        // renderable slots could plausibly have appeared. The earliest
+        // sweep typically races against `CCsdProject::Make` correlation
+        // buildup and finds nothing; the re-runs catch the gauge and
+        // deep-cluster scenes once they actually exist in the correlation
+        // table. Both growth threshold and frame interval guard against
+        // re-sweep spam during active loading.
+        const size_t currentCorrelationCount =
+            g_csdManagerSceneCorrelations.size();
+        auto& sweepState = g_lastHudOwnerSweepStates[ownerAddress];
+        const bool firstSweepForOwner = sweepState.lastSweepFrame == 0;
+        const bool correlationsGrewEnough =
+            currentCorrelationCount >=
+                sweepState.lastCorrelationCount +
+                    kHudOwnerSweepMinReSweepCorrelationGrowth;
+        const bool intervalElapsed =
+            g_presentedFrameCount >=
+                sweepState.lastSweepFrame +
+                    kHudOwnerSweepMinReSweepIntervalFrames;
+        if (!firstSweepForOwner &&
+            !(correlationsGrewEnough && intervalElapsed))
             return;
+
+        sweepState.lastSweepFrame = g_presentedFrameCount;
+        sweepState.lastCorrelationCount = currentCorrelationCount;
 
         static constexpr uint32_t kHudOwnerSweepBytes = 0x3000;
         static constexpr uint32_t kHudOwnerSweepIndirectBytes = 0x80;
@@ -3725,7 +3765,6 @@ namespace UiLab
                 slot.managerSceneAddress = directCorrelation->managerSceneAddress;
                 slot.resourceSceneAddress = directCorrelation->resourceSceneAddress;
                 slot.frame = g_presentedFrameCount;
-                g_hudOwnerRenderableSlots.push_back(slot);
                 ++directHits;
 
                 const std::string key =
@@ -3733,6 +3772,7 @@ namespace UiLab
                     "|" + slot.matchKind + "|" + HexU32(slot.managerSceneAddress);
                 if (g_loggedHudOwnerRenderableSlotKeys.insert(key).second)
                 {
+                    g_hudOwnerRenderableSlots.push_back(slot);
                     WriteEvidenceEvent(
                         "native-hud-owner-renderable-slot",
                         "ownerSource=" + slot.ownerSource +
@@ -3797,7 +3837,6 @@ namespace UiLab
                 slot.managerSceneAddress = indirectCorrelation->managerSceneAddress;
                 slot.resourceSceneAddress = indirectCorrelation->resourceSceneAddress;
                 slot.frame = g_presentedFrameCount;
-                g_hudOwnerRenderableSlots.push_back(slot);
                 ++indirectHits;
 
                 const std::string key =
@@ -3805,6 +3844,7 @@ namespace UiLab
                     "|" + slot.matchKind + "|" + HexU32(slot.managerSceneAddress);
                 if (g_loggedHudOwnerRenderableSlotKeys.insert(key).second)
                 {
+                    g_hudOwnerRenderableSlots.push_back(slot);
                     WriteEvidenceEvent(
                         "native-hud-owner-renderable-slot",
                         "ownerSource=" + slot.ownerSource +
@@ -3851,6 +3891,8 @@ namespace UiLab
             "|indirectHits=" + std::to_string(indirectHits) +
             "|crossValidatedHits=" + std::to_string(crossValidatedHits) +
             "|expectedFieldTableSize=" + std::to_string(kChudSonicStageExpectedOwnerFields.size()) +
+            "|correlationTableSize=" + std::to_string(currentCorrelationCount) +
+            "|firstSweepForOwner=" + std::string(firstSweepForOwner ? "1" : "0") +
             "|status=read-only HUD owner layout sweep complete");
 
         WriteHudOwnerLayoutSidecar(ownerAddress, ownerSource);
@@ -10583,7 +10625,7 @@ namespace UiLab
         g_loggedHudOwnerSetterProbeFirstSeenKeys.clear();
         g_skippedHudOwnerSetterProbeCallCount = 0;
         g_recordedHudOwnerSetterProbeCallCount = 0;
-        g_sweptHudOwnerAddresses.clear();
+        g_lastHudOwnerSweepStates.clear();
         g_hudOwnerRenderableSlots.clear();
         g_loggedHudOwnerRenderableSlotKeys.clear();
         g_lastHudOwnerLayoutSidecarPath.clear();
