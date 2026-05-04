@@ -1097,6 +1097,59 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("Phase 257", generator)
 
+    def test_ui_lab_samples_hud_owner_slot_readouts(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            # Phase 258 struct + globals.
+            "struct HudOwnerSlotReadout",
+            "g_lastHudOwnerSlotReadouts",
+            "g_lastHudOwnerSlotReadoutStableSignatures",
+            "g_lastHudOwnerSlotReadoutEvidenceFrames",
+            "kHudOwnerSlotReadoutMinEvidenceIntervalFrames",
+            # Phase 258 sampler entry points.
+            "BuildHudOwnerSlotReadout",
+            "SampleHudOwnerSlotReadouts",
+            # Phase 258 slot specs cover the four proven HUD owner offsets.
+            "owner+0xD8 attachSourceScene",
+            "owner+0xE0 attachTargetScene",
+            "owner+0xF0 activeUpdateScenePrimary",
+            "owner+0xF4 activeUpdateSceneCompanion",
+            # Phase 258 classification labels.
+            "live-manager-scene: HUD owner slot directly references a live manager CScene",
+            "resource-scene: HUD owner slot directly references a resource Scene",
+            "indirect-manager-scene: HUD owner slot points at object containing a live manager CScene",
+            "indirect-resource-scene: HUD owner slot points at object containing a resource Scene",
+            "uncorrelated-pointer: HUD owner slot value is a plausible pointer",
+            "non-pointer: HUD owner slot value is not a plausible guest pointer",
+            "null: HUD owner slot is unset",
+            # Phase 258 evidence event.
+            "native-owner-setter-hud-owner-slot-readout",
+            # Phase 258 owner source labels (constructor vs inferred).
+            "CHudSonicStage owner (constructor-confirmed)",
+            "inferred CHudSonicStage owner",
+            # Phase 258 live-state JSON mirror.
+            "ownerSlotReadoutCount",
+            "ownerSlotReadouts",
+            "correlatedManagerSceneAddress",
+            "correlatedResourceSceneAddress",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 258",
+            "HUD Owner Slot Readout",
+            "live-manager-scene",
+            "indirect-manager-scene",
+            "uncorrelated-pointer",
+            "native-owner-setter-hud-owner-slot-readout",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 258", generator)
+
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")

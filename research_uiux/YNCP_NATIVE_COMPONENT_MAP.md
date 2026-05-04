@@ -42,6 +42,8 @@ Phase 256 adds HUD Owner Setter Field Map. The native owner setter probe now tra
 
 Phase 257 adds HUD Owner Layout Field Map. The setter probe seeds an `inferred CHudSonicStage owner` global from the proven `argR3 - 0x28` HUD helper traffic and feeds it into the bounded owner-layout scanner so sibling owner CSD fields can be enumerated even when the constructor-time CHudSonicStage hook has not landed yet. The owner layout semantic resolver now names `hudOwner.attachSourceScene` at `owner+0xD8`, `hudOwner.attachTargetScene` at `owner+0xE0`, `hudOwner.activeUpdateScenePrimary` at `owner+0xF0`, and `hudOwner.activeUpdateSceneCompanion` at `owner+0xF4`, with parallel `hudOwnerInferred.*` names when the inferred owner is the source. The attach setter writes still stay disabled until the lifecycle is proven through Ghidra xref export.
 
+Phase 258 adds HUD Owner Slot Readout. Whenever a HUD setter helper sample confirms the constructor-side or inferred CHudSonicStage owner, the lab now directly reads `owner+0xD8/0xE0/0xF0/0xF4` and classifies each value as `live-manager-scene`, `resource-scene`, `indirect-manager-scene`, `indirect-resource-scene`, `uncorrelated-pointer`, `non-pointer`, or `null`. Each new slot kind/value emits a deduped `native-owner-setter-hud-owner-slot-readout` event and the latest readout per slot is mirrored into the live-state JSON so the operator can see whether `owner+0xD8/0xE0` already point at a known renderable scene before any guarded native foreground attach is tried.
+
 - Input root: `C:/Users/DavidErikGarciaArena/Downloads/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/full_install_archives`
 - Project files parsed: `41`
 - Preview draw commands: `1888` real-yncp-subimage-dds-rect rows.
