@@ -1361,6 +1361,46 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
 
         self.assertIn("Phase 263", generator)
 
+    def test_ui_lab_groups_renderable_slots_and_tags_confidence(self):
+        ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
+        report = self.read("research_uiux/YNCP_NATIVE_COMPONENT_MAP.md")
+        generator = self.read("research_uiux/tools/build_yncp_native_component_map.py")
+
+        for token in [
+            # Phase 264 confidence tier helper + struct field.
+            "ResolveHudOwnerRenderableSlotConfidenceTier",
+            "std::string confidenceTier",
+            # Phase 264 the three tiers must all appear as literals.
+            "\"cross-validated\"",
+            "\"constructor-confirmed\"",
+            "\"inferred-owner\"",
+            # Phase 264 the renderable-slot evidence event carries the tier.
+            "|confidenceTier=",
+            # Phase 264 grouping in the sidecar.
+            "renderableSlotGroups",
+            "instanceCount",
+            "matchKinds",
+            # Phase 264 live-state JSON exposes per-tier counts.
+            "renderableSlotCrossValidatedCount",
+            "renderableSlotConstructorConfirmedCount",
+            "renderableSlotInferredOwnerCount",
+            # Phase 264 sidecar-written event surfaces group count.
+            "renderableSlotGroupCount",
+        ]:
+            self.assertIn(token, ui_lab)
+
+        for token in [
+            "Phase 264",
+            "HUD Renderable-Slot Grouping + Confidence Tiers",
+            "ring_get",
+            "renderableSlotGroups",
+            "cross-validated",
+            "inferred-owner",
+        ]:
+            self.assertIn(token, report)
+
+        self.assertIn("Phase 264", generator)
+
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")
         report = self.read("research_uiux/UNLEASHED_RECOMP_UI_LAB_PIVOT.md")

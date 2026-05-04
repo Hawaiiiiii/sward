@@ -499,6 +499,16 @@ namespace UiLab
         uint32_t managerSceneAddress = 0;
         uint32_t resourceSceneAddress = 0;
         uint64_t frame = 0;
+        // Phase 264: trust level for downstream SGFX HUD code generators.
+        // `cross-validated` means the offset matches the constructor
+        // `kChudSonicStageExpectedOwnerFields` table; `constructor-confirmed`
+        // means the sweep ran on the constructor-side owner pointer but the
+        // offset isn't in the expected-fields table (deep-cluster discoveries
+        // like the `ring_get` animation pool); `inferred-owner` means the
+        // sweep ran on the helper `argR3 - 0x28` inferred owner which can
+        // latch on a sub-object inside CHudSonicStage and produce false
+        // positives when the inference is off.
+        std::string confidenceTier;
     };
 
     struct CsdOwnerScanRange
@@ -3697,6 +3707,30 @@ namespace UiLab
         return nullptr;
     }
 
+    // Phase 264: trust ranking for a renderable slot the sweep produced.
+    // `cross-validated` is the highest tier and means the offset matches a
+    // SWA expected-field's `rcObjectOffset` (the slot is one of the named
+    // CHudSonicStage fields). `constructor-confirmed` means the sweep ran
+    // on the live constructor-confirmed CHudSonicStage owner pointer but
+    // the offset is outside the SWA expected-field table — the deep
+    // discoveries like the ring_get animation pool live here. `inferred-
+    // owner` is the lowest tier; the sweep ran on the `argR3 - 0x28`
+    // inferred owner which sometimes latches on a sub-object instead of
+    // the real CHudSonicStage owner, so SGFX consumers should treat these
+    // as low-confidence until the inference is independently confirmed.
+    static std::string ResolveHudOwnerRenderableSlotConfidenceTier(
+        std::string_view ownerSource,
+        uint32_t fieldOffset)
+    {
+        if (ownerSource.find("inferred CHudSonicStage owner") != std::string_view::npos)
+            return "inferred-owner";
+
+        if (FindChudSonicStageExpectedOwnerFieldByRcObjectOffset(fieldOffset) != nullptr)
+            return "cross-validated";
+
+        return "constructor-confirmed";
+    }
+
     static void TryRunOpportunisticHudOwnerLayoutSweep(
         uint32_t ownerAddress,
         std::string_view ownerSource)
@@ -3765,6 +3799,8 @@ namespace UiLab
                 slot.managerSceneAddress = directCorrelation->managerSceneAddress;
                 slot.resourceSceneAddress = directCorrelation->resourceSceneAddress;
                 slot.frame = g_presentedFrameCount;
+                slot.confidenceTier = ResolveHudOwnerRenderableSlotConfidenceTier(
+                    ownerSource, slot.fieldOffset);
                 ++directHits;
 
                 const std::string key =
@@ -3781,6 +3817,7 @@ namespace UiLab
                         "|fieldAddress=" + HexU32(slot.fieldAddress) +
                         "|slotValue=" + HexU32(slot.slotValue) +
                         "|matchKind=" + slot.matchKind +
+                        "|confidenceTier=" + slot.confidenceTier +
                         "|project=" + slot.projectName +
                         "|scenePath=" + slot.scenePath +
                         "|managerScene=" + HexU32(slot.managerSceneAddress) +
@@ -3837,6 +3874,8 @@ namespace UiLab
                 slot.managerSceneAddress = indirectCorrelation->managerSceneAddress;
                 slot.resourceSceneAddress = indirectCorrelation->resourceSceneAddress;
                 slot.frame = g_presentedFrameCount;
+                slot.confidenceTier = ResolveHudOwnerRenderableSlotConfidenceTier(
+                    ownerSource, slot.fieldOffset);
                 ++indirectHits;
 
                 const std::string key =
@@ -3854,6 +3893,7 @@ namespace UiLab
                         "|slotValue=" + HexU32(slot.slotValue) +
                         "|indirectAddress=" + HexU32(slot.indirectAddress) +
                         "|matchKind=" + slot.matchKind +
+                        "|confidenceTier=" + slot.confidenceTier +
                         "|project=" + slot.projectName +
                         "|scenePath=" + slot.scenePath +
                         "|managerScene=" + HexU32(slot.managerSceneAddress) +
@@ -3979,6 +4019,7 @@ namespace UiLab
                 << "\"slotValue\": \"" << JsonEscape(HexU32(r.slotValue)) << "\","
                 << "\"indirectAddress\": \"" << JsonEscape(HexU32(r.indirectAddress)) << "\","
                 << "\"matchKind\": \"" << JsonEscape(r.matchKind) << "\","
+                << "\"confidenceTier\": \"" << JsonEscape(r.confidenceTier) << "\","
                 << "\"projectName\": \"" << JsonEscape(r.projectName) << "\","
                 << "\"scenePath\": \"" << JsonEscape(r.scenePath) << "\","
                 << "\"managerSceneAddress\": \"" << JsonEscape(HexU32(r.managerSceneAddress)) << "\","
@@ -3990,6 +4031,111 @@ namespace UiLab
                 << ","
                 << "\"frame\": " << r.frame << "}"
                 << (i + 1 == g_hudOwnerRenderableSlots.size() ? "\n" : ",\n");
+        }
+        out << "  ],\n";
+
+        // Phase 264: group renderable slots by `(ownerSource,
+        // managerSceneAddress)` so a 22-slot ring-pickup pool becomes one
+        // entry instead of 22 raw rows. Downstream SGFX HUD code generators
+        // use this to emit one named scene per group with `instanceCount`
+        // and `fieldOffsets[]` instead of unrolling the pool by hand.
+        struct GroupKey
+        {
+            std::string ownerSource;
+            uint32_t managerSceneAddress = 0;
+        };
+        struct GroupAccumulator
+        {
+            std::string ownerSource;
+            std::string projectName;
+            std::string scenePath;
+            uint32_t managerSceneAddress = 0;
+            uint32_t resourceSceneAddress = 0;
+            std::string confidenceTier;
+            std::vector<std::string> fieldOffsets;
+            std::vector<std::string> matchKinds;
+            std::string crossValidatedExpectedField;
+        };
+        std::vector<GroupAccumulator> groups;
+        for (const auto& r : g_hudOwnerRenderableSlots)
+        {
+            auto it = std::find_if(groups.begin(), groups.end(),
+                [&r](const GroupAccumulator& g)
+                {
+                    return g.ownerSource == r.ownerSource &&
+                        g.managerSceneAddress == r.managerSceneAddress;
+                });
+            GroupAccumulator* group = nullptr;
+            if (it == groups.end())
+            {
+                GroupAccumulator fresh;
+                fresh.ownerSource = r.ownerSource;
+                fresh.projectName = r.projectName;
+                fresh.scenePath = r.scenePath;
+                fresh.managerSceneAddress = r.managerSceneAddress;
+                fresh.resourceSceneAddress = r.resourceSceneAddress;
+                fresh.confidenceTier = r.confidenceTier;
+                if (const auto* expected =
+                        FindChudSonicStageExpectedOwnerFieldByRcObjectOffset(r.fieldOffset))
+                {
+                    fresh.crossValidatedExpectedField = std::string(expected->field);
+                }
+                groups.push_back(std::move(fresh));
+                group = &groups.back();
+            }
+            else
+            {
+                group = &(*it);
+                if (group->confidenceTier != "cross-validated" &&
+                    r.confidenceTier == "cross-validated")
+                {
+                    group->confidenceTier = r.confidenceTier;
+                }
+                if (group->crossValidatedExpectedField.empty())
+                {
+                    if (const auto* expected =
+                            FindChudSonicStageExpectedOwnerFieldByRcObjectOffset(r.fieldOffset))
+                    {
+                        group->crossValidatedExpectedField =
+                            std::string(expected->field);
+                    }
+                }
+            }
+            group->fieldOffsets.push_back(HexU32(r.fieldOffset));
+            group->matchKinds.push_back(r.matchKind);
+        }
+
+        out << "  \"renderableSlotGroups\": [\n";
+        for (size_t i = 0; i < groups.size(); ++i)
+        {
+            const auto& g = groups[i];
+            out
+                << "    {\"ownerSource\": \"" << JsonEscape(g.ownerSource) << "\","
+                << "\"projectName\": \"" << JsonEscape(g.projectName) << "\","
+                << "\"scenePath\": \"" << JsonEscape(g.scenePath) << "\","
+                << "\"managerSceneAddress\": \"" << JsonEscape(HexU32(g.managerSceneAddress)) << "\","
+                << "\"resourceSceneAddress\": \"" << JsonEscape(HexU32(g.resourceSceneAddress)) << "\","
+                << "\"confidenceTier\": \"" << JsonEscape(g.confidenceTier) << "\","
+                << "\"crossValidatedExpectedField\": "
+                << (g.crossValidatedExpectedField.empty()
+                        ? std::string("null")
+                        : std::string("\"") + JsonEscape(g.crossValidatedExpectedField) + "\"")
+                << ","
+                << "\"instanceCount\": " << g.fieldOffsets.size() << ","
+                << "\"fieldOffsets\": [";
+            for (size_t j = 0; j < g.fieldOffsets.size(); ++j)
+            {
+                if (j != 0) out << ",";
+                out << "\"" << JsonEscape(g.fieldOffsets[j]) << "\"";
+            }
+            out << "],\"matchKinds\": [";
+            for (size_t j = 0; j < g.matchKinds.size(); ++j)
+            {
+                if (j != 0) out << ",";
+                out << "\"" << JsonEscape(g.matchKinds[j]) << "\"";
+            }
+            out << "]}"
+                << (i + 1 == groups.size() ? "\n" : ",\n");
         }
         out << "  ]\n";
         out << "}\n";
@@ -4009,6 +4155,7 @@ namespace UiLab
             "|sidecarPath=" + g_lastHudOwnerLayoutSidecarPath +
             "|namedSlotCount=" + std::to_string(g_lastHudOwnerSlotReadouts.size()) +
             "|renderableSlotCount=" + std::to_string(g_hudOwnerRenderableSlots.size()) +
+            "|renderableSlotGroupCount=" + std::to_string(groups.size()) +
             "|status=runtime-confirmed HUD owner layout written to sward-hud-owner-layout-v1 sidecar for SGFX HUD code generation");
     }
 
@@ -7407,6 +7554,7 @@ namespace UiLab
                 << "\"slotValue\":\"" << JsonEscape(HexU32(slot.slotValue)) << "\","
                 << "\"indirectAddress\":\"" << JsonEscape(HexU32(slot.indirectAddress)) << "\","
                 << "\"matchKind\":\"" << JsonEscape(slot.matchKind) << "\","
+                << "\"confidenceTier\":\"" << JsonEscape(slot.confidenceTier) << "\","
                 << "\"projectName\":\"" << JsonEscape(slot.projectName) << "\","
                 << "\"scenePath\":\"" << JsonEscape(slot.scenePath) << "\","
                 << "\"managerSceneAddress\":\"" << JsonEscape(HexU32(slot.managerSceneAddress)) << "\","
@@ -7414,8 +7562,20 @@ namespace UiLab
                 << "\"frame\":" << slot.frame
                 << "}";
         }
+        size_t crossValidatedCount = 0;
+        size_t constructorConfirmedCount = 0;
+        size_t inferredOwnerCount = 0;
+        for (const auto& slot : sonicOwnerPath.renderableSlots)
+        {
+            if (slot.confidenceTier == "cross-validated") ++crossValidatedCount;
+            else if (slot.confidenceTier == "constructor-confirmed") ++constructorConfirmedCount;
+            else if (slot.confidenceTier == "inferred-owner") ++inferredOwnerCount;
+        }
         out
             << "],\n"
+            << "        \"renderableSlotCrossValidatedCount\": " << crossValidatedCount << ",\n"
+            << "        \"renderableSlotConstructorConfirmedCount\": " << constructorConfirmedCount << ",\n"
+            << "        \"renderableSlotInferredOwnerCount\": " << inferredOwnerCount << ",\n"
             << "        \"hudOwnerLayoutSidecarPath\": \"" << JsonEscape(sonicOwnerPath.hudOwnerLayoutSidecarPath) << "\",\n"
             << "        \"hudOwnerLayoutSidecarFrame\": " << sonicOwnerPath.hudOwnerLayoutSidecarFrame << "\n"
             << "      }\n"
