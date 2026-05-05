@@ -128,7 +128,7 @@ int main()
         applyTitleMenuVisibility(state, true, false, false, true);
         TitleMenuInput in{}; in.acceptTapped = true;
         const auto evs = updateTitleMenuOneFrame(state, in);
-        expect(state.deleteSavePromptOpen, "test5.delete prompt opened");
+        expect(state.isDeleteCheckMessageOpen, "test5.delete prompt opened");
         expectEq(evs[0].kind, TitleMenuEventKind::DeleteSavePromptOpened,
                  "test5.event kind");
     }
@@ -138,7 +138,7 @@ int main()
     {
         TitleMenuState state{};
         applyTitleMenuVisibility(state, true, false, true, true);
-        state.dlcInstallPromptOpen = true;
+        state.isDLCInfoMessageOpen = true;
         const auto cursorBefore = state.cursorIndex;
         TitleMenuInput in{}; in.downTapped = true;
         updateTitleMenuOneFrame(state, in);

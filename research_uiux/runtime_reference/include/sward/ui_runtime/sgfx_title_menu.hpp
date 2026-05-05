@@ -99,11 +99,18 @@ namespace sward::ui_runtime::generated::sgfx_hud
         TransitioningOut  = 2, // outro animation playing
     };
 
+    // Phase 325: real retail field-name mirror from
+    // local_build_env/ur103clean/UnleashedRecomp/api/SWA/System/
+    // GameMode/Title/TitleMenu.h. CTitleMenu is the actual widget
+    // class CTitleStateMenu instantiates via m_pTitleMenu (per
+    // TitleStateMenu.h). Field names + offsets verified against
+    // SWA_ASSERT_OFFSETOF lines in the retail header.
+    //
     // Bookkeeping the menu carries between frames.
     struct TitleMenuState
     {
-        // Cursor position (raw int so we can clamp + wrap cleanly).
-        // The retail asset uses 4 visible rows; SGFX adds Exit as a 5th.
+        // m_CursorIndex @ +0x44 (be<u32> in retail). SGFX uses
+        // signed int for clamp/wrap math.
         std::int32_t cursorIndex = 0;
 
         // Phase 319: real retail phase counter (mirrors
@@ -116,11 +123,26 @@ namespace sward::ui_runtime::generated::sgfx_hud
         // outside the runtime.
         bool transitionTargetSet = false;
 
-        // Modal popups.
-        bool deleteSavePromptOpen = false;
-        bool dlcInstallPromptOpen = false;
+        // Modal popups -- real retail field names from CTitleMenu.h:
+        //   m_IsDeleteCheckMessageOpen @ +0x99 (bool)
+        //   m_IsDLCInfoMessageOpen     @ +0xA2 (bool)
+        bool isDeleteCheckMessageOpen = false; // m_IsDeleteCheckMessageOpen
+        bool isDLCInfoMessageOpen = false;     // m_IsDLCInfoMessageOpen
 
-        // Sub-menus.
+        // m_Field3C / m_Field54 -- "related to exit transition" per
+        // the retail header comments. m_Field9A -- "related to cursor
+        // selection". Carrying them as host-readable bools so the
+        // SGFX runtime can mirror the field state when running
+        // alongside UnleashedRecomp's live CTitleMenu instance.
+        bool field3c_exitTransition = false;   // m_Field3C
+        bool field54_exitTransition = false;   // m_Field54
+        bool field9a_cursorSelection = false;  // m_Field9A
+        bool field98 = false;                  // m_Field98 (uncategorized)
+        bool field9f = false;                  // m_Field9F (uncategorized)
+        std::uint32_t field38 = 0;             // m_Field38 (be<u32>)
+        float         field60 = 0.0f;          // m_Field60 (be<float>)
+
+        // Sub-menus (SGFX-side bookkeeping; not a CTitleMenu field).
         bool optionsSubMenuOpen = false;
 
         // Visibility filters: which options are currently selectable.
@@ -194,22 +216,22 @@ namespace sward::ui_runtime::generated::sgfx_hud
         // ProcessInstallMessage() short-circuit at line 184-187:
         // when an install message is open, the underlying menu
         // doesn't update.
-        if (state.dlcInstallPromptOpen)
+        if (state.isDLCInfoMessageOpen)
         {
             if (input.cancelTapped)
             {
-                state.dlcInstallPromptOpen = false;
+                state.isDLCInfoMessageOpen = false;
                 events.push_back({TitleMenuEventKind::DlcInstallPromptClosed,
                                   optionFromIndex(state.cursorIndex),
                                   std::string(kTitleMenuSfxBack)});
             }
             return events;
         }
-        if (state.deleteSavePromptOpen)
+        if (state.isDeleteCheckMessageOpen)
         {
             if (input.cancelTapped)
             {
-                state.deleteSavePromptOpen = false;
+                state.isDeleteCheckMessageOpen = false;
                 state.deleteSavePromptSelectedIndex = -1;
                 events.push_back({TitleMenuEventKind::DeleteSavePromptClosed,
                                   optionFromIndex(state.cursorIndex),
@@ -266,7 +288,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
             switch (opt)
             {
             case TitleMenuOption::NewGame:
-                state.deleteSavePromptOpen = true;
+                state.isDeleteCheckMessageOpen = true;
                 state.deleteSavePromptSelectedIndex = -1;
                 events.push_back({TitleMenuEventKind::DeleteSavePromptOpened,
                                   opt, std::string(kTitleMenuSfxConfirm)});
@@ -283,7 +305,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
                                   opt, std::string(kTitleMenuSfxConfirm)});
                 break;
             case TitleMenuOption::InstallDLC:
-                state.dlcInstallPromptOpen = true;
+                state.isDLCInfoMessageOpen = true;
                 events.push_back({TitleMenuEventKind::DlcInstallPromptOpened,
                                   opt, std::string(kTitleMenuSfxConfirm)});
                 break;
@@ -317,8 +339,8 @@ namespace sward::ui_runtime::generated::sgfx_hud
         s.phase = TitleMenuPhase::Idle;
         s.transitionTargetSet = false;
         s.optionsSubMenuOpen = false;
-        s.deleteSavePromptOpen = false;
-        s.dlcInstallPromptOpen = false;
+        s.isDeleteCheckMessageOpen = false;
+        s.isDLCInfoMessageOpen = false;
     }
 
     // Convenience: hide Continue (corrupt save); hide DLC (already

@@ -23,8 +23,21 @@
 
 namespace sward::ui_runtime::generated::sgfx_hud
 {
+    // Phase 325 retail-fidelity correction: SWA::CWorldMapCursor (mined
+    // from local_build_env/.../api/SWA/System/GameMode/WorldMap/
+    // WorldMapCursor.h) does NOT use a discrete continent enum --
+    // it's a free-moving analog cursor on the 3D globe with
+    // continuous (m_CursorX, m_CursorY) float positions, driven by
+    // (m_LeftStickHorizontal, m_LeftStickVertical) analog input.
+    // Continents become highlighted when the cursor is over them;
+    // SGFX picks them via WorldMapHover (host-supplied via raycast
+    // against the globe's continent regions).
+    //
+    // Continent identifiers preserved as a HOVER target / unlock
+    // state, not as the cursor itself.
     enum class WorldMapContinent : std::uint8_t
     {
+        None        = 0xFF,
         Apotos      = 0,
         Spagonia    = 1,
         Mazuri      = 2,
@@ -34,6 +47,16 @@ namespace sward::ui_runtime::generated::sgfx_hud
         Adabat      = 6,
         Eggmanland  = 7,
         Count       = 8,
+    };
+
+    // SWA::CWorldMapCursor field mirror.
+    struct WorldMapCursor
+    {
+        float leftStickVertical = 0.0f;   // m_LeftStickVertical @ +0x34
+        float leftStickHorizontal = 0.0f; // m_LeftStickHorizontal @ +0x38
+        bool  isCursorMoving = false;     // m_IsCursorMoving @ +0x3C
+        float cursorY = 0.0f;             // m_CursorY @ +0x44
+        float cursorX = 0.0f;             // m_CursorX @ +0x48
     };
 
     enum class WorldMapEventKind : std::uint8_t
@@ -54,7 +77,15 @@ namespace sward::ui_runtime::generated::sgfx_hud
 
     struct WorldMapState
     {
-        WorldMapContinent cursor = WorldMapContinent::Apotos;
+        // Phase 325: retail-shape free analog cursor. Apotos starts
+        // unlocked; rest gated by host save state.
+        WorldMapCursor cursor; // mirrors SWA::CWorldMapCursor
+
+        // Which continent the cursor is currently HOVERING (host
+        // computes via raycast against the globe regions). Replaces
+        // the prior discrete cursor enum.
+        WorldMapContinent hover = WorldMapContinent::Apotos;
+
         std::array<bool, static_cast<std::size_t>(WorldMapContinent::Count)>
             unlocked{ true, false, false, false, false, false, false, false };
         bool stageOpenPanelVisible = false;
@@ -79,17 +110,24 @@ namespace sward::ui_runtime::generated::sgfx_hud
 
     namespace detail::world_map
     {
-        inline WorldMapContinent advance(WorldMapState& s, std::int32_t step) noexcept
+        // D-pad fallback: walks discrete unlocked continents in
+        // hover order. Real retail uses the analog cursor; this
+        // helper is for hosts that bind D-pad input to the world
+        // map screen.
+        inline WorldMapContinent advanceHover(const WorldMapState& s,
+                                              WorldMapContinent from,
+                                              std::int32_t step) noexcept
         {
             const auto count = static_cast<std::int32_t>(WorldMapContinent::Count);
-            std::int32_t idx = static_cast<std::int32_t>(s.cursor);
+            std::int32_t idx = (from == WorldMapContinent::None)
+                ? 0 : static_cast<std::int32_t>(from);
             for (std::int32_t i = 0; i < count; ++i)
             {
                 idx = (idx + step + count) % count;
                 if (s.unlocked[static_cast<std::size_t>(idx)])
                     return static_cast<WorldMapContinent>(idx);
             }
-            return s.cursor;
+            return from;
         }
     }
 
@@ -104,19 +142,20 @@ namespace sward::ui_runtime::generated::sgfx_hud
             {
                 state.stageOpenPanelVisible = false;
                 events.push_back({WorldMapEventKind::ContinentMoved,
-                                  state.cursor,
+                                  state.hover,
                                   std::string(kWorldMapSfxCancel)});
             }
             return events;
         }
         if (input.leftTapped || input.rightTapped)
         {
-            const auto next = detail::world_map::advance(state, input.leftTapped ? -1 : +1);
-            if (next != state.cursor)
+            const auto next = detail::world_map::advanceHover(
+                state, state.hover, input.leftTapped ? -1 : +1);
+            if (next != state.hover)
             {
-                state.cursor = next;
+                state.hover = next;
                 events.push_back({WorldMapEventKind::ContinentMoved,
-                                  state.cursor,
+                                  state.hover,
                                   std::string(kWorldMapSfxCursor)});
             }
         }
@@ -128,16 +167,33 @@ namespace sward::ui_runtime::generated::sgfx_hud
             // to a stage on the World Map -- NOT plain _decide.
             state.stageOpenPanelVisible = true;
             events.push_back({WorldMapEventKind::StageOpened,
-                              state.cursor,
+                              state.hover,
                               std::string(kWorldMapSfxFinalConfirm)});
         }
         else if (input.cancelTapped)
         {
             events.push_back({WorldMapEventKind::BackedToTitle,
-                              state.cursor,
+                              state.hover,
                               std::string(kWorldMapSfxCancel)});
         }
         return events;
+    }
+
+    // Phase 325 retail-fidelity: feed analog stick input directly
+    // into the cursor mirror. Host calls this every frame from the
+    // gamepad poll. Mirrors what the runtime does in CTitleStateWorldMap::Update
+    // when reading m_pWorldMapCursor->m_LeftStickHorizontal/Vertical.
+    inline void applyAnalogToWorldMapCursor(
+        WorldMapState& state,
+        float leftStickX, float leftStickY,
+        float deltaSeconds, float cursorSpeed = 1.0f) noexcept
+    {
+        state.cursor.leftStickHorizontal = leftStickX;
+        state.cursor.leftStickVertical = leftStickY;
+        state.cursor.cursorX += leftStickX * deltaSeconds * cursorSpeed;
+        state.cursor.cursorY += leftStickY * deltaSeconds * cursorSpeed;
+        const float magSq = leftStickX*leftStickX + leftStickY*leftStickY;
+        state.cursor.isCursorMoving = (magSq > 0.001f);
     }
 
 } // namespace sward::ui_runtime::generated::sgfx_hud

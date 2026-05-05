@@ -242,18 +242,18 @@ static void testWorldMap()
     s.unlocked[static_cast<std::size_t>(WorldMapContinent::Apotos)] = true;
     s.unlocked[static_cast<std::size_t>(WorldMapContinent::Spagonia)] = true;
     s.unlocked[static_cast<std::size_t>(WorldMapContinent::Eggmanland)] = true;
-    expectEq(s.cursor, WorldMapContinent::Apotos, "wm.starts at Apotos");
+    expectEq(s.hover, WorldMapContinent::Apotos, "wm.starts at Apotos");
 
     {
         WorldMapInput in; in.rightTapped = true;
         const auto evs = updateWorldMapOneFrame(s, in);
-        expectEq(s.cursor, WorldMapContinent::Spagonia, "wm.right -> Spagonia");
+        expectEq(s.hover, WorldMapContinent::Spagonia, "wm.right -> Spagonia");
         expectEq(evs[0].sfxCueName, std::string(kWorldMapSfxCursor), "wm.cursor SFX");
     }
     {
         WorldMapInput in; in.rightTapped = true;
         updateWorldMapOneFrame(s, in);
-        expectEq(s.cursor, WorldMapContinent::Eggmanland, "wm.skipped locked");
+        expectEq(s.hover, WorldMapContinent::Eggmanland, "wm.skipped locked");
     }
     {
         WorldMapInput in; in.acceptTapped = true;
