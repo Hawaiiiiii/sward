@@ -1,0 +1,53 @@
+{
+  "phase": "295",
+  "purpose": "Map every Chao::CSD::CCastNode setter in the 0x830BB000-0x830BC000 address range so the human-readable port knows which functions a runtime probe must hook to capture the full public state-machine surface.",
+  "ccastnode_inner_layout": {
+    "+0x28": "u32 flag/index, written by sub_830BB378",
+    "+0x2C": "float X position (sub_830BB3D0 / sub_830BB4D8 / sub_830BB550 / sub_830BB470)",
+    "+0x30": "float Y position (same setters as above)",
+    "+0x34": "float (single value, sub_830BB5F8) - role uncertain (uniform scale or alpha)",
+    "+0x38": "float A (sub_830BB650)",
+    "+0x3C": "float B (sub_830BB650) - paired with +0x38, likely scale-pair or rotation-pair",
+    "+0x44": "u32 flag/index (sub_830BB6C8)",
+    "+0x7C": "u32 dirty/state bitfield, modified by all setters via rlwinm clear-bit patterns"
+  },
+  "setter_addresses": [
+    { "ppc_address": "sub_830BB378", "writes": [{ "offset": 40, "type": "u32" }], "params": "r3(this), r4(u32 value)", "notes": "Single u32 setter; non-transform" },
+    { "ppc_address": "sub_830BB3D0", "writes": [{ "offset": 44, "type": "f32" }, { "offset": 48, "type": "f32" }], "params": "f1=X, f2=Y", "notes": "CCastNode::SetPosition; runtime-proven via aspect_ratio_patches.cpp", "hooked": true, "live_observed": true },
+    { "ppc_address": "sub_830BB470", "writes": [{ "offset": 44, "type": "f32" }, { "offset": 48, "type": "f32" }], "params": "f1=X, f2=Y", "notes": "Wraps sub_830BB3D0", "hooked": false, "live_observed": false },
+    { "ppc_address": "sub_830BB4D8", "writes": [{ "offset": 44, "type": "f32" }, { "offset": 48, "type": "f32" }], "params": "f1, f2 (swapped)", "notes": "Stores f31,44 and f30,48 (param order reversed vs sub_830BB3D0)", "hooked": false, "live_observed": false },
+    { "ppc_address": "sub_830BB550", "writes": [{ "offset": 44, "type": "f32" }, { "offset": 48, "type": "f32" }], "params": "f1, f2", "notes": "Calls sub_830C0990 first then writes to +44,+48", "hooked": false, "live_observed": false },
+    { "ppc_address": "sub_830BB5F8", "writes": [{ "offset": 52, "type": "f32" }], "params": "f1", "notes": "Single-float setter; role uncertain", "hooked": true, "live_observed": false },
+    { "ppc_address": "sub_830BB650", "writes": [{ "offset": 56, "type": "f32" }, { "offset": 60, "type": "f32" }], "params": "f1, f2", "notes": "Two-float setter; expected to be SetScale but live runtime never called it for World Map info_bg_1 cells", "hooked": true, "live_observed": false },
+    { "ppc_address": "sub_830BB6C8", "writes": [{ "offset": 68, "type": "u32" }], "params": "r3(this), r4(u32)", "notes": "u32 setter; non-transform" },
+    { "ppc_address": "sub_830BB920", "writes": [{ "offset": 44, "type": "f32" }, { "offset": 48, "type": "f32" }], "params": "f1,f2 loaded from r4 then branches to sub_830BB3D0", "notes": "Wrapper variant" },
+    { "ppc_address": "sub_830BB930", "writes": [{ "offset": 44, "type": "f32" }, { "offset": 48, "type": "f32" }], "params": "f1,f2 loaded from r4 then branches to sub_830BB470", "notes": "Wrapper variant" },
+    { "ppc_address": "sub_830BB950", "writes": [{ "offset": 44, "type": "f32" }, { "offset": 48, "type": "f32" }], "params": "f1,f2 loaded from r4 then branches to sub_830BB550", "notes": "Wrapper variant" }
+  ],
+  "live_observation_summary": {
+    "session": "phase294b_20260505_134915",
+    "screen": "World Map (EGGMANLAND selected, 49 fps)",
+    "setposition_calls_observed": 26,
+    "setscale_pair_calls_observed": 0,
+    "setsingle_at52_calls_observed": 0,
+    "cnode_setscale_calls_observed": 0,
+    "cnode_sethideflag_calls_observed": 0,
+    "conclusion": "The runtime's transformation that flips info_bg_1's authoring-time horizontal grid into a vertical column does not go through ANY public CCastNode or CNode setter. It must be applied either (a) inside the CSD scene draw path itself when rendering each cast, (b) via direct memory writes that bypass the named setters, or (c) the cells themselves are repositioned via the cast hierarchy in a way the static extractor doesn't capture."
+  },
+  "transparency": {
+    "runtime_proven": [
+      "Every CCastNode setter at the +0x2C..+0x60 transform offsets has been hooked",
+      "Live World Map session captures zero calls to all hooked setters except SetPosition",
+      "info_bg_1 anchor (383,-178) and info_img_*/linked-list anchors (84,0) confirmed at runtime"
+    ],
+    "runtime_inferred": [
+      "Roles of +0x34 single float and +0x38/+0x3C pair (could be alpha+rotation rather than scaleU+scalePair)",
+      "Whether the wrapper variants sub_830BB920/930/950 see different traffic in other screens"
+    ],
+    "next_phase_options": [
+      "Phase 295b: hook the CSD scene draw path (sub_830BA228 / sub_830BCCA8 area) to read each cast's effective draw transform regardless of how the runtime got there",
+      "Phase 295c: probe the cast hierarchy walk so we capture parent/child transform composition",
+      "Phase 296 (preferred): pivot to native C++ + D3D12 renderer scaffold so the harvested data starts driving real native rendering; come back to info_bg_1 once we can A/B compare with the runtime in the same process"
+    ]
+  }
+}
