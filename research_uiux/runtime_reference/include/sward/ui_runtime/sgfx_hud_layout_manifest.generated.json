@@ -1,7 +1,7 @@
 {
   "schema": "sward-sgfx-hud-layout-manifest-v1",
   "sweptRoot": "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD",
-  "generatedAt": "2026-05-05T01:12:27+00:00",
+  "generatedAt": "2026-05-05T01:41:56+00:00",
   "manifestEntries": [
     {
       "className": "CGeneralWindow",
@@ -20,16 +20,16 @@
       "scalarCount": 4,
       "enumCount": 1,
       "memberCount": 5
-    }
-  ],
-  "skippedEntries": [
-    {
-      "header": "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/SaveIcon/SaveIcon.h",
-      "reason": "no SWA_ASSERT_OFFSETOF entries or no recognizable single-class layout \u2014 generator left the file alone to avoid emitting an unverified port"
     },
     {
-      "header": "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Sonic/HudSonicStage.h",
-      "reason": "no SWA_ASSERT_OFFSETOF entries or no recognizable single-class layout \u2014 generator left the file alone to avoid emitting an unverified port"
+      "className": "CSaveIcon",
+      "swaApiHeader": "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/SaveIcon/SaveIcon.h",
+      "outputHeader": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_csave_icon.generated.h",
+      "rcptrCount": 0,
+      "scalarCount": 1,
+      "enumCount": 0,
+      "memberCount": 1
     }
-  ]
+  ],
+  "skippedEntries": []
 }

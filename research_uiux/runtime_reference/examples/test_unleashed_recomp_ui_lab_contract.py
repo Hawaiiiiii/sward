@@ -1790,12 +1790,14 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         manifest_class_names = {entry["className"] for entry in manifest["manifestEntries"]}
         self.assertIn("CGeneralWindow", manifest_class_names)
         self.assertIn("CLoading", manifest_class_names)
-        skipped_headers = {entry["header"] for entry in manifest["skippedEntries"]}
-        # SaveIcon and the runtime-extended Sonic stage header have no
-        # SWA_ASSERT_OFFSETOF entries inside the SWA API header itself, so
-        # the sweep skips them and the explicit code paths handle them.
-        self.assertTrue(any("SaveIcon.h" in h for h in skipped_headers))
-        self.assertTrue(any("HudSonicStage.h" in h for h in skipped_headers))
+        # Phase 274: SaveIcon now generates via the SWA_INSERT_PADDING
+        # fallback path, so it appears in manifestEntries. CHudSonicStage
+        # still has its own runtime-extended path (Phase 266 / 267) and
+        # is deduped from the SWA-API-only sweep silently, so the
+        # generated CHudSonicStage header is the extended-table version
+        # rather than a SWA-API-only re-emission.
+        self.assertIn("CSaveIcon", manifest_class_names)
+        self.assertNotIn("CHudSonicStage", manifest_class_names)
 
     def test_sgfx_hud_layout_emits_phase270_inline_accessors(self):
         # Phase 270: every scalar / enum member should get a const noexcept
@@ -1910,7 +1912,11 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
                         {
                             "project": "ui_known",
                             "relative_path": "game/Known/ui_known.yncp",
-                            "scenes": [{"path": "ui_known/scene_a"}],
+                            # Phase 272 composes scene paths from
+                            # `(node_path, scene_name)` pairs.
+                            "scenes": [
+                                {"node_path": "Root", "scene_name": "scene_a"},
+                            ],
                         },
                     ],
                 },
@@ -1942,6 +1948,149 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
                 f"Known project should resolve and find the scene: {statuses['m_rcKnown']}")
             self.assertTrue(statuses["m_rcMissing"].startswith("unresolved-project"),
                 f"Missing project should be flagged unresolved-project: {statuses['m_rcMissing']}")
+
+    def test_sgfx_hud_validator_composes_scene_paths_from_node_path_and_scene_name(self):
+        # Phase 272: the validator must produce `<project>[/<sub>]/<scene>`
+        # paths from each YNCP scene's (node_path, scene_name) pair so it
+        # can match the runtime sweep's SceneBindings format.
+        import importlib.util
+        import sys
+
+        validator_path = ROOT / "research_uiux/tools/validate_sgfx_hud_asset_bindings.py"
+        spec_loader = importlib.util.spec_from_file_location(
+            "sgfx_hud_validator_phase272_under_test", validator_path)
+        module = importlib.util.module_from_spec(spec_loader)
+        sys.modules["sgfx_hud_validator_phase272_under_test"] = module
+        spec_loader.loader.exec_module(module)
+
+        composed = module._compose_project_scene_paths(
+            "ui_playscreen",
+            {"scenes": [
+                {"node_path": "Root", "scene_name": "so_speed_gauge"},
+                {"node_path": "Root", "scene_name": "gauge_frame"},
+                {"node_path": "Root/add", "scene_name": "speed_count"},
+                {"node_path": "Root/add/sub", "scene_name": "deeper"},
+                {"node_path": "Root", "scene_name": ""},  # skipped — no name
+                {"scene_name": "no_node_path_scene"},     # treated as Root
+            ]},
+        )
+        self.assertEqual(composed, (
+            "ui_playscreen/so_speed_gauge",
+            "ui_playscreen/gauge_frame",
+            "ui_playscreen/add/speed_count",
+            "ui_playscreen/add/sub/deeper",
+            "ui_playscreen/no_node_path_scene",
+        ))
+
+        # The committed live validation manifest must show every gauge-
+        # cluster binding resolving to `ok` (Phase 272 closed the
+        # asset-ok-scene-list-empty path).
+        validation = json.loads(self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_asset_binding_validation.generated.json"))
+        ok_count = validation["summary"].get("ok", 0)
+        self.assertGreaterEqual(ok_count, 4,
+            "Phase 272 must have at least 4 'ok' validations after the "
+            "scene-path composition fix; live summary was: "
+            f"{validation['summary']}")
+
+    def test_sgfx_hud_chud_pause_methods_real_method_bodies(self):
+        # Phase 273 + 276: hand-written real method bodies on top of the
+        # generated CHudPause layout header. The .cpp file is included in
+        # the repo and must reference the generated header + the four
+        # state-machine helper functions.
+        path = ROOT / "research_uiux/runtime_reference/src/sgfx_hud_chud_pause_methods.cpp"
+        self.assertTrue(path.is_file(),
+            "Phase 273 method-body .cpp must exist at the documented path")
+        text = path.read_text(encoding="utf-8")
+        for token in [
+            "Phase 273 / 276: hand-written method bodies for `class CHudPause`.",
+            '#include "sward/ui_runtime/sgfx_hud_chud_pause.generated.h"',
+            "namespace sward::ui_runtime::generated::sgfx_hud",
+            "bool isPauseQuitDialogArmed(const CHudPause& pause)",
+            "ETransitionType::eTransitionType_Quit",
+            "bool isPauseInteractive(const CHudPause& pause)",
+            "pause.isVisible()",
+            "pause.isShown()",
+            "ETransitionType::eTransitionType_Undefined",
+            "bool isPauseShowingSubmenu(const CHudPause& pause)",
+            "pause.getSubmenu()",
+            "bool isPauseMiscMenuActionAccepted(const CHudPause& pause)",
+            "EMenuType::eMenuType_Misc",
+            "EStatusType::eStatusType_Accept",
+            "static_assert(\n        sizeof(CHudPause) >= 0x1B9,",
+        ]:
+            self.assertIn(token, text)
+
+    def test_sgfx_hud_csave_icon_emitted_via_swa_padding_fallback(self):
+        # Phase 274: SaveIcon's SWA API header has no SWA_ASSERT_OFFSETOF
+        # entries, so the parser falls back to walking the SWA_INSERT_PADDING
+        # directives. The recomp's `lwz r3, 216(r31)` in `sub_824E5170`
+        # confirms `m_IsVisible` lives at offset 0xD8.
+        save_icon = self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_csave_icon.generated.h")
+        for token in [
+            "class CSaveIcon",
+            "bool m_IsVisible;",
+            "static_assert(offsetof(CSaveIcon, m_IsVisible) == 0xD8,",
+            "bool isVisible() const noexcept { return m_IsVisible; }",
+            "Hedgehog::Universe::CUpdateUnit",
+            "api/SWA/HUD/SaveIcon/SaveIcon.h",
+        ]:
+            self.assertIn(token, save_icon)
+
+    def test_sgfx_hud_csd_project_loader_header_and_smoke_test_present(self):
+        # Phase 275: header-only C++ YNCP/CPAF loader with a paired
+        # smoke-test translation unit. The header must declare the
+        # CsdProjectFile struct, the magic enum, and the entry-point
+        # function; the smoke test must include the header and call into
+        # `loadCsdProjectFile()`.
+        loader_path = ROOT / "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_csd_project_loader.hpp"
+        self.assertTrue(loader_path.is_file())
+        loader = loader_path.read_text(encoding="utf-8")
+        for token in [
+            "Phase 275: C++ loader for Sonic Unleashed CSD project files",
+            "namespace sward::ui_runtime::generated::sgfx_hud",
+            "enum class CsdProjectMagic : std::uint8_t",
+            "struct CsdProjectFile",
+            "std::filesystem::path        sourcePath;",
+            "CsdProjectMagic              outerMagic = CsdProjectMagic::Unknown;",
+            "constexpr bool hasRecognizedMagic() const noexcept",
+            "constexpr bool hasYncpPayload() const noexcept",
+            "inline CsdProjectFile loadCsdProjectFile(const std::filesystem::path& path)",
+            "inline bool isLoadableCsdProject(const std::filesystem::path& path)",
+            'classifyOuterMagic',
+            'CPAF',
+            'YNCP',
+            'XNCP',
+        ]:
+            self.assertIn(token, loader)
+
+        smoke_path = ROOT / "research_uiux/runtime_reference/src/sgfx_hud_csd_project_loader_smoke_test.cpp"
+        self.assertTrue(smoke_path.is_file())
+        smoke = smoke_path.read_text(encoding="utf-8")
+        for token in [
+            "#include \"sward/ui_runtime/sgfx_hud_csd_project_loader.hpp\"",
+            "loadCsdProjectFile(argv[1])",
+            "loadStatus",
+            "outerMagicChars",
+            "innerYncpMagicOffset",
+        ]:
+            self.assertIn(token, smoke)
+
+        # The Python validator already proves end-to-end on the same set
+        # of real assets; the C++ loader's surface mirrors the validator's
+        # acceptance set so a follow-up build pipeline can swap the
+        # validator for the loader without behavioral drift.
+        validation = json.loads(self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_asset_binding_validation.generated.json"))
+        for entry in validation["validations"]:
+            self.assertTrue(entry["asset_magic_ok"],
+                f"Validator marked {entry['member_name']} as bad-magic — the "
+                "C++ loader's accept set (CPAF / YNCP / XNCP) should have "
+                "matched too: " + str(entry))
 
     def test_sgfx_hud_layout_parses_swa_api_header_rcptr_declarations(self):
         # Phase 267: focused unit test for the SWA API header parser. The

@@ -11,7 +11,7 @@
 // compile time. Method bodies are intentionally out of scope; they
 // will be ported in subsequent phases as the recomp flow is decoded.
 //
-// Generated at: 2026-05-05T01:12:27+00:00
+// Generated at: 2026-05-05T01:41:56+00:00
 // SWA base class: CGameObject (modeled here as leading byte padding rather than a real C++ base class to keep the layout self-contained).
 
 #include <array>
@@ -160,7 +160,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     static_assert(offsetof(CHudPause, m_Submenu) == 0x19C, "CHudPause::m_Submenu must remain at +0x19C");
     static_assert(offsetof(CHudPause, m_IsShown) == 0x1B8, "CHudPause::m_IsShown must remain at +0x1B8");
 
-    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:12:27+00:00";
+    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:41:56+00:00";
     static constexpr std::string_view kSwaApiHeaderRelpath = "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Pause/HudPause.h";
 
 } // namespace sward::ui_runtime::generated::sgfx_hud

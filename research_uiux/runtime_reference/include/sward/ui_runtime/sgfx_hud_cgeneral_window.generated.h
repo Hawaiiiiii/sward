@@ -11,7 +11,7 @@
 // compile time. Method bodies are intentionally out of scope; they
 // will be ported in subsequent phases as the recomp flow is decoded.
 //
-// Generated at: 2026-05-05T01:12:27+00:00
+// Generated at: 2026-05-05T01:41:56+00:00
 
 #include <array>
 #include <cstddef>
@@ -109,7 +109,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     static_assert(offsetof(CGeneralWindow, m_CursorIndex) == 0x15C, "CGeneralWindow::m_CursorIndex must remain at +0x15C");
     static_assert(offsetof(CGeneralWindow, m_SelectedIndex) == 0x164, "CGeneralWindow::m_SelectedIndex must remain at +0x164");
 
-    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:12:27+00:00";
+    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:41:56+00:00";
     static constexpr std::string_view kSwaApiHeaderRelpath = "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/GeneralWindow/GeneralWindow.h";
 
 } // namespace sward::ui_runtime::generated::sgfx_hud

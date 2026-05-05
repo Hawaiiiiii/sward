@@ -11,7 +11,7 @@
 // compile time. Method bodies are intentionally out of scope; they
 // will be ported in subsequent phases as the recomp flow is decoded.
 //
-// Generated at: 2026-05-05T01:12:27+00:00
+// Generated at: 2026-05-05T01:41:56+00:00
 
 #include <array>
 #include <cstddef>
@@ -108,7 +108,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     static_assert(offsetof(CLoading, m_LoadingDisplayType) == 0x13C, "CLoading::m_LoadingDisplayType must remain at +0x13C");
     static_assert(offsetof(CLoading, m_IsNightToDay) == 0x1A1, "CLoading::m_IsNightToDay must remain at +0x1A1");
 
-    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:12:27+00:00";
+    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:41:56+00:00";
     static constexpr std::string_view kSwaApiHeaderRelpath = "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Loading/Loading.h";
 
 } // namespace sward::ui_runtime::generated::sgfx_hud

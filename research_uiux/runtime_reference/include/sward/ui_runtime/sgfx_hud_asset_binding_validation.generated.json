@@ -1,14 +1,14 @@
 {
   "schema": "sward-sgfx-hud-asset-binding-validation-v1",
-  "generatedAt": "2026-05-05T01:17:19+00:00",
+  "generatedAt": "2026-05-05T01:34:56+00:00",
   "headersDir": "research_uiux/runtime_reference/include/sward/ui_runtime",
   "yncpNativeMap": "research_uiux/data/yncp_native_component_map.json",
   "extractedRoot": "extracted_assets/full_install_archives",
   "indexedProjectCount": 23,
   "bindingCount": 4,
   "summary": {
-    "ok": 0,
-    "asset_ok_scene_list_empty": 4,
+    "ok": 4,
+    "asset_ok_scene_list_empty": 0,
     "missing_asset": 0,
     "bad_magic": 0,
     "unresolved_project": 0,
@@ -28,8 +28,8 @@
       "asset_exists": true,
       "asset_size_bytes": 198540,
       "asset_magic_ok": true,
-      "scene_in_project": null,
-      "status": "asset-ok-scene-list-empty: project 'ui_playscreen' file exists with valid magic but the YNCP map does not list its scenes; binding likely OK but cannot be cross-checked yet"
+      "scene_in_project": true,
+      "status": "ok: project 'ui_playscreen' loaded from 'game/Sonic/ui_playscreen.yncp' contains scene 'ui_playscreen/so_speed_gauge'"
     },
     {
       "member_name": "m_rcRingEnergyGauge",
@@ -44,8 +44,8 @@
       "asset_exists": true,
       "asset_size_bytes": 198540,
       "asset_magic_ok": true,
-      "scene_in_project": null,
-      "status": "asset-ok-scene-list-empty: project 'ui_playscreen' file exists with valid magic but the YNCP map does not list its scenes; binding likely OK but cannot be cross-checked yet"
+      "scene_in_project": true,
+      "status": "ok: project 'ui_playscreen' loaded from 'game/Sonic/ui_playscreen.yncp' contains scene 'ui_playscreen/so_ringenagy_gauge'"
     },
     {
       "member_name": "m_rcGaugeFrame",
@@ -60,8 +60,8 @@
       "asset_exists": true,
       "asset_size_bytes": 198540,
       "asset_magic_ok": true,
-      "scene_in_project": null,
-      "status": "asset-ok-scene-list-empty: project 'ui_playscreen' file exists with valid magic but the YNCP map does not list its scenes; binding likely OK but cannot be cross-checked yet"
+      "scene_in_project": true,
+      "status": "ok: project 'ui_playscreen' loaded from 'game/Sonic/ui_playscreen.yncp' contains scene 'ui_playscreen/gauge_frame'"
     },
     {
       "member_name": "m_rcSpeedCount",
@@ -76,8 +76,8 @@
       "asset_exists": true,
       "asset_size_bytes": 198540,
       "asset_magic_ok": true,
-      "scene_in_project": null,
-      "status": "asset-ok-scene-list-empty: project 'ui_playscreen' file exists with valid magic but the YNCP map does not list its scenes; binding likely OK but cannot be cross-checked yet"
+      "scene_in_project": true,
+      "status": "ok: project 'ui_playscreen' loaded from 'game/Sonic/ui_playscreen.yncp' contains scene 'ui_playscreen/add/speed_count'"
     }
   ]
 }

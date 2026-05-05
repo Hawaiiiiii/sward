@@ -136,6 +136,47 @@ def _strip_block_comments(text: str) -> str:
     return re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
 
 
+# Phase 274: scan a class body for the cumulative byte offset of each
+# named member by walking `SWA_INSERT_PADDING(N);`, RCPtr<T> declarations,
+# and scalar declarations in source order. Used as a fallback when the
+# SWA API header carries no `SWA_ASSERT_OFFSETOF` lines.
+_SWA_PADDING_DIRECTIVE_RE = re.compile(r'SWA_INSERT_PADDING\s*\(\s*(0x[0-9A-Fa-f]+|\d+)\s*\)\s*;')
+
+
+def _infer_offsets_from_swa_padding(class_body: str) -> dict[str, int]:
+    cursor = 0
+    offsets: dict[str, int] = {}
+    for line in class_body.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        pad_match = _SWA_PADDING_DIRECTIVE_RE.search(stripped)
+        if pad_match is not None:
+            cursor += int(pad_match.group(1), 0)
+            continue
+        rcptr_match = _SWA_RCPTR_DECL_RE.search(stripped)
+        if rcptr_match is not None:
+            offsets[rcptr_match.group("name")] = cursor
+            cursor += 8
+            continue
+        scalar_match = _SWA_SCALAR_MEMBER_RE.match(line)
+        if scalar_match is not None:
+            offsets[scalar_match.group("name")] = cursor
+            decl_type = scalar_match.group("type")
+            if decl_type == "bool" or decl_type.endswith("8_t"):
+                cursor += 1
+            elif decl_type.endswith("16_t"):
+                cursor += 2
+            elif decl_type.endswith("64_t") or decl_type == "double":
+                cursor += 8
+            else:
+                cursor += 4
+            continue
+        # Anything else (access specifiers, comments, blank lines) does
+        # not advance the offset cursor.
+    return offsets
+
+
 def _strip_line_comments(text: str) -> str:
     return re.sub(r'//[^\n]*', '', text)
 
@@ -206,8 +247,19 @@ def parse_swa_api_class(api_header_path: Path, repo_root: Path) -> SwaApiClass |
         if m.group("class") != class_name:
             continue
         offsets[m.group("member")] = int(m.group("offset"), 16)
+    # Phase 274: a few SWA API headers (notably SaveIcon.h) declare members
+    # but no `SWA_ASSERT_OFFSETOF` entries — the SWA team relied on the
+    # `SWA_INSERT_PADDING(N)` declarations alone. When that happens, fall
+    # back to a sequential layout walk through the class body that uses
+    # the SWA_INSERT_PADDING values verbatim and assigns each member its
+    # cumulative offset starting at 0. This matches the SWA team's
+    # implicit convention that `SWA_INSERT_PADDING` is measured from the
+    # start of the class itself (the recomp source confirms this for
+    # CSaveIcon: `lwz r3, 216(r31)` reads `m_IsVisible` at +0xD8).
     if not offsets:
-        return None
+        offsets = _infer_offsets_from_swa_padding(class_body)
+        if not offsets:
+            return None
 
     # Members: collect RCPtr<T> declarations and scalar declarations from
     # the class body and pair each with its authoritative offset.

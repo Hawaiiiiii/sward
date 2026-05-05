@@ -111,6 +111,35 @@ def collect_scene_bindings(headers_dir: Path) -> list[SceneBindingRow]:
     return rows
 
 
+def _compose_project_scene_paths(project_name: str, project: dict) -> tuple[str, ...]:
+    """Phase 272: turn each YNCP scene's `(node_path, scene_name)` pair into
+    the `<project>/<sub_path>/<scene>` form that the runtime sweep produces
+    in `kSceneBindings[]` rows. The YNCP map stores `node_path='Root'` for
+    top-level scenes and `node_path='Root/<sub>'` for nested clusters; we
+    replace the literal `Root` prefix with the project name so a scene
+    named `so_speed_gauge` under `Root` becomes `ui_playscreen/so_speed_gauge`
+    and a scene named `speed_count` under `Root/add` becomes
+    `ui_playscreen/add/speed_count`.
+    """
+    out: list[str] = []
+    for scene in project.get("scenes", []):
+        scene_name = scene.get("scene_name") or scene.get("name")
+        if not scene_name:
+            continue
+        node_path = scene.get("node_path") or scene.get("path") or "Root"
+        if node_path == "Root":
+            sub_path = ""
+        elif node_path.startswith("Root/"):
+            sub_path = node_path[len("Root"):]  # leading slash kept
+        elif node_path.startswith("Root"):
+            sub_path = node_path[len("Root"):]
+        else:
+            # Treat any non-`Root` node_path as a sub-path appended verbatim.
+            sub_path = "/" + node_path.strip("/")
+        out.append(f"{project_name}{sub_path}/{scene_name}")
+    return tuple(out)
+
+
 def build_project_asset_index(
     yncp_native_map_path: Path, repo_root: Path, extracted_root: Path
 ) -> dict[str, ProjectAssetEntry]:
@@ -135,11 +164,7 @@ def build_project_asset_index(
             if project_name in out:
                 continue
             absolute = (extracted_root / relative_path).resolve()
-            scene_paths = tuple(
-                scene.get("path", "")
-                for scene in project.get("scenes", [])
-                if scene.get("path")
-            )
+            scene_paths = _compose_project_scene_paths(project_name, project)
             out[project_name] = ProjectAssetEntry(
                 project_name=project_name,
                 relative_path=str(relative_path).replace("\\", "/"),
