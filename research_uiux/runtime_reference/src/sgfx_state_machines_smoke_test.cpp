@@ -10,6 +10,7 @@
 #include "sward/ui_runtime/sgfx_world_map.hpp"
 #include "sward/ui_runtime/sgfx_hub_screen.hpp"
 #include "sward/ui_runtime/sgfx_title_intro.hpp"
+#include "sward/ui_runtime/sgfx_general_window.hpp"
 
 #include <iostream>
 #include <string>
@@ -365,6 +366,70 @@ static void testTitleIntro()
     }
 }
 
+// ----- General Window tests (Phase 324 retail-mined) -----
+//
+// Mirrors SWA::CGeneralWindow's status machine: Closed ->
+// OpeningMessage -> DisplayingMessage -> Closed (when accepted /
+// canceled), or Closed -> OpeningControls -> DisplayingControls
+// -> Closed for help windows.
+static void testGeneralWindow()
+{
+    using namespace ui;
+    std::cout << "\n== general window ==\n";
+    GeneralWindowState s;
+    expectEq(s.status, WindowStatus::Closed, "gw.starts Closed");
+
+    // Open a 2-row message window (delete-save-confirm shape).
+    {
+        const auto evs = openGeneralWindow(s, 2, false);
+        expectEq(s.status, WindowStatus::OpeningMessage, "gw.opens to OpeningMessage");
+        expectEq(static_cast<int>(WindowStatus::OpeningMessage), 2, "gw.OpeningMessage value=2 (retail gap)");
+        expectEq(evs[0].kind, GeneralWindowEventKind::WindowOpened, "gw.WindowOpened");
+        expectEq(evs[0].sfxCueName, std::string("sys_worldmap_window"), "gw.open SFX");
+    }
+    // Advance to displaying.
+    advanceGeneralWindowToDisplaying(s);
+    expectEq(s.status, WindowStatus::DisplayingMessage, "gw.advance -> DisplayingMessage");
+    expectEq(static_cast<int>(WindowStatus::DisplayingMessage), 3, "gw.DisplayingMessage value=3");
+
+    // Cursor down.
+    {
+        GeneralWindowInput in; in.downTapped = true;
+        const auto evs = updateGeneralWindowOneFrame(s, in);
+        expectEq(s.cursorIndex, 1, "gw.cursor moved to row 1");
+        expectEq(evs[0].kind, GeneralWindowEventKind::CursorMoved, "gw.CursorMoved");
+    }
+    // Accept on row 1 -> Confirmed + Closed.
+    {
+        GeneralWindowInput in; in.acceptTapped = true;
+        const auto evs = updateGeneralWindowOneFrame(s, in);
+        expectEq(s.selectedIndex, 1, "gw.selectedIndex captured");
+        expectEq(s.status, WindowStatus::Closed, "gw.closes after accept");
+        expectEq(evs[0].kind, GeneralWindowEventKind::Confirmed, "gw.Confirmed");
+        expectEq(evs[1].kind, GeneralWindowEventKind::WindowClosed, "gw.WindowClosed");
+    }
+    // Controls window flow.
+    {
+        GeneralWindowState c;
+        openGeneralWindow(c, 0, true);
+        expectEq(c.status, WindowStatus::OpeningControls, "gw.controls -> OpeningControls=4");
+        expectEq(static_cast<int>(WindowStatus::OpeningControls), 4, "gw.OpeningControls value=4");
+        advanceGeneralWindowToDisplaying(c);
+        expectEq(c.status, WindowStatus::DisplayingControls, "gw.controls -> DisplayingControls=5");
+    }
+}
+
+// ----- Loading retail-fidelity sanity -----
+static void testLoadingDisplayType()
+{
+    using namespace ui;
+    std::cout << "\n== loading retail enum ==\n";
+    expectEq(static_cast<int>(LoadingDisplayType::MilesElectric), 0, "load.MilesElectric=0");
+    expectEq(static_cast<int>(LoadingDisplayType::Arrows), 4, "load.Arrows=4 (chevrons)");
+    expectEq(static_cast<int>(LoadingDisplayType::ChangeTimeOfDay), 7, "load.ChangeTimeOfDay=7");
+    expectEq(static_cast<int>(LoadingDisplayType::Blank), 8, "load.Blank=8");
+}
+
 int main()
 {
     testPauseMenu();
@@ -374,6 +439,8 @@ int main()
     testWorldMap();
     testHubScreen();
     testTitleIntro();
+    testGeneralWindow();
+    testLoadingDisplayType();
     std::cout << "\nfailures: " << g_failures << "\n";
     return g_failures == 0 ? 0 : 1;
 }

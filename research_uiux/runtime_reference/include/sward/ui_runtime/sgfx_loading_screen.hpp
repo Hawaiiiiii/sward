@@ -22,11 +22,35 @@
 
 namespace sward::ui_runtime::generated::sgfx_hud
 {
+    // Phase 324 retail-fidelity: SWA::CLoading carries an
+    // ELoadingDisplayType enum + an m_IsNightToDay bool (mined from
+    // local_build_env/.../api/SWA/HUD/Loading/Loading.h). The earlier
+    // SGFX Booting/Ready/Dismissed phase enum was invented; the real
+    // runtime selects one of 9 display variants and a Day<->Night
+    // direction. SGFX now mirrors the retail enum exactly.
+    enum class LoadingDisplayType : std::uint32_t
+    {
+        MilesElectric        = 0, // Tails' computer interface (controller-image loading screen)
+        None                 = 1, // suppress the loading display entirely
+        WerehogMovie         = 2, // Day -> Werehog transition cinematic
+        MilesElectricContext = 3, // contextual MilesElectric variant
+        Arrows               = 4, // the chevron-arrow loading panel
+        NowLoading           = 5, // generic "Now Loading" text
+        EventGallery         = 6, // event-gallery cutscene
+        ChangeTimeOfDay      = 7, // Day <-> Night swap
+        Blank                = 8, // empty / black
+    };
+
+    // Phase 324 keeps the high-level phase enum for hosts that want
+    // a coarse Booting/Ready/Dismissed view, but it is now layered
+    // ON TOP of the retail-fidelity LoadingDisplayType -- the real
+    // loading screen state is the (LoadingDisplayType, IsNightToDay)
+    // tuple, not an arbitrary three-step machine.
     enum class LoadingPhase : std::uint8_t
     {
-        Booting    = 0, // progress 0..1, instructions panel visible
-        Ready      = 1, // press-start prompt visible, awaits input
-        Dismissed  = 2, // fading out
+        Booting    = 0,
+        Ready      = 1,
+        Dismissed  = 2,
     };
 
     enum class LoadingEventKind : std::uint8_t
@@ -46,6 +70,11 @@ namespace sward::ui_runtime::generated::sgfx_hud
     struct LoadingState
     {
         LoadingPhase phase = LoadingPhase::Booting;
+        // Phase 324: real retail fields.
+        LoadingDisplayType displayType = LoadingDisplayType::NowLoading;
+        bool         isNightToDay = false; // mirrors CLoading::m_IsNightToDay
+        bool         isVisible = false;    // mirrors CLoading::m_IsVisible
+        // SGFX-side bookkeeping for the higher-level phase machine.
         float        progress = 0.0f;       // 0..1, host-driven
         bool         showInstructions = true;
         bool         showPressStart = false;
