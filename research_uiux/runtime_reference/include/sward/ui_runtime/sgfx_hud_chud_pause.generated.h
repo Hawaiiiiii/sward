@@ -11,7 +11,7 @@
 // compile time. Method bodies are intentionally out of scope; they
 // will be ported in subsequent phases as the recomp flow is decoded.
 //
-// Generated at: 2026-05-05T00:53:18+00:00
+// Generated at: 2026-05-05T01:12:27+00:00
 // SWA base class: CGameObject (modeled here as leading byte padding rather than a real C++ base class to keep the layout self-contained).
 
 #include <array>
@@ -127,6 +127,18 @@ namespace sward::ui_runtime::generated::sgfx_hud
     private: std::array<std::uint8_t, 0x18> m_padding01A0_01B8;  // pre-m_IsShown padding (covers SWA base class / SWA_INSERT_PADDING bytes)
     public:
         bool m_IsShown;  // +0x1B8 bool (type from SWA API header)
+
+        // Phase 270: inline accessors for scalar / enum members.
+        // Mechanical translations of the SWA `be<T>` storage layout to
+        // the host-side semantic value. Derived purely from the SWA
+        // API header; no recomp method bodies are referenced.
+        bool isVisible() const noexcept { return m_IsVisible; }
+        EActionType getAction() const noexcept { return static_cast<EActionType>(m_Action.m_storage); }
+        EMenuType getMenu() const noexcept { return static_cast<EMenuType>(m_Menu.m_storage); }
+        EStatusType getStatus() const noexcept { return static_cast<EStatusType>(m_Status.m_storage); }
+        ETransitionType getTransition() const noexcept { return static_cast<ETransitionType>(m_Transition.m_storage); }
+        uint32_t getSubmenu() const noexcept { return m_Submenu.m_storage; }
+        bool isShown() const noexcept { return m_IsShown; }
     };
 
     // Compile-time guards: every named member must land at the SWA-asserted
@@ -148,7 +160,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     static_assert(offsetof(CHudPause, m_Submenu) == 0x19C, "CHudPause::m_Submenu must remain at +0x19C");
     static_assert(offsetof(CHudPause, m_IsShown) == 0x1B8, "CHudPause::m_IsShown must remain at +0x1B8");
 
-    static constexpr std::string_view kGeneratedAt = "2026-05-05T00:53:18+00:00";
+    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:12:27+00:00";
     static constexpr std::string_view kSwaApiHeaderRelpath = "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Pause/HudPause.h";
 
 } // namespace sward::ui_runtime::generated::sgfx_hud

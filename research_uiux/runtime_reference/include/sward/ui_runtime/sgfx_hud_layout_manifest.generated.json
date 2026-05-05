@@ -1,0 +1,35 @@
+{
+  "schema": "sward-sgfx-hud-layout-manifest-v1",
+  "sweptRoot": "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD",
+  "generatedAt": "2026-05-05T01:12:27+00:00",
+  "manifestEntries": [
+    {
+      "className": "CGeneralWindow",
+      "swaApiHeader": "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/GeneralWindow/GeneralWindow.h",
+      "outputHeader": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_cgeneral_window.generated.h",
+      "rcptrCount": 6,
+      "scalarCount": 3,
+      "enumCount": 1,
+      "memberCount": 9
+    },
+    {
+      "className": "CLoading",
+      "swaApiHeader": "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Loading/Loading.h",
+      "outputHeader": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_cloading.generated.h",
+      "rcptrCount": 1,
+      "scalarCount": 4,
+      "enumCount": 1,
+      "memberCount": 5
+    }
+  ],
+  "skippedEntries": [
+    {
+      "header": "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/SaveIcon/SaveIcon.h",
+      "reason": "no SWA_ASSERT_OFFSETOF entries or no recognizable single-class layout \u2014 generator left the file alone to avoid emitting an unverified port"
+    },
+    {
+      "header": "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Sonic/HudSonicStage.h",
+      "reason": "no SWA_ASSERT_OFFSETOF entries or no recognizable single-class layout \u2014 generator left the file alone to avoid emitting an unverified port"
+    }
+  ]
+}

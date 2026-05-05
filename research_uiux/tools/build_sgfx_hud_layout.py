@@ -75,20 +75,21 @@ _SWA_OFFSETOF_RE = re.compile(
     r'(?P<member>m_[A-Za-z0-9_]+)\s*,\s*(?P<offset>0x[0-9A-Fa-f]+)\s*\)'
 )
 
-# Phase 268: capture the `class CXxx [: public CYyy]` line. CHudPause
-# inherits from `CGameObject`; CHudSonicStage in the SWA API header has no
-# explicit base. Both must parse cleanly.
+# Phase 268: capture the `class CXxx [: [public] [Namespace::]CYyy]` line.
+# CHudPause inherits `: public CGameObject`; CHudSonicStage has no base;
+# CSaveIcon inherits `: Hedgehog::Universe::CUpdateUnit` (multi-namespace
+# base, default access). All three must parse cleanly.
 _SWA_CLASS_DECL_RE = re.compile(
     r'class\s+(?P<class>C[A-Za-z0-9_]+)\s*'
-    r'(?:\:\s*public\s+(?P<base>C[A-Za-z0-9_]+))?\s*\{'
+    r'(?:\:\s*(?:public\s+)?(?P<base>[A-Za-z0-9_]+(?:::[A-Za-z0-9_]+)*))?\s*\{'
 )
 
-# Phase 268: capture `enum EXxx : uint32_t { ... };` definitions. The
-# whole block is captured (multiline) so the parser can extract every
-# enumerator value the SWA API header has named. Used for the enum
-# emission in the generated port header.
+# Phase 268 / 269: capture `enum EXxx [: uint32_t] { ... };` definitions.
+# The underlying type is optional because some SWA enums (e.g.
+# `ELoadingDisplayType`) omit it and rely on the C++ default `int`.
 _SWA_ENUM_DEF_RE = re.compile(
-    r'enum\s+(?P<name>E[A-Za-z0-9_]+)\s*:\s*(?P<underlying>[A-Za-z0-9_:]+)\s*'
+    r'enum\s+(?P<name>E[A-Za-z0-9_]+)\s*'
+    r'(?:\:\s*(?P<underlying>[A-Za-z0-9_:]+)\s*)?'
     r'\{(?P<body>[^}]*)\}\s*;',
     re.DOTALL,
 )
@@ -239,9 +240,14 @@ def parse_swa_api_class(api_header_path: Path, repo_root: Path) -> SwaApiClass |
 
     enums: list[SwaApiEnum] = []
     for m in _SWA_ENUM_DEF_RE.finditer(text):
+        # Phase 269: when the SWA API header writes `enum EXxx { ... }`
+        # without an explicit underlying type the C++ default is `int`.
+        # Preserve that intent in the generated header so the port matches
+        # the SWA enum width exactly.
+        underlying = m.group("underlying") or "int32_t"
         enums.append(SwaApiEnum(
             name=m.group("name"),
-            underlying_type=m.group("underlying"),
+            underlying_type=underlying,
             values=_enumerator_values(m.group("body")),
         ))
 
@@ -388,6 +394,22 @@ def emit_swa_api_class_header(spec: SwaApiClass) -> str:
             f"// +0x{member.offset:X} {_swa_member_provenance_comment(member)}"
         )
         cursor = member.offset + size_bytes
+
+    # Phase 270: emit inline accessor methods for the scalar / enum
+    # members. These are the first method bodies in the human-readable
+    # port — small, mechanical, and fully derivable from the SWA API
+    # header. RCPtr members do not get accessors yet because reading
+    # through `m_pMemory` requires the SWA RCObject runtime to be linked
+    # in; that arrives in a later phase.
+    accessor_lines = _render_scalar_accessor_methods(spec)
+    if accessor_lines:
+        lines.append("")
+        lines.append("        // Phase 270: inline accessors for scalar / enum members.")
+        lines.append("        // Mechanical translations of the SWA `be<T>` storage layout to")
+        lines.append("        // the host-side semantic value. Derived purely from the SWA")
+        lines.append("        // API header; no recomp method bodies are referenced.")
+        for line in accessor_lines:
+            lines.append(f"        {line}")
     lines.append("    };")
     lines.append("")
 
@@ -453,6 +475,71 @@ def _swa_member_provenance_comment(member: SwaApiMember) -> str:
     if member.rcptr_inner_type is not None:
         return f"{member.decl_type} (type from SWA API header)"
     return f"{member.decl_type} (type from SWA API header)"
+
+
+# Phase 270: derive a getter name from a member name. `m_IsVisible` →
+# `isVisible`, `m_Action` → `getAction`, `m_CursorIndex` → `getCursorIndex`,
+# `m_Submenu` → `getSubmenu`. Bool-returning getters use the `is*` /
+# `has*` form when the member already starts with `Is`/`Has`.
+def _accessor_name_from_member(member_name: str, returns_bool: bool) -> str:
+    base = member_name[len("m_"):] if member_name.startswith("m_") else member_name
+    if not base:
+        return "value"
+    if returns_bool:
+        if base.startswith("Is"):
+            # `m_IsVisible` → `isVisible`
+            return "is" + base[2:]
+        if base.startswith("Has"):
+            return "has" + base[3:]
+        # bool with neutral name → use the `is` prefix anyway so the
+        # accessor reads naturally.
+        return "is" + base
+    return "get" + base
+
+
+def _render_scalar_accessor_methods(spec: SwaApiClass) -> list[str]:
+    """Return the inline-accessor method lines for every scalar / enum member
+    in the class. Each accessor is a `const`-qualified getter that returns
+    the host-side semantic value with the appropriate cast for SWA's
+    `be<T>` big-endian wrapper.
+    """
+    enum_names = {e.name for e in spec.enums}
+    out: list[str] = []
+    for member in spec.members:
+        if member.rcptr_inner_type is not None:
+            continue
+        decl_type = member.decl_type
+        if decl_type == "bool":
+            accessor = _accessor_name_from_member(member.name, returns_bool=True)
+            out.append(f"bool {accessor}() const noexcept {{ return {member.name}; }}")
+            continue
+        if decl_type.startswith("be<") and decl_type.endswith(">"):
+            inner = decl_type[3:-1].strip()
+            if inner in enum_names:
+                accessor = _accessor_name_from_member(member.name, returns_bool=False)
+                out.append(
+                    f"{inner} {accessor}() const noexcept "
+                    f"{{ return static_cast<{inner}>({member.name}.m_storage); }}"
+                )
+            else:
+                # Plain integer be<T>; return the wrapped value as-is. The
+                # endian conversion still belongs to a separate runtime
+                # layer; this accessor is layout-correct but not yet
+                # endian-correct.
+                accessor = _accessor_name_from_member(member.name, returns_bool=False)
+                out.append(
+                    f"{inner} {accessor}() const noexcept "
+                    f"{{ return {member.name}.m_storage; }}"
+                )
+            continue
+        # Plain non-be<T> scalar: bool-typed already handled above; for
+        # ints / floats just return the raw value.
+        accessor = _accessor_name_from_member(member.name, returns_bool=False)
+        out.append(
+            f"{decl_type} {accessor}() const noexcept "
+            f"{{ return {member.name}; }}"
+        )
+    return out
 
 
 @dataclass(frozen=True)
@@ -880,6 +967,34 @@ def main() -> int:
         ),
         help="Where to write the generated C++ header for CHudPause.",
     )
+    parser.add_argument(
+        "--sweep-swa-hud-headers",
+        action="store_true",
+        default=True,
+        help=(
+            "Phase 269: also walk every SWA API HUD header under "
+            "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/ and "
+            "emit a port header for each parseable class."
+        ),
+    )
+    parser.add_argument(
+        "--no-sweep-swa-hud-headers",
+        action="store_false",
+        dest="sweep_swa_hud_headers",
+        help="Skip the Phase 269 SWA-HUD-headers sweep.",
+    )
+    parser.add_argument(
+        "--swa-hud-headers-root",
+        default="local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD",
+        help="Root directory under which to sweep for SWA HUD API headers.",
+    )
+    parser.add_argument(
+        "--port-header-output-dir",
+        default=(
+            "research_uiux/runtime_reference/include/sward/ui_runtime"
+        ),
+        help="Directory where Phase 269 sweep emits one port header per class.",
+    )
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -950,7 +1065,94 @@ def main() -> int:
                 f"sourced from {chud_pause_spec.swa_api_header_relpath}"
             )
 
+    if args.sweep_swa_hud_headers:
+        sweep_root = (repo_root / args.swa_hud_headers_root).resolve()
+        port_dir = (repo_root / args.port_header_output_dir).resolve()
+        manifest_entries: list[dict[str, object]] = []
+        skipped_entries: list[dict[str, object]] = []
+        # Dedup: the explicit CHudPause path above already covered Pause;
+        # walk every other .h under the sweep root and emit per-class
+        # headers for the parseable ones.
+        already_emitted_class_names: set[str] = set()
+        # CHudSonicStage uses the runtime-extended path, not the SWA-API-
+        # only path, so its header is already authoritative; do not let
+        # the sweep overwrite it.
+        already_emitted_class_names.add("CHudSonicStage")
+        if args.also_generate_chud_pause:
+            already_emitted_class_names.add("CHudPause")
+        for header_path in sorted(sweep_root.rglob("*.h")):
+            spec = parse_swa_api_class(header_path, repo_root)
+            relpath = (
+                str(header_path.relative_to(repo_root).as_posix())
+                if header_path.is_relative_to(repo_root)
+                else str(header_path)
+            )
+            if spec is None:
+                skipped_entries.append({
+                    "header": relpath,
+                    "reason": (
+                        "no SWA_ASSERT_OFFSETOF entries or no recognizable "
+                        "single-class layout — generator left the file alone "
+                        "to avoid emitting an unverified port"
+                    ),
+                })
+                print(f"sgfx-hud-layout: sweep skipped {relpath}")
+                continue
+            if spec.class_name in already_emitted_class_names:
+                continue
+            output_filename = f"sgfx_hud_{_camel_to_snake(spec.class_name)}.generated.h"
+            output_path = port_dir / output_filename
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(emit_swa_api_class_header(spec), encoding="utf-8")
+            already_emitted_class_names.add(spec.class_name)
+            rcptr_count = sum(1 for m in spec.members if m.rcptr_inner_type)
+            scalar_count = sum(1 for m in spec.members if not m.rcptr_inner_type)
+            manifest_entries.append({
+                "className": spec.class_name,
+                "swaApiHeader": spec.swa_api_header_relpath,
+                "outputHeader": str(output_path.relative_to(repo_root).as_posix()),
+                "rcptrCount": rcptr_count,
+                "scalarCount": scalar_count,
+                "enumCount": len(spec.enums),
+                "memberCount": len(spec.members),
+            })
+            print(
+                f"sgfx-hud-layout: sweep wrote {output_path.relative_to(repo_root)} "
+                f"({len(spec.members)} members: {rcptr_count} RCPtrs + {scalar_count} scalars, "
+                f"{len(spec.enums)} enums) from {spec.swa_api_header_relpath}"
+            )
+        manifest_path = port_dir / "sgfx_hud_layout_manifest.generated.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            json.dumps({
+                "schema": "sward-sgfx-hud-layout-manifest-v1",
+                "sweptRoot": (
+                    str(sweep_root.relative_to(repo_root).as_posix())
+                    if sweep_root.is_relative_to(repo_root)
+                    else str(sweep_root)
+                ),
+                "generatedAt": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
+                "manifestEntries": manifest_entries,
+                "skippedEntries": skipped_entries,
+            }, indent=2),
+            encoding="utf-8",
+        )
+        print(
+            f"sgfx-hud-layout: wrote {manifest_path.relative_to(repo_root)} "
+            f"with {len(manifest_entries)} class entries and {len(skipped_entries)} skipped"
+        )
+
     return 0
+
+
+def _camel_to_snake(name: str) -> str:
+    # Phase 269: turn `CHudSonicStage` → `c_hud_sonic_stage` for filename use.
+    out = []
+    for i, ch in enumerate(name):
+        if ch.isupper() and i > 0 and not name[i - 1].isupper():
+            out.append("_")
+        out.append(ch.lower())
+    return "".join(out)
 
 
 if __name__ == "__main__":

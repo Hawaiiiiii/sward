@@ -1,0 +1,83 @@
+{
+  "schema": "sward-sgfx-hud-asset-binding-validation-v1",
+  "generatedAt": "2026-05-05T01:17:19+00:00",
+  "headersDir": "research_uiux/runtime_reference/include/sward/ui_runtime",
+  "yncpNativeMap": "research_uiux/data/yncp_native_component_map.json",
+  "extractedRoot": "extracted_assets/full_install_archives",
+  "indexedProjectCount": 23,
+  "bindingCount": 4,
+  "summary": {
+    "ok": 0,
+    "asset_ok_scene_list_empty": 4,
+    "missing_asset": 0,
+    "bad_magic": 0,
+    "unresolved_project": 0,
+    "unresolved_scene": 0
+  },
+  "validations": [
+    {
+      "member_name": "m_rcSpeedGauge",
+      "member_offset_hex": "0xE8",
+      "project_name": "ui_playscreen",
+      "scene_path": "ui_playscreen/so_speed_gauge",
+      "confidence_tier": "cross-validated",
+      "instance_count": 1,
+      "source_header": "sgfx_hud_chud_sonic_stage.generated.h",
+      "asset_relative_path": "extracted_assets/full_install_archives/game/Sonic/ui_playscreen.yncp",
+      "asset_absolute_path": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\extracted_assets\\full_install_archives\\game\\Sonic\\ui_playscreen.yncp",
+      "asset_exists": true,
+      "asset_size_bytes": 198540,
+      "asset_magic_ok": true,
+      "scene_in_project": null,
+      "status": "asset-ok-scene-list-empty: project 'ui_playscreen' file exists with valid magic but the YNCP map does not list its scenes; binding likely OK but cannot be cross-checked yet"
+    },
+    {
+      "member_name": "m_rcRingEnergyGauge",
+      "member_offset_hex": "0xF0",
+      "project_name": "ui_playscreen",
+      "scene_path": "ui_playscreen/so_ringenagy_gauge",
+      "confidence_tier": "cross-validated",
+      "instance_count": 1,
+      "source_header": "sgfx_hud_chud_sonic_stage.generated.h",
+      "asset_relative_path": "extracted_assets/full_install_archives/game/Sonic/ui_playscreen.yncp",
+      "asset_absolute_path": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\extracted_assets\\full_install_archives\\game\\Sonic\\ui_playscreen.yncp",
+      "asset_exists": true,
+      "asset_size_bytes": 198540,
+      "asset_magic_ok": true,
+      "scene_in_project": null,
+      "status": "asset-ok-scene-list-empty: project 'ui_playscreen' file exists with valid magic but the YNCP map does not list its scenes; binding likely OK but cannot be cross-checked yet"
+    },
+    {
+      "member_name": "m_rcGaugeFrame",
+      "member_offset_hex": "0xF8",
+      "project_name": "ui_playscreen",
+      "scene_path": "ui_playscreen/gauge_frame",
+      "confidence_tier": "cross-validated",
+      "instance_count": 1,
+      "source_header": "sgfx_hud_chud_sonic_stage.generated.h",
+      "asset_relative_path": "extracted_assets/full_install_archives/game/Sonic/ui_playscreen.yncp",
+      "asset_absolute_path": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\extracted_assets\\full_install_archives\\game\\Sonic\\ui_playscreen.yncp",
+      "asset_exists": true,
+      "asset_size_bytes": 198540,
+      "asset_magic_ok": true,
+      "scene_in_project": null,
+      "status": "asset-ok-scene-list-empty: project 'ui_playscreen' file exists with valid magic but the YNCP map does not list its scenes; binding likely OK but cannot be cross-checked yet"
+    },
+    {
+      "member_name": "m_rcSpeedCount",
+      "member_offset_hex": "0x118",
+      "project_name": "ui_playscreen",
+      "scene_path": "ui_playscreen/add/speed_count",
+      "confidence_tier": "cross-validated",
+      "instance_count": 1,
+      "source_header": "sgfx_hud_chud_sonic_stage.generated.h",
+      "asset_relative_path": "extracted_assets/full_install_archives/game/Sonic/ui_playscreen.yncp",
+      "asset_absolute_path": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\extracted_assets\\full_install_archives\\game\\Sonic\\ui_playscreen.yncp",
+      "asset_exists": true,
+      "asset_size_bytes": 198540,
+      "asset_magic_ok": true,
+      "scene_in_project": null,
+      "status": "asset-ok-scene-list-empty: project 'ui_playscreen' file exists with valid magic but the YNCP map does not list its scenes; binding likely OK but cannot be cross-checked yet"
+    }
+  ]
+}

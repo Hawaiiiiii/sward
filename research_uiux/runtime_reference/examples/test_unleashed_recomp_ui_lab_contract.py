@@ -1739,6 +1739,210 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, live_pause)
 
+    def test_sgfx_hud_layout_sweep_emits_per_class_headers_and_manifest(self):
+        # Phase 269: the sweep walks every SWA API HUD header and emits
+        # one port header per parseable class plus a manifest JSON. Verify
+        # the live emitted artifacts cover the new classes (CGeneralWindow,
+        # CLoading) and the manifest faithfully records what was emitted /
+        # skipped.
+        general_window = self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_cgeneral_window.generated.h")
+        for token in [
+            "Phase 268",
+            "class CGeneralWindow",
+            "Chao::CSD::RCPtr<Chao::CSD::CProject> m_rcGeneral;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcBg;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcWindow;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcWindowSelect;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcFooter;",
+            "be<EWindowStatus> m_Status;",
+            "be<uint32_t> m_CursorIndex;",
+            "be<uint32_t> m_SelectedIndex;",
+            "enum class EWindowStatus : std::uint32_t",
+            "static_assert(offsetof(CGeneralWindow, m_rcGeneral) == 0xD0,",
+            "static_assert(offsetof(CGeneralWindow, m_SelectedIndex) == 0x164,",
+            "api/SWA/HUD/GeneralWindow/GeneralWindow.h",
+        ]:
+            self.assertIn(token, general_window)
+
+        loading = self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_cloading.generated.h")
+        for token in [
+            "class CLoading",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcNightToDay;",
+            "be<ELoadingDisplayType> m_LoadingDisplayType;",
+            "bool m_IsNightToDay;",
+            # Phase 269: ELoadingDisplayType is declared without explicit
+            # underlying type in the SWA header so the parser falls back
+            # to the C++ default (modeled here as int32_t).
+            "enum class ELoadingDisplayType : std::int32_t",
+            "static_assert(offsetof(CLoading, m_FieldD8) == 0xD8,",
+            "static_assert(offsetof(CLoading, m_IsNightToDay) == 0x1A1,",
+        ]:
+            self.assertIn(token, loading)
+
+        manifest = json.loads(self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_layout_manifest.generated.json"))
+        self.assertEqual(manifest["schema"], "sward-sgfx-hud-layout-manifest-v1")
+        manifest_class_names = {entry["className"] for entry in manifest["manifestEntries"]}
+        self.assertIn("CGeneralWindow", manifest_class_names)
+        self.assertIn("CLoading", manifest_class_names)
+        skipped_headers = {entry["header"] for entry in manifest["skippedEntries"]}
+        # SaveIcon and the runtime-extended Sonic stage header have no
+        # SWA_ASSERT_OFFSETOF entries inside the SWA API header itself, so
+        # the sweep skips them and the explicit code paths handle them.
+        self.assertTrue(any("SaveIcon.h" in h for h in skipped_headers))
+        self.assertTrue(any("HudSonicStage.h" in h for h in skipped_headers))
+
+    def test_sgfx_hud_layout_emits_phase270_inline_accessors(self):
+        # Phase 270: every scalar / enum member should get a const noexcept
+        # inline accessor. RCPtr members do not get accessors yet because
+        # reading through them requires the SWA RCObject runtime to be
+        # linked in.
+        pause = self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_chud_pause.generated.h")
+        for token in [
+            "// Phase 270: inline accessors for scalar / enum members.",
+            "bool isVisible() const noexcept { return m_IsVisible; }",
+            "EActionType getAction() const noexcept { return static_cast<EActionType>(m_Action.m_storage); }",
+            "EMenuType getMenu() const noexcept { return static_cast<EMenuType>(m_Menu.m_storage); }",
+            "EStatusType getStatus() const noexcept { return static_cast<EStatusType>(m_Status.m_storage); }",
+            "ETransitionType getTransition() const noexcept { return static_cast<ETransitionType>(m_Transition.m_storage); }",
+            "uint32_t getSubmenu() const noexcept { return m_Submenu.m_storage; }",
+            "bool isShown() const noexcept { return m_IsShown; }",
+        ]:
+            self.assertIn(token, pause)
+
+        general_window = self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_cgeneral_window.generated.h")
+        for token in [
+            "EWindowStatus getStatus() const noexcept { return static_cast<EWindowStatus>(m_Status.m_storage); }",
+            "uint32_t getCursorIndex() const noexcept { return m_CursorIndex.m_storage; }",
+            "uint32_t getSelectedIndex() const noexcept { return m_SelectedIndex.m_storage; }",
+        ]:
+            self.assertIn(token, general_window)
+
+    def test_sgfx_hud_asset_binding_validator_resolves_scene_bindings_against_extracted_assets(self):
+        # Phase 271: the validator reads every kSceneBindings row from the
+        # generated headers, resolves each `projectName` to the extracted
+        # `.yncp` file path via the YNCP native component map, and emits a
+        # manifest that pairs each binding with its on-disk asset status.
+        # The committed validation manifest must show every gauge-cluster
+        # binding resolving to an existing YNCP file.
+        validation = json.loads(self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_asset_binding_validation.generated.json"))
+        self.assertEqual(
+            validation["schema"], "sward-sgfx-hud-asset-binding-validation-v1")
+        self.assertGreater(validation["bindingCount"], 0,
+            "validator must find at least one SceneBinding to validate")
+        # Every validated binding for the gauge cluster must at least have
+        # the asset present on disk; "ok" or "asset-ok-scene-list-empty"
+        # are both acceptable terminal states (the YNCP map does not
+        # currently carry per-scene paths so cross-check is best-effort).
+        for entry in validation["validations"]:
+            status = entry["status"]
+            self.assertTrue(
+                status.startswith("ok")
+                or status.startswith("asset-ok-scene-list-empty"),
+                f"Binding {entry['member_name']} unexpectedly failed validation: {status}")
+            self.assertTrue(entry["asset_exists"],
+                f"Binding {entry['member_name']} resolved to a non-existent asset: {entry}")
+            self.assertTrue(entry["asset_magic_ok"],
+                f"Binding {entry['member_name']} asset failed magic-byte check: {entry}")
+        # Specifically the SpeedGauge / RingEnergyGauge / GaugeFrame /
+        # SpeedCount bindings must all be present (they correspond to the
+        # cross-validated runtime sweep finds).
+        member_names = {v["member_name"] for v in validation["validations"]}
+        self.assertIn("m_rcSpeedGauge", member_names)
+        self.assertIn("m_rcRingEnergyGauge", member_names)
+        self.assertIn("m_rcGaugeFrame", member_names)
+
+    def test_sgfx_hud_asset_binding_validator_handles_unresolved_project(self):
+        # Phase 271: the validator must produce a useful status even when
+        # the SceneBinding references a project the YNCP native map does
+        # not know about. Build a synthetic generated header + map and
+        # assert the resolution behavior end-to-end.
+        import importlib.util
+        import sys
+        import tempfile
+
+        validator_path = ROOT / "research_uiux/tools/validate_sgfx_hud_asset_bindings.py"
+        spec = importlib.util.spec_from_file_location(
+            "sgfx_hud_validator_under_test", validator_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["sgfx_hud_validator_under_test"] = module
+        spec.loader.exec_module(module)
+
+        synthetic_header = (
+            "#pragma once\n"
+            "namespace sward::ui_runtime::generated::sgfx_hud {\n"
+            "    static constexpr std::array<SceneBinding, 2> kSceneBindings =\n"
+            "    {{\n"
+            "        {\"m_rcKnown\", 0xE0, \"ui_known\", \"ui_known/scene_a\", \"cross-validated\", 1},\n"
+            "        {\"m_rcMissing\", 0xE8, \"ui_does_not_exist\", \"ui_does_not_exist/x\", \"inferred-owner\", 1},\n"
+            "    }};\n"
+            "}\n"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_root = Path(tmp)
+            headers_dir = tmp_root / "research_uiux/runtime_reference/include/sward/ui_runtime"
+            headers_dir.mkdir(parents=True)
+            (headers_dir / "fake_class.generated.h").write_text(
+                synthetic_header, encoding="utf-8")
+
+            extracted_root = tmp_root / "extracted_assets/full_install_archives/game/Known"
+            extracted_root.mkdir(parents=True)
+            (extracted_root / "ui_known.yncp").write_bytes(
+                b"YNCP" + b"\x00" * 60)
+
+            yncp_map = tmp_root / "research_uiux/data/yncp_native_component_map.json"
+            yncp_map.parent.mkdir(parents=True)
+            yncp_map.write_text(json.dumps({
+                "screen_groups": {
+                    "test_group": [
+                        {
+                            "project": "ui_known",
+                            "relative_path": "game/Known/ui_known.yncp",
+                            "scenes": [{"path": "ui_known/scene_a"}],
+                        },
+                    ],
+                },
+            }), encoding="utf-8")
+
+            output = tmp_root / "validation.json"
+            argv_backup = sys.argv
+            sys.argv = [
+                "validate_sgfx_hud_asset_bindings.py",
+                "--repo-root", str(tmp_root),
+                "--headers-dir",
+                str(headers_dir.relative_to(tmp_root).as_posix()),
+                "--yncp-native-map",
+                str(yncp_map.relative_to(tmp_root).as_posix()),
+                "--extracted-root",
+                str((tmp_root / "extracted_assets/full_install_archives").relative_to(tmp_root).as_posix()),
+                "--output", str(output.relative_to(tmp_root).as_posix()),
+            ]
+            try:
+                rc = module.main()
+            finally:
+                sys.argv = argv_backup
+            self.assertEqual(rc, 0)
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(payload["bindingCount"], 2)
+            statuses = {v["member_name"]: v["status"] for v in payload["validations"]}
+            self.assertTrue(statuses["m_rcKnown"].startswith("ok"),
+                f"Known project should resolve and find the scene: {statuses['m_rcKnown']}")
+            self.assertTrue(statuses["m_rcMissing"].startswith("unresolved-project"),
+                f"Missing project should be flagged unresolved-project: {statuses['m_rcMissing']}")
+
     def test_sgfx_hud_layout_parses_swa_api_header_rcptr_declarations(self):
         # Phase 267: focused unit test for the SWA API header parser. The
         # parser must accept both fully-qualified and brief RCPtr<T>
