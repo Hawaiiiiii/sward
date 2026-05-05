@@ -1,0 +1,105 @@
+{
+  "phase": "300",
+  "purpose": "Single-image catalog of every CSD project the in-process A/B harness rendered. Each panel is the project's most-content-rich PNG.",
+  "panel_width": 480,
+  "panel_height": 270,
+  "columns": 3,
+  "rows": 6,
+  "total_size": [
+    1488,
+    1896
+  ],
+  "project_count": 18,
+  "entries": [
+    {
+      "project": "ui_balloon",
+      "scene": "balloon_sonic",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_balloon__balloon_sonic.png"
+    },
+    {
+      "project": "ui_gate",
+      "scene": "bg",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_gate__bg.png"
+    },
+    {
+      "project": "ui_general",
+      "scene": "window",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_general__window.png"
+    },
+    {
+      "project": "ui_help",
+      "scene": "help_nametag",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_help__help_nametag.png"
+    },
+    {
+      "project": "ui_itemresult",
+      "scene": "window",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_itemresult__window.png"
+    },
+    {
+      "project": "ui_loading",
+      "scene": "bg_1",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_loading__bg_1.png"
+    },
+    {
+      "project": "ui_missionscreen",
+      "scene": "lap_count",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_missionscreen__lap_count.png"
+    },
+    {
+      "project": "ui_misson",
+      "scene": "bg_B1",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_misson__bg_B1.png"
+    },
+    {
+      "project": "ui_pause",
+      "scene": "skill_select",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_pause__skill_select.png"
+    },
+    {
+      "project": "ui_result",
+      "scene": "result_num_4",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_result__result_num_4.png"
+    },
+    {
+      "project": "ui_saveicon",
+      "scene": "icon",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_saveicon__icon.png"
+    },
+    {
+      "project": "ui_shop",
+      "scene": "select_1",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_shop__select_1.png"
+    },
+    {
+      "project": "ui_start",
+      "scene": "Game_over",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_start__Game_over.png"
+    },
+    {
+      "project": "ui_status",
+      "scene": "logo",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_status__logo.png"
+    },
+    {
+      "project": "ui_title",
+      "scene": "bg",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_title__bg.png"
+    },
+    {
+      "project": "ui_townscreen",
+      "scene": "time",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_townscreen__time.png"
+    },
+    {
+      "project": "ui_worldmap",
+      "scene": "worldmap_header_bg",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_worldmap__worldmap_header_bg.png"
+    },
+    {
+      "project": "ui_worldmap_help",
+      "scene": "help_chara_2",
+      "source_png": "Unleashed Recomp - Windows (Complete Installation) 1.0.3\\out\\csd_overlay_evidence\\ui_worldmap_help__help_chara_2.png"
+    }
+  ]
+}
