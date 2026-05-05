@@ -12,6 +12,7 @@
 #include "sward/ui_runtime/sgfx_title_intro.hpp"
 #include "sward/ui_runtime/sgfx_general_window.hpp"
 #include "sward/ui_runtime/sgfx_pad_state.hpp"
+#include "sward/ui_runtime/sgfx_evil_hud_guide.hpp"
 
 #include <iostream>
 #include <string>
@@ -590,6 +591,111 @@ static void testResultsScreenEx()
     expect(s.isExVariant, "results.EX flag preserved");
 }
 
+// ----- Phase 331: Werehog HUD QTE prompt machine -----
+static void testEvilHudGuide()
+{
+    using namespace ui;
+    std::cout << "\n== werehog HUD guide (QTE) ==\n";
+
+    // Retail enum values (from EvilHudGuide.h).
+    expectEq(static_cast<unsigned>(EvilGuideAction::Single), 0u, "evil.action.Single=0");
+    expectEq(static_cast<unsigned>(EvilGuideAction::Chain), 1u, "evil.action.Chain=1");
+    expectEq(static_cast<unsigned>(EvilGuideType::A), 0u, "evil.type.A=0");
+    expectEq(static_cast<unsigned>(EvilGuideType::Y), 3u, "evil.type.Y=3");
+
+    // Single A-prompt: shows, gets pressed correctly, completes.
+    {
+        EvilHudGuideState s;
+        const auto opened = showEvilHudGuide(s, EvilGuideType::A,
+                                             EvilGuideAction::Single);
+        expect(s.isShown, "evil.shown=true after showEvilHudGuide");
+        expect(s.isVisible, "evil.visible=true");
+        expectEq(s.guideType, EvilGuideType::A, "evil.guideType=A");
+        expectEq(opened[0].kind, EvilHudGuideEventKind::GuideShown,
+                 "evil.GuideShown");
+
+        EvilHudGuideInput in; in.aTapped = true;
+        const auto evs = updateEvilHudGuideOneFrame(s, in);
+        expectEq(evs[0].kind, EvilHudGuideEventKind::ChainCompleted,
+                 "evil.single A press = ChainCompleted");
+        expect(!s.isShown, "evil.hidden after press");
+    }
+
+    // Wrong button -> ButtonMissed and prompt hides.
+    {
+        EvilHudGuideState s;
+        showEvilHudGuide(s, EvilGuideType::B, EvilGuideAction::Single);
+        EvilHudGuideInput in; in.aTapped = true; // wrong button
+        const auto evs = updateEvilHudGuideOneFrame(s, in);
+        expectEq(evs[0].kind, EvilHudGuideEventKind::ButtonMissed,
+                 "evil.wrong button = ButtonMissed");
+        expect(!s.isShown, "evil.hidden after miss");
+    }
+
+    // Chain QTE: 3-press X chain.
+    {
+        EvilHudGuideState s;
+        showEvilHudGuide(s, EvilGuideType::X, EvilGuideAction::Chain, 3);
+        expectEq(s.chainPressesRemaining, 3, "evil.chain.3 remaining at start");
+
+        // First press.
+        {
+            EvilHudGuideInput in; in.xTapped = true;
+            const auto evs = updateEvilHudGuideOneFrame(s, in);
+            expectEq(evs[0].kind, EvilHudGuideEventKind::ChainAdvanced,
+                     "evil.chain.first = ChainAdvanced");
+            expectEq(s.chainPressesRemaining, 2, "evil.chain.2 remaining");
+        }
+        // Second press.
+        {
+            EvilHudGuideInput in; in.xTapped = true;
+            const auto evs = updateEvilHudGuideOneFrame(s, in);
+            expectEq(evs[0].kind, EvilHudGuideEventKind::ChainAdvanced,
+                     "evil.chain.second = ChainAdvanced");
+            expectEq(s.chainPressesRemaining, 1, "evil.chain.1 remaining");
+        }
+        // Third press completes the chain.
+        {
+            EvilHudGuideInput in; in.xTapped = true;
+            const auto evs = updateEvilHudGuideOneFrame(s, in);
+            expectEq(evs[0].kind, EvilHudGuideEventKind::ChainCompleted,
+                     "evil.chain.third = ChainCompleted");
+            expect(!s.isShown, "evil.chain hidden after completion");
+        }
+    }
+
+    // QTE timeout in middle of chain -> ButtonMissed.
+    {
+        EvilHudGuideState s;
+        showEvilHudGuide(s, EvilGuideType::Y, EvilGuideAction::Chain, 2);
+        EvilHudGuideInput in; in.qteTimedOut = true;
+        const auto evs = updateEvilHudGuideOneFrame(s, in);
+        expectEq(evs[0].kind, EvilHudGuideEventKind::ButtonMissed,
+                 "evil.timeout = ButtonMissed");
+        expect(!s.isShown, "evil.hidden on timeout");
+    }
+
+    // CEvilSonicContext companion fields propagate through state.
+    {
+        EvilHudGuideState s;
+        s.darkGaiaEnergy = 0.75f;
+        s.outOfControlCount = 3;
+        s.animationId = 0x100;
+        expectEq(s.darkGaiaEnergy, 0.75f, "evil.context.darkGaiaEnergy");
+        expectEq(s.outOfControlCount, 3u, "evil.context.outOfControlCount");
+        expectEq(s.animationId, 0x100u, "evil.context.animationId");
+    }
+
+    // StageHudState now carries the Werehog companion fields too.
+    {
+        StageHudState s; s.mode = StageMode::Werehog;
+        s.darkGaiaEnergy = 0.5f;
+        s.outOfControlCount = 2;
+        expectEq(s.darkGaiaEnergy, 0.5f, "stage.werehog.darkGaiaEnergy carried");
+        expectEq(s.outOfControlCount, 2u, "stage.werehog.outOfControlCount carried");
+    }
+}
+
 int main()
 {
     testPauseMenu();
@@ -605,6 +711,7 @@ int main()
     testWorldMapCamera();
     testTitleIntroAttractMovie();
     testResultsScreenEx();
+    testEvilHudGuide();
     std::cout << "\nfailures: " << g_failures << "\n";
     return g_failures == 0 ? 0 : 1;
 }

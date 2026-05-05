@@ -69,6 +69,16 @@ namespace sward::ui_runtime::generated::sgfx_hud
         bool  timeLimitHitFired = false;
         // Pause overlay state.
         bool paused = false;
+
+        // Phase 331: Werehog-only retail fields, mined from
+        //   api/SWA/Player/Character/EvilSonic/EvilSonicContext.h
+        // m_DarkGaiaEnergy drives the Werehog rage meter visible
+        // on the HUD; m_OutOfControlCount tracks how many enemies
+        // the Werehog is currently grappling. These are zero / unused
+        // for DaySonic stages -- the asset renderer chooses what to
+        // draw based on StageMode.
+        float        darkGaiaEnergy   = 0.0f;
+        std::uint32_t outOfControlCount = 0;
     };
 
     struct StageHudEvent
