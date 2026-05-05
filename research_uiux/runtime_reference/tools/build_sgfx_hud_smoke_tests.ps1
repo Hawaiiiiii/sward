@@ -98,6 +98,15 @@ $targets = @(
         )
     },
     @{
+        # Phase 303: SGFX title-menu state-machine smoke test.
+        # Drives the standalone state-machine port through scripted
+        # input sequences without any game/runtime dependency.
+        Sources = @((Join-Path $srcDir "sgfx_title_menu_smoke_test.cpp"))
+        Exe     = (Join-Path $OutputDir "sgfx_title_menu_smoke_test.exe")
+        Args    = @("--no-asset-needed")  # binary takes no positional args
+        ExtraIncludes = @()
+    },
+    @{
         # Phase 297: same renderer driven by the direct binary .yncp
         # parser (no JSON). Reuses the EXE built above; just runs it
         # again with --binary as the first arg.
