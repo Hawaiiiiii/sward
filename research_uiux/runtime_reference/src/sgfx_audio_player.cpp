@@ -11,6 +11,7 @@
 
 #include <cstring>
 #include <string>
+#include <unordered_map>
 
 namespace sward::ui_runtime::generated::sgfx_hud
 {
@@ -24,6 +25,22 @@ namespace sward::ui_runtime::generated::sgfx_hud
         // BGM channel 1 is mapped onto SDL_mixer's music slot.
         Mix_Music* g_bgmMusic = nullptr;
         std::string g_bgmCurrentCueName;
+
+        // Phase 347: cue name -> registered byte blob. Host owns
+        // the bytes; SGFX just stores the (ptr, size) slice.
+        struct BgmBlob { const unsigned char* bytes; std::size_t size; };
+        std::unordered_map<std::string, BgmBlob> g_bgmRegistry;
+    }
+
+    bool sgfxAudioPlayerRegisterBgm(std::string_view cueName,
+                                    const unsigned char* bytes,
+                                    std::size_t size) noexcept
+    {
+        if (cueName.empty() || bytes == nullptr || size == 0) return false;
+        auto [it, inserted] = g_bgmRegistry.insert_or_assign(
+            std::string(cueName), BgmBlob{bytes, size});
+        (void)it;
+        return !inserted; // returns true when an existing entry was replaced
     }
 
     bool sgfxAudioPlayerInit() noexcept
@@ -99,10 +116,8 @@ namespace sward::ui_runtime::generated::sgfx_hud
     {
         if (!g_isActive) return;
         // Map BGM channel 1 onto SDL_mixer's single music slot. SGFX
-        // tracks the cue name + volume; if the cue changed, halt
-        // the current music. Actual streaming requires the BGM .ogg
-        // bytes which SGFX does not bundle yet -- only the cue NAME
-        // is set here. Volume changes still work.
+        // tracks the cue name + volume; when the cue changes AND a
+        // matching blob is registered (Phase 347), reload + replay.
         const auto& cue = admin.cueAt(kBgmChannelMain);
         if (cue != g_bgmCurrentCueName)
         {
@@ -113,8 +128,25 @@ namespace sward::ui_runtime::generated::sgfx_hud
                 g_bgmMusic = nullptr;
             }
             g_bgmCurrentCueName = cue;
-            // Streaming would happen here once a host wires its BGM
-            // bank; for now the slot is just renamed.
+            if (!cue.empty())
+            {
+                auto it = g_bgmRegistry.find(cue);
+                if (it != g_bgmRegistry.end())
+                {
+                    SDL_RWops* rw = SDL_RWFromConstMem(
+                        it->second.bytes, static_cast<int>(it->second.size));
+                    if (rw != nullptr)
+                    {
+                        // SDL_FreeRW called by SDL_mixer when the second arg is 1.
+                        g_bgmMusic = Mix_LoadMUS_RW(rw, 1);
+                        if (g_bgmMusic != nullptr)
+                        {
+                            // Loop forever (-1 in SDL_mixer parlance).
+                            Mix_PlayMusic(g_bgmMusic, -1);
+                        }
+                    }
+                }
+            }
         }
         const float vol01 = admin.getChannelVolume(kBgmChannelMain) * g_masterVolume;
         Mix_VolumeMusic(static_cast<int>(vol01 * MIX_MAX_VOLUME));

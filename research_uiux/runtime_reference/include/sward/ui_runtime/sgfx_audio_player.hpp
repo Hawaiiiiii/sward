@@ -41,11 +41,25 @@ namespace sward::ui_runtime::generated::sgfx_hud
     // Master volume scale (0..1) applied to all SFX channels.
     void sgfxAudioPlayerSetMasterVolume(float v01) noexcept;
 
+    // Phase 347: register a BGM cue name -> byte blob mapping. The
+    // host owns the bytes (must outlive the player); SGFX just
+    // tracks the slice. Multiple cue names can share the same blob
+    // (e.g. all in-stage BGMs pointing at one demo OGG). Returns
+    // true if the registration replaced an existing entry.
+    bool sgfxAudioPlayerRegisterBgm(std::string_view cueName,
+                                    const unsigned char* bytes,
+                                    std::size_t size) noexcept;
+
     // Apply BGM admin state to the actual SDL_mixer music channel.
     // Channel 1's volume + cue is what plays as music; channels 2-4
     // are tracked but only the loudest active one streams (SDL_mixer
     // has a single music slot). Hosts that want true 4-channel BGM
     // would need to use streamed Mix_Chunk on extra channels.
+    //
+    // Phase 347: when the cue on channel 1 changes AND the new cue
+    // is registered via sgfxAudioPlayerRegisterBgm, the player
+    // halts the current music + loads the new bytes via
+    // Mix_LoadMUS_RW + plays via Mix_PlayMusic with infinite loop.
     void sgfxAudioPlayerApplyBgmAdmin(const SgfxBgmAdmin& admin) noexcept;
 
 } // namespace sward::ui_runtime::generated::sgfx_hud

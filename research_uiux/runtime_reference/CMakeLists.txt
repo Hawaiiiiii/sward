@@ -175,6 +175,7 @@ add_executable(sgfx_runtime
     "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausedecide.ogg.c"
     "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausewinclose.ogg.c"
     "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausewinopen.ogg.c"
+    "${_SGFX_RUNTIME_RES_SOUNDS}/res/music/installer.ogg.c"
 )
 
 target_include_directories(sgfx_runtime
@@ -233,6 +234,7 @@ if(EXISTS "${_SGFX_RUNTIME_SDL_BUILD}/SDL/SDL2-static.lib")
         "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausedecide.ogg.c"
         "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausewinclose.ogg.c"
         "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausewinopen.ogg.c"
+        "${_SGFX_RUNTIME_RES_SOUNDS}/res/music/installer.ogg.c"
     )
     target_include_directories(sgfx_ui_mirror
         PRIVATE

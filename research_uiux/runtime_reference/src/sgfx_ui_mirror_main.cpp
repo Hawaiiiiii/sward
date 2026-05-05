@@ -34,6 +34,9 @@
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 
+// Phase 347: real BGM byte blob.
+#include "res/music/installer.ogg.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -267,6 +270,27 @@ namespace
         {"progress",       "Loading..."},
     };
 
+    // Phase 347: pick a BGM cue per active screen so the mirror's
+    // demo cycle plays music continuously. Hosts streaming retail
+    // BGM banks would replace this map with the real per-area cue.
+    const char* bgmCueForScreen(ui::SgfxScreen s, ui::StageMode mode) noexcept
+    {
+        switch (s)
+        {
+            case ui::SgfxScreen::TitleIntro:
+            case ui::SgfxScreen::Title:      return "bgm_sys_title";
+            case ui::SgfxScreen::WorldMap:
+            case ui::SgfxScreen::Loading:    return "bgm_sys_worldmap";
+            case ui::SgfxScreen::StageHud:
+                return (mode == ui::StageMode::Werehog)
+                       ? "bgm_act_hub_apotos" : "bgm_act_apotos";
+            case ui::SgfxScreen::Pause:      return "bgm_sys_worldmap";
+            case ui::SgfxScreen::Results:    return "bgm_sys_result";
+            case ui::SgfxScreen::Hub:        return "bgm_act_hub_apotos";
+        }
+        return "";
+    }
+
     // Map screen -> caption shown at the top of the framebuffer.
     const char* screenCaption(ui::SgfxScreen s, ui::StageMode mode)
     {
@@ -429,6 +453,18 @@ int main(int argc, char** argv)
             std::cerr << "sgfxAudioPlayerInit failed; continuing silent\n";
             silent = true;
         }
+        else
+        {
+            // Phase 347: register the embedded OGG blob as the BGM
+            // bytes for every demo cue the orchestrator may mount.
+            const char* kBgmCues[] = {
+                "bgm_sys_title", "bgm_sys_worldmap", "bgm_act_apotos",
+                "bgm_act_hub_apotos", "bgm_sys_result", "bgm_sys_result_ng",
+            };
+            for (const char* name : kBgmCues)
+                ui::sgfxAudioPlayerRegisterBgm(name, g_installer_music,
+                                               sizeof(g_installer_music));
+        }
     }
 
     std::cout << "scanning asset textures under " << assetRoot << " ...\n";
@@ -585,6 +621,15 @@ int main(int argc, char** argv)
                 if (!silent) ui::sgfxAudioPlayerPlayCue("sys_actstg_pausewinopen");
                 std::cout << "[demo] auto -> " << kDemoSteps[demoIdx].label << "\n";
             }
+        }
+
+        // Phase 347: keep BGM in lockstep with active screen.
+        if (!silent)
+        {
+            const char* desiredCue = bgmCueForScreen(orch.current, orch.stageHud.mode);
+            if (orch.bgmAdmin.cueAt(ui::kBgmChannelMain) != std::string(desiredCue))
+                orch.bgmAdmin.mountCue(ui::kBgmChannelMain, desiredCue);
+            ui::sgfxAudioPlayerApplyBgmAdmin(orch.bgmAdmin);
         }
 
         // Render the active screen.

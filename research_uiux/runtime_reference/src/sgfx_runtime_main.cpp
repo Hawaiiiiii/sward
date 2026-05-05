@@ -20,6 +20,9 @@
 #include "sward/ui_runtime/sgfx_audio_player.hpp"
 #include "sward/ui_runtime/sgfx_animation_playback.hpp"
 
+// Phase 347: real BGM byte blob (vendored OGG vorbis stream).
+#include "res/music/installer.ogg.h"
+
 #include <chrono>
 #include <iostream>
 #include <string>
@@ -107,6 +110,9 @@ static int runFullPlaythroughScenario()
                   << " (current=" << screenName(o.current) << ") ===\n";
         const auto evs = updateSgfxOrchestratorOneFrame(o, in);
         logEvents(evs);
+        // Phase 347: push BGM admin state to SDL_mixer so any cue
+        // change made before / during this step actually streams.
+        if (!g_silentMode) ui::sgfxAudioPlayerApplyBgmAdmin(o.bgmAdmin);
     };
 
     auto stepHostHelper = [&](std::vector<SgfxOrchestratorEvent> evs,
@@ -115,6 +121,7 @@ static int runFullPlaythroughScenario()
         std::cout << "\n=== host-step: " << label
                   << " (current=" << screenName(o.current) << ") ===\n";
         logEvents(evs);
+        if (!g_silentMode) ui::sgfxAudioPlayerApplyBgmAdmin(o.bgmAdmin);
     };
 
     // ---- TitleIntro ----
@@ -389,6 +396,23 @@ int main(int argc, char** argv)
         const bool ok = ui::sgfxAudioPlayerInit();
         std::cout << "  SDL_mixer init: " << (ok ? "OK" : "FAILED (running silent)") << "\n";
         if (!ok) g_silentMode = true;
+        else
+        {
+            // Phase 347: register the embedded OGG blob as the BGM
+            // bytes for every cue the demo scenario mounts. A real
+            // host would register one blob per cue; for the runtime
+            // demo a single track demonstrates the streaming path.
+            const auto* bgmBytes = g_installer_music;
+            const std::size_t bgmSize = sizeof(g_installer_music);
+            const char* kBgmCues[] = {
+                "bgm_sys_title", "bgm_sys_worldmap", "bgm_act_apotos",
+                "bgm_act_hub_apotos", "bgm_sys_result", "bgm_sys_result_ng",
+            };
+            for (const char* name : kBgmCues)
+                ui::sgfxAudioPlayerRegisterBgm(name, bgmBytes, bgmSize);
+            std::cout << "  BGM cues registered: "
+                      << (sizeof(kBgmCues) / sizeof(kBgmCues[0])) << "\n";
+        }
     }
     else
     {
