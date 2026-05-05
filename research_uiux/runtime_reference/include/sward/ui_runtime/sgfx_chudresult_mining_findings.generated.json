@@ -68,6 +68,30 @@
     }
   ],
   "decision_for_this_session": "Mark Phase 336 as 'blocked, alternative paths documented'. The real-playthrough capture (rank 1) is the practical follow-up since logcat infrastructure already exists. Move on to Phase 337 (SDL_mixer wiring) which is unblocked.",
+  "phase_339_breakthrough": {
+    "summary": "Discovered default_patched.xex is NONE/NONE compressed+encrypted -- a fully-decompressed plain image -- which made raw-byte string scanning trivial without needing libmspack or AES.",
+    "tool":   "research_uiux/runtime_reference/src/sgfx_xex_strings_dumper.cpp (header-only XEX2 inspector)",
+    "recovered_evidence": {
+      "retail_source_path": "D:\\SonicWorldAdventure\\SWA\\source\\HUD\\Common\\Result\\HudResult.cpp",
+      "class_hierarchy": [
+        "SWA::CHudResult derives from Hedgehog::Universe::TStateMachine<CHudResult>",
+        "Boost::shared_ptr<CHudResult> instances",
+        "Four sub-states (TStateMachine<CHudResult>::TState):",
+        "  CStateFirstWaiting -- initial idle phase",
+        "  CStateChangingCamera -- camera lerp into result pose",
+        "  CStateResultAnimation -- 6-line typewriter reveal",
+        "  CStateRank -- rank fanfare phase, accept-to-exit gated by min dwell",
+        "CFunctorImp binding suggests state callbacks take a CSD::CScene* and a const char* tag (likely scene/cast name)"
+      ],
+      "format_string": "result_num_%d -- counters constructed dynamically rather than as 6 hardcoded names",
+      "image_base":   "0x82000000 (entry point 0x82bd5010 in patched xex)"
+    },
+    "what_landed_in_sgfx_port": "sgfx_results_screen.hpp now models the 4-state retail TStateMachine: ResultsPhase::FirstWaiting -> ChangingCamera -> ResultAnimation -> Rank. Per-phase dwell timers, 4 new EnteredXxx events, accept-on-Rank gated by rankPhaseMinSeconds. 9 new smoke assertions cover the phase walk, dwell gates, and EX variant.",
+    "still_inferred": [
+      "Camera lerp duration (cameraLerpSeconds=0.5f default) -- retail value lives in the asset animation tracks, not in the xex strings",
+      "Rank-phase min dwell (rankPhaseMinSeconds=1.0f default) -- ditto"
+    ]
+  },
   "transparency": {
     "runtime_proven": [
       "All 5 attempted approaches were actually executed in this session; result/verdict reflects what each produced.",

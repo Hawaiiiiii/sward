@@ -59,11 +59,38 @@ namespace sward::ui_runtime::generated::sgfx_hud
         LineRevealed,
         TallyComplete,
         Acknowledged,   // user presses A to advance
+        // Phase 339: phase transitions mined from RTTI in
+        // local_build_env/.../UnleashedRecompLib/private/default_patched.xex.
+        // The retail CHudResult is a TStateMachine<CHudResult> with
+        // FOUR explicit sub-states; SGFX previously collapsed all of
+        // them into "tally cycle". These events fire at each retail
+        // sub-state boundary so hosts can drive camera + audio cues
+        // accurately.
+        EnteredFirstWaiting,
+        EnteredChangingCamera,
+        EnteredResultAnimation,
+        EnteredRank,
     };
 
     enum class ResultsRank : std::uint8_t
     {
         D = 0, C = 1, B = 2, A = 3, S = 4,
+    };
+
+    // Phase 339: retail CHudResult sub-states. RTTI mined from
+    // default_patched.xex (uncompressed retail image):
+    //   .?AVCStateFirstWaiting@CHudResult@SWA@@
+    //   .?AVCStateChangingCamera@CHudResult@SWA@@
+    //   .?AVCStateResultAnimation@CHudResult@SWA@@
+    //   .?AVCStateRank@CHudResult@SWA@@
+    // Source file path also recovered:
+    //   D:\SonicWorldAdventure\SWA\source\HUD\Common\Result\HudResult.cpp
+    enum class ResultsPhase : std::uint8_t
+    {
+        FirstWaiting     = 0, // CStateFirstWaiting -- idle while host fades in
+        ChangingCamera   = 1, // CStateChangingCamera -- camera lerp into pose
+        ResultAnimation  = 2, // CStateResultAnimation -- 6-line typewriter reveal
+        Rank             = 3, // CStateRank -- rank fanfare + accept-to-exit
     };
 
     struct ResultsInput
@@ -80,12 +107,28 @@ namespace sward::ui_runtime::generated::sgfx_hud
         std::int32_t rings = 0;
         std::int64_t specialScore = 0;
         std::int64_t totalScore = 0;
+
+        // Phase 339: retail TStateMachine<CHudResult> sub-state. The
+        // host drives transitions either via host helpers (camera
+        // settle complete) or by exhausting timers within a phase.
+        ResultsPhase phase = ResultsPhase::FirstWaiting;
+
         // Animation cursor: which line is currently revealing.
         ResultsLineId nextLine = ResultsLineId::Rank;
         float         secondsSinceLastReveal = 0.0f;
         float         secondsBetweenLines = 0.4f;
         bool          tallyComplete = false;
         bool          acknowledged = false;
+        // Phase 339: time the host says it takes for the camera lerp
+        // (CStateChangingCamera) to settle. SGFX advances out of that
+        // phase when this elapses; retail real value is in the asset
+        // animation tracks, not directly mined.
+        float         cameraLerpSeconds = 0.5f;
+        float         secondsInPhase = 0.0f;
+        // Phase 339: minimum dwell on the rank fanfare phase before
+        // accept moves to Acknowledged. Retail uses the rank-anim
+        // length; SGFX defaults to 1s, host can override.
+        float         rankPhaseMinSeconds = 1.0f;
 
         // Phase 329: EX-stage variant flag. Retail ships ui_result_ex
         // as a separate CSD project bound for Tails Tornado / Werehog
@@ -126,13 +169,49 @@ namespace sward::ui_runtime::generated::sgfx_hud
     constexpr std::string_view kResultsBgmSuccess = "bgm_sys_result";
     constexpr std::string_view kResultsBgmFailure = "bgm_sys_result_ng";
 
+    // Phase 339: helper for hosts that want to skip the camera lerp
+    // (e.g. UI tests that just want to drive the tally directly).
+    inline void resultsScreenSkipToAnimation(ResultsState& s) noexcept
+    {
+        s.phase = ResultsPhase::ResultAnimation;
+        s.secondsInPhase = 0.0f;
+    }
+
     inline std::vector<ResultsEvent> updateResultsScreenOneFrame(
         ResultsState& state,
         const ResultsInput& input)
     {
         std::vector<ResultsEvent> events;
+        state.secondsInPhase += input.deltaSeconds;
 
-        if (!state.tallyComplete)
+        // Phase 339: drive the four-state retail machine.
+        // CStateFirstWaiting: trivial; advance after one tick so hosts
+        //   can synchronize fade-in. The retail FirstWaiting is also
+        //   trivial -- it waits for the camera-changing trigger.
+        if (state.phase == ResultsPhase::FirstWaiting)
+        {
+            state.phase = ResultsPhase::ChangingCamera;
+            state.secondsInPhase = 0.0f;
+            events.push_back({ResultsEventKind::EnteredChangingCamera,
+                              ResultsLineId::Rank, ""});
+            return events;
+        }
+        // CStateChangingCamera: dwell `cameraLerpSeconds` then advance
+        // to ResultAnimation.
+        if (state.phase == ResultsPhase::ChangingCamera)
+        {
+            if (state.secondsInPhase >= state.cameraLerpSeconds)
+            {
+                state.phase = ResultsPhase::ResultAnimation;
+                state.secondsInPhase = 0.0f;
+                state.secondsSinceLastReveal = 0.0f;
+                events.push_back({ResultsEventKind::EnteredResultAnimation,
+                                  ResultsLineId::Rank, ""});
+            }
+            return events;
+        }
+        // CStateResultAnimation: typewriter reveal each of the 6 lines.
+        if (state.phase == ResultsPhase::ResultAnimation && !state.tallyComplete)
         {
             state.secondsSinceLastReveal += input.deltaSeconds;
             if (state.secondsSinceLastReveal >= state.secondsBetweenLines)
@@ -150,6 +229,10 @@ namespace sward::ui_runtime::generated::sgfx_hud
                     state.tallyComplete = true;
                     events.push_back({ResultsEventKind::TallyComplete,
                                       ResultsLineId::TotalScore, ""});
+                    state.phase = ResultsPhase::Rank;
+                    state.secondsInPhase = 0.0f;
+                    events.push_back({ResultsEventKind::EnteredRank,
+                                      ResultsLineId::TotalScore, ""});
                 }
                 else
                 {
@@ -157,7 +240,13 @@ namespace sward::ui_runtime::generated::sgfx_hud
                 }
             }
         }
-        else if (input.acceptTapped && !state.acknowledged)
+        // Phase 339: CStateRank handles the rank fanfare. Accept can
+        // only fire Acknowledged after rankPhaseMinSeconds dwell so
+        // the host has time to play the rank-specific fanfare cue.
+        else if (state.phase == ResultsPhase::Rank
+                 && input.acceptTapped
+                 && !state.acknowledged
+                 && state.secondsInPhase >= state.rankPhaseMinSeconds)
         {
             state.acknowledged = true;
             events.push_back({ResultsEventKind::Acknowledged,

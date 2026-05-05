@@ -206,32 +206,68 @@ static void testResultsScreen()
     using namespace ui;
     std::cout << "\n== results screen ==\n";
 
+    // Phase 339: 4-phase retail TStateMachine<CHudResult> walk.
     ResultsState s; s.rank = ResultsRank::A; s.score = 100000; s.rings = 99;
     s.totalScore = 200000; s.timeSeconds = 75.5f;
-    s.secondsBetweenLines = 0.1f;
+    s.secondsBetweenLines = 0.05f;
+    s.cameraLerpSeconds = 0.1f;
+    s.rankPhaseMinSeconds = 0.1f;
+    expectEq(s.phase, ResultsPhase::FirstWaiting, "results.starts FirstWaiting");
+
+    // Tick once: FirstWaiting -> ChangingCamera (one-frame).
+    {
+        ResultsInput in; in.deltaSeconds = 0.0f;
+        const auto evs = updateResultsScreenOneFrame(s, in);
+        expectEq(s.phase, ResultsPhase::ChangingCamera, "results.advance to ChangingCamera");
+        expectEq(evs[0].kind, ResultsEventKind::EnteredChangingCamera,
+                 "results.EnteredChangingCamera");
+    }
+    // Tick the camera lerp: -> ResultAnimation.
+    {
+        ResultsInput in; in.deltaSeconds = 0.15f;
+        const auto evs = updateResultsScreenOneFrame(s, in);
+        expectEq(s.phase, ResultsPhase::ResultAnimation, "results.advance to ResultAnimation");
+        expectEq(evs[0].kind, ResultsEventKind::EnteredResultAnimation,
+                 "results.EnteredResultAnimation");
+    }
 
     // Tick through all 6 lines of the tally.
     int revealCount = 0;
     bool sawComplete = false;
+    bool sawRank = false;
     for (int i = 0; i < 100 && !sawComplete; ++i)
     {
-        ResultsInput in; in.deltaSeconds = 0.15f;
+        ResultsInput in; in.deltaSeconds = 0.06f;
         const auto evs = updateResultsScreenOneFrame(s, in);
         for (const auto& e : evs)
         {
             if (e.kind == ResultsEventKind::LineRevealed) ++revealCount;
             if (e.kind == ResultsEventKind::TallyComplete) sawComplete = true;
+            if (e.kind == ResultsEventKind::EnteredRank) sawRank = true;
         }
     }
     expectEq(revealCount, static_cast<int>(ResultsLineId::Count),
              "results.6 lines revealed");
     expect(sawComplete, "results.TallyComplete fired");
+    expect(sawRank, "results.EnteredRank fired after tally");
+    expectEq(s.phase, ResultsPhase::Rank, "results.now in Rank phase");
 
-    // Acknowledge.
+    // Accept BEFORE rankPhaseMinSeconds elapses -> NOT acknowledged.
     {
         ResultsInput in; in.acceptTapped = true;
         const auto evs = updateResultsScreenOneFrame(s, in);
-        expect(s.acknowledged, "results.acknowledged");
+        expect(!s.acknowledged, "results.early accept ignored");
+        expect(evs.empty(), "results.no Acknowledged event yet");
+    }
+    // Tick to past rankPhaseMinSeconds, then accept.
+    {
+        ResultsInput in; in.deltaSeconds = 0.2f;
+        updateResultsScreenOneFrame(s, in);
+    }
+    {
+        ResultsInput in; in.acceptTapped = true;
+        const auto evs = updateResultsScreenOneFrame(s, in);
+        expect(s.acknowledged, "results.acknowledged after rank dwell");
         expectEq(evs[0].kind, ResultsEventKind::Acknowledged, "results.Acknowledged");
     }
 }
@@ -573,8 +609,9 @@ static void testResultsScreenEx()
     s.useFailureBgm = false;
     s.rank = ResultsRank::S;
     s.secondsBetweenLines = 0.05f;
+    s.cameraLerpSeconds = 0.05f;
 
-    // Tally completes the same as base variant.
+    // Tally completes after walking through the 4-state machine.
     bool sawComplete = false;
     int reveals = 0;
     for (int i = 0; i < 100 && !sawComplete; ++i)
@@ -591,6 +628,7 @@ static void testResultsScreenEx()
              "results.EX 6 lines revealed");
     expect(sawComplete, "results.EX TallyComplete fired");
     expect(s.isExVariant, "results.EX flag preserved");
+    expectEq(s.phase, ResultsPhase::Rank, "results.EX in Rank after tally");
 }
 
 // ----- Phase 331: Werehog HUD QTE prompt machine -----
