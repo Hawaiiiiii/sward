@@ -18,6 +18,7 @@
 #include "sward/ui_runtime/sgfx_hud_evil_stage.hpp"
 #include "sward/ui_runtime/sgfx_hud_status.hpp"
 #include "sward/ui_runtime/sgfx_help_window.hpp"
+#include "sward/ui_runtime/sgfx_obj_balloon.hpp"
 
 #include <iostream>
 #include <string>
@@ -994,6 +995,119 @@ static void testHelpWindow()
     }
 }
 
+// ----- Phase 343: Hub town message-passing protocol -----
+static void testObjBalloonProtocol()
+{
+    using namespace ui;
+    std::cout << "\n== obj balloon protocol ==\n";
+    ObjBalloonState balloon;
+    HubTownMan npc;
+    npc.npcId = 42;
+    npc.countryId = 0; // Apotos
+    npc.isTalkable = true;
+    npc.talkAnchorX = 100.0f; npc.talkAnchorY = 50.0f; npc.talkAnchorZ = 0.0f;
+
+    // Retail message kind values match RTTI scan order.
+    expect(static_cast<int>(HubMessageKind::SetTownManTalk) == 0,
+           "msg.SetTownManTalk=0");
+    expect(static_cast<int>(HubMessageKind::ReceiveNowTalkBalloon) == 7,
+           "msg.ReceiveNowTalkBalloon=7");
+    expect(static_cast<int>(HubMessageKind::SetTownTime) == 50,
+           "msg.SetTownTime=50");
+
+    // Receive balloon: balloon goes Hidden -> Appearing.
+    {
+        HubMessage msg;
+        msg.kind = HubMessageKind::ReceiveNowTalkBalloon;
+        msg.targetTownManId = 42;
+        msg.intParam0 = 0;
+        msg.intParam1 = 0; // no choices
+        const auto evs = dispatchHubMessage(balloon, npc, msg);
+        expectEq(balloon.phase, BalloonPhase::Appearing, "balloon.Appearing");
+        expectEq(balloon.boundTownManId, 42, "balloon.bound to NPC 42");
+        expectEq(evs[0].kind, BalloonEventKind::Appeared, "balloon.Appeared event");
+        expectEq(evs[0].sfxCueName, std::string("obj_navi_appear"), "balloon.appear cue");
+    }
+    // Tick past appear duration -> Showing.
+    {
+        const auto evs = updateObjBalloonOneFrame(balloon, 0.2f);
+        expectEq(balloon.phase, BalloonPhase::Showing, "balloon.Showing");
+        expectEq(evs[0].kind, BalloonEventKind::ShowingNow, "balloon.ShowingNow event");
+    }
+    // SetTownManTalk: NPC marked speaking.
+    {
+        HubMessage msg;
+        msg.kind = HubMessageKind::SetTownManTalk;
+        msg.targetTownManId = 42;
+        dispatchHubMessage(balloon, npc, msg);
+        expect(npc.isSpeaking, "npc.isSpeaking after SetTownManTalk");
+    }
+    // SetTownManTalkEnd -> Disappearing + npc.isSpeaking false.
+    {
+        HubMessage msg;
+        msg.kind = HubMessageKind::SetTownManTalkEnd;
+        msg.targetTownManId = 42;
+        dispatchHubMessage(balloon, npc, msg);
+        expect(!npc.isSpeaking, "npc.isSpeaking false after TalkEnd");
+        expectEq(balloon.phase, BalloonPhase::Disappearing, "balloon.Disappearing");
+    }
+    // Tick past disappear -> Hidden + Disappeared event.
+    {
+        const auto evs = updateObjBalloonOneFrame(balloon, 0.2f);
+        expectEq(balloon.phase, BalloonPhase::Hidden, "balloon.Hidden");
+        expectEq(balloon.boundTownManId, -1, "balloon.unbound");
+        expectEq(evs[0].kind, BalloonEventKind::Disappeared, "balloon.Disappeared event");
+    }
+
+    // Multi-choice flow: balloon Appears -> Choosing -> ReceiveSelectBalloon.
+    {
+        HubMessage msg;
+        msg.kind = HubMessageKind::ReceiveNowTalkBalloon;
+        msg.targetTownManId = 42;
+        msg.intParam0 = 0;
+        msg.intParam1 = 3; // 3 choices
+        dispatchHubMessage(balloon, npc, msg);
+        updateObjBalloonOneFrame(balloon, 0.2f);
+        expectEq(balloon.phase, BalloonPhase::Choosing, "balloon.Choosing with choices");
+        expectEq(balloon.choiceCount, 3, "balloon.choiceCount=3");
+
+        HubMessage selectMsg;
+        selectMsg.kind = HubMessageKind::ReceiveSelectBalloon;
+        selectMsg.intParam0 = 2;
+        const auto evs = dispatchHubMessage(balloon, npc, selectMsg);
+        expectEq(balloon.choiceIndex, 2, "balloon.choiceIndex=2");
+        expectEq(evs[0].kind, BalloonEventKind::ChoiceSelected, "balloon.ChoiceSelected");
+        expectEq(balloon.phase, BalloonPhase::Disappearing, "balloon.Disappearing after choice");
+    }
+
+    // Flash protocol.
+    {
+        npc.isFlashing = false;
+        HubMessage msg;
+        msg.kind = HubMessageKind::SetTownManFlash;
+        msg.targetTownManId = 42;
+        dispatchHubMessage(balloon, npc, msg);
+        expect(npc.isFlashing, "npc.isFlashing after SetTownManFlash");
+        msg.kind = HubMessageKind::SetTownManFlashEnd;
+        dispatchHubMessage(balloon, npc, msg);
+        expect(!npc.isFlashing, "npc.isFlashing false after FlashEnd");
+    }
+
+    // Query reply helpers fill the payload in-place.
+    {
+        HubMessage msg;
+        msg.kind = HubMessageKind::GetIsTownManTalkable;
+        replyGetIsTownManTalkable(msg, npc);
+        expect(msg.boolParam0, "reply.GetIsTownManTalkable=true");
+        msg.kind = HubMessageKind::GetTownManCountry;
+        replyGetTownManCountry(msg, npc);
+        expectEq(msg.intParam0, 0, "reply.GetTownManCountry=Apotos(0)");
+        msg.kind = HubMessageKind::GetTownManID;
+        replyGetTownManID(msg, npc);
+        expectEq(msg.intParam0, 42, "reply.GetTownManID=42");
+    }
+}
+
 int main()
 {
     testPauseMenu();
@@ -1015,6 +1129,7 @@ int main()
     testEvilStageHud();
     testStatusOverlay();
     testHelpWindow();
+    testObjBalloonProtocol();
     std::cout << "\nfailures: " << g_failures << "\n";
     return g_failures == 0 ? 0 : 1;
 }
