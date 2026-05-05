@@ -1,0 +1,154 @@
+{
+  "phase": "340",
+  "purpose": "Catalog of every retail UI/UX class + source path recovered from default_patched.xex (NONE/NONE compression+encryption -- raw byte scan via sgfx_xex_strings_dumper.exe). This is the authoritative ground truth: every entry here is RTTI mined from the actual retail Xbox 360 image, not inferred. Replaces the earlier 'inferred from screen-index' guesses scattered across the SGFX ports.",
+  "source": "local_build_env/ur103clean/UnleashedRecompLib/private/default_patched.xex",
+  "tool":   "research_uiux/runtime_reference/src/sgfx_xex_strings_dumper.cpp",
+  "format_note": "RTTI strings from MSVC C++ ABI (.?AV...@@). Each class also has a corresponding sp_counted_impl_p<T> for boost::shared_ptr instances, confirming it's a heap-allocated class.",
+
+  "retail_ui_class_hierarchy": {
+    "Title": {
+      "CTitleStateIntro@SWA":     "ported in sgfx_title_intro.hpp (Phase 320 + 328)",
+      "CTitleStateMenu@SWA":      "ported in sgfx_title_menu.hpp (Phase 319 + 325)",
+      "CTitleStateWorldMap@SWA":  "ported in sgfx_world_map.hpp (Phase 325 + 327)",
+      "CTitleMenu@SWA":           "TitleMenu.h api header (Phase 325)"
+    },
+    "WorldMap": {
+      "CWorldMapCursor@SWA":  "ported (analog stick, Phase 325)",
+      "CWorldMapCamera@SWA":  "ported (orbit camera, Phase 327)"
+    },
+    "StageHud": {
+      "CHudSonicStage@SWA":     "ported in sgfx_stage_hud.hpp (Phase 306). Day Sonic.",
+      "SonicMainDisplay":       "additional 'main display' subcomponent at HUD/Sonic/SonicMainDisplay.cpp -- NOT YET MODELED",
+      "CHudEvilStage@SWA":      "Werehog stage HUD! Located at HUD/Evil/HudEvilStage.cpp. Currently SGFX collapses both into StageHudState with a mode flag; retail has SEPARATE classes for Day vs Werehog stage HUDs.",
+      "EvilMainDisplay":        "additional Werehog main display at HUD/Evil/EvilMainDisplay.cpp"
+    },
+    "Pause": {
+      "CHudPause@SWA":          "ported (Phase 323)",
+      "HudItemList":            "Pause sub-screen at HUD/Pause/Item/HudItemList.cpp -- inventory tab",
+      "HudSkillList":           "Pause sub-screen at HUD/Pause/Skill/HudSkillList.cpp -- skill upgrade tab",
+      "SkillParamManager":      "skill parameter store at HUD/Pause/Skill/SkillParamManager.cpp"
+    },
+    "Result": {
+      "CHudResult@SWA":               "ported with retail 4-state machine (Phase 339)",
+      "CStateFirstWaiting":           "sub-state",
+      "CStateChangingCamera":         "sub-state",
+      "CStateResultAnimation":        "sub-state (the 6-line typewriter reveal)",
+      "CStateRank":                   "sub-state (rank fanfare)"
+    },
+    "Loading": {
+      "CLoading@SWA":  "ported (Phase 324)"
+    },
+    "GeneralWindow": {
+      "CGeneralWindow@SWA":  "ported (Phase 324)",
+      "HelpWindow":          "SEPARATE class at HUD/HelpWindow/HelpWindow.cpp -- NOT YET MODELED. ui_help.yncp screen."
+    },
+    "SaveIcon": {
+      "CSaveIcon@SWA":  "ported (Phase 333)"
+    },
+    "Hub town UI (was inferred; NOW retail-mined)": {
+      "CHudTown@SWA":                 "MAIN hub screen HUD class -- replaces SGFX's HubState root. Located at HUD/Town/* (or similar)",
+      "CObjBalloon@SWA":              "talk balloon overlay -- this is in the Object hierarchy, NOT HUD. Used when an NPC is speaking",
+      "CTownManBase@SWA":             "base class for hub NPCs ('TownMan' = town man = NPC). Located at NPC/TownMan/TownManBase.cpp",
+      "CTownManParameterPool@SWA":    "NPC config data pool, reads from XML (CXMLBinNode)",
+      "CTownManStateDamage":          "NPC state at NPC/TownMan/State/TownManStateDamage.cpp",
+      "CTownManStateDispel":          "NPC state at NPC/TownMan/State/TownManStateDispel.cpp",
+      "TownShopCamera":               "camera-controller variant at Camera/Controller/TownShopCamera.cpp",
+      "TownTalkCamera":               "camera-controller variant at Camera/Controller/TownTalkCamera.cpp",
+      "town_messages": [
+        "MsgSetTownManTalk / MsgSetTownManTalkEnd",
+        "MsgRequestNowTalkBalloon / MsgReceiveNowTalkBalloon",
+        "MsgReceiveSelectBalloon",
+        "MsgSetTownManFlash / MsgSetTownManFlashEnd / MsgSetTownManFlashTarget",
+        "MsgSetTownManVibration",
+        "MsgSetTownManSpeakActive",
+        "MsgSetTownManTalkable / MsgSetTownManTalkableMark",
+        "MsgChangeTownManAnimation / MsgChangeTownManFacialAnimation / MsgChangeTownManFaceForce",
+        "MsgGetTownManCamOffset / MsgGetTownManHeight / MsgGetTownManID / MsgGetTownManCountry",
+        "MsgGetTownManTalkMatrix / MsgGetTownManTalkPreInfo",
+        "MsgGetTownManScream / MsgGetTownManPkg",
+        "MsgGetIsTownManFlashable / MsgGetIsTownManTalkable",
+        "MsgSetTownManActive / MsgSetTownManDirection / MsgSetTownManRetryTimeTable",
+        "MsgSetTownManGrobalWindow",
+        "MsgLetTownManKnowMissionEnd",
+        "MsgSetTownTime"
+      ]
+    },
+    "MediaRoom (Town sub-screen)": {
+      "CMediaRoom@SWA":                  "media room main screen at HUD/MediaRoom/MediaRoom.cpp",
+      "CMediaRoomDetail@SWA":            "detail panel at HUD/MediaRoom/MediaRoomDetail.cpp",
+      "CMediaRoomScrollBar@SWA":         "scrollbar widget",
+      "CMediaRoomSelectBook@SWA":        "book selector tab",
+      "CMediaRoomSelectCountry@SWA":     "country selector at HUD/MediaRoom/MediaRoomSelectCountry.cpp",
+      "CMediaRoomSelectItem@SWA":        "item selector at HUD/MediaRoom/MediaRoomSelectItem.cpp",
+      "CMediaRoomItemList@SWA":          "item list at HUD/MediaRoom/MediaRoomItemList.cpp",
+      "USItemInfo (struct)":             "media room item info record"
+    },
+    "Status overlay": {
+      "CHudStatus@SWA":  "Status / Skill Upgrade overlay at HUD/Status/HudStatus.cpp -- NOT YET MODELED in SGFX"
+    },
+    "Item pickup overlay": {
+      "HudItemGet": "item-pickup popup at HUD/Item/HudItemGet.cpp -- NOT YET MODELED"
+    },
+    "Mission HUD": {
+      "HudMissionStage":         "in-stage mission HUD at HUD/Mission/HudMissionStage.cpp",
+      "HudMissionFinish":        "mission-clear panel at HUD/Mission/HudMissionFinish.cpp",
+      "HudSelectMissionFailed":  "fail-and-select panel at HUD/Mission/HudSelectMissionFailed.cpp"
+    },
+    "Stage select (in-hub)": {
+      "HudStageSelect":  "DISTINCT from CTitleStateWorldMap. Located at HUD/StageSelect/HudStageSelect.cpp. This is the in-hub act-select panel (not the world-map globe)."
+    },
+    "EX Stage / Tornado Defense": {
+      "CHudExQte@SWA":  "QTE HUD at ExtraStage/Tails/Hud/HudExQte.cpp"
+    },
+    "Werehog (Evil Sonic) extras": {
+      "CEvilHudGuide@SWA":      "ported (Phase 331). Confirmed as TStateMachine<CEvilHudGuide>",
+      "CEvilHudTarget@SWA":     "Werehog grab targeting reticle -- NOT YET MODELED",
+      "EvilEnemyChanceAttackHud":         "Werehog finisher attack HUD at NPC/Enemy/EvilEnemy/Common/ChanceAttack/...",
+      "EvilEnemyChanceAttackHudSuccess":  "success variant of finisher HUD",
+      "EvilEnemyComboHud":      "combo counter overlay at NPC/Enemy/EvilEnemy/Common/Combo/EvilEnemyComboHud.cpp",
+      "EvilEnemyHudStage":      "per-enemy HP/state HUD at NPC/Enemy/EvilEnemy/Common/EvilEnemyHudStage.cpp"
+    },
+    "Boss HUD": {
+      "CBossNamePlate@Boss@SWA":     "boss name plate (mined RTTI)",
+      "BossHudSuperSonic":           "Super Sonic boss HUD at Boss/BossHudSuperSonic.cpp",
+      "BossHudVitality":             "boss HP gauge at Boss/BossHudVitality.cpp",
+      "FinalDarkGaiaHud":            "final boss HUD at Boss/FinalDarkGaia/Object/FinalDarkGaiaHud.cpp",
+      "PhoenixHudVitality":          "Phoenix boss HUD at Boss/Phoenix/Hud/PhoenixHudVitality.cpp"
+    },
+    "Cutscene subtitles": {
+      "InspireResourceData_Subtitle":  "subtitle data at Inspire/InspireResourceData_Subtitle.cpp",
+      "InspireResourceEnv_Subtitle":   "subtitle env at Inspire/InspireResourceEnv_Subtitle.cpp"
+    },
+    "Install (out of UI/UX scope per user)": {
+      "InstallDisplay":  "first-run install screen at HUD/Install/InstallDisplay.cpp"
+    }
+  },
+
+  "what_changed_about_my_existing_ports": [
+    "sgfx_stage_hud.hpp's StageMode::Werehog should be a SEPARATE class CHudEvilStage in retail (currently SGFX collapses Day + Werehog under one StageHudState). Asset variant ui_playscreen_ev.yncp confirms.",
+    "sgfx_hub_screen.hpp's HubState should be CHudTown + CObjBalloon + a CTownManBase pool with retail message-passing protocol. Currently SGFX models just open/close balloon flags.",
+    "sgfx_general_window.hpp covers CGeneralWindow but NOT CHelpWindow which is a separate class for ui_help.yncp.",
+    "sgfx_results_screen.hpp now correctly maps to CHudResult's 4 sub-states (Phase 339)."
+  ],
+
+  "next_phase_options": [
+    "(a) Apply CHudTown / CObjBalloon hierarchy to sgfx_hub_screen.hpp -- biggest fidelity gain, replaces inferred logic",
+    "(b) Add new sgfx_hud_evil_stage.hpp as a sibling of sgfx_stage_hud.hpp with Werehog-specific fields (combo HUD, chance-attack overlays)",
+    "(c) Add sgfx_hud_status.hpp + sgfx_help_window.hpp + sgfx_hud_item_get.hpp -- cover the still-unmodeled UI/UX surfaces from the catalog",
+    "(d) Mine cross-references: each class's RTTI VA can be searched in ppc_recomp.*.cpp via 'lis r,xxxx + addi r,yyyy' patterns to find its constructor / Update body. Heavy work."
+  ],
+
+  "transparency": {
+    "runtime_proven": [
+      "Every class name in retail_ui_class_hierarchy is recovered RTTI from default_patched.xex via sgfx_xex_strings_dumper",
+      "Every source path (D:\\SonicWorldAdventure\\SWA\\source\\...) is a real string literal in the xex .data section -- compiler debug info baked in"
+    ],
+    "runtime_inferred": [
+      "Mapping of class to which yncp asset it loads is inferred from name correspondence; not all class<->asset bindings are confirmed",
+      "Town message-passing protocol semantics (which message triggers what) are inferred from the message names alone"
+    ],
+    "pending_ghidra": [
+      "The actual Update-loop bodies for each class would still need ppc_recomp source spelunking. The xex tells us the symbol exists; the C++ recompile gives the body. No live Ghidra needed."
+    ]
+  }
+}

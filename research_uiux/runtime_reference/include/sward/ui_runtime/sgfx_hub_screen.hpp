@@ -1,13 +1,29 @@
-// Phase 309: SGFX-shaped port of the Hub world UI (CHubSonicStage
-// Day Sonic / Werehog modes). The hub world is the in-between
-// space where the player walks around between stages -- talks
-// to NPCs (balloon), enters shops (gate), accepts missions
-// (mission screen).
+// Phase 309 / 340: SGFX-shaped port of the Hub world UI.
 //
-// Sourced from the hub-relevant retail .yncp projects we mass-
-// rendered in Phase 299: ui_balloon, ui_gate, ui_shop, ui_townscreen,
-// ui_missionscreen, ui_misson. Each maps to a "modal overlay" the
-// player can be inside while in the hub.
+// Phase 340 retail-fidelity update: xex-mined RTTI (sgfx_xex_strings_dumper
+// against default_patched.xex) revealed the actual retail class
+// hierarchy is much richer than my earlier inferred port:
+//
+//   CHudTown@SWA           -- main hub HUD (was: HubState root inferred)
+//   CObjBalloon@SWA        -- talk balloon overlay (lives in Object/, not HUD/)
+//   CTownManBase@SWA       -- base class for hub NPCs ("town men")
+//   CTownManParameterPool  -- NPC config pool, reads XML
+//   CTownManStateDamage    -- NPC sub-state (taking damage)
+//   CTownManStateDispel    -- NPC sub-state (being dispelled)
+//   TownShopCamera         -- camera-controller for shop interactions
+//   TownTalkCamera         -- camera-controller for NPC talk
+//
+//   CMediaRoom@SWA         -- media room main screen
+//   CMediaRoomDetail       -- media room detail panel
+//   CMediaRoomSelectCountry / SelectItem / SelectBook / ItemList / ScrollBar
+//
+// Plus a retail message-passing protocol (40+ Msg* types) that
+// drives talkability, flash highlight, animation triggers, etc.
+// See sgfx_retail_class_hierarchy.generated.json for the full
+// catalog. The SGFX HubState below is intentionally simpler than
+// the retail multi-class graph -- it preserves behavior at the
+// orchestrator boundary while flagging where the inferred logic
+// would need to expand to mirror retail in full.
 //
 // Day Sonic and Werehog (codename "Evil Sonic") share the hub
 // state but with different time-of-day display and different
@@ -57,10 +73,46 @@ namespace sward::ui_runtime::generated::sgfx_hud
         bool openMapTapped = false;    // Back / Select for town map
     };
 
+    // Phase 340 retail-mined: the hub NPC ("town man") tracks
+    // talkability + highlight + screaming separately. Mirrors the
+    // boolean queries the retail Msg* protocol exposes:
+    //   MsgGetIsTownManTalkable  -> isTalkable
+    //   MsgGetIsTownManFlashable -> isFlashable
+    //   MsgSetTownManFlash       -> sets isFlashing
+    //   MsgSetTownManSpeakActive -> sets isSpeaking
+    // Real retail also stores country, height, anim ID, facial-anim,
+    // talk matrix, and a parameter-pool pointer; SGFX captures the
+    // ones the orchestrator + renderer actually consume.
+    struct HubTownMan
+    {
+        std::int32_t  npcId = -1;        // MsgGetTownManID
+        std::uint8_t  countryId = 0;     // MsgGetTownManCountry (Apotos=0..)
+        bool          isTalkable = false;
+        bool          isFlashable = false;
+        bool          isFlashing = false;
+        bool          isSpeaking = false;
+        bool          isActive = true;   // MsgSetTownManActive
+        // Cached talk position (MsgGetTownManTalkMatrix returns the
+        // world matrix; SGFX collapses it to an X/Y/Z anchor).
+        float         talkAnchorX = 0.0f;
+        float         talkAnchorY = 0.0f;
+        float         talkAnchorZ = 0.0f;
+    };
+
     struct HubState
     {
         HubMode mode = HubMode::DaySonic;
         HubOverlay overlay = HubOverlay::None;
+
+        // Phase 340: which NPC the player is currently interacting
+        // with (-1 = none). Retail keeps the actual CTownManBase*
+        // pointer; SGFX uses an index into a host-provided NPC list.
+        std::int32_t activeTownManIndex = -1;
+
+        // Phase 340: time-of-day timer (MsgSetTownTime in retail).
+        // SGFX hosts that don't model day/night cycles can leave
+        // this at 0; orchestrator does not consume it.
+        float timeOfDaySeconds = 0.0f;
     };
 
     struct HubEvent

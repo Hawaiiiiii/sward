@@ -1,4 +1,4 @@
-// Phase 306: SGFX-shaped port of the gameplay HUD state.
+// Phase 306 / 340: SGFX-shaped port of the gameplay HUD state.
 //
 // Mirrors the data shape we carved out of CHudSonicStage across
 // prior phases (sgfx_hud_chud_sonic_stage.generated.h, Phase 277-280
@@ -12,9 +12,20 @@
 //   - life count integer                   -> ui_playscreen/u_info
 //   - pause requested bool                 -> opens CHudPause overlay
 //
-// Day Sonic (normal) and Werehog (Evil Sonic) share the same HUD
-// shape; the asset variants (ui_playscreen.yncp vs ui_playscreen_ev.yncp)
-// supply the texture differences. SGFX picks one via the host.
+// Day Sonic (normal) and Werehog (Evil Sonic) appear visually
+// similar but retail SPLITS them into two distinct classes (xex
+// RTTI, Phase 340):
+//   CHudSonicStage@SWA  -> HUD/Sonic/HudSonicStage.cpp + SonicMainDisplay.cpp
+//   CHudEvilStage@SWA   -> HUD/Evil/HudEvilStage.cpp   + EvilMainDisplay.cpp
+// Plus Werehog-only combat overlays in NPC/Enemy/EvilEnemy/Common/:
+//   EvilEnemyHudStage (per-enemy state)
+//   EvilEnemyComboHud (combo counter)
+//   EvilEnemyChanceAttackHud + EvilEnemyChanceAttackHudSuccess
+//
+// SGFX collapses both into a single StageHudState with a `mode`
+// flag for now -- shared field set is the same -- but a retail-
+// fidelity expansion would split the file into sgfx_hud_sonic_stage
+// + sgfx_hud_evil_stage and add the EvilEnemy combat overlay set.
 
 #pragma once
 
