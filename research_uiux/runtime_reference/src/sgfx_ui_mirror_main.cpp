@@ -73,6 +73,10 @@ namespace
     // Map orchestrator screens to their primary CSD asset. These
     // come from research_uiux/data/yncp_native_component_map.json
     // (the parity-validated asset spec).
+    //
+    // Phase 345: StageHud entry binds to Day Sonic by default; the
+    // mirror swaps to ui_playscreen_ev / ui_playscreen_su when
+    // orchestrator.stageHud.mode is Werehog or Boss respectively.
     constexpr ScreenSpec kScreenSpecs[] = {
         { ui::SgfxScreen::TitleIntro, "TitleIntro", "game/Title/ui_title.yncp" },
         { ui::SgfxScreen::Title,      "Title",      "game/MainMenu/ui_mainmenu.yncp" },
@@ -89,6 +93,31 @@ namespace
         for (const auto& sp : kScreenSpecs)
             if (sp.screen == s) return sp;
         return kScreenSpecs[0];
+    }
+
+    // Phase 345: pick the actual CSD project for the active screen,
+    // taking StageHudState::mode into account. Day Sonic uses
+    // ui_playscreen.yncp; Werehog uses ui_playscreen_ev.yncp; Boss
+    // uses ui_playscreen_su.yncp; BossHit uses ui_playscreen_ev_hit.
+    const char* projectPathForScreen(ui::SgfxScreen s,
+                                     const ui::StageHudState& stage) noexcept
+    {
+        if (s == ui::SgfxScreen::StageHud)
+        {
+            switch (stage.mode)
+            {
+                case ui::StageMode::Werehog:
+                    return "game/EvilSonic/ui_playscreen_ev.yncp";
+                case ui::StageMode::Boss:
+                    return "game/BossDarkGaia1_1Air/ui_playscreen_su.yncp";
+                case ui::StageMode::BossHit:
+                    return "game/EvilActionCommon/ui_playscreen_ev_hit.yncp";
+                case ui::StageMode::DaySonic:
+                default:
+                    return "game/Sonic/ui_playscreen.yncp";
+            }
+        }
+        return specFor(s).projectRelPath;
     }
 
     // Map JSONL "target" field -> orchestrator screen.
@@ -215,19 +244,20 @@ namespace
     // framebuffer. For container-heavy projects (worldmap etc.)
     // this composites the entire screen.
     void renderScreenIntoFramebuffer(ui::SgfxScreen screen,
+                                     const ui::StageHudState& stage,
                                      ui::CsdNativeFramebuffer& fb)
     {
         // Clear to dark gray (so blank areas read as "rendered, not
         // crashed").
         fb.resize(kCanvasW, kCanvasH, {16, 16, 24, 255});
-        const auto& spec = specFor(screen);
+        const std::string projectPath = projectPathForScreen(screen, stage);
         // Mutable lookup so we can grow the texture cache as the
         // renderer reads new textures on first appearance.
-        auto it = g_assetCache.find(spec.projectRelPath);
+        auto it = g_assetCache.find(projectPath);
         if (it == g_assetCache.end())
         {
-            getOrLoadScreenAssets(spec.projectRelPath);
-            it = g_assetCache.find(spec.projectRelPath);
+            getOrLoadScreenAssets(projectPath);
+            it = g_assetCache.find(projectPath);
         }
         if (it == g_assetCache.end() || !it->second.loadedOk) return;
         auto& assets = it->second;
@@ -355,14 +385,29 @@ int main(int argc, char** argv)
         std::cout << "tailing JSONL: " << jsonlPath << "\n";
     }
 
-    // Demo cycle state.
-    const ui::SgfxScreen kDemoCycle[] = {
-        ui::SgfxScreen::TitleIntro, ui::SgfxScreen::Title,
-        ui::SgfxScreen::WorldMap,   ui::SgfxScreen::Loading,
-        ui::SgfxScreen::StageHud,   ui::SgfxScreen::Pause,
-        ui::SgfxScreen::Results,    ui::SgfxScreen::Hub,
+    // Demo cycle: same screen flow as before, but the StageHud
+    // appears 3 times -- once per StageMode (Day / Werehog / Boss)
+    // -- so the mirror visibly swaps to ui_playscreen_ev /
+    // ui_playscreen_su. (Phase 345)
+    struct DemoStep
+    {
+        ui::SgfxScreen screen;
+        ui::StageMode  stageMode;
+        const char*    label;
     };
-    const std::size_t kDemoCount = sizeof(kDemoCycle) / sizeof(kDemoCycle[0]);
+    const DemoStep kDemoSteps[] = {
+        { ui::SgfxScreen::TitleIntro, ui::StageMode::DaySonic, "TitleIntro" },
+        { ui::SgfxScreen::Title,      ui::StageMode::DaySonic, "Title" },
+        { ui::SgfxScreen::WorldMap,   ui::StageMode::DaySonic, "WorldMap" },
+        { ui::SgfxScreen::Loading,    ui::StageMode::DaySonic, "Loading" },
+        { ui::SgfxScreen::StageHud,   ui::StageMode::DaySonic, "StageHud[Day]" },
+        { ui::SgfxScreen::StageHud,   ui::StageMode::Werehog,  "StageHud[Werehog]" },
+        { ui::SgfxScreen::StageHud,   ui::StageMode::Boss,     "StageHud[Boss]" },
+        { ui::SgfxScreen::Pause,      ui::StageMode::DaySonic, "Pause" },
+        { ui::SgfxScreen::Results,    ui::StageMode::DaySonic, "Results" },
+        { ui::SgfxScreen::Hub,        ui::StageMode::DaySonic, "Hub" },
+    };
+    const std::size_t kDemoCount = sizeof(kDemoSteps) / sizeof(kDemoSteps[0]);
     std::size_t demoIdx = 0;
     auto demoStart = std::chrono::steady_clock::now();
 
@@ -384,9 +429,10 @@ int main(int argc, char** argv)
                          && forceScreen.empty())
                 {
                     demoIdx = (demoIdx + 1) % kDemoCount;
-                    orch.current = kDemoCycle[demoIdx];
+                    orch.current = kDemoSteps[demoIdx].screen;
+                    orch.stageHud.mode = kDemoSteps[demoIdx].stageMode;
                     demoStart = std::chrono::steady_clock::now();
-                    std::cout << "[demo] step -> " << specFor(orch.current).friendlyName << "\n";
+                    std::cout << "[demo] step -> " << kDemoSteps[demoIdx].label << "\n";
                 }
             }
         }
@@ -437,16 +483,17 @@ int main(int argc, char** argv)
             if (dwell >= demoSeconds)
             {
                 demoIdx = (demoIdx + 1) % kDemoCount;
-                orch.current = kDemoCycle[demoIdx];
+                orch.current = kDemoSteps[demoIdx].screen;
+                orch.stageHud.mode = kDemoSteps[demoIdx].stageMode;
                 demoStart = now;
                 // Play a transition cue audibly.
                 if (!silent) ui::sgfxAudioPlayerPlayCue("sys_actstg_pausewinopen");
-                std::cout << "[demo] auto -> " << specFor(orch.current).friendlyName << "\n";
+                std::cout << "[demo] auto -> " << kDemoSteps[demoIdx].label << "\n";
             }
         }
 
         // Render the active screen.
-        renderScreenIntoFramebuffer(orch.current, fb);
+        renderScreenIntoFramebuffer(orch.current, orch.stageHud, fb);
 
         // Blit framebuffer -> SDL_Texture -> present.
         void* pixels = nullptr;
@@ -463,9 +510,20 @@ int main(int argc, char** argv)
         }
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, tex, nullptr, nullptr);
-        // Window title overlay (cheap status).
+        // Window title overlay (cheap status). Phase 345: include
+        // stage mode when on StageHud so the asset swap is visible.
         std::string title = "SGFX UI Mirror -- ";
         title += specFor(orch.current).friendlyName;
+        if (orch.current == ui::SgfxScreen::StageHud)
+        {
+            switch (orch.stageHud.mode)
+            {
+                case ui::StageMode::Werehog: title += " [Werehog]"; break;
+                case ui::StageMode::Boss:    title += " [Boss]"; break;
+                case ui::StageMode::BossHit: title += " [BossHit]"; break;
+                default:                     title += " [Day]"; break;
+            }
+        }
         if (!jsonlPath.empty()) title += " [JSONL]";
         else if (!forceScreen.empty()) title += " [forced]";
         else title += " [demo]";
