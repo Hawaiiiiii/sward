@@ -21,31 +21,59 @@
 
 namespace sward::ui_runtime::generated::sgfx_hud
 {
-    // Pause menu's calling context. Drives which transition fires
-    // when the user backs out (Quit = leave the activity; Hide =
-    // just dismiss the overlay).
-    enum class PauseMenuContext : std::uint8_t
+    // Phase 323 retail-fidelity correction: enum values + ordering
+    // mined directly from local_build_env/ur103clean/UnleashedRecomp/
+    // api/SWA/HUD/Pause/HudPause.h. The earlier draft (Phase 304)
+    // had WRONG values for every member of every enum; the runtime
+    // uses these exact integer values, including the gaps (Quit=2
+    // not 1, Restart=8 not 7, Dialog=5 not consecutive).
+    //
+    // SWA::EMenuType (calling context).
+    enum class PauseMenuContext : std::uint32_t
     {
-        Undefined = 0,
-        WorldMap  = 1,
-        Stage     = 2,
-        Misc      = 3,
-        Village   = 4,
-        Hub       = 5,
+        WorldMap = 0,
+        Village  = 1,
+        Stage    = 2,
+        Hub      = 3,
+        Misc     = 4,
     };
 
-    enum class PauseTransition : std::uint8_t
+    // SWA::ETransitionType. The retail enum has gaps: Quit=2 (no 1),
+    // Dialog=5 (no 3,4). SGFX preserves these exact values so the
+    // host can mirror the runtime's expected wire format.
+    enum class PauseTransition : std::uint32_t
     {
         Undefined = 0,
-        Quit      = 1, // WorldMap / Stage / Misc
-        Hide      = 2, // Village / Hub or Options selected
-        SubMenu   = 3, // Achievement menu via Select
+        Quit      = 2,  // WorldMap / Stage / Misc context
+        Dialog    = 5,  // Modal dialog overlay
+        Hide      = 6,  // Village / Hub context, or Options selected
+        Abort     = 7,
+        SubMenu   = 8,  // Achievements / nested menu
     };
 
-    enum class PauseAction : std::uint8_t
+    // SWA::EActionType. Nine values total; runtime uses these to
+    // signal what "kind of return" the player has requested when
+    // they back out of the pause overlay.
+    enum class PauseAction : std::uint32_t
     {
         Undefined = 0,
-        Return    = 1,
+        Status    = 1, // open status sub-screen
+        Return    = 2, // back out
+        Inventory = 3,
+        Skills    = 4,
+        Lab       = 5,
+        Wait      = 6,
+        Restart   = 8, // gap on 7 in retail
+        Continue  = 9,
+    };
+
+    // SWA::EStatusType. Three states. SGFX previously didn't model
+    // Decline; runtime uses it when the player cancels a sub-prompt.
+    enum class PauseStatus : std::uint32_t
+    {
+        Idle    = 0,
+        Accept  = 1,
+        Decline = 2,
     };
 
     enum class PauseEventKind : std::uint8_t
@@ -70,7 +98,10 @@ namespace sward::ui_runtime::generated::sgfx_hud
 
     struct PauseState
     {
-        PauseMenuContext context = PauseMenuContext::Undefined;
+        // Phase 323: retail's EMenuType has no Undefined value;
+        // WorldMap is the zero entry. Host should always set an
+        // explicit context before pause becomes visible.
+        PauseMenuContext context = PauseMenuContext::WorldMap;
         std::int32_t     cursorIndex = 0;
         std::int32_t     itemCount = 0;
         bool             isVisible = false;
@@ -138,7 +169,10 @@ namespace sward::ui_runtime::generated::sgfx_hud
                 state.lastTransition = PauseTransition::Undefined;
                 events.push_back({PauseEventKind::BackedOut,
                                   state.cursorIndex,
-                                  std::string(kPauseSfxBack)});
+                                  std::string(kPauseSfxCloseWindow)}); // pausewinclose first
+                events.push_back({PauseEventKind::BackedOut,
+                                  state.cursorIndex,
+                                  std::string(kPauseSfxBack)});      // then pausecansel
             }
             return events;
         }
@@ -153,7 +187,10 @@ namespace sward::ui_runtime::generated::sgfx_hud
                 state.lastTransition = PauseTransition::Undefined;
                 events.push_back({PauseEventKind::BackedOut,
                                   state.cursorIndex,
-                                  std::string(kPauseSfxBack)});
+                                  std::string(kPauseSfxCloseWindow)}); // pausewinclose first
+                events.push_back({PauseEventKind::BackedOut,
+                                  state.cursorIndex,
+                                  std::string(kPauseSfxBack)});      // then pausecansel
             }
             return events;
         }
@@ -194,7 +231,11 @@ namespace sward::ui_runtime::generated::sgfx_hud
         }
 
         // Cancel = back out of the pause overlay entirely (no
-        // sub-menu engaged).
+        // sub-menu engaged). Phase 323 retail-fidelity update from
+        // captured trace (frame 7432, t=171.60s): the runtime fires
+        // sys_actstg_pausewinclose AND sys_actstg_pausecansel on
+        // the same frame in this order. Earlier draft only emitted
+        // pausecansel.
         if (input.cancelTapped)
         {
             state.lastAction = PauseAction::Return;
@@ -202,7 +243,10 @@ namespace sward::ui_runtime::generated::sgfx_hud
             const auto kind = (state.lastTransition == PauseTransition::Quit)
                 ? PauseEventKind::QuitTransition
                 : PauseEventKind::HideTransition;
-            events.push_back({kind, state.cursorIndex, std::string(kPauseSfxBack)});
+            events.push_back({kind, state.cursorIndex,
+                              std::string(kPauseSfxCloseWindow)});  // pausewinclose first
+            events.push_back({kind, state.cursorIndex,
+                              std::string(kPauseSfxBack)});         // then pausecansel
             state.isVisible = false;
             state.isShown = false;
             return events;

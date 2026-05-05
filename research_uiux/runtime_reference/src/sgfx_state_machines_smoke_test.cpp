@@ -45,7 +45,9 @@ static void testPauseMenu()
     using namespace ui;
     std::cout << "\n== pause menu ==\n";
 
-    // Stage context -> Quit transition on cancel.
+    // Stage context -> Quit transition on cancel. Phase 323
+    // captured-trace update: cancel fires TWO cues (pausewinclose
+    // then pausecansel) on the same frame.
     {
         PauseState s; s.context = PauseMenuContext::Stage;
         s.itemCount = 4; s.cursorIndex = 0;
@@ -53,6 +55,12 @@ static void testPauseMenu()
         const auto evs = updatePauseMenuOneFrame(s, in);
         expectEq(evs[0].kind, PauseEventKind::QuitTransition, "pause.stage cancel = Quit");
         expectEq(s.lastTransition, PauseTransition::Quit, "pause.lastTransition Quit");
+        expectEq(evs.size(), static_cast<std::size_t>(2),
+                 "pause.cancel emits two cues (winclose + cansel)");
+        expectEq(evs[0].sfxCueName, std::string("sys_actstg_pausewinclose"),
+                 "pause.cancel cue1 = pausewinclose");
+        expectEq(evs[1].sfxCueName, std::string("sys_actstg_pausecansel"),
+                 "pause.cancel cue2 = pausecansel");
     }
     // Hub context -> Hide transition on cancel.
     {

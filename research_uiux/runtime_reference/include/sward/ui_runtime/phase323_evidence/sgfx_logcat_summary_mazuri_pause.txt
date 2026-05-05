@@ -1,0 +1,45 @@
+=== SGFX logcat session summary ===
+evidence_dir: out\ui_lab_runtime_evidence\phase323_logcat_20260505_201215\manual-observer
+total events: 27449
+csd_projects observed: 22
+distinct SFX cues fired: 6
+
+CSD project timeline:
+  frame=       0 t=    2.07  ui_loading
+  frame=       0 t=    2.08  ui_saveicon
+  frame=     575 t=   12.33  ui_general
+  frame=     575 t=   12.33  ui_pause
+  frame=     575 t=   12.33  ui_status
+  frame=     579 t=   12.46  ui_gate
+  frame=     579 t=   12.46  ui_result
+  frame=     579 t=   12.46  ui_missionscreen
+  frame=     579 t=   12.46  ui_misson
+  frame=     579 t=   12.46  ui_start
+  frame=     583 t=   12.59  ui_title
+  frame=     591 t=   12.87  ui_balloon
+  frame=     592 t=   12.87  ui_shop
+  frame=     592 t=   12.88  ui_townscreen
+  frame=     595 t=   13.00  ui_worldmap
+  frame=     595 t=   13.00  ui_worldmap_help
+  frame=     598 t=   13.10  ui_help
+  frame=     598 t=   13.10  ui_itemresult
+  frame=    1876 t=   35.81  ui_qte
+  frame=    1876 t=   35.81  ui_lcursor
+  frame=    1876 t=   35.81  ui_playscreen
+  frame=    1881 t=   36.01  ui_itembox
+
+SFX cues per UI target (runtime's own active-screen tracker):
+  [title-loop]
+       71  sys_worldmap_cursor
+       65  sys_actstg_pausecursor
+        3  sys_actstg_score
+        1  sys_actstg_pausewinopen
+        1  sys_actstg_pausewinclose
+        1  sys_actstg_pausecansel
+
+State machine transitions:
+  sonic-hud-value-write-update: samples=1 distinct=1
+  stage-title-context: samples=3617 distinct=3617
+  title-intro-context: samples=221 distinct=221
+  title-menu-context: samples=4 distinct=4
+  world-map-update: samples=50 distinct=2
