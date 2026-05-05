@@ -75,35 +75,55 @@ namespace
         return out;
     }
 
+    // Phase 299: build a global filename -> relative-path index for
+    // every .yncp / .xncp under the asset root, scanned once and
+    // cached. Lets the harness resolve any project the runtime loads
+    // (not just the four subdirs the original list hard-coded).
+    std::mutex g_projectIndexMutex;
+    std::unordered_map<std::string, std::string> g_projectIndex;
+    bool g_projectIndexBuilt = false;
+
+    void ensureProjectIndex(const std::filesystem::path& assetRoot)
+    {
+        std::lock_guard<std::mutex> lock(g_projectIndexMutex);
+        if (g_projectIndexBuilt) return;
+        g_projectIndexBuilt = true;
+        std::error_code ec;
+        for (auto it = std::filesystem::recursive_directory_iterator(assetRoot, ec);
+             it != std::filesystem::recursive_directory_iterator(); ++it)
+        {
+            if (ec) break;
+            if (!it->is_regular_file(ec)) continue;
+            const auto& p = it->path();
+            const auto ext = p.extension().string();
+            if (ext != ".yncp" && ext != ".xncp") continue;
+            const std::string stem = p.stem().string();
+            if (g_projectIndex.find(stem) == g_projectIndex.end())
+            {
+                const auto rel = std::filesystem::relative(p, assetRoot, ec);
+                g_projectIndex.emplace(stem, rel.generic_string());
+            }
+        }
+    }
+
     void renderProjectInBackground(const std::string& projectName)
     {
         const auto assetRoot = getAssetRoot();
         if (assetRoot.empty())
             return;
 
-        // Try matching projectName as a .yncp file under assetRoot.
-        // The CSD probe doesn't ship full relative paths, so we scan
-        // a handful of likely subdirectories.
-        const std::vector<std::string> candidateRels{
-            std::string("game/Sonic/") + projectName + ".yncp",
-            std::string("game/WorldMap/") + projectName + ".yncp",
-            std::string("game/SystemCommon/") + projectName + ".yncp",
-            std::string("game/Title/") + projectName + ".yncp",
-        };
-        std::filesystem::path projectPath;
+        ensureProjectIndex(assetRoot);
         std::string matchedRelative;
-        for (const auto& rel : candidateRels)
         {
-            const auto candidate = assetRoot / rel;
-            std::error_code ec;
-            if (std::filesystem::exists(candidate, ec))
-            {
-                projectPath = candidate;
-                matchedRelative = rel;
-                break;
-            }
+            std::lock_guard<std::mutex> lock(g_projectIndexMutex);
+            auto it = g_projectIndex.find(projectName);
+            if (it == g_projectIndex.end())
+                return;
+            matchedRelative = it->second;
         }
-        if (projectPath.empty())
+        const std::filesystem::path projectPath = assetRoot / matchedRelative;
+        std::error_code ec;
+        if (!std::filesystem::exists(projectPath, ec))
             return;
 
         const auto loaded = ui::loadCsdProjectFile(projectPath);
@@ -116,7 +136,6 @@ namespace
 
         // Resolve textureRelativePath: scan asset_root for each filename.
         std::unordered_map<std::string, std::string> texIndex;
-        std::error_code ec;
         for (auto it = std::filesystem::recursive_directory_iterator(assetRoot, ec);
              it != std::filesystem::recursive_directory_iterator(); ++it)
         {
@@ -141,34 +160,39 @@ namespace
                 c.textureRelativePath = t->second;
         }
 
-        // Pick the first non-empty scene the project exposes and
-        // render it. This is the simplest demo pass; a follow-up can
-        // iterate every scene and emit one PNG per scene.
-        std::string firstScene;
-        for (const auto& c : cmds)
-        {
-            if (!c.sceneName.empty()) { firstScene = c.sceneName; break; }
-        }
-        if (firstScene.empty()) return;
-
-        std::vector<ui::CsdNativeDrawCommand> filtered;
-        filtered.reserve(cmds.size());
+        // Phase 299: render every distinct scene in the project. A
+        // single project commonly carries 5-30 scenes (gauge, frame,
+        // counters, etc.), each useful as a separate A/B anchor.
+        // Group commands by scene name (stable order from the
+        // extractor's draw_order sort) and emit one PNG each.
+        std::vector<std::string> sceneOrder;
+        std::unordered_map<std::string, std::vector<ui::CsdNativeDrawCommand>> bySceneMap;
         for (auto& c : cmds)
-            if (c.sceneName == firstScene)
-                filtered.push_back(c);
-
-        ui::CsdNativeFramebuffer fb;
-        fb.resize(1280, 720, {0, 0, 0, 0});
-        std::vector<std::pair<std::string, std::pair<std::vector<std::uint8_t>, std::pair<std::uint32_t, std::uint32_t>>>> textureCache;
-        std::vector<ui::CsdNativeRuntimeOverride> overrides;
-        for (const auto& c : filtered)
-            ui::compositeCommand(fb, c, assetRoot, textureCache, overrides);
+        {
+            if (c.sceneName.empty()) continue;
+            auto it = bySceneMap.find(c.sceneName);
+            if (it == bySceneMap.end())
+            {
+                sceneOrder.push_back(c.sceneName);
+                it = bySceneMap.emplace(c.sceneName, std::vector<ui::CsdNativeDrawCommand>{}).first;
+            }
+            it->second.push_back(c);
+        }
 
         const auto outDir = getEvidenceDir();
-        const auto outPath = outDir / (projectName + "_" + firstScene + ".png");
-        stbi_write_png(outPath.string().c_str(),
-                       static_cast<int>(fb.width), static_cast<int>(fb.height),
-                       4, fb.rgba.data(), static_cast<int>(fb.width * 4));
+        std::vector<ui::CsdNativeRuntimeOverride> overrides;
+        for (const auto& scene : sceneOrder)
+        {
+            ui::CsdNativeFramebuffer fb;
+            fb.resize(1280, 720, {0, 0, 0, 0});
+            std::vector<std::pair<std::string, std::pair<std::vector<std::uint8_t>, std::pair<std::uint32_t, std::uint32_t>>>> textureCache;
+            for (const auto& c : bySceneMap[scene])
+                ui::compositeCommand(fb, c, assetRoot, textureCache, overrides);
+            const auto outPath = outDir / (projectName + "__" + scene + ".png");
+            stbi_write_png(outPath.string().c_str(),
+                           static_cast<int>(fb.width), static_cast<int>(fb.height),
+                           4, fb.rgba.data(), static_cast<int>(fb.width * 4));
+        }
     }
 } // namespace
 
@@ -188,15 +212,17 @@ namespace UiLab
         {
             std::lock_guard<std::mutex> lock(g_csdOverlayMutex);
             if (!g_csdOverlayRendered.insert(name).second)
-                return;
+                return;  // Already rendered or in flight.
         }
-        if (g_csdOverlayThreadActive.exchange(true))
-            return;
-
+        // Phase 299: spawn a dedicated thread per project rather than
+        // a single shared worker. Each project's render is independent
+        // (own loader, own framebuffer, own texture cache) and most
+        // boot-time projects fire within ~100 ms of each other; the
+        // shared semaphore in Phase 298 was dropping every request
+        // after the first. The dedup map above keeps repeat calls cheap.
         std::thread([name]
         {
             renderProjectInBackground(name);
-            g_csdOverlayThreadActive.store(false);
         }).detach();
     }
 } // namespace UiLab
