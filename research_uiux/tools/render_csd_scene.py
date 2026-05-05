@@ -184,6 +184,11 @@ def composite_command(
     # outer fit-to-bounds zoom.
     scene_w = float(cmd.get("scene_width", 0.0)) * sx * fit_scale[0]
     scene_h = float(cmd.get("scene_height", 0.0)) * sy * fit_scale[1]
+    # Sanity cap: a cast bigger than 4x the canvas is a popup/dialog
+    # container whose parent transform will reduce it at runtime; without
+    # the parent chain we can't render it sensibly. Skip rather than crash.
+    if scene_w * canvas_w > 4 * canvas_w or scene_h * canvas_h > 4 * canvas_h:
+        return False
     dst_w = max(1, int(round(scene_w * canvas_w)))
     dst_h = max(1, int(round(scene_h * canvas_h)))
     if (dst_w, dst_h) != crop.size:
@@ -203,6 +208,53 @@ def composite_command(
 
     canvas.alpha_composite(crop, dest=(px, py))
     return True
+
+
+def render_full_project(
+    project_entry: dict[str, Any],
+    output_path: Path,
+    canvas_w: int,
+    canvas_h: int,
+    background: tuple[int, int, int, int],
+    scene_filter: list[str] | None = None,
+) -> dict[str, Any]:
+    """Composite EVERY scene in the project (or just `scene_filter` scenes)
+    into a single canvas using world coordinates -- the natural Hedgehog
+    CSD interpretation: (base_translation + scene_offset) * canvas. Casts
+    are draw-order-sorted within scene; scenes are drawn in declared
+    order (which preserves NCPJ scene_table ordering)."""
+    cmds_all = list(project_entry.get("scene_draw_commands", []))
+    if scene_filter is not None:
+        keep = set(scene_filter)
+        cmds_all = [c for c in cmds_all if c.get("scene_name") in keep]
+    cmds_all.sort(key=lambda c: (
+        c.get("draw_order", 0),
+        c.get("group_index", 0),
+        c.get("cast_index", 0),
+    ))
+    canvas = Image.new("RGBA", (canvas_w, canvas_h), background)
+    texture_cache: dict[Path, Image.Image] = {}
+    drawn = 0
+    skipped = 0
+    scenes_seen: set[str] = set()
+    for cmd in cmds_all:
+        scenes_seen.add(cmd.get("scene_name", ""))
+        if composite_command(canvas, cmd, texture_cache, canvas_w, canvas_h):
+            drawn += 1
+        else:
+            skipped += 1
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(output_path, "PNG")
+    return {
+        "commands_total": len(cmds_all),
+        "commands_drawn": drawn,
+        "commands_skipped": skipped,
+        "scenes_used": sorted(scenes_seen),
+        "textures_used": len(texture_cache),
+        "output_path": str(output_path),
+        "canvas_width": canvas_w,
+        "canvas_height": canvas_h,
+    }
 
 
 def render_scene(
@@ -349,6 +401,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--all", action="store_true", help="Batch mode: render every scene in every project.")
     parser.add_argument("--out-dir", help="Output directory root for --all batch mode.")
     parser.add_argument("--manifest", help="Path to write batch manifest JSON.")
+    parser.add_argument(
+        "--full-project", action="store_true",
+        help="Composite every scene in the project into one canvas (world coords). "
+             "Use --scene-filter to restrict to a subset.",
+    )
+    parser.add_argument(
+        "--scene-filter", action="append", default=None,
+        help="Repeatable. With --full-project, restrict to these scene names.",
+    )
     parser.add_argument("--canvas-width", type=int, default=DEFAULT_CANVAS_W)
     parser.add_argument("--canvas-height", type=int, default=DEFAULT_CANVAS_H)
     parser.add_argument("--background", choices=["transparent", "black", "magenta"], default="transparent")
@@ -395,6 +456,20 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--project is required (or use --all for batch mode)")
 
     project_entry = find_project(cmap, args.project)
+
+    if args.full_project:
+        if not args.output:
+            print("--output is required with --full-project", file=sys.stderr)
+            return 2
+        summary = render_full_project(
+            project_entry,
+            Path(args.output),
+            args.canvas_width, args.canvas_height,
+            bg_map[args.background],
+            scene_filter=args.scene_filter,
+        )
+        print(json.dumps(summary, indent=2))
+        return 0
 
     if args.scene is None:
         scenes = list_scenes(project_entry)

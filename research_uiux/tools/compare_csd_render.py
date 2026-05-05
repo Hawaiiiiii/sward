@@ -60,6 +60,33 @@ def fit_letterbox(src: Image.Image, target_w: int, target_h: int) -> Image.Image
     return canvas
 
 
+def fit_logical_canvas(src: Image.Image, logical_w: int, logical_h: int) -> Image.Image:
+    """Map a runtime window capture (potentially non-16:9) into the game's
+    logical UI canvas. Sonic Unleashed's HUD is authored at 1280x720 (16:9);
+    if the runtime window has a different aspect, the game letterboxes its
+    16:9 viewport inside that window. Inverse: crop the captured window to
+    the centered 16:9 region, then resize to (logical_w, logical_h)."""
+    sw, sh = src.size
+    target_aspect = logical_w / logical_h
+    src_aspect = sw / sh
+    if abs(src_aspect - target_aspect) < 1e-6:
+        return src.resize((logical_w, logical_h), Image.LANCZOS)
+    if src_aspect > target_aspect:
+        # Window is wider than 16:9 -> game letterboxes vertically? No: game
+        # always renders 16:9; with a wider window the 16:9 viewport is
+        # centered with vertical full-height and horizontal pillarbox bars.
+        new_w = int(round(sh * target_aspect))
+        crop_x = (sw - new_w) // 2
+        cropped = src.crop((crop_x, 0, crop_x + new_w, sh))
+    else:
+        # Window is taller than 16:9 -> 16:9 viewport is full-width with
+        # letterbox bars top/bottom.
+        new_h = int(round(sw / target_aspect))
+        crop_y = (sh - new_h) // 2
+        cropped = src.crop((0, crop_y, sw, crop_y + new_h))
+    return cropped.resize((logical_w, logical_h), Image.LANCZOS)
+
+
 def build_diff(a: Image.Image, b: Image.Image) -> tuple[Image.Image, dict]:
     """Per-pixel absolute diff. Returns (diff_image, metrics)."""
     assert a.size == b.size, "diff inputs must be same size"
@@ -138,11 +165,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--label-ref", default="Reference")
     parser.add_argument("--label-diff", default="Per-pixel diff (red=mismatch)")
     parser.add_argument("--output-stem", required=True, help="Output stem; produces _sxs.png, _diff.png, _report.json")
+    parser.add_argument(
+        "--logical-canvas-fit", action="store_true",
+        help="Treat the reference as a runtime window capture: crop the centered "
+             "16:9 viewport (matching the game's letterboxed render area) and "
+             "resize to the port render's size. Use this when the window aspect "
+             "differs from the 16:9 logical UI canvas.",
+    )
     args = parser.parse_args(argv)
 
     port = load_rgba(Path(args.port_render))
     ref = load_rgba(Path(args.reference))
-    if ref.size != port.size:
+    if args.logical_canvas_fit:
+        ref_fit = fit_logical_canvas(ref, port.size[0], port.size[1])
+    elif ref.size != port.size:
         ref_fit = fit_letterbox(ref, port.size[0], port.size[1])
     else:
         ref_fit = ref
