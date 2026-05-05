@@ -35,6 +35,7 @@
 
 #pragma once
 
+#include "sgfx_title_intro.hpp"
 #include "sgfx_title_menu.hpp"
 #include "sgfx_pause_menu.hpp"
 #include "sgfx_loading_screen.hpp"
@@ -42,6 +43,10 @@
 #include "sgfx_results_screen.hpp"
 #include "sgfx_world_map.hpp"
 #include "sgfx_hub_screen.hpp"
+#include "sgfx_general_window.hpp"
+#include "sgfx_save_icon.hpp"
+#include "sgfx_sound_admin.hpp"
+#include "sgfx_evil_hud_guide.hpp"
 
 #include <cstdint>
 #include <string>
@@ -52,13 +57,14 @@ namespace sward::ui_runtime::generated::sgfx_hud
 {
     enum class SgfxScreen : std::uint8_t
     {
-        Title    = 0,
-        WorldMap = 1,
-        Loading  = 2,
-        StageHud = 3,
-        Pause    = 4,
-        Results  = 5,
-        Hub      = 6,
+        TitleIntro = 0,
+        Title      = 1,
+        WorldMap   = 2,
+        Loading    = 3,
+        StageHud   = 4,
+        Pause      = 5,
+        Results    = 6,
+        Hub        = 7,
     };
 
     enum class SgfxOrchestratorEventKind : std::uint8_t
@@ -97,13 +103,14 @@ namespace sward::ui_runtime::generated::sgfx_hud
 
     struct SgfxOrchestrator
     {
-        SgfxScreen current = SgfxScreen::Title;
-        SgfxScreen previousNonOverlay = SgfxScreen::Title;
+        SgfxScreen current = SgfxScreen::TitleIntro;
+        SgfxScreen previousNonOverlay = SgfxScreen::TitleIntro;
 
         // Each child machine's state. The orchestrator only ticks
         // the one matching `current`, but keeps all of them resident
         // so a Pause overlay can be popped without losing the
         // underlying StageHud values.
+        TitleIntroSlot   titleIntro;
         TitleMenuState   title;
         WorldMapState    worldMap;
         LoadingState     loading;
@@ -111,6 +118,14 @@ namespace sward::ui_runtime::generated::sgfx_hud
         PauseState       pause;
         ResultsState     results;
         HubState         hub;
+
+        // Phase 334: cross-cutting overlays + audio admin that any
+        // active screen can poke. They live on the orchestrator so
+        // the host has one root to drive the whole UI/UX.
+        EvilHudGuideState  evilHudGuide;     // Werehog QTE prompts
+        GeneralWindowState generalWindow;    // modal confirm/help windows
+        SaveIconState      saveIcon;         // save-disk overlay
+        SgfxBgmAdmin       bgmAdmin;         // BGM channel volumes + cues
     };
 
     namespace detail::orchestrator
@@ -128,6 +143,35 @@ namespace sward::ui_runtime::generated::sgfx_hud
             return {SgfxOrchestratorEventKind::SfxCueRequested, s, std::move(cue)};
         }
 
+        // Phase 334: clear transient UI flags on the screen we're
+        // about to enter so its state machine starts in a known
+        // shape. Only resets per-screen UI latches, NOT user data
+        // (ring count, score, save state, etc).
+        inline void resetTransientStateOnEntry(SgfxOrchestrator& o,
+                                               SgfxScreen next) noexcept
+        {
+            switch (next)
+            {
+            case SgfxScreen::WorldMap:
+                // The stage-open confirmation panel must be closed
+                // when we re-enter the world map (e.g. after Quit,
+                // Results acknowledge, Hub leave).
+                o.worldMap.stageOpenPanelVisible = false;
+                break;
+            case SgfxScreen::StageHud:
+                // The paused latch is what gates Start re-opening
+                // the pause overlay.
+                o.stageHud.paused = false;
+                break;
+            case SgfxScreen::Loading:
+                // Each load is a fresh boot/ready/dismissed cycle.
+                o.loading = LoadingState{};
+                break;
+            default:
+                break;
+            }
+        }
+
         inline void switchScreen(SgfxOrchestrator& o,
                                  SgfxScreen next,
                                  std::vector<SgfxOrchestratorEvent>& events)
@@ -136,6 +180,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
             // Track the underlying screen for Pause overlay return-paths.
             if (o.current != SgfxScreen::Pause)
                 o.previousNonOverlay = o.current;
+            resetTransientStateOnEntry(o, next);
             o.current = next;
             events.push_back(screenEntered(next));
         }
@@ -155,6 +200,29 @@ namespace sward::ui_runtime::generated::sgfx_hud
 
         switch (o.current)
         {
+        case SgfxScreen::TitleIntro:
+        {
+            TitleIntroInput in;
+            in.startTapped = input.startTapped;
+            in.acceptTapped = input.acceptTapped;
+            in.deltaSeconds = input.deltaSeconds;
+            in.anyInputThisFrame =
+                input.acceptTapped || input.cancelTapped || input.startTapped
+                || input.selectTapped || input.upTapped || input.downTapped
+                || input.leftTapped || input.rightTapped;
+            const auto childEvents = updateTitleIntroOneFrame(o.titleIntro, in);
+            for (const auto& e : childEvents)
+            {
+                if (!e.sfxCueName.empty())
+                    events.push_back(sfx(SgfxScreen::TitleIntro, e.sfxCueName));
+                if (e.kind == TitleIntroEventKind::PressStartArmed)
+                {
+                    // Hand off to the title menu state machine.
+                    switchScreen(o, SgfxScreen::Title, events);
+                }
+            }
+            break;
+        }
         case SgfxScreen::Title:
         {
             TitleMenuInput in;
@@ -255,19 +323,49 @@ namespace sward::ui_runtime::generated::sgfx_hud
             in.upTapped = input.upTapped;
             in.downTapped = input.downTapped;
             const auto childEvents = updatePauseMenuOneFrame(o.pause, in);
+            // Phase 334 fix: Stage-context cancel emits TWO events
+            // both kinded QuitTransition (with different cues). Hub-
+            // context cancel emits two HideTransition events. Take
+            // only the FIRST transition event; subsequent ones are
+            // duplicate-cue notifications, not separate transitions.
+            bool transitionTaken = false;
+            auto leavePause = [&](SgfxScreen next)
+            {
+                // The underlying StageHud holds a "paused" latch the
+                // gameplay tick uses to gate timer / input. Reset it
+                // so a future Start press can re-open the pause.
+                o.stageHud.paused = false;
+                switchScreen(o, next, events);
+                transitionTaken = true;
+            };
             for (const auto& e : childEvents)
             {
                 if (!e.sfxCueName.empty())
                     events.push_back(sfx(SgfxScreen::Pause, e.sfxCueName));
+                if (transitionTaken)
+                    continue;
                 if (e.kind == PauseEventKind::HideTransition
                     || e.kind == PauseEventKind::BackedOut)
                 {
                     // Return to whatever screen we paused.
-                    switchScreen(o, o.previousNonOverlay, events);
+                    leavePause(o.previousNonOverlay);
                 }
                 else if (e.kind == PauseEventKind::QuitTransition)
                 {
-                    switchScreen(o, SgfxScreen::WorldMap, events);
+                    // From Stage context, Quit goes to WorldMap. From
+                    // a Hub-context Pause this branch shouldn't fire
+                    // (Hub uses HideTransition).
+                    leavePause(SgfxScreen::WorldMap);
+                }
+                else if (e.kind == PauseEventKind::OptionAccepted
+                         && e.cursorAtFire == 0)
+                {
+                    // Row 0 of the pause menu is "Continue Game" --
+                    // accepting it resumes gameplay (Hide back to
+                    // the screen we paused). The SGFX pause state
+                    // machine emits OptionAccepted but doesn't move
+                    // screens itself; the orchestrator owns that.
+                    leavePause(o.previousNonOverlay);
                 }
             }
             break;
@@ -345,6 +443,31 @@ namespace sward::ui_runtime::generated::sgfx_hud
         o.hub = HubState{};
         o.hub.mode = mode;
         switchScreen(o, SgfxScreen::Hub, events);
+        return events;
+    }
+
+    // Phase 334: host signals "user left the hub" (e.g. fly to
+    // world map button). Pure transition; doesn't run any per-frame
+    // child update.
+    inline std::vector<SgfxOrchestratorEvent> sgfxOrchestratorLeaveHubToWorldMap(
+        SgfxOrchestrator& o)
+    {
+        using namespace detail::orchestrator;
+        std::vector<SgfxOrchestratorEvent> events;
+        if (o.current == SgfxScreen::Hub)
+            switchScreen(o, SgfxScreen::WorldMap, events);
+        return events;
+    }
+
+    // Phase 334: convenience for hosts that don't want to drive
+    // the title-intro fade and just need to land on the menu.
+    inline std::vector<SgfxOrchestratorEvent> sgfxOrchestratorSkipToTitleMenu(
+        SgfxOrchestrator& o)
+    {
+        using namespace detail::orchestrator;
+        std::vector<SgfxOrchestratorEvent> events;
+        if (o.current == SgfxScreen::TitleIntro)
+            switchScreen(o, SgfxScreen::Title, events);
         return events;
     }
 
