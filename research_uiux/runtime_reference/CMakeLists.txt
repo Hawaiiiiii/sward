@@ -214,3 +214,40 @@ target_include_directories(sgfx_state_machines_smoke
 )
 
 target_compile_features(sgfx_state_machines_smoke PRIVATE cxx_std_20)
+
+# Phase 338: SGFX UI Mirror window. Opens an SDL2 window and renders
+# Sonic Unleashed's UI natively via SGFX's CSD compositor. Two modes:
+# --demo (default): cycles through every screen; --jsonl=<path> tails
+# UnleashedRecomp's ui_lab_events.jsonl in real-time so the window
+# tracks whatever screen the live game is showing.
+if(EXISTS "${_SGFX_RUNTIME_SDL_BUILD}/SDL/SDL2-static.lib")
+    add_executable(sgfx_ui_mirror
+        src/sgfx_ui_mirror_main.cpp
+        src/sgfx_audio_dispatch.cpp
+        src/sgfx_audio_player.cpp
+        "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_worldmap_cursor.ogg.c"
+        "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_worldmap_finaldecide.ogg.c"
+        "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausecansel.ogg.c"
+        "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausecursor.ogg.c"
+        "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausedecide.ogg.c"
+        "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausewinclose.ogg.c"
+        "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausewinopen.ogg.c"
+    )
+    target_include_directories(sgfx_ui_mirror
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            "${_SGFX_RUNTIME_RES_SOUNDS}"
+            "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL/include"
+            "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL/include/SDL2"
+            "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL_mixer/include"
+    )
+    target_compile_features(sgfx_ui_mirror PRIVATE cxx_std_20)
+    target_link_libraries(sgfx_ui_mirror PRIVATE
+        "${_SGFX_RUNTIME_SDL_BUILD}/SDL_mixer/SDL2_mixer-static.lib"
+        "${_SGFX_RUNTIME_SDL_BUILD}/SDL_mixer/external/vorbis/lib/vorbisfile.lib"
+        "${_SGFX_RUNTIME_SDL_BUILD}/SDL_mixer/external/vorbis/lib/vorbis.lib"
+        "${_SGFX_RUNTIME_SDL_BUILD}/SDL_mixer/external/ogg/ogg.lib"
+        "${_SGFX_RUNTIME_SDL_BUILD}/SDL/SDL2-static.lib"
+        winmm imm32 ole32 oleaut32 version setupapi
+    )
+endif()

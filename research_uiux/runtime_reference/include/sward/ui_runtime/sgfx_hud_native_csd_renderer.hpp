@@ -44,6 +44,16 @@
 #include <string_view>
 #include <vector>
 
+#if defined(_MSC_VER)
+    #include <intrin.h>
+    static inline int sgfxCountTrailingZeros(unsigned int x) noexcept
+    {
+        unsigned long index = 0;
+        return _BitScanForward(&index, x) ? static_cast<int>(index) : 32;
+    }
+    #define __builtin_ctz(x) sgfxCountTrailingZeros(static_cast<unsigned int>(x))
+#endif
+
 namespace sward::ui_runtime::generated::sgfx_hud
 {
     // Phase 296: a single draw command pulled from the YNCP native
@@ -452,17 +462,32 @@ namespace sward::ui_runtime::generated::sgfx_hud
         if (texture.empty() || textureWidth == 0 || textureHeight == 0) return;
         if (srcW == 0 || srcH == 0 || dstW == 0 || dstH == 0) return;
 
-        for (std::uint32_t py = 0; py < dstH; ++py)
+        // Phase 338: clip destination bounds against the framebuffer
+        // BEFORE the inner loop. The previous implementation iterated
+        // every pixel (including out-of-bounds ones) and skipped via
+        // `continue`, which on huge-quads-mostly-off-screen scenes
+        // burned millions of ops per frame for nothing.
+        std::int32_t pyStart = 0;
+        std::int32_t pyEnd   = static_cast<std::int32_t>(dstH);
+        std::int32_t pxStart = 0;
+        std::int32_t pxEnd   = static_cast<std::int32_t>(dstW);
+        if (dstY < 0)                              pyStart = -dstY;
+        if (dstY + pyEnd > static_cast<std::int32_t>(fb.height))
+            pyEnd = static_cast<std::int32_t>(fb.height) - dstY;
+        if (dstX < 0)                              pxStart = -dstX;
+        if (dstX + pxEnd > static_cast<std::int32_t>(fb.width))
+            pxEnd = static_cast<std::int32_t>(fb.width) - dstX;
+        if (pyStart >= pyEnd || pxStart >= pxEnd) return;
+
+        for (std::int32_t py = pyStart; py < pyEnd; ++py)
         {
-            const std::int32_t fbY = dstY + static_cast<std::int32_t>(py);
-            if (fbY < 0 || static_cast<std::uint32_t>(fbY) >= fb.height) continue;
-            const std::uint32_t srcRow = srcY + (py * srcH) / dstH;
+            const std::int32_t fbY = dstY + py;
+            const std::uint32_t srcRow = srcY + (static_cast<std::uint32_t>(py) * srcH) / dstH;
             if (srcRow >= textureHeight) continue;
-            for (std::uint32_t px = 0; px < dstW; ++px)
+            for (std::int32_t px = pxStart; px < pxEnd; ++px)
             {
-                const std::int32_t fbX = dstX + static_cast<std::int32_t>(px);
-                if (fbX < 0 || static_cast<std::uint32_t>(fbX) >= fb.width) continue;
-                const std::uint32_t srcCol = srcX + (px * srcW) / dstW;
+                const std::int32_t fbX = dstX + px;
+                const std::uint32_t srcCol = srcX + (static_cast<std::uint32_t>(px) * srcW) / dstW;
                 if (srcCol >= textureWidth) continue;
                 const std::size_t srcIdx = (static_cast<std::size_t>(srcRow) * textureWidth + srcCol) * 4;
                 const std::uint8_t sr = texture[srcIdx + 0];
