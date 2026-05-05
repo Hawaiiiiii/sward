@@ -113,11 +113,17 @@ $targets = @(
         ExtraIncludes = @()
     },
     @{
-        # Phase 310: SGFX top-level orchestrator smoke test. Drives
-        # the full game flow Title -> WorldMap -> Loading -> StageHud
-        # -> Pause -> Results -> WorldMap -> Hub.
+        # Phase 310: SGFX top-level orchestrator smoke test.
         Sources = @((Join-Path $srcDir "sgfx_orchestrator_smoke_test.cpp"))
         Exe     = (Join-Path $OutputDir "sgfx_orchestrator_smoke_test.exe")
+        Args    = @("--no-asset-needed")
+        ExtraIncludes = @()
+    },
+    @{
+        # Phase 311: SGFX input adapter smoke test (SDL-shaped raw
+        # snapshot -> SgfxFrameInput edge detection).
+        Sources = @((Join-Path $srcDir "sgfx_input_layer_smoke_test.cpp"))
+        Exe     = (Join-Path $OutputDir "sgfx_input_layer_smoke_test.exe")
         Args    = @("--no-asset-needed")
         ExtraIncludes = @()
     },

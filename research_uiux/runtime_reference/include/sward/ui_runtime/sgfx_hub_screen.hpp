@@ -70,9 +70,15 @@ namespace sward::ui_runtime::generated::sgfx_hud
         std::string  sfxCueName;
     };
 
-    constexpr std::string_view kHubSfxOpenMenu = "sys_worldmap_window";
-    constexpr std::string_view kHubSfxConfirm  = "sys_worldmap_decide";
-    constexpr std::string_view kHubSfxCancel   = "sys_worldmap_cansel";
+    // Phase 311 fix-up: sys_actstg_twn_speechbutton is the real cue
+    // played when the hub balloon dialogue advances (mined from
+    // UnleashedRecomp source; "twn" = town). Worldmap-style cues
+    // are reused here for the open/confirm/cancel since the hub UI
+    // shares those bank entries per the existing patches.
+    constexpr std::string_view kHubSfxOpenMenu      = "sys_worldmap_window";
+    constexpr std::string_view kHubSfxConfirm       = "sys_worldmap_decide";
+    constexpr std::string_view kHubSfxCancel        = "sys_worldmap_cansel";
+    constexpr std::string_view kHubSfxBalloonAdvance = "sys_actstg_twn_speechbutton";
 
     inline std::vector<HubEvent> openHubOverlay(HubState& s, HubOverlay o)
     {

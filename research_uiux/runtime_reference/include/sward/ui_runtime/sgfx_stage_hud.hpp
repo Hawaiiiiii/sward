@@ -78,13 +78,22 @@ namespace sward::ui_runtime::generated::sgfx_hud
         std::string  sfxCueName;
     };
 
-    constexpr std::string_view kStageSfxRing       = "sys_actstg_ring";
-    constexpr std::string_view kStageSfxRingLost   = "sys_actstg_ringlost";
-    constexpr std::string_view kStageSfxBoost      = "sys_actstg_boost";
-    constexpr std::string_view kStageSfxLifeUp     = "sys_actstg_1up";
-    constexpr std::string_view kStageSfxLifeLost   = "sys_actstg_lifelost";
-    constexpr std::string_view kStageSfxPauseOpen  = "sys_actstg_pausewinopen";
-    constexpr std::string_view kStageSfxTimeLimit  = "sys_actstg_timelimit";
+    // Phase 311 fix-up: only cues actually grep-mined from
+    // UnleashedRecomp's source are kept as constants. Ring / boost /
+    // 1up / lifelost / timelimit cues exist in the retail .csb sound
+    // banks but aren't referenced from UnleashedRecomp's host-side
+    // C++ -- they trigger via the PPC-translated game code instead.
+    // Empty cue strings here mark "host: wire to your audio system
+    // when porting"; the state machine still emits the event, just
+    // without a host-side string to map.
+    constexpr std::string_view kStageSfxScore      = "sys_actstg_score";        // mined from source
+    constexpr std::string_view kStageSfxPauseOpen  = "sys_actstg_pausewinopen"; // mined from source
+    constexpr std::string_view kStageSfxRing       = "";                        // unverified
+    constexpr std::string_view kStageSfxRingLost   = "";                        // unverified
+    constexpr std::string_view kStageSfxBoost      = "";                        // unverified
+    constexpr std::string_view kStageSfxLifeUp     = "";                        // unverified
+    constexpr std::string_view kStageSfxLifeLost   = "";                        // unverified
+    constexpr std::string_view kStageSfxTimeLimit  = "";                        // unverified
 
     // Host applies score/ring/life/gauge deltas via these helpers
     // so the state machine can emit the right SFX cue and surface

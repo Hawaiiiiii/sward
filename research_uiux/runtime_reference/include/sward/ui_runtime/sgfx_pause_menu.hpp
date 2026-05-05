@@ -88,14 +88,18 @@ namespace sward::ui_runtime::generated::sgfx_hud
         std::string    sfxCueName;
     };
 
-    // Cue names re-use the title-menu mining from Phase 303 because
-    // SU's pause menu shares the same window/decide/cancel SFX bank
-    // (the existing SFX cue candidates list confirms this from prior
-    // phases).
+    // Phase 311 fix-up: cue names are now the real ones grep-mined
+    // from UnleashedRecomp's actual source (Game_PlaySound /
+    // PlaySound call sites). Pause uses the dedicated sys_actstg_pause*
+    // bank, NOT the worldmap bank that the earlier draft assumed.
+    constexpr std::string_view kPauseSfxOpenWindow  = "sys_actstg_pausewinopen";
+    constexpr std::string_view kPauseSfxCloseWindow = "sys_actstg_pausewinclose";
+    constexpr std::string_view kPauseSfxConfirm     = "sys_actstg_pausedecide";
+    constexpr std::string_view kPauseSfxBack        = "sys_actstg_pausecansel";
+    constexpr std::string_view kPauseSfxCursor      = "sys_actstg_pausecursor";
+    // The achievements sub-menu uses the worldmap-window cue per the
+    // existing CHudPause_patches.cpp wrapper (Phase 304 mining).
     constexpr std::string_view kPauseSfxOpenSubMenu = "sys_worldmap_window";
-    constexpr std::string_view kPauseSfxConfirm    = "sys_worldmap_decide";
-    constexpr std::string_view kPauseSfxBack       = "sys_worldmap_cansel";
-    constexpr std::string_view kPauseSfxCursor     = "sys_worldmap_cursor";
 
     namespace detail::pause_menu
     {

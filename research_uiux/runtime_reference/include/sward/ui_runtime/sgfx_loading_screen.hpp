@@ -59,7 +59,10 @@ namespace sward::ui_runtime::generated::sgfx_hud
         std::string      sfxCueName;
     };
 
-    constexpr std::string_view kLoadingSfxReady   = "sys_loading_ready";
+    // Phase 311 fix-up: sys_loading_ready was invented; not in source.
+    // Empty = host wires to its own audio. sys_worldmap_decide IS
+    // mined-real (see CTitleStateMenu_patches.cpp:175).
+    constexpr std::string_view kLoadingSfxReady   = "";                  // unverified
     constexpr std::string_view kLoadingSfxConfirm = "sys_worldmap_decide";
 
     // Host calls this each frame and provides the latest progress

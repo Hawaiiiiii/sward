@@ -73,9 +73,14 @@ namespace sward::ui_runtime::generated::sgfx_hud
         std::string      sfxCueName;
     };
 
-    constexpr std::string_view kResultsSfxLine    = "sys_result_line";
-    constexpr std::string_view kResultsSfxRank    = "sys_result_rank";
-    constexpr std::string_view kResultsSfxConfirm = "sys_worldmap_decide";
+    // Phase 311 fix-up: sys_result_line / sys_result_rank were
+    // invented (not in UnleashedRecomp source nor in the existing
+    // SFX_CUE_CANDIDATES list). Real cues for the results-tally
+    // animation live in the .csb banks but aren't referenced from
+    // the host-side patches we have access to. Confirm cue is real.
+    constexpr std::string_view kResultsSfxLine    = "";                     // unverified
+    constexpr std::string_view kResultsSfxRank    = "";                     // unverified
+    constexpr std::string_view kResultsSfxConfirm = "sys_worldmap_decide";  // mined
 
     inline std::vector<ResultsEvent> updateResultsScreenOneFrame(
         ResultsState& state,

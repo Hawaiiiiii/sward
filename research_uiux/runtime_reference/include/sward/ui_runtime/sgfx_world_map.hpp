@@ -67,10 +67,15 @@ namespace sward::ui_runtime::generated::sgfx_hud
         std::string sfxCueName;
     };
 
-    constexpr std::string_view kWorldMapSfxCursor  = "sys_worldmap_cursor";
-    constexpr std::string_view kWorldMapSfxConfirm = "sys_worldmap_decide";
-    constexpr std::string_view kWorldMapSfxCancel  = "sys_worldmap_cansel";
-    constexpr std::string_view kWorldMapSfxOpen    = "sys_worldmap_window";
+    // Phase 311 fix-up: all four cues here are real (mined from the
+    // UnleashedRecomp source). sys_worldmap_finaldecide is the cue
+    // played when the player commits to launching a stage from the
+    // World Map (mined alongside the others).
+    constexpr std::string_view kWorldMapSfxCursor       = "sys_worldmap_cursor";
+    constexpr std::string_view kWorldMapSfxConfirm      = "sys_worldmap_decide";
+    constexpr std::string_view kWorldMapSfxFinalConfirm = "sys_worldmap_finaldecide";
+    constexpr std::string_view kWorldMapSfxCancel       = "sys_worldmap_cansel";
+    constexpr std::string_view kWorldMapSfxOpen         = "sys_worldmap_window";
 
     namespace detail::world_map
     {
