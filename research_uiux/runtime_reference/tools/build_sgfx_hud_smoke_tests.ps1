@@ -120,12 +120,62 @@ $targets = @(
         ExtraIncludes = @()
     },
     @{
-        # Phase 311: SGFX input adapter smoke test (SDL-shaped raw
-        # snapshot -> SgfxFrameInput edge detection).
+        # Phase 311: SGFX input adapter smoke test.
         Sources = @((Join-Path $srcDir "sgfx_input_layer_smoke_test.cpp"))
         Exe     = (Join-Path $OutputDir "sgfx_input_layer_smoke_test.exe")
         Args    = @("--no-asset-needed")
         ExtraIncludes = @()
+    },
+    @{
+        # Phase 313: SGFX animation playback smoke test.
+        Sources = @((Join-Path $srcDir "sgfx_animation_playback_smoke_test.cpp"))
+        Exe     = (Join-Path $OutputDir "sgfx_animation_playback_smoke_test.exe")
+        Args    = @("--no-asset-needed")
+        ExtraIncludes = @()
+    },
+    @{
+        # Phase 314: SGFX standalone runtime EXE. Compiles the same
+        # state machines + audio dispatch + animation playback into
+        # a single sgfx-runtime.exe that runs a built-in scenario
+        # demonstrating the full game flow without UnleashedRecomp.
+        Sources = @(
+            (Join-Path $srcDir "sgfx_runtime_main.cpp"),
+            (Join-Path $srcDir "sgfx_audio_dispatch.cpp"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_worldmap_cursor.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_worldmap_finaldecide.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_actstg_pausecansel.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_actstg_pausecursor.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_actstg_pausedecide.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_actstg_pausewinclose.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_actstg_pausewinopen.ogg.c")
+        )
+        Exe     = (Join-Path $OutputDir "sgfx_runtime.exe")
+        Args    = @("--scenario-only")
+        ExtraIncludes = @(
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp")
+        )
+    },
+    @{
+        # Phase 312: SGFX audio dispatch smoke test. Compiles the
+        # dispatch impl + the .ogg.c byte arrays straight from
+        # UnleashedRecomp/res/sounds, ensuring SGFX uses the SAME
+        # OGG bytes the runtime's EmbeddedPlayer feeds SDL_mixer.
+        Sources = @(
+            (Join-Path $srcDir "sgfx_audio_dispatch_smoke_test.cpp"),
+            (Join-Path $srcDir "sgfx_audio_dispatch.cpp"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_worldmap_cursor.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_worldmap_finaldecide.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_actstg_pausecansel.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_actstg_pausecursor.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_actstg_pausedecide.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_actstg_pausewinclose.ogg.c"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp\res\sounds\sys_actstg_pausewinopen.ogg.c")
+        )
+        Exe     = (Join-Path $OutputDir "sgfx_audio_dispatch_smoke_test.exe")
+        Args    = @("--no-asset-needed")
+        ExtraIncludes = @(
+            (Join-Path $RepoRoot "local_build_env\ur103clean\UnleashedRecomp")
+        )
     },
     @{
         # Phase 297: same renderer driven by the direct binary .yncp
