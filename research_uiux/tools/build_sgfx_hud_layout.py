@@ -52,6 +52,19 @@ _SOURCE_ATTR_RE = re.compile(
     r'kChudSonicStageExpectedOwnerFieldSource\s*=\s*"([^"]+)"'
 )
 
+# Phase 267: capture `RCPtr<T> m_xxx;` member declarations from the
+# UnleashedRecomp team's existing SWA API headers (e.g.
+# `api/SWA/HUD/Sonic/HudSonicStage.h`). The headers may write either the
+# fully-qualified `Chao::CSD::RCPtr<Chao::CSD::CScene>` form or the brief
+# `RCPtr<CScene>` form (the Pause header opens with `using namespace
+# Chao::CSD;`); both must round-trip to the same template-argument type
+# name so we can render `Chao::CSD::RCPtr<Chao::CSD::CScene>` consistently
+# in the generated port header.
+_SWA_RCPTR_DECL_RE = re.compile(
+    r'(?:Chao::CSD::)?RCPtr<\s*(?:Chao::CSD::)?(?P<inner>[A-Za-z0-9_:]+)\s*>\s+'
+    r'(?P<name>m_rc[A-Za-z0-9_]+)\s*;'
+)
+
 
 @dataclass(frozen=True)
 class ExpectedField:
@@ -119,6 +132,26 @@ def parse_expected_fields(ui_lab_path: Path) -> tuple[list[ExpectedField], str]:
                 "RCPtr layout invariant violated.")
 
     return fields, source_attr
+
+
+def parse_swa_api_header(api_header_path: Path) -> dict[str, str]:
+    """Return a `{member_name: rcptr_inner_type}` map for every `RCPtr<T> m_xxx;`
+    declared in the UnleashedRecomp team's SWA API header for this class.
+
+    The map is the authoritative source for template-argument types
+    (`CProject` vs `CScene` vs `CNode`) for the originally-named SWA HUD
+    fields. Phase-265 runtime extensions that don't appear in this map fall
+    back to the conservative default `CScene` in the generator and the
+    generated header annotates the fallback so a reader knows the type is
+    runtime-evidence only.
+    """
+    if not api_header_path.is_file():
+        return {}
+    text = api_header_path.read_text(encoding="utf-8")
+    return {
+        m.group("name"): m.group("inner")
+        for m in _SWA_RCPTR_DECL_RE.finditer(text)
+    }
 
 
 def find_latest_sidecar(repo_root: Path) -> Path | None:
@@ -217,9 +250,12 @@ def emit_header(
     bindings: list[SceneBinding],
     source_attr: str,
     expected_total_size: int,
+    rcptr_type_by_name: dict[str, str] | None = None,
+    swa_api_header_relpath: str | None = None,
 ) -> str:
     generated_at = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
     binding_by_name = {b.field_name: b for b in bindings}
+    type_map = dict(rcptr_type_by_name or {})
 
     lines: list[str] = []
     lines.append("#pragma once")
@@ -237,9 +273,17 @@ def emit_header(
     lines.append("// constructor / destructor / Update / Render method bodies will be ported")
     lines.append("// in subsequent phases as their recomp flow is decoded.")
     lines.append("//")
+    lines.append("// Phase 267: per-member template-argument types come from the")
+    lines.append("// UnleashedRecomp team's existing SWA API header (when available). Members")
+    lines.append("// the SWA API header has not yet named fall back to the conservative")
+    lines.append("// default `Chao::CSD::CScene`; those fall-backs are flagged inline so")
+    lines.append("// readers know the type is runtime-evidence-only and may be refined later.")
+    lines.append("//")
     lines.append(f"// Generated at: {generated_at}")
     if source_attr:
         lines.append(f"// Source attribution: {source_attr}")
+    if swa_api_header_relpath:
+        lines.append(f"// SWA API header (authoritative for SWA-named field types): {swa_api_header_relpath}")
     lines.append("")
     lines.append("#include <array>")
     lines.append("#include <cstddef>")
@@ -248,11 +292,17 @@ def emit_header(
     lines.append("")
     lines.append("namespace sward::ui_runtime::generated::sgfx_hud")
     lines.append("{")
-    lines.append("    // Forward declaration of the SWA CSD scene type. The retail SWA")
-    lines.append("    // executable holds a `CSD::Manager::CScene*` here; the human-readable")
-    lines.append("    // port keeps the type opaque at this layer because the CSD runtime is")
-    lines.append("    // ported separately.")
-    lines.append("    class CScene;")
+    lines.append("    // Forward declarations of the SWA CSD types referenced by the SWA")
+    lines.append("    // HUD class. The retail SWA executable holds the corresponding")
+    lines.append("    // `Chao::CSD::*` types; the human-readable port keeps them opaque at")
+    lines.append("    // this layer because the CSD runtime is ported separately. The")
+    lines.append("    // forward-decl set is the union of every template-argument type the")
+    lines.append("    // SWA API header uses for the SWA-named members.")
+    forward_types = sorted({type_map[name] for name in type_map if type_map.get(name)})
+    forward_types_with_default = forward_types + (["CScene"] if "CScene" not in forward_types else [])
+    forward_types_sorted = sorted(set(forward_types_with_default))
+    for fwd in forward_types_sorted:
+        lines.append(f"    class {fwd};")
     lines.append("")
     lines.append("    // SWA `RCPtr<T>` matches an Xbox 360 32-bit pointer pair:")
     lines.append("    // `m_pRCObject` (the reference-counted wrapper) at offset 0 and")
@@ -263,6 +313,17 @@ def emit_header(
     lines.append("        std::uint32_t m_pRCObject;  // guest-relative pointer to the RCObject wrapper")
     lines.append("        std::uint32_t m_pMemory;    // guest-relative pointer to the wrapped T")
     lines.append("    };")
+    lines.append("    // The SWA executable references the wrapper as `Chao::CSD::RCPtr<T>`")
+    lines.append("    // throughout the existing API headers; the `Chao::CSD::` alias here")
+    lines.append("    // matches that convention so the human-readable port's member")
+    lines.append("    // declarations read identically to the SWA originals.")
+    lines.append("    namespace Chao { namespace CSD")
+    lines.append("    {")
+    lines.append("        template <class T> using RCPtr = ::sward::ui_runtime::generated::sgfx_hud::RCPtr<T>;")
+    for fwd in forward_types_sorted:
+        lines.append(f"        using {fwd} = ::sward::ui_runtime::generated::sgfx_hud::{fwd};")
+    lines.append("    }} // namespace Chao::CSD")
+    lines.append("")
     lines.append("    static_assert(sizeof(RCPtr<CScene>) == 8, \"RCPtr<T> must match the SWA 8-byte layout\");")
     lines.append("")
     lines.append("    // Layout reference for `class CHudSonicStage` (the Sonic stage HUD).")
@@ -283,7 +344,14 @@ def emit_header(
     lines.append("    public:")
     for field in fields:
         binding = binding_by_name.get(field.name)
-        comment = f"+0x{field.rc_ptr_offset:X} RCPtr<CScene>"
+        rcptr_inner = type_map.get(field.name)
+        type_provenance: str
+        if rcptr_inner:
+            type_provenance = "type from SWA API header"
+        else:
+            rcptr_inner = "CScene"
+            type_provenance = "type defaulted to CScene; SWA API header has not yet named this RCPtr"
+        comment = f"+0x{field.rc_ptr_offset:X} Chao::CSD::RCPtr<{rcptr_inner}>; {type_provenance}"
         if binding and binding.scene_path:
             # The sidecar's scenePath field is already a full project-relative
             # path (e.g. `ui_playscreen/so_speed_gauge`), so quote it directly
@@ -294,7 +362,7 @@ def emit_header(
             )
         elif field.name.startswith("m_rcPtrField"):
             comment += "; constructor-confirmed but no runtime scene yet — name pending evidence"
-        lines.append(f"        RCPtr<CScene> {field.name};  // {comment}")
+        lines.append(f"        Chao::CSD::RCPtr<Chao::CSD::{rcptr_inner}> {field.name};  // {comment}")
     lines.append("    };")
     lines.append("")
     last = fields[-1]
@@ -366,6 +434,17 @@ def main() -> int:
         help="Path to ui_lab_patches.cpp (relative to repo root).",
     )
     parser.add_argument(
+        "--swa-api-header",
+        default=(
+            "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Sonic/HudSonicStage.h"
+        ),
+        help=(
+            "Path to the UnleashedRecomp SWA API header for the HUD class "
+            "being ported (relative to repo root). Used for authoritative "
+            "RCPtr<T> template-argument types."
+        ),
+    )
+    parser.add_argument(
         "--sidecar",
         default=None,
         help=(
@@ -388,6 +467,16 @@ def main() -> int:
     ui_lab_path = (repo_root / args.ui_lab_path).resolve()
     fields, source_attr = parse_expected_fields(ui_lab_path)
 
+    swa_api_header_path = (repo_root / args.swa_api_header).resolve()
+    rcptr_type_by_name = parse_swa_api_header(swa_api_header_path)
+    swa_api_header_relpath: str | None = None
+    if rcptr_type_by_name and swa_api_header_path.exists():
+        try:
+            swa_api_header_relpath = str(
+                swa_api_header_path.relative_to(repo_root).as_posix())
+        except ValueError:
+            swa_api_header_relpath = str(swa_api_header_path)
+
     if args.sidecar is not None:
         sidecar_path = (repo_root / args.sidecar).resolve()
     else:
@@ -396,15 +485,28 @@ def main() -> int:
     bindings = build_scene_bindings(fields, sidecar_path)
 
     expected_total_size = fields[-1].rc_ptr_offset + 8
-    header = emit_header(fields, bindings, source_attr, expected_total_size)
+    header = emit_header(
+        fields,
+        bindings,
+        source_attr,
+        expected_total_size,
+        rcptr_type_by_name=rcptr_type_by_name,
+        swa_api_header_relpath=swa_api_header_relpath,
+    )
     output_path = (repo_root / args.output_header).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(header, encoding="utf-8")
 
+    swa_api_summary = (
+        f"; SWA API types from {swa_api_header_relpath} ({len(rcptr_type_by_name)} typed members)"
+        if swa_api_header_relpath
+        else "; no SWA API header found"
+    )
     print(
         f"sgfx-hud-layout: wrote {output_path.relative_to(repo_root)} "
         f"with {len(fields)} RCPtr members and {len(bindings)} runtime scene bindings"
         + (f" from sidecar {sidecar_path.relative_to(repo_root)}" if sidecar_path else "")
+        + swa_api_summary
     )
     return 0
 

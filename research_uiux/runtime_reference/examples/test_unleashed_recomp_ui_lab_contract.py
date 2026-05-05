@@ -1505,11 +1505,31 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             "renderableSlots": [],
         }
 
+        # Phase 267: synthetic SWA API header that names m_rcBeta as
+        # CProject so the generator picks up an authoritative type for at
+        # least one member. The other two synthetic members fall through
+        # to the conservative default.
+        synthetic_swa_api = (
+            "#pragma once\n"
+            "#include <SWA.inl>\n"
+            "namespace SWA {\n"
+            "    class CHudSonicStage {\n"
+            "    public:\n"
+            "        SWA_INSERT_PADDING(0xE0);\n"
+            "        Chao::CSD::RCPtr<Chao::CSD::CProject> m_rcBeta;\n"
+            "    };\n"
+            "}\n"
+        )
+
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
             patches_dir = tmp_root / "UnleashedRecomp/patches"
             patches_dir.mkdir(parents=True)
             (patches_dir / "ui_lab_patches.cpp").write_text(synthetic_ui_lab, encoding="utf-8")
+
+            api_dir = tmp_root / "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Sonic"
+            api_dir.mkdir(parents=True)
+            (api_dir / "HudSonicStage.h").write_text(synthetic_swa_api, encoding="utf-8")
 
             sidecar_dir = tmp_root / "out/ui_lab_runtime_evidence/manual_test/manual-observer"
             sidecar_dir.mkdir(parents=True)
@@ -1537,16 +1557,27 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
                 # Layout-only header is honest about what it is.
                 "// SGFX HUD layout: human-readable port of `class CHudSonicStage`.",
                 "Phase 266",
+                "Phase 267",
                 "ppc_recomp.28.cpp:61909",
                 "namespace sward::ui_runtime::generated::sgfx_hud",
                 "class CScene;",
                 "template <class T>\n    struct RCPtr",
                 "static_assert(sizeof(RCPtr<CScene>) == 8",
                 "class CHudSonicStage",
-                # All three synthetic members appear with proper offsets.
-                "RCPtr<CScene> m_rcAlpha;",
-                "RCPtr<CScene> m_rcBeta;",
-                "RCPtr<CScene> m_rcGamma;",
+                # Phase 267: members declared with Chao::CSD::RCPtr<...>
+                # template form matching the SWA convention.
+                "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcAlpha;",
+                # m_rcBeta is named in the synthetic SWA API header as
+                # RCPtr<CProject> so the generator must use that type.
+                "Chao::CSD::RCPtr<Chao::CSD::CProject> m_rcBeta;",
+                "type from SWA API header",
+                "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcGamma;",
+                "type defaulted to CScene; SWA API header has not yet named this RCPtr",
+                # Forward declarations include the union of named types.
+                "class CProject;",
+                # Citation in preamble
+                "SWA API header (authoritative for SWA-named field types)",
+                "HudSonicStage.h",
                 # The cross-validated synthetic binding flows through.
                 "ui_synthetic/beta_scene",
                 "cross-validated",
@@ -1569,23 +1600,71 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertNotIn("should_be_dropped", emitted)
 
         # The committed live-generated header must also exist and have the
-        # expected runtime-confirmed members + sidecar bindings.
+        # expected runtime-confirmed members + sidecar bindings, now using
+        # the Phase 267 type-aware Chao::CSD::RCPtr<T> declarations.
         live_header = self.read(
             "research_uiux/runtime_reference/include/sward/ui_runtime/"
             "sgfx_hud_chud_sonic_stage.generated.h")
         for token in [
             "Phase 266",
+            "Phase 267",
             "namespace sward::ui_runtime::generated::sgfx_hud",
             "class CHudSonicStage",
-            "RCPtr<CScene> m_rcPlayScreen;",
-            "RCPtr<CScene> m_rcSpeedGauge;",
-            "RCPtr<CScene> m_rcRingEnergyGauge;",
-            "RCPtr<CScene> m_rcGaugeFrame;",
-            "RCPtr<CScene> m_rcExpCount;",
-            "RCPtr<CScene> m_rcSpeedCount;",
+            # Phase 267: SWA-API-typed members carry their authoritative
+            # template type and the gauge cluster is RCPtr<CScene>.
+            "Chao::CSD::RCPtr<Chao::CSD::CProject> m_rcPlayScreen;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcSpeedGauge;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcRingEnergyGauge;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcGaugeFrame;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcExpCount;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcSpeedCount;",
+            "Chao::CSD::RCPtr<Chao::CSD::CNode> m_rcScoreCount;",
+            "Chao::CSD::RCPtr<Chao::CSD::CNode> m_rcTimeCount;",
             "static_assert(offsetof(CHudSonicStage, m_rcRingEnergyGauge) == 0xF0",
+            # Phase 267: the SWA API header path is cited authoritatively.
+            "api/SWA/HUD/Sonic/HudSonicStage.h",
         ]:
             self.assertIn(token, live_header)
+
+    def test_sgfx_hud_layout_parses_swa_api_header_rcptr_declarations(self):
+        # Phase 267: focused unit test for the SWA API header parser. The
+        # parser must accept both fully-qualified and brief RCPtr<T>
+        # declarations because real SWA API headers mix the two forms.
+        import importlib.util
+        import sys
+        import tempfile
+
+        generator_path = ROOT / "research_uiux/tools/build_sgfx_hud_layout.py"
+        spec = importlib.util.spec_from_file_location(
+            "sgfx_hud_layout_parser_under_test", generator_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["sgfx_hud_layout_parser_under_test"] = module
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            api_path = Path(tmp) / "FakeHud.h"
+            api_path.write_text(
+                "#pragma once\n"
+                "namespace SWA {\n"
+                "    class CFakeHud {\n"
+                "    public:\n"
+                "        Chao::CSD::RCPtr<Chao::CSD::CProject> m_rcProject;\n"
+                "        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcMain;\n"
+                "        RCPtr<CScene> m_rcAlt;\n"
+                "        RCPtr<CNode> m_rcCounter;\n"
+                "    };\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            result = module.parse_swa_api_header(api_path)
+        self.assertEqual(result, {
+            "m_rcProject": "CProject",
+            "m_rcMain": "CScene",
+            "m_rcAlt": "CScene",
+            "m_rcCounter": "CNode",
+        })
+        # Missing file returns empty mapping rather than raising.
+        self.assertEqual(module.parse_swa_api_header(Path(tmp) / "missing.h"), {})
 
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")

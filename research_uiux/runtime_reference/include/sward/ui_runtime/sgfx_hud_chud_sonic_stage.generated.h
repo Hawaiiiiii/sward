@@ -13,8 +13,15 @@
 // constructor / destructor / Update / Render method bodies will be ported
 // in subsequent phases as their recomp flow is decoded.
 //
-// Generated at: 2026-05-05T00:13:57+00:00
+// Phase 267: per-member template-argument types come from the
+// UnleashedRecomp team's existing SWA API header (when available). Members
+// the SWA API header has not yet named fall back to the conservative
+// default `Chao::CSD::CScene`; those fall-backs are flagged inline so
+// readers know the type is runtime-evidence-only and may be refined later.
+//
+// Generated at: 2026-05-05T00:39:29+00:00
 // Source attribution: api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0x184; Phase 265 expanded from CHudSonicStage::CHudSonicStage (sub_824D89B0) decoded from local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.28.cpp:61909
+// SWA API header (authoritative for SWA-named field types): local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Sonic/HudSonicStage.h
 
 #include <array>
 #include <cstddef>
@@ -23,10 +30,14 @@
 
 namespace sward::ui_runtime::generated::sgfx_hud
 {
-    // Forward declaration of the SWA CSD scene type. The retail SWA
-    // executable holds a `CSD::Manager::CScene*` here; the human-readable
-    // port keeps the type opaque at this layer because the CSD runtime is
-    // ported separately.
+    // Forward declarations of the SWA CSD types referenced by the SWA
+    // HUD class. The retail SWA executable holds the corresponding
+    // `Chao::CSD::*` types; the human-readable port keeps them opaque at
+    // this layer because the CSD runtime is ported separately. The
+    // forward-decl set is the union of every template-argument type the
+    // SWA API header uses for the SWA-named members.
+    class CNode;
+    class CProject;
     class CScene;
 
     // SWA `RCPtr<T>` matches an Xbox 360 32-bit pointer pair:
@@ -38,6 +49,18 @@ namespace sward::ui_runtime::generated::sgfx_hud
         std::uint32_t m_pRCObject;  // guest-relative pointer to the RCObject wrapper
         std::uint32_t m_pMemory;    // guest-relative pointer to the wrapped T
     };
+    // The SWA executable references the wrapper as `Chao::CSD::RCPtr<T>`
+    // throughout the existing API headers; the `Chao::CSD::` alias here
+    // matches that convention so the human-readable port's member
+    // declarations read identically to the SWA originals.
+    namespace Chao { namespace CSD
+    {
+        template <class T> using RCPtr = ::sward::ui_runtime::generated::sgfx_hud::RCPtr<T>;
+        using CNode = ::sward::ui_runtime::generated::sgfx_hud::CNode;
+        using CProject = ::sward::ui_runtime::generated::sgfx_hud::CProject;
+        using CScene = ::sward::ui_runtime::generated::sgfx_hud::CScene;
+    }} // namespace Chao::CSD
+
     static_assert(sizeof(RCPtr<CScene>) == 8, "RCPtr<T> must match the SWA 8-byte layout");
 
     // Layout reference for `class CHudSonicStage` (the Sonic stage HUD).
@@ -56,27 +79,27 @@ namespace sward::ui_runtime::generated::sgfx_hud
     private:
         std::array<std::uint8_t, 0xB4> m_padding2C_E0;  // pre-RCPtr-table bytes
     public:
-        RCPtr<CScene> m_rcPlayScreen;  // +0xE0 RCPtr<CScene>
-        RCPtr<CScene> m_rcSpeedGauge;  // +0xE8 RCPtr<CScene>; runtime: ui_playscreen/so_speed_gauge (cross-validated, instances=1)
-        RCPtr<CScene> m_rcRingEnergyGauge;  // +0xF0 RCPtr<CScene>; runtime: ui_playscreen/so_ringenagy_gauge (cross-validated, instances=1)
-        RCPtr<CScene> m_rcGaugeFrame;  // +0xF8 RCPtr<CScene>; runtime: ui_playscreen/gauge_frame (cross-validated, instances=1)
-        RCPtr<CScene> m_rcExpCount;  // +0x100 RCPtr<CScene>
-        RCPtr<CScene> m_rcPtrField108;  // +0x108 RCPtr<CScene>; constructor-confirmed but no runtime scene yet — name pending evidence
-        RCPtr<CScene> m_rcPtrField110;  // +0x110 RCPtr<CScene>; constructor-confirmed but no runtime scene yet — name pending evidence
-        RCPtr<CScene> m_rcSpeedCount;  // +0x118 RCPtr<CScene>; runtime: ui_playscreen/add/speed_count (cross-validated, instances=1)
-        RCPtr<CScene> m_rcPtrField120;  // +0x120 RCPtr<CScene>; constructor-confirmed but no runtime scene yet — name pending evidence
-        RCPtr<CScene> m_rcScoreCount;  // +0x128 RCPtr<CScene>
-        RCPtr<CScene> m_rcTimeCount;  // +0x130 RCPtr<CScene>
-        RCPtr<CScene> m_rcTimeCount2;  // +0x138 RCPtr<CScene>
-        RCPtr<CScene> m_rcTimeCount3;  // +0x140 RCPtr<CScene>
-        RCPtr<CScene> m_rcPlayerCount;  // +0x148 RCPtr<CScene>
-        RCPtr<CScene> m_rcPtrField150;  // +0x150 RCPtr<CScene>; constructor-confirmed but no runtime scene yet — name pending evidence
-        RCPtr<CScene> m_rcPtrField158;  // +0x158 RCPtr<CScene>; constructor-confirmed but no runtime scene yet — name pending evidence
-        RCPtr<CScene> m_rcPtrField160;  // +0x160 RCPtr<CScene>; constructor-confirmed but no runtime scene yet — name pending evidence
-        RCPtr<CScene> m_rcPtrField168;  // +0x168 RCPtr<CScene>; constructor-confirmed but no runtime scene yet — name pending evidence
-        RCPtr<CScene> m_rcPtrField170;  // +0x170 RCPtr<CScene>; constructor-confirmed but no runtime scene yet — name pending evidence
-        RCPtr<CScene> m_rcPtrField178;  // +0x178 RCPtr<CScene>; constructor-confirmed but no runtime scene yet — name pending evidence
-        RCPtr<CScene> m_rcPtrField180;  // +0x180 RCPtr<CScene>; constructor-confirmed but no runtime scene yet — name pending evidence
+        Chao::CSD::RCPtr<Chao::CSD::CProject> m_rcPlayScreen;  // +0xE0 Chao::CSD::RCPtr<CProject>; type from SWA API header
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcSpeedGauge;  // +0xE8 Chao::CSD::RCPtr<CScene>; type from SWA API header; runtime: ui_playscreen/so_speed_gauge (cross-validated, instances=1)
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcRingEnergyGauge;  // +0xF0 Chao::CSD::RCPtr<CScene>; type from SWA API header; runtime: ui_playscreen/so_ringenagy_gauge (cross-validated, instances=1)
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcGaugeFrame;  // +0xF8 Chao::CSD::RCPtr<CScene>; type from SWA API header; runtime: ui_playscreen/gauge_frame (cross-validated, instances=1)
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcExpCount;  // +0x100 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcPtrField108;  // +0x108 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr; constructor-confirmed but no runtime scene yet — name pending evidence
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcPtrField110;  // +0x110 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr; constructor-confirmed but no runtime scene yet — name pending evidence
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcSpeedCount;  // +0x118 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr; runtime: ui_playscreen/add/speed_count (cross-validated, instances=1)
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcPtrField120;  // +0x120 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr; constructor-confirmed but no runtime scene yet — name pending evidence
+        Chao::CSD::RCPtr<Chao::CSD::CNode> m_rcScoreCount;  // +0x128 Chao::CSD::RCPtr<CNode>; type from SWA API header
+        Chao::CSD::RCPtr<Chao::CSD::CNode> m_rcTimeCount;  // +0x130 Chao::CSD::RCPtr<CNode>; type from SWA API header
+        Chao::CSD::RCPtr<Chao::CSD::CNode> m_rcTimeCount2;  // +0x138 Chao::CSD::RCPtr<CNode>; type from SWA API header
+        Chao::CSD::RCPtr<Chao::CSD::CNode> m_rcTimeCount3;  // +0x140 Chao::CSD::RCPtr<CNode>; type from SWA API header
+        Chao::CSD::RCPtr<Chao::CSD::CNode> m_rcPlayerCount;  // +0x148 Chao::CSD::RCPtr<CNode>; type from SWA API header
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcPtrField150;  // +0x150 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr; constructor-confirmed but no runtime scene yet — name pending evidence
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcPtrField158;  // +0x158 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr; constructor-confirmed but no runtime scene yet — name pending evidence
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcPtrField160;  // +0x160 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr; constructor-confirmed but no runtime scene yet — name pending evidence
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcPtrField168;  // +0x168 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr; constructor-confirmed but no runtime scene yet — name pending evidence
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcPtrField170;  // +0x170 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr; constructor-confirmed but no runtime scene yet — name pending evidence
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcPtrField178;  // +0x178 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr; constructor-confirmed but no runtime scene yet — name pending evidence
+        Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcPtrField180;  // +0x180 Chao::CSD::RCPtr<CScene>; type defaulted to CScene; SWA API header has not yet named this RCPtr; constructor-confirmed but no runtime scene yet — name pending evidence
     };
 
     // Compile-time guards: every named RCPtr must land at the runtime-
@@ -131,7 +154,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
         {"m_rcSpeedCount", 0x118, "ui_playscreen", "ui_playscreen/add/speed_count", "cross-validated", 1},
     }};
 
-    static constexpr std::string_view kGeneratedAt = "2026-05-05T00:13:57+00:00";
+    static constexpr std::string_view kGeneratedAt = "2026-05-05T00:39:29+00:00";
     static constexpr std::string_view kSourceAttribution = "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0x184; Phase 265 expanded from CHudSonicStage::CHudSonicStage (sub_824D89B0) decoded from local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.28.cpp:61909";
 
 } // namespace sward::ui_runtime::generated::sgfx_hud
