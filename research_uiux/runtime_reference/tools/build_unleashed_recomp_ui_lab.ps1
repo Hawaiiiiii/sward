@@ -135,6 +135,7 @@ Invoke-PythonTool `
 
 @(
     "UnleashedRecomp\CMakeLists.txt",
+    "UnleashedRecomp\exports.cpp",
     "UnleashedRecomp\gpu\video.cpp",
     "UnleashedRecomp\gpu\rhi\plume_d3d12.cpp",
     "UnleashedRecomp\gpu\rhi\plume_vulkan.cpp",

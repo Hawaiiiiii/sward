@@ -6,9 +6,11 @@
 #include <kernel/memory.h>
 #include <ui/game_window.h>
 #include <patches/inspire_patches.h>
+#include <patches/ui_lab_patches.h>
 
 void Game_PlaySound(const char* pName)
 {
+    UiLab::OnGamePlaySoundDispatched(pName != nullptr ? pName : "");
     if (EmbeddedPlayer::s_isActive)
     {
         EmbeddedPlayer::Play(pName);

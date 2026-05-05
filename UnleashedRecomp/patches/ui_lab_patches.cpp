@@ -13094,6 +13094,86 @@ namespace UiLab
         RecordCsdSetterPair('p', "position", nodeAddress, positionX, positionY, true, kCsdSetterEpsilon, hookSource);
     }
 
+    // Phase 315: Game_PlaySound runtime logcat. Every SFX cue
+    // dispatched by the game ends up here with its current frame
+    // number and the active CSD project context (g_lastCsdProjectName
+    // tracks which UI screen is "live"). Together this gives an
+    // authoritative cue-vs-screen timeline that the SGFX state
+    // machines can be reconciled against.
+    void OnGamePlaySoundDispatched(std::string_view cueName)
+    {
+        if (!g_isEnabled || cueName.empty())
+            return;
+        std::string detail;
+        detail.reserve(cueName.size() + 64);
+        detail.append("cue=");
+        detail.append(cueName);
+        detail.append(" csd=");
+        detail.append(g_lastCsdProjectName.empty() ? "<none>" : g_lastCsdProjectName);
+        detail.append(" csdFrame=");
+        detail.append(std::to_string(g_lastCsdProjectFrame));
+        WriteEvidenceEvent("game-play-sound", detail);
+    }
+
+    // Phase 315: per-state-machine update logcat. The hooks below
+    // fire from each Update() PPC wrapper; each emits one event per
+    // SAMPLE_INTERVAL frames (every 60 frames at 60 fps = once per
+    // second) so the JSONL doesn't fill with duplicate per-frame data.
+    static constexpr uint32_t kStateMachineLogIntervalFrames = 60;
+    static std::unordered_map<std::string, uint32_t> g_lastStateMachineLogFrame;
+
+    static bool ShouldLogStateMachineFrame(std::string_view kind)
+    {
+        if (!g_isEnabled) return false;
+        const std::string key(kind);
+        const auto& last = g_lastStateMachineLogFrame[key];
+        if (g_presentedFrameCount - last < kStateMachineLogIntervalFrames)
+            return false;
+        g_lastStateMachineLogFrame[key] = g_presentedFrameCount;
+        return true;
+    }
+
+    void OnWorldMapUpdate(uint32_t thisAddress, uint32_t worldMapSimpleInfoAddress)
+    {
+        if (!ShouldLogStateMachineFrame("world-map-update")) return;
+        std::ostringstream d;
+        d << "this=" << HexU32(thisAddress)
+          << " worldMapSimpleInfo=" << HexU32(worldMapSimpleInfoAddress);
+        WriteEvidenceEvent("world-map-update", d.str());
+    }
+
+    void OnHudSonicStageUpdate(uint32_t thisAddress)
+    {
+        if (!ShouldLogStateMachineFrame("hud-sonic-stage-update")) return;
+        std::ostringstream d;
+        d << "this=" << HexU32(thisAddress);
+        WriteEvidenceEvent("hud-sonic-stage-update", d.str());
+    }
+
+    void OnGameModeStageUpdate(uint32_t thisAddress)
+    {
+        if (!ShouldLogStateMachineFrame("game-mode-stage-update")) return;
+        std::ostringstream d;
+        d << "this=" << HexU32(thisAddress);
+        WriteEvidenceEvent("game-mode-stage-update", d.str());
+    }
+
+    void OnLoadingDisplayUpdate(uint32_t thisAddress)
+    {
+        if (!ShouldLogStateMachineFrame("loading-display-update")) return;
+        std::ostringstream d;
+        d << "this=" << HexU32(thisAddress);
+        WriteEvidenceEvent("loading-display-update", d.str());
+    }
+
+    void OnGeneralWindowUpdate(uint32_t thisAddress)
+    {
+        if (!ShouldLogStateMachineFrame("general-window-update")) return;
+        std::ostringstream d;
+        d << "this=" << HexU32(thisAddress);
+        WriteEvidenceEvent("general-window-update", d.str());
+    }
+
     void OnCsdCastNodeSetScale(
         uint32_t nodeAddress,
         float scaleX,

@@ -158,6 +158,20 @@ namespace UiLab
     // PNG to the evidence directory. Guards against re-renders of
     // the same project across the session.
     void RunInProcessNativeRenderForProject(std::string_view projectName);
+    // Phase 315: log every Game_PlaySound call so we capture the
+    // exact (cue name, frame, screen) tuple whenever the game
+    // triggers an SFX. Wired from exports.cpp::Game_PlaySound's
+    // entry; cheap (one JSONL line per call, no probing/sweeping).
+    void OnGamePlaySoundDispatched(std::string_view cueName);
+    // Phase 315: comprehensive logcat for every state machine update.
+    // Each hook logs one structured JSONL entry per call so a session
+    // playthrough produces a complete behavior trace ready to be
+    // diffed against the SGFX state machine ports.
+    void OnWorldMapUpdate(uint32_t thisAddress, uint32_t worldMapSimpleInfoAddress);
+    void OnHudSonicStageUpdate(uint32_t thisAddress);
+    void OnGameModeStageUpdate(uint32_t thisAddress);
+    void OnLoadingDisplayUpdate(uint32_t thisAddress);
+    void OnGeneralWindowUpdate(uint32_t thisAddress);
     void OnNativeCsdMakeCallContext(
         uint32_t ownerAddress,
         uint32_t bytesAddress,

@@ -298,6 +298,7 @@ PPC_FUNC(sub_8258B558)
     __imp__sub_8258B558(ctx, base);
 
     uint32_t worldMapSimpleInfo = PPC_LOAD_U32(r3.u32 + 0x70);
+    UiLab::OnWorldMapUpdate(r3.u32, worldMapSimpleInfo);
     if (worldMapSimpleInfo != NULL)
     {
         auto setPosition = [&](uint32_t rcPtr, float offsetX = 0.0f, float offsetY = 0.0f)
