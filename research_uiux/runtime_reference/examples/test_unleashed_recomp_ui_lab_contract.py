@@ -1413,7 +1413,10 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             '{ "m_rcExpCount", 0x100, 0x104 },',
             '{ "m_rcPtrField108", 0x108, 0x10C },',
             '{ "m_rcPtrField110", 0x110, 0x114 },',
-            '{ "m_rcPtrField118", 0x118, 0x11C },',
+            # Phase 266: +0x118 promoted to m_rcSpeedCount after the runtime
+            # sweep cross-validated it against ui_playscreen/add/speed_count
+            # on the constructor-confirmed CHudSonicStage owner.
+            '{ "m_rcSpeedCount", 0x118, 0x11C },',
             '{ "m_rcPtrField120", 0x120, 0x124 },',
             '{ "m_rcPtrField150", 0x150, 0x154 },',
             '{ "m_rcPtrField158", 0x158, 0x15C },',
@@ -1443,6 +1446,146 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             self.assertIn(token, report)
 
         self.assertIn("Phase 265", generator)
+
+    def test_sgfx_hud_layout_generator_produces_human_readable_class(self):
+        # Phase 266: end-to-end test of the generator and the emitted header.
+        # Drive the generator with a self-contained synthetic ui_lab_patches
+        # snippet + a synthetic sidecar so the test does not depend on
+        # whatever live evidence happens to exist.
+        import importlib.util
+        import sys
+        import tempfile
+
+        generator_path = ROOT / "research_uiux/tools/build_sgfx_hud_layout.py"
+        self.assertTrue(generator_path.is_file(),
+            "Phase 266 generator script must exist at the expected path")
+
+        spec = importlib.util.spec_from_file_location(
+            "sgfx_hud_layout_under_test", generator_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["sgfx_hud_layout_under_test"] = module
+        spec.loader.exec_module(module)
+
+        synthetic_ui_lab = (
+            "// header preamble\n"
+            "namespace UiLab {\n"
+            "    static constexpr std::string_view kChudSonicStageExpectedOwnerFieldSource =\n"
+            "        \"synthetic source attribution for test\";\n"
+            "    static constexpr std::array<ChudSonicStageExpectedOwnerField, 3> kChudSonicStageExpectedOwnerFields =\n"
+            "    {{\n"
+            "        { \"m_rcAlpha\", 0xE0, 0xE4 },\n"
+            "        { \"m_rcBeta\", 0xE8, 0xEC },\n"
+            "        { \"m_rcGamma\", 0xF0, 0xF4 },\n"
+            "    }};\n"
+            "}\n"
+        )
+        synthetic_sidecar = {
+            "schema": "sward-hud-owner-layout-v1",
+            "renderableSlotGroups": [
+                {
+                    "ownerSource": "CHudSonicStage owner (constructor-confirmed)",
+                    "projectName": "ui_synthetic",
+                    "scenePath": "ui_synthetic/beta_scene",
+                    "managerSceneAddress": "0xDEADBEEF",
+                    "confidenceTier": "cross-validated",
+                    "instanceCount": 1,
+                    "fieldOffsets": ["0xEC"],
+                },
+                {
+                    # Inferred-owner groups must be ignored by the generator.
+                    "ownerSource": "inferred CHudSonicStage owner",
+                    "projectName": "ui_inferred_noise",
+                    "scenePath": "ui_inferred_noise/should_be_dropped",
+                    "managerSceneAddress": "0xCAFEBABE",
+                    "confidenceTier": "inferred-owner",
+                    "instanceCount": 1,
+                    "fieldOffsets": ["0xE4"],
+                },
+            ],
+            "renderableSlots": [],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_root = Path(tmp)
+            patches_dir = tmp_root / "UnleashedRecomp/patches"
+            patches_dir.mkdir(parents=True)
+            (patches_dir / "ui_lab_patches.cpp").write_text(synthetic_ui_lab, encoding="utf-8")
+
+            sidecar_dir = tmp_root / "out/ui_lab_runtime_evidence/manual_test/manual-observer"
+            sidecar_dir.mkdir(parents=True)
+            sidecar_path = sidecar_dir / "hud_owner_layout.json"
+            sidecar_path.write_text(json.dumps(synthetic_sidecar), encoding="utf-8")
+
+            output_header = tmp_root / "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_chud_sonic_stage.generated.h"
+
+            argv_backup = sys.argv
+            sys.argv = [
+                "build_sgfx_hud_layout.py",
+                "--repo-root", str(tmp_root),
+                "--output-header", str(output_header.relative_to(tmp_root).as_posix()),
+            ]
+            try:
+                rc = module.main()
+            finally:
+                sys.argv = argv_backup
+            self.assertEqual(rc, 0, "Generator should exit 0 on a valid synthetic input")
+
+            self.assertTrue(output_header.is_file(), "Generator must write the header path it was told to use")
+            emitted = output_header.read_text(encoding="utf-8")
+
+            for token in [
+                # Layout-only header is honest about what it is.
+                "// SGFX HUD layout: human-readable port of `class CHudSonicStage`.",
+                "Phase 266",
+                "ppc_recomp.28.cpp:61909",
+                "namespace sward::ui_runtime::generated::sgfx_hud",
+                "class CScene;",
+                "template <class T>\n    struct RCPtr",
+                "static_assert(sizeof(RCPtr<CScene>) == 8",
+                "class CHudSonicStage",
+                # All three synthetic members appear with proper offsets.
+                "RCPtr<CScene> m_rcAlpha;",
+                "RCPtr<CScene> m_rcBeta;",
+                "RCPtr<CScene> m_rcGamma;",
+                # The cross-validated synthetic binding flows through.
+                "ui_synthetic/beta_scene",
+                "cross-validated",
+                # Static-asserts cover every named member and the vtables.
+                "static_assert(offsetof(CHudSonicStage, m_pVTable) == 0x00,",
+                "static_assert(offsetof(CHudSonicStage, m_pSecondaryVTable) == 0x28,",
+                "static_assert(offsetof(CHudSonicStage, m_rcAlpha) == 0xE0,",
+                "static_assert(offsetof(CHudSonicStage, m_rcBeta) == 0xE8,",
+                "static_assert(offsetof(CHudSonicStage, m_rcGamma) == 0xF0,",
+                # SceneBinding registry contains the cross-validated entry only.
+                "struct SceneBinding",
+                "kSceneBindings",
+                "{\"m_rcBeta\", 0xE8,",
+                "synthetic source attribution for test",
+            ]:
+                self.assertIn(token, emitted)
+
+            # The inferred-owner group must NOT leak into the binding registry.
+            self.assertNotIn("ui_inferred_noise", emitted)
+            self.assertNotIn("should_be_dropped", emitted)
+
+        # The committed live-generated header must also exist and have the
+        # expected runtime-confirmed members + sidecar bindings.
+        live_header = self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_chud_sonic_stage.generated.h")
+        for token in [
+            "Phase 266",
+            "namespace sward::ui_runtime::generated::sgfx_hud",
+            "class CHudSonicStage",
+            "RCPtr<CScene> m_rcPlayScreen;",
+            "RCPtr<CScene> m_rcSpeedGauge;",
+            "RCPtr<CScene> m_rcRingEnergyGauge;",
+            "RCPtr<CScene> m_rcGaugeFrame;",
+            "RCPtr<CScene> m_rcExpCount;",
+            "RCPtr<CScene> m_rcSpeedCount;",
+            "static_assert(offsetof(CHudSonicStage, m_rcRingEnergyGauge) == 0xF0",
+        ]:
+            self.assertIn(token, live_header)
 
     def test_ui_lab_operator_reads_debug_menu_guest_globals(self):
         ui_lab = self.read("UnleashedRecomp/patches/ui_lab_patches.cpp")

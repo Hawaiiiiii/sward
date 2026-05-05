@@ -1064,7 +1064,10 @@ namespace UiLab
         { "m_rcExpCount", 0x100, 0x104 },
         { "m_rcPtrField108", 0x108, 0x10C },
         { "m_rcPtrField110", 0x110, 0x114 },
-        { "m_rcPtrField118", 0x118, 0x11C },
+        // Phase 266: Phase 260 sweep cross-validated +0x118 against
+        // `ui_playscreen/add/speed_count` (constructor-confirmed owner),
+        // so this RCPtr holds the additive speed-count HUD scene.
+        { "m_rcSpeedCount", 0x118, 0x11C },
         { "m_rcPtrField120", 0x120, 0x124 },
         { "m_rcScoreCount", 0x128, 0x12C },
         { "m_rcTimeCount", 0x130, 0x134 },
