@@ -75,26 +75,34 @@ def group_by_screen(events: list[dict[str, Any]]) -> dict[str, list[dict[str, An
 
 
 def summarize_sfx_cues(events: list[dict[str, Any]]) -> dict[str, Any]:
-    cues_per_screen: dict[str, Counter] = defaultdict(Counter)
+    """Attribute each game-play-sound to the active screen via the
+    UI Lab `target` field (e.g. "title-loop", "stage-action") which
+    is the runtime's authoritative active-screen tracker. The
+    `csd` detail field carries the LAST loaded project, which is
+    not the right attribution because all 18 UI projects load at
+    boot before any gameplay starts."""
+    cues_per_target: dict[str, Counter] = defaultdict(Counter)
     sequence: list[dict[str, Any]] = []
     for evt in events:
         if evt.get("event") != "game-play-sound":
             continue
         kv = parse_detail(evt.get("detail", ""))
         cue = kv.get("cue", "")
-        screen = kv.get("csd", evt.get("_screen", ""))
+        target = evt.get("target", "") or kv.get("csd", "")
         if cue:
-            cues_per_screen[screen][cue] += 1
+            cues_per_target[target][cue] += 1
             sequence.append({
                 "frame": evt.get("frame", 0),
                 "time": evt.get("time", 0),
                 "cue": cue,
-                "screen": screen,
+                "target": target,
+                "csdProject": kv.get("csd", ""),
             })
     return {
-        "per_screen_counts": {k: dict(v) for k, v in cues_per_screen.items()},
+        "per_target_counts": {k: dict(v) for k, v in cues_per_target.items()},
         "sequence": sequence,
-        "total_distinct_cues": len({c for ev in cues_per_screen.values() for c in ev}),
+        "total_distinct_cues": len({c for ev in cues_per_target.values() for c in ev}),
+        "total_distinct_targets": len(cues_per_target),
     }
 
 
@@ -199,9 +207,9 @@ def main(argv=None):
         for p in csd_projects[:30]:
             lines.append(f"  frame={p['frame']:8d} t={p['time']:8.2f}  {p['project']}")
         lines.append("")
-        lines.append("SFX cues per screen:")
-        for screen, cues in sorted(sfx["per_screen_counts"].items()):
-            lines.append(f"  [{screen}]")
+        lines.append("SFX cues per UI target (runtime's own active-screen tracker):")
+        for target, cues in sorted(sfx["per_target_counts"].items()):
+            lines.append(f"  [{target}]")
             for cue, count in sorted(cues.items(), key=lambda x: -x[1]):
                 lines.append(f"    {count:5d}  {cue}")
         lines.append("")

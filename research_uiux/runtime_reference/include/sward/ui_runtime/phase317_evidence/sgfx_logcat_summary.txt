@@ -1,0 +1,56 @@
+=== SGFX logcat session summary ===
+evidence_dir: out\ui_lab_runtime_evidence\phase315_take2_20260505_174123\manual-observer
+total events: 44484
+csd_projects observed: 26
+distinct SFX cues fired: 13
+
+CSD project timeline:
+  frame=       0 t=    1.99  ui_loading
+  frame=       0 t=    2.00  ui_saveicon
+  frame=    2348 t=   16.84  ui_general
+  frame=    2348 t=   16.85  ui_pause
+  frame=    2348 t=   16.85  ui_status
+  frame=    2351 t=   16.95  ui_gate
+  frame=    2351 t=   16.96  ui_result
+  frame=    2351 t=   16.96  ui_missionscreen
+  frame=    2351 t=   16.96  ui_misson
+  frame=    2351 t=   16.97  ui_start
+  frame=    2354 t=   17.05  ui_title
+  frame=    2362 t=   17.32  ui_balloon
+  frame=    2362 t=   17.32  ui_shop
+  frame=    2362 t=   17.32  ui_townscreen
+  frame=    2366 t=   17.46  ui_worldmap
+  frame=    2366 t=   17.46  ui_worldmap_help
+  frame=    2369 t=   17.55  ui_help
+  frame=    2369 t=   17.55  ui_itemresult
+  frame=   16951 t=  240.84  ui_qte
+  frame=   16951 t=  240.84  ui_lcursor
+  frame=   16951 t=  240.85  ui_playscreen
+  frame=   18807 t=  281.08  ui_itembox
+  frame=   19275 t=  294.80  ui_enemygauge
+  frame=   19275 t=  294.80  ui_playscreen_ev_hit
+  frame=   19275 t=  294.80  ui_qte_ev
+  frame=   19291 t=  295.32  ui_playscreen_ev
+
+SFX cues per UI target (runtime's own active-screen tracker):
+  [title-loop]
+       94  sys_actstg_pausecursor
+       49  sys_worldmap_cursor
+       33  sys_worldmap_finaldecide
+       31  sys_actstg_twn_speechbutton
+       18  sys_worldmap_decide
+        5  sys_actstg_score
+        3  sys_actstg_pausewinopen
+        3  obj_navi_appear
+        2  sys_actstg_pausewinclose
+        1  sys_worldmap_window
+        1  sys_worldmap_cansel
+        1  sys_actstg_pausedecide
+        1  sys_actstg_pausecansel
+
+State machine transitions:
+  sonic-hud-value-write-update: samples=3 distinct=1
+  stage-title-context: samples=14552 distinct=14552
+  title-intro-context: samples=2904 distinct=2904
+  title-menu-context: samples=12 distinct=12
+  world-map-update: samples=26 distinct=1

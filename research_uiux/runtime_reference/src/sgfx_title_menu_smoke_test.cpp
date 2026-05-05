@@ -60,9 +60,10 @@ int main()
         {
             const auto evs = updateTitleMenuOneFrame(state, in);
             expect(!evs.empty(), "test1.cursor move event");
-            expectEq(evs[0].sfxCueName,
-                     std::string(kTitleMenuSfxCursor),
-                     "test1.cursor SFX cue");
+            // Phase 317: title menu cursor moves are SILENT in retail
+            // (captured trace shows no SFX on cursor change). Empty
+            // string is the runtime-correct cue for this event.
+            expectEq(evs[0].sfxCueName, std::string{}, "test1.cursor silent");
         }
         // After 5 down-taps starting at 0 in a 5-option ring, we land back at 0.
         expectEq(state.cursorIndex, 0, "test1.cursor wrapped back to NewGame");

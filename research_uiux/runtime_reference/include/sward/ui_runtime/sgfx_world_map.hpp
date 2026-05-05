@@ -122,10 +122,14 @@ namespace sward::ui_runtime::generated::sgfx_hud
         }
         if (input.acceptTapped)
         {
+            // Phase 317 retail correction: captured runtime trace
+            // (phase315_take2, frames 7192..7764) shows
+            // sys_worldmap_finaldecide fires when the player commits
+            // to a stage on the World Map -- NOT plain _decide.
             state.stageOpenPanelVisible = true;
             events.push_back({WorldMapEventKind::StageOpened,
                               state.cursor,
-                              std::string(kWorldMapSfxConfirm)});
+                              std::string(kWorldMapSfxFinalConfirm)});
         }
         else if (input.cancelTapped)
         {

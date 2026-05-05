@@ -205,6 +205,12 @@ namespace sward::ui_runtime::generated::sgfx_hud
         }
 
         // Vertical cursor movement.
+        // Phase 317 retail correction: the captured runtime trace
+        // (phase315_take2 session, frames 5362..6416) shows cursor
+        // changing 0->1->2 with NO Game_PlaySound calls at those
+        // frames. Title-menu cursor movement is SILENT in retail
+        // SU; a CursorMoved event still fires for the host but we
+        // emit an empty SFX cue string instead of sys_worldmap_cursor.
         if (input.upTapped || input.downTapped)
         {
             const std::int32_t step = input.upTapped ? -1 : +1;
@@ -214,7 +220,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
                 state.cursorIndex = next;
                 events.push_back({TitleMenuEventKind::CursorMoved,
                                   optionFromIndex(state.cursorIndex),
-                                  std::string(kTitleMenuSfxCursor)});
+                                  std::string{}}); // silent in retail
             }
         }
 

@@ -1,0 +1,2934 @@
+{
+  "phase": "316",
+  "evidence_dir": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\out\\ui_lab_runtime_evidence\\phase315_take2_20260505_174123\\manual-observer",
+  "totals": {
+    "events": 44484,
+    "csd_projects_observed": 26,
+    "screens_with_events": 27,
+    "distinct_sfx_cues": 13,
+    "state_machine_kinds": 5
+  },
+  "csd_project_timeline": [
+    {
+      "frame": 0,
+      "time": 1.98713,
+      "project": "ui_loading"
+    },
+    {
+      "frame": 0,
+      "time": 1.99594,
+      "project": "ui_saveicon"
+    },
+    {
+      "frame": 2348,
+      "time": 16.845,
+      "project": "ui_general"
+    },
+    {
+      "frame": 2348,
+      "time": 16.8458,
+      "project": "ui_pause"
+    },
+    {
+      "frame": 2348,
+      "time": 16.8468,
+      "project": "ui_status"
+    },
+    {
+      "frame": 2351,
+      "time": 16.9543,
+      "project": "ui_gate"
+    },
+    {
+      "frame": 2351,
+      "time": 16.9566,
+      "project": "ui_result"
+    },
+    {
+      "frame": 2351,
+      "time": 16.962,
+      "project": "ui_missionscreen"
+    },
+    {
+      "frame": 2351,
+      "time": 16.9643,
+      "project": "ui_misson"
+    },
+    {
+      "frame": 2351,
+      "time": 16.9658,
+      "project": "ui_start"
+    },
+    {
+      "frame": 2354,
+      "time": 17.0479,
+      "project": "ui_title"
+    },
+    {
+      "frame": 2362,
+      "time": 17.3225,
+      "project": "ui_balloon"
+    },
+    {
+      "frame": 2362,
+      "time": 17.3236,
+      "project": "ui_shop"
+    },
+    {
+      "frame": 2362,
+      "time": 17.3246,
+      "project": "ui_townscreen"
+    },
+    {
+      "frame": 2366,
+      "time": 17.459,
+      "project": "ui_worldmap"
+    },
+    {
+      "frame": 2366,
+      "time": 17.4611,
+      "project": "ui_worldmap_help"
+    },
+    {
+      "frame": 2369,
+      "time": 17.5481,
+      "project": "ui_help"
+    },
+    {
+      "frame": 2369,
+      "time": 17.5489,
+      "project": "ui_itemresult"
+    },
+    {
+      "frame": 16951,
+      "time": 240.843,
+      "project": "ui_qte"
+    },
+    {
+      "frame": 16951,
+      "time": 240.845,
+      "project": "ui_lcursor"
+    },
+    {
+      "frame": 16951,
+      "time": 240.846,
+      "project": "ui_playscreen"
+    },
+    {
+      "frame": 18807,
+      "time": 281.077,
+      "project": "ui_itembox"
+    },
+    {
+      "frame": 19275,
+      "time": 294.798,
+      "project": "ui_enemygauge"
+    },
+    {
+      "frame": 19275,
+      "time": 294.801,
+      "project": "ui_playscreen_ev_hit"
+    },
+    {
+      "frame": 19275,
+      "time": 294.803,
+      "project": "ui_qte_ev"
+    },
+    {
+      "frame": 19291,
+      "time": 295.324,
+      "project": "ui_playscreen_ev"
+    }
+  ],
+  "sfx_summary": {
+    "per_target_counts": {
+      "title-loop": {
+        "sys_worldmap_window": 1,
+        "sys_worldmap_decide": 18,
+        "sys_worldmap_cursor": 49,
+        "sys_actstg_score": 5,
+        "sys_actstg_pausecursor": 94,
+        "sys_worldmap_finaldecide": 33,
+        "sys_actstg_twn_speechbutton": 31,
+        "sys_worldmap_cansel": 1,
+        "sys_actstg_pausewinopen": 3,
+        "sys_actstg_pausedecide": 1,
+        "sys_actstg_pausewinclose": 2,
+        "obj_navi_appear": 3,
+        "sys_actstg_pausecansel": 1
+      }
+    },
+    "sequence": [
+      {
+        "frame": 6456,
+        "time": 85.8979,
+        "cue": "sys_worldmap_window",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6456,
+        "time": 85.8986,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6619,
+        "time": 87.8091,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6657,
+        "time": 88.2518,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6685,
+        "time": 88.598,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6714,
+        "time": 88.9297,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6738,
+        "time": 89.2029,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6757,
+        "time": 89.4477,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6814,
+        "time": 90.1103,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6844,
+        "time": 90.4764,
+        "cue": "sys_actstg_score",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6884,
+        "time": 90.9359,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6904,
+        "time": 91.1752,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6922,
+        "time": 91.3667,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6945,
+        "time": 91.6573,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 6963,
+        "time": 91.8587,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7004,
+        "time": 92.3351,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7016,
+        "time": 92.4852,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7028,
+        "time": 92.634,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7043,
+        "time": 92.8224,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7071,
+        "time": 93.1553,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7102,
+        "time": 93.5526,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7128,
+        "time": 93.8503,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7150,
+        "time": 94.1177,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7192,
+        "time": 94.6092,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7221,
+        "time": 94.9479,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7244,
+        "time": 95.2299,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7277,
+        "time": 95.6339,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7311,
+        "time": 96.0185,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7350,
+        "time": 96.4962,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7397,
+        "time": 97.3627,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7437,
+        "time": 97.8597,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7462,
+        "time": 98.1644,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7483,
+        "time": 98.4301,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7497,
+        "time": 98.5958,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7509,
+        "time": 98.747,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7542,
+        "time": 99.142,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7563,
+        "time": 99.4025,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7613,
+        "time": 100.022,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7634,
+        "time": 100.277,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7645,
+        "time": 100.4,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7667,
+        "time": 100.689,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7683,
+        "time": 100.874,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7698,
+        "time": 101.064,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7714,
+        "time": 101.26,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7728,
+        "time": 101.418,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7745,
+        "time": 101.62,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7764,
+        "time": 101.837,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7787,
+        "time": 102.126,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7800,
+        "time": 102.284,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7813,
+        "time": 102.43,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7845,
+        "time": 102.834,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7877,
+        "time": 103.231,
+        "cue": "sys_actstg_score",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7917,
+        "time": 103.695,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7940,
+        "time": 103.972,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 7989,
+        "time": 104.555,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8012,
+        "time": 104.845,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8061,
+        "time": 105.409,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8099,
+        "time": 105.875,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8143,
+        "time": 106.414,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8181,
+        "time": 106.857,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8210,
+        "time": 107.219,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8250,
+        "time": 107.72,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8289,
+        "time": 108.213,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8380,
+        "time": 109.64,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8406,
+        "time": 109.964,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8421,
+        "time": 110.14,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8436,
+        "time": 110.336,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8468,
+        "time": 110.739,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8506,
+        "time": 111.188,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8540,
+        "time": 111.585,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8568,
+        "time": 111.919,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8583,
+        "time": 112.106,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8598,
+        "time": 112.282,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8618,
+        "time": 112.544,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8644,
+        "time": 112.875,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8667,
+        "time": 113.159,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8687,
+        "time": 113.405,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8698,
+        "time": 113.556,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8714,
+        "time": 113.748,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8738,
+        "time": 114.045,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8757,
+        "time": 114.282,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8779,
+        "time": 114.556,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8799,
+        "time": 114.827,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8816,
+        "time": 115.038,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8840,
+        "time": 115.33,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8860,
+        "time": 115.581,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8882,
+        "time": 115.841,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8900,
+        "time": 116.071,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8932,
+        "time": 116.457,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8957,
+        "time": 116.754,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 8977,
+        "time": 116.994,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9007,
+        "time": 117.366,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9035,
+        "time": 117.706,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9055,
+        "time": 117.962,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9078,
+        "time": 118.283,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9102,
+        "time": 118.568,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9177,
+        "time": 119.502,
+        "cue": "sys_actstg_score",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9206,
+        "time": 119.849,
+        "cue": "sys_actstg_score",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9245,
+        "time": 120.344,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9278,
+        "time": 120.817,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9317,
+        "time": 121.32,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9329,
+        "time": 121.457,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9340,
+        "time": 121.6,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9348,
+        "time": 121.695,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9386,
+        "time": 122.199,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9396,
+        "time": 122.341,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9407,
+        "time": 122.485,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9432,
+        "time": 122.79,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9460,
+        "time": 123.149,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9486,
+        "time": 123.463,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9500,
+        "time": 123.632,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9520,
+        "time": 123.891,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9530,
+        "time": 124.022,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9548,
+        "time": 124.298,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9564,
+        "time": 124.503,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9575,
+        "time": 124.652,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9596,
+        "time": 124.917,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9615,
+        "time": 125.199,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9656,
+        "time": 125.71,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9666,
+        "time": 125.844,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9674,
+        "time": 125.938,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9712,
+        "time": 126.447,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9721,
+        "time": 126.583,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9735,
+        "time": 126.789,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9751,
+        "time": 126.985,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9762,
+        "time": 127.135,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9810,
+        "time": 127.759,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9844,
+        "time": 128.207,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9866,
+        "time": 128.473,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9882,
+        "time": 128.691,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9921,
+        "time": 129.194,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9932,
+        "time": 129.341,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9944,
+        "time": 129.482,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9955,
+        "time": 129.623,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 9964,
+        "time": 129.737,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10004,
+        "time": 130.244,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10016,
+        "time": 130.385,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10027,
+        "time": 130.525,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10039,
+        "time": 130.669,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10080,
+        "time": 131.207,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10129,
+        "time": 131.815,
+        "cue": "sys_actstg_score",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10206,
+        "time": 132.765,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10219,
+        "time": 133.104,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10306,
+        "time": 134.21,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10342,
+        "time": 134.651,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10368,
+        "time": 134.972,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10410,
+        "time": 135.498,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10440,
+        "time": 135.888,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10452,
+        "time": 136.026,
+        "cue": "sys_worldmap_decide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10465,
+        "time": 136.188,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10477,
+        "time": 136.345,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10501,
+        "time": 136.655,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10513,
+        "time": 136.794,
+        "cue": "sys_actstg_twn_speechbutton",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10540,
+        "time": 137.163,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10567,
+        "time": 137.49,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10601,
+        "time": 137.921,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10622,
+        "time": 138.198,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10631,
+        "time": 138.351,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10706,
+        "time": 139.747,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10724,
+        "time": 139.985,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 10741,
+        "time": 140.243,
+        "cue": "sys_worldmap_finaldecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11147,
+        "time": 145.557,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11158,
+        "time": 145.693,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11204,
+        "time": 146.302,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11215,
+        "time": 146.451,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11226,
+        "time": 146.613,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11237,
+        "time": 146.766,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11249,
+        "time": 146.935,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11259,
+        "time": 147.069,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11268,
+        "time": 147.193,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11277,
+        "time": 147.305,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11286,
+        "time": 147.424,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11297,
+        "time": 147.551,
+        "cue": "sys_worldmap_cursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11327,
+        "time": 147.93,
+        "cue": "sys_worldmap_cansel",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11543,
+        "time": 150.86,
+        "cue": "sys_actstg_pausewinopen",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11696,
+        "time": 152.86,
+        "cue": "sys_actstg_pausewinopen",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11735,
+        "time": 153.409,
+        "cue": "sys_actstg_pausedecide",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 11735,
+        "time": 153.41,
+        "cue": "sys_actstg_pausewinclose",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 13450,
+        "time": 182.344,
+        "cue": "obj_navi_appear",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 13650,
+        "time": 185.38,
+        "cue": "obj_navi_appear",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 13844,
+        "time": 188.396,
+        "cue": "obj_navi_appear",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 15720,
+        "time": 221.493,
+        "cue": "sys_actstg_pausewinopen",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 15782,
+        "time": 222.547,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 15824,
+        "time": 223.224,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 15854,
+        "time": 223.704,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 15903,
+        "time": 224.494,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 15919,
+        "time": 224.721,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 15934,
+        "time": 224.978,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 15975,
+        "time": 225.578,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 15986,
+        "time": 225.729,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 15996,
+        "time": 225.877,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16010,
+        "time": 226.075,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16018,
+        "time": 226.191,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16028,
+        "time": 226.34,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16036,
+        "time": 226.481,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16047,
+        "time": 226.63,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16056,
+        "time": 226.765,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16067,
+        "time": 226.924,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16079,
+        "time": 227.086,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16088,
+        "time": 227.234,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16098,
+        "time": 227.375,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16109,
+        "time": 227.538,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16119,
+        "time": 227.677,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16130,
+        "time": 227.834,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16142,
+        "time": 228.038,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16154,
+        "time": 228.22,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16163,
+        "time": 228.369,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16180,
+        "time": 228.618,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16223,
+        "time": 229.22,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16233,
+        "time": 229.367,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16243,
+        "time": 229.521,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16254,
+        "time": 229.676,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16264,
+        "time": 229.821,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16275,
+        "time": 229.974,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16285,
+        "time": 230.119,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16294,
+        "time": 230.266,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16305,
+        "time": 230.419,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16316,
+        "time": 230.575,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16326,
+        "time": 230.719,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16337,
+        "time": 230.875,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16347,
+        "time": 231.029,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16356,
+        "time": 231.175,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16367,
+        "time": 231.328,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16378,
+        "time": 231.481,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16388,
+        "time": 231.627,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16399,
+        "time": 231.774,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16410,
+        "time": 231.933,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16420,
+        "time": 232.079,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16430,
+        "time": 232.222,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16440,
+        "time": 232.377,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16449,
+        "time": 232.527,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16460,
+        "time": 232.68,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16470,
+        "time": 232.844,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16480,
+        "time": 232.999,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16490,
+        "time": 233.155,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16499,
+        "time": 233.311,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16508,
+        "time": 233.462,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16518,
+        "time": 233.614,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16529,
+        "time": 233.757,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16551,
+        "time": 234.07,
+        "cue": "sys_actstg_pausecursor",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16560,
+        "time": 234.209,
+        "cue": "sys_actstg_pausewinclose",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      },
+      {
+        "frame": 16560,
+        "time": 234.211,
+        "cue": "sys_actstg_pausecansel",
+        "target": "title-loop",
+        "csdProject": "ui_itemresult"
+      }
+    ],
+    "total_distinct_cues": 13,
+    "total_distinct_targets": 1
+  },
+  "state_transitions": {
+    "stage-title-context": {
+      "samples_total": 14552,
+      "distinct_states": 14552,
+      "first_5_states": [
+        {
+          "game_mode": "66016304",
+          "context": "55050800",
+          "state_machine": "55050800",
+          "state_time_ms": "66",
+          "is_title_state_menu": "0",
+          "autosave_warning": "0",
+          "owner_title_context": "114411952",
+          "owner_flag556": "0",
+          "owner_flag558": "0",
+          "owner_gate568": "0",
+          "owner_gate570": "0",
+          "owner_timer560_ms": "66",
+          "owner_timer564_ms": "0",
+          "title_ctx464": "0",
+          "title_ctx465": "0",
+          "title_ctx466": "0",
+          "title_ctx467": "0",
+          "title_ctx468": "0",
+          "title_request": "0",
+          "title_dirty": "0",
+          "title_transition": "0",
+          "title_flag580": "0",
+          "title_csd488": "0"
+        },
+        {
+          "game_mode": "66016304",
+          "context": "55050800",
+          "state_machine": "55050800",
+          "state_time_ms": "73",
+          "is_title_state_menu": "0",
+          "autosave_warning": "0",
+          "owner_title_context": "114411952",
+          "owner_flag556": "0",
+          "owner_flag558": "0",
+          "owner_gate568": "0",
+          "owner_gate570": "0",
+          "owner_timer560_ms": "73",
+          "owner_timer564_ms": "0",
+          "title_ctx464": "0",
+          "title_ctx465": "0",
+          "title_ctx466": "0",
+          "title_ctx467": "0",
+          "title_ctx468": "0",
+          "title_request": "0",
+          "title_dirty": "0",
+          "title_transition": "0",
+          "title_flag580": "0",
+          "title_csd488": "0"
+        },
+        {
+          "game_mode": "66016304",
+          "context": "55050800",
+          "state_machine": "55050800",
+          "state_time_ms": "85",
+          "is_title_state_menu": "0",
+          "autosave_warning": "0",
+          "owner_title_context": "114411952",
+          "owner_flag556": "0",
+          "owner_flag558": "0",
+          "owner_gate568": "0",
+          "owner_gate570": "0",
+          "owner_timer560_ms": "85",
+          "owner_timer564_ms": "0",
+          "title_ctx464": "0",
+          "title_ctx465": "0",
+          "title_ctx466": "0",
+          "title_ctx467": "0",
+          "title_ctx468": "0",
+          "title_request": "0",
+          "title_dirty": "0",
+          "title_transition": "0",
+          "title_flag580": "0",
+          "title_csd488": "0"
+        },
+        {
+          "game_mode": "66016304",
+          "context": "55050800",
+          "state_machine": "55050800",
+          "state_time_ms": "92",
+          "is_title_state_menu": "0",
+          "autosave_warning": "0",
+          "owner_title_context": "114411952",
+          "owner_flag556": "0",
+          "owner_flag558": "0",
+          "owner_gate568": "0",
+          "owner_gate570": "0",
+          "owner_timer560_ms": "92",
+          "owner_timer564_ms": "0",
+          "title_ctx464": "0",
+          "title_ctx465": "0",
+          "title_ctx466": "0",
+          "title_ctx467": "0",
+          "title_ctx468": "0",
+          "title_request": "0",
+          "title_dirty": "0",
+          "title_transition": "0",
+          "title_flag580": "0",
+          "title_csd488": "0"
+        },
+        {
+          "game_mode": "66016304",
+          "context": "55050800",
+          "state_machine": "55050800",
+          "state_time_ms": "97",
+          "is_title_state_menu": "0",
+          "autosave_warning": "0",
+          "owner_title_context": "114411952",
+          "owner_flag556": "0",
+          "owner_flag558": "0",
+          "owner_gate568": "0",
+          "owner_gate570": "0",
+          "owner_timer560_ms": "97",
+          "owner_timer564_ms": "0",
+          "title_ctx464": "0",
+          "title_ctx465": "0",
+          "title_ctx466": "0",
+          "title_ctx467": "0",
+          "title_ctx468": "0",
+          "title_request": "0",
+          "title_dirty": "0",
+          "title_transition": "0",
+          "title_flag580": "0",
+          "title_csd488": "0"
+        }
+      ],
+      "last_5_states": [
+        {
+          "game_mode": "66016304",
+          "context": "55050800",
+          "state_machine": "55050800",
+          "state_time_ms": "220619",
+          "is_title_state_menu": "1",
+          "autosave_warning": "1",
+          "owner_title_context": "114411952",
+          "owner_flag556": "0",
+          "owner_flag558": "0",
+          "owner_gate568": "1",
+          "owner_gate570": "0",
+          "owner_timer560_ms": "0",
+          "owner_timer564_ms": "1113",
+          "title_ctx464": "0",
+          "title_ctx465": "0",
+          "title_ctx466": "0",
+          "title_ctx467": "0",
+          "title_ctx468": "1",
+          "title_request": "1",
+          "title_dirty": "0",
+          "title_transition": "1",
+          "title_flag580": "0",
+          "title_csd488": "99629360",
+          "csd_byte62": "0",
+          "csd_byte84": "1",
+          "csd_byte152": "0",
+          "csd_byte160": "0"
+        },
+        {
+          "game_mode": "66016304",
+          "context": "55050800",
+          "state_machine": "55050800",
+          "state_time_ms": "220634",
+          "is_title_state_menu": "1",
+          "autosave_warning": "1",
+          "owner_title_context": "114411952",
+          "owner_flag556": "0",
+          "owner_flag558": "0",
+          "owner_gate568": "1",
+          "owner_gate570": "0",
+          "owner_timer560_ms": "0",
+          "owner_timer564_ms": "1113",
+          "title_ctx464": "0",
+          "title_ctx465": "0",
+          "title_ctx466": "0",
+          "title_ctx467": "0",
+          "title_ctx468": "1",
+          "title_request": "1",
+          "title_dirty": "0",
+          "title_transition": "1",
+          "title_flag580": "0",
+          "title_csd488": "99629360",
+          "csd_byte62": "0",
+          "csd_byte84": "1",
+          "csd_byte152": "0",
+          "csd_byte160": "0"
+        },
+        {
+          "game_mode": "66016304",
+          "context": "55050800",
+          "state_machine": "55050800",
+          "state_time_ms": "220649",
+          "is_title_state_menu": "1",
+          "autosave_warning": "1",
+          "owner_title_context": "114411952",
+          "owner_flag556": "0",
+          "owner_flag558": "0",
+          "owner_gate568": "1",
+          "owner_gate570": "0",
+          "owner_timer560_ms": "0",
+          "owner_timer564_ms": "1113",
+          "title_ctx464": "0",
+          "title_ctx465": "0",
+          "title_ctx466": "0",
+          "title_ctx467": "0",
+          "title_ctx468": "1",
+          "title_request": "1",
+          "title_dirty": "0",
+          "title_transition": "1",
+          "title_flag580": "0",
+          "title_csd488": "99629360",
+          "csd_byte62": "0",
+          "csd_byte84": "1",
+          "csd_byte152": "0",
+          "csd_byte160": "0"
+        },
+        {
+          "game_mode": "66016304",
+          "context": "55050800",
+          "state_machine": "55050800",
+          "state_time_ms": "220664",
+          "is_title_state_menu": "1",
+          "autosave_warning": "1",
+          "owner_title_context": "114411952",
+          "owner_flag556": "0",
+          "owner_flag558": "0",
+          "owner_gate568": "1",
+          "owner_gate570": "0",
+          "owner_timer560_ms": "0",
+          "owner_timer564_ms": "1113",
+          "title_ctx464": "0",
+          "title_ctx465": "0",
+          "title_ctx466": "0",
+          "title_ctx467": "0",
+          "title_ctx468": "1",
+          "title_request": "1",
+          "title_dirty": "0",
+          "title_transition": "1",
+          "title_flag580": "0",
+          "title_csd488": "99629360",
+          "csd_byte62": "0",
+          "csd_byte84": "1",
+          "csd_byte152": "0",
+          "csd_byte160": "0"
+        },
+        {
+          "game_mode": "66016304",
+          "context": "55050800",
+          "state_machine": "55050800",
+          "state_time_ms": "220680",
+          "is_title_state_menu": "1",
+          "autosave_warning": "1",
+          "owner_title_context": "114411952",
+          "owner_flag556": "0",
+          "owner_flag558": "0",
+          "owner_gate568": "1",
+          "owner_gate570": "0",
+          "owner_timer560_ms": "0",
+          "owner_timer564_ms": "1113",
+          "title_ctx464": "0",
+          "title_ctx465": "0",
+          "title_ctx466": "0",
+          "title_ctx467": "0",
+          "title_ctx468": "1",
+          "title_request": "1",
+          "title_dirty": "0",
+          "title_transition": "1",
+          "title_flag580": "0",
+          "title_csd488": "99629360",
+          "csd_byte62": "0",
+          "csd_byte84": "1",
+          "csd_byte152": "0",
+          "csd_byte160": "0"
+        }
+      ]
+    },
+    "title-intro-context": {
+      "samples_total": 2904,
+      "distinct_states": 2904,
+      "first_5_states": [
+        {
+          "context": "114411952",
+          "state_machine": "114412188",
+          "elapsed_ms": "6",
+          "requested_state": "0",
+          "dirty": "0",
+          "transition_armed": "0",
+          "context_flag580": "0",
+          "context_472": "0",
+          "context_480": "0",
+          "context_488": "0"
+        },
+        {
+          "context": "114411952",
+          "state_machine": "114412188",
+          "elapsed_ms": "34",
+          "requested_state": "0",
+          "dirty": "0",
+          "transition_armed": "0",
+          "context_flag580": "0",
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360"
+        },
+        {
+          "context": "114411952",
+          "state_machine": "114412188",
+          "elapsed_ms": "49",
+          "requested_state": "1",
+          "dirty": "0",
+          "transition_armed": "0",
+          "context_flag580": "0",
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360"
+        },
+        {
+          "context": "114411952",
+          "state_machine": "114412188",
+          "elapsed_ms": "53",
+          "requested_state": "1",
+          "dirty": "0",
+          "transition_armed": "0",
+          "context_flag580": "0",
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360"
+        },
+        {
+          "context": "114411952",
+          "state_machine": "114412188",
+          "elapsed_ms": "58",
+          "requested_state": "1",
+          "dirty": "0",
+          "transition_armed": "0",
+          "context_flag580": "0",
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360"
+        }
+      ],
+      "last_5_states": [
+        {
+          "context": "114411952",
+          "state_machine": "114412188",
+          "elapsed_ms": "48244",
+          "requested_state": "1",
+          "dirty": "0",
+          "transition_armed": "0",
+          "context_flag580": "0",
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360"
+        },
+        {
+          "context": "114411952",
+          "state_machine": "114412188",
+          "elapsed_ms": "48254",
+          "requested_state": "1",
+          "dirty": "0",
+          "transition_armed": "0",
+          "context_flag580": "0",
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360"
+        },
+        {
+          "context": "114411952",
+          "state_machine": "114412188",
+          "elapsed_ms": "48265",
+          "requested_state": "1",
+          "dirty": "0",
+          "transition_armed": "0",
+          "context_flag580": "0",
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360"
+        },
+        {
+          "context": "114411952",
+          "state_machine": "114412188",
+          "elapsed_ms": "48275",
+          "requested_state": "1",
+          "dirty": "0",
+          "transition_armed": "0",
+          "context_flag580": "0",
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360"
+        },
+        {
+          "context": "114411952",
+          "state_machine": "114412188",
+          "elapsed_ms": "48290",
+          "requested_state": "1",
+          "dirty": "0",
+          "transition_armed": "0",
+          "context_flag580": "0",
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360"
+        }
+      ]
+    },
+    "title-menu-context": {
+      "samples_total": 12,
+      "distinct_states": 12,
+      "first_5_states": [
+        {
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360",
+          "context_phase": "0",
+          "context_flag580": "0",
+          "menu_cursor": "0",
+          "menu_field3c": "0",
+          "menu_field54": "1",
+          "menu_field9a": "0"
+        },
+        {
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360",
+          "context_phase": "0",
+          "context_flag580": "0",
+          "menu_cursor": "1",
+          "menu_field3c": "0",
+          "menu_field54": "1",
+          "menu_field9a": "0"
+        },
+        {
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360",
+          "context_phase": "0",
+          "context_flag580": "0",
+          "menu_cursor": "2",
+          "menu_field3c": "0",
+          "menu_field54": "1",
+          "menu_field9a": "0"
+        },
+        {
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360",
+          "context_phase": "0",
+          "context_flag580": "0",
+          "menu_cursor": "3",
+          "menu_field3c": "0",
+          "menu_field54": "1",
+          "menu_field9a": "0"
+        },
+        {
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360",
+          "context_phase": "0",
+          "context_flag580": "0",
+          "menu_cursor": "0",
+          "menu_field3c": "0",
+          "menu_field54": "1",
+          "menu_field9a": "0"
+        }
+      ],
+      "last_5_states": [
+        {
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360",
+          "context_phase": "0",
+          "context_flag580": "0",
+          "menu_cursor": "3",
+          "menu_field3c": "0",
+          "menu_field54": "1",
+          "menu_field9a": "0"
+        },
+        {
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360",
+          "context_phase": "0",
+          "context_flag580": "0",
+          "menu_cursor": "0",
+          "menu_field3c": "0",
+          "menu_field54": "1",
+          "menu_field9a": "0"
+        },
+        {
+          "context_472": "0",
+          "context_480": "99610160",
+          "context_488": "99629360",
+          "context_phase": "0",
+          "context_flag580": "0",
+          "menu_cursor": "1",
+          "menu_field3c": "0",
+          "menu_field54": "1",
+          "menu_field9a": "0"
+        },
+        {
+          "context_472": "60610096",
+          "context_480": "99610160",
+          "context_488": "99629360",
+          "context_phase": "1",
+          "context_flag580": "0",
+          "menu_cursor": "1",
+          "menu_field3c": "0",
+          "menu_field54": "1",
+          "menu_field9a": "0"
+        },
+        {
+          "context_472": "60610096",
+          "context_480": "99610160",
+          "context_488": "99629360",
+          "context_phase": "2",
+          "context_flag580": "0",
+          "menu_cursor": "1",
+          "menu_field3c": "0",
+          "menu_field54": "1",
+          "menu_field9a": "0"
+        }
+      ]
+    },
+    "world-map-update": {
+      "samples_total": 26,
+      "distinct_states": 1,
+      "first_5_states": [
+        {
+          "worldMapSimpleInfo": "0x5E9DA30"
+        }
+      ],
+      "last_5_states": [
+        {
+          "worldMapSimpleInfo": "0x5E9DA30"
+        }
+      ]
+    },
+    "sonic-hud-value-write-update": {
+      "samples_total": 3,
+      "distinct_states": 1,
+      "first_5_states": [
+        {
+          "path": "ui_playscreen/add/speed_count/position/num_speed",
+          "value": "99",
+          "source": "generated-PPC-callsite-semantic-candidate:same-frame-hud-update-context:sub_824D6418:CSD::CNode::SetText/sub_830BF640:semanticValueName=speedKmh:semanticBindingStatus=stable-candidate-bound-pending-exact-child-node-resolution@ui_playscreen/add/speed_count/position/num_speed"
+        }
+      ],
+      "last_5_states": [
+        {
+          "path": "ui_playscreen/add/speed_count/position/num_speed",
+          "value": "99",
+          "source": "generated-PPC-callsite-semantic-candidate:same-frame-hud-update-context:sub_824D6418:CSD::CNode::SetText/sub_830BF640:semanticValueName=speedKmh:semanticBindingStatus=stable-candidate-bound-pending-exact-child-node-resolution@ui_playscreen/add/speed_count/position/num_speed"
+        }
+      ]
+    }
+  },
+  "per_screen_event_counts": {
+    "<bootstrap>": [
+      [
+        "native-owner-setter-hud-helper-first-seen",
+        2
+      ],
+      [
+        "observer-mode",
+        1
+      ],
+      [
+        "configured",
+        1
+      ],
+      [
+        "live-bridge-started",
+        1
+      ]
+    ],
+    "ui_loading": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_saveicon": [
+      [
+        "presented-frame",
+        39
+      ],
+      [
+        "native-owner-setter-hud-helper-first-seen",
+        12
+      ],
+      [
+        "native-csd-manager-scene-correlated",
+        6
+      ],
+      [
+        "loading-requested",
+        2
+      ],
+      [
+        "csd-project-made",
+        1
+      ],
+      [
+        "first-presented-frame",
+        1
+      ],
+      [
+        "sonic-hud-render-gate-correlated",
+        1
+      ],
+      [
+        "loading-display-active",
+        1
+      ]
+    ],
+    "ui_general": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_pause": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_status": [
+      [
+        "native-owner-setter-hud-helper-first-seen",
+        4
+      ],
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_gate": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_result": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_missionscreen": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_misson": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_start": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_title": [
+      [
+        "csd-project-made",
+        1
+      ],
+      [
+        "target-csd-project-made",
+        1
+      ]
+    ],
+    "ui_balloon": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_shop": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_townscreen": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_worldmap": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_worldmap_help": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_help": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_itemresult": [
+      [
+        "stage-title-context",
+        14552
+      ],
+      [
+        "title-intro-context",
+        2904
+      ],
+      [
+        "native-csd-manager-scene-correlated",
+        519
+      ],
+      [
+        "presented-frame",
+        243
+      ],
+      [
+        "game-play-sound",
+        242
+      ],
+      [
+        "native-owner-setter-hud-helper-first-seen",
+        65
+      ],
+      [
+        "native-owner-setter-probe",
+        46
+      ],
+      [
+        "native-csd-owner-candidate",
+        44
+      ],
+      [
+        "world-map-update",
+        26
+      ],
+      [
+        "title-menu-context",
+        12
+      ],
+      [
+        "loading-display-active",
+        4
+      ],
+      [
+        "sonic-hud-render-gate-correlated",
+        4
+      ],
+      [
+        "loading-requested",
+        2
+      ],
+      [
+        "csd-project-made",
+        1
+      ],
+      [
+        "title-intro-attached",
+        1
+      ],
+      [
+        "loading-display-ended",
+        1
+      ],
+      [
+        "title-menu-attached",
+        1
+      ]
+    ],
+    "ui_qte": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_lcursor": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_playscreen": [
+      [
+        "native-owner-setter-hud-helper-first-seen",
+        116
+      ],
+      [
+        "native-csd-manager-scene-correlated",
+        87
+      ],
+      [
+        "presented-frame",
+        31
+      ],
+      [
+        "native-owner-setter-probe",
+        4
+      ],
+      [
+        "loading-display-active",
+        4
+      ],
+      [
+        "loading-requested",
+        3
+      ],
+      [
+        "csd-project-made",
+        1
+      ],
+      [
+        "loading-display-ended",
+        1
+      ]
+    ],
+    "ui_itembox": [
+      [
+        "native-owner-setter-hud-owner-slot-readout",
+        3718
+      ],
+      [
+        "native-owner-setter-probe",
+        228
+      ],
+      [
+        "native-owner-setter-hud-owner-field-map",
+        228
+      ],
+      [
+        "native-owner-setter-hud-helper-first-seen",
+        48
+      ],
+      [
+        "native-csd-manager-scene-correlated",
+        33
+      ],
+      [
+        "sonic-hud-node-write-unresolved",
+        18
+      ],
+      [
+        "sonic-hud-ct-code-entry-gauge-transition-candidate",
+        17
+      ],
+      [
+        "sonic-hud-native-ct-day-boost-site",
+        17
+      ],
+      [
+        "sonic-hud-node-write-callsite-correlated",
+        10
+      ],
+      [
+        "sonic-hud-node-write-semantic-path-candidate",
+        10
+      ],
+      [
+        "presented-frame",
+        8
+      ],
+      [
+        "native-csd-owner-candidate",
+        7
+      ],
+      [
+        "sonic-hud-update-callsite-sample",
+        6
+      ],
+      [
+        "sonic-hud-callsite-value-classified",
+        5
+      ],
+      [
+        "loading-display-active",
+        5
+      ],
+      [
+        "native-hud-owner-renderable-slot",
+        4
+      ],
+      [
+        "native-hud-owner-field-cross-validated",
+        4
+      ],
+      [
+        "loading-requested",
+        3
+      ],
+      [
+        "native-hud-owner-layout-sweep-complete",
+        2
+      ],
+      [
+        "native-hud-owner-layout-sidecar-written",
+        2
+      ],
+      [
+        "sonic-hud-render-gate-correlated",
+        2
+      ],
+      [
+        "csd-project-made",
+        1
+      ],
+      [
+        "sonic-hud-owner-hooked",
+        1
+      ],
+      [
+        "sonic-hud-owner-field-sample",
+        1
+      ],
+      [
+        "native-owner-setter-hud-inferred-owner-seeded",
+        1
+      ],
+      [
+        "loading-display-ended",
+        1
+      ],
+      [
+        "sonic-hud-ct-gameplay-writer-probe",
+        1
+      ],
+      [
+        "sonic-hud-ct-gameplay-writer",
+        1
+      ]
+    ],
+    "ui_enemygauge": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_playscreen_ev_hit": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_qte_ev": [
+      [
+        "csd-project-made",
+        1
+      ]
+    ],
+    "ui_playscreen_ev": [
+      [
+        "native-owner-setter-hud-owner-slot-readout",
+        18629
+      ],
+      [
+        "native-owner-setter-probe",
+        772
+      ],
+      [
+        "native-owner-setter-hud-owner-field-map",
+        768
+      ],
+      [
+        "sonic-hud-ct-code-entry-gauge-transition-candidate",
+        174
+      ],
+      [
+        "sonic-hud-native-ct-day-boost-site",
+        174
+      ],
+      [
+        "native-csd-manager-scene-correlated",
+        137
+      ],
+      [
+        "native-owner-setter-hud-helper-first-seen",
+        109
+      ],
+      [
+        "native-csd-owner-candidate",
+        78
+      ],
+      [
+        "sonic-hud-node-write-unresolved",
+        47
+      ],
+      [
+        "presented-frame",
+        40
+      ],
+      [
+        "sonic-hud-node-write-callsite-correlated",
+        40
+      ],
+      [
+        "sonic-hud-node-write-semantic-path-candidate",
+        40
+      ],
+      [
+        "sonic-hud-update-callsite-sample",
+        18
+      ],
+      [
+        "sonic-hud-callsite-value-classified",
+        15
+      ],
+      [
+        "native-hud-owner-renderable-slot",
+        14
+      ],
+      [
+        "sonic-hud-render-gate-correlated",
+        10
+      ],
+      [
+        "loading-display-active",
+        6
+      ],
+      [
+        "loading-requested",
+        4
+      ],
+      [
+        "native-hud-owner-field-cross-validated",
+        3
+      ],
+      [
+        "sonic-hud-value-write-update",
+        3
+      ],
+      [
+        "sonic-hud-node-write-semantic-bound",
+        3
+      ],
+      [
+        "loading-display-ended",
+        2
+      ],
+      [
+        "native-hud-owner-layout-sweep-complete",
+        2
+      ],
+      [
+        "native-hud-owner-layout-sidecar-written",
+        2
+      ],
+      [
+        "sonic-hud-ct-gameplay-writer-probe",
+        2
+      ],
+      [
+        "csd-project-made",
+        1
+      ],
+      [
+        "sonic-hud-speed-readout-value",
+        1
+      ]
+    ]
+  }
+}
