@@ -1,4 +1,4 @@
-// Phase 307: SGFX-shaped port of the post-stage results screen
+// Phase 307 / 329: SGFX-shaped port of the post-stage results screen
 // (CResult / ui_result.yncp). Renders the rank tally + final
 // score reveal sequence after a stage clears.
 //
@@ -8,9 +8,25 @@
 //     time_count, ring_count, special_score, total_score).
 //   * Each value typewriter-reveals before the next one starts.
 //
-// The retail game animates each line of the tally appearing in
-// sequence; SGFX matches that animation order so the same SFX
-// cues fire at the same moments.
+// Phase 329 retail-fidelity additions:
+//   * The retail asset has SIX numeric counters (result_num_1 ..
+//     result_num_6) per aspect_ratio_patches.cpp:664-705. SGFX's
+//     six ResultsLineId values map 1:1 onto those scene IDs.
+//   * Two BGM cues exist for the results screen, mined from
+//     install/hashes/game.cpp:8111-8114:
+//        bgm_sys_result    -- success fanfare (rank C..S)
+//        bgm_sys_result_ng -- failure fanfare (rank D / time-out)
+//   * "ui_result_ex" exists as a separate retail screen for EX
+//     stages (Tails Tornado / Werehog QTE clears) per
+//     ui_lab_runtime_screen_index.generated.h:36. Same logic, just
+//     a different CSD project bound; SGFX models it as a flag on
+//     ResultsState.
+//
+// Note: HUD/Result/Result.cpp is the retail source file (per the
+// runtime screen index), but it is NOT exposed as an api/ struct
+// header in UnleashedRecomp. So inner field offsets / per-frame
+// state machine are still inferred from the captured trace +
+// scene shape, not retail-validated SWA_ASSERT_OFFSETOF lines.
 
 #pragma once
 
@@ -21,14 +37,20 @@
 
 namespace sward::ui_runtime::generated::sgfx_hud
 {
+    // Phase 329: the retail asset's six numeric counters
+    //   result_num_1 .. result_num_6 (per aspect_ratio_patches.cpp)
+    // map 1:1 onto these enum values. The semantic labels (Rank,
+    // Score, Time, Rings, SpecialScore, TotalScore) are inferred
+    // from the standard Sonic Unleashed results-screen layout that
+    // the captured retail asset renders.
     enum class ResultsLineId : std::uint8_t
     {
-        Rank        = 0,
-        ScoreLine   = 1,
-        TimeLine    = 2,
-        RingsLine   = 3,
-        SpecialScore = 4,
-        TotalScore  = 5,
+        Rank        = 0, // result_num_1
+        ScoreLine   = 1, // result_num_2
+        TimeLine    = 2, // result_num_3
+        RingsLine   = 3, // result_num_4
+        SpecialScore = 4, // result_num_5
+        TotalScore  = 5, // result_num_6
         Count       = 6,
     };
 
@@ -64,6 +86,20 @@ namespace sward::ui_runtime::generated::sgfx_hud
         float         secondsBetweenLines = 0.4f;
         bool          tallyComplete = false;
         bool          acknowledged = false;
+
+        // Phase 329: EX-stage variant flag. Retail ships ui_result_ex
+        // as a separate CSD project bound for Tails Tornado / Werehog
+        // QTE stage clears; the inner state machine is identical
+        // (six counters, same animation order) but the host should
+        // load the EX project's textures instead. Tracked here so
+        // the same updateResultsScreenOneFrame routine can drive
+        // both variants without branching.
+        bool isExVariant = false;
+        // Phase 329: which BGM the host should kick off when this
+        // screen opens. Set from rank: rank D -> failure fanfare,
+        // ranks C..S -> success fanfare. Value populated by the
+        // host before calling update; SGFX does not write to it.
+        bool useFailureBgm = false;
     };
 
     struct ResultsEvent
@@ -81,6 +117,14 @@ namespace sward::ui_runtime::generated::sgfx_hud
     constexpr std::string_view kResultsSfxLine    = "";                     // unverified
     constexpr std::string_view kResultsSfxRank    = "";                     // unverified
     constexpr std::string_view kResultsSfxConfirm = "sys_worldmap_decide";  // mined
+
+    // Phase 329: BGM cues mined from
+    //   local_build_env/.../UnleashedRecomp/install/hashes/game.cpp:8111-8114
+    // (Sound/bgm_sys_result.cpk + bgm_sys_result_ng.cpk). These are
+    // BGM stems, not SFX cues -- the host triggers them on results-
+    // screen entry, not via the SGFX event stream.
+    constexpr std::string_view kResultsBgmSuccess = "bgm_sys_result";
+    constexpr std::string_view kResultsBgmFailure = "bgm_sys_result_ng";
 
     inline std::vector<ResultsEvent> updateResultsScreenOneFrame(
         ResultsState& state,

@@ -28,18 +28,22 @@ namespace sward::ui_runtime::generated::sgfx_hud
     {
         LogoFadeIn      = 0, // requested_state == 0; ~50 ms
         PressStartIdle  = 1, // requested_state == 1; idle until input
+        AttractMovie    = 2, // CGameModeStageTitle attract-movie playing
     };
 
     enum class TitleIntroEventKind : std::uint8_t
     {
         StateAdvanced,
-        PressStartArmed,    // user input observed; menu about to take over
+        PressStartArmed,        // user input observed; menu about to take over
+        AttractMovieStarted,    // m_AdvertiseMovieWaitTime elapsed -> demo plays
+        AttractMovieDismissed,  // user input during attract -> back to PressStartIdle
     };
 
     struct TitleIntroInput
     {
         bool startTapped = false;
         bool acceptTapped = false;
+        bool anyInputThisFrame = false; // any key/pad press dismisses attract
         float deltaSeconds = 0.0f;
     };
 
@@ -53,6 +57,24 @@ namespace sward::ui_runtime::generated::sgfx_hud
         // after first sample; SGFX uses 60 ms as a nominal threshold
         // so a host running at 30 fps still sees the advance fire.
         float           logoFadeInDurationSeconds = 0.060f;
+
+        // Phase 328: SWA::CGameModeStageTitle field mirror.
+        // Sourced from
+        //   local_build_env/.../api/SWA/System/GameMode/GameModeStageTitle.h
+        //
+        // CGameModeStageTitle layout:
+        //   <pad +0x0E from CGameModeStage>
+        //   bool m_IsPlayingAdvertiseMovie;
+        //   be<float> m_AdvertiseMovieWaitTime;
+        //
+        // m_AdvertiseMovieWaitTime is the idle countdown (in seconds)
+        // before the title attract-movie auto-plays; the retail value
+        // observed in xex2 disasm is in the 30-60 s range. We mirror
+        // the timer + the playing flag here so SGFX hosts can replay
+        // the same attract behavior.
+        bool  isPlayingAdvertiseMovie = false;     // m_IsPlayingAdvertiseMovie
+        float advertiseMovieWaitTime  = 30.0f;     // m_AdvertiseMovieWaitTime (seconds)
+        float advertiseMovieIdleSeconds = 0.0f;    // running idle counter; resets on input
     };
 
     struct TitleIntroEvent
@@ -81,10 +103,43 @@ namespace sward::ui_runtime::generated::sgfx_hud
         // stays 0 in captured trace because the actual transition is
         // owned by the menu state, not the intro -- the intro just
         // signals "user has acknowledged".
-        else if (slot.requestedState == TitleIntroState::PressStartIdle
-                 && (input.startTapped || input.acceptTapped))
+        else if (slot.requestedState == TitleIntroState::PressStartIdle)
         {
-            events.push_back({TitleIntroEventKind::PressStartArmed,
+            if (input.startTapped || input.acceptTapped)
+            {
+                slot.advertiseMovieIdleSeconds = 0.0f;
+                events.push_back({TitleIntroEventKind::PressStartArmed,
+                                  TitleIntroState::PressStartIdle, ""});
+            }
+            else
+            {
+                // Phase 328: track idle time toward attract-movie
+                // auto-play. Any unrelated input also resets via
+                // anyInputThisFrame so attract doesn't kick in mid-
+                // navigation.
+                if (input.anyInputThisFrame)
+                    slot.advertiseMovieIdleSeconds = 0.0f;
+                else
+                    slot.advertiseMovieIdleSeconds += input.deltaSeconds;
+
+                if (slot.advertiseMovieIdleSeconds >= slot.advertiseMovieWaitTime)
+                {
+                    slot.requestedState = TitleIntroState::AttractMovie;
+                    slot.isPlayingAdvertiseMovie = true;
+                    slot.advertiseMovieIdleSeconds = 0.0f;
+                    events.push_back({TitleIntroEventKind::AttractMovieStarted,
+                                      TitleIntroState::AttractMovie, ""});
+                }
+            }
+        }
+        else if (slot.requestedState == TitleIntroState::AttractMovie
+                 && (input.startTapped || input.acceptTapped
+                     || input.anyInputThisFrame))
+        {
+            slot.requestedState = TitleIntroState::PressStartIdle;
+            slot.isPlayingAdvertiseMovie = false;
+            slot.advertiseMovieIdleSeconds = 0.0f;
+            events.push_back({TitleIntroEventKind::AttractMovieDismissed,
                               TitleIntroState::PressStartIdle, ""});
         }
         return events;

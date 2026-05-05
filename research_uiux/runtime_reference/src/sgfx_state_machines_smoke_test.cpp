@@ -11,6 +11,7 @@
 #include "sward/ui_runtime/sgfx_hub_screen.hpp"
 #include "sward/ui_runtime/sgfx_title_intro.hpp"
 #include "sward/ui_runtime/sgfx_general_window.hpp"
+#include "sward/ui_runtime/sgfx_pad_state.hpp"
 
 #include <iostream>
 #include <string>
@@ -430,6 +431,165 @@ static void testLoadingDisplayType()
     expectEq(static_cast<int>(LoadingDisplayType::Blank), 8, "load.Blank=8");
 }
 
+// ----- Phase 326: SPadState retail bitfield -----
+static void testPadState()
+{
+    using namespace ui;
+    std::cout << "\n== pad state bitfield ==\n";
+    // Retail key values (from SWA::EKeyState).
+    expectEq(static_cast<unsigned>(kSgfxKey_A), 0x1u, "pad.A=0x1");
+    expectEq(static_cast<unsigned>(kSgfxKey_B), 0x2u, "pad.B=0x2");
+    expectEq(static_cast<unsigned>(kSgfxKey_X), 0x8u, "pad.X=0x8 (gap on 0x4)");
+    expectEq(static_cast<unsigned>(kSgfxKey_Y), 0x10u, "pad.Y=0x10");
+    expectEq(static_cast<unsigned>(kSgfxKey_Start), 0x400u, "pad.Start=0x400");
+    expectEq(static_cast<unsigned>(kSgfxKey_DpadDown), 0x80u, "pad.DpadDown=0x80");
+    expectEq(static_cast<unsigned>(kSgfxKey_LeftStickRight), 0x200000u, "pad.LeftStickRight=0x200000");
+    expectEq(static_cast<unsigned>(kSgfxKey_RightStickRight), 0x2000000u, "pad.RightStickRight=0x2000000");
+
+    // Edge math: A pressed this frame, not last frame -> tapped.
+    SgfxPadEdgeSample cur{}, prev{};
+    cur.a = true;
+    SgfxPadState s;
+    sgfxApplyPadEdges(s, cur, prev);
+    expect(s.isDown(kSgfxKey_A), "pad.A is down this frame");
+    expect(s.isTapped(kSgfxKey_A), "pad.A is tapped (rising edge)");
+    expect(!s.isReleased(kSgfxKey_A), "pad.A not released");
+
+    // Hold A: still down, but no longer tapped.
+    prev = cur;
+    sgfxApplyPadEdges(s, cur, prev);
+    expect(s.isDown(kSgfxKey_A), "pad.A still down");
+    expect(!s.isTapped(kSgfxKey_A), "pad.A not tapped on hold");
+
+    // Release A: released this frame.
+    cur.a = false;
+    sgfxApplyPadEdges(s, cur, prev);
+    expect(s.isReleased(kSgfxKey_A), "pad.A released (falling edge)");
+    expect(!s.isDown(kSgfxKey_A), "pad.A no longer down");
+
+    // Multi-mask: B and DpadDown together.
+    cur = {}; prev = {};
+    cur.b = true; cur.dpadDown = true;
+    sgfxApplyPadEdges(s, cur, prev);
+    expect(s.isTapped(static_cast<SgfxKeyState>(kSgfxKey_B | kSgfxKey_DpadDown)),
+           "pad.B+DpadDown both tapped");
+
+    // CInputState::GetPadState slot indexing.
+    SgfxInputState input;
+    input.currentPadStateIndex = 0;
+    input.padStates[0].downState = kSgfxKey_Start;
+    expect(input.getPadState().isDown(kSgfxKey_Start), "input.GetPadState() reads slot 0");
+    input.currentPadStateIndex = 3;
+    input.padStates[3].downState = kSgfxKey_Y;
+    expect(input.getPadState().isDown(kSgfxKey_Y), "input.GetPadState() reads slot 3");
+}
+
+// ----- Phase 327: World Map camera retail fields -----
+static void testWorldMapCamera()
+{
+    using namespace ui;
+    std::cout << "\n== world map camera ==\n";
+    WorldMapState s;
+    // Defaults: canMove starts true (player can rotate the globe at idle).
+    expect(s.camera.canMove, "wmcam.canMove default true");
+    expectEq(s.camera.pitch, 0.0f, "wmcam.pitch default 0");
+    expectEq(s.camera.yaw, 0.0f, "wmcam.yaw default 0");
+    // Host can lock the camera during stage-launch transitions.
+    s.camera.canMove = false;
+    s.camera.tiltToEarthTransitionSpeed = 1.5f;
+    expect(!s.camera.canMove, "wmcam.canMove can be locked");
+    expectEq(s.camera.tiltToEarthTransitionSpeed, 1.5f, "wmcam.tilt speed = 1.5");
+}
+
+// ----- Phase 328: title-intro attract movie -----
+static void testTitleIntroAttractMovie()
+{
+    using namespace ui;
+    std::cout << "\n== title intro attract movie ==\n";
+    TitleIntroSlot s;
+    // Walk past LogoFadeIn first.
+    {
+        TitleIntroInput in; in.deltaSeconds = 0.080f;
+        updateTitleIntroOneFrame(s, in);
+    }
+    expectEq(s.requestedState, TitleIntroState::PressStartIdle,
+             "intro.attract.starts at PressStartIdle");
+
+    // Idle past advertiseMovieWaitTime (default 30s) -> attract starts.
+    s.advertiseMovieWaitTime = 1.0f; // shrink for the test
+    {
+        TitleIntroInput in; in.deltaSeconds = 1.5f;
+        const auto evs = updateTitleIntroOneFrame(s, in);
+        expectEq(s.requestedState, TitleIntroState::AttractMovie,
+                 "intro.attract.advances on idle timeout");
+        expect(s.isPlayingAdvertiseMovie, "intro.attract.isPlayingAdvertiseMovie=true");
+        expectEq(evs[0].kind, TitleIntroEventKind::AttractMovieStarted,
+                 "intro.attract.AttractMovieStarted event");
+    }
+    // Any input dismisses the attract.
+    {
+        TitleIntroInput in; in.anyInputThisFrame = true;
+        const auto evs = updateTitleIntroOneFrame(s, in);
+        expectEq(s.requestedState, TitleIntroState::PressStartIdle,
+                 "intro.attract.dismissed back to PressStartIdle");
+        expect(!s.isPlayingAdvertiseMovie, "intro.attract.movie stopped");
+        expectEq(evs[0].kind, TitleIntroEventKind::AttractMovieDismissed,
+                 "intro.attract.AttractMovieDismissed event");
+    }
+    // Input during PressStartIdle resets the idle counter (attract
+    // doesn't kick in mid-navigation).
+    {
+        TitleIntroSlot s2;
+        // Walk past logo.
+        TitleIntroInput in; in.deltaSeconds = 0.080f;
+        updateTitleIntroOneFrame(s2, in);
+        s2.advertiseMovieWaitTime = 1.0f;
+        TitleIntroInput in2; in2.deltaSeconds = 0.5f;
+        updateTitleIntroOneFrame(s2, in2);
+        // 0.5s in; now any input should reset the counter.
+        TitleIntroInput in3; in3.anyInputThisFrame = true; in3.deltaSeconds = 0.0f;
+        updateTitleIntroOneFrame(s2, in3);
+        expectEq(s2.advertiseMovieIdleSeconds, 0.0f,
+                 "intro.attract.idle counter reset on input");
+    }
+}
+
+// ----- Phase 329: results-screen EX variant + BGM cues -----
+static void testResultsScreenEx()
+{
+    using namespace ui;
+    std::cout << "\n== results EX variant + BGM ==\n";
+    expectEq(kResultsBgmSuccess, std::string_view("bgm_sys_result"),
+             "results.success BGM cue");
+    expectEq(kResultsBgmFailure, std::string_view("bgm_sys_result_ng"),
+             "results.failure BGM cue");
+
+    // EX variant flag and BGM selection are host-driven.
+    ResultsState s;
+    s.isExVariant = true;
+    s.useFailureBgm = false;
+    s.rank = ResultsRank::S;
+    s.secondsBetweenLines = 0.05f;
+
+    // Tally completes the same as base variant.
+    bool sawComplete = false;
+    int reveals = 0;
+    for (int i = 0; i < 100 && !sawComplete; ++i)
+    {
+        ResultsInput in; in.deltaSeconds = 0.06f;
+        const auto evs = updateResultsScreenOneFrame(s, in);
+        for (const auto& e : evs)
+        {
+            if (e.kind == ResultsEventKind::LineRevealed) ++reveals;
+            if (e.kind == ResultsEventKind::TallyComplete) sawComplete = true;
+        }
+    }
+    expectEq(reveals, static_cast<int>(ResultsLineId::Count),
+             "results.EX 6 lines revealed");
+    expect(sawComplete, "results.EX TallyComplete fired");
+    expect(s.isExVariant, "results.EX flag preserved");
+}
+
 int main()
 {
     testPauseMenu();
@@ -441,6 +601,10 @@ int main()
     testTitleIntro();
     testGeneralWindow();
     testLoadingDisplayType();
+    testPadState();
+    testWorldMapCamera();
+    testTitleIntroAttractMovie();
+    testResultsScreenEx();
     std::cout << "\nfailures: " << g_failures << "\n";
     return g_failures == 0 ? 0 : 1;
 }

@@ -59,6 +59,26 @@ namespace sward::ui_runtime::generated::sgfx_hud
         float cursorX = 0.0f;             // m_CursorX @ +0x48
     };
 
+    // Phase 327: SWA::CWorldMapCamera field mirror. Sourced from
+    //   local_build_env/.../api/SWA/System/GameMode/WorldMap/
+    //   WorldMapCamera.h
+    // The camera orbits the 3D globe; pitch/yaw drive the spherical
+    // angles, distance is the orbit radius, rotationSpeed scales how
+    // fast the cursor input rotates the globe, and canMove is set to
+    // false during transitions in/out of stage launches.
+    // tiltToEarthTransitionSpeed governs the camera lerp when the
+    // player picks a continent (the camera tilts down to face that
+    // region of the globe).
+    struct WorldMapCamera
+    {
+        float pitch = 0.0f;                       // m_Pitch @ +0xD0
+        float yaw = 0.0f;                         // m_Yaw @ +0xD4
+        float distance = 0.0f;                    // m_Distance @ +0xD8
+        float rotationSpeed = 0.0f;               // m_RotationSpeed @ +0xDC
+        bool  canMove = true;                     // m_CanMove @ +0xE8
+        float tiltToEarthTransitionSpeed = 0.0f;  // m_TiltToEarthTransitionSpeed @ +0x120
+    };
+
     enum class WorldMapEventKind : std::uint8_t
     {
         ContinentMoved,
@@ -80,6 +100,9 @@ namespace sward::ui_runtime::generated::sgfx_hud
         // Phase 325: retail-shape free analog cursor. Apotos starts
         // unlocked; rest gated by host save state.
         WorldMapCursor cursor; // mirrors SWA::CWorldMapCursor
+
+        // Phase 327: retail orbit camera around the 3D globe.
+        WorldMapCamera camera; // mirrors SWA::CWorldMapCamera
 
         // Which continent the cursor is currently HOVERING (host
         // computes via raycast against the globe regions). Replaces
