@@ -99,11 +99,26 @@ $targets = @(
     },
     @{
         # Phase 303: SGFX title-menu state-machine smoke test.
-        # Drives the standalone state-machine port through scripted
-        # input sequences without any game/runtime dependency.
         Sources = @((Join-Path $srcDir "sgfx_title_menu_smoke_test.cpp"))
         Exe     = (Join-Path $OutputDir "sgfx_title_menu_smoke_test.exe")
-        Args    = @("--no-asset-needed")  # binary takes no positional args
+        Args    = @("--no-asset-needed")
+        ExtraIncludes = @()
+    },
+    @{
+        # Phases 304-309: SGFX pause / loading / stage HUD / results
+        # / world map / hub state-machine smoke test.
+        Sources = @((Join-Path $srcDir "sgfx_state_machines_smoke_test.cpp"))
+        Exe     = (Join-Path $OutputDir "sgfx_state_machines_smoke_test.exe")
+        Args    = @("--no-asset-needed")
+        ExtraIncludes = @()
+    },
+    @{
+        # Phase 310: SGFX top-level orchestrator smoke test. Drives
+        # the full game flow Title -> WorldMap -> Loading -> StageHud
+        # -> Pause -> Results -> WorldMap -> Hub.
+        Sources = @((Join-Path $srcDir "sgfx_orchestrator_smoke_test.cpp"))
+        Exe     = (Join-Path $OutputDir "sgfx_orchestrator_smoke_test.exe")
+        Args    = @("--no-asset-needed")
         ExtraIncludes = @()
     },
     @{
