@@ -298,6 +298,23 @@ static void testHubScreen()
         expectEq(s.mode, HubMode::Werehog, "hub.switched to Werehog");
         expectEq(evs[0].kind, HubEventKind::TimeOfDayChanged, "hub.TimeOfDayChanged");
     }
+    // Phase 318 retail-fidelity check: hub menu open uses the
+    // pause-bank cue, not the worldmap-bank cue.
+    {
+        HubState s2;
+        const auto evs = openHubOverlay(s2, HubOverlay::ShopMenu);
+        expectEq(evs[0].sfxCueName,
+                 std::string(kHubSfxOpenMenu),
+                 "hub.shop open uses sys_actstg_pausewinopen");
+    }
+    // Tutorial popup uses obj_navi_appear.
+    {
+        HubState s2;
+        const auto evs = openHubTutorialPopup(s2);
+        expectEq(evs[0].sfxCueName,
+                 std::string(kHubSfxTutorialPopup),
+                 "hub.tutorial popup uses obj_navi_appear");
+    }
 }
 
 int main()

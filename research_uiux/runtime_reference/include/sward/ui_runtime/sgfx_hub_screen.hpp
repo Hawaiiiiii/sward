@@ -70,15 +70,26 @@ namespace sward::ui_runtime::generated::sgfx_hud
         std::string  sfxCueName;
     };
 
-    // Phase 311 fix-up: sys_actstg_twn_speechbutton is the real cue
-    // played when the hub balloon dialogue advances (mined from
-    // UnleashedRecomp source; "twn" = town). Worldmap-style cues
-    // are reused here for the open/confirm/cancel since the hub UI
-    // shares those bank entries per the existing patches.
-    constexpr std::string_view kHubSfxOpenMenu      = "sys_worldmap_window";
-    constexpr std::string_view kHubSfxConfirm       = "sys_worldmap_decide";
-    constexpr std::string_view kHubSfxCancel        = "sys_worldmap_cansel";
-    constexpr std::string_view kHubSfxBalloonAdvance = "sys_actstg_twn_speechbutton";
+    // Phase 318 retail-fidelity update from captured logcat
+    // (phase315_take2 session, frames 7000..16950 in the WorldMap +
+    // Hub navigation window). The user opened in-hub menus 94+ times
+    // and the cursor cues fired as sys_actstg_pausecursor (NOT
+    // sys_worldmap_cursor). The pause-bank cues are the real
+    // sound-effect bank shared by hub gate/shop/mission menus
+    // because those are stage-context overlays. Balloon dialogue
+    // ("twn" = town) keeps its dedicated cue. Tutorial popup
+    // (3 captured fires) uses obj_navi_appear.
+    constexpr std::string_view kHubSfxOpenMenu        = "sys_actstg_pausewinopen";  // 3 captured fires
+    constexpr std::string_view kHubSfxCloseMenu       = "sys_actstg_pausewinclose"; // 2 captured fires
+    constexpr std::string_view kHubSfxConfirm         = "sys_actstg_pausedecide";   // 1 captured fire
+    constexpr std::string_view kHubSfxCancel          = "sys_actstg_pausecansel";
+    constexpr std::string_view kHubSfxCursor          = "sys_actstg_pausecursor";   // 94 captured fires
+    constexpr std::string_view kHubSfxBalloonAdvance  = "sys_actstg_twn_speechbutton"; // 31 captured fires
+    constexpr std::string_view kHubSfxTutorialPopup   = "obj_navi_appear";           // 3 captured fires
+    // Some flows still go through sys_worldmap_decide (16 captured fires
+    // in the WorldMap range, attributed to stage-pick confirms going
+    // through the world-map-side menu rather than the hub-side).
+    constexpr std::string_view kHubSfxWorldMapConfirm = "sys_worldmap_decide";
 
     inline std::vector<HubEvent> openHubOverlay(HubState& s, HubOverlay o)
     {
@@ -92,7 +103,18 @@ namespace sward::ui_runtime::generated::sgfx_hud
         if (s.overlay == HubOverlay::None) return {};
         const auto prev = s.overlay;
         s.overlay = HubOverlay::None;
-        return {{HubEventKind::OverlayClosed, prev, std::string(kHubSfxCancel)}};
+        return {{HubEventKind::OverlayClosed, prev, std::string(kHubSfxCloseMenu)}};
+    }
+
+    // Phase 318: tutorial popup. The retail Sonic Unleashed hub
+    // pops a "navi" tutorial bubble on first-encounter NPCs and
+    // certain dialog triggers; cue is obj_navi_appear (3 captured
+    // fires in the trace). Host calls this when their tutorial
+    // trigger fires; the SGFX layer just emits the event + cue.
+    inline std::vector<HubEvent> openHubTutorialPopup(HubState& s)
+    {
+        return {{HubEventKind::OverlayOpened, HubOverlay::BalloonText,
+                 std::string(kHubSfxTutorialPopup)}};
     }
 
     inline std::vector<HubEvent> setHubTimeOfDay(HubState& s, HubMode m)
