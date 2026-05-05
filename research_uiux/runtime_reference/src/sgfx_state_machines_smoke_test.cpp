@@ -15,6 +15,9 @@
 #include "sward/ui_runtime/sgfx_evil_hud_guide.hpp"
 #include "sward/ui_runtime/sgfx_save_icon.hpp"
 #include "sward/ui_runtime/sgfx_sound_admin.hpp"
+#include "sward/ui_runtime/sgfx_hud_evil_stage.hpp"
+#include "sward/ui_runtime/sgfx_hud_status.hpp"
+#include "sward/ui_runtime/sgfx_help_window.hpp"
 
 #include <iostream>
 #include <string>
@@ -802,6 +805,195 @@ static void testBgmAdmin()
     expectEq(kBgmChannelAttract, 4, "bgm.attract constant=4");
 }
 
+// ----- Phase 341: Werehog stage HUD overlays -----
+static void testEvilStageHud()
+{
+    using namespace ui;
+    std::cout << "\n== werehog stage HUD ==\n";
+    EvilStageHudState s;
+    s.base.mode = StageMode::Werehog;
+    s.darkGaiaEnergy = 0.5f;
+    s.outOfControlCount = 2;
+
+    // Combo increments visible.
+    {
+        const auto evs = evilStageHudIncrementCombo(s);
+        expect(s.combo.isVisible, "evil.combo.visible after first hit");
+        expectEq(s.combo.comboCount, 1, "evil.combo.count=1");
+        expectEq(evs[0].kind, EvilStageHudEventKind::ComboIncremented, "evil.ComboIncremented");
+    }
+    // Multi-hit then grace-window expires -> combo resets.
+    evilStageHudIncrementCombo(s);
+    evilStageHudIncrementCombo(s);
+    expectEq(s.combo.comboCount, 3, "evil.combo.count=3");
+    {
+        StageHudInput in; in.deltaSeconds = 2.0f; // > graceWindow 1.5s
+        const auto evs = updateEvilStageHudOneFrame(s, in, false);
+        expect(!s.combo.isVisible, "evil.combo hidden after grace");
+        expectEq(s.combo.comboCount, 0, "evil.combo.count=0 after grace");
+        bool sawReset = false;
+        for (const auto& e : evs)
+            if (e.kind == EvilStageHudEventKind::ComboReset) sawReset = true;
+        expect(sawReset, "evil.ComboReset fired");
+    }
+
+    // Chance Attack: prompt -> success on correct press.
+    {
+        evilStageHudShowChancePrompt(s, EvilGuideType::Y);
+        expectEq(s.chanceAttack.phase, EvilChanceAttackPhase::Prompt, "evil.chance.Prompt");
+        StageHudInput in; in.deltaSeconds = 0.05f;
+        const auto evs = updateEvilStageHudOneFrame(s, in, /*chanceTapped*/true);
+        expectEq(s.chanceAttack.phase, EvilChanceAttackPhase::Success, "evil.chance.Success");
+        bool sawSuccess = false;
+        for (const auto& e : evs)
+            if (e.kind == EvilStageHudEventKind::ChanceAttackSuccess) sawSuccess = true;
+        expect(sawSuccess, "evil.ChanceAttackSuccess event");
+    }
+    // Chance Attack: timeout -> Failed.
+    {
+        EvilStageHudState s2;
+        evilStageHudShowChancePrompt(s2, EvilGuideType::A);
+        StageHudInput in; in.deltaSeconds = 1.0f; // > 0.8s window
+        const auto evs = updateEvilStageHudOneFrame(s2, in, false);
+        expectEq(s2.chanceAttack.phase, EvilChanceAttackPhase::Failed, "evil.chance.Failed on timeout");
+        bool sawFailed = false;
+        for (const auto& e : evs)
+            if (e.kind == EvilStageHudEventKind::ChanceAttackFailed) sawFailed = true;
+        expect(sawFailed, "evil.ChanceAttackFailed event");
+    }
+
+    // Targeting reticle.
+    {
+        EvilStageHudState s2;
+        const auto evs = evilStageHudAcquireTarget(s2, 640.0f, 360.0f);
+        expect(s2.target.isVisible, "evil.target.visible");
+        expectEq(s2.target.screenX, 640.0f, "evil.target.x=640");
+        expectEq(evs[0].kind, EvilStageHudEventKind::TargetAcquired, "evil.TargetAcquired");
+
+        StageHudInput in; in.deltaSeconds = 0.5f;
+        updateEvilStageHudOneFrame(s2, in, false);
+        expectEq(s2.target.lockProgress, 1.0f, "evil.target.lockProgress=1 after dwell");
+
+        const auto evs2 = evilStageHudReleaseTarget(s2);
+        expect(!s2.target.isVisible, "evil.target.released");
+        expectEq(evs2[0].kind, EvilStageHudEventKind::TargetLost, "evil.TargetLost");
+    }
+
+    // Werehog companion fields propagate from EvilStageHudState to QTE.
+    {
+        EvilStageHudState s2;
+        s2.darkGaiaEnergy = 0.75f;
+        s2.outOfControlCount = 5;
+        StageHudInput in; in.deltaSeconds = 0.0f;
+        updateEvilStageHudOneFrame(s2, in, false);
+        expectEq(s2.qtePrompt.darkGaiaEnergy, 0.75f, "evil.qte.darkGaiaEnergy mirrored");
+        expectEq(s2.qtePrompt.outOfControlCount, 5u, "evil.qte.outOfControlCount mirrored");
+    }
+}
+
+// ----- Phase 341: Status overlay -----
+static void testStatusOverlay()
+{
+    using namespace ui;
+    std::cout << "\n== status overlay ==\n";
+    StatusState s;
+    expectEq(s.phase, StatusPhase::Closed, "status.starts Closed");
+
+    {
+        const auto evs = openStatusOverlay(s, 100);
+        expectEq(s.phase, StatusPhase::Browsing, "status.opens to Browsing");
+        expectEq(s.availableSkillPoints, 100, "status.availablePoints=100");
+        expectEq(evs[0].kind, StatusEventKind::Opened, "status.Opened");
+    }
+    {
+        const auto evs = hoverStatusSkill(s, 7);
+        expectEq(s.hoveredSkillId, 7, "status.hoveredSkillId=7");
+        expectEq(evs[0].kind, StatusEventKind::SkillHovered, "status.SkillHovered");
+    }
+    {
+        StatusInput in; in.acceptTapped = true;
+        const auto evs = updateStatusOverlayOneFrame(s, in);
+        expectEq(s.phase, StatusPhase::Confirming, "status.advance to Confirming");
+        expectEq(s.selectedSkillId, 7, "status.selectedSkillId=7");
+        expectEq(evs[0].kind, StatusEventKind::SkillUpgradeConfirmed, "status.UpgradeConfirmed");
+    }
+    s.pendingCostPoints = 20;
+    {
+        StatusInput in; in.acceptTapped = true;
+        const auto evs = updateStatusOverlayOneFrame(s, in);
+        expectEq(s.phase, StatusPhase::LevelingUp, "status.advance to LevelingUp");
+        expectEq(s.availableSkillPoints, 80, "status.points deducted (100-20)");
+    }
+    {
+        StatusInput in; in.deltaSeconds = 1.5f;
+        const auto evs = updateStatusOverlayOneFrame(s, in);
+        expectEq(s.phase, StatusPhase::Browsing, "status.returns to Browsing");
+        expect(!evs.empty(), "status.SkillUpgradeApplied fired");
+        expectEq(evs[0].kind, StatusEventKind::SkillUpgradeApplied, "status.UpgradeApplied");
+    }
+    // Cancel from Browsing closes the overlay.
+    {
+        StatusInput in; in.cancelTapped = true;
+        const auto evs = updateStatusOverlayOneFrame(s, in);
+        expectEq(s.phase, StatusPhase::Closed, "status.cancel closes");
+        expectEq(evs[0].kind, StatusEventKind::Closed, "status.Closed");
+    }
+}
+
+// ----- Phase 341: HelpWindow -----
+static void testHelpWindow()
+{
+    using namespace ui;
+    std::cout << "\n== help window ==\n";
+    HelpWindowState s;
+    expectEq(s.phase, HelpWindowPhase::Closed, "help.starts Closed");
+
+    {
+        const auto evs = openHelpWindow(s, 0, 3);
+        expectEq(s.phase, HelpWindowPhase::Opening, "help.opens to Opening");
+        expectEq(s.currentTopicId, 0, "help.topicId=0");
+        expectEq(s.topicCount, 3, "help.topicCount=3");
+        expectEq(evs[0].kind, HelpWindowEventKind::Opened, "help.Opened");
+    }
+    // Tick past opening duration -> Visible.
+    {
+        HelpWindowInput in; in.deltaSeconds = 0.3f;
+        updateHelpWindowOneFrame(s, in);
+        expectEq(s.phase, HelpWindowPhase::Visible, "help.advances to Visible");
+    }
+    // Right-tap cycles topic.
+    {
+        HelpWindowInput in; in.rightTapped = true;
+        const auto evs = updateHelpWindowOneFrame(s, in);
+        expectEq(s.currentTopicId, 1, "help.topicId=1 after right");
+        expectEq(evs[0].kind, HelpWindowEventKind::TopicChanged, "help.TopicChanged");
+    }
+    // Left-tap wraps backwards.
+    {
+        HelpWindowInput in; in.leftTapped = true;
+        updateHelpWindowOneFrame(s, in);
+        expectEq(s.currentTopicId, 0, "help.topicId=0 after left");
+    }
+    {
+        HelpWindowInput in; in.leftTapped = true;
+        updateHelpWindowOneFrame(s, in);
+        expectEq(s.currentTopicId, 2, "help.topicId=2 after left wrap");
+    }
+    // Cancel transitions to Closing.
+    {
+        HelpWindowInput in; in.cancelTapped = true;
+        const auto evs = updateHelpWindowOneFrame(s, in);
+        expectEq(s.phase, HelpWindowPhase::Closing, "help.advances to Closing");
+        expectEq(evs[0].kind, HelpWindowEventKind::Closed, "help.Closed event on cancel");
+    }
+    // Tick past closing -> Closed.
+    {
+        HelpWindowInput in; in.deltaSeconds = 0.3f;
+        updateHelpWindowOneFrame(s, in);
+        expectEq(s.phase, HelpWindowPhase::Closed, "help.fully Closed");
+    }
+}
+
 int main()
 {
     testPauseMenu();
@@ -820,6 +1012,9 @@ int main()
     testEvilHudGuide();
     testSaveIcon();
     testBgmAdmin();
+    testEvilStageHud();
+    testStatusOverlay();
+    testHelpWindow();
     std::cout << "\nfailures: " << g_failures << "\n";
     return g_failures == 0 ? 0 : 1;
 }
