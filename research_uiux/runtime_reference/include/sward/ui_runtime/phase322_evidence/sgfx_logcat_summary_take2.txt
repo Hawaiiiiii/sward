@@ -1,0 +1,47 @@
+=== SGFX logcat session summary ===
+evidence_dir: out\ui_lab_runtime_evidence\phase322_take2_20260505_195813\manual-observer
+total events: 52621
+csd_projects observed: 23
+distinct SFX cues fired: 7
+
+CSD project timeline:
+  frame=       0 t=    1.73  ui_loading
+  frame=       0 t=    1.74  ui_saveicon
+  frame=     631 t=   12.74  ui_general
+  frame=     631 t=   12.74  ui_pause
+  frame=     631 t=   12.74  ui_status
+  frame=     635 t=   12.86  ui_gate
+  frame=     635 t=   12.86  ui_result
+  frame=     635 t=   12.86  ui_missionscreen
+  frame=     635 t=   12.86  ui_misson
+  frame=     635 t=   12.87  ui_start
+  frame=     637 t=   12.94  ui_title
+  frame=     643 t=   13.13  ui_help
+  frame=     643 t=   13.14  ui_itemresult
+  frame=     648 t=   13.30  ui_balloon
+  frame=     648 t=   13.30  ui_shop
+  frame=     648 t=   13.30  ui_townscreen
+  frame=     651 t=   13.42  ui_worldmap
+  frame=     652 t=   13.42  ui_worldmap_help
+  frame=    1720 t=   34.00  ui_qte
+  frame=    1720 t=   34.00  ui_lcursor
+  frame=    1720 t=   34.00  ui_playscreen
+  frame=    1725 t=   34.17  ui_itembox
+  frame=    1744 t=   34.89  ui_lcursor_enemy
+
+SFX cues per UI target (runtime's own active-screen tracker):
+  [title-loop]
+       48  sys_worldmap_cursor
+       21  sys_actstg_twn_speechbutton
+       14  sys_worldmap_finaldecide
+       10  sys_actstg_pausecursor
+        9  sys_actstg_score
+        8  sys_actstg_stateserror
+        6  sys_worldmap_decide
+
+State machine transitions:
+  sonic-hud-value-write-update: samples=1 distinct=1
+  stage-title-context: samples=1038 distinct=1038
+  title-intro-context: samples=126 distinct=126
+  title-menu-context: samples=4 distinct=4
+  world-map-update: samples=10 distinct=1
