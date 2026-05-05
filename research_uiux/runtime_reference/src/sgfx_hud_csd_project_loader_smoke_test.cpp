@@ -64,7 +64,25 @@ static void emitJson(const sward::ui_runtime::generated::sgfx_hud::CsdProjectFil
         const auto& ref = loaded.allSceneRefs[i];
         std::cout << (i ? "," : "") << "\n    {\"nodePath\": \"" << jsonEscape(ref.nodePath)
                   << "\", \"name\": \"" << jsonEscape(ref.name)
-                  << "\", \"index\": " << ref.index << "}";
+                  << "\", \"index\": " << ref.index
+                  << ", \"castCount\": " << ref.metadata.castCount
+                  << ", \"castGroupCount\": " << ref.metadata.castGroupCount
+                  << ", \"animationCount\": " << ref.metadata.animationCount
+                  << ", \"animationFramerate\": " << ref.metadata.animationFramerate
+                  << ", \"aspectRatio\": " << ref.metadata.aspectRatio
+                  << ", \"subimageCount\": " << ref.metadata.subimages.size()
+                  << ", \"subimages\": [";
+        for (std::size_t j = 0; j < ref.metadata.subimages.size(); ++j)
+        {
+            const auto& sub = ref.metadata.subimages[j];
+            std::cout << (j ? "," : "")
+                      << "\n      {\"texIdx\": " << sub.textureIndex
+                      << ", \"u0\": " << sub.topLeftU
+                      << ", \"v0\": " << sub.topLeftV
+                      << ", \"u1\": " << sub.bottomRightU
+                      << ", \"v1\": " << sub.bottomRightV << "}";
+        }
+        std::cout << (ref.metadata.subimages.empty() ? "]" : "\n    ]") << "}";
     }
     std::cout << (loaded.allSceneRefs.empty() ? "]" : "\n  ]") << ",\n";
     std::cout << "  \"textureNames\": [";
@@ -123,8 +141,16 @@ int main(int argc, char** argv)
         std::cout << "    [" << sid.index << "] " << sid.name << "\n";
     std::cout << "allSceneRefs:     count=" << loaded.allSceneRefs.size() << "\n";
     for (const auto& ref : loaded.allSceneRefs)
+    {
         std::cout << "    [" << ref.index << "] "
-                  << (ref.nodePath.empty() ? "" : ref.nodePath + "/") << ref.name << "\n";
+                  << (ref.nodePath.empty() ? "" : ref.nodePath + "/") << ref.name
+                  << " (casts=" << ref.metadata.castCount
+                  << ", groups=" << ref.metadata.castGroupCount
+                  << ", anims=" << ref.metadata.animationCount
+                  << ", subimages=" << ref.metadata.subimages.size()
+                  << ", aspect=" << ref.metadata.aspectRatio
+                  << ")\n";
+    }
     std::cout << "textureNames:     count=" << loaded.textureNames.size() << "\n";
     for (std::size_t i = 0; i < loaded.textureNames.size(); ++i)
         std::cout << "    [" << i << "] " << loaded.textureNames[i] << "\n";

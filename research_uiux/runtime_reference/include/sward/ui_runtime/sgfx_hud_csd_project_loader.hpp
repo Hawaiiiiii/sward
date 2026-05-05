@@ -74,11 +74,46 @@ namespace sward::ui_runtime::generated::sgfx_hud
     // the bare scene name. The `nodePath` is empty for scenes that hang
     // directly off the root node, matching the YNCP native component
     // map's `Root` node_path.
+    // Phase 286: a single CSD subimage rectangle. The SWA renderer
+    // binds each cast to a subimage by index; the texture-relative UV
+    // rectangle below tells the renderer which slice of the named DDS
+    // texture (`textureNames[textureIndex]`) to map onto a cast's quad.
+    // Layout matches the SWA on-disk record (20 bytes: u32 + 4 floats).
+    struct CsdSubimage
+    {
+        std::uint32_t textureIndex = 0;
+        float         topLeftU = 0.0f;
+        float         topLeftV = 0.0f;
+        float         bottomRightU = 0.0f;
+        float         bottomRightV = 0.0f;
+    };
+
+    // Phase 286: per-scene metadata pulled from the SWA scene header
+    // (76 bytes per `inspect_xncp_yncp.parse_scene`). Carries enough
+    // to drive a basic renderer: subimages (texture rectangles), the
+    // cast count (number of drawable elements), and animation timing
+    // hints. Cast hierarchy + per-cast transforms come in a follow-up
+    // phase as the renderer needs them.
+    struct CsdSceneMetadata
+    {
+        std::uint32_t version = 0;
+        float         zIndex = 0.0f;
+        float         animationFramerate = 0.0f;
+        float         aspectRatio = 0.0f;
+        std::uint32_t castGroupCount = 0;
+        std::uint32_t castCount = 0;
+        std::uint32_t animationCount = 0;
+        std::vector<CsdSubimage> subimages;
+    };
+
     struct CsdSceneRef
     {
         std::string nodePath;
         std::string name;
         std::uint32_t index = 0;
+        // Phase 286: per-scene header + subimage table extracted from
+        // the SWA scene record pointed at by the node's scene_table.
+        CsdSceneMetadata metadata;
     };
 
     struct CsdProjectFile
@@ -176,6 +211,20 @@ namespace sward::ui_runtime::generated::sgfx_hud
                 : (b3 << 24) | (b2 << 16) | (b1 << 8) | b0;
         }
 
+        // Phase 286: IEEE-754 float read with the same endian handling
+        // as readU32. Used for the Z-index / framerate / aspect-ratio /
+        // subimage UV fields in the SWA scene header.
+        inline float readF32(
+            const std::vector<std::byte>& bytes,
+            std::uint64_t offset,
+            bool bigEndian) noexcept
+        {
+            const std::uint32_t bits = readU32(bytes, offset, bigEndian);
+            float value = 0.0f;
+            std::memcpy(&value, &bits, sizeof(value));
+            return value;
+        }
+
         inline std::array<char, 4> readMagic(
             const std::vector<std::byte>& bytes,
             std::uint64_t offset) noexcept
@@ -226,6 +275,14 @@ namespace sward::ui_runtime::generated::sgfx_hud
             const std::vector<std::byte>& bytes,
             bool bigEndian,
             std::uint64_t nxtlOrigin) noexcept;
+        // Phase 286: parse a single 76-byte SWA scene header + the
+        // subimage table it points at. Returns a populated metadata
+        // struct or an empty one on bounds failure.
+        inline CsdSceneMetadata parseSceneMetadata(
+            const std::vector<std::byte>& bytes,
+            bool bigEndian,
+            std::uint64_t ncpjOrigin,
+            std::uint64_t sceneHeaderOrigin) noexcept;
 
         inline std::optional<std::uint64_t> findFourByteMagic(
             const std::vector<std::byte>& bytes,
@@ -517,9 +574,11 @@ namespace sward::ui_runtime::generated::sgfx_hud
                 return;
 
             const std::uint32_t sceneCount         = readU32(bytes, nodeOrigin + 0, bigEndian);
-            // sceneTableOff (offset +4) is the table of full scene
-            // descriptors; we only need the scene IDs at offset +8 for
-            // name lookup, so the descriptor table is not consumed here.
+            // Phase 286: sceneTableOff (offset +4) is the table of full
+            // scene descriptors. Each entry is a u32 offset (relative
+            // to the NCPJ chunk origin) pointing at a 76-byte scene
+            // header followed by subimage / cast / animation tables.
+            const std::uint32_t sceneTableOff      = readU32(bytes, nodeOrigin + 4, bigEndian);
             const std::uint32_t sceneIdTableOff    = readU32(bytes, nodeOrigin + 8, bigEndian);
             const std::uint32_t childCount         = readU32(bytes, nodeOrigin + 12, bigEndian);
             const std::uint32_t childListOffset    = readU32(bytes, nodeOrigin + 16, bigEndian);
@@ -539,6 +598,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
             // the canonical scene order the Python ground-truth parser
             // produces (`sorted(scene_ids, key=lambda x: x["index"])`).
             const std::uint64_t sceneIdTableOrigin = ncpjOrigin + sceneIdTableOff;
+            const std::uint64_t sceneTableOrigin   = ncpjOrigin + sceneTableOff;
             if (sceneCount > 0
                 && sceneIdTableOrigin + (8 * static_cast<std::uint64_t>(sceneCount)) <= bytes.size())
             {
@@ -555,13 +615,35 @@ namespace sward::ui_runtime::generated::sgfx_hud
                             : std::string{};
                     }
                 }
+
+                // Phase 286: parse the scene_table to also extract each
+                // scene's 76-byte header + subimage table. Each entry in
+                // scene_table is a u32 pointing (relative to ncpjOrigin)
+                // at a scene header.
+                std::vector<CsdSceneMetadata> sceneMetadataByIndex(sceneCount);
+                if (sceneTableOff != 0
+                    && sceneTableOrigin + (4 * static_cast<std::uint64_t>(sceneCount)) <= bytes.size())
+                {
+                    for (std::uint32_t i = 0; i < sceneCount; ++i)
+                    {
+                        const std::uint32_t sceneOffset =
+                            readU32(bytes, sceneTableOrigin + (4u * i), bigEndian);
+                        if (sceneOffset == 0)
+                            continue;
+                        const std::uint64_t sceneHeaderOrigin = ncpjOrigin + sceneOffset;
+                        sceneMetadataByIndex[i] = parseSceneMetadata(
+                            bytes, bigEndian, ncpjOrigin, sceneHeaderOrigin);
+                    }
+                }
+
                 for (std::uint32_t i = 0; i < sceneCount; ++i)
                 {
                     CsdSceneRef ref;
                     ref.nodePath = currentNodePath;
                     ref.name = sceneNamesByIndex[i];
                     ref.index = i;
-                    out.allSceneRefs.push_back(ref);
+                    ref.metadata = std::move(sceneMetadataByIndex[i]);
+                    out.allSceneRefs.push_back(std::move(ref));
 
                     if (isRootNode)
                     {
@@ -655,6 +737,69 @@ namespace sward::ui_runtime::generated::sgfx_hud
                     : std::string{};
                 out.textureNames.push_back(std::move(name));
             }
+        }
+
+        // Phase 286: parse a single SWA scene record. The on-disk layout
+        // (matches `inspect_xncp_yncp.parse_scene`):
+        //   +0x00  u32  version
+        //   +0x04  f32  z_index
+        //   +0x08  f32  animation_framerate
+        //   +0x0C  u32  field0c (ignored)
+        //   +0x10  f32  field10 (ignored)
+        //   +0x14  u32  data1_count (ignored)
+        //   +0x18  u32  data1_offset (ignored)
+        //   +0x1C  u32  subimages_count
+        //   +0x20  u32  subimages_offset (relative to ncpjOrigin)
+        //   +0x24  u32  cast_group_count
+        //   +0x28  u32  cast_group_table_offset (ignored here)
+        //   +0x2C  u32  cast_count
+        //   +0x30  u32  cast_dictionary_offset (ignored here)
+        //   +0x34  u32  animation_count
+        //   +0x40  f32  aspect_ratio
+        //
+        // Each subimage is 20 bytes: u32 texture_index + 4 floats UV.
+        inline CsdSceneMetadata parseSceneMetadata(
+            const std::vector<std::byte>& bytes,
+            bool bigEndian,
+            std::uint64_t ncpjOrigin,
+            std::uint64_t sceneHeaderOrigin) noexcept
+        {
+            CsdSceneMetadata meta;
+            if (sceneHeaderOrigin + 0x44 > bytes.size())
+                return meta;
+
+            meta.version            = readU32(bytes, sceneHeaderOrigin + 0x00, bigEndian);
+            meta.zIndex             = readF32(bytes, sceneHeaderOrigin + 0x04, bigEndian);
+            meta.animationFramerate = readF32(bytes, sceneHeaderOrigin + 0x08, bigEndian);
+            const std::uint32_t subimagesCount  = readU32(bytes, sceneHeaderOrigin + 0x1C, bigEndian);
+            const std::uint32_t subimagesOffset = readU32(bytes, sceneHeaderOrigin + 0x20, bigEndian);
+            meta.castGroupCount     = readU32(bytes, sceneHeaderOrigin + 0x24, bigEndian);
+            meta.castCount          = readU32(bytes, sceneHeaderOrigin + 0x2C, bigEndian);
+            meta.animationCount     = readU32(bytes, sceneHeaderOrigin + 0x34, bigEndian);
+            meta.aspectRatio        = readF32(bytes, sceneHeaderOrigin + 0x40, bigEndian);
+
+            // Sanity bound — every observed retail scene has fewer than
+            // 1024 subimages; cap the count so a corrupt header cannot
+            // make the loop run away.
+            if (subimagesCount > 1024 || subimagesOffset == 0)
+                return meta;
+            const std::uint64_t subimagesOrigin = ncpjOrigin + subimagesOffset;
+            if (subimagesOrigin + (20 * static_cast<std::uint64_t>(subimagesCount)) > bytes.size())
+                return meta;
+
+            meta.subimages.reserve(subimagesCount);
+            for (std::uint32_t i = 0; i < subimagesCount; ++i)
+            {
+                const std::uint64_t entryOrigin = subimagesOrigin + (20u * i);
+                CsdSubimage sub;
+                sub.textureIndex = readU32(bytes, entryOrigin + 0x00, bigEndian);
+                sub.topLeftU     = readF32(bytes, entryOrigin + 0x04, bigEndian);
+                sub.topLeftV     = readF32(bytes, entryOrigin + 0x08, bigEndian);
+                sub.bottomRightU = readF32(bytes, entryOrigin + 0x0C, bigEndian);
+                sub.bottomRightV = readF32(bytes, entryOrigin + 0x10, bigEndian);
+                meta.subimages.push_back(sub);
+            }
+            return meta;
         }
     } // namespace detail
 
