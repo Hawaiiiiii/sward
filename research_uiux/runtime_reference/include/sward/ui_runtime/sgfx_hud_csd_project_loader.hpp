@@ -104,6 +104,12 @@ namespace sward::ui_runtime::generated::sgfx_hud
         // recursive walk over the CSD node tree's child / scene tables;
         // empty when only the root scenes are present.
         std::vector<CsdSceneRef>     allSceneRefs;
+        // Phase 284: every texture name referenced by the project, in
+        // SWA texture-table order. The retail Sonic Unleashed CSD format
+        // ships a parallel `NXTL` chunk alongside `NCPJ`; the SWA HUD
+        // bindings use these names to resolve subimage UVs back to DDS
+        // files on disk. Empty when the project file has no NXTL chunk.
+        std::vector<std::string>     textureNames;
 
         // True iff `outerMagic` is one of the known CSD project magics
         // (CPAF wraps a YNCP/XNCP payload; Yncp / Xncp are raw payloads).
@@ -212,6 +218,14 @@ namespace sward::ui_runtime::generated::sgfx_hud
             const std::string& currentNodePath,
             int depth,
             bool isRootNode) noexcept;
+        // Phase 284: walk an `NXTL` (texture list) chunk and populate
+        // `out.textureNames` with the per-index DDS filenames the SWA
+        // CSD runtime would resolve when loading the project's casts.
+        inline void parseTextureList(
+            CsdProjectFile& out,
+            const std::vector<std::byte>& bytes,
+            bool bigEndian,
+            std::uint64_t nxtlOrigin) noexcept;
 
         inline std::optional<std::uint64_t> findFourByteMagic(
             const std::vector<std::byte>& bytes,
@@ -379,21 +393,52 @@ namespace sward::ui_runtime::generated::sgfx_hud
             const bool bigEndian = isBigEndianContainer(out.outerMagic);
 
             // Outer header: 4-byte magic + 4-byte content_size_0,
-            // followed by chunk_file_0 starting at offset 8.
-            constexpr std::uint64_t kChunkFileStart = 8;
-            if (bytes.size() < kChunkFileStart + 32)
-                return "truncated-container: less than 40 bytes after outer header";
-
-            const std::uint64_t chunkOrigin = kChunkFileStart;
-            const auto firstChunkSig = readMagic(bytes, chunkOrigin);
-            const std::uint32_t nextChunkOffset = readU32(bytes, chunkOrigin + 12, bigEndian);
-            if (nextChunkOffset == 0
-                || chunkOrigin + nextChunkOffset + 32 > bytes.size())
+            // followed by chunk_file_0 starting at offset 8. The Sonic
+            // Unleashed CPAF / FAPC container ships TWO chunk_file
+            // resources back-to-back; one carries the NCPJ project tree,
+            // the other the NXTL texture list. Phase 284 walks both.
+            constexpr std::uint64_t kFirstResourceSize = 4;
+            std::uint64_t cursor = 4;  // skip 4-byte outer magic
+            std::uint64_t ncpjOrigin = 0;
+            bool foundNcpj = false;
+            for (int resourceIndex = 0; resourceIndex < 2; ++resourceIndex)
             {
-                return "bad-chunk-header: next_chunk_offset points outside the file";
+                if (cursor + kFirstResourceSize > bytes.size())
+                    break;
+                const std::uint32_t resourceContentSize =
+                    readU32(bytes, cursor, bigEndian);
+                const std::uint64_t chunkFileStart = cursor + 4;
+                if (chunkFileStart + 32 > bytes.size())
+                    break;
+
+                const std::uint32_t nextChunkOff =
+                    readU32(bytes, chunkFileStart + 12, bigEndian);
+                if (nextChunkOff != 0
+                    && chunkFileStart + nextChunkOff + 4 <= bytes.size())
+                {
+                    const std::uint64_t innerOrigin = chunkFileStart + nextChunkOff;
+                    const auto innerMagic = readMagic(bytes, innerOrigin);
+                    if (innerMagic[0] == 'N' && innerMagic[1] == 'X'
+                        && innerMagic[2] == 'T' && innerMagic[3] == 'L')
+                    {
+                        parseTextureList(out, bytes, bigEndian, innerOrigin);
+                    }
+                    else if (!foundNcpj)
+                    {
+                        ncpjOrigin = innerOrigin;
+                        out.ncpjSignature.assign(innerMagic.begin(), innerMagic.end());
+                        foundNcpj = true;
+                    }
+                }
+
+                cursor = chunkFileStart + resourceContentSize;
             }
 
-            const std::uint64_t ncpjOrigin = chunkOrigin + nextChunkOffset;
+            if (!foundNcpj)
+                return "no-ncpj-resource: container has no NCPJ-style project chunk";
+            if (ncpjOrigin + 32 > bytes.size())
+                return "bad-ncpj-origin: NCPJ chunk position is past end of file";
+
             const auto ncpjMagic = readMagic(bytes, ncpjOrigin);
             out.ncpjSignature.assign(ncpjMagic.begin(), ncpjMagic.end());
             // The NCPJ signature is the project-format tag; we do not
@@ -444,11 +489,9 @@ namespace sward::ui_runtime::generated::sgfx_hud
                 /*isRootNode=*/true);
 
             // Returning empty status means "ok"; non-empty is a failure
-            // diagnostic. Keep both the firstChunkSig and ncpjMagic
-            // values traceable in `out.ncpjSignature` for callers; the
-            // actual wire-format tags depend on the platform and don't
-            // need to be hard-asserted here.
-            (void)firstChunkSig;
+            // diagnostic. The NCPJ signature tag stays in
+            // `out.ncpjSignature` for callers; the actual wire-format
+            // value depends on platform endian and is not hard-asserted.
             (void)sceneCount;  // sceneCount was for the bound check; the
                                // recursive walker re-reads it per-node.
             return std::string{};
@@ -487,30 +530,44 @@ namespace sward::ui_runtime::generated::sgfx_hud
 
             // Pull the scene IDs at this node level into `allSceneRefs`
             // and (for the root node) also into `rootSceneIds`.
+            //
+            // Phase 281 fix: each scene-id entry's `index` field points
+            // at which scene in the node's `scenes[]` table receives
+            // that name; the entries on disk are NOT necessarily in
+            // index order. Build a name array sized to `sceneCount` and
+            // place each name at its target index so the output matches
+            // the canonical scene order the Python ground-truth parser
+            // produces (`sorted(scene_ids, key=lambda x: x["index"])`).
             const std::uint64_t sceneIdTableOrigin = ncpjOrigin + sceneIdTableOff;
             if (sceneCount > 0
                 && sceneIdTableOrigin + (8 * static_cast<std::uint64_t>(sceneCount)) <= bytes.size())
             {
+                std::vector<std::string> sceneNamesByIndex(sceneCount);
                 for (std::uint32_t i = 0; i < sceneCount; ++i)
                 {
                     const std::uint64_t entryOrigin = sceneIdTableOrigin + (8u * i);
                     const std::uint32_t nameOffset = readU32(bytes, entryOrigin + 0, bigEndian);
                     const std::uint32_t sceneIndex = readU32(bytes, entryOrigin + 4, bigEndian);
-                    std::string sceneName = nameOffset != 0
-                        ? readNullTerminatedString(bytes, ncpjOrigin + nameOffset)
-                        : std::string{};
-
+                    if (sceneIndex < sceneCount)
+                    {
+                        sceneNamesByIndex[sceneIndex] = nameOffset != 0
+                            ? readNullTerminatedString(bytes, ncpjOrigin + nameOffset)
+                            : std::string{};
+                    }
+                }
+                for (std::uint32_t i = 0; i < sceneCount; ++i)
+                {
                     CsdSceneRef ref;
                     ref.nodePath = currentNodePath;
-                    ref.name = sceneName;
-                    ref.index = sceneIndex;
+                    ref.name = sceneNamesByIndex[i];
+                    ref.index = i;
                     out.allSceneRefs.push_back(ref);
 
                     if (isRootNode)
                     {
                         CsdSceneId sid;
-                        sid.name = std::move(sceneName);
-                        sid.index = sceneIndex;
+                        sid.name = sceneNamesByIndex[i];
+                        sid.index = i;
                         out.rootSceneIds.push_back(std::move(sid));
                     }
                 }
@@ -519,22 +576,34 @@ namespace sward::ui_runtime::generated::sgfx_hud
             // Walk children. Each child entry in the node-list is 24
             // bytes wide (matches the recursive `parse_csd_node` stride
             // in `inspect_xncp_yncp.py`); the dictionary table uses
-            // 8-byte entries holding name_offset + index that names the
-            // child.
+            // 8-byte entries holding (name_offset, index) where the
+            // index points at which entry in the child-list receives
+            // that name. Phase 281 fix: same canonical-index re-ordering
+            // as the scene-id loop above so child names line up with the
+            // file's child[i] declaration order.
             const std::uint64_t childListOrigin = ncpjOrigin + childListOffset;
             const std::uint64_t childDictionaryOrigin = ncpjOrigin + childDictionaryOff;
             if (childCount > 0
                 && childListOrigin + (24 * static_cast<std::uint64_t>(childCount)) <= bytes.size()
                 && childDictionaryOrigin + (8 * static_cast<std::uint64_t>(childCount)) <= bytes.size())
             {
+                std::vector<std::string> childNamesByIndex(childCount);
+                for (std::uint32_t i = 0; i < childCount; ++i)
+                {
+                    const std::uint64_t dictEntryOrigin = childDictionaryOrigin + (8u * i);
+                    const std::uint32_t childNameOffset = readU32(bytes, dictEntryOrigin + 0, bigEndian);
+                    const std::uint32_t childIndex = readU32(bytes, dictEntryOrigin + 4, bigEndian);
+                    if (childIndex < childCount)
+                    {
+                        childNamesByIndex[childIndex] = childNameOffset != 0
+                            ? readNullTerminatedString(bytes, ncpjOrigin + childNameOffset)
+                            : std::string{};
+                    }
+                }
                 for (std::uint32_t i = 0; i < childCount; ++i)
                 {
                     const std::uint64_t childOrigin = childListOrigin + (24u * i);
-                    const std::uint64_t dictEntryOrigin = childDictionaryOrigin + (8u * i);
-                    const std::uint32_t childNameOffset = readU32(bytes, dictEntryOrigin + 0, bigEndian);
-                    const std::string childName = childNameOffset != 0
-                        ? readNullTerminatedString(bytes, ncpjOrigin + childNameOffset)
-                        : std::string{};
+                    const std::string& childName = childNamesByIndex[i];
                     const std::string nextPath = currentNodePath.empty()
                         ? childName
                         : currentNodePath + "/" + childName;
@@ -545,6 +614,46 @@ namespace sward::ui_runtime::generated::sgfx_hud
                         depth + 1,
                         /*isRootNode=*/false);
                 }
+            }
+        }
+
+        // Phase 284: extract every DDS texture name referenced by the
+        // CSD project. The NXTL chunk header layout (matches the Python
+        // `parse_texture_list`):
+        //   +0x00: 4-byte "NXTL" signature
+        //   +0x04: chunk size (little-endian, ignored here)
+        //   +0x08: list_offset (endian)
+        //   +0x0C: field0c (endian, ignored)
+        //   +0x10: texture_count (endian)
+        //   +0x14: textures_offset (endian; pointer relative to NXTL origin)
+        // Each texture entry is 8 bytes: name_offset (endian) + field04
+        // (endian, ignored). Names are null-terminated strings whose
+        // offsets are relative to the NXTL origin.
+        inline void parseTextureList(
+            CsdProjectFile& out,
+            const std::vector<std::byte>& bytes,
+            bool bigEndian,
+            std::uint64_t nxtlOrigin) noexcept
+        {
+            if (nxtlOrigin + 0x18 > bytes.size())
+                return;
+            const std::uint32_t textureCount   = readU32(bytes, nxtlOrigin + 0x10, bigEndian);
+            const std::uint32_t texturesOffset = readU32(bytes, nxtlOrigin + 0x14, bigEndian);
+            if (textureCount > 4096)
+                return;  // implausible — corrupt header.
+            const std::uint64_t entriesOrigin = nxtlOrigin + texturesOffset;
+            if (entriesOrigin + (8 * static_cast<std::uint64_t>(textureCount)) > bytes.size())
+                return;
+
+            out.textureNames.reserve(textureCount);
+            for (std::uint32_t i = 0; i < textureCount; ++i)
+            {
+                const std::uint64_t entryOrigin = entriesOrigin + (8u * i);
+                const std::uint32_t nameOffset = readU32(bytes, entryOrigin + 0, bigEndian);
+                std::string name = nameOffset != 0
+                    ? readNullTerminatedString(bytes, nxtlOrigin + nameOffset)
+                    : std::string{};
+                out.textureNames.push_back(std::move(name));
             }
         }
     } // namespace detail

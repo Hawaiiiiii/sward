@@ -19,7 +19,7 @@
 // default `Chao::CSD::CScene`; those fall-backs are flagged inline so
 // readers know the type is runtime-evidence-only and may be refined later.
 //
-// Generated at: 2026-05-05T01:41:56+00:00
+// Generated at: 2026-05-05T06:56:26+00:00
 // Source attribution: api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0x184; Phase 265 expanded from CHudSonicStage::CHudSonicStage (sub_824D89B0) decoded from local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.28.cpp:61909
 // SWA API header (authoritative for SWA-named field types): local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Sonic/HudSonicStage.h
 
@@ -71,14 +71,14 @@ namespace sward::ui_runtime::generated::sgfx_hud
     class CHudSonicStage
     {
     public:
+        // Phase 282: every member is `public:` so the class qualifies as
+        // standard-layout per [class.prop]. That makes `offsetof` on the
+        // members below well-defined under clang/MSVC and silences the
+        // `-Winvalid-offsetof` warning the alternating-access version triggered.
         std::uint32_t m_pVTable;             // +0x00 vtable pointer set by sub_824D89B0
-    private:
         std::array<std::uint8_t, 0x24> m_padding00_28;  // pre-secondary-vtable bytes
-    public:
         std::uint32_t m_pSecondaryVTable;    // +0x28 typeinfo / aux vtable set by sub_824D89B0
-    private:
         std::array<std::uint8_t, 0xB4> m_padding2C_E0;  // pre-RCPtr-table bytes
-    public:
         Chao::CSD::RCPtr<Chao::CSD::CProject> m_rcPlayScreen;  // +0xE0 Chao::CSD::RCPtr<CProject>; type from SWA API header
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcSpeedGauge;  // +0xE8 Chao::CSD::RCPtr<CScene>; type from SWA API header; runtime: ui_playscreen/so_speed_gauge (cross-validated, instances=1)
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcRingEnergyGauge;  // +0xF0 Chao::CSD::RCPtr<CScene>; type from SWA API header; runtime: ui_playscreen/so_ringenagy_gauge (cross-validated, instances=1)
@@ -154,7 +154,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
         {"m_rcSpeedCount", 0x118, "ui_playscreen", "ui_playscreen/add/speed_count", "cross-validated", 1},
     }};
 
-    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:41:56+00:00";
+    static constexpr std::string_view kGeneratedAt = "2026-05-05T06:56:26+00:00";
     static constexpr std::string_view kSourceAttribution = "api/SWA/HUD/Sonic/HudSonicStage.h offsets 0xE0..0x184; Phase 265 expanded from CHudSonicStage::CHudSonicStage (sub_824D89B0) decoded from local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.28.cpp:61909";
 
 } // namespace sward::ui_runtime::generated::sgfx_hud

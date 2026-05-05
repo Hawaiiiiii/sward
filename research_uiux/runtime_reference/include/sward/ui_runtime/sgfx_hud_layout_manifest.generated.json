@@ -1,7 +1,7 @@
 {
   "schema": "sward-sgfx-hud-layout-manifest-v1",
   "sweptRoot": "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD",
-  "generatedAt": "2026-05-05T01:41:56+00:00",
+  "generatedAt": "2026-05-05T06:56:26+00:00",
   "manifestEntries": [
     {
       "className": "CGeneralWindow",

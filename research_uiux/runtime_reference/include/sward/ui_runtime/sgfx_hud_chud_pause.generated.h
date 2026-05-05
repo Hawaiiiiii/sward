@@ -11,7 +11,7 @@
 // compile time. Method bodies are intentionally out of scope; they
 // will be ported in subsequent phases as the recomp flow is decoded.
 //
-// Generated at: 2026-05-05T01:41:56+00:00
+// Generated at: 2026-05-05T06:56:26+00:00
 // SWA base class: CGameObject (modeled here as leading byte padding rather than a real C++ base class to keep the layout self-contained).
 
 #include <array>
@@ -102,8 +102,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     class CHudPause
     {
     public:
-    private: std::array<std::uint8_t, 0xEC> m_padding0000_00EC;  // pre-m_rcPause padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0xEC> m_padding0000_00EC;  // pre-m_rcPause padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         Chao::CSD::RCPtr<Chao::CSD::CProject> m_rcPause;  // +0xEC Chao::CSD::RCPtr<Chao::CSD::CProject> (type from SWA API header)
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcBg;  // +0xF4 Chao::CSD::RCPtr<Chao::CSD::CScene> (type from SWA API header)
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcBg1;  // +0xFC Chao::CSD::RCPtr<Chao::CSD::CScene> (type from SWA API header)
@@ -112,20 +111,16 @@ namespace sward::ui_runtime::generated::sgfx_hud
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcBg1Select_2;  // +0x114 Chao::CSD::RCPtr<Chao::CSD::CScene> (type from SWA API header)
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcStatusTitle;  // +0x11C Chao::CSD::RCPtr<Chao::CSD::CScene> (type from SWA API header)
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcFooterA;  // +0x124 Chao::CSD::RCPtr<Chao::CSD::CScene> (type from SWA API header)
-    private: std::array<std::uint8_t, 0x59> m_padding012C_0185;  // pre-m_IsVisible padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0x59> m_padding012C_0185;  // pre-m_IsVisible padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         bool m_IsVisible;  // +0x185 bool (type from SWA API header)
-    private: std::array<std::uint8_t, 0x2> m_padding0186_0188;  // pre-m_Action padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0x2> m_padding0186_0188;  // pre-m_Action padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         be<EActionType> m_Action;  // +0x188 be<EActionType> (type from SWA API header)
         be<EMenuType> m_Menu;  // +0x18C be<EMenuType> (type from SWA API header)
         be<EStatusType> m_Status;  // +0x190 be<EStatusType> (type from SWA API header)
         be<ETransitionType> m_Transition;  // +0x194 be<ETransitionType> (type from SWA API header)
-    private: std::array<std::uint8_t, 0x4> m_padding0198_019C;  // pre-m_Submenu padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0x4> m_padding0198_019C;  // pre-m_Submenu padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         be<uint32_t> m_Submenu;  // +0x19C be<uint32_t> (type from SWA API header)
-    private: std::array<std::uint8_t, 0x18> m_padding01A0_01B8;  // pre-m_IsShown padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0x18> m_padding01A0_01B8;  // pre-m_IsShown padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         bool m_IsShown;  // +0x1B8 bool (type from SWA API header)
 
         // Phase 270: inline accessors for scalar / enum members.
@@ -160,7 +155,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     static_assert(offsetof(CHudPause, m_Submenu) == 0x19C, "CHudPause::m_Submenu must remain at +0x19C");
     static_assert(offsetof(CHudPause, m_IsShown) == 0x1B8, "CHudPause::m_IsShown must remain at +0x1B8");
 
-    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:41:56+00:00";
+    static constexpr std::string_view kGeneratedAt = "2026-05-05T06:56:26+00:00";
     static constexpr std::string_view kSwaApiHeaderRelpath = "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Pause/HudPause.h";
 
 } // namespace sward::ui_runtime::generated::sgfx_hud

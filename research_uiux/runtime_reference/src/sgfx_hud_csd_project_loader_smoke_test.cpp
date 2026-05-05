@@ -1,33 +1,109 @@
-// Phase 275 smoke test: drive `loadCsdProjectFile()` against a real
-// extracted Sonic Unleashed asset and print the result. Stand-alone
-// translation unit; compile and run from the repo root with:
+// Phase 275 / 281 smoke test + JSON dumper for CSD project assets.
 //
-//   g++ -std=c++17 -I research_uiux/runtime_reference/include \
-//       research_uiux/runtime_reference/src/sgfx_hud_csd_project_loader_smoke_test.cpp \
-//       -o /tmp/sgfx_hud_csd_project_loader_smoke_test
-//   ./tmp/sgfx_hud_csd_project_loader_smoke_test \
-//       extracted_assets/full_install_archives/game/Sonic/ui_playscreen.yncp
+// Stand-alone translation unit; compile via the wrapping PowerShell
+// script `build_sgfx_hud_smoke_tests.ps1`. Two output modes:
 //
-// Expected output: `loadStatus = ok: CSD project asset loaded with
-// recognizable magic` and the inner YNCP magic offset equal to 11
-// (matches the user's extraction).
+//   * Default: human-readable trace of the loader's findings.
+//   * `--json`: machine-readable JSON document on stdout, used by the
+//     Phase 281 parity validator (`parity_check_csd_loader.py`) to
+//     compare the C++ loader's parsed scene set against the YNCP
+//     native component map's ground truth across every retail asset.
 
 #include "sward/ui_runtime/sgfx_hud_csd_project_loader.hpp"
 
 #include <iostream>
 #include <string>
 
+static std::string jsonEscape(const std::string& s)
+{
+    std::string out;
+    out.reserve(s.size() + 2);
+    for (char c : s)
+    {
+        switch (c)
+        {
+        case '\\': out += "\\\\"; break;
+        case '"':  out += "\\\""; break;
+        case '\n': out += "\\n";  break;
+        case '\r': out += "\\r";  break;
+        case '\t': out += "\\t";  break;
+        default:
+            if (static_cast<unsigned char>(c) < 0x20)
+                out += '?';
+            else
+                out += c;
+        }
+    }
+    return out;
+}
+
+static void emitJson(const sward::ui_runtime::generated::sgfx_hud::CsdProjectFile& loaded)
+{
+    std::cout << "{\n";
+    std::cout << "  \"sourcePath\": \"" << jsonEscape(loaded.sourcePath.string()) << "\",\n";
+    std::cout << "  \"fileSizeBytes\": " << loaded.fileSizeBytes << ",\n";
+    std::cout << "  \"outerMagic\": \"";
+    for (char c : loaded.outerMagicChars) std::cout << (c >= 0x20 && c < 0x7F ? c : '.');
+    std::cout << "\",\n";
+    std::cout << "  \"hasRecognizedMagic\": " << (loaded.hasRecognizedMagic() ? "true" : "false") << ",\n";
+    std::cout << "  \"loadStatus\": \"" << jsonEscape(loaded.loadStatus) << "\",\n";
+    std::cout << "  \"parseStatus\": \"" << jsonEscape(loaded.parseStatus) << "\",\n";
+    std::cout << "  \"projectName\": \"" << jsonEscape(loaded.projectName) << "\",\n";
+    std::cout << "  \"ncpjSignature\": \"" << jsonEscape(loaded.ncpjSignature) << "\",\n";
+    std::cout << "  \"rootSceneIds\": [";
+    for (std::size_t i = 0; i < loaded.rootSceneIds.size(); ++i)
+    {
+        const auto& sid = loaded.rootSceneIds[i];
+        std::cout << (i ? "," : "") << "\n    {\"index\": " << sid.index
+                  << ", \"name\": \"" << jsonEscape(sid.name) << "\"}";
+    }
+    std::cout << (loaded.rootSceneIds.empty() ? "]" : "\n  ]") << ",\n";
+    std::cout << "  \"allSceneRefs\": [";
+    for (std::size_t i = 0; i < loaded.allSceneRefs.size(); ++i)
+    {
+        const auto& ref = loaded.allSceneRefs[i];
+        std::cout << (i ? "," : "") << "\n    {\"nodePath\": \"" << jsonEscape(ref.nodePath)
+                  << "\", \"name\": \"" << jsonEscape(ref.name)
+                  << "\", \"index\": " << ref.index << "}";
+    }
+    std::cout << (loaded.allSceneRefs.empty() ? "]" : "\n  ]") << ",\n";
+    std::cout << "  \"textureNames\": [";
+    for (std::size_t i = 0; i < loaded.textureNames.size(); ++i)
+    {
+        std::cout << (i ? "," : "") << "\n    \""
+                  << jsonEscape(loaded.textureNames[i]) << "\"";
+    }
+    std::cout << (loaded.textureNames.empty() ? "]" : "\n  ]") << "\n";
+    std::cout << "}\n";
+}
+
 int main(int argc, char** argv)
 {
     using namespace sward::ui_runtime::generated::sgfx_hud;
 
-    if (argc < 2)
+    bool jsonOutput = false;
+    const char* path = nullptr;
+    for (int i = 1; i < argc; ++i)
     {
-        std::cerr << "usage: " << argv[0] << " <path-to-yncp-or-xncp-file>\n";
+        const std::string arg = argv[i];
+        if (arg == "--json")
+            jsonOutput = true;
+        else
+            path = argv[i];
+    }
+    if (path == nullptr)
+    {
+        std::cerr << "usage: " << argv[0] << " [--json] <path-to-yncp-or-xncp-file>\n";
         return 2;
     }
 
-    const CsdProjectFile loaded = loadCsdProjectFile(argv[1]);
+    const CsdProjectFile loaded = loadCsdProjectFile(path);
+
+    if (jsonOutput)
+    {
+        emitJson(loaded);
+        return loaded.hasRecognizedMagic() ? 0 : 1;
+    }
 
     std::cout << "sourcePath:       " << loaded.sourcePath.string() << "\n";
     std::cout << "fileSizeBytes:    " << loaded.fileSizeBytes << "\n";
@@ -36,14 +112,8 @@ int main(int argc, char** argv)
         std::cout << (c >= 0x20 && c < 0x7F ? c : '.');
     std::cout << "\n";
     std::cout << "outerMagic enum:  " << static_cast<int>(loaded.outerMagic)
-              << " (0=Unknown, 1=Cpaf, 2=Yncp, 3=Xncp)\n";
+              << " (0=Unknown, 1=Cpaf, 2=Fapc, 3=Yncp, 4=Xncp)\n";
     std::cout << "hasRecognizedMagic: " << (loaded.hasRecognizedMagic() ? "true" : "false") << "\n";
-    std::cout << "hasYncpPayload:   " << (loaded.hasYncpPayload() ? "true" : "false") << "\n";
-    std::cout << "hasXncpPayload:   " << (loaded.hasXncpPayload() ? "true" : "false") << "\n";
-    if (loaded.innerYncpMagicOffset)
-        std::cout << "innerYncpOffset:  " << *loaded.innerYncpMagicOffset << "\n";
-    if (loaded.innerXncpMagicOffset)
-        std::cout << "innerXncpOffset:  " << *loaded.innerXncpMagicOffset << "\n";
     std::cout << "loadStatus:       " << loaded.loadStatus << "\n";
     std::cout << "parseStatus:      " << loaded.parseStatus << "\n";
     std::cout << "projectName:      " << loaded.projectName << "\n";
@@ -51,13 +121,13 @@ int main(int argc, char** argv)
     std::cout << "rootSceneIds:     count=" << loaded.rootSceneIds.size() << "\n";
     for (const auto& sid : loaded.rootSceneIds)
         std::cout << "    [" << sid.index << "] " << sid.name << "\n";
+    std::cout << "allSceneRefs:     count=" << loaded.allSceneRefs.size() << "\n";
+    for (const auto& ref : loaded.allSceneRefs)
+        std::cout << "    [" << ref.index << "] "
+                  << (ref.nodePath.empty() ? "" : ref.nodePath + "/") << ref.name << "\n";
+    std::cout << "textureNames:     count=" << loaded.textureNames.size() << "\n";
+    for (std::size_t i = 0; i < loaded.textureNames.size(); ++i)
+        std::cout << "    [" << i << "] " << loaded.textureNames[i] << "\n";
 
-    // The smoke test passes when the loader recognized the asset's
-    // outer container magic. Real Sonic Unleashed `.yncp` files ship as
-    // CPAF containers whose inner payload tag is not stored as the
-    // literal ASCII string "YNCP" / "XNCP" anywhere in the file, so
-    // requiring the inner magic here would over-reject valid retail
-    // assets. The inner-magic offsets above remain useful diagnostic
-    // output for any future raw-payload smoke runs.
     return loaded.hasRecognizedMagic() ? 0 : 1;
 }

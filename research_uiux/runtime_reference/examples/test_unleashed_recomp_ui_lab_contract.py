@@ -2072,10 +2072,18 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         smoke = smoke_path.read_text(encoding="utf-8")
         for token in [
             "#include \"sward/ui_runtime/sgfx_hud_csd_project_loader.hpp\"",
-            "loadCsdProjectFile(argv[1])",
+            # Phase 281: argv handling moved into a small loop that sets
+            # `path` after stripping the `--json` flag, so the loader
+            # call is now `loadCsdProjectFile(path)` rather than the
+            # original `loadCsdProjectFile(argv[1])`.
+            "loadCsdProjectFile(path)",
             "loadStatus",
             "outerMagicChars",
-            "innerYncpMagicOffset",
+            # Phase 281 dropped the verbose innerYncpMagicOffset trace
+            # line in favor of the structured JSON dump (`emitJson`); the
+            # field is still declared on the loader struct, just no
+            # longer printed by the smoke driver.
+            "rootSceneIds",
         ]:
             self.assertIn(token, smoke)
 
@@ -2187,6 +2195,131 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
             'CsdProjectMagic::Fapc',
         ]:
             self.assertIn(token, loader)
+
+    def test_sgfx_hud_loader_parity_report_shows_full_csd_project_coverage(self):
+        # Phase 281 / 283: the parity report is the proof that every
+        # retail CSD project the C++ loader reads produces the SAME scene
+        # set the YNCP native component map (canonical Python parser)
+        # produces. A 41/41 match across every entry in
+        # `extracted_assets/full_install_archives/` is concrete evidence
+        # the human-readable port loads what Sonic Unleashed actually
+        # displays — not an inspired or reconstructed approximation.
+        report = json.loads(self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_loader_parity_report.generated.json"))
+        self.assertEqual(report["schema"], "sward-sgfx-hud-loader-parity-report-v1")
+        self.assertGreaterEqual(report["projectCount"], 25,
+            "parity sweep should cover at least 25 retail CSD projects; "
+            f"actual: {report['projectCount']}")
+        self.assertEqual(report["summary"]["parity_ok"], report["projectCount"],
+            "every project in the parity report must show parity-ok; "
+            f"summary: {report['summary']}")
+        self.assertEqual(report["summary"]["parity_mismatch"], 0)
+        self.assertEqual(report["summary"]["loader_error"], 0)
+        # Spot-check a representative entry: ui_playscreen must be in the
+        # report and must show parity-ok with a non-empty scene set.
+        playscreen = next(
+            (e for e in report["entries"]
+             if e["project_name"] == "ui_playscreen"
+             and "Sonic" in e["relative_path"]),
+            None)
+        self.assertIsNotNone(playscreen,
+            "parity report must include ui_playscreen from game/Sonic/")
+        self.assertTrue(playscreen["status"].startswith("parity-ok"),
+            f"ui_playscreen parity status: {playscreen['status']}")
+        self.assertGreater(playscreen["yncp_map_scene_count"], 0)
+        self.assertEqual(
+            playscreen["yncp_map_scene_count"],
+            playscreen["cpp_loader_scene_count"])
+
+    def test_sgfx_hud_csd_loader_extracts_texture_names(self):
+        # Phase 284: the C++ loader walks both FAPC resources and pulls
+        # the NXTL chunk's per-index DDS texture names. The header must
+        # declare the textureNames field and a parseTextureList helper.
+        loader = self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_csd_project_loader.hpp")
+        for token in [
+            "Phase 284: every texture name referenced by the project",
+            "std::vector<std::string>     textureNames;",
+            "inline void parseTextureList(",
+            'NXTL',
+            "out.textureNames",
+        ]:
+            self.assertIn(token, loader)
+
+        # The smoke test must also surface texture names so a downstream
+        # driver / parity tool can consume them. The JSON dump has the
+        # field as an escaped C++ string literal `\"textureNames\":`;
+        # the human-readable trace uses `textureNames:`.
+        smoke = self.read(
+            "research_uiux/runtime_reference/src/sgfx_hud_csd_project_loader_smoke_test.cpp")
+        for token in [
+            "loaded.textureNames",
+            "\\\"textureNames\\\":",
+            "textureNames:",
+        ]:
+            self.assertIn(token, smoke)
+
+    def test_sgfx_hud_remaining_class_method_bodies_present(self):
+        # Phase 285: every previously layout-only HUD class now has its
+        # own hand-written method-body translation unit. The PowerShell
+        # smoke wrapper compiles them alongside the existing CHudPause /
+        # CHudSonicStage methods to validate the layouts and includes
+        # are well-formed.
+        for header_relpath, expected_helper in [
+            (
+                "research_uiux/runtime_reference/src/sgfx_hud_cgeneral_window_methods.cpp",
+                "isGeneralWindowVisible",
+            ),
+            (
+                "research_uiux/runtime_reference/src/sgfx_hud_cloading_methods.cpp",
+                "isLoadingScreenVisible",
+            ),
+            (
+                "research_uiux/runtime_reference/src/sgfx_hud_csave_icon_methods.cpp",
+                "isSaveInProgress",
+            ),
+        ]:
+            text = self.read(header_relpath)
+            self.assertIn("Phase 285", text)
+            self.assertIn(expected_helper, text)
+            self.assertIn("namespace sward::ui_runtime::generated::sgfx_hud", text)
+            self.assertIn("static_assert(", text)
+
+        # The smoke-test wrapper must include all three new methods .cpp
+        # files in the link list so a future regression in any of them
+        # breaks the build immediately.
+        wrapper = self.read("research_uiux/runtime_reference/tools/build_sgfx_hud_smoke_tests.ps1")
+        for fname in [
+            "sgfx_hud_chud_pause_methods.cpp",
+            "sgfx_hud_cgeneral_window_methods.cpp",
+            "sgfx_hud_cloading_methods.cpp",
+            "sgfx_hud_csave_icon_methods.cpp",
+        ]:
+            self.assertIn(fname, wrapper)
+
+    def test_sgfx_hud_layout_paddings_are_public_for_standard_layout(self):
+        # Phase 282: every committed generated header must declare its
+        # paddings in the same access section as its members so the
+        # class qualifies as standard-layout per [class.prop] and
+        # `offsetof` is well-defined for the static_asserts that follow.
+        # `private:` access blocks for paddings are forbidden because
+        # they trigger -Winvalid-offsetof under clang/MSVC.
+        for header_relpath in [
+            "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_chud_sonic_stage.generated.h",
+            "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_chud_pause.generated.h",
+            "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_cgeneral_window.generated.h",
+            "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_cloading.generated.h",
+            "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_csave_icon.generated.h",
+        ]:
+            text = self.read(header_relpath)
+            # The padding declarations are now plain `std::array<...>
+            # m_padding...;` lines without a leading `private:` access
+            # specifier in the same line.
+            self.assertNotIn("private: std::array<std::uint8_t,", text,
+                f"{header_relpath} still has private-access paddings; the class "
+                "is not standard-layout and offsetof asserts will warn")
 
     def test_sgfx_hud_layout_parses_swa_api_header_rcptr_declarations(self):
         # Phase 267: focused unit test for the SWA API header parser. The

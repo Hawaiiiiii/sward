@@ -11,7 +11,7 @@
 // compile time. Method bodies are intentionally out of scope; they
 // will be ported in subsequent phases as the recomp flow is decoded.
 //
-// Generated at: 2026-05-05T01:41:56+00:00
+// Generated at: 2026-05-05T06:56:26+00:00
 // SWA base class: Hedgehog::Universe::CUpdateUnit (modeled here as leading byte padding rather than a real C++ base class to keep the layout self-contained).
 
 #include <array>
@@ -51,8 +51,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     class CSaveIcon
     {
     public:
-    private: std::array<std::uint8_t, 0xD8> m_padding0000_00D8;  // pre-m_IsVisible padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0xD8> m_padding0000_00D8;  // pre-m_IsVisible padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         bool m_IsVisible;  // +0xD8 bool (type from SWA API header)
 
         // Phase 270: inline accessors for scalar / enum members.
@@ -67,7 +66,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     // the build and forces a re-generation.
     static_assert(offsetof(CSaveIcon, m_IsVisible) == 0xD8, "CSaveIcon::m_IsVisible must remain at +0xD8");
 
-    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:41:56+00:00";
+    static constexpr std::string_view kGeneratedAt = "2026-05-05T06:56:26+00:00";
     static constexpr std::string_view kSwaApiHeaderRelpath = "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/SaveIcon/SaveIcon.h";
 
 } // namespace sward::ui_runtime::generated::sgfx_hud

@@ -430,16 +430,19 @@ def emit_swa_api_class_header(spec: SwaApiClass) -> str:
     lines.append("    {")
     lines.append("    public:")
 
+    # Phase 282: every member is `public:` so the class qualifies as
+    # standard-layout per [class.prop]. That makes `offsetof` on the
+    # paddings + members below well-defined under clang/MSVC and silences
+    # the `-Winvalid-offsetof` warning the alternating-access version
+    # triggered for every SWA_INSERT_PADDING / member alternation.
     cursor = 0
     for i, member in enumerate(spec.members):
         if member.offset > cursor:
             gap = member.offset - cursor
             lines.append(
-                f"    private:"
-                f" std::array<std::uint8_t, 0x{gap:X}> m_padding{cursor:04X}_{member.offset:04X};"
+                f"        std::array<std::uint8_t, 0x{gap:X}> m_padding{cursor:04X}_{member.offset:04X};"
                 f"  // pre-{member.name} padding (covers SWA base class / SWA_INSERT_PADDING bytes)"
             )
-            lines.append("    public:")
         size_bytes = _swa_member_size_bytes(member)
         lines.append(
             f"        {_render_swa_member_decl(member)}  "
@@ -862,14 +865,14 @@ def emit_header(
     lines.append("    class CHudSonicStage")
     lines.append("    {")
     lines.append("    public:")
+    lines.append("        // Phase 282: every member is `public:` so the class qualifies as")
+    lines.append("        // standard-layout per [class.prop]. That makes `offsetof` on the")
+    lines.append("        // members below well-defined under clang/MSVC and silences the")
+    lines.append("        // `-Winvalid-offsetof` warning the alternating-access version triggered.")
     lines.append("        std::uint32_t m_pVTable;             // +0x00 vtable pointer set by sub_824D89B0")
-    lines.append("    private:")
     lines.append("        std::array<std::uint8_t, 0x24> m_padding00_28;  // pre-secondary-vtable bytes")
-    lines.append("    public:")
     lines.append("        std::uint32_t m_pSecondaryVTable;    // +0x28 typeinfo / aux vtable set by sub_824D89B0")
-    lines.append("    private:")
     lines.append(f"        std::array<std::uint8_t, 0x{fields[0].rc_ptr_offset - 0x2C:X}> m_padding2C_E0;  // pre-RCPtr-table bytes")
-    lines.append("    public:")
     for field in fields:
         binding = binding_by_name.get(field.name)
         rcptr_inner = type_map.get(field.name)

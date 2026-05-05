@@ -11,7 +11,7 @@
 // compile time. Method bodies are intentionally out of scope; they
 // will be ported in subsequent phases as the recomp flow is decoded.
 //
-// Generated at: 2026-05-05T01:41:56+00:00
+// Generated at: 2026-05-05T06:56:26+00:00
 
 #include <array>
 #include <cstddef>
@@ -73,20 +73,15 @@ namespace sward::ui_runtime::generated::sgfx_hud
     class CLoading
     {
     public:
-    private: std::array<std::uint8_t, 0xD8> m_padding0000_00D8;  // pre-m_FieldD8 padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0xD8> m_padding0000_00D8;  // pre-m_FieldD8 padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         be<uint32_t> m_FieldD8;  // +0xD8 be<uint32_t> (type from SWA API header)
-    private: std::array<std::uint8_t, 0x3C> m_padding00DC_0118;  // pre-m_rcNightToDay padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0x3C> m_padding00DC_0118;  // pre-m_rcNightToDay padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcNightToDay;  // +0x118 Chao::CSD::RCPtr<Chao::CSD::CScene> (type from SWA API header)
-    private: std::array<std::uint8_t, 0xC> m_padding0120_012C;  // pre-m_IsVisible padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0xC> m_padding0120_012C;  // pre-m_IsVisible padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         be<uint32_t> m_IsVisible;  // +0x12C be<uint32_t> (type from SWA API header)
-    private: std::array<std::uint8_t, 0xC> m_padding0130_013C;  // pre-m_LoadingDisplayType padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0xC> m_padding0130_013C;  // pre-m_LoadingDisplayType padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         be<ELoadingDisplayType> m_LoadingDisplayType;  // +0x13C be<ELoadingDisplayType> (type from SWA API header)
-    private: std::array<std::uint8_t, 0x61> m_padding0140_01A1;  // pre-m_IsNightToDay padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0x61> m_padding0140_01A1;  // pre-m_IsNightToDay padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         bool m_IsNightToDay;  // +0x1A1 bool (type from SWA API header)
 
         // Phase 270: inline accessors for scalar / enum members.
@@ -108,7 +103,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     static_assert(offsetof(CLoading, m_LoadingDisplayType) == 0x13C, "CLoading::m_LoadingDisplayType must remain at +0x13C");
     static_assert(offsetof(CLoading, m_IsNightToDay) == 0x1A1, "CLoading::m_IsNightToDay must remain at +0x1A1");
 
-    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:41:56+00:00";
+    static constexpr std::string_view kGeneratedAt = "2026-05-05T06:56:26+00:00";
     static constexpr std::string_view kSwaApiHeaderRelpath = "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Loading/Loading.h";
 
 } // namespace sward::ui_runtime::generated::sgfx_hud

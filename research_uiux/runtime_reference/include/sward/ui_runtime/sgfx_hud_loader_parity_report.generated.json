@@ -1,0 +1,386 @@
+{
+  "schema": "sward-sgfx-hud-loader-parity-report-v1",
+  "generatedAt": "2026-05-05T07:02:02+00:00",
+  "repoRoot": "C:/Users/DavidErikGarciaArena/Downloads/UI-UX Sonic World Adventure for SGFX - Project Quality Hero",
+  "yncpNativeMap": "research_uiux/data/yncp_native_component_map.json",
+  "extractedRoot": "extracted_assets/full_install_archives",
+  "smokeExe": "out/sgfx_hud_smoke_tests/sgfx_hud_csd_project_loader_smoke_test.exe",
+  "projectCount": 41,
+  "summary": {
+    "parity_ok": 41,
+    "parity_mismatch": 0,
+    "missing_asset": 0,
+    "loader_error": 0
+  },
+  "entries": [
+    {
+      "project_name": "ui_gate",
+      "relative_path": "game/ActionCommon/ui_gate.yncp",
+      "yncp_map_scene_count": 16,
+      "cpp_loader_scene_count": 16,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 16 scenes for project 'ui_gate'"
+    },
+    {
+      "project_name": "ui_missionscreen",
+      "relative_path": "game/ActionCommon/ui_missionscreen.yncp",
+      "yncp_map_scene_count": 7,
+      "cpp_loader_scene_count": 7,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 7 scenes for project 'ui_missionscreen'"
+    },
+    {
+      "project_name": "ui_misson",
+      "relative_path": "game/ActionCommon/ui_misson.yncp",
+      "yncp_map_scene_count": 6,
+      "cpp_loader_scene_count": 6,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 6 scenes for project 'ui_misson'"
+    },
+    {
+      "project_name": "ui_balloon",
+      "relative_path": "game/Town_Common/ui_balloon.yncp",
+      "yncp_map_scene_count": 15,
+      "cpp_loader_scene_count": 15,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 15 scenes for project 'ui_balloon'"
+    },
+    {
+      "project_name": "ui_shop",
+      "relative_path": "game/Town_Common/ui_shop.yncp",
+      "yncp_map_scene_count": 17,
+      "cpp_loader_scene_count": 17,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 17 scenes for project 'ui_shop'"
+    },
+    {
+      "project_name": "ui_townscreen",
+      "relative_path": "game/Town_Common/ui_townscreen.yncp",
+      "yncp_map_scene_count": 5,
+      "cpp_loader_scene_count": 5,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 5 scenes for project 'ui_townscreen'"
+    },
+    {
+      "project_name": "ui_gate",
+      "relative_path": "game/Town_EggManBase_Common/ui_gate.yncp",
+      "yncp_map_scene_count": 16,
+      "cpp_loader_scene_count": 16,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 16 scenes for project 'ui_gate'"
+    },
+    {
+      "project_name": "ui_start",
+      "relative_path": "game/ActionCommon/ui_start.yncp",
+      "yncp_map_scene_count": 4,
+      "cpp_loader_scene_count": 4,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 4 scenes for project 'ui_start'"
+    },
+    {
+      "project_name": "ui_loading",
+      "relative_path": "game/Loading/ui_loading.yncp",
+      "yncp_map_scene_count": 7,
+      "cpp_loader_scene_count": 7,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 7 scenes for project 'ui_loading'"
+    },
+    {
+      "project_name": "ui_help",
+      "relative_path": "game/SystemCommon/ui_help.yncp",
+      "yncp_map_scene_count": 6,
+      "cpp_loader_scene_count": 6,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 6 scenes for project 'ui_help'"
+    },
+    {
+      "project_name": "ui_general",
+      "relative_path": "game/SystemCommonCore/ui_general.yncp",
+      "yncp_map_scene_count": 4,
+      "cpp_loader_scene_count": 4,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 4 scenes for project 'ui_general'"
+    },
+    {
+      "project_name": "ui_pause",
+      "relative_path": "game/SystemCommonCore/ui_pause.yncp",
+      "yncp_map_scene_count": 29,
+      "cpp_loader_scene_count": 29,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 29 scenes for project 'ui_pause'"
+    },
+    {
+      "project_name": "ui_result",
+      "relative_path": "game/ActionCommon/ui_result.yncp",
+      "yncp_map_scene_count": 17,
+      "cpp_loader_scene_count": 17,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 17 scenes for project 'ui_result'"
+    },
+    {
+      "project_name": "ui_result_ex",
+      "relative_path": "game/ExStageTails_Common/ui_result_ex.yncp",
+      "yncp_map_scene_count": 15,
+      "cpp_loader_scene_count": 15,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 15 scenes for project 'ui_result_ex'"
+    },
+    {
+      "project_name": "ui_itemresult",
+      "relative_path": "game/SystemCommon/ui_itemresult.yncp",
+      "yncp_map_scene_count": 4,
+      "cpp_loader_scene_count": 4,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 4 scenes for project 'ui_itemresult'"
+    },
+    {
+      "project_name": "ui_playscreen_su",
+      "relative_path": "game/BossDarkGaia1_1Air/ui_playscreen_su.yncp",
+      "yncp_map_scene_count": 3,
+      "cpp_loader_scene_count": 3,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 3 scenes for project 'ui_playscreen_su'"
+    },
+    {
+      "project_name": "ui_playscreen_ev_hit",
+      "relative_path": "game/BossFinalDarkGaia/ui_playscreen_ev_hit.yncp",
+      "yncp_map_scene_count": 5,
+      "cpp_loader_scene_count": 5,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 5 scenes for project 'ui_playscreen_ev_hit'"
+    },
+    {
+      "project_name": "ui_playscreen_su",
+      "relative_path": "game/BossFinalDarkGaia/ui_playscreen_su.yncp",
+      "yncp_map_scene_count": 3,
+      "cpp_loader_scene_count": 3,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 3 scenes for project 'ui_playscreen_su'"
+    },
+    {
+      "project_name": "ui_playscreen_ev_hit",
+      "relative_path": "game/EvilActionCommon/ui_playscreen_ev_hit.yncp",
+      "yncp_map_scene_count": 5,
+      "cpp_loader_scene_count": 5,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 5 scenes for project 'ui_playscreen_ev_hit'"
+    },
+    {
+      "project_name": "ui_playscreen_ev",
+      "relative_path": "game/EvilSonic/ui_playscreen_ev.yncp",
+      "yncp_map_scene_count": 33,
+      "cpp_loader_scene_count": 33,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 33 scenes for project 'ui_playscreen_ev'"
+    },
+    {
+      "project_name": "ui_playscreen",
+      "relative_path": "game/Sonic/ui_playscreen.yncp",
+      "yncp_map_scene_count": 13,
+      "cpp_loader_scene_count": 13,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 13 scenes for project 'ui_playscreen'"
+    },
+    {
+      "project_name": "ui_playscreen",
+      "relative_path": "game/SuperSonic/ui_playscreen.yncp",
+      "yncp_map_scene_count": 13,
+      "cpp_loader_scene_count": 13,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 13 scenes for project 'ui_playscreen'"
+    },
+    {
+      "project_name": "ui_status",
+      "relative_path": "game/SystemCommonCore/ui_status.yncp",
+      "yncp_map_scene_count": 42,
+      "cpp_loader_scene_count": 42,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 42 scenes for project 'ui_status'"
+    },
+    {
+      "project_name": "ui_mainmenu",
+      "relative_path": "game/MainMenu/ui_mainmenu.xncp",
+      "yncp_map_scene_count": 16,
+      "cpp_loader_scene_count": 16,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 16 scenes for project 'ui_mainmenu'"
+    },
+    {
+      "project_name": "ui_mainmenu",
+      "relative_path": "game/MainMenu/ui_mainmenu.yncp",
+      "yncp_map_scene_count": 16,
+      "cpp_loader_scene_count": 16,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 16 scenes for project 'ui_mainmenu'"
+    },
+    {
+      "project_name": "ui_title",
+      "relative_path": "game/Title/ui_title.yncp",
+      "yncp_map_scene_count": 8,
+      "cpp_loader_scene_count": 8,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 8 scenes for project 'ui_title'"
+    },
+    {
+      "project_name": "ui_title",
+      "relative_path": "game/TitleE3/ui_title.yncp",
+      "yncp_map_scene_count": 9,
+      "cpp_loader_scene_count": 9,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 9 scenes for project 'ui_title'"
+    },
+    {
+      "project_name": "ui_worldmap",
+      "relative_path": "dlc/Apotos & Shamar Adventure Pack/WorldMap/ui_worldmap.yncp",
+      "yncp_map_scene_count": 35,
+      "cpp_loader_scene_count": 35,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 35 scenes for project 'ui_worldmap'"
+    },
+    {
+      "project_name": "ui_worldmap_help",
+      "relative_path": "dlc/Apotos & Shamar Adventure Pack/WorldMap/ui_worldmap_help.yncp",
+      "yncp_map_scene_count": 3,
+      "cpp_loader_scene_count": 3,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 3 scenes for project 'ui_worldmap_help'"
+    },
+    {
+      "project_name": "ui_worldmap",
+      "relative_path": "dlc/Chun-nan Adventure Pack/WorldMap/ui_worldmap.yncp",
+      "yncp_map_scene_count": 35,
+      "cpp_loader_scene_count": 35,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 35 scenes for project 'ui_worldmap'"
+    },
+    {
+      "project_name": "ui_worldmap_help",
+      "relative_path": "dlc/Chun-nan Adventure Pack/WorldMap/ui_worldmap_help.yncp",
+      "yncp_map_scene_count": 3,
+      "cpp_loader_scene_count": 3,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 3 scenes for project 'ui_worldmap_help'"
+    },
+    {
+      "project_name": "ui_worldmap",
+      "relative_path": "dlc/Empire City & Adabat Adventure Pack/WorldMap/ui_worldmap.yncp",
+      "yncp_map_scene_count": 35,
+      "cpp_loader_scene_count": 35,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 35 scenes for project 'ui_worldmap'"
+    },
+    {
+      "project_name": "ui_worldmap_help",
+      "relative_path": "dlc/Empire City & Adabat Adventure Pack/WorldMap/ui_worldmap_help.yncp",
+      "yncp_map_scene_count": 3,
+      "cpp_loader_scene_count": 3,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 3 scenes for project 'ui_worldmap_help'"
+    },
+    {
+      "project_name": "ui_worldmap",
+      "relative_path": "dlc/Holoska Adventure Pack/WorldMap/ui_worldmap.yncp",
+      "yncp_map_scene_count": 35,
+      "cpp_loader_scene_count": 35,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 35 scenes for project 'ui_worldmap'"
+    },
+    {
+      "project_name": "ui_worldmap_help",
+      "relative_path": "dlc/Holoska Adventure Pack/WorldMap/ui_worldmap_help.yncp",
+      "yncp_map_scene_count": 3,
+      "cpp_loader_scene_count": 3,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 3 scenes for project 'ui_worldmap_help'"
+    },
+    {
+      "project_name": "ui_worldmap",
+      "relative_path": "dlc/Mazuri Adventure Pack/WorldMap/ui_worldmap.yncp",
+      "yncp_map_scene_count": 35,
+      "cpp_loader_scene_count": 35,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 35 scenes for project 'ui_worldmap'"
+    },
+    {
+      "project_name": "ui_worldmap_help",
+      "relative_path": "dlc/Mazuri Adventure Pack/WorldMap/ui_worldmap_help.yncp",
+      "yncp_map_scene_count": 3,
+      "cpp_loader_scene_count": 3,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 3 scenes for project 'ui_worldmap_help'"
+    },
+    {
+      "project_name": "ui_worldmap",
+      "relative_path": "dlc/Spagonia Adventure Pack/WorldMap/ui_worldmap.yncp",
+      "yncp_map_scene_count": 35,
+      "cpp_loader_scene_count": 35,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 35 scenes for project 'ui_worldmap'"
+    },
+    {
+      "project_name": "ui_worldmap_help",
+      "relative_path": "dlc/Spagonia Adventure Pack/WorldMap/ui_worldmap_help.yncp",
+      "yncp_map_scene_count": 3,
+      "cpp_loader_scene_count": 3,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 3 scenes for project 'ui_worldmap_help'"
+    },
+    {
+      "project_name": "ui_worldmap",
+      "relative_path": "game/WorldMap/ui_worldmap.yncp",
+      "yncp_map_scene_count": 35,
+      "cpp_loader_scene_count": 35,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 35 scenes for project 'ui_worldmap'"
+    },
+    {
+      "project_name": "ui_worldmap_help",
+      "relative_path": "game/WorldMap/ui_worldmap_help.yncp",
+      "yncp_map_scene_count": 3,
+      "cpp_loader_scene_count": 3,
+      "only_in_yncp_map": [],
+      "only_in_cpp_loader": [],
+      "status": "parity-ok: both paths agree on 3 scenes for project 'ui_worldmap_help'"
+    }
+  ]
+}

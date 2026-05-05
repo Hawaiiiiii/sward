@@ -58,7 +58,9 @@ $srcDir     = Join-Path $RepoRoot "research_uiux\runtime_reference\src"
 
 # Each entry: source file -> exe name. The CHudSonicStage smoke test
 # links the methods .cpp because the smoke driver and the methods live
-# in separate translation units.
+# in separate translation units. Phase 285 method-body translation
+# units for CGeneralWindow / CLoading / CSaveIcon are also included so
+# their static_asserts and `#include` chains get built every smoke run.
 $targets = @(
     @{
         Sources = @((Join-Path $srcDir "sgfx_hud_csd_project_loader_smoke_test.cpp"))
@@ -68,7 +70,11 @@ $targets = @(
     @{
         Sources = @(
             (Join-Path $srcDir "sgfx_hud_chud_sonic_stage_methods_smoke_test.cpp"),
-            (Join-Path $srcDir "sgfx_hud_chud_sonic_stage_methods.cpp")
+            (Join-Path $srcDir "sgfx_hud_chud_sonic_stage_methods.cpp"),
+            (Join-Path $srcDir "sgfx_hud_chud_pause_methods.cpp"),
+            (Join-Path $srcDir "sgfx_hud_cgeneral_window_methods.cpp"),
+            (Join-Path $srcDir "sgfx_hud_cloading_methods.cpp"),
+            (Join-Path $srcDir "sgfx_hud_csave_icon_methods.cpp")
         )
         Exe     = (Join-Path $OutputDir "sgfx_hud_chud_sonic_stage_methods_smoke_test.exe")
         Args    = @($null)

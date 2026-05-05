@@ -11,7 +11,7 @@
 // compile time. Method bodies are intentionally out of scope; they
 // will be ported in subsequent phases as the recomp flow is decoded.
 //
-// Generated at: 2026-05-05T01:41:56+00:00
+// Generated at: 2026-05-05T06:56:26+00:00
 
 #include <array>
 #include <cstddef>
@@ -71,20 +71,17 @@ namespace sward::ui_runtime::generated::sgfx_hud
     class CGeneralWindow
     {
     public:
-    private: std::array<std::uint8_t, 0xD0> m_padding0000_00D0;  // pre-m_rcGeneral padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0xD0> m_padding0000_00D0;  // pre-m_rcGeneral padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         Chao::CSD::RCPtr<Chao::CSD::CProject> m_rcGeneral;  // +0xD0 Chao::CSD::RCPtr<Chao::CSD::CProject> (type from SWA API header)
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcBg;  // +0xD8 Chao::CSD::RCPtr<Chao::CSD::CScene> (type from SWA API header)
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcWindow;  // +0xE0 Chao::CSD::RCPtr<Chao::CSD::CScene> (type from SWA API header)
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcWindow_2;  // +0xE8 Chao::CSD::RCPtr<Chao::CSD::CScene> (type from SWA API header)
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcWindowSelect;  // +0xF0 Chao::CSD::RCPtr<Chao::CSD::CScene> (type from SWA API header)
         Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcFooter;  // +0xF8 Chao::CSD::RCPtr<Chao::CSD::CScene> (type from SWA API header)
-    private: std::array<std::uint8_t, 0x58> m_padding0100_0158;  // pre-m_Status padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0x58> m_padding0100_0158;  // pre-m_Status padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         be<EWindowStatus> m_Status;  // +0x158 be<EWindowStatus> (type from SWA API header)
         be<uint32_t> m_CursorIndex;  // +0x15C be<uint32_t> (type from SWA API header)
-    private: std::array<std::uint8_t, 0x4> m_padding0160_0164;  // pre-m_SelectedIndex padding (covers SWA base class / SWA_INSERT_PADDING bytes)
-    public:
+        std::array<std::uint8_t, 0x4> m_padding0160_0164;  // pre-m_SelectedIndex padding (covers SWA base class / SWA_INSERT_PADDING bytes)
         be<uint32_t> m_SelectedIndex;  // +0x164 be<uint32_t> (type from SWA API header)
 
         // Phase 270: inline accessors for scalar / enum members.
@@ -109,7 +106,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     static_assert(offsetof(CGeneralWindow, m_CursorIndex) == 0x15C, "CGeneralWindow::m_CursorIndex must remain at +0x15C");
     static_assert(offsetof(CGeneralWindow, m_SelectedIndex) == 0x164, "CGeneralWindow::m_SelectedIndex must remain at +0x164");
 
-    static constexpr std::string_view kGeneratedAt = "2026-05-05T01:41:56+00:00";
+    static constexpr std::string_view kGeneratedAt = "2026-05-05T06:56:26+00:00";
     static constexpr std::string_view kSwaApiHeaderRelpath = "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/GeneralWindow/GeneralWindow.h";
 
 } // namespace sward::ui_runtime::generated::sgfx_hud
