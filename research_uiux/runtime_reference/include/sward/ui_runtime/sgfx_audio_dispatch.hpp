@@ -57,6 +57,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     {
         const unsigned char* bytes = nullptr;
         std::size_t          size = 0;
+        EmbeddedCue          slot = EmbeddedCue::Count; // Count == "no slot"
         bool present() const noexcept { return bytes != nullptr && size > 0; }
     };
 

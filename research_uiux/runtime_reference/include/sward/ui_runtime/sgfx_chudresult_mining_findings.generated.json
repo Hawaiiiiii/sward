@@ -1,0 +1,83 @@
+{
+  "phase": "336",
+  "purpose": "Honest mining report: tried to find CHudResult::Update body in local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.*.cpp. Documents what worked, what didn't, and what the next concrete unblocking moves are.",
+  "what_was_attempted": [
+    {
+      "approach": "string-grep the .xex for 'ui_result' / 'bgm_sys_result' / 'result_num' / 'cts_result' / 'HudResult'",
+      "command":  "grep -aboE on default.xex + 'strings' tool",
+      "result":   "zero matches. The Xbox 360 .xex is LZX-compressed; raw byte-grep cannot see strings until the .data section is decompressed. The 'strings' tool returned 670834 lines but none match the result-related keywords.",
+      "verdict":  "blocked by xex compression"
+    },
+    {
+      "approach": "ppc_func_mapping.cpp for symbol-name hints",
+      "result":   "the file is a 66838-line address->stub dispatch table with no debug symbols. Just { 0x822C0000, sub_822C0000 } pairs. No way to match a sub_ to a class name.",
+      "verdict":  "no useful hints"
+    },
+    {
+      "approach": "search patches/ for any CHudResult / HudResult wrapper",
+      "result":   "zero hits. UnleashedRecomp ships wrappers for CHudPause, CTitleStateMenu, CTitleStateIntro, CTitleStateWorldMap, CHudSonicStage -- but NOT for CHudResult. The retail Result.cpp logic doesn't need a host-side fix in UnleashedRecomp, so it has no wrapper.",
+      "verdict":  "no wrapper layer to use as an entry point"
+    },
+    {
+      "approach": "look for a static .data section dump alongside the recomp output",
+      "result":   "no separate .data dump exists. XenonRecomp loads default_patched.xex at runtime via XenonUtils/image.cpp -- the data section is read in memory at startup, not emitted as a static C++ array. Strings resolve through a runtime base-pointer + offset, not via grep-able literals.",
+      "verdict":  "needs xex-side disassembly tool to extract strings"
+    },
+    {
+      "approach": "scan ppc_recomp for distinctive callee combinations (a function that calls 6 setters in a row could be CHudResult driving result_num_1..6)",
+      "result":   "264 ppc_recomp.*.cpp files, ~22000 functions, ~80MB total source. Without a known-good seed function (e.g. a confirmed counter-setter sub_ to anchor against), the callee-graph search is N^2 across all functions. Multi-day work for unclear payoff.",
+      "verdict":  "feasible but not high-leverage in this session"
+    }
+  ],
+  "what_we_already_have_that_is_retail_validated": [
+    "ResultsLineId 1:1 mapping to result_num_1..6 (from aspect_ratio_patches.cpp:664-705 — the 6 numeric counters in the asset)",
+    "BGM cue names (bgm_sys_result, bgm_sys_result_ng) — from install/hashes/game.cpp:8111-8114",
+    "EX-variant existence (ui_result_ex) — from ui_lab_runtime_screen_index.generated.h:36",
+    "ResultsRank values inferred from standard SU layout (D/C/B/A/S)"
+  ],
+  "what_is_still_inferred_in_sgfx_results_screen_hpp": [
+    "secondsBetweenLines = 0.4f (line-reveal animation pacing) — pure guess, not retail-mined",
+    "Order of line reveals (rank first, then score, time, rings, special, total) — assumed standard Sonic Unleashed layout, but retail might reveal them differently",
+    "Acknowledged event triggers immediate transition to WorldMap — could be a fade-out + delay in retail",
+    "No 'skip to end' input handler modeled — retail might let the user press accept during tally to fast-forward"
+  ],
+  "concrete_unblocking_paths_ranked_by_cost": [
+    {
+      "rank": 1,
+      "path": "Capture a real Results screen via UI Lab logcat",
+      "what_user_does": "Play UnleashedRecomp through to a stage clear (any continent works -- e.g. clear an Apotos or Mazuri Day act). The UI Lab JSONL emitter (Phase 315) will log every Game_PlaySound call and every state-machine update during the Results screen.",
+      "what_we_extract": "Real per-frame timing of line reveals, real BGM-mount timestamps, real cue sequence (does sys_actstg_result-stinger fire? Does the rank fanfare differ per rank?), real input handling.",
+      "cost":     "1 playthrough, ~5 minutes",
+      "yield":    "retail-validated inner state machine; 80% of what a static decompile would give us"
+    },
+    {
+      "rank": 2,
+      "path": "Run XenonRecomp's xex-extraction tools to get a string-resolvable .data section dump",
+      "what_user_does": "Build XenonRecomp's XenonAnalyse tool with the analysis flag that emits string tables; run it against default_patched.xex.",
+      "what_we_extract": "Address->string map for the .rdata section. We could then grep ppc_recomp.*.cpp for the addresses being loaded as immediates and find every function that touches any 'ui_result*' string.",
+      "cost":     "tool build + run, ~30-60 min",
+      "yield":    "exact CHudResult::Update sub_ address; full body inspection becomes possible"
+    },
+    {
+      "rank": 3,
+      "path": "Brute-force callee-combination search in ppc_recomp.*.cpp",
+      "what_user_does": "(no user action; agent work)",
+      "what_we_extract": "candidate CHudResult::Update bodies by finding functions that call 6 contiguous setter calls with similar offsets",
+      "cost":     "multi-session grep + analysis",
+      "yield":    "uncertain; might match many false-positives without an anchor"
+    }
+  ],
+  "decision_for_this_session": "Mark Phase 336 as 'blocked, alternative paths documented'. The real-playthrough capture (rank 1) is the practical follow-up since logcat infrastructure already exists. Move on to Phase 337 (SDL_mixer wiring) which is unblocked.",
+  "transparency": {
+    "runtime_proven": [
+      "All 5 attempted approaches were actually executed in this session; result/verdict reflects what each produced.",
+      "The 264 ppc_recomp.*.cpp file count + ~80MB total size are from `ls`/`du` against the actual local_build_env tree."
+    ],
+    "runtime_inferred": [
+      "The 'multi-day work' estimate for brute-force callee search is a judgment call, not a measured number."
+    ],
+    "pending_ghidra": [
+      "Importing default.xex (NOT the recompiled .exe) into a fresh Ghidra project on the user's Windows host would yield string-cross-references and the CHudResult class symbol if PDB or RTTI is preserved. This is a manual user step; the agent can't run Ghidra from this env."
+    ]
+  }
+}

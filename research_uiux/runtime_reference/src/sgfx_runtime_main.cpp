@@ -17,10 +17,13 @@
 #include "sward/ui_runtime/sgfx_orchestrator.hpp"
 #include "sward/ui_runtime/sgfx_input_layer.hpp"
 #include "sward/ui_runtime/sgfx_audio_dispatch.hpp"
+#include "sward/ui_runtime/sgfx_audio_player.hpp"
 #include "sward/ui_runtime/sgfx_animation_playback.hpp"
 
+#include <chrono>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace ui = sward::ui_runtime::generated::sgfx_hud;
@@ -46,6 +49,9 @@ static int g_screenEnteredCount = 0;
 static int g_screenExitedCount = 0;
 static int g_hostExitCount = 0;
 
+static int g_audioPlayedCount = 0;
+static bool g_silentMode = false;
+
 static void logEvents(const std::vector<ui::SgfxOrchestratorEvent>& events)
 {
     for (const auto& e : events)
@@ -63,10 +69,14 @@ static void logEvents(const std::vector<ui::SgfxOrchestratorEvent>& events)
         case ui::SgfxOrchestratorEventKind::SfxCueRequested:
         {
             const auto cue = ui::lookupEmbeddedCueByName(e.sfxCueName);
+            const bool played = !g_silentMode
+                && ui::sgfxAudioPlayerPlayCue(e.sfxCueName);
+            if (played) ++g_audioPlayedCount;
             std::cout << "[sfx]            cue=" << e.sfxCueName
                       << " on " << screenName(e.screen)
                       << " embedded=" << (cue.present() ? "yes" : "no")
-                      << " size=" << cue.size << "\n";
+                      << " size=" << cue.size
+                      << " played=" << (played ? "yes" : "no") << "\n";
             ++g_sfxFiredCount;
             break;
         }
@@ -295,12 +305,18 @@ static int runFullPlaythroughScenario()
                   << static_cast<int>(o.generalWindow.status) << "\n";
     }
 
+    // Brief drain: let any in-flight cue finish playing through
+    // SDL_mixer's mixer thread before we tear down.
+    if (!g_silentMode && ui::sgfxAudioPlayerIsActive())
+        std::this_thread::sleep_for(std::chrono::milliseconds(800));
+
     std::cout << "\n=== scenario complete. final screen: "
               << screenName(o.current) << " ===\n";
-    std::cout << "  total screen-enters:  " << g_screenEnteredCount << "\n";
-    std::cout << "  total screen-exits:   " << g_screenExitedCount << "\n";
-    std::cout << "  total SFX cues fired: " << g_sfxFiredCount << "\n";
-    std::cout << "  host-exits requested: " << g_hostExitCount << "\n";
+    std::cout << "  total screen-enters:    " << g_screenEnteredCount << "\n";
+    std::cout << "  total screen-exits:     " << g_screenExitedCount << "\n";
+    std::cout << "  total SFX cues fired:   " << g_sfxFiredCount << "\n";
+    std::cout << "  total cues audibly played: " << g_audioPlayedCount << "\n";
+    std::cout << "  host-exits requested:   " << g_hostExitCount << "\n";
     return 0;
 }
 
@@ -310,8 +326,24 @@ int main(int argc, char** argv)
     std::cout << "  embedded SFX cues: "
               << static_cast<int>(ui::EmbeddedCue::Count) << "\n";
 
-    if (argc > 1 && std::string(argv[1]) == "--scenario-only")
-        return runFullPlaythroughScenario();
+    // CLI: --silent disables SDL_mixer init (useful for CI / headless).
+    for (int i = 1; i < argc; ++i)
+    {
+        if (std::string(argv[i]) == "--silent") g_silentMode = true;
+    }
 
-    return runFullPlaythroughScenario();
+    if (!g_silentMode)
+    {
+        const bool ok = ui::sgfxAudioPlayerInit();
+        std::cout << "  SDL_mixer init: " << (ok ? "OK" : "FAILED (running silent)") << "\n";
+        if (!ok) g_silentMode = true;
+    }
+    else
+    {
+        std::cout << "  SDL_mixer: SKIPPED (--silent)\n";
+    }
+
+    const int rc = runFullPlaythroughScenario();
+    ui::sgfxAudioPlayerShutdown();
+    return rc;
 }

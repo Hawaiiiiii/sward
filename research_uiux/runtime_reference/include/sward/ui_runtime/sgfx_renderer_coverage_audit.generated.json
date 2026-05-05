@@ -1,0 +1,89 @@
+{
+  "phase": "335",
+  "purpose": "Native CSD renderer coverage audit across every CSD project the runtime loads. Cross-references three pre-existing reports (loader parity, all-screens render, asset binding) and classifies the 8.8% of skipped draw commands so we know which are legitimate vs which would be real renderer gaps.",
+  "input_reports": [
+    "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_loader_parity_report.generated.json",
+    "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_all_screens_render_report.generated.json",
+    "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_hud_asset_binding_validation.generated.json"
+  ],
+  "headline_numbers": {
+    "projects_loaded_ok":            41,
+    "projects_with_loader_errors":   0,
+    "scenes_total":                  522,
+    "draw_commands_total":           7530,
+    "draw_commands_drawn":           6869,
+    "draw_commands_skipped":         661,
+    "draw_command_coverage_pct":     91.22,
+    "scenes_with_zero_drawn":        42,
+    "asset_bindings_validated_ok":   4,
+    "asset_bindings_failed":         0
+  },
+  "skip_classification": {
+    "phase_291_sanity_cap_skips": {
+      "count_scenes":   32,
+      "rule":           "renderer skips a single-cast scene whose post-base-scale destination size exceeds 4x the canvas (sgfx_hud_native_csd_renderer.hpp:544)",
+      "what_these_are": "container scenes that span 'all of asset space' by design (e.g. cts_stage_select, cts_choices_bg in ui_worldmap; unleash_bg, life_bg in ui_playscreen_ev). The container's *children* render via OTHER scenes; rendering the container as a single quad would draw a giant background slab over everything.",
+      "verdict":        "correct -- not a renderer gap"
+    },
+    "text_rendering_not_implemented": {
+      "count_scenes":   10,
+      "scene_names":    ["help_chara_1", "help_chara_2", "help_chara_3", "help_text_area (x7 DLC variants)"],
+      "what_these_are": "scenes whose content is text (help-screen captions, world-map help body text). The native CSD renderer does not implement font/text rendering yet -- CSD ships separate font tables that get composited by the runtime, not the static asset.",
+      "verdict":        "known gap -- needs a follow-up phase to implement CSD font rendering"
+    }
+  },
+  "per_screen_health": [
+    {"screen_group": "loading",   "best_pct": 97.5,  "worst_pct": 61.5,  "blank_scenes": 0,  "notes": "ui_loading at 97.5%; ui_start at 61.5% (10 of 26 commands skipped, mostly multi-language splash text)"},
+    {"screen_group": "title",     "best_pct": 98.1,  "worst_pct": 95.5,  "blank_scenes": 2,  "notes": "ui_title 98.1%, ui_mainmenu 95.5%. Single 'progress' scene in ui_title is empty (text-only loading bar)"},
+    {"screen_group": "world_map", "best_pct": 95.0,  "worst_pct": 40.0,  "blank_scenes_per_project": 4, "notes": "ui_worldmap projects ALL render at 95% across 8 DLC + base variants (32 blank scenes total, all are choices/select containers). ui_worldmap_help is the 40% outlier (text-only help body)."},
+    {"screen_group": "pause",     "best_pct": 88.1,  "worst_pct": 25.0,  "blank_scenes": 3,  "notes": "ui_pause 88%, ui_general 84%. ui_help 25% (3 of 4 scenes are help_chara_* text)"},
+    {"screen_group": "result",    "best_pct": 93.9,  "worst_pct": 82.9,  "blank_scenes": 0,  "notes": "ui_result 85%, ui_result_ex 83%, ui_itemresult 94%. All scenes draw. result_num_1..6 visible counters all rendering."},
+    {"screen_group": "sonic_hud", "best_pct": 82.1,  "worst_pct": 61.3,  "blank_scenes_evilsonic": 2, "notes": "ui_playscreen 82% (Day Sonic), ui_playscreen_ev 74% (Werehog). Boss HUD variants 61-67% (lower because boss has more dynamic content)"},
+    {"screen_group": "hub_town",  "best_pct": 93.5,  "worst_pct": 48.4,  "blank_scenes": 0,  "notes": "ui_townscreen 94%, ui_balloon 73%, ui_shop 73%. ui_missionscreen 48% (lots of text)"},
+    {"screen_group": "status",    "best_pct": 83.7,  "worst_pct": 83.7,  "blank_scenes": 0,  "notes": "ui_status fully populated; 17% of skips are likely cells outside the canvas frame (status overlay is large)"}
+  ],
+  "verdict_per_in_scope_screen": {
+    "Title":      "renderer covers visual layout fully; only a tiny 'progress' text-only scene is empty",
+    "Loading":    "ui_loading 97.5% drawn -- renderer is essentially complete for this screen",
+    "WorldMap":   "ui_worldmap 95% drawn across all 8 continent variants; 4 blank scenes per variant are stage-select containers (children render correctly)",
+    "StageHud":   "ui_playscreen 82% Day, 74% Werehog -- renderer covers gauges, counters, ring icon. Skips are mostly multi-state cell variants only one is shown at a time.",
+    "Pause":      "ui_pause 88% drawn -- core menu visible. Skips are dialog-frame variants (different sizes per context).",
+    "Results":    "All ui_result scenes draw at 83-94%. result_num_1..6 counters render. No blank scenes.",
+    "Hub":        "Town UI projects render at 73-94%. ui_townscreen 94% (the navigation overlay). Balloons + shop have multi-state cells.",
+    "GeneralWindow": "ui_general 84% drawn. Modal overlay frames render correctly."
+  },
+  "actionable_gaps": [
+    {
+      "id": "FONT-1",
+      "severity": "medium",
+      "what":   "Native CSD renderer does not implement font/text rendering",
+      "evidence": "10 zero-drawn scenes (help_chara_1/2/3, help_text_area x7). All have 1x1 normalized bounds and 1 draw command that renders nothing.",
+      "scope_of_impact": "ui_help screen looks like an empty frame; ui_worldmap_help body text doesn't appear",
+      "what_unblocks_it": "Implement CSD font glyph rendering (SDDFTBL font tables in the asset) -- separate phase"
+    },
+    {
+      "id": "MULTILANG-1",
+      "severity": "low",
+      "what":    "ui_start splash screen multi-language variants partially skip",
+      "evidence": "ui_start renders at 61.5%; the per-language headline panels are stacked and only one shows at a time, but the renderer doesn't pick a single language",
+      "what_unblocks_it": "Add a language selector to the renderer (host picks JP/EN/etc, renderer skips the others). Low priority -- doesn't affect any in-scope screen except the loading-start splash."
+    }
+  ],
+  "transparency": {
+    "runtime_proven": [
+      "All loader parity numbers (41/41 projects) come from sgfx_hud_csd_project_loader_smoke_test.exe execution captured in the parity report",
+      "All render command counts come from sgfx_hud_native_csd_renderer_smoke_test.exe execution captured in the all-screens render report",
+      "Asset binding validations (4/4) hit real .yncp byte streams and verified scene presence"
+    ],
+    "runtime_inferred": [
+      "Per-screen-group 'best/worst pct' summary in this audit is computed from the all-screens report at audit time, not by re-running the renderer; the underlying numbers are from the last renderer run (2026-05-05)",
+      "Skip-classification ('container vs text vs sanity-cap') is inferred from scene-bounds + scene names; not all 32 'huge bounds' skips have been individually verified to be containers (sample-checked: cts_stage_select, cts_choices_bg, unleash_bg)"
+    ],
+    "pending_ghidra": []
+  },
+  "next_phase_actions": [
+    "Phase 336: ppc_recomp.*.cpp mining for CHudResult inner state",
+    "Phase 337: SDL_mixer wiring",
+    "Future: implement CSD font rendering to lift ui_help / ui_worldmap_help / ui_missionscreen / ui_start out of partial coverage"
+  ]
+}

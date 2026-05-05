@@ -155,15 +155,19 @@ target_link_libraries(sward_su_ui_asset_renderer
         gdiplus
 )
 
-# Phase 334: standalone sgfx_runtime.exe -- drives every screen
+# Phase 334 / 337: standalone sgfx_runtime.exe -- drives every screen
 # state machine through a full retail playthrough scenario without
 # UnleashedRecomp in the loop. Compiles audio dispatch + the
-# embedded OGG cue blobs from UnleashedRecomp/res/sounds.
+# embedded OGG cue blobs from UnleashedRecomp/res/sounds. Phase 337
+# adds SDL_mixer-backed audio playback (SDL2-static + SDL2_mixer-static
+# linked when SDL2_LIBS_PATH is provided; otherwise the runtime
+# falls back to silent mode and just logs cue requests).
 set(_SGFX_RUNTIME_RES_SOUNDS
     "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/UnleashedRecomp")
 add_executable(sgfx_runtime
     src/sgfx_runtime_main.cpp
     src/sgfx_audio_dispatch.cpp
+    src/sgfx_audio_player.cpp
     "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_worldmap_cursor.ogg.c"
     "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_worldmap_finaldecide.ogg.c"
     "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausecansel.ogg.c"
@@ -177,9 +181,25 @@ target_include_directories(sgfx_runtime
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         "${_SGFX_RUNTIME_RES_SOUNDS}"
+        "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL/include"
+        "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL/include/SDL2"
+        "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL_mixer/include"
 )
 
 target_compile_features(sgfx_runtime PRIVATE cxx_std_20)
+
+set(_SGFX_RUNTIME_SDL_BUILD
+    "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/b/ui_lab_runtime/thirdparty")
+if(EXISTS "${_SGFX_RUNTIME_SDL_BUILD}/SDL/SDL2-static.lib")
+    target_link_libraries(sgfx_runtime PRIVATE
+        "${_SGFX_RUNTIME_SDL_BUILD}/SDL_mixer/SDL2_mixer-static.lib"
+        "${_SGFX_RUNTIME_SDL_BUILD}/SDL_mixer/external/vorbis/lib/vorbisfile.lib"
+        "${_SGFX_RUNTIME_SDL_BUILD}/SDL_mixer/external/vorbis/lib/vorbis.lib"
+        "${_SGFX_RUNTIME_SDL_BUILD}/SDL_mixer/external/ogg/ogg.lib"
+        "${_SGFX_RUNTIME_SDL_BUILD}/SDL/SDL2-static.lib"
+        winmm imm32 ole32 oleaut32 version setupapi
+    )
+endif()
 
 # Phase 334: state-machine smoke test target. Header-only state
 # machines + free-standing test driver -- verifies retail-mined

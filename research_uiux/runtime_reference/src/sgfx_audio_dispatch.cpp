@@ -53,7 +53,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     {
         for (const auto& row : kCueTable)
             if (row.name == name)
-                return {row.bytes, row.size};
+                return {row.bytes, row.size, row.slot};
         return {};
     }
 
@@ -61,7 +61,7 @@ namespace sward::ui_runtime::generated::sgfx_hud
     {
         for (const auto& row : kCueTable)
             if (row.slot == slot)
-                return {row.bytes, row.size};
+                return {row.bytes, row.size, row.slot};
         return {};
     }
 } // namespace sward::ui_runtime::generated::sgfx_hud
