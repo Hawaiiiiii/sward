@@ -356,7 +356,11 @@ def main(argv: list[str] | None = None) -> int:
         "--fit-to-bounds",
         action="store_true",
         help="Translate + uniformly scale all casts so the scene's bounding box fills the canvas. "
-             "Use this for first-pixel verification when the world coordinate convention is unknown.",
+             "Use this for first-pixel verification when the world coordinate convention is unknown. "
+             "Without this flag, casts are placed at "
+             "(base_translation_x + scene_left, base_translation_y + scene_top) * canvas, "
+             "which is the natural world-coord interpretation for Hedgehog CSD scenes "
+             "(matches Sonic Unleashed's 1280x720 logical HUD canvas at retail asset granularity).",
     )
     args = parser.parse_args(argv)
 
