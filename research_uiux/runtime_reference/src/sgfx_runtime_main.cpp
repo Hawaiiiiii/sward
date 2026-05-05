@@ -305,6 +305,58 @@ static int runFullPlaythroughScenario()
                   << static_cast<int>(o.generalWindow.status) << "\n";
     }
 
+    // Phase 341 Werehog HUD overlays: combo + chance attack + target.
+    o.evilStageHud.base.mode = ui::StageMode::Werehog;
+    {
+        ui::evilStageHudIncrementCombo(o.evilStageHud);
+        ui::evilStageHudIncrementCombo(o.evilStageHud);
+        ui::evilStageHudIncrementCombo(o.evilStageHud);
+        std::cout << "[overlay] EvilStageHud combo=" << o.evilStageHud.combo.comboCount
+                  << " visible=" << o.evilStageHud.combo.isVisible << "\n";
+    }
+    {
+        ui::evilStageHudShowChancePrompt(o.evilStageHud, ui::EvilGuideType::B);
+        ui::StageHudInput in; in.deltaSeconds = 0.05f;
+        ui::updateEvilStageHudOneFrame(o.evilStageHud, in, /*chanceTapped*/true);
+        std::cout << "[overlay] EvilStageHud chance attack phase="
+                  << static_cast<int>(o.evilStageHud.chanceAttack.phase) << " (3 = Success)\n";
+    }
+    {
+        ui::evilStageHudAcquireTarget(o.evilStageHud, 320.0f, 180.0f);
+        ui::StageHudInput in; in.deltaSeconds = 0.5f;
+        ui::updateEvilStageHudOneFrame(o.evilStageHud, in, false);
+        std::cout << "[overlay] EvilStageHud target lockProgress="
+                  << o.evilStageHud.target.lockProgress << "\n";
+    }
+
+    // Phase 341 Status / Skill Upgrade overlay walk.
+    {
+        ui::openStatusOverlay(o.statusOverlay, /*availablePoints*/100);
+        ui::hoverStatusSkill(o.statusOverlay, 7);
+        ui::StatusInput in1; in1.acceptTapped = true;
+        ui::updateStatusOverlayOneFrame(o.statusOverlay, in1);
+        o.statusOverlay.pendingCostPoints = 20;
+        ui::StatusInput in2; in2.acceptTapped = true;
+        ui::updateStatusOverlayOneFrame(o.statusOverlay, in2);
+        ui::StatusInput in3; in3.deltaSeconds = 1.5f;
+        ui::updateStatusOverlayOneFrame(o.statusOverlay, in3);
+        std::cout << "[overlay] StatusOverlay phase="
+                  << static_cast<int>(o.statusOverlay.phase)
+                  << " pointsLeft=" << o.statusOverlay.availableSkillPoints << "\n";
+    }
+
+    // Phase 341 HelpWindow walk.
+    {
+        ui::openHelpWindow(o.helpWindow, /*topicId*/0, /*topicCount*/3);
+        ui::HelpWindowInput in1; in1.deltaSeconds = 0.3f;
+        ui::updateHelpWindowOneFrame(o.helpWindow, in1);
+        ui::HelpWindowInput in2; in2.rightTapped = true;
+        ui::updateHelpWindowOneFrame(o.helpWindow, in2);
+        std::cout << "[overlay] HelpWindow phase="
+                  << static_cast<int>(o.helpWindow.phase)
+                  << " topicId=" << o.helpWindow.currentTopicId << "\n";
+    }
+
     // Brief drain: let any in-flight cue finish playing through
     // SDL_mixer's mixer thread before we tear down.
     if (!g_silentMode && ui::sgfxAudioPlayerIsActive())

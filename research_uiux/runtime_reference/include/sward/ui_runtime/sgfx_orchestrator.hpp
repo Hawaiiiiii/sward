@@ -47,6 +47,9 @@
 #include "sgfx_save_icon.hpp"
 #include "sgfx_sound_admin.hpp"
 #include "sgfx_evil_hud_guide.hpp"
+#include "sgfx_hud_evil_stage.hpp"
+#include "sgfx_hud_status.hpp"
+#include "sgfx_help_window.hpp"
 
 #include <cstdint>
 #include <string>
@@ -119,13 +122,21 @@ namespace sward::ui_runtime::generated::sgfx_hud
         ResultsState     results;
         HubState         hub;
 
-        // Phase 334: cross-cutting overlays + audio admin that any
-        // active screen can poke. They live on the orchestrator so
-        // the host has one root to drive the whole UI/UX.
+        // Phase 334 / 341: cross-cutting overlays + audio admin that
+        // any active screen can poke. They live on the orchestrator
+        // so the host has one root to drive the whole UI/UX.
         EvilHudGuideState  evilHudGuide;     // Werehog QTE prompts
-        GeneralWindowState generalWindow;    // modal confirm/help windows
+        GeneralWindowState generalWindow;    // modal confirm dialogs
+        HelpWindowState    helpWindow;       // distinct help overlay (Phase 341)
         SaveIconState      saveIcon;         // save-disk overlay
         SgfxBgmAdmin       bgmAdmin;         // BGM channel volumes + cues
+        // Phase 341: Werehog stage HUD overlay set. Active when
+        // current = StageHud AND stageHud.mode == Werehog.
+        EvilStageHudState  evilStageHud;
+        // Phase 341: Status / Skill Upgrade overlay. Reachable as a
+        // sub-state of Pause -> Status (host opens it; not in the
+        // screen graph as a top-level destination).
+        StatusState        statusOverlay;
     };
 
     namespace detail::orchestrator
