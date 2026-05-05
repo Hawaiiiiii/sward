@@ -19,6 +19,10 @@
 #include "sward/ui_runtime/sgfx_hud_status.hpp"
 #include "sward/ui_runtime/sgfx_help_window.hpp"
 #include "sward/ui_runtime/sgfx_obj_balloon.hpp"
+#include "sward/ui_runtime/sgfx_hud_mission.hpp"
+#include "sward/ui_runtime/sgfx_hud_boss.hpp"
+#include "sward/ui_runtime/sgfx_hud_ex_qte.hpp"
+#include "sward/ui_runtime/sgfx_hud_media_room.hpp"
 
 #include <iostream>
 #include <string>
@@ -1108,6 +1112,215 @@ static void testObjBalloonProtocol()
     }
 }
 
+// ----- Phase 348: Mission HUD trio -----
+static void testMissionHud()
+{
+    using namespace ui;
+    std::cout << "\n== mission HUD ==\n";
+    MissionState s;
+    expectEq(s.phase, MissionPhase::Inactive, "mission.starts Inactive");
+
+    // CollectRings 100 mission.
+    startMission(s, MissionType::CollectRings, /*target*/100, /*timeLimit*/0);
+    expectEq(s.phase, MissionPhase::InStage, "mission.advanced to InStage");
+    {
+        const auto evs = applyMissionProgress(s, 50);
+        expectEq(s.currentValue, 50, "mission.progress=50");
+        expectEq(evs[0].kind, MissionEventKind::ProgressUpdated, "mission.ProgressUpdated");
+    }
+    {
+        const auto evs = applyMissionProgress(s, 60);
+        expectEq(s.phase, MissionPhase::Finished, "mission.Finished");
+        bool sawCompleted = false;
+        for (const auto& e : evs)
+            if (e.kind == MissionEventKind::Completed) sawCompleted = true;
+        expect(sawCompleted, "mission.Completed event");
+    }
+
+    // Time-limited mission failure path.
+    {
+        MissionState s2;
+        startMission(s2, MissionType::BeatTime, /*target*/1, /*timeLimit*/5.0f);
+        MissionInput in; in.deltaSeconds = 6.0f;
+        const auto evs = updateMissionOneFrame(s2, in);
+        expectEq(s2.phase, MissionPhase::Failed, "mission.Failed on timeout");
+        expectEq(evs[0].kind, MissionEventKind::Failed, "mission.Failed event");
+        // Cursor cycle on fail panel.
+        MissionInput in2; in2.downTapped = true;
+        const auto evs2 = updateMissionOneFrame(s2, in2);
+        expectEq(s2.failedCursor, MissionFailedChoice::Quit, "mission.cursor=Quit");
+        expectEq(evs2[0].kind, MissionEventKind::FailedChoiceMoved, "mission.ChoiceMoved");
+        // Confirm.
+        MissionInput in3; in3.acceptTapped = true;
+        const auto evs3 = updateMissionOneFrame(s2, in3);
+        expectEq(evs3[0].kind, MissionEventKind::FailedChoiceConfirmed, "mission.ChoiceConfirmed");
+        expectEq(s2.phase, MissionPhase::Inactive, "mission.Inactive after confirm");
+    }
+}
+
+// ----- Phase 349: Boss HUD family -----
+static void testBossHud()
+{
+    using namespace ui;
+    std::cout << "\n== boss HUD ==\n";
+    // Standard boss vitality.
+    {
+        BossHudState s;
+        s.maxVitality = 100; s.currentVitality = 100;
+        applyBossDamage(s, 30);
+        expectEq(s.currentVitality, 70, "boss.HP=70 after 30 dmg");
+        const auto evs = applyBossDamage(s, 100);
+        expectEq(s.currentVitality, 0, "boss.HP clamped to 0");
+        bool sawDefeated = false;
+        for (const auto& e : evs)
+            if (e.kind == BossHudEventKind::BossDefeated) sawDefeated = true;
+        expect(sawDefeated, "boss.BossDefeated fired");
+    }
+    // SuperSonic ring drain.
+    {
+        BossHudState s;
+        s.kind = BossKind::SuperSonic;
+        s.superSonicRingsRemaining = 50;
+        s.superSonicDrainPerSecond = 25.0f;
+        tickSuperSonicDrain(s, 1.0f);
+        expectEq(s.superSonicRingsRemaining, 25, "supersonic.rings=25 after 1s");
+        const auto evs = tickSuperSonicDrain(s, 2.0f);
+        expectEq(s.superSonicRingsRemaining, 0, "supersonic.rings exhausted");
+        bool sawExhausted = false;
+        for (const auto& e : evs)
+            if (e.kind == BossHudEventKind::SuperSonicRingsExhausted) sawExhausted = true;
+        expect(sawExhausted, "supersonic.RingsExhausted fired");
+    }
+    // FinalDarkGaia phase advance.
+    {
+        BossHudState s;
+        s.kind = BossKind::FinalDarkGaia;
+        s.maxVitality = 100; s.currentVitality = 50;
+        const auto evs = advanceDarkGaiaPhase(s);
+        expectEq(s.darkGaiaPhase, std::uint8_t{1}, "darkgaia.phase=1");
+        expectEq(s.currentVitality, 100, "darkgaia.HP refreshed");
+        expectEq(evs[0].kind, BossHudEventKind::PhaseAdvanced, "darkgaia.PhaseAdvanced");
+    }
+    // BossNamePlate auto-hide.
+    {
+        BossNamePlateState np;
+        np.autoFadeSeconds = 0.5f;
+        showBossNamePlate(np);
+        expect(np.isVisible, "nameplate.visible after show");
+        tickBossNamePlate(np, 1.0f);
+        expect(!np.isVisible, "nameplate.auto-hidden after fade");
+    }
+}
+
+// ----- Phase 350: Tornado Defense (CHudExQte) -----
+static void testExQte()
+{
+    using namespace ui;
+    std::cout << "\n== ex qte (tornado defense) ==\n";
+    ExQteState s;
+
+    // Spawn an A-button slot, hit it.
+    {
+        const auto evs = spawnExQteSlot(s, EvilGuideType::A, 100.0f, 200.0f);
+        expectEq(evs[0].kind, ExQteEventKind::SlotShown, "exqte.SlotShown");
+        expectEq(s.slots[0].phase, ExQteSlotPhase::Active, "exqte.slot 0 active");
+    }
+    {
+        ExQteInput in; in.aTapped = true; in.deltaSeconds = 0.05f;
+        const auto evs = updateExQteOneFrame(s, in);
+        expectEq(s.slots[0].phase, ExQteSlotPhase::Success, "exqte.slot 0 success");
+        expectEq(s.score, 100, "exqte.score=100");
+        expectEq(s.hitsInARow, 1, "exqte.hitsInARow=1");
+        bool sawHit = false;
+        for (const auto& e : evs)
+            if (e.kind == ExQteEventKind::SlotHit) sawHit = true;
+        expect(sawHit, "exqte.SlotHit");
+    }
+    // Spawn a B slot, time it out -> Failed + combo reset.
+    clearExQteSlot(s, 0);
+    spawnExQteSlot(s, EvilGuideType::B, 200.0f, 300.0f, /*window*/0.5f);
+    {
+        ExQteInput in; in.deltaSeconds = 1.0f;
+        const auto evs = updateExQteOneFrame(s, in);
+        expectEq(s.slots[0].phase, ExQteSlotPhase::Failed, "exqte.slot Failed on timeout");
+        expectEq(s.hitsInARow, 0, "exqte.hitsInARow reset to 0");
+        bool sawMissed = false;
+        for (const auto& e : evs)
+            if (e.kind == ExQteEventKind::SlotMissed) sawMissed = true;
+        expect(sawMissed, "exqte.SlotMissed");
+    }
+    // Multiple slots active simultaneously.
+    {
+        ExQteState s2;
+        spawnExQteSlot(s2, EvilGuideType::A, 0.0f, 0.0f);
+        spawnExQteSlot(s2, EvilGuideType::B, 0.0f, 0.0f);
+        spawnExQteSlot(s2, EvilGuideType::X, 0.0f, 0.0f);
+        expectEq(s2.slots[0].phase, ExQteSlotPhase::Active, "exqte.multi.s0");
+        expectEq(s2.slots[1].phase, ExQteSlotPhase::Active, "exqte.multi.s1");
+        expectEq(s2.slots[2].phase, ExQteSlotPhase::Active, "exqte.multi.s2");
+    }
+}
+
+// ----- Phase 351: MediaRoom navigation -----
+static void testMediaRoom()
+{
+    using namespace ui;
+    std::cout << "\n== media room ==\n";
+    MediaRoomState s;
+    expectEq(s.phase, MediaRoomPhase::Closed, "mediaroom.starts Closed");
+
+    {
+        const auto evs = openMediaRoom(s);
+        expectEq(s.phase, MediaRoomPhase::SelectBook, "mediaroom.opens to SelectBook");
+        expectEq(evs[0].kind, MediaRoomEventKind::Opened, "mediaroom.Opened");
+    }
+    // Accept on SelectBook -> SelectCountry.
+    {
+        MediaRoomInput in; in.acceptTapped = true;
+        const auto evs = updateMediaRoomOneFrame(s, in);
+        expectEq(s.phase, MediaRoomPhase::SelectCountry, "mediaroom.SelectCountry");
+        expectEq(evs[0].kind, MediaRoomEventKind::BookSelected, "mediaroom.BookSelected");
+    }
+    // Accept on SelectCountry -> ItemList.
+    {
+        MediaRoomInput in; in.acceptTapped = true;
+        const auto evs = updateMediaRoomOneFrame(s, in);
+        expectEq(s.phase, MediaRoomPhase::ItemList, "mediaroom.ItemList");
+        expectEq(evs[0].kind, MediaRoomEventKind::CountrySelected, "mediaroom.CountrySelected");
+    }
+    // Item navigation.
+    s.itemCount = 10;
+    s.hoveredItemIndex = 0;
+    {
+        MediaRoomInput in; in.downTapped = true;
+        const auto evs = updateMediaRoomOneFrame(s, in);
+        expectEq(s.hoveredItemIndex, 1, "mediaroom.cursor=1");
+        expectEq(evs[0].kind, MediaRoomEventKind::ItemHovered, "mediaroom.ItemHovered");
+    }
+    // Detail open + close.
+    {
+        MediaRoomInput in; in.acceptTapped = true;
+        const auto evs = updateMediaRoomOneFrame(s, in);
+        expectEq(s.phase, MediaRoomPhase::Detail, "mediaroom.Detail");
+        expectEq(evs[0].kind, MediaRoomEventKind::ItemDetailOpened, "mediaroom.DetailOpened");
+    }
+    {
+        MediaRoomInput in; in.cancelTapped = true;
+        const auto evs = updateMediaRoomOneFrame(s, in);
+        expectEq(s.phase, MediaRoomPhase::ItemList, "mediaroom.back to ItemList");
+        expectEq(evs[0].kind, MediaRoomEventKind::ItemDetailClosed, "mediaroom.DetailClosed");
+    }
+    // Cancel cascade up to Closed.
+    {
+        MediaRoomInput in; in.cancelTapped = true;
+        updateMediaRoomOneFrame(s, in); // ItemList -> SelectCountry
+        updateMediaRoomOneFrame(s, in); // SelectCountry -> SelectBook
+        const auto evs = updateMediaRoomOneFrame(s, in); // SelectBook -> Closed
+        expectEq(s.phase, MediaRoomPhase::Closed, "mediaroom.cancel cascades to Closed");
+        expectEq(evs[0].kind, MediaRoomEventKind::Closed, "mediaroom.Closed");
+    }
+}
+
 int main()
 {
     testPauseMenu();
@@ -1130,6 +1343,10 @@ int main()
     testStatusOverlay();
     testHelpWindow();
     testObjBalloonProtocol();
+    testMissionHud();
+    testBossHud();
+    testExQte();
+    testMediaRoom();
     std::cout << "\nfailures: " << g_failures << "\n";
     return g_failures == 0 ? 0 : 1;
 }
