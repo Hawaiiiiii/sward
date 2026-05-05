@@ -204,20 +204,29 @@ def composite_command(
     norm_y = (by + st + fit_offset[1]) * fit_scale[1]
     world_x = norm_x * canvas_w
     world_y = norm_y * canvas_h
-    # Runtime override: emulates Chao::CSD::CCastNode::SetPosition called by
+    # Runtime override: emulates Chao::CSD::CCastNode setters called by
     # screen-state-machine code (see UnleashedRecomp's
     # SWA::CTitleStateWorldMap::Update). Per-scene override sets the scene
-    # anchor in pixel space; per-cast world position becomes anchor + cast_offset.
+    # anchor + scale in pixel space; per-cast world position becomes
+    # anchor + cast_offset * scale, and per-cast size also gets multiplied.
+    runtime_scale_x = 1.0
+    runtime_scale_y = 1.0
     if runtime_overrides:
         scene_name = cmd.get("scene_name", "")
         ov = runtime_overrides.get(scene_name)
         if ov is not None:
             anchor_x_px = float(ov.get("anchor_x_px", 0.0))
             anchor_y_px = float(ov.get("anchor_y_px", 0.0))
-            cast_local_x_px = float(cmd.get("scene_left", 0.0)) * canvas_w
-            cast_local_y_px = float(cmd.get("scene_top", 0.0)) * canvas_h
+            runtime_scale_x = float(ov.get("scale_x", 1.0))
+            runtime_scale_y = float(ov.get("scale_y", 1.0))
+            cast_local_x_px = float(cmd.get("scene_left", 0.0)) * canvas_w * runtime_scale_x
+            cast_local_y_px = float(cmd.get("scene_top", 0.0)) * canvas_h * runtime_scale_y
             world_x = anchor_x_px + cast_local_x_px
             world_y = anchor_y_px + cast_local_y_px
+            if (runtime_scale_x != 1.0 or runtime_scale_y != 1.0) and crop.size != (1, 1):
+                new_w = max(1, int(round(crop.size[0] * runtime_scale_x)))
+                new_h = max(1, int(round(crop.size[1] * runtime_scale_y)))
+                crop = crop.resize((new_w, new_h), Image.NEAREST)
     px = int(round(world_x))
     py = int(round(world_y))
 

@@ -50,22 +50,47 @@ def parse_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def harvest_setpositions(setposition_rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Per node_address, keep the last observed (x, y, hits, last_frame)."""
+    """Per node_address, keep the last observed setter values across kinds.
+
+    The probe writes one entry per setter call (Phase 294a: position only;
+    Phase 294b: position, scale, uniformScaleOrAlpha). Each call writes a
+    `kind` field; older logs without `kind` are treated as position."""
     latest: dict[str, dict[str, Any]] = {}
     for row in setposition_rows:
         node = row.get("node")
         if not node:
             continue
-        latest[node] = {
+        kind = row.get("kind", "position")
+        x = float(row.get("x", 0.0))
+        y_value = row.get("y")
+        rec = latest.setdefault(node, {
             "node_address": node,
-            "anchor_x_px": float(row.get("x", 0.0)),
-            "anchor_y_px": float(row.get("y", 0.0)),
-            "observed_hits": int(row.get("hits", 0)),
-            "last_observed_frame": int(row.get("frame", 0)),
-            "last_observed_time": float(row.get("time", 0.0)),
+            "anchor_x_px": 0.0,
+            "anchor_y_px": 0.0,
+            "scale_x": 1.0,
+            "scale_y": 1.0,
+            "uniform_at_52": 1.0,
+            "observed_hits_position": 0,
+            "observed_hits_scale": 0,
+            "observed_hits_uniform": 0,
+            "last_observed_frame": 0,
+            "last_observed_time": 0.0,
             "hook": row.get("hook", ""),
             "target_token": row.get("target", ""),
-        }
+        })
+        if kind == "position":
+            rec["anchor_x_px"] = x
+            rec["anchor_y_px"] = float(y_value) if y_value is not None else 0.0
+            rec["observed_hits_position"] = int(row.get("hits", 0))
+        elif kind == "scale":
+            rec["scale_x"] = x
+            rec["scale_y"] = float(y_value) if y_value is not None else 1.0
+            rec["observed_hits_scale"] = int(row.get("hits", 0))
+        elif kind == "uniformScaleOrAlpha":
+            rec["uniform_at_52"] = x
+            rec["observed_hits_uniform"] = int(row.get("hits", 0))
+        rec["last_observed_frame"] = max(int(rec["last_observed_frame"]), int(row.get("frame", 0)))
+        rec["last_observed_time"] = max(float(rec["last_observed_time"]), float(row.get("time", 0.0)))
     return latest
 
 
@@ -154,6 +179,14 @@ def main(argv: list[str] | None = None) -> int:
 
     enriched.sort(key=lambda r: (r["scene_name"], r["node_address"]))
 
+    def hit_total(r: dict[str, Any]) -> int:
+        return (
+            int(r.get("observed_hits_position", 0))
+            + int(r.get("observed_hits_scale", 0))
+            + int(r.get("observed_hits_uniform", 0))
+            + int(r.get("observed_hits", 0))
+        )
+
     summary = {
         "phase": "294",
         "purpose": "Harvested runtime SetPosition (sub_830BB3D0) values from a live UnleashedRecomp session. Each entry is a CCastNode anchor that the screen state machine writes every frame; we keep the steady-state (last observed) value as the effective runtime override for the human-readable port.",
@@ -172,12 +205,17 @@ def main(argv: list[str] | None = None) -> int:
                     "node_address": r["node_address"],
                     "anchor_x_px": r["anchor_x_px"],
                     "anchor_y_px": r["anchor_y_px"],
-                    "observed_hits": r["observed_hits"],
+                    "scale_x": r.get("scale_x", 1.0),
+                    "scale_y": r.get("scale_y", 1.0),
+                    "uniform_at_52": r.get("uniform_at_52", 1.0),
+                    "observed_hits_position": r.get("observed_hits_position", 0),
+                    "observed_hits_scale": r.get("observed_hits_scale", 0),
+                    "observed_hits_uniform": r.get("observed_hits_uniform", 0),
                     "cast_name": r.get("cast_name", ""),
                     "csd_path": r.get("csd_path", ""),
                     "project": r.get("project", ""),
                 }
-                for r in sorted(records, key=lambda x: (-x["observed_hits"], x["node_address"]))
+                for r in sorted(records, key=lambda x: (-hit_total(x), x["node_address"]))
             ]
             for scene, records in sorted(by_scene.items())
         },

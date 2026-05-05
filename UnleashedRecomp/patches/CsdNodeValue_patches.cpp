@@ -68,3 +68,42 @@ PPC_FUNC(sub_830BB3D0)
         positionY,
         "CSD::CCastNode::SetPosition/sub_830BB3D0");
 }
+
+// Phase 294b: Chao::CSD::CCastNode::SetScale. Stores f1 to +0x38 (56)
+// and f2 to +0x3C (60) of inner data, mirroring SetPosition's pattern.
+// Mined from local_build_env/.../ppc_recomp.224.cpp line 3240. Capturing
+// both axes lets us recover non-uniform scales the runtime applies to
+// scenes like info_bg_1 (12x8 grid stretched into a vertical column).
+PPC_FUNC_IMPL(__imp__sub_830BB650);
+PPC_FUNC(sub_830BB650)
+{
+    const uint32_t nodeAddress = ctx.r3.u32;
+    const float scaleX = static_cast<float>(ctx.f1.f64);
+    const float scaleY = static_cast<float>(ctx.f2.f64);
+
+    __imp__sub_830BB650(ctx, base);
+
+    UiLab::OnCsdCastNodeSetScale(
+        nodeAddress,
+        scaleX,
+        scaleY,
+        "CSD::CCastNode::SetScale/sub_830BB650");
+}
+
+// Phase 294b: companion single-float setter at sub_830BB5F8. Stores f1
+// to +0x34 (52) of inner data. Likely SetUniformScale or SetAlpha; we
+// log it generically and let the harvester decide based on observed
+// value distributions (uniform scale stays in [0..2]; alpha in [0..1]).
+PPC_FUNC_IMPL(__imp__sub_830BB5F8);
+PPC_FUNC(sub_830BB5F8)
+{
+    const uint32_t nodeAddress = ctx.r3.u32;
+    const float value = static_cast<float>(ctx.f1.f64);
+
+    __imp__sub_830BB5F8(ctx, base);
+
+    UiLab::OnCsdCastNodeSetSingleFloatAt52(
+        nodeAddress,
+        value,
+        "CSD::CCastNode::SetSingleFloatAt52/sub_830BB5F8");
+}

@@ -232,6 +232,15 @@ namespace UiLab
         float positionX,
         float positionY,
         std::string_view hookSource);
+    void OnCsdCastNodeSetScale(
+        uint32_t nodeAddress,
+        float scaleX,
+        float scaleY,
+        std::string_view hookSource);
+    void OnCsdCastNodeSetSingleFloatAt52(
+        uint32_t nodeAddress,
+        float value,
+        std::string_view hookSource);
     void OnBackendMaterialSubmit(
         std::string_view source,
         uint32_t primitiveType,

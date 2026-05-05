@@ -12965,28 +12965,72 @@ namespace UiLab
             WriteLiveStateSnapshot();
     }
 
-    // Phase 294: harvest the runtime SetPosition values that screen state
-    // machines (e.g. SWA::CTitleStateWorldMap::Update) write to CCastNode
-    // anchors every frame. Dedup aggressively (only emit on real change of
-    // >0.5 pixel), cap total entries (50k), write to a dedicated JSONL so
-    // it doesn't drown the main ui_lab_events.jsonl. The harvested data
-    // becomes the ground-truth runtime_overrides config consumed by
+    // Phase 294: harvest runtime CCastNode setter calls (SetPosition,
+    // SetScale, single-float setter at +52) that screen state machines
+    // write every frame. Dedup aggressively (only emit on real change),
+    // cap total entries (50k), write to a dedicated JSONL so it doesn't
+    // drown the main ui_lab_events.jsonl. The harvested data becomes
+    // the ground-truth runtime_overrides config consumed by
     // research_uiux/tools/render_csd_scene.py.
-    static std::mutex g_csdSetPositionMutex;
-    struct CsdSetPositionRecord {
-        float lastX;
-        float lastY;
+    struct CsdSetterDedupRecord {
+        float lastA;
+        float lastB;
         uint32_t hitCount;
     };
-    static std::unordered_map<uint32_t, CsdSetPositionRecord> g_csdSetPositionByNode;
-    static uint32_t g_csdSetPositionUniqueWrites = 0;
-    static constexpr uint32_t kCsdSetPositionMaxUniqueWrites = 50000;
-    static constexpr float kCsdSetPositionEpsilonPixels = 0.5f;
+    using CsdSetterDedupMap = std::unordered_map<uint64_t, CsdSetterDedupRecord>;
+    static std::mutex g_csdSetterMutex;
+    static CsdSetterDedupMap g_csdSetterDedup;
+    static uint32_t g_csdSetterUniqueWrites = 0;
+    static constexpr uint32_t kCsdSetterMaxUniqueWrites = 50000;
+    static constexpr float kCsdSetterEpsilon = 0.5f;          // pixels for position
+    static constexpr float kCsdSetterEpsilonScale = 0.005f;   // 0.5% for scale/alpha
 
-    void OnCsdNodeSetPosition(
+    static uint64_t MakeCsdSetterKey(uint32_t nodeAddress, char kindTag)
+    {
+        return (static_cast<uint64_t>(nodeAddress) << 8) | static_cast<uint64_t>(static_cast<uint8_t>(kindTag));
+    }
+
+    static void EmitCsdSetterEvent(
+        std::string_view kind,
         uint32_t nodeAddress,
-        float positionX,
-        float positionY,
+        float a,
+        float b,
+        bool hasB,
+        uint32_t hitCount,
+        std::string_view hookSource)
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(g_evidenceDirectory, ec);
+        if (ec)
+            return;
+        const auto path = g_evidenceDirectory / "ui_lab_csd_setposition.jsonl";
+        std::ofstream out(path, std::ios::app);
+        if (!out)
+            return;
+        std::ostringstream line;
+        line.precision(6);
+        line << "{\"frame\":" << g_presentedFrameCount
+             << ",\"time\":" << SecondsSinceStart()
+             << ",\"kind\":\"" << JsonEscape(kind) << "\""
+             << ",\"node\":\"" << HexU32(nodeAddress) << "\""
+             << ",\"x\":" << a;
+        if (hasB)
+            line << ",\"y\":" << b;
+        line << ",\"hits\":" << hitCount
+             << ",\"hook\":\"" << JsonEscape(hookSource) << "\""
+             << ",\"target\":\"" << JsonEscape(TargetFor(g_target).token) << "\""
+             << "}\n";
+        out << line.str();
+    }
+
+    static void RecordCsdSetterPair(
+        char kindTag,
+        std::string_view kindLabel,
+        uint32_t nodeAddress,
+        float a,
+        float b,
+        bool hasB,
+        float epsilon,
         std::string_view hookSource)
     {
         if (!g_isEnabled || g_evidenceDirectory.empty())
@@ -12994,17 +13038,18 @@ namespace UiLab
         if (nodeAddress == 0)
             return;
 
+        const uint64_t key = MakeCsdSetterKey(nodeAddress, kindTag);
         bool isNewOrChanged;
         uint32_t hitCount;
         {
-            std::lock_guard<std::mutex> lock(g_csdSetPositionMutex);
-            auto it = g_csdSetPositionByNode.find(nodeAddress);
-            if (it == g_csdSetPositionByNode.end())
+            std::lock_guard<std::mutex> lock(g_csdSetterMutex);
+            auto it = g_csdSetterDedup.find(key);
+            if (it == g_csdSetterDedup.end())
             {
-                if (g_csdSetPositionUniqueWrites >= kCsdSetPositionMaxUniqueWrites)
+                if (g_csdSetterUniqueWrites >= kCsdSetterMaxUniqueWrites)
                     return;
-                g_csdSetPositionByNode.emplace(nodeAddress, CsdSetPositionRecord{positionX, positionY, 1});
-                ++g_csdSetPositionUniqueWrites;
+                g_csdSetterDedup.emplace(key, CsdSetterDedupRecord{a, b, 1});
+                ++g_csdSetterUniqueWrites;
                 isNewOrChanged = true;
                 hitCount = 1;
             }
@@ -13012,16 +13057,15 @@ namespace UiLab
             {
                 ++it->second.hitCount;
                 hitCount = it->second.hitCount;
-                const float dx = positionX - it->second.lastX;
-                const float dy = positionY - it->second.lastY;
-                if (std::abs(dx) >= kCsdSetPositionEpsilonPixels ||
-                    std::abs(dy) >= kCsdSetPositionEpsilonPixels)
+                const float da = a - it->second.lastA;
+                const float db = hasB ? (b - it->second.lastB) : 0.0f;
+                if (std::abs(da) >= epsilon || (hasB && std::abs(db) >= epsilon))
                 {
-                    if (g_csdSetPositionUniqueWrites >= kCsdSetPositionMaxUniqueWrites)
+                    if (g_csdSetterUniqueWrites >= kCsdSetterMaxUniqueWrites)
                         return;
-                    it->second.lastX = positionX;
-                    it->second.lastY = positionY;
-                    ++g_csdSetPositionUniqueWrites;
+                    it->second.lastA = a;
+                    it->second.lastB = b;
+                    ++g_csdSetterUniqueWrites;
                     isNewOrChanged = true;
                 }
                 else
@@ -13030,32 +13074,35 @@ namespace UiLab
                 }
             }
         }
-
         if (!isNewOrChanged)
             return;
+        EmitCsdSetterEvent(kindLabel, nodeAddress, a, b, hasB, hitCount, hookSource);
+    }
 
-        std::error_code ec;
-        std::filesystem::create_directories(g_evidenceDirectory, ec);
-        if (ec)
-            return;
+    void OnCsdNodeSetPosition(
+        uint32_t nodeAddress,
+        float positionX,
+        float positionY,
+        std::string_view hookSource)
+    {
+        RecordCsdSetterPair('p', "position", nodeAddress, positionX, positionY, true, kCsdSetterEpsilon, hookSource);
+    }
 
-        const auto path = g_evidenceDirectory / "ui_lab_csd_setposition.jsonl";
-        std::ofstream out(path, std::ios::app);
-        if (!out)
-            return;
+    void OnCsdCastNodeSetScale(
+        uint32_t nodeAddress,
+        float scaleX,
+        float scaleY,
+        std::string_view hookSource)
+    {
+        RecordCsdSetterPair('s', "scale", nodeAddress, scaleX, scaleY, true, kCsdSetterEpsilonScale, hookSource);
+    }
 
-        std::ostringstream line;
-        line.precision(6);
-        line << "{\"frame\":" << g_presentedFrameCount
-             << ",\"time\":" << SecondsSinceStart()
-             << ",\"node\":\"" << HexU32(nodeAddress) << "\""
-             << ",\"x\":" << positionX
-             << ",\"y\":" << positionY
-             << ",\"hits\":" << hitCount
-             << ",\"hook\":\"" << JsonEscape(hookSource) << "\""
-             << ",\"target\":\"" << JsonEscape(TargetFor(g_target).token) << "\""
-             << "}\n";
-        out << line.str();
+    void OnCsdCastNodeSetSingleFloatAt52(
+        uint32_t nodeAddress,
+        float value,
+        std::string_view hookSource)
+    {
+        RecordCsdSetterPair('u', "uniformScaleOrAlpha", nodeAddress, value, 0.0f, false, kCsdSetterEpsilonScale, hookSource);
     }
 
     void OnBackendMaterialSubmit(
