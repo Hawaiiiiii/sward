@@ -82,11 +82,7 @@ $targets = @(
         ExtraIncludes = @()
     },
     @{
-        # Phase 296: native CSD scene renderer smoke test. Pulls stb +
-        # nlohmann/json from the vendored thirdparty trees so we don't
-        # add new dependencies to the repo. Args list overridden below
-        # because this binary takes 5 positional args (json, asset root,
-        # project, scene, out png).
+        # Phase 296: native CSD scene renderer smoke test (JSON mode).
         Sources = @((Join-Path $srcDir "sgfx_hud_native_csd_renderer_smoke_test.cpp"))
         Exe     = (Join-Path $OutputDir "sgfx_hud_native_csd_renderer_smoke_test.exe")
         Args    = @(
@@ -94,12 +90,27 @@ $targets = @(
             (Join-Path $RepoRoot "extracted_assets\full_install_archives"),
             "game/WorldMap/ui_worldmap.yncp",
             "worldmap_header_img",
-            (Join-Path $OutputDir "native_worldmap_header_img.png")
+            (Join-Path $OutputDir "native_worldmap_header_img_json.png")
         )
         ExtraIncludes = @(
             (Join-Path $RepoRoot "local_build_env\ur103clean\thirdparty\stb"),
             (Join-Path $RepoRoot "local_build_env\ur103clean\thirdparty\json\single_include")
         )
+    },
+    @{
+        # Phase 297: same renderer driven by the direct binary .yncp
+        # parser (no JSON). Reuses the EXE built above; just runs it
+        # again with --binary as the first arg.
+        Sources = @()
+        Exe     = (Join-Path $OutputDir "sgfx_hud_native_csd_renderer_smoke_test.exe")
+        Args    = @(
+            "--binary",
+            (Join-Path $RepoRoot "extracted_assets\full_install_archives"),
+            "game/WorldMap/ui_worldmap.yncp",
+            "worldmap_header_img",
+            (Join-Path $OutputDir "native_worldmap_header_img_binary.png")
+        )
+        ExtraIncludes = @()
     }
 )
 
@@ -172,21 +183,31 @@ foreach ($t in $targets) {
          "$objArg /Fe`"$exePathEscaped`" > `"$compileLogEscaped`" 2>&1")
     ) -join " && "
 
-    Write-Host "[sgfx-hud-smoke] compiling -> $exePathEscaped" -ForegroundColor Cyan
-    cmd /c $compileCmd | Out-Null
-    $compileExit = $LASTEXITCODE
-    if (Test-Path -LiteralPath $compileLogPath) {
-        Get-Content -LiteralPath $compileLogPath | ForEach-Object { Write-Host "  $_" }
-    }
-    if ($compileExit -ne 0) {
-        Write-Host "[sgfx-hud-smoke] compile failed for $exePathEscaped (exit $compileExit)" -ForegroundColor Red
-        $failedTargets++
-        continue
-    }
-    if (-not (Test-Path -LiteralPath $exePath)) {
-        Write-Host "[sgfx-hud-smoke] compile reported success but output missing: $exePath" -ForegroundColor Red
-        $failedTargets++
-        continue
+    if ($t.Sources.Count -eq 0) {
+        # Phase 297: an entry that re-runs an already-compiled exe with
+        # different args. Skip compile, validate the exe is present.
+        if (-not (Test-Path -LiteralPath $exePath)) {
+            Write-Host "[sgfx-hud-smoke] cannot re-run missing exe: $exePath" -ForegroundColor Red
+            $failedTargets++
+            continue
+        }
+    } else {
+        Write-Host "[sgfx-hud-smoke] compiling -> $exePathEscaped" -ForegroundColor Cyan
+        cmd /c $compileCmd | Out-Null
+        $compileExit = $LASTEXITCODE
+        if (Test-Path -LiteralPath $compileLogPath) {
+            Get-Content -LiteralPath $compileLogPath | ForEach-Object { Write-Host "  $_" }
+        }
+        if ($compileExit -ne 0) {
+            Write-Host "[sgfx-hud-smoke] compile failed for $exePathEscaped (exit $compileExit)" -ForegroundColor Red
+            $failedTargets++
+            continue
+        }
+        if (-not (Test-Path -LiteralPath $exePath)) {
+            Write-Host "[sgfx-hud-smoke] compile reported success but output missing: $exePath" -ForegroundColor Red
+            $failedTargets++
+            continue
+        }
     }
 
     if ($SkipRun) {

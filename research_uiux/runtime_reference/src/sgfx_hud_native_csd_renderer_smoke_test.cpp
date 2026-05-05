@@ -20,6 +20,8 @@
 //      out/native_so_speed_gauge.png
 
 #include "sward/ui_runtime/sgfx_hud_native_csd_renderer.hpp"
+#include "sward/ui_runtime/sgfx_hud_csd_project_loader.hpp"
+#include "sward/ui_runtime/sgfx_hud_csd_cast_extractor.hpp"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -28,6 +30,7 @@
 
 #include <iostream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace ui = sward::ui_runtime::generated::sgfx_hud;
@@ -137,12 +140,90 @@ static std::vector<ui::CsdNativeRuntimeOverride> loadRuntimeOverrides(const std:
     return overrides;
 }
 
+// Phase 297: scan the asset tree once and build a name -> first-match
+// path map. Localized textures (mat_*_en_*.dds) live under
+// `Languages/English/<area>/` rather than next to the .yncp, so a flat
+// filename index is the cheapest way to resolve them at render time.
+// Mirrors `choose_texture_path` in build_yncp_native_component_map.py.
+static std::unordered_map<std::string, std::string> buildTextureNameIndex(
+    const std::filesystem::path& assetRoot)
+{
+    std::unordered_map<std::string, std::string> index;
+    std::error_code ec;
+    if (!std::filesystem::exists(assetRoot, ec)) return index;
+    for (auto it = std::filesystem::recursive_directory_iterator(assetRoot, ec);
+         it != std::filesystem::recursive_directory_iterator(); ++it)
+    {
+        if (ec) break;
+        if (!it->is_regular_file(ec)) continue;
+        const auto& p = it->path();
+        if (p.extension() != ".dds") continue;
+        const std::string name = p.filename().string();
+        // Prefer the first occurrence; deeper duplicates (DLC variants)
+        // are skipped. Same priority as Python's first-match policy.
+        if (index.find(name) == index.end())
+        {
+            const auto rel = std::filesystem::relative(p, assetRoot, ec);
+            index.emplace(name, rel.generic_string());
+        }
+    }
+    return index;
+}
+
+// Phase 297: build draw commands by directly parsing the .yncp /
+// .xncp file (no JSON in the loop). Resolves the full draw command
+// list end-to-end from retail bytes.
+static std::vector<ui::CsdNativeDrawCommand> buildDrawCommandsFromBinary(
+    const std::filesystem::path& assetRoot,
+    const std::string& projectRelPath,
+    const std::string& sceneName)
+{
+    const auto projectPath = assetRoot / projectRelPath;
+    const auto loaded = ui::loadCsdProjectFile(projectPath);
+    if (!loaded.hasRecognizedMagic())
+    {
+        std::cerr << "loadCsdProjectFile failed (loadStatus=" << loaded.loadStatus
+                  << " parseStatus=" << loaded.parseStatus << ")\n";
+        return {};
+    }
+    auto cmds = ui::extractDrawCommandsFromProject(loaded);
+    const auto textureIndex = buildTextureNameIndex(assetRoot);
+    const auto projectDirRel = std::filesystem::path(projectRelPath).parent_path();
+    for (auto& c : cmds)
+    {
+        // Prefer texture next to the .yncp; fall back to the global
+        // filename index (catches Languages/English/* localized assets).
+        const std::filesystem::path siblingRel = projectDirRel / c.textureName;
+        if (std::filesystem::exists(assetRoot / siblingRel))
+            c.textureRelativePath = siblingRel.generic_string();
+        else if (auto it = textureIndex.find(c.textureName); it != textureIndex.end())
+            c.textureRelativePath = it->second;
+        else
+            c.textureRelativePath = siblingRel.generic_string();
+    }
+    // Filter to the requested scene only.
+    std::vector<ui::CsdNativeDrawCommand> filtered;
+    filtered.reserve(cmds.size());
+    for (auto& c : cmds)
+        if (c.sceneName == sceneName)
+            filtered.push_back(std::move(c));
+    std::sort(filtered.begin(), filtered.end(),
+        [](const auto& a, const auto& b)
+        {
+            if (a.drawOrder != b.drawOrder) return a.drawOrder < b.drawOrder;
+            if (a.groupIndex != b.groupIndex) return a.groupIndex < b.groupIndex;
+            return a.castIndex < b.castIndex;
+        });
+    return filtered;
+}
+
 int main(int argc, char** argv)
 {
     if (argc < 6)
     {
         std::cerr << "usage: " << argv[0]
-                  << " <component_map.json> <asset_root> <project_relative_path> <scene_name> <output.png> [<runtime_overrides.json>]\n";
+                  << " <component_map.json> <asset_root> <project_relative_path> <scene_name> <output.png> [<runtime_overrides.json>]\n"
+                  << "       (pass component_map.json='--binary' to parse the .yncp directly instead of using the JSON)\n";
         return 2;
     }
 
@@ -152,8 +233,11 @@ int main(int argc, char** argv)
     const std::string sceneName                  = argv[4];
     const std::filesystem::path outputPath       = argv[5];
     const std::filesystem::path overridesPath    = (argc >= 7) ? std::filesystem::path(argv[6]) : std::filesystem::path{};
+    const bool useBinaryParser                   = (componentMapPath.string() == "--binary");
 
-    const auto commands = loadProjectDrawCommands(componentMapPath, projectRelPath, sceneName);
+    const auto commands = useBinaryParser
+        ? buildDrawCommandsFromBinary(assetRoot, projectRelPath, sceneName)
+        : loadProjectDrawCommands(componentMapPath, projectRelPath, sceneName);
     if (commands.empty())
     {
         std::cerr << "no draw commands found for scene '" << sceneName << "' in project '" << projectRelPath << "'\n";
@@ -184,6 +268,7 @@ int main(int argc, char** argv)
     }
 
     std::cout << "scene=" << sceneName
+              << " mode=" << (useBinaryParser ? "binary" : "json")
               << " commands=" << commands.size()
               << " drawn=" << drawn
               << " skipped=" << skipped

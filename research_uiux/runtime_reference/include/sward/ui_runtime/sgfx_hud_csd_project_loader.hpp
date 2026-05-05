@@ -104,6 +104,13 @@ namespace sward::ui_runtime::generated::sgfx_hud
         std::uint32_t castCount = 0;
         std::uint32_t animationCount = 0;
         std::vector<CsdSubimage> subimages;
+        // Phase 297: absolute byte offsets needed by the cast extractor
+        // to re-walk this scene's cast group / cast table without doing
+        // another full project parse. Populated by the loader; zeroed
+        // when parseSceneMetadata fails on a malformed header.
+        std::uint64_t sceneHeaderFileOffset = 0;
+        std::uint64_t ncpjChunkFileOffset = 0;
+        bool          bigEndian = true;
     };
 
     struct CsdSceneRef
@@ -765,6 +772,12 @@ namespace sward::ui_runtime::generated::sgfx_hud
             std::uint64_t sceneHeaderOrigin) noexcept
         {
             CsdSceneMetadata meta;
+            // Phase 297: stash the absolute file offsets so the cast
+            // extractor can re-walk the cast tree without re-parsing
+            // the outer container.
+            meta.sceneHeaderFileOffset = sceneHeaderOrigin;
+            meta.ncpjChunkFileOffset = ncpjOrigin;
+            meta.bigEndian = bigEndian;
             if (sceneHeaderOrigin + 0x44 > bytes.size())
                 return meta;
 
