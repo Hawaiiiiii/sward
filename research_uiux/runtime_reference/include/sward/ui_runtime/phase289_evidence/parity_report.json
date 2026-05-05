@@ -1,0 +1,33 @@
+{
+  "phase": "288",
+  "purpose": "Side-by-side + per-pixel diff between human-readable port render and a reference (intended for UnleashedRecomp captures).",
+  "port_render": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\runtime_reference\\out\\phase289\\worldmap_header_img.png",
+  "reference": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\runtime_reference\\out\\phase289\\title_capture_cropped.png",
+  "port_size": [
+    1280,
+    720
+  ],
+  "reference_size_native": [
+    1040,
+    220
+  ],
+  "reference_size_fitted": [
+    1280,
+    720
+  ],
+  "label_port": "Human-readable port (Phase 287, fit-to-bounds 1280x720)",
+  "label_ref": "UnleashedRecomp live capture (cropped from 2048x1280)",
+  "metrics": {
+    "pixel_count": 921600,
+    "differing_pixels": 346880,
+    "differing_fraction": 0.3763888888888889,
+    "mean_abs_diff_per_channel": 32.731425509982635,
+    "max_abs_diff": 255,
+    "perfect_match": false
+  },
+  "outputs": {
+    "side_by_side": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\runtime_reference\\out\\phase289\\worldmap_header_parity_sxs.png",
+    "diff": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\runtime_reference\\out\\phase289\\worldmap_header_parity_diff.png",
+    "report": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\runtime_reference\\out\\phase289\\worldmap_header_parity_report.json"
+  }
+}
