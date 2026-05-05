@@ -11793,6 +11793,12 @@ namespace UiLab
         WriteEvidenceEvent("csd-project-made", project);
 
         MarkTargetCsdProjectLive(projectName);
+
+        // Phase 298: kick off the in-process native render of this
+        // project's first scene. Background-threaded so it doesn't
+        // block the runtime's main loop. Each project name renders
+        // at most once per session.
+        RunInProcessNativeRenderForProject(projectName);
     }
 
     void OnNativeCsdMakeCallContext(

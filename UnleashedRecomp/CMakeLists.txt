@@ -136,6 +136,7 @@ set(UNLEASHED_RECOMP_PATCHES_CXX_SOURCES
     "patches/CGameModeStageTitle_patches.cpp"
     "patches/CHudPause_patches.cpp"
     "patches/CHudSonicStage_patches.cpp"
+    "patches/csd_overlay_patches.cpp"
     "patches/CsdNodeLookup_patches.cpp"
     "patches/CsdNodeText_patches.cpp"
     "patches/CsdNodeValue_patches.cpp"
@@ -386,6 +387,7 @@ target_link_libraries(UnleashedRecomp PRIVATE
 target_include_directories(UnleashedRecomp PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     "${CMAKE_CURRENT_SOURCE_DIR}/api"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../research_uiux/runtime_reference/include"
     ${UNLEASHED_RECOMP_THIRDPARTY_INCLUDES}
 )
 

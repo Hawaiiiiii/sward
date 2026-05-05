@@ -152,6 +152,12 @@ namespace UiLab
     void OnLoadingRequest(uint32_t displayType);
     void OnLoadingUpdate(uint32_t displayType);
     void OnCsdProjectMade(std::string_view projectName);
+    // Phase 298: in-process A/B harness. Spawns a background thread
+    // that runs the native human-readable C++ CSD renderer on the
+    // same .yncp + .dds files the runtime just loaded, and writes a
+    // PNG to the evidence directory. Guards against re-renders of
+    // the same project across the session.
+    void RunInProcessNativeRenderForProject(std::string_view projectName);
     void OnNativeCsdMakeCallContext(
         uint32_t ownerAddress,
         uint32_t bytesAddress,

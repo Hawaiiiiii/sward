@@ -145,6 +145,7 @@ Invoke-PythonTool `
     "UnleashedRecomp\patches\CTitleStateIntro_patches.cpp",
     "UnleashedRecomp\patches\CTitleStateMenu_patches.cpp",
     "UnleashedRecomp\patches\CHudSonicStage_patches.cpp",
+    "UnleashedRecomp\patches\csd_overlay_patches.cpp",
     "UnleashedRecomp\patches\CsdNodeLookup_patches.cpp",
     "UnleashedRecomp\patches\CsdNodeText_patches.cpp",
     "UnleashedRecomp\patches\CsdNodeValue_patches.cpp",
@@ -152,7 +153,10 @@ Invoke-PythonTool `
     "UnleashedRecomp\patches\ui_lab_patches.cpp",
     "UnleashedRecomp\patches\ui_lab_runtime_screen_index.generated.h",
     "UnleashedRecomp\patches\ui_lab_yncp_native_component_map.generated.h",
-    "UnleashedRecomp\patches\ui_lab_patches.h"
+    "UnleashedRecomp\patches\ui_lab_patches.h",
+    "research_uiux\runtime_reference\include\sward\ui_runtime\sgfx_hud_csd_project_loader.hpp",
+    "research_uiux\runtime_reference\include\sward\ui_runtime\sgfx_hud_csd_cast_extractor.hpp",
+    "research_uiux\runtime_reference\include\sward\ui_runtime\sgfx_hud_native_csd_renderer.hpp"
 ) | ForEach-Object { Sync-TrackedRuntimeFile $_ $root }
 
 $drive = "$DriveLetter`:"
