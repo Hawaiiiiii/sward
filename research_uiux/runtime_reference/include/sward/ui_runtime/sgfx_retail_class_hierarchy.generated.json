@@ -173,15 +173,33 @@
     "Status_overlay":   { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": false, "notes": "skill upgrade screen; reachable via Pause sub-menu" }
   },
 
-  "out_of_scope_per_user (catalogued for future)": [
-    "Mission HUD trio (HudMissionStage / HudMissionFinish / HudSelectMissionFailed)",
-    "Boss HUDs (BossHudVitality / BossHudSuperSonic / FinalDarkGaiaHud / PhoenixHudVitality / CBossNamePlate)",
-    "Tornado Defense HUD (CHudExQte)",
-    "Item-pickup overlay (HudItemGet)",
-    "MediaRoom 7-class hierarchy",
-    "InspireResource subtitle system (cutscene subtitles -- user says cutscenes out of scope)",
-    "InstallDisplay (game install screen)"
+  "out_of_scope_per_user (initially catalogued for future, now PORTED)": [
+    "Mission HUD trio (HudMissionStage / HudMissionFinish / HudSelectMissionFailed) -- LANDED Phase 348 in sgfx_hud_mission.hpp",
+    "Boss HUDs (5 classes) -- LANDED Phase 349 in sgfx_hud_boss.hpp",
+    "Tornado Defense HUD (CHudExQte) -- LANDED Phase 350 in sgfx_hud_ex_qte.hpp",
+    "MediaRoom 7-class hierarchy -- LANDED Phase 351 in sgfx_hud_media_room.hpp"
   ],
+
+  "still_truly_out_of_scope": [
+    "Item-pickup overlay (HudItemGet) -- single small popup, deferrable",
+    "InspireResource subtitle system -- user says cutscenes out of scope",
+    "InstallDisplay -- first-run install screen, not gameplay"
+  ],
+
+  "phase_346_347_polish": {
+    "Phase_346 (font rendering)": {
+      "approach":   "stb_truetype-backed glyph rasterizer wired into the existing CsdNativeFramebuffer path",
+      "new_header": "sgfx_hud_font_renderer.hpp + .cpp",
+      "result":     "10 zero-drawn text scenes (help_chara_*, help_text_area, progress) now render placeholder labels via runtime glyph composition. Top-of-screen caption labels each variant for fast visual identification.",
+      "follow_up":  "Real retail-fidelity would use the per-language pre-baked text strips (mat_*_en_*.dds, fte_ConverseMain_*.dds) for in-game text; runtime glyph composition is reserved for help body text."
+    },
+    "Phase_347 (BGM streaming)": {
+      "approach":   "sgfxAudioPlayerRegisterBgm(cueName, bytes, size) maps cues to OGG byte blobs; ApplyBgmAdmin streams via SDL_mixer Mix_PlayMusic with infinite loop on cue change",
+      "demo_blob":  "g_installer_music (4MB OGG vorbis, vendored from UnleashedRecomp/res/music/installer.ogg.h)",
+      "result":     "sgfx_runtime.exe + sgfx_ui_mirror.exe both stream BGM continuously through SDL_mixer's music slot. Mirror auto-mounts a per-screen cue (Title -> bgm_sys_title, Stage -> bgm_act_apotos, etc.) so the demo cycle plays music as it walks screens.",
+      "follow_up":  "Real retail BGM bank (.csb files in extracted_assets/Sound/) would need decoding -- CSB is CRI ADX which needs vgmstream. For now hosts register one OGG per cue manually."
+    }
+  }
 
   "next_phase_options": [
     "(a) Apply CHudTown / CObjBalloon hierarchy to sgfx_hub_screen.hpp -- biggest fidelity gain, replaces inferred logic",
