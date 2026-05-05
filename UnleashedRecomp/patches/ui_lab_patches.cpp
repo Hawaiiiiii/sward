@@ -12965,6 +12965,99 @@ namespace UiLab
             WriteLiveStateSnapshot();
     }
 
+    // Phase 294: harvest the runtime SetPosition values that screen state
+    // machines (e.g. SWA::CTitleStateWorldMap::Update) write to CCastNode
+    // anchors every frame. Dedup aggressively (only emit on real change of
+    // >0.5 pixel), cap total entries (50k), write to a dedicated JSONL so
+    // it doesn't drown the main ui_lab_events.jsonl. The harvested data
+    // becomes the ground-truth runtime_overrides config consumed by
+    // research_uiux/tools/render_csd_scene.py.
+    static std::mutex g_csdSetPositionMutex;
+    struct CsdSetPositionRecord {
+        float lastX;
+        float lastY;
+        uint32_t hitCount;
+    };
+    static std::unordered_map<uint32_t, CsdSetPositionRecord> g_csdSetPositionByNode;
+    static uint32_t g_csdSetPositionUniqueWrites = 0;
+    static constexpr uint32_t kCsdSetPositionMaxUniqueWrites = 50000;
+    static constexpr float kCsdSetPositionEpsilonPixels = 0.5f;
+
+    void OnCsdNodeSetPosition(
+        uint32_t nodeAddress,
+        float positionX,
+        float positionY,
+        std::string_view hookSource)
+    {
+        if (!g_isEnabled || g_evidenceDirectory.empty())
+            return;
+        if (nodeAddress == 0)
+            return;
+
+        bool isNewOrChanged;
+        uint32_t hitCount;
+        {
+            std::lock_guard<std::mutex> lock(g_csdSetPositionMutex);
+            auto it = g_csdSetPositionByNode.find(nodeAddress);
+            if (it == g_csdSetPositionByNode.end())
+            {
+                if (g_csdSetPositionUniqueWrites >= kCsdSetPositionMaxUniqueWrites)
+                    return;
+                g_csdSetPositionByNode.emplace(nodeAddress, CsdSetPositionRecord{positionX, positionY, 1});
+                ++g_csdSetPositionUniqueWrites;
+                isNewOrChanged = true;
+                hitCount = 1;
+            }
+            else
+            {
+                ++it->second.hitCount;
+                hitCount = it->second.hitCount;
+                const float dx = positionX - it->second.lastX;
+                const float dy = positionY - it->second.lastY;
+                if (std::abs(dx) >= kCsdSetPositionEpsilonPixels ||
+                    std::abs(dy) >= kCsdSetPositionEpsilonPixels)
+                {
+                    if (g_csdSetPositionUniqueWrites >= kCsdSetPositionMaxUniqueWrites)
+                        return;
+                    it->second.lastX = positionX;
+                    it->second.lastY = positionY;
+                    ++g_csdSetPositionUniqueWrites;
+                    isNewOrChanged = true;
+                }
+                else
+                {
+                    isNewOrChanged = false;
+                }
+            }
+        }
+
+        if (!isNewOrChanged)
+            return;
+
+        std::error_code ec;
+        std::filesystem::create_directories(g_evidenceDirectory, ec);
+        if (ec)
+            return;
+
+        const auto path = g_evidenceDirectory / "ui_lab_csd_setposition.jsonl";
+        std::ofstream out(path, std::ios::app);
+        if (!out)
+            return;
+
+        std::ostringstream line;
+        line.precision(6);
+        line << "{\"frame\":" << g_presentedFrameCount
+             << ",\"time\":" << SecondsSinceStart()
+             << ",\"node\":\"" << HexU32(nodeAddress) << "\""
+             << ",\"x\":" << positionX
+             << ",\"y\":" << positionY
+             << ",\"hits\":" << hitCount
+             << ",\"hook\":\"" << JsonEscape(hookSource) << "\""
+             << ",\"target\":\"" << JsonEscape(TargetFor(g_target).token) << "\""
+             << "}\n";
+        out << line.str();
+    }
+
     void OnBackendMaterialSubmit(
         std::string_view source,
         uint32_t primitiveType,

@@ -437,6 +437,13 @@ def main(argv: list[str] | None = None) -> int:
              "machine at runtime (e.g. SWA::CTitleStateWorldMap::Update). "
              "Example: --runtime-override info_bg_1=299,-178",
     )
+    parser.add_argument(
+        "--runtime-overrides-from-json",
+        help="Path to a harvest JSON produced by harvest_runtime_setposition.py. "
+             "Loads its by_scene block and applies each scene's most-observed "
+             "anchor as a runtime override. Stacks with --runtime-override "
+             "(per-flag overrides win on conflict).",
+    )
     parser.add_argument("--canvas-width", type=int, default=DEFAULT_CANVAS_W)
     parser.add_argument("--canvas-height", type=int, default=DEFAULT_CANVAS_H)
     parser.add_argument("--background", choices=["transparent", "black", "magenta"], default="transparent")
@@ -489,6 +496,21 @@ def main(argv: list[str] | None = None) -> int:
             print("--output is required with --full-project", file=sys.stderr)
             return 2
         runtime_overrides: dict[str, dict[str, float]] = {}
+        if args.runtime_overrides_from_json:
+            try:
+                with open(args.runtime_overrides_from_json, "r", encoding="utf-8") as f:
+                    harvest = json.load(f)
+            except (OSError, json.JSONDecodeError) as exc:
+                print(f"could not read --runtime-overrides-from-json: {exc}", file=sys.stderr)
+                return 2
+            for scene_name, records in (harvest.get("by_scene") or {}).items():
+                if not records or scene_name in ("", "<unresolved>"):
+                    continue
+                top = records[0]
+                runtime_overrides[scene_name] = {
+                    "anchor_x_px": float(top.get("anchor_x_px", 0.0)),
+                    "anchor_y_px": float(top.get("anchor_y_px", 0.0)),
+                }
         for spec in args.runtime_override or []:
             try:
                 name, coords = spec.split("=", 1)

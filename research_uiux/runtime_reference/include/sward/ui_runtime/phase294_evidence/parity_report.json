@@ -1,0 +1,33 @@
+{
+  "phase": "288",
+  "purpose": "Side-by-side + per-pixel diff between human-readable port render and a reference (intended for UnleashedRecomp captures).",
+  "port_render": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\runtime_reference\\out\\phase294\\worldmap_with_harvested_overrides.png",
+  "reference": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\runtime_reference\\out\\phase294\\live_capture_final.png",
+  "port_size": [
+    1280,
+    720
+  ],
+  "reference_size_native": [
+    2048,
+    1280
+  ],
+  "reference_size_fitted": [
+    1280,
+    720
+  ],
+  "label_port": "Port + harvested overrides (Phase 294a)",
+  "label_ref": "Live runtime World Map",
+  "metrics": {
+    "pixel_count": 921600,
+    "differing_pixels": 921524,
+    "differing_fraction": 0.9999175347222222,
+    "mean_abs_diff_per_channel": 131.3446213107639,
+    "max_abs_diff": 255,
+    "perfect_match": false
+  },
+  "outputs": {
+    "side_by_side": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\runtime_reference\\out\\phase294\\parity_sxs.png",
+    "diff": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\runtime_reference\\out\\phase294\\parity_diff.png",
+    "report": "C:\\Users\\DavidErikGarciaArena\\Downloads\\UI-UX Sonic World Adventure for SGFX - Project Quality Hero\\research_uiux\\runtime_reference\\out\\phase294\\parity_report.json"
+  }
+}

@@ -44,3 +44,27 @@ PPC_FUNC(sub_830BF090)
         scaleY,
         "CSD::CNode::SetScale/sub_830BF090");
 }
+
+// Phase 294: Chao::CSD::CCastNode::SetPosition. Identified via
+// UnleashedRecomp/patches/aspect_ratio_patches.cpp:295-344 where
+// SWA::CTitleStateWorldMap::Update calls sub_830BB3D0(scene, x, y)
+// with f1/f2 in pixel space relative to the 1280x720 logical canvas.
+// Also stores the new f30 at +0x2C (44) and f31 at +0x30 (48) of the
+// cast node. We hook to harvest the per-node anchor positions live so
+// the human-readable port can apply them without source-mining every
+// screen state machine by hand.
+PPC_FUNC_IMPL(__imp__sub_830BB3D0);
+PPC_FUNC(sub_830BB3D0)
+{
+    const uint32_t nodeAddress = ctx.r3.u32;
+    const float positionX = static_cast<float>(ctx.f1.f64);
+    const float positionY = static_cast<float>(ctx.f2.f64);
+
+    __imp__sub_830BB3D0(ctx, base);
+
+    UiLab::OnCsdNodeSetPosition(
+        nodeAddress,
+        positionX,
+        positionY,
+        "CSD::CCastNode::SetPosition/sub_830BB3D0");
+}
