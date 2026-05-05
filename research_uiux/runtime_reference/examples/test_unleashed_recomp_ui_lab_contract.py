@@ -2092,6 +2092,102 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
                 "C++ loader's accept set (CPAF / YNCP / XNCP) should have "
                 "matched too: " + str(entry))
 
+    def test_sgfx_hud_chud_sonic_stage_methods_real_method_bodies(self):
+        # Phase 277 + 280: real method bodies on top of the runtime-
+        # extended CHudSonicStage layout, including a destructor-port
+        # helper that mirrors the SWA `sub_824D8CE8` cleanup order and
+        # an asset-side readiness predicate that consults the C++ CSD
+        # project loader.
+        path = ROOT / "research_uiux/runtime_reference/src/sgfx_hud_chud_sonic_stage_methods.cpp"
+        self.assertTrue(path.is_file(),
+            "Phase 277 / 280 method-body .cpp must exist at the documented path")
+        text = path.read_text(encoding="utf-8")
+        for token in [
+            'Phase 277: hand-written method bodies for `class CHudSonicStage`',
+            '#include "sward/ui_runtime/sgfx_hud_chud_sonic_stage.generated.h"',
+            '#include "sward/ui_runtime/sgfx_hud_csd_project_loader.hpp"',
+            "namespace sward::ui_runtime::generated::sgfx_hud",
+            "const SceneBinding* findSceneBindingByMember(std::string_view memberName)",
+            "bool hasFullGaugeClusterBindings()",
+            "std::size_t countCrossValidatedBindings()",
+            "std::string_view ownedCsdProjectName()",
+            "bool isAdditiveClusterBinding(const SceneBinding& binding)",
+            # Phase 280 ports.
+            "Phase 280: ported method bodies that mirror the SWA recomp flow",
+            "bool isCHudSonicStageInPostConstructorState(const CHudSonicStage& hud)",
+            "void releaseAllOwnedScenes(CHudSonicStage& hud)",
+            "bool isPlayScreenAssetSideReadyForBinding",
+            "release(hud.m_rcPtrField180);",
+            "release(hud.m_rcPlayScreen);",
+            "static_assert(\n        sizeof(CHudSonicStage) >= 0x188,",
+            "static_assert(\n        kSceneBindings.size() >= 4,",
+        ]:
+            self.assertIn(token, text)
+
+    def test_sgfx_hud_smoke_test_pipeline_present_and_buildable(self):
+        # Phase 278 + 279 + 280: a PowerShell wrapper drives clang-cl
+        # against the SGFX HUD smoke tests using the same VsDevCmd /
+        # LLVM toolchain the main UI Lab build wraps. Verify the script
+        # references both smoke targets and the key compile + run flow.
+        ps1 = self.read("research_uiux/runtime_reference/tools/build_sgfx_hud_smoke_tests.ps1")
+        for token in [
+            "Phase 278",
+            "VsDevCmd.bat",
+            "C:\\Program Files\\LLVM\\bin",
+            "vswhere.exe",
+            "sgfx_hud_csd_project_loader_smoke_test.cpp",
+            "sgfx_hud_chud_sonic_stage_methods_smoke_test.cpp",
+            "clang-cl /nologo /std:c++17",
+            "smoke target(s) failed",
+        ]:
+            self.assertIn(token, ps1)
+
+        loader_smoke = self.read(
+            "research_uiux/runtime_reference/src/sgfx_hud_csd_project_loader_smoke_test.cpp")
+        for token in [
+            "loadCsdProjectFile",
+            "outerMagicChars",
+            "rootSceneIds",
+            "projectName",
+            "ncpjSignature",
+        ]:
+            self.assertIn(token, loader_smoke)
+
+        methods_smoke = self.read(
+            "research_uiux/runtime_reference/src/sgfx_hud_chud_sonic_stage_methods_smoke_test.cpp")
+        for token in [
+            "isCHudSonicStageInPostConstructorState",
+            "releaseAllOwnedScenes",
+            "isPlayScreenAssetSideReadyForBinding",
+            "findSceneBindingByMember",
+            "hasFullGaugeClusterBindings",
+            "ownedCsdProjectName",
+        ]:
+            self.assertIn(token, methods_smoke)
+
+    def test_sgfx_hud_csd_project_loader_extracts_scene_ids_and_walks_children(self):
+        # Phase 279 + 280: the C++ loader extracts root scene IDs AND
+        # recursively walks child nodes to populate `allSceneRefs`. The
+        # helpers + test fields the runtime-extended SceneBinding
+        # validator needs are all present in the header.
+        loader = self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_csd_project_loader.hpp")
+        for token in [
+            "Phase 279: parsed CSD project metadata",
+            "struct CsdSceneId",
+            "struct CsdSceneRef",
+            "std::vector<CsdSceneId>      rootSceneIds;",
+            "std::vector<CsdSceneRef>     allSceneRefs;",
+            "inline std::string parseCsdProjectInPlace(CsdProjectFile& out) noexcept",
+            "inline void walkCsdNodeRecursive(",
+            "constexpr int kMaxDepth = 6",
+            "isBigEndianContainer(",
+            'CsdProjectMagic::Cpaf',
+            'CsdProjectMagic::Fapc',
+        ]:
+            self.assertIn(token, loader)
+
     def test_sgfx_hud_layout_parses_swa_api_header_rcptr_declarations(self):
         # Phase 267: focused unit test for the SWA API header parser. The
         # parser must accept both fully-qualified and brief RCPtr<T>
