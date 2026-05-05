@@ -131,6 +131,58 @@
     "sgfx_results_screen.hpp now correctly maps to CHudResult's 4 sub-states (Phase 339)."
   ],
 
+  "phase_341_343_landed_ports": {
+    "summary": "All four 'what_changed_about_my_existing_ports' items are now addressed.",
+    "Phase_341 (Werehog HUD split)": {
+      "new_header": "sgfx_hud_evil_stage.hpp",
+      "covers":     "CHudEvilStage + EvilEnemyComboHud + EvilEnemyChanceAttackHud(Success) + CEvilHudTarget reticle",
+      "smoke_assertions_added": 14
+    },
+    "Phase_341 (Status overlay)": {
+      "new_header": "sgfx_hud_status.hpp",
+      "covers":     "CHudStatus 4-phase machine (Browsing/Confirming/LevelingUp/Closed) with skill-point spending",
+      "smoke_assertions_added": 13
+    },
+    "Phase_341 (HelpWindow)": {
+      "new_header": "sgfx_help_window.hpp",
+      "covers":     "HelpWindow distinct from CGeneralWindow; topic-cycle nav",
+      "smoke_assertions_added": 13
+    },
+    "Phase_343 (Hub message protocol)": {
+      "new_header": "sgfx_obj_balloon.hpp",
+      "covers":     "CObjBalloon 5-phase machine + 25-message HubMessageKind enum + dispatch + reply helpers; integrates with HubTownMan from sgfx_hub_screen.hpp",
+      "smoke_assertions_added": 23
+    },
+    "total_smoke_assertions_after_phase_343": 190
+  },
+
+  "in_scope_screen_completion_status": {
+    "Title":            { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": true },
+    "TitleIntro":       { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": true },
+    "Loading":          { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": true },
+    "WorldMap":         { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": true },
+    "Hub_Day":          { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": true,  "notes": "Hub root + balloon protocol + 25 Msg* types now retail-mined" },
+    "Hub_Werehog":      { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": true,  "notes": "Same hub root, mode=Werehog flag" },
+    "Stage_HUD_Day":    { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": true },
+    "Stage_HUD_Werehog":{ "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": false, "notes": "EvilStageHudState exists but mirror still uses ui_playscreen for both modes; future work to swap to ui_playscreen_ev when mode=Werehog" },
+    "Pause":            { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": true },
+    "Results":          { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": true,  "notes": "4-state CHudResult machine retail-mined Phase 339" },
+    "GeneralWindow":    { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": false, "notes": "modal overlay; renders only when host opens" },
+    "HelpWindow":       { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": false, "notes": "ditto, modal overlay" },
+    "SaveIcon":         { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": false, "notes": "small overlay; auto-hide timer" },
+    "Status_overlay":   { "behavior": "complete", "retail_validated": true,  "in_orchestrator": true,  "in_mirror": false, "notes": "skill upgrade screen; reachable via Pause sub-menu" }
+  },
+
+  "out_of_scope_per_user (catalogued for future)": [
+    "Mission HUD trio (HudMissionStage / HudMissionFinish / HudSelectMissionFailed)",
+    "Boss HUDs (BossHudVitality / BossHudSuperSonic / FinalDarkGaiaHud / PhoenixHudVitality / CBossNamePlate)",
+    "Tornado Defense HUD (CHudExQte)",
+    "Item-pickup overlay (HudItemGet)",
+    "MediaRoom 7-class hierarchy",
+    "InspireResource subtitle system (cutscene subtitles -- user says cutscenes out of scope)",
+    "InstallDisplay (game install screen)"
+  ],
+
   "next_phase_options": [
     "(a) Apply CHudTown / CObjBalloon hierarchy to sgfx_hub_screen.hpp -- biggest fidelity gain, replaces inferred logic",
     "(b) Add new sgfx_hud_evil_stage.hpp as a sibling of sgfx_stage_hud.hpp with Werehog-specific fields (combo HUD, chance-attack overlays)",
