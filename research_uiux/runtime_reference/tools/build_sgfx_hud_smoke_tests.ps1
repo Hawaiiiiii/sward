@@ -66,6 +66,7 @@ $targets = @(
         Sources = @((Join-Path $srcDir "sgfx_hud_csd_project_loader_smoke_test.cpp"))
         Exe     = (Join-Path $OutputDir "sgfx_hud_csd_project_loader_smoke_test.exe")
         Args    = @($null) # set per-target below
+        ExtraIncludes = @()
     },
     @{
         Sources = @(
@@ -78,6 +79,27 @@ $targets = @(
         )
         Exe     = (Join-Path $OutputDir "sgfx_hud_chud_sonic_stage_methods_smoke_test.exe")
         Args    = @($null)
+        ExtraIncludes = @()
+    },
+    @{
+        # Phase 296: native CSD scene renderer smoke test. Pulls stb +
+        # nlohmann/json from the vendored thirdparty trees so we don't
+        # add new dependencies to the repo. Args list overridden below
+        # because this binary takes 5 positional args (json, asset root,
+        # project, scene, out png).
+        Sources = @((Join-Path $srcDir "sgfx_hud_native_csd_renderer_smoke_test.cpp"))
+        Exe     = (Join-Path $OutputDir "sgfx_hud_native_csd_renderer_smoke_test.exe")
+        Args    = @(
+            (Join-Path $RepoRoot "research_uiux\data\yncp_native_component_map.json"),
+            (Join-Path $RepoRoot "extracted_assets\full_install_archives"),
+            "game/WorldMap/ui_worldmap.yncp",
+            "worldmap_header_img",
+            (Join-Path $OutputDir "native_worldmap_header_img.png")
+        )
+        ExtraIncludes = @(
+            (Join-Path $RepoRoot "local_build_env\ur103clean\thirdparty\stb"),
+            (Join-Path $RepoRoot "local_build_env\ur103clean\thirdparty\json\single_include")
+        )
     }
 )
 
@@ -136,12 +158,17 @@ foreach ($t in $targets) {
 
     $compileLogPath = Join-Path $OutputDir "compile.log"
     $compileLogEscaped = $compileLogPath.Replace("/", "\")
+    $extraIncFlags = ""
+    foreach ($inc in $t.ExtraIncludes)
+    {
+        $extraIncFlags += " /I`"$($inc.Replace("/", "\"))`""
+    }
     $compileCmd = @(
         "set `"PATH=$vswhereDir;%PATH%`"",
         "`"$vsDevCmd`" -arch=x64 >nul",
         "set `"PATH=$llvmBin;%PATH%`"",
         ("clang-cl /nologo /std:c++17 /EHsc " +
-         "/I`"$includeDirEscaped`" $sourcesEscaped " +
+         "/I`"$includeDirEscaped`"$extraIncFlags $sourcesEscaped " +
          "$objArg /Fe`"$exePathEscaped`" > `"$compileLogEscaped`" 2>&1")
     ) -join " && "
 
@@ -167,8 +194,15 @@ foreach ($t in $targets) {
         continue
     }
 
-    Write-Host "[sgfx-hud-smoke] running $exePathEscaped against $resolvedAssetPath" -ForegroundColor Cyan
-    & $exePath $resolvedAssetPath
+    # Phase 296: when a target supplies its own positional Args list,
+    # use those instead of the default `<assetPath>` smoke run.
+    $targetArgs = @($resolvedAssetPath)
+    if ($t.Args -and $t.Args.Count -gt 0 -and $null -ne $t.Args[0])
+    {
+        $targetArgs = $t.Args
+    }
+    Write-Host "[sgfx-hud-smoke] running $exePathEscaped with $($targetArgs.Count) arg(s)" -ForegroundColor Cyan
+    & $exePath @targetArgs
     $runExit = $LASTEXITCODE
     if ($runExit -ne 0) {
         Write-Host "[sgfx-hud-smoke] run failed for $exePathEscaped (exit $runExit)" -ForegroundColor Red
