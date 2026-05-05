@@ -9,6 +9,7 @@
 #include "sward/ui_runtime/sgfx_results_screen.hpp"
 #include "sward/ui_runtime/sgfx_world_map.hpp"
 #include "sward/ui_runtime/sgfx_hub_screen.hpp"
+#include "sward/ui_runtime/sgfx_title_intro.hpp"
 
 #include <iostream>
 #include <string>
@@ -317,6 +318,45 @@ static void testHubScreen()
     }
 }
 
+// ----- Title intro tests -----
+//
+// Captured trace (phase315_take2 frames 2458..5361) showed
+// requested_state advance 0->1 over ~2 frames (~50 ms) then
+// stayed at 1 for ~50 seconds until the menu state machine took
+// over. Verify the same advance behavior + the press-start arm.
+static void testTitleIntro()
+{
+    using namespace ui;
+    std::cout << "\n== title intro ==\n";
+
+    TitleIntroSlot s;
+    expectEq(s.requestedState, TitleIntroState::LogoFadeIn, "intro.starts LogoFadeIn");
+
+    // Tick 30 ms -> still in LogoFadeIn.
+    {
+        TitleIntroInput in; in.deltaSeconds = 0.030f;
+        const auto evs = updateTitleIntroOneFrame(s, in);
+        expectEq(s.requestedState, TitleIntroState::LogoFadeIn, "intro.30ms still LogoFadeIn");
+        expect(evs.empty(), "intro.30ms no event");
+    }
+    // Tick another 50 ms -> 80ms total, past 60ms threshold -> advance.
+    {
+        TitleIntroInput in; in.deltaSeconds = 0.050f;
+        const auto evs = updateTitleIntroOneFrame(s, in);
+        expectEq(s.requestedState, TitleIntroState::PressStartIdle, "intro.advance to PressStartIdle");
+        expectEq(evs[0].kind, TitleIntroEventKind::StateAdvanced, "intro.StateAdvanced");
+    }
+    // Press start in PressStartIdle -> PressStartArmed event.
+    {
+        TitleIntroInput in; in.startTapped = true;
+        const auto evs = updateTitleIntroOneFrame(s, in);
+        expectEq(evs[0].kind, TitleIntroEventKind::PressStartArmed, "intro.PressStartArmed");
+        // dirty + transition_armed stay 0 (matches captured trace).
+        expect(!s.dirty, "intro.dirty stays 0 (matches retail)");
+        expect(!s.transitionArmed, "intro.transitionArmed stays 0 (matches retail)");
+    }
+}
+
 int main()
 {
     testPauseMenu();
@@ -325,6 +365,7 @@ int main()
     testResultsScreen();
     testWorldMap();
     testHubScreen();
+    testTitleIntro();
     std::cout << "\nfailures: " << g_failures << "\n";
     return g_failures == 0 ? 0 : 1;
 }
