@@ -1,0 +1,72 @@
+{
+  "phase": "321",
+  "purpose": "Map every SGFX-relevant CTitleStateMenu / CTitleStateWorldMap / CHudPause / CHudSonicStage state-machine PPC function to its on-disk auto-translated PPC C++ body. The recompiled UnleashedRecomp.exe doesn't expose the sub_XXXX PPC symbols Ghidra needs (XenonRecomp translates them into x64 functions with new addresses), so the auto-translated source files in local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.*.cpp are the static-decompile oracle. This map lets future retroactive ports target the right body directly.",
+  "discovery_method": "Searched local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.*.cpp for PPC_FUNC_IMPL(__imp__sub_XXXXXXXX) declarations.",
+  "ghidra_status": "Ghidra analyzeHeadless on the existing project (sward_unleashed_recomp_context, programs phase222_smoke.exe / phase254_owner_layout_noanalysis.exe) returns UNRESOLVED for every PPC sub_ symbol because the analyzed program is the recompiled x64 binary, not the original Xbox 360 default.xex. To get Ghidra-side PPC decompiles a future phase would import the original .xex file from extracted_assets.",
+  "state_machines": [
+    {
+      "ppc_address": "sub_824B0930",
+      "labeled_name": "SWA::CHudPause::Update",
+      "source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.27.cpp",
+      "source_line": 39777,
+      "body_lines": 2053,
+      "wrapper": "UnleashedRecomp/patches/CHudPause_patches.cpp",
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_pause_menu.hpp",
+      "captured_state_fields": ["m_Action", "m_Menu", "m_Status", "m_Transition", "m_IsVisible", "m_IsShown", "cursorIndex (via m_pHudPause + 0x19C +0x68)"],
+      "callees_total": 30,
+      "notes": "Largest state machine in the SGFX port set. Reading line-by-line is multi-session work; the captured logcat trace (Phase 315) is the more efficient ground-truth source. Use this PPC body when logcat data is missing for a specific transition (e.g. m_Status = Accept resolution that wasn't observed live)."
+    },
+    {
+      "ppc_address": "sub_8258B558",
+      "labeled_name": "SWA::CTitleStateWorldMap::Update",
+      "source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.40.cpp",
+      "source_line": 49453,
+      "body_lines": 2147,
+      "wrapper": "UnleashedRecomp/patches/aspect_ratio_patches.cpp:294-344",
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_world_map.hpp",
+      "captured_state_fields": ["worldMapSimpleInfo (via this+0x70)", "cursor + visibility flags via the linked-list at +0x20..+0x24"],
+      "callees_total": 69,
+      "notes": "Already partially mined via Phase 295 (Ghidra-confirmed callee map; no CSD setter calls in body, runtime overrides come from the aspect_ratio patch wrapper)."
+    },
+    {
+      "ppc_address": "sub_825882B8",
+      "labeled_name": "SWA::CTitleStateMenu::Update",
+      "source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.40.cpp",
+      "source_line": 42336,
+      "body_lines": 898,
+      "wrapper": "UnleashedRecomp/patches/CTitleStateMenu_patches.cpp:99-202",
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_title_menu.hpp",
+      "captured_state_fields": ["m_CursorIndex", "m_IsDeleteCheckMessageOpen", "m_Field3C", "m_Field54", "m_Field9A", "context_phase (0/1/2)", "context_472 (transition target pointer)"],
+      "callees_total": "tbd",
+      "notes": "Phase 319 retroactive port mirrored context_phase (Idle/TransitionRequested/TransitioningOut) directly from the captured 12 title-menu-context samples."
+    },
+    {
+      "ppc_address": "sub_82A50838",
+      "labeled_name": "(CHudSonicStage helper or similar - small body)",
+      "source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.119.cpp",
+      "source_line": 57390,
+      "body_lines": 114,
+      "wrapper": "UnleashedRecomp/patches/CHudSonicStage_patches.cpp",
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_stage_hud.hpp",
+      "captured_state_fields": ["unknown - small function, likely a getter/setter rather than the full Update"],
+      "callees_total": "tbd",
+      "notes": "Smaller body (114 lines) suggests this is a sub-helper, not the main CHudSonicStage::Update entry point. Need to identify the full Update function symbol for the SGFX stage HUD port."
+    }
+  ],
+  "next_phase_actions": [
+    "Phase 322 fresh logcat session (currently in flight) should capture pause + stage HUD + results data. Cross-validate against the body locations above when logcat is silent on a specific transition.",
+    "If the logcat still doesn't reach the stage HUD due to game crash, read sub_824B0930's body directly (2053 lines) focusing on the m_Status switch + cursor handling, and port those branches into sgfx_pause_menu.hpp."
+  ],
+  "transparency": {
+    "runtime_proven": [
+      "All four sub_ addresses exist in the local PPC source at the documented locations",
+      "CTitleStateMenu::Update (sub_825882B8) was already partially ported retroactively in Phase 319 from captured context_phase data"
+    ],
+    "runtime_inferred": [
+      "sub_82A50838's role as a stage HUD helper is inferred from its 114-line size and presence in CHudSonicStage_patches.cpp; full identification needs a callee-graph trace"
+    ],
+    "pending_ghidra": [
+      "If a Ghidra static decompile is needed for a function whose body is too large to read line-by-line, importing the original Xbox 360 default.xex into a fresh Ghidra project is the path"
+    ]
+  }
+}
