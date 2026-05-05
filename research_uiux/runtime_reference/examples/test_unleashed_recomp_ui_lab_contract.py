@@ -1626,6 +1626,119 @@ class UnleashedRecompUiLabContractTests(unittest.TestCase):
         ]:
             self.assertIn(token, live_header)
 
+    def test_sgfx_hud_layout_generates_chud_pause_from_swa_api_header(self):
+        # Phase 268: end-to-end test that the generator can produce a full
+        # SWA-API-driven port header for a HUD class with mixed member
+        # types (RCPtrs + scalars + be<enum> + multiple enum definitions)
+        # and that it correctly captures every SWA_ASSERT_OFFSETOF entry.
+        import importlib.util
+        import sys
+        import tempfile
+
+        generator_path = ROOT / "research_uiux/tools/build_sgfx_hud_layout.py"
+        spec_loader = importlib.util.spec_from_file_location(
+            "sgfx_hud_layout_chudpause_under_test", generator_path)
+        module = importlib.util.module_from_spec(spec_loader)
+        sys.modules["sgfx_hud_layout_chudpause_under_test"] = module
+        spec_loader.loader.exec_module(module)
+
+        synthetic_pause_api = (
+            "#pragma once\n"
+            "#include <SWA.inl>\n"
+            "using namespace Chao::CSD;\n"
+            "namespace SWA {\n"
+            "    enum EThing : uint32_t { eThing_A, eThing_B = 4, eThing_C };\n"
+            "    class CFakePause : public CGameObject {\n"
+            "    public:\n"
+            "        SWA_INSERT_PADDING(0x10);\n"
+            "        RCPtr<CProject> m_rcProject;\n"
+            "        RCPtr<CScene> m_rcScene;\n"
+            "        SWA_INSERT_PADDING(0x4);\n"
+            "        bool m_IsActive;\n"
+            "        SWA_INSERT_PADDING(0x3);\n"
+            "        be<EThing> m_Thing;\n"
+            "    };\n"
+            "    SWA_ASSERT_OFFSETOF(CFakePause, m_rcProject, 0x40);\n"
+            "    SWA_ASSERT_OFFSETOF(CFakePause, m_rcScene, 0x48);\n"
+            "    SWA_ASSERT_OFFSETOF(CFakePause, m_IsActive, 0x54);\n"
+            "    SWA_ASSERT_OFFSETOF(CFakePause, m_Thing, 0x58);\n"
+            "}\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            api_path = Path(tmp) / "FakePause.h"
+            api_path.write_text(synthetic_pause_api, encoding="utf-8")
+            spec = module.parse_swa_api_class(api_path, Path(tmp))
+
+        self.assertIsNotNone(spec)
+        self.assertEqual(spec.class_name, "CFakePause")
+        self.assertEqual(spec.base_class, "CGameObject")
+        self.assertEqual([m.name for m in spec.members],
+            ["m_rcProject", "m_rcScene", "m_IsActive", "m_Thing"])
+        self.assertEqual([m.offset for m in spec.members], [0x40, 0x48, 0x54, 0x58])
+        self.assertEqual(spec.members[0].rcptr_inner_type, "CProject")
+        self.assertEqual(spec.members[1].rcptr_inner_type, "CScene")
+        self.assertIsNone(spec.members[2].rcptr_inner_type)
+        self.assertEqual(spec.members[2].decl_type, "bool")
+        self.assertEqual(spec.members[3].decl_type, "be<EThing>")
+        self.assertEqual(len(spec.enums), 1)
+        self.assertEqual(spec.enums[0].name, "EThing")
+        self.assertEqual(spec.enums[0].underlying_type, "uint32_t")
+        self.assertEqual(spec.enums[0].values,
+            (("eThing_A", None), ("eThing_B", 4), ("eThing_C", None)))
+
+        emitted = module.emit_swa_api_class_header(spec)
+        for token in [
+            "Phase 268",
+            "class CFakePause",
+            "Chao::CSD::RCPtr<Chao::CSD::CProject> m_rcProject;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcScene;",
+            "bool m_IsActive;",
+            "be<EThing> m_Thing;",
+            "enum class EThing : std::uint32_t",
+            "eThing_A,",
+            "eThing_B = 4,",
+            "eThing_C",
+            # Padding fills the gaps between members.
+            "m_padding0000_0040",
+            "m_padding0050_0054",
+            "m_padding0055_0058",
+            # Static asserts cover every SWA_ASSERT_OFFSETOF entry.
+            "static_assert(offsetof(CFakePause, m_rcProject) == 0x40,",
+            "static_assert(offsetof(CFakePause, m_rcScene) == 0x48,",
+            "static_assert(offsetof(CFakePause, m_IsActive) == 0x54,",
+            "static_assert(offsetof(CFakePause, m_Thing) == 0x58,",
+            # be<T> wrapper is emitted because at least one member uses it.
+            "struct be",
+            # Base class noted in preamble.
+            "SWA base class: CGameObject",
+        ]:
+            self.assertIn(token, emitted)
+
+        # The committed live CHudPause header must also exist with the
+        # expected SWA-API-driven members.
+        live_pause = self.read(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_chud_pause.generated.h")
+        for token in [
+            "Phase 268",
+            "class CHudPause",
+            "Chao::CSD::RCPtr<Chao::CSD::CProject> m_rcPause;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcBg;",
+            "Chao::CSD::RCPtr<Chao::CSD::CScene> m_rcFooterA;",
+            "bool m_IsVisible;",
+            "be<EActionType> m_Action;",
+            "be<EMenuType> m_Menu;",
+            "be<uint32_t> m_Submenu;",
+            "enum class EActionType : std::uint32_t",
+            "enum class EMenuType : std::uint32_t",
+            "enum class EStatusType : std::uint32_t",
+            "enum class ETransitionType : std::uint32_t",
+            "static_assert(offsetof(CHudPause, m_rcPause) == 0xEC,",
+            "static_assert(offsetof(CHudPause, m_IsShown) == 0x1B8,",
+            "api/SWA/HUD/Pause/HudPause.h",
+        ]:
+            self.assertIn(token, live_pause)
+
     def test_sgfx_hud_layout_parses_swa_api_header_rcptr_declarations(self):
         # Phase 267: focused unit test for the SWA API header parser. The
         # parser must accept both fully-qualified and brief RCPtr<T>

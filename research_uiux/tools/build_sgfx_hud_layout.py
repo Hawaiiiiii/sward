@@ -65,6 +65,395 @@ _SWA_RCPTR_DECL_RE = re.compile(
     r'(?P<name>m_rc[A-Za-z0-9_]+)\s*;'
 )
 
+# Phase 268: capture every `SWA_ASSERT_OFFSETOF(Class, m_member, 0xN);`
+# entry — the UnleashedRecomp team's authoritative offsets for a given SWA
+# class. The asserts live just below the `class` body in the SWA API
+# header so we use them as the ground truth for member offsets when laying
+# out the corresponding generated port class.
+_SWA_OFFSETOF_RE = re.compile(
+    r'SWA_ASSERT_OFFSETOF\(\s*(?P<class>[A-Za-z0-9_]+)\s*,\s*'
+    r'(?P<member>m_[A-Za-z0-9_]+)\s*,\s*(?P<offset>0x[0-9A-Fa-f]+)\s*\)'
+)
+
+# Phase 268: capture the `class CXxx [: public CYyy]` line. CHudPause
+# inherits from `CGameObject`; CHudSonicStage in the SWA API header has no
+# explicit base. Both must parse cleanly.
+_SWA_CLASS_DECL_RE = re.compile(
+    r'class\s+(?P<class>C[A-Za-z0-9_]+)\s*'
+    r'(?:\:\s*public\s+(?P<base>C[A-Za-z0-9_]+))?\s*\{'
+)
+
+# Phase 268: capture `enum EXxx : uint32_t { ... };` definitions. The
+# whole block is captured (multiline) so the parser can extract every
+# enumerator value the SWA API header has named. Used for the enum
+# emission in the generated port header.
+_SWA_ENUM_DEF_RE = re.compile(
+    r'enum\s+(?P<name>E[A-Za-z0-9_]+)\s*:\s*(?P<underlying>[A-Za-z0-9_:]+)\s*'
+    r'\{(?P<body>[^}]*)\}\s*;',
+    re.DOTALL,
+)
+
+# Phase 268: capture non-RCPtr scalar members inside the class body so
+# the generated port class can emit them with their authoritative type.
+# Examples that must match: `bool m_IsVisible;`,
+# `be<EActionType> m_Action;`, `be<uint32_t> m_Submenu;`.
+_SWA_SCALAR_MEMBER_RE = re.compile(
+    r'^[ \t]+(?P<type>(?:be<[A-Za-z0-9_:]+>|bool|float|double|std::uint8_t|'
+    r'std::uint16_t|std::uint32_t|std::uint64_t|std::int8_t|std::int16_t|'
+    r'std::int32_t|std::int64_t|uint8_t|uint16_t|uint32_t|uint64_t|'
+    r'int8_t|int16_t|int32_t|int64_t))\s+(?P<name>m_[A-Za-z0-9_]+)\s*;',
+    re.MULTILINE,
+)
+
+
+@dataclass(frozen=True)
+class SwaApiMember:
+    name: str
+    decl_type: str          # full C++ type as written in the SWA API header
+    rcptr_inner_type: str | None  # "CProject" / "CScene" / "CNode" if RCPtr, else None
+    offset: int             # absolute offset within the class, from SWA_ASSERT_OFFSETOF
+
+
+@dataclass(frozen=True)
+class SwaApiEnum:
+    name: str
+    underlying_type: str
+    values: tuple[tuple[str, int | None], ...]
+
+
+@dataclass(frozen=True)
+class SwaApiClass:
+    namespace: str
+    class_name: str
+    base_class: str | None
+    members: tuple[SwaApiMember, ...]   # ordered by offset
+    enums: tuple[SwaApiEnum, ...]
+    swa_api_header_relpath: str
+
+
+def _strip_block_comments(text: str) -> str:
+    return re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
+
+
+def _strip_line_comments(text: str) -> str:
+    return re.sub(r'//[^\n]*', '', text)
+
+
+def _enumerator_values(body: str) -> tuple[tuple[str, int | None], ...]:
+    cleaned = _strip_block_comments(_strip_line_comments(body))
+    out: list[tuple[str, int | None]] = []
+    for raw in cleaned.split(","):
+        token = raw.strip()
+        if not token:
+            continue
+        if "=" in token:
+            name_part, value_part = token.split("=", 1)
+            name = name_part.strip()
+            try:
+                value: int | None = int(value_part.strip(), 0)
+            except ValueError:
+                value = None
+        else:
+            name = token
+            value = None
+        if name:
+            out.append((name, value))
+    return tuple(out)
+
+
+def parse_swa_api_class(api_header_path: Path, repo_root: Path) -> SwaApiClass | None:
+    """Parse a single-class SWA API HUD header into a structured SwaApiClass.
+
+    The parser is deliberately scoped to the SWA HUD header pattern (one
+    class per file, RCPtr/scalar members + SWA_INSERT_PADDING + a trailing
+    block of SWA_ASSERT_OFFSETOF lines). Returns None if the header does
+    not match that pattern; the caller decides whether that's an error.
+    """
+    if not api_header_path.is_file():
+        return None
+    raw_text = api_header_path.read_text(encoding="utf-8")
+    text = _strip_line_comments(_strip_block_comments(raw_text))
+
+    class_match = _SWA_CLASS_DECL_RE.search(text)
+    if class_match is None:
+        return None
+    class_name = class_match.group("class")
+    base_class = class_match.group("base")
+
+    # Class body runs from the opening `{` to the matching `}` immediately
+    # before the closing `};`. The SWA API headers have no nested types so
+    # a depth-1 brace counter from the class opening is adequate.
+    body_start = class_match.end() - 1  # back to the `{`
+    depth = 0
+    body_end = body_start
+    for i in range(body_start, len(text)):
+        ch = text[i]
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                body_end = i
+                break
+    if body_end <= body_start:
+        return None
+    class_body = text[body_start:body_end + 1]
+
+    # Offset table — read every SWA_ASSERT_OFFSETOF entry that targets this class.
+    offsets: dict[str, int] = {}
+    for m in _SWA_OFFSETOF_RE.finditer(text):
+        if m.group("class") != class_name:
+            continue
+        offsets[m.group("member")] = int(m.group("offset"), 16)
+    if not offsets:
+        return None
+
+    # Members: collect RCPtr<T> declarations and scalar declarations from
+    # the class body and pair each with its authoritative offset.
+    members: list[SwaApiMember] = []
+    for m in _SWA_RCPTR_DECL_RE.finditer(class_body):
+        name = m.group("name")
+        if name not in offsets:
+            continue
+        inner = m.group("inner")
+        members.append(SwaApiMember(
+            name=name,
+            decl_type=f"Chao::CSD::RCPtr<Chao::CSD::{inner}>",
+            rcptr_inner_type=inner,
+            offset=offsets[name],
+        ))
+    for m in _SWA_SCALAR_MEMBER_RE.finditer(class_body):
+        name = m.group("name")
+        if name not in offsets:
+            continue
+        members.append(SwaApiMember(
+            name=name,
+            decl_type=m.group("type"),
+            rcptr_inner_type=None,
+            offset=offsets[name],
+        ))
+
+    members.sort(key=lambda m: m.offset)
+    if not members:
+        return None
+
+    enums: list[SwaApiEnum] = []
+    for m in _SWA_ENUM_DEF_RE.finditer(text):
+        enums.append(SwaApiEnum(
+            name=m.group("name"),
+            underlying_type=m.group("underlying"),
+            values=_enumerator_values(m.group("body")),
+        ))
+
+    try:
+        relpath = str(api_header_path.relative_to(repo_root).as_posix())
+    except ValueError:
+        relpath = str(api_header_path)
+
+    return SwaApiClass(
+        namespace="SWA",
+        class_name=class_name,
+        base_class=base_class,
+        members=tuple(members),
+        enums=tuple(enums),
+        swa_api_header_relpath=relpath,
+    )
+
+
+def emit_swa_api_class_header(spec: SwaApiClass) -> str:
+    """Emit the human-readable port C++ header for a class fully sourced from
+    the UnleashedRecomp SWA API header (no ui_lab table extension needed).
+
+    Produces: namespace, forward decls, RCPtr template defn, namespace
+    alias, enum declarations, the class itself with byte-padded layout,
+    and one static_assert per SWA_ASSERT_OFFSETOF entry. Output structure
+    mirrors `emit_header` so downstream consumers see a consistent layout
+    regardless of which generator path produced the file.
+    """
+    generated_at = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
+    rcptr_inner_types = sorted({
+        m.rcptr_inner_type for m in spec.members if m.rcptr_inner_type
+    })
+    forward_types = list(rcptr_inner_types)
+    if "CScene" not in forward_types:
+        forward_types.append("CScene")
+    forward_types = sorted(set(forward_types))
+
+    lines: list[str] = []
+    lines.append("#pragma once")
+    lines.append("")
+    lines.append(f"// SGFX HUD layout: human-readable port of `class {spec.class_name}`.")
+    lines.append("//")
+    lines.append("// Phase 268: generated directly from the UnleashedRecomp SWA API header")
+    lines.append(f"// `{spec.swa_api_header_relpath}` — that header already names every")
+    lines.append("// member of this class with the authoritative SWA template-argument")
+    lines.append("// types and pins each member offset via `SWA_ASSERT_OFFSETOF`. The")
+    lines.append("// generator copies those offsets verbatim and pads between members so")
+    lines.append("// `static_assert(offsetof(...))` continues to validate the layout at")
+    lines.append("// compile time. Method bodies are intentionally out of scope; they")
+    lines.append("// will be ported in subsequent phases as the recomp flow is decoded.")
+    lines.append("//")
+    lines.append(f"// Generated at: {generated_at}")
+    if spec.base_class:
+        lines.append(
+            f"// SWA base class: {spec.base_class} (modeled here as leading byte padding "
+            "rather than a real C++ base class to keep the layout self-contained).")
+    lines.append("")
+    lines.append("#include <array>")
+    lines.append("#include <cstddef>")
+    lines.append("#include <cstdint>")
+    lines.append("#include <string_view>")
+    lines.append("")
+    lines.append("namespace sward::ui_runtime::generated::sgfx_hud")
+    lines.append("{")
+    lines.append("    // Forward declarations of the SWA CSD types referenced by this HUD")
+    lines.append("    // class. The retail SWA executable holds the corresponding")
+    lines.append("    // `Chao::CSD::*` types; the human-readable port keeps them opaque at")
+    lines.append("    // this layer because the CSD runtime is ported separately.")
+    for fwd in forward_types:
+        lines.append(f"    class {fwd};")
+    lines.append("")
+    lines.append("    // SWA `RCPtr<T>` matches an Xbox 360 32-bit pointer pair:")
+    lines.append("    // `m_pRCObject` (the reference-counted wrapper) at offset 0 and")
+    lines.append("    // `m_pMemory` (the wrapped object) at offset 4. Total size: 8 bytes.")
+    lines.append("    template <class T>")
+    lines.append("    struct RCPtr")
+    lines.append("    {")
+    lines.append("        std::uint32_t m_pRCObject;  // guest-relative pointer to the RCObject wrapper")
+    lines.append("        std::uint32_t m_pMemory;    // guest-relative pointer to the wrapped T")
+    lines.append("    };")
+    lines.append("    static_assert(sizeof(RCPtr<CScene>) == 8, \"RCPtr<T> must match the SWA 8-byte layout\");")
+    lines.append("")
+    lines.append("    // The SWA executable references the wrapper as `Chao::CSD::RCPtr<T>`")
+    lines.append("    // throughout the existing API headers; the `Chao::CSD::` alias here")
+    lines.append("    // matches that convention so the human-readable port's member")
+    lines.append("    // declarations read identically to the SWA originals.")
+    lines.append("    namespace Chao { namespace CSD")
+    lines.append("    {")
+    lines.append("        template <class T> using RCPtr = ::sward::ui_runtime::generated::sgfx_hud::RCPtr<T>;")
+    for fwd in forward_types:
+        lines.append(f"        using {fwd} = ::sward::ui_runtime::generated::sgfx_hud::{fwd};")
+    lines.append("    }} // namespace Chao::CSD")
+    lines.append("")
+
+    # SWA `be<T>` is a big-endian wrapper. Re-emit it here as a thin struct
+    # that holds the same byte width as T so static_assert(sizeof(...))
+    # continues to round-trip the SWA layout. The semantic decoding (host
+    # endian conversion) belongs to a runtime layer ported separately.
+    if any(m.decl_type.startswith("be<") for m in spec.members):
+        lines.append("    // SWA `be<T>` is a thin big-endian wrapper around T; for layout")
+        lines.append("    // purposes it is equivalent to T itself (same size and alignment).")
+        lines.append("    // Endian decoding is the responsibility of a separate runtime")
+        lines.append("    // layer ported alongside the rest of the SWA executable.")
+        lines.append("    template <class T>")
+        lines.append("    struct be")
+        lines.append("    {")
+        lines.append("        T m_storage;")
+        lines.append("    };")
+        lines.append("")
+
+    # Enum declarations.
+    for enum in spec.enums:
+        lines.append(f"    enum class {enum.name} : std::{enum.underlying_type}")
+        lines.append("    {")
+        for i, (name, value) in enumerate(enum.values):
+            comma = "," if i + 1 < len(enum.values) else ""
+            if value is None:
+                lines.append(f"        {name}{comma}")
+            else:
+                lines.append(f"        {name} = {value}{comma}")
+        lines.append("    };")
+        lines.append("")
+
+    # The class itself: emit a flat layout with explicit byte padding
+    # between members so each member lands at its SWA_ASSERT_OFFSETOF
+    # offset.
+    lines.append(f"    class {spec.class_name}")
+    lines.append("    {")
+    lines.append("    public:")
+
+    cursor = 0
+    for i, member in enumerate(spec.members):
+        if member.offset > cursor:
+            gap = member.offset - cursor
+            lines.append(
+                f"    private:"
+                f" std::array<std::uint8_t, 0x{gap:X}> m_padding{cursor:04X}_{member.offset:04X};"
+                f"  // pre-{member.name} padding (covers SWA base class / SWA_INSERT_PADDING bytes)"
+            )
+            lines.append("    public:")
+        size_bytes = _swa_member_size_bytes(member)
+        lines.append(
+            f"        {_render_swa_member_decl(member)}  "
+            f"// +0x{member.offset:X} {_swa_member_provenance_comment(member)}"
+        )
+        cursor = member.offset + size_bytes
+    lines.append("    };")
+    lines.append("")
+
+    # Compile-time guards.
+    lines.append("    // Compile-time guards: every named member must land at the SWA-asserted")
+    lines.append("    // offset. Drift against the live recomp executable's class layout breaks")
+    lines.append("    // the build and forces a re-generation.")
+    for member in spec.members:
+        lines.append(
+            f"    static_assert(offsetof({spec.class_name}, {member.name}) == 0x{member.offset:X},"
+            f" \"{spec.class_name}::{member.name} must remain at +0x{member.offset:X}\");"
+        )
+    lines.append("")
+    lines.append(f"    static constexpr std::string_view kGeneratedAt = \"{generated_at}\";")
+    lines.append(
+        f"    static constexpr std::string_view kSwaApiHeaderRelpath = "
+        f"\"{_cpp_escape(spec.swa_api_header_relpath)}\";"
+    )
+    lines.append("")
+    lines.append("} // namespace sward::ui_runtime::generated::sgfx_hud")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _swa_member_size_bytes(member: SwaApiMember) -> int:
+    if member.rcptr_inner_type is not None:
+        return 8
+    if member.decl_type == "bool":
+        return 1
+    if member.decl_type.startswith("be<"):
+        # SWA `be<T>` is the size of T. The underlying T inside `be<>` is
+        # the SWA enum or scalar; for the SWA HUD class enums we observe
+        # `EActionType` etc. all use `uint32_t` underlying, and `be<uint32_t>`
+        # is also 4 bytes. Default to 4 bytes which covers every observed
+        # case in the existing SWA API headers.
+        return 4
+    if member.decl_type in {
+        "std::uint8_t", "std::int8_t", "uint8_t", "int8_t",
+    }:
+        return 1
+    if member.decl_type in {
+        "std::uint16_t", "std::int16_t", "uint16_t", "int16_t",
+    }:
+        return 2
+    if member.decl_type in {
+        "std::uint32_t", "std::int32_t", "uint32_t", "int32_t", "float",
+    }:
+        return 4
+    if member.decl_type in {
+        "std::uint64_t", "std::int64_t", "uint64_t", "int64_t", "double",
+    }:
+        return 8
+    # Conservative default for an unknown SWA scalar — assume 4 bytes
+    # which matches the most common case (be<EnumType> / be<uint32_t>).
+    return 4
+
+
+def _render_swa_member_decl(member: SwaApiMember) -> str:
+    return f"{member.decl_type} {member.name};"
+
+
+def _swa_member_provenance_comment(member: SwaApiMember) -> str:
+    if member.rcptr_inner_type is not None:
+        return f"{member.decl_type} (type from SWA API header)"
+    return f"{member.decl_type} (type from SWA API header)"
+
 
 @dataclass(frozen=True)
 class ExpectedField:
@@ -461,6 +850,36 @@ def main() -> int:
         ),
         help="Where to write the generated C++ header.",
     )
+    parser.add_argument(
+        "--also-generate-chud-pause",
+        action="store_true",
+        default=True,
+        help=(
+            "Also generate sgfx_hud_chud_pause.generated.h from the "
+            "UnleashedRecomp SWA API header for CHudPause; on by default."
+        ),
+    )
+    parser.add_argument(
+        "--no-also-generate-chud-pause",
+        action="store_false",
+        dest="also_generate_chud_pause",
+        help="Skip the parallel CHudPause generation pass.",
+    )
+    parser.add_argument(
+        "--chud-pause-swa-api-header",
+        default=(
+            "local_build_env/ur103clean/UnleashedRecomp/api/SWA/HUD/Pause/HudPause.h"
+        ),
+        help="Path to the UnleashedRecomp SWA API header for CHudPause.",
+    )
+    parser.add_argument(
+        "--chud-pause-output-header",
+        default=(
+            "research_uiux/runtime_reference/include/sward/ui_runtime/"
+            "sgfx_hud_chud_pause.generated.h"
+        ),
+        help="Where to write the generated C++ header for CHudPause.",
+    )
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -508,6 +927,29 @@ def main() -> int:
         + (f" from sidecar {sidecar_path.relative_to(repo_root)}" if sidecar_path else "")
         + swa_api_summary
     )
+
+    if args.also_generate_chud_pause:
+        chud_pause_api_path = (repo_root / args.chud_pause_swa_api_header).resolve()
+        chud_pause_spec = parse_swa_api_class(chud_pause_api_path, repo_root)
+        if chud_pause_spec is None:
+            print(
+                f"sgfx-hud-layout: skipped CHudPause generation; could not parse "
+                f"{chud_pause_api_path.relative_to(repo_root) if chud_pause_api_path.is_relative_to(repo_root) else chud_pause_api_path}"
+            )
+        else:
+            chud_pause_header_text = emit_swa_api_class_header(chud_pause_spec)
+            chud_pause_output_path = (repo_root / args.chud_pause_output_header).resolve()
+            chud_pause_output_path.parent.mkdir(parents=True, exist_ok=True)
+            chud_pause_output_path.write_text(chud_pause_header_text, encoding="utf-8")
+            print(
+                f"sgfx-hud-layout: wrote {chud_pause_output_path.relative_to(repo_root)} "
+                f"with {len(chud_pause_spec.members)} members "
+                f"({sum(1 for m in chud_pause_spec.members if m.rcptr_inner_type)} RCPtrs, "
+                f"{sum(1 for m in chud_pause_spec.members if not m.rcptr_inner_type)} scalars) "
+                f"and {len(chud_pause_spec.enums)} enum definitions; "
+                f"sourced from {chud_pause_spec.swa_api_header_relpath}"
+            )
+
     return 0
 
 
