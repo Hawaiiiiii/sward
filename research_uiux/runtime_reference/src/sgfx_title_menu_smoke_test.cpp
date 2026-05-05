@@ -157,6 +157,27 @@ int main()
                  "test7.ExitRequested fired");
     }
 
+    // Phase 319: real captured retail phase counter advances on
+    // accept and is reset by the host once the transition completes.
+    {
+        TitleMenuState state{};
+        applyTitleMenuVisibility(state, true, false, false, true);
+        state.cursorIndex = static_cast<std::int32_t>(TitleMenuOption::Continue);
+        expectEq(state.phase, TitleMenuPhase::Idle, "test8.starts Idle");
+        TitleMenuInput in{}; in.acceptTapped = true;
+        updateTitleMenuOneFrame(state, in);
+        expectEq(state.phase, TitleMenuPhase::TransitionRequested,
+                 "test8.accept -> TransitionRequested");
+        expect(state.transitionTargetSet, "test8.transitionTargetSet=true");
+        advanceTitleMenuToTransitioningOut(state);
+        expectEq(state.phase, TitleMenuPhase::TransitioningOut,
+                 "test8.advance -> TransitioningOut");
+        resetTitleMenuPhaseAfterTransition(state);
+        expectEq(state.phase, TitleMenuPhase::Idle,
+                 "test8.reset -> Idle");
+        expect(!state.transitionTargetSet, "test8.transitionTargetSet=false after reset");
+    }
+
     std::cout << "failures: " << g_failures << "\n";
     return g_failures == 0 ? 0 : 1;
 }

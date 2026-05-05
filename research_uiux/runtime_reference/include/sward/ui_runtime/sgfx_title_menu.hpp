@@ -84,12 +84,37 @@ namespace sward::ui_runtime::generated::sgfx_hud
         std::string        sfxCueName;     // e.g. "sys_worldmap_decide"; empty = no cue
     };
 
+    // Phase 319 retail-fidelity addition: the runtime's
+    // CTitleStateMenu::CTitleStateMenuContext carries a 3-stage
+    // phase counter that drives the screen-transition pipeline.
+    // Captured trace (phase315_take2 trace, last 5 title-menu-context
+    // samples) shows context_phase advancing 0 -> 1 -> 2 on accept,
+    // with context_472 going from 0 to a non-null pointer when
+    // phase advances. SGFX mirrors that as a discrete enum the
+    // host can read alongside the higher-level events.
+    enum class TitleMenuPhase : std::uint8_t
+    {
+        Idle              = 0, // cursor active, menu interactive
+        TransitionRequested = 1, // accept fired, target sub-state set
+        TransitioningOut  = 2, // outro animation playing
+    };
+
     // Bookkeeping the menu carries between frames.
     struct TitleMenuState
     {
         // Cursor position (raw int so we can clamp + wrap cleanly).
         // The retail asset uses 4 visible rows; SGFX adds Exit as a 5th.
         std::int32_t cursorIndex = 0;
+
+        // Phase 319: real retail phase counter (mirrors
+        // CTitleStateMenuContext::context_phase). Idle/Requested/Out.
+        TitleMenuPhase phase = TitleMenuPhase::Idle;
+        // Mirrors context_472: when non-zero, a sub-state pointer
+        // is armed (the runtime sets this when accept fires on a
+        // row that opens a sub-screen). SGFX represents it as a
+        // simple bool because the actual address isn't meaningful
+        // outside the runtime.
+        bool transitionTargetSet = false;
 
         // Modal popups.
         bool deleteSavePromptOpen = false;
@@ -224,16 +249,23 @@ namespace sward::ui_runtime::generated::sgfx_hud
             }
         }
 
-        // Accept on the highlighted option.
+        // Accept on the highlighted option. Phase 319: also
+        // advances the captured retail phase counter (Idle ->
+        // TransitionRequested) and sets transitionTargetSet so
+        // the host can observe the same state shape the runtime
+        // carries in CTitleStateMenuContext.
         if (input.acceptTapped)
         {
             const auto opt = optionFromIndex(state.cursorIndex);
+            // Captured retail flow: every accept advances phase 0 -> 1
+            // and arms the transition target pointer. Exact target
+            // semantics depend on which option was picked.
+            state.phase = TitleMenuPhase::TransitionRequested;
+            state.transitionTargetSet = true;
+
             switch (opt)
             {
             case TitleMenuOption::NewGame:
-                // Retail SU: if a save exists, pops the delete-save
-                // confirmation. SGFX host decides whether to follow
-                // through with OnDeleteSavePromptDecision().
                 state.deleteSavePromptOpen = true;
                 state.deleteSavePromptSelectedIndex = -1;
                 events.push_back({TitleMenuEventKind::DeleteSavePromptOpened,
@@ -265,6 +297,28 @@ namespace sward::ui_runtime::generated::sgfx_hud
         }
 
         return events;
+    }
+
+    // Phase 319: host calls this once the outro animation is
+    // committed (e.g. fade-out has begun). Mirrors the retail
+    // runtime's progression context_phase=1 -> 2 captured in the
+    // last 5 title-menu-context samples of the phase315_take2 trace.
+    inline void advanceTitleMenuToTransitioningOut(TitleMenuState& s) noexcept
+    {
+        if (s.phase == TitleMenuPhase::TransitionRequested)
+            s.phase = TitleMenuPhase::TransitioningOut;
+    }
+
+    // Phase 319: host calls this when the outgoing transition has
+    // fully resolved (next screen has taken over). Resets back to
+    // Idle so the menu is ready for re-entry.
+    inline void resetTitleMenuPhaseAfterTransition(TitleMenuState& s) noexcept
+    {
+        s.phase = TitleMenuPhase::Idle;
+        s.transitionTargetSet = false;
+        s.optionsSubMenuOpen = false;
+        s.deleteSavePromptOpen = false;
+        s.dlcInstallPromptOpen = false;
     }
 
     // Convenience: hide Continue (corrupt save); hide DLC (already
