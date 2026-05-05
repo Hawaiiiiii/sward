@@ -99,7 +99,7 @@ Phase 285 ports method bodies for the three previously layout-only HUD classes. 
 - Input root: `C:/Users/DavidErikGarciaArena/Downloads/UI-UX Sonic World Adventure for SGFX - Project Quality Hero/extracted_assets/full_install_archives`
 - Project files parsed: `41`
 - Preview draw commands: `1888` real-yncp-subimage-dds-rect rows.
-- Scene draw commands: `7530` real-yncp-cast-tree-subimage-scene-rect rows.
+- Scene draw commands: `9927` real-yncp-cast-tree-subimage-scene-rect rows.
 - Animation keyframes: `20091` real-yncp-animation-keyframe rows for keyframe interpolation.
 - SFX cue candidates: `4` runtime-hook + Ghidra xref SFX candidates.
 - SFX correlation: `sfx-correlation-pending` until audio banks/XML/runtime hooks/Ghidra xrefs prove every exact cue ID.
@@ -589,7 +589,7 @@ Phase 285 ports method bodies for the three previously layout-only HUD classes. 
 - Root scenes: `bg, logo, title_1, title_2, menu, menu_scroll, txt, progress`
 - Component roles: `title_logo=8`
 - Texture-backed preview commands: `28`
-- Composed scene draw commands: `265`
+- Composed scene draw commands: `414`
 - Animation keyframes: `1447`
 - Key scenes:
   - `bg` -> `title_logo` casts=14 anims=5 frames=[60.0, 120.0]
@@ -607,7 +607,7 @@ Phase 285 ports method bodies for the three previously layout-only HUD classes. 
 - Root scenes: `sample, bg, logo, title_1, title_2, menu, menu_scroll, txt, progress`
 - Component roles: `title_logo=9`
 - Texture-backed preview commands: `29`
-- Composed scene draw commands: `251`
+- Composed scene draw commands: `336`
 - Animation keyframes: `790`
 - Key scenes:
   - `sample` -> `title_logo` casts=1 anims=1 frames=[100.0, 100.0]
@@ -628,7 +628,7 @@ Phase 285 ports method bodies for the three previously layout-only HUD classes. 
 - Root scenes: `worldmap_background`
 - Component roles: `world_map_marker=35`
 - Texture-backed preview commands: `112`
-- Composed scene draw commands: `637`
+- Composed scene draw commands: `946`
 - Animation keyframes: `1082`
 - Key scenes:
   - `worldmap_background` -> `world_map_marker` casts=47 anims=2 frames=[0.0, 60.0]
@@ -663,7 +663,7 @@ Phase 285 ports method bodies for the three previously layout-only HUD classes. 
 - Root scenes: `worldmap_background`
 - Component roles: `world_map_marker=35`
 - Texture-backed preview commands: `112`
-- Composed scene draw commands: `637`
+- Composed scene draw commands: `946`
 - Animation keyframes: `1082`
 - Key scenes:
   - `worldmap_background` -> `world_map_marker` casts=47 anims=2 frames=[0.0, 60.0]
@@ -698,7 +698,7 @@ Phase 285 ports method bodies for the three previously layout-only HUD classes. 
 - Root scenes: `worldmap_background`
 - Component roles: `world_map_marker=35`
 - Texture-backed preview commands: `112`
-- Composed scene draw commands: `637`
+- Composed scene draw commands: `946`
 - Animation keyframes: `1082`
 - Key scenes:
   - `worldmap_background` -> `world_map_marker` casts=47 anims=2 frames=[0.0, 60.0]
@@ -733,7 +733,7 @@ Phase 285 ports method bodies for the three previously layout-only HUD classes. 
 - Root scenes: `worldmap_background`
 - Component roles: `world_map_marker=35`
 - Texture-backed preview commands: `112`
-- Composed scene draw commands: `637`
+- Composed scene draw commands: `946`
 - Animation keyframes: `1082`
 - Key scenes:
   - `worldmap_background` -> `world_map_marker` casts=47 anims=2 frames=[0.0, 60.0]
@@ -768,7 +768,7 @@ Phase 285 ports method bodies for the three previously layout-only HUD classes. 
 - Root scenes: `worldmap_background`
 - Component roles: `world_map_marker=35`
 - Texture-backed preview commands: `112`
-- Composed scene draw commands: `637`
+- Composed scene draw commands: `946`
 - Animation keyframes: `1082`
 - Key scenes:
   - `worldmap_background` -> `world_map_marker` casts=47 anims=2 frames=[0.0, 60.0]
@@ -803,7 +803,7 @@ Phase 285 ports method bodies for the three previously layout-only HUD classes. 
 - Root scenes: `worldmap_background`
 - Component roles: `world_map_marker=35`
 - Texture-backed preview commands: `112`
-- Composed scene draw commands: `637`
+- Composed scene draw commands: `946`
 - Animation keyframes: `1082`
 - Key scenes:
   - `worldmap_background` -> `world_map_marker` casts=47 anims=2 frames=[0.0, 60.0]
@@ -838,7 +838,7 @@ Phase 285 ports method bodies for the three previously layout-only HUD classes. 
 - Root scenes: `worldmap_background`
 - Component roles: `world_map_marker=35`
 - Texture-backed preview commands: `112`
-- Composed scene draw commands: `637`
+- Composed scene draw commands: `946`
 - Animation keyframes: `1082`
 - Key scenes:
   - `worldmap_background` -> `world_map_marker` casts=47 anims=2 frames=[0.0, 60.0]

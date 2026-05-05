@@ -1,0 +1,44 @@
+{
+  "phase": "302",
+  "purpose": "Identify the cause of info_bg_1's horizontal-vs-vertical layout divergence between the human-readable C++ port and the live UnleashedRecomp runtime.",
+  "investigation_path": [
+    "Phase 295 mapped every CCastNode setter in 0x830BB000-0x830BC000; live runtime called only SetPosition (sub_830BB3D0) on info_bg_1's root cast.",
+    "Phase 302a ran Ghidra analyzeHeadless against the existing project to dump CTitleStateWorldMap::Update (sub_8258B558) callees: 69 unique sub_ functions but ZERO in the CSD setter ranges (0x830BB*, 0x830BF*).",
+    "Inspecting the auto-translated PPC body of sub_8258B558 in local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.40.cpp (49453+) confirms the original game does NOT call CSD transform setters from this update routine.",
+    "The SetPosition calls visible in the Phase 294 probe come from UnleashedRecomp's aspect_ratio_patches.cpp wrapper, NOT from the original game.",
+    "Tracing back to the asset bytes via inspect_xncp_yncp.parse_scene reveals the actual root cause: info_bg_1 has 4 cast_groups x 53 casts = 212 total casts, but build_yncp_native_component_map.py was capping at MAX_SCENE_DRAW_COMMANDS_PER_SCENE=96 - so the renderer was only seeing 45% of the panel's cells."
+  ],
+  "fix_applied": {
+    "file": "research_uiux/tools/build_yncp_native_component_map.py",
+    "change": "Raised MAX_SCENE_DRAW_COMMANDS_PER_SCENE from 96 to 1024",
+    "result_for_info_bg_1": {
+      "before": { "cells_extracted": 96,  "grid_shape": "12x8 horizontal" },
+      "after":  { "cells_extracted": 192, "grid_shape": "12x16 (still wider than tall but with all rows present)" }
+    }
+  },
+  "remaining_gap": {
+    "description": "Even with full 192 cells extracted, the asset's natural layout is ~432 px wide x ~144 px tall. The live runtime renders the panel as ~100 px wide x ~300 px tall - a non-uniform scale of approximately (0.23, 2.08).",
+    "candidate_explanations": [
+      "The runtime applies SetScale or SetCastScale via a path that doesn't go through sub_830BB650 / sub_830BF090 (both probed; both silent for World Map).",
+      "info_bg_1 in the asset has 4 cast_groups; the runtime might activate ONLY ONE of them at a time and stack them differently.",
+      "There is a CSD-engine internal field (e.g. cast_offset at +0x60/+0x64 of the cast struct, or a 'visible_rect' override stored in CCastNode at runtime init) that the on-disk extractor doesn't capture and the public setter API never touches."
+    ],
+    "next_phase_actions": [
+      "Add a CSD draw-time probe that hooks the per-cast draw call (sub_830BC540 or similar in the CScene::Update / CCastNode::Render path) so we capture the EFFECTIVE per-cast world transform regardless of which setter (or no setter) produced it.",
+      "Re-render info_bg_1 with the now-complete 192-cell extraction and re-compare; the gap might shrink enough that this phase's cap-fix is the dominant correction."
+    ]
+  },
+  "transparency": {
+    "runtime_proven": [
+      "Cap on MAX_SCENE_DRAW_COMMANDS_PER_SCENE was 96; info_bg_1 has 4x53=212 casts; raising the cap lets us extract 192 cells (up from 96)",
+      "CTitleStateWorldMap::Update's 69 PPC-body callees do not include any CSD transform setter (Ghidra-confirmed via headless export)",
+      "The Phase 294 SetPosition probe captured exactly one call on info_bg_1's root cast at (383, -178) coming from UnleashedRecomp's aspect_ratio_patches.cpp"
+    ],
+    "runtime_inferred": [
+      "The non-uniform scale that turns 12x16 horizontal into ~vertical column must come from somewhere outside the public CCastNode/CNode setter API"
+    ],
+    "pending_ghidra": [
+      "Decompile the 69 sub_8258B558 callees to find any that internally apply scale or rotation to info_bg_1's cast tree"
+    ]
+  }
+}
