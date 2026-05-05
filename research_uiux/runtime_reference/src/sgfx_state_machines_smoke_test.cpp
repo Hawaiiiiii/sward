@@ -13,6 +13,8 @@
 #include "sward/ui_runtime/sgfx_general_window.hpp"
 #include "sward/ui_runtime/sgfx_pad_state.hpp"
 #include "sward/ui_runtime/sgfx_evil_hud_guide.hpp"
+#include "sward/ui_runtime/sgfx_save_icon.hpp"
+#include "sward/ui_runtime/sgfx_sound_admin.hpp"
 
 #include <iostream>
 #include <string>
@@ -696,6 +698,72 @@ static void testEvilHudGuide()
     }
 }
 
+// ----- Phase 333: SaveIcon retail port -----
+static void testSaveIcon()
+{
+    using namespace ui;
+    std::cout << "\n== save icon ==\n";
+    SaveIconState s;
+    expect(!s.isVisible, "save.starts hidden");
+
+    {
+        const auto evs = showSaveIcon(s, 0.5f);
+        expect(s.isVisible, "save.shown");
+        expectEq(evs[0].kind, SaveIconEventKind::Shown, "save.Shown event");
+        expectEq(s.visibleSecondsRemaining, 0.5f, "save.timer set");
+    }
+    // Tick 0.3s -> still visible.
+    {
+        const auto evs = updateSaveIconOneFrame(s, 0.3f);
+        expect(s.isVisible, "save.still visible after 0.3s");
+        expect(evs.empty(), "save.no event yet");
+    }
+    // Tick 0.3s more -> auto-hide fires.
+    {
+        const auto evs = updateSaveIconOneFrame(s, 0.3f);
+        expect(!s.isVisible, "save.auto-hidden after timer");
+        expectEq(evs[0].kind, SaveIconEventKind::Hidden, "save.Hidden event");
+    }
+    // Re-show resets timer.
+    {
+        showSaveIcon(s, 1.0f);
+        expect(s.isVisible, "save.re-shown");
+        showSaveIcon(s, 2.0f); // updates timer without re-firing
+        expectEq(s.visibleSecondsRemaining, 2.0f, "save.timer extended without re-fire");
+    }
+}
+
+// ----- Phase 333: SoundAdministrator BGM channels -----
+static void testBgmAdmin()
+{
+    using namespace ui;
+    std::cout << "\n== sound admin BGM ==\n";
+    SgfxBgmAdmin admin;
+
+    // Default volumes are 1.0.
+    expectEq(admin.getChannelVolume(1), 1.0f, "bgm.ch1 default 1.0");
+    expectEq(admin.getChannelVolume(4), 1.0f, "bgm.ch4 default 1.0");
+
+    // Set + clamp.
+    admin.setChannelVolume(2, 0.5f);
+    expectEq(admin.getChannelVolume(2), 0.5f, "bgm.ch2 = 0.5");
+    admin.setChannelVolume(3, 1.5f); // over 1.0, should clamp
+    expectEq(admin.getChannelVolume(3), 1.0f, "bgm.ch3 clamped to 1.0");
+    admin.setChannelVolume(1, -0.2f); // under 0, should clamp
+    expectEq(admin.getChannelVolume(1), 0.0f, "bgm.ch1 clamped to 0.0");
+
+    // Mount cues per channel.
+    admin.mountCue(kBgmChannelMain, "bgm_act_apotos");
+    admin.mountCue(kBgmChannelResults, "bgm_sys_result");
+    expectEq(admin.cueAt(1), std::string("bgm_act_apotos"), "bgm.main cue");
+    expectEq(admin.cueAt(3), std::string("bgm_sys_result"), "bgm.results cue");
+
+    // Channel constants match retail-observed convention.
+    expectEq(kBgmChannelMain, 1, "bgm.main constant=1");
+    expectEq(kBgmChannelResults, 3, "bgm.results constant=3");
+    expectEq(kBgmChannelAttract, 4, "bgm.attract constant=4");
+}
+
 int main()
 {
     testPauseMenu();
@@ -712,6 +780,8 @@ int main()
     testTitleIntroAttractMovie();
     testResultsScreenEx();
     testEvilHudGuide();
+    testSaveIcon();
+    testBgmAdmin();
     std::cout << "\nfailures: " << g_failures << "\n";
     return g_failures == 0 ? 0 : 1;
 }

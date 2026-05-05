@@ -1,72 +1,169 @@
 {
-  "phase": "321",
-  "purpose": "Map every SGFX-relevant CTitleStateMenu / CTitleStateWorldMap / CHudPause / CHudSonicStage state-machine PPC function to its on-disk auto-translated PPC C++ body. The recompiled UnleashedRecomp.exe doesn't expose the sub_XXXX PPC symbols Ghidra needs (XenonRecomp translates them into x64 functions with new addresses), so the auto-translated source files in local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.*.cpp are the static-decompile oracle. This map lets future retroactive ports target the right body directly.",
-  "discovery_method": "Searched local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.*.cpp for PPC_FUNC_IMPL(__imp__sub_XXXXXXXX) declarations.",
-  "ghidra_status": "Ghidra analyzeHeadless on the existing project (sward_unleashed_recomp_context, programs phase222_smoke.exe / phase254_owner_layout_noanalysis.exe) returns UNRESOLVED for every PPC sub_ symbol because the analyzed program is the recompiled x64 binary, not the original Xbox 360 default.xex. To get Ghidra-side PPC decompiles a future phase would import the original .xex file from extracted_assets.",
-  "state_machines": [
+  "phase": "333",
+  "purpose": "Map every SGFX-relevant SWA UI/UX class to its retail-fidelity source: api/ struct headers (validated by SWA_ASSERT_OFFSETOF) and ppc_recomp.*.cpp Update bodies (the static-decompile oracle for behaviors not exposed via api/ headers). The recompiled UnleashedRecomp.exe doesn't expose the sub_XXXX PPC symbols Ghidra needs (XenonRecomp translates them into x64 functions with new addresses), so the auto-translated source files in local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.*.cpp are the static-decompile oracle. This map lets future retroactive ports target the right body directly.",
+  "discovery_method": "Read api/SWA/**/*.h for retail field offsets validated by SWA_ASSERT_OFFSETOF. Searched local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.*.cpp for PPC_FUNC_IMPL(__imp__sub_XXXXXXXX) declarations.",
+  "ghidra_status": "Ghidra cannot run from the agent CLI environment. Even if it could, analyzeHeadless on the recompiled x64 binary returns UNRESOLVED for every PPC sub_ symbol because XenonRecomp translates PPC bodies into x64 functions with new addresses. To get Ghidra-side PPC decompiles a future user-driven phase would import the original Xbox 360 default.xex into a fresh Ghidra project. ppc_recomp.*.cpp is the equivalent static decompile and is preferred.",
+  "retail_mined_classes": [
     {
-      "ppc_address": "sub_824B0930",
-      "labeled_name": "SWA::CHudPause::Update",
-      "source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.27.cpp",
-      "source_line": 39777,
-      "body_lines": 2053,
-      "wrapper": "UnleashedRecomp/patches/CHudPause_patches.cpp",
-      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_pause_menu.hpp",
-      "captured_state_fields": ["m_Action", "m_Menu", "m_Status", "m_Transition", "m_IsVisible", "m_IsShown", "cursorIndex (via m_pHudPause + 0x19C +0x68)"],
-      "callees_total": 30,
-      "notes": "Largest state machine in the SGFX port set. Reading line-by-line is multi-session work; the captured logcat trace (Phase 315) is the more efficient ground-truth source. Use this PPC body when logcat data is missing for a specific transition (e.g. m_Status = Accept resolution that wasn't observed live)."
-    },
-    {
-      "ppc_address": "sub_8258B558",
-      "labeled_name": "SWA::CTitleStateWorldMap::Update",
-      "source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.40.cpp",
-      "source_line": 49453,
-      "body_lines": 2147,
-      "wrapper": "UnleashedRecomp/patches/aspect_ratio_patches.cpp:294-344",
-      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_world_map.hpp",
-      "captured_state_fields": ["worldMapSimpleInfo (via this+0x70)", "cursor + visibility flags via the linked-list at +0x20..+0x24"],
-      "callees_total": 69,
-      "notes": "Already partially mined via Phase 295 (Ghidra-confirmed callee map; no CSD setter calls in body, runtime overrides come from the aspect_ratio patch wrapper)."
-    },
-    {
+      "swa_class": "SWA::CTitleStateMenu",
+      "api_header": "api/SWA/System/GameMode/Title/TitleStateMenu.h",
+      "fields_mined": ["m_CursorIndex", "m_IsDeleteCheckMessageOpen", "m_IsDLCInfoMessageOpen", "m_Field3C", "m_Field54", "m_Field98", "m_Field9A", "m_Field9F", "m_Field38", "m_Field60"],
       "ppc_address": "sub_825882B8",
-      "labeled_name": "SWA::CTitleStateMenu::Update",
-      "source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.40.cpp",
-      "source_line": 42336,
-      "body_lines": 898,
+      "ppc_source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.40.cpp",
+      "ppc_source_line": 42336,
+      "ppc_body_lines": 898,
       "wrapper": "UnleashedRecomp/patches/CTitleStateMenu_patches.cpp:99-202",
       "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_title_menu.hpp",
-      "captured_state_fields": ["m_CursorIndex", "m_IsDeleteCheckMessageOpen", "m_Field3C", "m_Field54", "m_Field9A", "context_phase (0/1/2)", "context_472 (transition target pointer)"],
-      "callees_total": "tbd",
-      "notes": "Phase 319 retroactive port mirrored context_phase (Idle/TransitionRequested/TransitioningOut) directly from the captured 12 title-menu-context samples."
+      "phase_landed": "319 + 325"
     },
     {
-      "ppc_address": "sub_82A50838",
-      "labeled_name": "(CHudSonicStage helper or similar - small body)",
-      "source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.119.cpp",
-      "source_line": 57390,
-      "body_lines": 114,
+      "swa_class": "SWA::CTitleStateIntro / SWA::CGameModeStageTitle",
+      "api_header": "api/SWA/System/GameMode/{Title/TitleStateIntro.h,GameModeStageTitle.h}",
+      "fields_mined": ["TitleStateIntro internals (private from header)", "m_IsPlayingAdvertiseMovie", "m_AdvertiseMovieWaitTime"],
+      "ppc_address": "TBD - find via grep for advertise-movie wait-time constant",
+      "wrapper": "UnleashedRecomp/patches/CTitleStateIntro_patches.cpp:239",
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_title_intro.hpp",
+      "phase_landed": "320 + 328"
+    },
+    {
+      "swa_class": "SWA::CTitleStateWorldMap / SWA::CWorldMapCursor / SWA::CWorldMapCamera",
+      "api_header": "api/SWA/System/GameMode/{Title/TitleStateWorldMap.h,WorldMap/WorldMapCursor.h,WorldMap/WorldMapCamera.h}",
+      "fields_mined": ["m_LeftStickHorizontal/Vertical", "m_IsCursorMoving", "m_CursorX/Y", "m_Pitch/Yaw/Distance", "m_RotationSpeed", "m_CanMove", "m_TiltToEarthTransitionSpeed"],
+      "ppc_address": "sub_8258B558",
+      "ppc_source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.40.cpp",
+      "ppc_source_line": 49453,
+      "ppc_body_lines": 2147,
+      "wrapper": "UnleashedRecomp/patches/aspect_ratio_patches.cpp:294-344",
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_world_map.hpp",
+      "phase_landed": "325 + 327"
+    },
+    {
+      "swa_class": "SWA::CHudPause",
+      "api_header": "api/SWA/HUD/Pause/HudPause.h",
+      "fields_mined": ["EContext (5 values)", "EAction (9 values inc Restart)", "EStatus (Idle/Accept/Decline)", "ETransition (8 values inc Quit=2 NOT 1, SubMenu=8)", "m_Action", "m_Menu", "m_Status", "m_Transition", "m_IsVisible/IsShown"],
+      "ppc_address": "sub_824B0930",
+      "ppc_source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.27.cpp",
+      "ppc_source_line": 39777,
+      "ppc_body_lines": 2053,
+      "wrapper": "UnleashedRecomp/patches/CHudPause_patches.cpp:160",
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_pause_menu.hpp",
+      "phase_landed": "323"
+    },
+    {
+      "swa_class": "SWA::CLoading",
+      "api_header": "api/SWA/HUD/Loading/Loading.h",
+      "fields_mined": ["ELoadingDisplayType (9 values inc MilesElectric=0, Arrows=4, ChangeTimeOfDay=7, Blank=8)"],
+      "ppc_address": "TBD - look up CLoading::Update via wrapper",
+      "wrapper": "(none yet)",
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_loading_screen.hpp",
+      "phase_landed": "324"
+    },
+    {
+      "swa_class": "SWA::CGeneralWindow",
+      "api_header": "api/SWA/HUD/GeneralWindow/GeneralWindow.h",
+      "fields_mined": ["EWindowStatus (Closed=0, OpeningMessage=2 GAP on 1, DisplayingMessage=3, OpeningControls=4, DisplayingControls=5)", "m_Status", "m_CursorIndex", "m_SelectedIndex"],
+      "ppc_address": "TBD - look up CGeneralWindow::Update via wrapper",
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_general_window.hpp",
+      "phase_landed": "324"
+    },
+    {
+      "swa_class": "SWA::CHudSonicStage + SWA::Player::CEvilSonicContext + SWA::Player::CEvilHudGuide",
+      "api_header": "api/SWA/HUD/Sonic/HudSonicStage.h + api/SWA/Player/Character/EvilSonic/{EvilSonicContext,Hud/EvilHudGuide}.h",
+      "fields_mined": ["m_rcPlayScreen", "m_rcSpeedGauge", "m_rcRingEnergyGauge", "m_rcGaugeFrame", "m_rcScoreCount", "m_rcTimeCount", "m_rcPlayerCount", "EGuideAction (Single/Chain)", "EGuideType (A/B/X/Y)", "m_IsShown @+0x95", "m_IsVisible @+0x96", "m_GuideType @+0x98", "m_DarkGaiaEnergy @+0x688", "m_AnimationID @+0x7C8 region", "m_OutOfControlCount @+0x8B8 region"],
+      "ppc_address": "sub_82A50838 (small body, likely a helper not the full Update)",
+      "ppc_source_file": "local_build_env/ur103clean/UnleashedRecompLib/ppc/ppc_recomp.119.cpp",
+      "ppc_source_line": 57390,
       "wrapper": "UnleashedRecomp/patches/CHudSonicStage_patches.cpp",
-      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_stage_hud.hpp",
-      "captured_state_fields": ["unknown - small function, likely a getter/setter rather than the full Update"],
-      "callees_total": "tbd",
-      "notes": "Smaller body (114 lines) suggests this is a sub-helper, not the main CHudSonicStage::Update entry point. Need to identify the full Update function symbol for the SGFX stage HUD port."
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_stage_hud.hpp + sgfx_evil_hud_guide.hpp",
+      "phase_landed": "306 + 331"
+    },
+    {
+      "swa_class": "SWA::CSaveIcon",
+      "api_header": "api/SWA/HUD/SaveIcon/SaveIcon.h",
+      "fields_mined": ["m_IsVisible @+0xD8 (only public field; rest is opaque CUpdateUnit base)"],
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_save_icon.hpp",
+      "phase_landed": "333"
+    },
+    {
+      "swa_class": "SWA::CSoundAdministrator + ::CBgm",
+      "api_header": "api/SWA/Sound/Sound.h",
+      "fields_mined": ["CBgm::m_Volume1..4 (4 simultaneous BGM channels)", "CBgm::m_spSoundBGM (boost shared_ptr)"],
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_sound_admin.hpp",
+      "phase_landed": "333"
+    },
+    {
+      "swa_class": "SWA::SPadState + SWA::CInputState",
+      "api_header": "api/SWA/System/{PadState.h,InputState.h}",
+      "fields_mined": ["EKeyState (24 retail bit values)", "DownState/UpState/TappedState/ReleasedState bitmasks", "LeftStick + RightStick analog axes", "L/R triggers", "8 SPadState slots in CInputState"],
+      "sgfx_port": "research_uiux/runtime_reference/include/sward/ui_runtime/sgfx_pad_state.hpp",
+      "phase_landed": "326"
+    },
+    {
+      "swa_class": "SWA::CMovieDisplayer + SWA::CMovieManager",
+      "api_header": "api/SWA/Movie/MovieDisplayer.h + Movie/MovieManager.h",
+      "fields_mined": ["SVertexData {X,Y,Z,U,V}", "TopLeft/TopRight/BottomRight/BottomLeft corners", "m_MovieWidth/Height", "GetInstance() singleton"],
+      "sgfx_port": "(deferred - user explicitly excluded pre-rendered movies from initial scope)",
+      "phase_landed": "(read-only, not yet ported)"
     }
   ],
-  "next_phase_actions": [
-    "Phase 322 fresh logcat session (currently in flight) should capture pause + stage HUD + results data. Cross-validate against the body locations above when logcat is silent on a specific transition.",
-    "If the logcat still doesn't reach the stage HUD due to game crash, read sub_824B0930's body directly (2053 lines) focusing on the m_Status switch + cursor handling, and port those branches into sgfx_pause_menu.hpp."
+  "still_unmined": [
+    {
+      "screen": "Stage Result (CHudResult / Result.cpp)",
+      "data_source": "ui_lab_runtime_screen_index.generated.h:35-36 names HUD/Result/Result.cpp as the source file but no api/ struct header is exposed in UnleashedRecomp",
+      "evidence_in_hand": ["aspect_ratio_patches.cpp:658-705 lays out result_num_1..6 visual layout", "install/hashes/game.cpp:8111-8114 names bgm_sys_result + bgm_sys_result_ng"],
+      "what_is_inferred_in_sgfx_port": "ResultsState inner state machine (line-reveal animation timing, accept-to-acknowledge transition); 6 ResultsLineId values map 1:1 to result_num_1..6 in retail",
+      "what_would_unblock_full_retail_fidelity": "Find CHudResult::Update body in ppc_recomp.*.cpp -- requires either grep for unique instruction patterns or reading the wrapper (none exists yet)"
+    },
+    {
+      "screen": "Hub Town UI (ui_balloon / ui_townscreen / ui_shop / ui_mediaroom)",
+      "data_source": "ui_lab_runtime_screen_index.generated.h:49-52 lists 4 town_ui screens with ui_archaeology_database as the data source -- no .cpp source file named, no api/ struct header",
+      "evidence_in_hand": ["captured CSD scenes for each yncp project"],
+      "what_is_inferred_in_sgfx_port": "Entire HubState (overlays, time-of-day) -- inferred from screen list + captured SFX cues (sys_actstg_pausewinopen for menu open, obj_navi_appear for tutorial popup)",
+      "what_would_unblock_full_retail_fidelity": "Hub world is CGameMode-rooted with no dedicated class; town UI overlays may live in MenuWindowBase descendants. Mining requires reading the GameModeStage subclass for hub stages (location TBD)."
+    },
+    {
+      "screen": "Status / Skill Upgrade overlay (ui_status)",
+      "data_source": "ui_lab_runtime_screen_index.generated.h:43 names HUD/Status/Status.cpp as source -- no api/ header",
+      "what_is_inferred_in_sgfx_port": "(no SGFX port yet; not in initial scope per user direction)",
+      "phase_when_addressed": "out of initial UI/UX scope; would land alongside Result mining"
+    },
+    {
+      "screen": "Boss HUD (ui_boss_gauge + ui_boss_name)",
+      "data_source": "ui_lab_runtime_screen_index.generated.h:27-28 -- no api/ header",
+      "what_is_inferred_in_sgfx_port": "StageMode::Boss exists in StageHudState but no boss-specific gauge fields are modeled",
+      "phase_when_addressed": "future phase; could mine boss-specific Update from ppc_recomp via Egg Dragoon stage logcat capture"
+    },
+    {
+      "screen": "Tornado Defense / EX Stage (ui_qte / ui_exstage / ui_prov_playscreen)",
+      "data_source": "ui_lab_runtime_screen_index.generated.h:46-48 names ExtraStage/Tails/Hud/HudExQte.cpp -- has limited api/ exposure (ExStageBoss + ExPlayerTails state classes)",
+      "what_is_inferred_in_sgfx_port": "(no SGFX port yet)",
+      "phase_when_addressed": "out of initial UI/UX scope"
+    }
   ],
   "transparency": {
     "runtime_proven": [
-      "All four sub_ addresses exist in the local PPC source at the documented locations",
-      "CTitleStateMenu::Update (sub_825882B8) was already partially ported retroactively in Phase 319 from captured context_phase data"
+      "All retail field offsets in retail_mined_classes are validated by SWA_ASSERT_OFFSETOF in the upstream api/ headers and ported 1:1 into the SGFX port files",
+      "Logcat-captured cue names in retail_mined_classes (e.g. sys_actstg_pausewinopen, sys_worldmap_finaldecide, bgm_sys_result) are grep-mined from UnleashedRecomp source"
     ],
     "runtime_inferred": [
-      "sub_82A50838's role as a stage HUD helper is inferred from its 114-line size and presence in CHudSonicStage_patches.cpp; full identification needs a callee-graph trace"
+      "Inner per-frame state-machine logic for screens lacking api/ struct headers (Result inner tally timing, Hub overlay transitions)",
+      "BGM channel role assignments (channel 1=main, 2=stinger, 3=results, 4=attract) inferred from captured retail trace, not retail-validated"
     ],
     "pending_ghidra": [
-      "If a Ghidra static decompile is needed for a function whose body is too large to read line-by-line, importing the original Xbox 360 default.xex into a fresh Ghidra project is the path"
+      "Detailed disassembly of CHudResult / hub town UI Update bodies -- ppc_recomp.*.cpp would need targeted grep for distinctive instruction sequences since the recompiled C++ doesn't carry the SWA class names. Ghidra against original default.xex would also work but requires the user to drive that on their Windows host."
     ]
+  },
+  "ui_ux_scope_completion": {
+    "title_screen": {"behavior_state_machine": "complete (Phase 319 + 325)", "attract_movie": "complete (Phase 328)", "press_start_idle": "complete (Phase 320)"},
+    "loading_screen": {"behavior_state_machine": "complete (Phase 324)", "display_type_enum": "retail-validated"},
+    "world_map": {"behavior_state_machine": "complete (Phase 325)", "analog_cursor": "retail-validated", "camera": "retail-validated (Phase 327)"},
+    "hub_world": {"behavior_state_machine": "inferred (no api/ header)", "day_sonic_overlay_set": "captured trace", "werehog_overlay_set": "captured trace"},
+    "stage_hud": {"behavior_state_machine": "complete for shared HUD (Phase 306)", "werehog_specific": "complete (Phase 331)", "boss_hud": "stub only (StageMode::Boss exists, fields not modeled)"},
+    "pause_menu": {"behavior_state_machine": "complete (Phase 323)", "all_4_enums": "retail-validated"},
+    "results_screen": {"behavior_state_machine": "inferred (no api/ header)", "6_line_layout": "retail-validated from aspect_ratio_patches", "bgm_cues": "retail-mined from install hashes", "ex_variant": "documented (Phase 329)"},
+    "general_window_modal": {"behavior_state_machine": "complete (Phase 324)", "status_enum_with_gap": "retail-validated"},
+    "save_icon": {"behavior_state_machine": "complete (Phase 333)", "field_offset": "retail-validated"},
+    "input_layer": {"retail_pad_state": "complete (Phase 326)", "key_state_bitfield": "retail-validated"},
+    "audio_admin": {"bgm_channel_layout": "retail-validated (Phase 333)", "channel_assignments": "inferred from trace"}
   }
 }
