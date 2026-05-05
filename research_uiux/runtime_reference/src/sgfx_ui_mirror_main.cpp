@@ -28,6 +28,7 @@
 #include "sward/ui_runtime/sgfx_hud_csd_project_loader.hpp"
 #include "sward/ui_runtime/sgfx_hud_csd_cast_extractor.hpp"
 #include "sward/ui_runtime/sgfx_hud_native_csd_renderer.hpp"
+#include "sward/ui_runtime/sgfx_hud_font_renderer.hpp"
 
 // Static-link SDL2 with no SDL_main shim (we provide our own main).
 #define SDL_MAIN_HANDLED
@@ -185,6 +186,11 @@ namespace
     std::unordered_map<std::string, std::string> g_textureIndex;
     fs::path g_assetRoot;
 
+    // Phase 346: baked font for runtime text overlays. Loaded once
+    // at startup from a system TTF (defaults to arial.ttf on Windows).
+    ui::SgfxBakedFont g_bodyFont;
+    ui::SgfxBakedFont g_smallFont;
+
     void buildTextureIndex(const fs::path& assetRoot)
     {
         g_textureIndex.clear();
@@ -243,6 +249,48 @@ namespace
     // Render every scene of the screen's CSD project into the
     // framebuffer. For container-heavy projects (worldmap etc.)
     // this composites the entire screen.
+    // Phase 346: known blank text-container scenes from the renderer
+    // coverage audit (sgfx_renderer_coverage_audit.generated.json).
+    // The CSD container has zero textured cells; in retail these
+    // would be runtime-text-rasterized. SGFX paints placeholder
+    // labels via stb_truetype so the layout doesn't read as blank.
+    struct BlankTextScene
+    {
+        const char* sceneName;
+        const char* placeholderText;
+    };
+    constexpr BlankTextScene kBlankTextScenes[] = {
+        {"help_chara_1",   "[help line 1]"},
+        {"help_chara_2",   "[help line 2]"},
+        {"help_chara_3",   "[help line 3]"},
+        {"help_text_area", "[world map help text]"},
+        {"progress",       "Loading..."},
+    };
+
+    // Map screen -> caption shown at the top of the framebuffer.
+    const char* screenCaption(ui::SgfxScreen s, ui::StageMode mode)
+    {
+        switch (s)
+        {
+            case ui::SgfxScreen::TitleIntro: return "Title Intro";
+            case ui::SgfxScreen::Title:      return "Title Menu";
+            case ui::SgfxScreen::WorldMap:   return "World Map";
+            case ui::SgfxScreen::Loading:    return "Loading";
+            case ui::SgfxScreen::StageHud:
+                switch (mode)
+                {
+                    case ui::StageMode::Werehog: return "Stage HUD - Werehog";
+                    case ui::StageMode::Boss:    return "Stage HUD - Boss";
+                    case ui::StageMode::BossHit: return "Stage HUD - Boss Hit";
+                    default:                     return "Stage HUD - Day Sonic";
+                }
+            case ui::SgfxScreen::Pause:      return "Pause";
+            case ui::SgfxScreen::Results:    return "Results";
+            case ui::SgfxScreen::Hub:        return "Hub";
+        }
+        return "?";
+    }
+
     void renderScreenIntoFramebuffer(ui::SgfxScreen screen,
                                      const ui::StageHudState& stage,
                                      ui::CsdNativeFramebuffer& fb)
@@ -264,6 +312,38 @@ namespace
         for (const auto& cmd : assets.commands)
             (void)ui::compositeCommand(
                 fb, cmd, g_assetRoot, assets.textureCache, assets.overrides);
+
+        // Phase 346: paint placeholder text into known-blank text
+        // scenes. We iterate the assets' commands looking for cast
+        // sceneNames matching our blank-scene table; if a hit is
+        // found, draw placeholder text near the cast's anchor.
+        if (g_bodyFont.loaded)
+        {
+            for (const auto& cmd : assets.commands)
+            {
+                for (const auto& bts : kBlankTextScenes)
+                {
+                    if (cmd.sceneName != bts.sceneName) continue;
+                    const float canvasW = static_cast<float>(fb.width);
+                    const float canvasH = static_cast<float>(fb.height);
+                    const auto x = static_cast<std::int32_t>(
+                        (cmd.baseTranslationX + cmd.sceneLeft) * canvasW + 4.0f);
+                    const auto y = static_cast<std::int32_t>(
+                        (cmd.baseTranslationY + cmd.sceneTop)  * canvasH + 4.0f);
+                    ui::compositeText(fb, g_bodyFont, bts.placeholderText,
+                                      x, y, {255, 255, 255, 255});
+                }
+            }
+        }
+
+        // Phase 346: top-left screen caption so each variant is
+        // visually labeled even when CSD assets are unfamiliar.
+        if (g_smallFont.loaded)
+        {
+            ui::compositeText(fb, g_smallFont,
+                              screenCaption(screen, stage.mode),
+                              6, 4, {220, 230, 255, 255});
+        }
     }
 }
 
@@ -354,6 +434,21 @@ int main(int argc, char** argv)
     std::cout << "scanning asset textures under " << assetRoot << " ...\n";
     buildTextureIndex(assetRoot);
     std::cout << "  texture index size: " << g_textureIndex.size() << "\n";
+
+    // Phase 346: bake fonts at startup so per-frame text overlays
+    // are O(glyph) per character. Defaults to Windows Arial; if
+    // missing we silently leave g_bodyFont.loaded == false and
+    // the renderer skips the text overlay step.
+    {
+        const fs::path arial = "C:/Windows/Fonts/arial.ttf";
+        g_bodyFont  = ui::loadFontFromFile(arial, 18.0f);
+        g_smallFont = ui::loadFontFromFile(arial, 14.0f);
+        std::cout << "  fonts: body="
+                  << (g_bodyFont.loaded ? "ok" : "missing")
+                  << " small="
+                  << (g_smallFont.loaded ? "ok" : "missing")
+                  << " (path=" << arial.string() << ")\n";
+    }
 
     ui::SgfxOrchestrator orch;
     ui::applyTitleMenuVisibility(orch.title, true, false, false, true);

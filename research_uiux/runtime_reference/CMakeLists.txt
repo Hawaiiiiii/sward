@@ -225,6 +225,7 @@ if(EXISTS "${_SGFX_RUNTIME_SDL_BUILD}/SDL/SDL2-static.lib")
         src/sgfx_ui_mirror_main.cpp
         src/sgfx_audio_dispatch.cpp
         src/sgfx_audio_player.cpp
+        src/sgfx_hud_font_renderer.cpp
         "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_worldmap_cursor.ogg.c"
         "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_worldmap_finaldecide.ogg.c"
         "${_SGFX_RUNTIME_RES_SOUNDS}/res/sounds/sys_actstg_pausecansel.ogg.c"
@@ -240,6 +241,7 @@ if(EXISTS "${_SGFX_RUNTIME_SDL_BUILD}/SDL/SDL2-static.lib")
             "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL/include"
             "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL/include/SDL2"
             "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL_mixer/include"
+            "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/stb"
     )
     target_compile_features(sgfx_ui_mirror PRIVATE cxx_std_20)
     target_link_libraries(sgfx_ui_mirror PRIVATE
