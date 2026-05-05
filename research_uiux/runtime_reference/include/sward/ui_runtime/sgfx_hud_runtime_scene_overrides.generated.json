@@ -1,0 +1,85 @@
+{
+  "phase": "293",
+  "purpose": "Runtime scene-position overrides distilled from UnleashedRecomp's PPC->C++ source. The retail .yncp asset stores authoring-time cast positions; the live runtime walks specific scenes each frame and overrides them via Chao::CSD::CCastNode setPosition (sub_830BB3D0). Without these overrides, our renderer places info_bg_1 / info_img_* at their authoring positions which differs from the runtime layout.",
+  "logical_canvas": {
+    "width": 1280,
+    "height": 720,
+    "source": "UnleashedRecomp/patches/aspect_ratio_patches.cpp:282-283 (ComputeScreenPositionMidAsmHook divides by 1280/720)"
+  },
+  "ppc_address_setPosition": "sub_830BB3D0",
+  "ppc_address_setPosition_layout": {
+    "offset_x_in_cast_node": 44,
+    "offset_y_in_cast_node": 48,
+    "comment": "stores f30 at +44, f31 at +48 of the CCastNode (Chao::CSD)"
+  },
+  "screen_state_machines": [
+    {
+      "ppc_address": "sub_8258B558",
+      "labeled_name": "SWA::CTitleStateWorldMap::Update",
+      "source_file": "UnleashedRecomp/patches/aspect_ratio_patches.cpp:294-344",
+      "screen_group": "world_map",
+      "project_relative_path_assumed": "game/WorldMap/ui_worldmap.yncp",
+      "owner_struct_offset": "0x70 of CTitleStateWorldMap",
+      "owner_struct_label": "worldMapSimpleInfo",
+      "scene_overrides": [
+        {
+          "owner_field_offset": "0x2C",
+          "guessed_scene_name": "info_bg_1",
+          "guessed_basis": "first repositioned scene; matches the Phase 291 horizontal-vs-vertical layout gap on the green grid panel",
+          "x_pixel_formula": "299.0 + g_aspectRatioNarrowScale * 140.0",
+          "y_pixel_formula": "-178.0",
+          "x_pixel_at_16x9": 299.0,
+          "y_pixel_at_16x9": -178.0
+        },
+        {
+          "owner_field_offset": "0x34",
+          "guessed_scene_name": "info_img_1_or_2",
+          "guessed_basis": "second repositioned scene; same x formula with offsetX=0",
+          "x_pixel_formula": "0.0 + g_aspectRatioNarrowScale * 140.0",
+          "y_pixel_formula": "0.0",
+          "x_pixel_at_16x9": 0.0,
+          "y_pixel_at_16x9": 0.0
+        },
+        {
+          "owner_field_offset": "0x4C",
+          "guessed_scene_name": "info_img_3_or_4",
+          "guessed_basis": "third repositioned scene; same overrides as 0x34",
+          "x_pixel_formula": "0.0 + g_aspectRatioNarrowScale * 140.0",
+          "y_pixel_formula": "0.0",
+          "x_pixel_at_16x9": 0.0,
+          "y_pixel_at_16x9": 0.0
+        }
+      ],
+      "linked_list_overrides": {
+        "head_field_offset": "0x20",
+        "tail_field_offset": "0x24",
+        "stride_bytes": 8,
+        "x_pixel_formula": "0.0 + g_aspectRatioNarrowScale * 140.0",
+        "y_pixel_formula": "0.0",
+        "comment": "variable-length list of additional scenes (ring count, medal level, etc.); same x shift, y untouched"
+      },
+      "menu_textbox_override": {
+        "owner_field_offset": "0x5C",
+        "ppc_store": "PPC_STORE_U32(textBox + 0x38, x_pixel)",
+        "x_pixel_formula": "708.0 + g_aspectRatioNarrowScale * 140.0",
+        "x_pixel_at_16x9": 708.0
+      }
+    }
+  ],
+  "next_steps": [
+    "Resolve owner_field_offset -> exact scene_name by reading sub_830BB2B0 / the World Map state object's constructor",
+    "Apply the override values to render_csd_scene.py via a --runtime-overrides flag and re-run live-runtime parity",
+    "Repeat for other screens (CTitleStateMenu, CHudPause, CGeneralWindow) by mining their respective Update methods"
+  ],
+  "transparency": {
+    "runtime_proven": [
+      "Logical canvas is 1280x720 (ComputeScreenPositionMidAsmHook)",
+      "sub_830BB3D0 is the cast-node setPosition (offsets 44/48 are X/Y)",
+      "CTitleStateWorldMap::Update repositions three +linked-list scenes every frame"
+    ],
+    "runtime_inferred": [
+      "owner_field_offset -> scene name mapping is guessed from the Phase 291 layout-gap evidence; not verified by reading the World Map state constructor"
+    ],
+    "pending_ghidra": []
+  }
+}

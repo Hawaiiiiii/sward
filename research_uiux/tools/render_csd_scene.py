@@ -161,6 +161,7 @@ def composite_command(
     *,
     fit_offset: tuple[float, float] = (0.0, 0.0),
     fit_scale: tuple[float, float] = (1.0, 1.0),
+    runtime_overrides: dict[str, dict[str, float]] | None = None,
 ) -> bool:
     if cmd.get("hide_flag", 0):
         return False
@@ -203,6 +204,20 @@ def composite_command(
     norm_y = (by + st + fit_offset[1]) * fit_scale[1]
     world_x = norm_x * canvas_w
     world_y = norm_y * canvas_h
+    # Runtime override: emulates Chao::CSD::CCastNode::SetPosition called by
+    # screen-state-machine code (see UnleashedRecomp's
+    # SWA::CTitleStateWorldMap::Update). Per-scene override sets the scene
+    # anchor in pixel space; per-cast world position becomes anchor + cast_offset.
+    if runtime_overrides:
+        scene_name = cmd.get("scene_name", "")
+        ov = runtime_overrides.get(scene_name)
+        if ov is not None:
+            anchor_x_px = float(ov.get("anchor_x_px", 0.0))
+            anchor_y_px = float(ov.get("anchor_y_px", 0.0))
+            cast_local_x_px = float(cmd.get("scene_left", 0.0)) * canvas_w
+            cast_local_y_px = float(cmd.get("scene_top", 0.0)) * canvas_h
+            world_x = anchor_x_px + cast_local_x_px
+            world_y = anchor_y_px + cast_local_y_px
     px = int(round(world_x))
     py = int(round(world_y))
 
@@ -217,6 +232,7 @@ def render_full_project(
     canvas_h: int,
     background: tuple[int, int, int, int],
     scene_filter: list[str] | None = None,
+    runtime_overrides: dict[str, dict[str, float]] | None = None,
 ) -> dict[str, Any]:
     """Composite EVERY scene in the project (or just `scene_filter` scenes)
     into a single canvas using world coordinates -- the natural Hedgehog
@@ -239,7 +255,10 @@ def render_full_project(
     scenes_seen: set[str] = set()
     for cmd in cmds_all:
         scenes_seen.add(cmd.get("scene_name", ""))
-        if composite_command(canvas, cmd, texture_cache, canvas_w, canvas_h):
+        if composite_command(
+            canvas, cmd, texture_cache, canvas_w, canvas_h,
+            runtime_overrides=runtime_overrides,
+        ):
             drawn += 1
         else:
             skipped += 1
@@ -254,6 +273,7 @@ def render_full_project(
         "output_path": str(output_path),
         "canvas_width": canvas_w,
         "canvas_height": canvas_h,
+        "runtime_overrides_applied": list((runtime_overrides or {}).keys()),
     }
 
 
@@ -410,6 +430,13 @@ def main(argv: list[str] | None = None) -> int:
         "--scene-filter", action="append", default=None,
         help="Repeatable. With --full-project, restrict to these scene names.",
     )
+    parser.add_argument(
+        "--runtime-override", action="append", default=None, metavar="SCENE=X,Y",
+        help="Repeatable. Override a scene's anchor in pixel space, mimicking "
+             "Chao::CSD::CCastNode::SetPosition calls made by the screen state "
+             "machine at runtime (e.g. SWA::CTitleStateWorldMap::Update). "
+             "Example: --runtime-override info_bg_1=299,-178",
+    )
     parser.add_argument("--canvas-width", type=int, default=DEFAULT_CANVAS_W)
     parser.add_argument("--canvas-height", type=int, default=DEFAULT_CANVAS_H)
     parser.add_argument("--background", choices=["transparent", "black", "magenta"], default="transparent")
@@ -461,12 +488,25 @@ def main(argv: list[str] | None = None) -> int:
         if not args.output:
             print("--output is required with --full-project", file=sys.stderr)
             return 2
+        runtime_overrides: dict[str, dict[str, float]] = {}
+        for spec in args.runtime_override or []:
+            try:
+                name, coords = spec.split("=", 1)
+                xs, ys = coords.split(",", 1)
+                runtime_overrides[name.strip()] = {
+                    "anchor_x_px": float(xs),
+                    "anchor_y_px": float(ys),
+                }
+            except ValueError:
+                print(f"bad --runtime-override spec: {spec!r} (expected SCENE=X,Y)", file=sys.stderr)
+                return 2
         summary = render_full_project(
             project_entry,
             Path(args.output),
             args.canvas_width, args.canvas_height,
             bg_map[args.background],
             scene_filter=args.scene_filter,
+            runtime_overrides=runtime_overrides or None,
         )
         print(json.dumps(summary, indent=2))
         return 0
