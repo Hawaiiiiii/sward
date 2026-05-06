@@ -26,6 +26,7 @@
 #include <mod/mod_loader.h>
 #include <preload_executable.h>
 #include <patches/sg_text_overrides.h>
+#include <patches/sg_asset_overrides.h>
 #include <patches/ui_lab_patches.h>
 
 #ifdef _WIN32
@@ -349,6 +350,13 @@ int main(int argc, char *argv[])
     // retail SetText overrides take effect on first call once the guest
     // is running.
     SGTextOverrides::EnsureLoaded();
+
+    // Phase 369A: load SG-Preflight pixel-level texture overrides from
+    // the same directory. Pre-reads each referenced DDS into a host-
+    // side cache so the MakePictureData hot path never blocks on disk
+    // I/O. Idempotent and a no-op when sg_asset_overrides.json is
+    // absent.
+    SGAssetOverrides::EnsureLoaded();
 
     if (!PersistentStorageManager::LoadBinary())
         LOGFN_ERROR("Failed to load persistent storage binary... (status code {})", (int)PersistentStorageManager::BinStatus);

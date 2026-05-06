@@ -17,6 +17,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -39,6 +40,34 @@ namespace
     // (not value), since Localise() callers ask for keys.
     static std::unordered_set<std::string> g_hostHitSet;
     static std::mutex g_hostHitMutex;
+
+    // Phase 369B: scoped text override rules. Each rule replaces a
+    // literal only when at least one currently-active CSD project
+    // name contains the rule's `csd_project_substring`. Rules are
+    // evaluated in declaration order; the first matching rule wins.
+    struct ScopedTextRule
+    {
+        std::string literal;
+        std::string projectSubstring;
+        std::string replacement;
+    };
+    static std::vector<ScopedTextRule> g_scopedRules;
+
+    // Phase 369B: scoped match dedup set. Keyed by `<literal>@<scope>`
+    // so the same literal hit through two different scope rules emits
+    // two distinct events.
+    static std::unordered_set<std::string> g_scopedHitSet;
+    static std::mutex g_scopedHitMutex;
+
+    // Phase 369B: active CSD project tracker. Set is appended-to by
+    // `MarkCsdProjectActive` (called from ui_lab_patches at every
+    // CSD project make) and never shrinks during the process's life
+    // -- retail SU rarely unloads CSD projects mid-session, and the
+    // dedup-set semantics of the scope match make a one-way set
+    // safer than maintaining add/remove balance through every retail
+    // hook callsite.
+    static std::unordered_set<std::string> g_activeCsdProjects;
+    static std::mutex g_activeCsdProjectsMutex;
 
     static std::atomic<bool> g_loaded{false};
     static std::once_flag g_loadOnce;
@@ -87,15 +116,44 @@ namespace
         }
 
         if (!doc.is_object()) return;
-        const auto stringsIt = doc.find("strings");
-        if (stringsIt == doc.end() || !stringsIt->is_object()) return;
 
         size_t loaded = 0;
-        for (const auto& [k, v] : stringsIt->items())
+        const auto stringsIt = doc.find("strings");
+        if (stringsIt != doc.end() && stringsIt->is_object())
         {
-            if (!v.is_string()) continue;
-            g_overrides.emplace(k, v.get<std::string>());
-            ++loaded;
+            for (const auto& [k, v] : stringsIt->items())
+            {
+                if (!v.is_string()) continue;
+                g_overrides.emplace(k, v.get<std::string>());
+                ++loaded;
+            }
+        }
+
+        // Phase 369B: parse `scoped_rules` array. v1 packs without
+        // this key still work -- we just leave g_scopedRules empty.
+        size_t scopedLoaded = 0;
+        const auto scopedIt = doc.find("scoped_rules");
+        if (scopedIt != doc.end() && scopedIt->is_array())
+        {
+            for (const auto& rule : *scopedIt)
+            {
+                if (!rule.is_object()) continue;
+                const auto litIt   = rule.find("literal");
+                const auto scopeIt = rule.find("csd_project_substring");
+                const auto replIt  = rule.find("replacement");
+                if (litIt   == rule.end() || !litIt->is_string())   continue;
+                if (scopeIt == rule.end() || !scopeIt->is_string()) continue;
+                if (replIt  == rule.end() || !replIt->is_string())  continue;
+
+                ScopedTextRule entry;
+                entry.literal          = litIt->get<std::string>();
+                entry.projectSubstring = scopeIt->get<std::string>();
+                entry.replacement      = replIt->get<std::string>();
+                if (entry.literal.empty() || entry.projectSubstring.empty())
+                    continue;
+                g_scopedRules.push_back(std::move(entry));
+                ++scopedLoaded;
+            }
         }
 
         // Apply overrides to g_locale so Localise() returns the override
@@ -113,8 +171,9 @@ namespace
         }
 
         LOGF_IMPL(Utility, "SG-Preflight",
-                  "text overrides: loaded {} string(s) from \"{}\"",
+                  "text overrides: loaded {} string(s) + {} scoped rule(s) from \"{}\"",
                   loaded,
+                  scopedLoaded,
                   reinterpret_cast<const char*>(manifest.u8string().c_str()));
 
         // Phase 364: runtime-prove the loader fired by emitting one
@@ -125,6 +184,35 @@ namespace
         UiLab::EmitBridgeScreenEntered(
             "Text:OverridesLoaded:" + std::to_string(loaded));
 
+        // Phase 369B: separate marker for scoped rule count so a
+        // bridge consumer can distinguish "v1 pack, no scopes" from
+        // "v2 pack, N scoped rules". Always emitted (even when zero)
+        // so consumers can detect whether the manifest understood
+        // the v2 schema vs. silently ignored the `scoped_rules` key.
+        UiLab::EmitBridgeScreenEntered(
+            "Text:ScopedRulesLoaded:" + std::to_string(scopedLoaded));
+    }
+
+    static bool ScopeMatchesAnyActiveProject(const std::string& projectSubstring)
+    {
+        std::scoped_lock lock(g_activeCsdProjectsMutex);
+        for (const auto& projectName : g_activeCsdProjects)
+        {
+            if (projectName.find(projectSubstring) != std::string::npos)
+                return true;
+        }
+        return false;
+    }
+
+    static const ScopedTextRule* FindMatchingScopedRule(std::string_view original)
+    {
+        for (const auto& rule : g_scopedRules)
+        {
+            if (rule.literal != original) continue;
+            if (ScopeMatchesAnyActiveProject(rule.projectSubstring))
+                return &rule;
+        }
+        return nullptr;
     }
 }
 
@@ -152,32 +240,105 @@ namespace SGTextOverrides
 
     uint32_t TryGetOverrideGuestPtr(std::string_view original)
     {
-        const std::string* override = TryGetOverride(original);
-        if (override == nullptr) return 0;
+        // Phase 369B: now a thin wrapper over the scoped variant so
+        // both callers (Phase 364 and any new Phase 369B caller)
+        // share a single allocation cache and emit policy. The out-
+        // scope string is discarded here; callers that want the
+        // scope context use the scoped variant directly.
+        std::string scopeDiscard;
+        return TryGetOverrideGuestPtrScoped(original, &scopeDiscard);
+    }
+
+    uint32_t TryGetOverrideGuestPtrScoped(std::string_view original,
+                                          std::string* outScopeSubstring)
+    {
+        if (outScopeSubstring) outScopeSubstring->clear();
+        if (!g_loaded.load(std::memory_order_acquire)) return 0;
+
+        // Phase 369B: scoped rules are tried first because they are
+        // narrower than the global lane. The first matching rule (in
+        // declaration order) wins; if no rule scope-matches, fall
+        // through to the v1 global map.
+        const ScopedTextRule* matched = FindMatchingScopedRule(original);
+        const std::string* replacement = nullptr;
+        if (matched != nullptr)
+        {
+            replacement = &matched->replacement;
+            if (outScopeSubstring) *outScopeSubstring = matched->projectSubstring;
+        }
+        else
+        {
+            const std::string* global = TryGetOverride(original);
+            if (global == nullptr) return 0;
+            replacement = global;
+        }
 
         std::scoped_lock lock(g_guestStringCacheMutex);
-        auto cacheIt = g_guestStringCache.find(*override);
-        if (cacheIt != g_guestStringCache.end()) return cacheIt->second;
+        auto cacheIt = g_guestStringCache.find(*replacement);
+        const bool freshAlloc = (cacheIt == g_guestStringCache.end());
+        uint32_t guestAddr = 0;
+        if (!freshAlloc)
+        {
+            guestAddr = cacheIt->second;
+        }
+        else
+        {
+            const size_t bytes = replacement->size() + 1;
+            void* hostBuf = g_userHeap.Alloc(bytes);
+            if (hostBuf == nullptr) return 0;
+            std::memcpy(hostBuf, replacement->data(), replacement->size());
+            static_cast<char*>(hostBuf)[replacement->size()] = '\0';
+            guestAddr = g_memory.MapVirtual(hostBuf);
+            g_guestStringCache.emplace(*replacement, guestAddr);
+        }
 
-        const size_t bytes = override->size() + 1;
-        void* hostBuf = g_userHeap.Alloc(bytes);
-        if (hostBuf == nullptr) return 0;
-        std::memcpy(hostBuf, override->data(), override->size());
-        static_cast<char*>(hostBuf)[override->size()] = '\0';
-
-        const uint32_t guestAddr = g_memory.MapVirtual(hostBuf);
-        g_guestStringCache.emplace(*override, guestAddr);
-
-        // Phase 364 / 367b: emit a bridge event the first time each
-        // override is resolved into guest memory. Phase 367b renames
-        // the event from the original `Text:OverrideHit:<original>`
-        // to `Text:CsdOverrideHit:<original>` so it is distinguishable
-        // from host-side `Text:HostOverrideHit:<key>` (Localise path)
-        // and from any boot-time loader probes. Bounded volume = at
-        // most one event per unique original literal per process boot.
-        UiLab::EmitBridgeScreenEntered(
-            "Text:CsdOverrideHit:" + std::string(original));
+        // Phase 364 / 367b / 369B: distinct emit per lane so bridge
+        // consumers can tell scoped hits from global hits. Both
+        // emits are deduped (per literal, or per literal+scope) so
+        // event volume stays bounded.
+        if (matched != nullptr)
+        {
+            const std::string scopedKey =
+                std::string(original) + "@" + matched->projectSubstring;
+            std::scoped_lock lockHits(g_scopedHitMutex);
+            if (g_scopedHitSet.emplace(scopedKey).second)
+            {
+                UiLab::EmitBridgeScreenEntered(
+                    "Text:CsdScopedOverrideHit:" + scopedKey);
+            }
+        }
+        else
+        {
+            // Phase 364 dedup is on the value-cache (one emit per
+            // unique replacement). Preserve that contract.
+            if (freshAlloc)
+            {
+                UiLab::EmitBridgeScreenEntered(
+                    "Text:CsdOverrideHit:" + std::string(original));
+            }
+        }
         return guestAddr;
+    }
+
+    void MarkCsdProjectActive(std::string_view projectName)
+    {
+        if (projectName.empty()) return;
+        bool inserted = false;
+        {
+            std::scoped_lock lock(g_activeCsdProjectsMutex);
+            inserted = g_activeCsdProjects.emplace(projectName).second;
+        }
+        // Phase 369B diagnostic: emit one bridge event per UNIQUE
+        // project name so the proof script can see exactly which
+        // project names retail SU registered during the run. Lets
+        // the operator validate scoped-rule substrings against the
+        // real names instead of guessing. Bounded volume = number of
+        // distinct CSD projects loaded per process boot.
+        if (inserted)
+        {
+            UiLab::EmitBridgeScreenEntered(
+                "Text:CsdProjectActive:" + std::string(projectName));
+        }
     }
 
     void NoteHostHitForKey(std::string_view key)

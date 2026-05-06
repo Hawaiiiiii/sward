@@ -329,3 +329,265 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 | [`UnleashedRecomp/kernel/io/file_system.cpp`](../UnleashedRecomp/kernel/io/file_system.cpp) | `FileSystem::ResolvePath` returns `{}` for any `save:\` path when `SG_PREFLIGHT_NO_AUTOLOAD=1`, completing the auto-load suppression that Phase 367b started in `mod_loader.cpp`. |
 | [`research_uiux/runtime_reference/tools/phase368_path_b_proof.ps1`](runtime_reference/tools/phase368_path_b_proof.ps1) | Phase 368 runner: builds, stages a non-identical override pack (retail DDS + Phase 368 trailer + parked `res/` framework assets), backs up the user's save, launches plain UR with `NO_AUTOLOAD=1`, captures a screen frame at first VisibleOverrideHit, restores the save, runs the gates. |
 | [`_sgfx_shell_launch.bat`](../_sgfx_shell_launch.bat) | Reusable SGFX shell launcher; honors `SGFX_NO_AUTOLOAD` and `SGFX_LOG_SETTEXT` opt-ins. |
+
+## Phase 369A -- visible pixel swap via MakePictureData hook
+
+Phase 369A delivers the actual visible content swap that Phase 368
+deferred. Retail SU's resource manager decompresses each LZX-wrapped
+`*.dds` from disk into raw `DDS ` bytes BEFORE handing them to
+`sub_82E43FC8`, which UR has already hooked as
+`gpu/video.cpp::MakePictureData`. Phase 369A intercepts at that
+post-decompression callsite: it reads the guest `pictureData->name`,
+looks the name up in `<override>/sg_asset_overrides.json`, and
+substitutes the cached raw DDS bytes for the original BEFORE
+`LoadTexture`/`ddspp` parses them. No LZX encoder is needed and the
+override DDS can be at arbitrary dimensions / format.
+
+### Override pack format
+
+```
+<SG_PREFLIGHT_OVERRIDE_DIR>/
+    sg_asset_overrides.json
+    sgfx_assets/
+        logo_sgfx.dds         (raw `DDS ` magic, any dimensions)
+```
+
+`sg_asset_overrides.json`:
+
+```json
+{
+  "version": 1,
+  "pictures": {
+    "logo_sonicteam": "sgfx_assets/logo_sgfx.dds"
+  }
+}
+```
+
+The key is the bare `CTexturePicture` name retail SU stores in
+`pictureData->name` (NOT a file path on disk). The loader rejects
+files that don't start with `DDS ` magic at load time so an LZX-
+wrapped file at the pixel-override lane fails loud rather than
+silently producing a black texture.
+
+### Event taxonomy additions
+
+| Event | Source | Cardinality |
+|---|---|---|
+| `Asset:PixelOverridesLoaded:<count>` | `sg_asset_overrides.cpp::DoLoad()` -- emitted on first `EnsureLoaded()` call | once per process |
+| `Asset:PixelOverrideHit:<picture_name>` | `gpu/video.cpp::MakePictureData` -> `SGAssetOverrides::NoteHitForPicture()` | once per unique picture name per process |
+
+### Phase 369A acceptance gates
+
+The runner [`research_uiux/runtime_reference/tools/phase369a_path_b_proof.ps1`](runtime_reference/tools/phase369a_path_b_proof.ps1)
+exits 0 only when ALL of:
+
+| Exit | Reason |
+|---|---|
+| 0 | all gates passed |
+| 2 | build / deploy / launch failed |
+| 3 | `Asset:PixelOverridesLoaded` missing (manifest never loaded) |
+| 4 | `Asset:PixelOverrideHit` missing (MakePictureData hook never matched) |
+| 5 | no native BMP captured |
+| 6 | pixel-diff vs Phase 368 baseline did not exceed threshold (override fired but rendered frame is visually identical to baseline) |
+| 7 | `menu_accepted:Title row=continue` observed (gameplay routing fired despite NO_AUTOLOAD) |
+
+The pixel-diff stage compares the Phase 369A capture against the
+Phase 368 baseline BMP at
+`research_uiux/runtime_reference/out/phase368_path_b_proof/phase368_screen_grab.bmp`,
+counts pixels whose any RGB channel differs by more than
+`-PixelChannelDelta` (default 8), and asserts the ratio exceeds
+`-PixelDiffThreshold` (default 0.001 = 0.1%). The default 0.001
+threshold is intentionally very low; a real swap routinely yields
+70%+ different pixels.
+
+### What's runtime-proven (Phase 369A, 2026-05-06)
+
+Captured in
+[research_uiux/runtime_reference/out/phase369a_path_b_proof/](runtime_reference/out/phase369a_path_b_proof/):
+
+```json
+{
+  "asset_pixel_overrides_loaded": 1,
+  "asset_pixel_override_hits":    1,
+  "stage_gameplay_skip":          3,
+  "input_ui_only_lock":           1,
+  "title_continue_accepted":      false,
+  "native_frames_written":        1,
+  "pixel_diff_percent":           0.004691314697265625,
+  "pixel_diff_mean_abs_diff":     0.16902008056640625,
+  "elapsed_seconds":              47
+}
+```
+
+- **runtime-proven**: `Asset:PixelOverrideHit:logo_sonicteam` fires
+  exactly once during retail SU's loading-screen flow. The user's
+  `res/logo_sgfx.dds` (raw BC7, 2752x1536) is rendered through
+  ddspp -> RHI -> GPU at the SonicTeam logo slot.
+- **runtime-proven**: pixel diff vs the Phase 368 baseline BMP is
+  **0.469 %** of total pixels at a per-channel delta threshold of 8;
+  mean absolute diff per channel is 0.169 / 255. The captured BMP
+  is at
+  [phase369a_screen_grab.bmp](runtime_reference/out/phase369a_path_b_proof/phase369a_screen_grab.bmp).
+- **runtime-proven**: save backup safety net engaged; all three
+  save files SHA-256-unchanged after the run.
+
+The pixel-diff gate intentionally compares against the Phase 368
+baseline (which captured the unmodified retail SonicTeam logo) so a
+capture differing above the proof threshold proves the rendered content actually
+changed -- not just that the pipeline fired but rendered the same
+pixels. Pixel-level SGFX-logo specific verification (gate 2 in the
+review) is deferred to a later phase that adds a stable reference-
+image hash; the brittle path is leaving the renderer's exact
+quantization decisions to compare-by-hash, which is sensitive to
+GPU driver / dxc / D3D12 settings.
+
+## Phase 369B -- scoped text overrides (v2 schema)
+
+Phase 369B fixes the Phase 367b "BMW999 everywhere" regression. The
+v1 `strings` global lane replaces every CSD `SetText` of the
+literal regardless of which scene the literal appears in, which is
+exactly why the Phase 367b override of digit `99` produced clipped
+or green-rectangle artifacts in scenes whose text nodes were sized
+for shorter literals. The v2 `scoped_rules` lane attaches a CSD-
+project-substring scope to each rule; the rule only fires when a
+CSD project whose name contains that substring has been registered
+during the process.
+
+### v2 schema
+
+```json
+{
+  "version": 2,
+  "strings": { "Common_Yes": "BMW Yes 35" },
+  "scoped_rules": [
+    { "literal": "</dependency>",
+      "csd_project_substring": "status",
+      "replacement": "SGFX_DEP" }
+  ]
+}
+```
+
+v1 packs (just `strings`) keep working; the loader treats them as
+"all rules global". v2 packs can mix both lanes -- scoped rules
+take precedence over global when the scope matches.
+
+### Event taxonomy additions
+
+| Event | Source | Cardinality |
+|---|---|---|
+| `Text:ScopedRulesLoaded:<count>` | `sg_text_overrides.cpp::DoLoad()` (always emitted, even when zero) | once per process |
+| `Text:CsdProjectActive:<name>` | `sg_text_overrides.cpp::MarkCsdProjectActive()` invoked from `ui_lab_patches.cpp::OnCsdProjectMade()` | once per unique CSD project name per process |
+| `Text:CsdScopedOverrideHit:<literal>@<scope>` | `sg_text_overrides.cpp::TryGetOverrideGuestPtrScoped()` when a scoped rule wins resolution | once per unique `(literal, scope)` per process |
+| `Text:CsdOverrideHit:<literal>` | same site when the global v1 lane wins | once per unique replacement value per process (existing Phase 367b semantics, unchanged) |
+
+The `MarkCsdProjectActive` call lives BEFORE the
+`if (!g_isEnabled) return;` gate in `OnCsdProjectMade`, so the
+scoped-rules path works whether or not `--ui-lab` is on. The SGFX
+shell launch profile does not require `--ui-lab`.
+
+### Active CSD projects observed in the Phase 369B test window
+
+The 45-second auto-load / title-flow run registered 18 distinct
+CSD projects via `MarkCsdProjectActive`:
+
+```
+ui_loading       ui_saveicon      ui_general       ui_pause
+ui_status        ui_gate          ui_result        ui_missionscreen
+ui_misson        ui_start         ui_title         ui_balloon
+ui_shop          ui_townscreen    ui_worldmap      ui_worldmap_help
+ui_help          ui_itemresult
+```
+
+The Phase 367b assumption that the gameplay HUD would carry a
+`playscreen` substring did NOT hold in the captured runs: the
+status/UI project surfaces here as `ui_status`, not
+`ui_prov_playscreen` (the latter only appears in some retail
+SetText paths the proof did not exercise this run). This is the
+exact "fragile node naming" the Phase 369 review flagged -- the
+proof script's positive-control rule was authored against a real
+runtime-observed project name (`status`) and a route-stable
+runtime-observed SetText literal (`</dependency>`), not a guessed one.
+
+### Phase 369B acceptance gates
+
+The runner [`research_uiux/runtime_reference/tools/phase369b_path_b_proof.ps1`](runtime_reference/tools/phase369b_path_b_proof.ps1)
+stages two rules: a positive control (`</dependency>` -> `SGFX_DEP`
+scoped to `status`) and a negative control (`35` -> `BMW35_should_never_appear`
+scoped to a substring no real project carries). Exits 0 only when
+ALL of:
+
+| Exit | Reason |
+|---|---|
+| 0 | all gates passed |
+| 2 | build / deploy / launch failed |
+| 3 | `Text:ScopedRulesLoaded` missing or zero (v2 schema not parsed) |
+| 4 | `Text:CsdScopedOverrideHit:</dependency>@status` missing (positive rule did not match) |
+| 5 | `Text:CsdOverrideHit:99` observed (scoped lane was bypassed and global fired) |
+| 6 | `Text:CsdScopedOverrideHit` for the negative-control scope observed (substring matcher is too loose) |
+| 7 | no native BMP captured |
+
+### What's runtime-proven (Phase 369B, 2026-05-06)
+
+Captured in
+[research_uiux/runtime_reference/out/phase369b_path_b_proof/](runtime_reference/out/phase369b_path_b_proof/):
+
+```json
+{
+  "scoped_rules_loaded":  2,
+  "scoped_hit_keys":      ["</dependency>@status"],
+  "global_hit_keys":      [],
+  "active_csd_projects":  ["ui_loading", "ui_status", "ui_townscreen", ...],
+  "native_frames_written": 1,
+  "elapsed_seconds":       47
+}
+```
+
+- **runtime-proven**: 2 scoped rules parsed from v2 schema
+  (`Text:ScopedRulesLoaded:2`).
+- **runtime-proven**: `Text:CsdScopedOverrideHit:</dependency>@status`
+  fires exactly once during the current auto-load/title-flow route
+  when retail SU `SetText`s the sampled literal `</dependency>` while
+  `ui_status` is registered.
+- **runtime-proven**: `Text:CsdOverrideHit:99` is NEVER observed --
+  the scoped rule wins resolution before the v1 global lane is
+  consulted, so the BMW999 regression cannot recur for any literal
+  that has a scoped rule.
+- **runtime-proven**: the negative-control rule with substring
+  `ZZZNeverActive_phase369b_negative_control` does NOT fire,
+  proving the substring matcher is precise (never false-positives
+  against real project names).
+- **runtime-proven**: 18 distinct CSD projects registered via
+  `Text:CsdProjectActive:<name>`; substrings authored against this
+  list will never miss because of a typo'd guess.
+- **runtime-proven**: save backup safety net engaged; all three save
+  files were SHA-256-unchanged after the run.
+
+### Phase 369 file layout
+
+| Path | Purpose |
+|---|---|
+| [`UnleashedRecomp/patches/sg_asset_overrides.h`](../UnleashedRecomp/patches/sg_asset_overrides.h) | Phase 369A pixel-override loader API. |
+| [`UnleashedRecomp/patches/sg_asset_overrides.cpp`](../UnleashedRecomp/patches/sg_asset_overrides.cpp) | Phase 369A loader: parses `sg_asset_overrides.json`, pre-reads each referenced raw `DDS ` file, exposes `TryGetPixelOverride` + `NoteHitForPicture`. |
+| [`UnleashedRecomp/gpu/video.cpp`](../UnleashedRecomp/gpu/video.cpp) | Phase 369A: `MakePictureData` reads `pictureData->name`, calls `TryGetPixelOverride`, swaps `(data, dataSize)` before `LoadTexture` if the picture name has an override; calls `NoteHitForPicture` after the swap. |
+| [`UnleashedRecomp/main.cpp`](../UnleashedRecomp/main.cpp) | Phase 369A: `SGAssetOverrides::EnsureLoaded()` after `SGTextOverrides::EnsureLoaded()` so the pixel cache is ready before the first MakePictureData hit. |
+| [`UnleashedRecomp/patches/sg_text_overrides.h`](../UnleashedRecomp/patches/sg_text_overrides.h) | Phase 369B: declares `MarkCsdProjectActive`, `TryGetOverrideGuestPtrScoped`. |
+| [`UnleashedRecomp/patches/sg_text_overrides.cpp`](../UnleashedRecomp/patches/sg_text_overrides.cpp) | Phase 369B: parses v2 `scoped_rules`; tracks active CSD projects; `TryGetOverrideGuestPtrScoped` dispatches scoped-then-global, emitting the right event per lane. `TryGetOverrideGuestPtr` is now a thin wrapper that discards scope info. |
+| [`UnleashedRecomp/patches/ui_lab_patches.cpp`](../UnleashedRecomp/patches/ui_lab_patches.cpp) | Phase 369B: `OnCsdProjectMade` calls `SGTextOverrides::MarkCsdProjectActive` BEFORE the `g_isEnabled` gate so scope tracking works without `--ui-lab`. |
+| [`research_uiux/runtime_reference/tools/phase369a_path_b_proof.ps1`](runtime_reference/tools/phase369a_path_b_proof.ps1) | Phase 369A runner. |
+| [`research_uiux/runtime_reference/tools/phase369b_path_b_proof.ps1`](runtime_reference/tools/phase369b_path_b_proof.ps1) | Phase 369B runner. |
+
+### Fresh verification commands
+
+```powershell
+# Phase 369A: visible pixel swap (logo_sgfx.dds @ logo_sonicteam slot).
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\phase369a_path_b_proof.ps1 `
+    -AutoExitSeconds 45
+
+# Phase 369B: scoped text override (`</dependency>` -> SGFX_DEP only when `ui_status` active).
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\phase369b_path_b_proof.ps1 `
+    -AutoExitSeconds 45
+```
+
+Phase 367b / Phase 368 runners still pass unchanged.

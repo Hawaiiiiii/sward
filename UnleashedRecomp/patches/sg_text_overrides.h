@@ -54,6 +54,48 @@ namespace SGTextOverrides
     // a guest char* pointer.
     uint32_t TryGetOverrideGuestPtr(std::string_view original);
 
+    // Phase 369B: scoped text overrides.
+    //
+    // Schema v2 adds a `scoped_rules` array alongside the v1
+    // `strings` map. Both lanes co-exist. v1 entries are global
+    // (apply everywhere); v2 rules apply only when the literal AND
+    // the scope match.
+    //
+    //   {
+    //     "version": 2,
+    //     "strings": {
+    //       "Common_Yes": "BMW Yes 35"
+    //     },
+    //     "scoped_rules": [
+    //       { "literal": "99",
+    //         "csd_project_substring": "playscreen",
+    //         "replacement": "BMW99" }
+    //     ]
+    //   }
+    //
+    // Scope is a substring match against the names of the CSD
+    // projects active in the current process (every project that has
+    // had `MarkCsdProjectActive` called). This is intentionally
+    // coarse -- node-path matching is too brittle in practice given
+    // how retail SU's CSD trees vary across regions / patches -- but
+    // it is enough to fix the Phase 367b "BMW999 everywhere" issue
+    // because the HUD project name (e.g. `ui_prov_playscreen`) is
+    // distinct from the title project name (`ui_title`).
+    void MarkCsdProjectActive(std::string_view projectName);
+
+    // Phase 369B: extended guest-side override lookup. Returns 0 if
+    // no override applies. When a scope-matched rule wins,
+    // `*outScopeSubstring` is set to the rule's `csd_project_substring`
+    // (so the caller can report which scope matched in the bridge
+    // event). When the global lane wins, `*outScopeSubstring` is
+    // cleared. May return a previously-cached guest pointer when the
+    // same (literal, replacement) pair has already been allocated.
+    //
+    // The caller passes `original` exactly as it was read from guest
+    // memory; the loader matches by the JSON key string.
+    uint32_t TryGetOverrideGuestPtrScoped(std::string_view original,
+                                          std::string* outScopeSubstring);
+
     // Phase 367b: host-side proof emit. Called by Localise() the first
     // time it returns an override-backed string for a given key. Emits
     // exactly one bridge event per unique key per process boot:

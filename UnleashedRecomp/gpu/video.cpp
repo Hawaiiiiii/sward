@@ -28,6 +28,7 @@
 #include <ui/game_window.h>
 #include <ui/black_bar.h>
 #include <patches/aspect_ratio_patches.h>
+#include <patches/sg_asset_overrides.h>
 #include <patches/ui_lab_patches.h>
 #include <user/config.h>
 #include <sdl_listener.h>
@@ -6403,6 +6404,35 @@ static void MakePictureData(GuestPictureData* pictureData, uint8_t* data, uint32
 {
     if ((pictureData->flags & 0x1) == 0 && data != nullptr)
     {
+        // Phase 369A: pixel-level texture override. Retail SU stores
+        // the CTexturePicture name in `pictureData->name` (a guest
+        // pointer to a 2-byte-length-prefixed C string). If
+        // sg_asset_overrides.json has an entry for that name, swap
+        // the (data, dataSize) pair for the cached raw DDS bytes
+        // BEFORE LoadTexture / ddspp parse them. The retail decoder
+        // has already decompressed the on-disk LZX wrapper by this
+        // point, so the override file must be raw `DDS ` magic; the
+        // loader rejects anything else at load time. Dimensions /
+        // format are arbitrary -- ddspp / RHI handle it.
+        std::string_view pictureName;
+        if (pictureData->name != 0)
+        {
+            const char* nameC = reinterpret_cast<const char*>(
+                g_memory.Translate(pictureData->name + 2));
+            if (nameC != nullptr)
+                pictureName = std::string_view(nameC);
+        }
+        const uint8_t* overrideData = nullptr;
+        std::size_t overrideSize = 0;
+        const bool pixelOverrideApplied =
+            !pictureName.empty() &&
+            SGAssetOverrides::TryGetPixelOverride(pictureName, &overrideData, &overrideSize);
+        if (pixelOverrideApplied)
+        {
+            data = const_cast<uint8_t*>(overrideData);
+            dataSize = static_cast<uint32_t>(overrideSize);
+        }
+
         GuestTexture texture(ResourceType::Texture);
 
         if (LoadTexture(texture, data, dataSize, {}))
@@ -6410,6 +6440,8 @@ static void MakePictureData(GuestPictureData* pictureData, uint8_t* data, uint32
 #ifdef _DEBUG
             texture.texture->setName(reinterpret_cast<char*>(g_memory.Translate(pictureData->name + 2)));
 #endif
+            if (pixelOverrideApplied)
+                SGAssetOverrides::NoteHitForPicture(pictureName);
             XXH64_hash_t hash = XXH3_64bits(data, dataSize);
 
             // The whale in Cool Edge has a 2D texture assigned as a cubemap which makes it not display in recomp.

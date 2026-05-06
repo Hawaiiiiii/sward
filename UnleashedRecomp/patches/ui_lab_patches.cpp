@@ -1,3 +1,4 @@
+#include <patches/sg_text_overrides.h>
 #include <patches/ui_lab_patches.h>
 #include <app.h>
 #include <api/SWA.h>
@@ -11935,7 +11936,16 @@ namespace UiLab
 
     void OnCsdProjectMade(std::string_view projectName)
     {
-        if (!g_isEnabled || projectName.empty())
+        if (projectName.empty())
+            return;
+
+        // Phase 369B: register the project name with the text-
+        // override scope tracker BEFORE the g_isEnabled gate so the
+        // scoped-rules path works even when UI Lab itself is off
+        // (the SGFX shell launch profile does not require --ui-lab).
+        SGTextOverrides::MarkCsdProjectActive(projectName);
+
+        if (!g_isEnabled)
             return;
 
         const std::string project(projectName);
