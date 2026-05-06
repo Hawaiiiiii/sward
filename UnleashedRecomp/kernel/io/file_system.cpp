@@ -422,6 +422,26 @@ std::filesystem::path FileSystem::ResolvePath(const std::string_view& path, bool
             EmitSgPreflightAssetOverrideHit(path, resolvedPath);
             return resolvedPath;
         }
+
+        // Phase 368: SG_PREFLIGHT_NO_AUTOLOAD=1 suppresses retail SU's
+        // save auto-resume. ModLoader::ResolvePath also short-circuits
+        // the `save:` root for this env, but the FileSystem::ResolvePath
+        // fallback below still hands the call off to XamGetRootPath
+        // which finds the user's SYS-DATA on disk -- so the suppression
+        // only works if we ALSO refuse the save root here, before any
+        // XamGetRootPath lookup. Any path with the literal `save:` root
+        // and a non-empty env returns an empty resolution; XCreateFileA
+        // then surfaces this as "file not found", which retail SU's
+        // save loader treats as a missing-save scenario and the title
+        // menu's Continue row does not auto-resume.
+        if (path.starts_with("save:\\"))
+        {
+            if (const char* env = std::getenv("SG_PREFLIGHT_NO_AUTOLOAD");
+                env != nullptr && std::string_view(env) == "1")
+            {
+                return {};
+            }
+        }
     }
 
     thread_local std::string builtPath;

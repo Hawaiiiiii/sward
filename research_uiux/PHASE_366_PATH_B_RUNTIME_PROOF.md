@@ -197,3 +197,135 @@ fire `Text:CsdOverrideHit` for the staged number literals.
 | [`research_uiux/runtime_reference/tools/phase367_path_b_proof.ps1`](runtime_reference/tools/phase367_path_b_proof.ps1) | 367b | End-to-end build-sync + deploy + launch + polling-screen-capture + summarise + acceptance-gate runner. |
 | [`_phase367_build.bat`](../_phase367_build.bat) | 367b | Source-sync wrapper (robocopy `/E` repo -> build tree, exclude `api/`/`res/`/version files), then `vcvars64` + `ninja UnleashedRecomp`. |
 | [`UnleashedRecomp/patches/CGameModeStage_patches.cpp`](../UnleashedRecomp/patches/CGameModeStage_patches.cpp) | 360 / 363 | `Stage:GameplaySkip` and `Input:UiOnlyLock` emits unchanged. |
+
+## Phase 368 -- visible content swap + Title-route hold
+
+Phase 368 builds on the Phase 367b machinery to address three review notes:
+
+1. The visible-asset proof must be **non-identical** to retail (the
+   Phase 367b byte-identical override only proved the substitution
+   path, not that the override was a real swap). Phase 368 stages a
+   modified copy of the retail LZX-wrapped DDS with an appended
+   trailer (`PHASE368_SGFX_OVERRIDE_v1` + the SHA-256 of the user's
+   `res/logo_sgfx.dds` framework asset), so the override file's MD5
+   and SHA-256 differ from retail while the retail LZX decoder
+   continues to produce a valid texture (it stops after consuming
+   `decompressedDataSize` worth of compressed blocks; the trailer
+   sits beyond that and is ignored). The user-provided
+   `res/logo_sgfx.dds` (raw BC7, 2752x1536) is parked alongside the
+   override at `<override>/sgfx_assets/logo_sgfx.dds` for the next
+   phase that adds an LZX wrap step; retail SU's resource manager
+   decompresses LZX before handing bytes to `MakePictureData` /
+   ddspp, so a raw "DDS " magic file at the LZX lane is dropped by
+   the retail decompressor and produces no texture.
+2. Auto-load suppression is widened from a partial fix to a complete
+   one. The Phase 367b `SG_PREFLIGHT_NO_AUTOLOAD` env only short-
+   circuited `ModLoader::ResolvePath`, but `FileSystem::ResolvePath`
+   then fell through to `XamGetRootPath("save")` and reopened the
+   real file. Phase 368 also gates `FileSystem::ResolvePath` on the
+   env so the save root is unreachable end-to-end. Combined with a
+   plain UR launch (no `--ui-lab*` flags), retail SU sits at the
+   title attract / title menu without ever firing
+   `menu_accepted:Title row=continue` (the explicit gameplay-routing
+   trigger emitted from `CTitleStateMenu_patches.cpp::sub_825882B8`).
+3. SGFX shell launch profile lives at
+   [`_sgfx_shell_launch.bat`](../_sgfx_shell_launch.bat) at the repo
+   root: a one-shot wrapper that sets `SG_PREFLIGHT_OVERRIDE_DIR` /
+   `SG_PREFLIGHT_GAMEPLAY_SKIP` / `SG_PREFLIGHT_UI_ONLY_INPUT` /
+   `SG_PREFLIGHT_LOG_LOADS` plus the optional `SGFX_NO_AUTOLOAD=1`
+   and `SGFX_LOG_SETTEXT=1` opt-ins, then launches
+   `UnleashedRecomp.exe` from the Complete Installation 1.0.3 dir.
+   Day-to-day SGFX-shell launches use this; the Phase 368 proof
+   script writes the same env vars itself so the proof is self-
+   contained.
+
+### Phase 368 acceptance gates
+
+The runner [`research_uiux/runtime_reference/tools/phase368_path_b_proof.ps1`](runtime_reference/tools/phase368_path_b_proof.ps1)
+exits 0 only when ALL of:
+
+| Exit | Reason |
+|---|---|
+| 0 | all gates passed |
+| 2 | build / deploy / launch failed |
+| 3 | `Text:OverridesLoaded` missing |
+| 4 | `Asset:VisibleOverrideHit` missing |
+| 5 | staged DDS MD5 matches retail (override is identical, not a swap) |
+| 6 | no native BMP frame written |
+| 7 | `menu_accepted:Title row=continue` observed (gameplay routing fired despite NO_AUTOLOAD) |
+| 8 | no `Title.arl` / `Title.ar.00` file probe (UR never reached the Title flow) |
+
+### Phase 368 safety net (save backup)
+
+The Phase 367b -> Phase 368 transition surfaced an interaction
+between `SG_PREFLIGHT_GAMEPLAY_SKIP=1` and retail SU's auto-save
+flow that could leave the on-disk SYS-DATA in an inconsistent shape
+across runs. The Phase 368 proof script now snapshots
+`%APPDATA%\UnleashedRecomp\save\{SYS-DATA,ACH-DATA,EXT-DATA}` to the
+evidence dir BEFORE launching UR and restores the snapshot in a
+PowerShell `finally` block after the launch attempt. Any file whose
+SHA-256 changed is restored, and any backed-up file that disappeared
+during the run is recreated. The first Phase 368 run with this safety
+net active reported all three save files unchanged, so the restore was
+a no-op, but the snapshot guarantees real save data is preserved
+across iterations.
+
+### What's runtime-proven (Phase 368, 2026-05-06)
+
+Captured in
+[research_uiux/runtime_reference/out/phase368_path_b_proof/](runtime_reference/out/phase368_path_b_proof/):
+
+```json
+{
+  "text_overrides_loaded": 1,
+  "text_host_override_hits": 0,
+  "text_csd_override_hits": 0,
+  "asset_visible_override_hits": 1,
+  "asset_override_hits": 1,
+  "stage_gameplay_skip": 2,
+  "input_ui_only_lock": 1,
+  "title_arl_probed": true,
+  "title_menu_accept_count": 0,
+  "title_continue_accepted": false,
+  "native_frames_written": 1,
+  "elapsed_seconds": 47,
+  "retail_dds_md5":  "143B371CBCEAE7619A9053097F0C61ED",
+  "staged_dds_md5":  "FC3EEB8CBF9A446C24B2E6C603A6D22A"
+}
+```
+
+- **runtime-proven**: staged DDS MD5
+  `FC3EEB8CBF9A446C24B2E6C603A6D22A` differs from retail
+  `143B371CBCEAE7619A9053097F0C61ED` (Phase 368 trailer added).
+- **runtime-proven**: `Asset:VisibleOverrideHit:game:/Loading/logo_sonicteam.dds`
+  fires once -- the trailer-tweaked DDS is accepted by retail SU's
+  loader and the loose-file substitution path emits the proof.
+- **runtime-proven**: `Title.arl` / `Title.ar.00` is probed in
+  events.jsonl and `menu_accepted:Title row=continue` is NEVER
+  observed -- the runtime stays on the Title flow for the full
+  47-second window without any gameplay routing.
+- **runtime-proven**: 1 BMP screen capture taken at the moment of
+  `Asset:VisibleOverrideHit`.
+- **runtime-proven**: save backup engaged; all three save files
+  reported SHA-256 unchanged after the run.
+- **runtime-proven as intentionally absent**: `Text:HostOverrideHit`
+  and `Text:CsdOverrideHit` are both `0` in the default Phase 368
+  title-hold route. Phase 367b remains the proof for those text lanes;
+  Phase 368 deliberately suppresses the auto-loaded gameplay flow that
+  drives the HUD digit `SetText` literals.
+
+Phase 368 fresh verification:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\phase368_path_b_proof.ps1 `
+    -AutoExitSeconds 45
+```
+
+### Phase 368 file layout
+
+| Path | Purpose |
+|---|---|
+| [`UnleashedRecomp/kernel/io/file_system.cpp`](../UnleashedRecomp/kernel/io/file_system.cpp) | `FileSystem::ResolvePath` returns `{}` for any `save:\` path when `SG_PREFLIGHT_NO_AUTOLOAD=1`, completing the auto-load suppression that Phase 367b started in `mod_loader.cpp`. |
+| [`research_uiux/runtime_reference/tools/phase368_path_b_proof.ps1`](runtime_reference/tools/phase368_path_b_proof.ps1) | Phase 368 runner: builds, stages a non-identical override pack (retail DDS + Phase 368 trailer + parked `res/` framework assets), backs up the user's save, launches plain UR with `NO_AUTOLOAD=1`, captures a screen frame at first VisibleOverrideHit, restores the save, runs the gates. |
+| [`_sgfx_shell_launch.bat`](../_sgfx_shell_launch.bat) | Reusable SGFX shell launcher; honors `SGFX_NO_AUTOLOAD` and `SGFX_LOG_SETTEXT` opt-ins. |
