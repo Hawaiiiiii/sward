@@ -6,6 +6,7 @@
 #include <os/process.h>
 #include <patches/audio_patches.h>
 #include <patches/inspire_patches.h>
+#include <patches/ui_lab_patches.h>
 #include <ui/game_window.h>
 #include <user/config.h>
 #include <user/paths.h>
@@ -75,6 +76,11 @@ PPC_FUNC(sub_822C1130)
 
     AudioPatches::Update(App::s_deltaTime);
     InspirePatches::Update();
+
+    // Phase 361: poll the SGFX bridge for state.json mtime changes
+    // pushed by sg-preflight's bridge-daemon. Single stat() syscall
+    // per frame; no-op when the daemon isn't running.
+    UiLab::TickBridge();
 
     // Apply subtitles option.
     if (auto pApplicationDocument = SWA::CApplicationDocument::GetInstance())

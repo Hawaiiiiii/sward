@@ -142,6 +142,27 @@ PPC_FUNC(sub_825882B8)
 
     auto isAccepted = pPadState.IsTapped(SWA::eKeyState_A) || pPadState.IsTapped(SWA::eKeyState_Start);
 
+    // Phase 361: emit MenuAccepted to the SGFX bridge so sg-preflight
+    // sees title-menu accepts in real time. Cursor index mapping
+    // matches retail SU's row order (mined from this patch's existing
+    // isNewGameIndex / isOptionsIndex / isInstallIndex constants):
+    //   0 -> "new_save"   (NEW SAVE / NEW GAME)
+    //   1 -> "continue"
+    //   2 -> "settings"   (Options)
+    //   3 -> "dlc"        (Install Data)
+    //   4 -> "exit"
+    // Emit only on accept-tap (not on every Update frame). The bridge
+    // singleton is a no-op when the daemon isn't running.
+    if (isAccepted)
+    {
+        static const char* const kRowIds[] = {
+            "new_save", "continue", "settings", "dlc", "exit"
+        };
+        const uint32_t row = pTitleMenu->m_CursorIndex;
+        if (row < std::size(kRowIds))
+            UiLab::EmitBridgeMenuAccepted("Title", kRowIds[row]);
+    }
+
     auto isNewGameIndex = pTitleMenu->m_CursorIndex == 0;
     auto isOptionsIndex = pTitleMenu->m_CursorIndex == 2;
     auto isInstallIndex = pTitleMenu->m_CursorIndex == 3;

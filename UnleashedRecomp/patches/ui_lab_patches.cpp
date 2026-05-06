@@ -9,6 +9,13 @@
 #include <kernel/memory.h>
 #include <os/logger.h>
 #include <user/config.h>
+#include <user/paths.h>
+
+// Phase 361: pull in the SgfxBridge from the SWARD reference tree.
+// The patches CMakeLists already adds research_uiux/runtime_reference/include
+// to the include path (see csd_overlay_patches.cpp's #includes that follow
+// the same `<sward/ui_runtime/...>` convention).
+#include <sward/ui_runtime/sgfx_bridge.hpp>
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -46,6 +53,166 @@ extern void sub_825E4068(PPCContext& ctx, uint8_t* base);
 
 namespace UiLab
 {
+    // Phase 360 + 363: gameplay-skip honors the SG_PREFLIGHT_GAMEPLAY_SKIP
+    // env var. When set to "1" (or "true"/"TRUE"), the menu shell behaves
+    // as a re-skinnable "demo loop": the player can browse Title / World
+    // Map / Pause normally, but once gameplay (CGameModeStage) is entered,
+    // the gameplay-relevant pad inputs are masked off so the character
+    // never moves. The HUD / world tick continues, producing the
+    // screensaver-on-stage demo behaviour the SGFX consumer expects.
+    // Pressing Start still reaches the pause path, so the player can
+    // Quit back to World Map normally.
+    //
+    // Activated at CGameModeStage_patches.cpp::sub_8253B7C0 (the
+    // CGameModeStage::Update PPC entry).
+    static bool ReadBoolEnv(const char* name)
+    {
+        const char* env = std::getenv(name);
+        if (env == nullptr) return false;
+        const std::string_view v(env);
+        return v == "1" || v == "true" || v == "TRUE";
+    }
+
+    bool IsGameplaySkipMode()
+    {
+        static const bool value = ReadBoolEnv("SG_PREFLIGHT_GAMEPLAY_SKIP");
+        return value;
+    }
+
+    // Phase 363: independent UI-only input lock. Gameplay-skip implies
+    // it; users can also enable it on its own via SG_PREFLIGHT_UI_ONLY_INPUT
+    // (e.g. when capturing a stage HUD reference frame and the character
+    // must stand still without changing the gameplay-skip semantics).
+    bool IsUiOnlyInputMode()
+    {
+        static const bool value =
+            ReadBoolEnv("SG_PREFLIGHT_UI_ONLY_INPUT") || IsGameplaySkipMode();
+        return value;
+    }
+
+    // Phase 363: one-shot bridge emit on stage entry while gameplay-skip
+    // is engaged. The CGameModeStage hook calls this on the first
+    // CGameModeStage::Update tick of a new stage instance. Re-entering the
+    // same stage instance later in the session re-fires (idempotent on
+    // the daemon side; profiles list is unchanged either way).
+    static std::atomic<uint32_t> g_lastSkipStageThis{0};
+    void OnGameplaySkipStageEntered(uint32_t stageThisAddress)
+    {
+        const uint32_t prev = g_lastSkipStageThis.exchange(
+            stageThisAddress, std::memory_order_acq_rel);
+        if (prev == stageThisAddress) return;
+        EmitBridgeScreenEntered("Stage:GameplaySkip");
+        LOGF_IMPL(Utility, "SG-Preflight",
+                  "gameplay-skip engaged on stage entry (CGameModeStage @ 0x{:08X})",
+                  stageThisAddress);
+    }
+
+    static std::atomic<bool> g_uiOnlyInputLockProofEmitted{false};
+    void OnUiOnlyInputLockApplied(uint32_t stageThisAddress)
+    {
+        if (g_uiOnlyInputLockProofEmitted.exchange(true, std::memory_order_acq_rel))
+            return;
+
+        EmitBridgeScreenEntered("Input:UiOnlyLock");
+        LOGF_IMPL(Utility, "SG-Preflight",
+                  "UI-only input lock masked gameplay controls (CGameModeStage @ 0x{:08X})",
+                  stageThisAddress);
+    }
+
+    // Phase 361: SgfxBridge singleton + emit helpers.
+    //
+    // The bridge talks to sg-preflight's `python -m sg_preflight bridge-daemon`
+    // through two filesystem-watched JSON files in
+    // <userPath>/sgfx_bridge/. Lazy init on first call so the cost is
+    // a single mkdir per process. If the daemon is not running, the
+    // bridge degrades to "events written, never read" + "state never
+    // updated" -- both safe.
+    //
+    // Honor SG_PREFLIGHT_BRIDGE_DISABLE=1 to short-circuit (e.g. when
+    // running plain UR for a non-sg-preflight scenario).
+    namespace bridge_impl
+    {
+        using SgfxBridge      = sward::ui_runtime::generated::sgfx_hud::SgfxBridge;
+        using SgfxBridgeEvent = sward::ui_runtime::generated::sgfx_hud::SgfxBridgeEvent;
+        using SgfxBridgeKind  = sward::ui_runtime::generated::sgfx_hud::SgfxBridgeEventKind;
+
+        static SgfxBridge s_bridge;
+        static std::atomic<bool> s_inited{false};
+        static std::atomic<bool> s_disabled{false};
+        static std::once_flag s_initFlag;
+
+        static void doInit()
+        {
+            if (const char* env = std::getenv("SG_PREFLIGHT_BRIDGE_DISABLE");
+                env != nullptr && std::string_view(env) == "1")
+            {
+                s_disabled.store(true, std::memory_order_release);
+                return;
+            }
+            const auto bridgeDir = GetUserPath() / "sgfx_bridge";
+            if (s_bridge.Init(bridgeDir))
+            {
+                LOGF_IMPL(Utility, "SG-Preflight",
+                          "bridge mounted at \"{}\" (events.jsonl + state.json)",
+                          reinterpret_cast<const char*>(bridgeDir.u8string().c_str()));
+            }
+            s_inited.store(true, std::memory_order_release);
+        }
+
+        static SgfxBridge* getOrInit() noexcept
+        {
+            std::call_once(s_initFlag, doInit);
+            if (s_disabled.load(std::memory_order_acquire)) return nullptr;
+            return &s_bridge;
+        }
+    } // namespace bridge_impl
+
+    void TickBridge()
+    {
+        if (auto* b = bridge_impl::getOrInit())
+            b->Tick();
+    }
+
+    void EmitBridgeMenuAccepted(std::string_view screen, std::string_view rowId)
+    {
+        auto* b = bridge_impl::getOrInit();
+        if (b == nullptr) return;
+        bridge_impl::SgfxBridgeEvent ev;
+        ev.kind   = bridge_impl::SgfxBridgeKind::MenuAccepted;
+        ev.screen = std::string(screen);
+        ev.rowId  = std::string(rowId);
+        b->EmitEvent(ev);
+    }
+
+    void EmitBridgeProfileSelected(std::string_view profileId)
+    {
+        auto* b = bridge_impl::getOrInit();
+        if (b == nullptr) return;
+        bridge_impl::SgfxBridgeEvent ev;
+        ev.kind      = bridge_impl::SgfxBridgeKind::ProfileSelected;
+        ev.profileId = std::string(profileId);
+        b->EmitEvent(ev);
+    }
+
+    void EmitBridgeScreenEntered(std::string_view screen)
+    {
+        auto* b = bridge_impl::getOrInit();
+        if (b == nullptr) return;
+        bridge_impl::SgfxBridgeEvent ev;
+        ev.kind   = bridge_impl::SgfxBridgeKind::ScreenEntered;
+        ev.screen = std::string(screen);
+        b->EmitEvent(ev);
+    }
+
+    void EmitBridgeQuitRequested()
+    {
+        auto* b = bridge_impl::getOrInit();
+        if (b == nullptr) return;
+        bridge_impl::SgfxBridgeEvent ev;
+        ev.kind = bridge_impl::SgfxBridgeKind::QuitRequested;
+        b->EmitEvent(ev);
+    }
+
     enum class RoutePolicy : uint8_t
     {
         InputInjection,

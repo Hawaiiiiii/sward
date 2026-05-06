@@ -163,7 +163,7 @@ target_link_libraries(sward_su_ui_asset_renderer
 # linked when SDL2_LIBS_PATH is provided; otherwise the runtime
 # falls back to silent mode and just logs cue requests).
 set(_SGFX_RUNTIME_RES_SOUNDS
-    "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/UnleashedRecomp")
+    "${CMAKE_SOURCE_DIR}/../../local_build_env/ur103clean/UnleashedRecomp")
 add_executable(sgfx_runtime
     src/sgfx_runtime_main.cpp
     src/sgfx_audio_dispatch.cpp
@@ -182,15 +182,15 @@ target_include_directories(sgfx_runtime
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         "${_SGFX_RUNTIME_RES_SOUNDS}"
-        "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL/include"
-        "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL/include/SDL2"
-        "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL_mixer/include"
+        "${CMAKE_SOURCE_DIR}/../../local_build_env/ur103clean/thirdparty/SDL/include"
+        "${CMAKE_SOURCE_DIR}/../../local_build_env/ur103clean/thirdparty/SDL/include/SDL2"
+        "${CMAKE_SOURCE_DIR}/../../local_build_env/ur103clean/thirdparty/SDL_mixer/include"
 )
 
 target_compile_features(sgfx_runtime PRIVATE cxx_std_20)
 
 set(_SGFX_RUNTIME_SDL_BUILD
-    "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/b/ui_lab_runtime/thirdparty")
+    "${CMAKE_SOURCE_DIR}/../../local_build_env/ur103clean/b/ui_lab_runtime/thirdparty")
 if(EXISTS "${_SGFX_RUNTIME_SDL_BUILD}/SDL/SDL2-static.lib")
     target_link_libraries(sgfx_runtime PRIVATE
         "${_SGFX_RUNTIME_SDL_BUILD}/SDL_mixer/SDL2_mixer-static.lib"
@@ -240,10 +240,10 @@ if(EXISTS "${_SGFX_RUNTIME_SDL_BUILD}/SDL/SDL2-static.lib")
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             "${_SGFX_RUNTIME_RES_SOUNDS}"
-            "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL/include"
-            "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL/include/SDL2"
-            "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/SDL_mixer/include"
-            "${CMAKE_SOURCE_DIR}/local_build_env/ur103clean/thirdparty/stb"
+            "${CMAKE_SOURCE_DIR}/../../local_build_env/ur103clean/thirdparty/SDL/include"
+            "${CMAKE_SOURCE_DIR}/../../local_build_env/ur103clean/thirdparty/SDL/include/SDL2"
+            "${CMAKE_SOURCE_DIR}/../../local_build_env/ur103clean/thirdparty/SDL_mixer/include"
+            "${CMAKE_SOURCE_DIR}/../../local_build_env/ur103clean/thirdparty/stb"
     )
     target_compile_features(sgfx_ui_mirror PRIVATE cxx_std_20)
     target_link_libraries(sgfx_ui_mirror PRIVATE

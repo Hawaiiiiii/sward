@@ -1,5 +1,6 @@
 #include <kernel/function.h>
 #include <kernel/memory.h>
+#include <patches/sg_text_overrides.h>
 #include <patches/ui_lab_patches.h>
 
 #include <cctype>
@@ -76,16 +77,47 @@ PPC_FUNC_IMPL(__imp__sub_830BF640);
 PPC_FUNC(sub_830BF640)
 {
     const uint32_t nodeAddress = ctx.r3.u32;
-    const uint32_t textAddress = ctx.r4.u32;
-    std::string textUtf8 = TryReadGuestAsciiString(textAddress);
+    const uint32_t originalTextAddress = ctx.r4.u32;
+    std::string textUtf8 = TryReadGuestAsciiString(originalTextAddress);
     if (textUtf8.empty())
-        textUtf8 = TryReadGuestUtf16String(textAddress);
+        textUtf8 = TryReadGuestUtf16String(originalTextAddress);
+
+    // Phase 364: per-string text override. If the override map has an
+    // entry for the original literal, point r4 at a guest-heap-resident
+    // UTF-8 copy of the override before SetText runs. Only swap when the
+    // original parsed as ASCII -- the existing CSD glyph layout for
+    // Sonic Unleashed treats single-byte UTF-8 in this slot the same as
+    // ASCII, which matches the retail string layout for menu labels.
+    uint32_t effectiveTextAddress = originalTextAddress;
+    bool overrideApplied = false;
+    if (!textUtf8.empty())
+    {
+        const uint32_t overrideGuestPtr = SGTextOverrides::TryGetOverrideGuestPtr(textUtf8);
+        if (overrideGuestPtr != 0)
+        {
+            ctx.r4.u32 = overrideGuestPtr;
+            effectiveTextAddress = overrideGuestPtr;
+            overrideApplied = true;
+        }
+    }
 
     __imp__sub_830BF640(ctx, base);
 
-    UiLab::OnCsdNodeSetText(
-        nodeAddress,
-        textAddress,
-        textUtf8,
-        "CSD::CNode::SetText/sub_830BF640");
+    if (overrideApplied)
+    {
+        const std::string* overrideText = SGTextOverrides::TryGetOverride(textUtf8);
+        UiLab::OnCsdNodeSetText(
+            nodeAddress,
+            effectiveTextAddress,
+            overrideText != nullptr ? *overrideText : textUtf8,
+            "CSD::CNode::SetText/sub_830BF640+override");
+    }
+    else
+    {
+        UiLab::OnCsdNodeSetText(
+            nodeAddress,
+            originalTextAddress,
+            textUtf8,
+            "CSD::CNode::SetText/sub_830BF640");
+    }
 }

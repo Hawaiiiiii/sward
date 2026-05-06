@@ -1,0 +1,109 @@
+# Phase 359 -- SG-Preflight asset override mount for UnleashedRecomp.
+#
+# Current source of truth: tracked files under `UnleashedRecomp/`.
+# This paste patch is retained as a portable reference for external
+# 1.0.3-derived trees; the repo implementation also includes Phase 366
+# bridge proof events, direct file probes, and loose archive-entry lookup.
+#
+# Apply to UnleashedRecomp/mod/mod_loader.cpp (any 1.0.3-derived copy).
+# The change is two parts:
+#   1. A new static function registerSgPreflightOverrideMod() inserted
+#      immediately above ModLoader::Init().
+#   2. One call to that function as the FIRST line of ModLoader::Init().
+#
+# After applying, set SG_PREFLIGHT_OVERRIDE_DIR=<path> and run
+# UnleashedRecomp -- files in <path>/win32/<game-relative> override
+# the matching retail asset. See
+# research_uiux/PHASE_359_SG_PREFLIGHT_OVERRIDE_HOWTO.md for the
+# operator workflow.
+#
+# This patch is intentionally not a unified diff (the local copy is
+# gitignored); paste the two blocks below into the corresponding
+# locations of mod_loader.cpp.
+
+# ============================================================
+# BLOCK 1 -- insert immediately ABOVE `void ModLoader::Init()`:
+# ============================================================
+
+// Phase 359: SG-Preflight override mount.
+//
+// In addition to the standard HMM/UMM mod stack (cpkredir.ini-based),
+// honor a host-supplied override directory. This is the path
+// sg-preflight uses to swap retail Sonic Unleashed assets for
+// BMW / Seriengrafik replacements one file at a time without
+// authoring a full HMM mod manifest.
+//
+// Activation precedence (first match wins):
+//   1. SG_PREFLIGHT_OVERRIDE_DIR environment variable (absolute path)
+//   2. <userPath>/sg_preflight_overrides/  (auto-detected if exists)
+//
+// Layout: drop replacement files under
+//   <override-dir>/<game-relative-path>
+// e.g.
+//   <override-dir>/win32/game/Title/ui_title.yncp
+//   <override-dir>/win32/game/MainMenu/ui_mm_contentstext.dds
+//
+// The override mod is inserted at the FRONT of g_mods so it takes
+// priority over every cpkredir mod. Console logging is auto-enabled
+// when the override mount is active; honor SG_PREFLIGHT_LOG_LOADS=0
+// to opt out.
+static void registerSgPreflightOverrideMod()
+{
+    std::filesystem::path overrideDir;
+    if (const char* env = std::getenv("SG_PREFLIGHT_OVERRIDE_DIR");
+        env != nullptr && env[0] != '\0')
+    {
+        overrideDir = std::filesystem::path(std::u8string_view(
+            reinterpret_cast<const char8_t*>(env)));
+    }
+    else
+    {
+        const auto candidate = GetUserPath() / "sg_preflight_overrides";
+        std::error_code ec;
+        if (std::filesystem::is_directory(candidate, ec))
+            overrideDir = candidate;
+    }
+
+    if (overrideDir.empty()) return;
+
+    std::error_code ec;
+    if (!std::filesystem::is_directory(overrideDir, ec)) return;
+
+    Mod mod;
+    // UMM with merge=false so every file in the dir is treated as a
+    // straight override (no .ar merging gymnastics) -- matches the
+    // "drop a file, see it replace retail" expectation.
+    mod.type = ModType::UMM;
+    mod.merge = false;
+    mod.includeDirs.emplace_back(overrideDir);
+
+    // Insert at front so this mod wins against any cpkredir mods
+    // that get appended afterwards.
+    g_mods.insert(g_mods.begin(), std::move(mod));
+
+    LOGF_IMPL(Utility, "SG-Preflight",
+              "override mount active: \"{}\" (priority=top)",
+              reinterpret_cast<const char*>(overrideDir.u8string().c_str()));
+
+    // Auto-enable per-load console logging when the override mount
+    // is in use; the user wants to see substitution events as they
+    // build the override pack. Honor an explicit
+    // SG_PREFLIGHT_LOG_LOADS=0 to opt out.
+    if (const char* logEnv = std::getenv("SG_PREFLIGHT_LOG_LOADS");
+        logEnv == nullptr || std::string_view(logEnv) != "0")
+    {
+        ModLoader::s_isLogTypeConsole = true;
+    }
+}
+
+
+# ============================================================
+# BLOCK 2 -- insert as the FIRST statement of `ModLoader::Init()`,
+# immediately after `const std::filesystem::path& userPath = GetUserPath();`:
+# ============================================================
+
+    // Phase 359: register the SG-Preflight override mount FIRST so
+    // it takes priority over any cpkredir mods. This makes the mod
+    // system usable without authoring an HMM/UMM manifest -- just
+    // drop files in the override dir and go.
+    registerSgPreflightOverrideMod();

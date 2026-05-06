@@ -92,6 +92,26 @@ bool InjectMenuBehaviour(uint32_t pThis, uint32_t count)
 
     if (pHudPause->m_Status == SWA::eStatusType_Accept)
     {
+        // Phase 361: emit MenuAccepted to the SGFX bridge. Pause menu
+        // rows are context-dependent (Stage / WorldMap / Hub each
+        // have different layouts), but three positions are stable:
+        //   cursor == 0          -> "continue" (always first row)
+        //   cursor == count - 2  -> "options"  (Settings sub-menu)
+        //   cursor == count - 1  -> "quit"     (Return / Quit)
+        // Other rows fall through to "row_<N>" so the daemon can
+        // see them even before the per-context mapping is finalised.
+        const uint32_t ci = static_cast<uint32_t>(cursorIndex);
+        std::string rowId;
+        if (ci == 0)
+            rowId = "continue";
+        else if (ci == count - 2)
+            rowId = "options";
+        else if (ci == count - 1)
+            rowId = "quit";
+        else
+            rowId = "row_" + std::to_string(ci);
+        UiLab::EmitBridgeMenuAccepted("Pause", rowId);
+
         if (cursorIndex == count - 2)
         {
             OptionsMenu::Open(true, pHudPause->m_Menu);

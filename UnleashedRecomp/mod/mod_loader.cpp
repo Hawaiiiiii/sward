@@ -9,6 +9,7 @@
 #include <user/paths.h>
 #include <os/logger.h>
 #include <os/process.h>
+#include <patches/ui_lab_patches.h>
 #include <xxHashMap.h>
 
 enum class ModType
@@ -26,6 +27,66 @@ struct Mod
 };
 
 static std::vector<Mod> g_mods;
+static std::filesystem::path g_sgPreflightOverrideDir;
+static ankerl::unordered_dense::map<std::string, std::filesystem::path> g_sgPreflightLooseOverrideIndex;
+static ankerl::unordered_dense::set<std::string> g_sgPreflightObservedArchiveEntries;
+
+static std::string NormalizeSgPreflightAssetKey(std::string_view value)
+{
+    std::string key(value);
+    std::replace(key.begin(), key.end(), '\\', '/');
+    std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c)
+    {
+        return static_cast<char>(std::tolower(c));
+    });
+    return key;
+}
+
+static void IndexSgPreflightLooseOverrides(const std::filesystem::path& overrideDir)
+{
+    g_sgPreflightLooseOverrideIndex.clear();
+
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(overrideDir, ec))
+    {
+        if (ec) break;
+        if (!entry.is_regular_file(ec)) continue;
+
+        const auto path = entry.path();
+        const auto filename = path.filename().u8string();
+        if (filename == u8"sg_text_overrides.json" || filename == u8"README.md")
+            continue;
+
+        const auto rel = path.lexically_relative(overrideDir).generic_u8string();
+        const std::string relKey = NormalizeSgPreflightAssetKey(
+            std::string_view(reinterpret_cast<const char*>(rel.data()), rel.size()));
+        g_sgPreflightLooseOverrideIndex[relKey] = path;
+
+        const std::string fileKey = NormalizeSgPreflightAssetKey(
+            std::string_view(reinterpret_cast<const char*>(filename.data()), filename.size()));
+        auto [it, inserted] = g_sgPreflightLooseOverrideIndex.emplace(fileKey, path);
+        if (!inserted && it->second != path)
+            it->second.clear();
+    }
+}
+
+static bool IsSgPreflightLoadLoggingEnabled()
+{
+    const char* logEnv = std::getenv("SG_PREFLIGHT_LOG_LOADS");
+    return logEnv != nullptr && std::string_view(logEnv) != "0";
+}
+
+static void EmitSgPreflightArchiveEntryProbe(std::string_view assetName)
+{
+    if (!IsSgPreflightLoadLoggingEnabled() || assetName.empty()) return;
+    if (g_sgPreflightObservedArchiveEntries.size() >= 128) return;
+
+    std::string key(assetName);
+    std::replace(key.begin(), key.end(), '\\', '/');
+    if (!g_sgPreflightObservedArchiveEntries.emplace(key).second) return;
+
+    UiLab::EmitBridgeScreenEntered("Asset:ArchiveEntry:" + key);
+}
 
 std::filesystem::path ModLoader::ResolvePath(std::string_view path)
 {
@@ -91,9 +152,135 @@ std::vector<std::filesystem::path>* ModLoader::GetIncludeDirectories(size_t modI
     return modIndex < g_mods.size() ? &g_mods[modIndex].includeDirs : nullptr;
 }
 
+// Phase 359: SG-Preflight override mount.
+//
+// In addition to the standard HMM/UMM mod stack (cpkredir.ini-based),
+// honor a host-supplied override directory. This is the path
+// sg-preflight uses to swap retail Sonic Unleashed assets for
+// BMW / Seriengrafik replacements one file at a time without
+// authoring a full HMM mod manifest.
+//
+// Activation precedence (first match wins):
+//   1. SG_PREFLIGHT_OVERRIDE_DIR environment variable (absolute path)
+//   2. <userPath>/sg_preflight_overrides/  (auto-detected if exists)
+//
+// Layout: drop replacement files under the same root-relative path
+// requested by the guest. For example, `game:\Title\ui_title.yncp`
+// resolves as:
+//   <override-dir>/Title/ui_title.yncp
+//
+// If you are copying from the extracted install tree, that usually
+// means setting SG_PREFLIGHT_OVERRIDE_DIR to the extracted `game`
+// folder or mirroring the root-relative folders under your override dir.
+//
+// e.g.
+//   <override-dir>/Title/ui_title.yncp
+//   <override-dir>/MainMenu/ui_mm_contentstext.dds
+//
+// The override mod is inserted at the FRONT of g_mods so it takes
+// priority over every cpkredir mod. When SG_PREFLIGHT_LOG_LOADS=1
+// is also set, every file load is logged with its resolved path
+// (override vs install) so you can see exactly what's being
+// substituted as you build the override pack incrementally.
+static void registerSgPreflightOverrideMod()
+{
+    std::filesystem::path overrideDir;
+    if (const char* env = std::getenv("SG_PREFLIGHT_OVERRIDE_DIR");
+        env != nullptr && env[0] != '\0')
+    {
+        overrideDir = std::filesystem::path(std::u8string_view(
+            reinterpret_cast<const char8_t*>(env)));
+    }
+    else
+    {
+        const auto candidate = GetUserPath() / "sg_preflight_overrides";
+        std::error_code ec;
+        if (std::filesystem::is_directory(candidate, ec))
+            overrideDir = candidate;
+    }
+
+    if (overrideDir.empty()) return;
+
+    std::error_code ec;
+    if (!std::filesystem::is_directory(overrideDir, ec)) return;
+    g_sgPreflightOverrideDir = std::filesystem::weakly_canonical(overrideDir, ec);
+    if (ec)
+        g_sgPreflightOverrideDir = overrideDir;
+    IndexSgPreflightLooseOverrides(g_sgPreflightOverrideDir);
+
+    Mod mod;
+    // UMM with merge=false so every file in the dir is treated as a
+    // straight override (no .ar merging gymnastics) -- matches the
+    // "drop a file, see it replace retail" expectation.
+    mod.type = ModType::UMM;
+    mod.merge = false;
+    mod.includeDirs.emplace_back(overrideDir);
+
+    // Insert at front so this mod wins against any cpkredir mods
+    // that get appended afterwards.
+    g_mods.insert(g_mods.begin(), std::move(mod));
+
+    LOGF_IMPL(Utility, "SG-Preflight",
+              "override mount active: \"{}\" (priority=top)",
+              reinterpret_cast<const char*>(overrideDir.u8string().c_str()));
+
+    // Auto-enable per-load console logging when the override mount
+    // is in use; the user wants to see substitution events as they
+    // build the override pack. Honor an explicit
+    // SG_PREFLIGHT_LOG_LOADS=0 to opt out.
+    if (const char* logEnv = std::getenv("SG_PREFLIGHT_LOG_LOADS");
+        logEnv == nullptr || std::string_view(logEnv) != "0")
+    {
+        ModLoader::s_isLogTypeConsole = true;
+    }
+}
+
+bool ModLoader::IsSgPreflightOverridePath(const std::filesystem::path& path)
+{
+    if (g_sgPreflightOverrideDir.empty() || path.empty()) return false;
+
+    std::error_code ec;
+    const auto base = std::filesystem::weakly_canonical(g_sgPreflightOverrideDir, ec);
+    if (ec) return false;
+
+    const auto candidate = std::filesystem::weakly_canonical(path, ec);
+    if (ec) return false;
+
+    const auto rel = std::filesystem::relative(candidate, base, ec);
+    if (ec || rel.empty()) return false;
+
+    auto it = rel.begin();
+    return it != rel.end() && *it != "..";
+}
+
+std::filesystem::path ModLoader::ResolveSgPreflightLooseAssetOverride(std::string_view assetName)
+{
+    if (g_sgPreflightOverrideDir.empty() || assetName.empty()) return {};
+
+    const std::string relKey = NormalizeSgPreflightAssetKey(assetName);
+    auto it = g_sgPreflightLooseOverrideIndex.find(relKey);
+    if (it != g_sgPreflightLooseOverrideIndex.end())
+        return it->second;
+
+    const size_t slash = relKey.find_last_of('/');
+    const std::string_view fileKey =
+        slash == std::string::npos ? std::string_view(relKey) : std::string_view(relKey).substr(slash + 1);
+    it = g_sgPreflightLooseOverrideIndex.find(std::string(fileKey));
+    if (it == g_sgPreflightLooseOverrideIndex.end() || it->second.empty())
+        return {};
+
+    return it->second;
+}
+
 void ModLoader::Init()
 {
     const std::filesystem::path& userPath = GetUserPath();
+
+    // Phase 359: register the SG-Preflight override mount FIRST so
+    // it takes priority over any cpkredir mods. This makes the mod
+    // system usable without authoring an HMM/UMM manifest -- just
+    // drop files in the override dir and go.
+    registerSgPreflightOverrideMod();
 
     IniFile configIni;
     if (!configIni.read(userPath / "cpkredir.ini"))
@@ -645,6 +832,52 @@ PPC_FUNC(sub_82E0B500)
     std::u8string_view arFilePathU8(reinterpret_cast<const char8_t*>(base + prefixedArFilePath));
     if (!arFilePathU8.starts_with(u8"/UnleashedRecomp/"))
     {
+        const std::string_view assetName(
+            reinterpret_cast<const char*>(arFilePathU8.data()), arFilePathU8.size());
+        EmitSgPreflightArchiveEntryProbe(assetName);
+
+        const std::filesystem::path looseOverridePath =
+            ModLoader::ResolveSgPreflightLooseAssetOverride(assetName);
+        if (!looseOverridePath.empty())
+        {
+            std::ifstream stream(looseOverridePath, std::ios::binary);
+            if (stream.good())
+            {
+                stream.seekg(0, std::ios::end);
+                const size_t fileSize = stream.tellg();
+                stream.seekg(0, std::ios::beg);
+
+                void* fileData = g_userHeap.Alloc(fileSize);
+                stream.read(reinterpret_cast<char*>(fileData), fileSize);
+                stream.close();
+
+                auto fileDataHolder = reinterpret_cast<be<uint32_t>*>(g_userHeap.Alloc(sizeof(uint32_t) * 2));
+                fileDataHolder[0] = g_memory.MapVirtual(fileData);
+                fileDataHolder[1] = NULL;
+
+                auto r6 = ctx.r6;
+                auto r7 = ctx.r7;
+                ctx.r6.u32 = g_memory.MapVirtual(fileDataHolder);
+                ctx.r7.u32 = static_cast<uint32_t>(fileSize);
+
+                UiLab::EmitBridgeScreenEntered(
+                    "Asset:OverrideHit:" + std::string(assetName));
+                if (ModLoader::s_isLogTypeConsole)
+                    LOGF_IMPL(Utility, "SG-Preflight",
+                              "loose asset override: {} -> \"{}\"",
+                              std::string(assetName),
+                              reinterpret_cast<const char*>(looseOverridePath.u8string().c_str()));
+
+                __imp__sub_82E0B500(ctx, base);
+
+                ctx.r6 = r6;
+                ctx.r7 = r7;
+                g_userHeap.Free(fileDataHolder);
+                g_userHeap.Free(fileData);
+                return;
+            }
+        }
+
         __imp__sub_82E0B500(ctx, base);
         return;
     }

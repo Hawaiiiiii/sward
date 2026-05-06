@@ -25,6 +25,8 @@
 #include "sward/ui_runtime/sgfx_orchestrator.hpp"
 #include "sward/ui_runtime/sgfx_audio_player.hpp"
 #include "sward/ui_runtime/sgfx_audio_dispatch.hpp"
+#include "sward/ui_runtime/sgfx_bgm_bank_loader.hpp"
+#include "sward/ui_runtime/sgfx_csd_animation_replay.hpp"
 #include "sward/ui_runtime/sgfx_hud_csd_project_loader.hpp"
 #include "sward/ui_runtime/sgfx_hud_csd_cast_extractor.hpp"
 #include "sward/ui_runtime/sgfx_hud_native_csd_renderer.hpp"
@@ -42,6 +44,7 @@
 #include <stb_image_write.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -193,10 +196,44 @@ namespace
     std::unordered_map<std::string, std::string> g_textureIndex;
     fs::path g_assetRoot;
 
-    // Phase 346: baked font for runtime text overlays. Loaded once
-    // at startup from a system TTF (defaults to arial.ttf on Windows).
-    ui::SgfxBakedFont g_bodyFont;
+    // Phase 346: baked font for the top-left screen caption (the
+    // tiny "Title Intro" / "Pause" / etc. label that helps identify
+    // each frame in the validation pack). Loaded once at startup
+    // from a system TTF (defaults to arial.ttf on Windows). The
+    // body-text font that previously painted Phase 346 placeholders
+    // was removed in Phase 355 along with the placeholder painter.
     ui::SgfxBakedFont g_smallFont;
+
+    // Phase 357: optional CSD animation replay. When the user
+    // passes --csd-replay=<path>, the JSONL captured from
+    // UnleashedRecomp's UI Lab is loaded here and queried per
+    // render frame; the resulting per-target runtime overrides are
+    // merged into the renderer's override list. Empty log == no-op.
+    ui::CsdReplayLog g_csdReplay;
+    double           g_csdReplayQueryTime = -1.0; // <0 = use frame clock
+
+    // Map SgfxScreen -> the screen-token string the harvester writes
+    // to JSONL events (matches targetTokenToScreen() above going the
+    // other direction). Used by the replay path to filter events.
+    inline std::string_view replayTargetTokenFor(ui::SgfxScreen s,
+                                                 ui::StageMode m) noexcept
+    {
+        using S = ui::SgfxScreen;
+        switch (s)
+        {
+            case S::TitleIntro: return "title-loop";
+            case S::Title:      return "title-menu";
+            case S::WorldMap:   return "world-map";
+            case S::Loading:    return "loading";
+            case S::StageHud:
+                return (m == ui::StageMode::Werehog) ? "extra-stage-hud"
+                                                     : "sonic-hud";
+            case S::Pause:      return "pause";
+            case S::Results:    return "result";
+            case S::Hub:        return "townscreen";
+        }
+        return {};
+    }
 
     void buildTextureIndex(const fs::path& assetRoot)
     {
@@ -256,23 +293,23 @@ namespace
     // Render every scene of the screen's CSD project into the
     // framebuffer. For container-heavy projects (worldmap etc.)
     // this composites the entire screen.
-    // Phase 346: known blank text-container scenes from the renderer
-    // coverage audit (sgfx_renderer_coverage_audit.generated.json).
-    // The CSD container has zero textured cells; in retail these
-    // would be runtime-text-rasterized. SGFX paints placeholder
-    // labels via stb_truetype so the layout doesn't read as blank.
-    struct BlankTextScene
-    {
-        const char* sceneName;
-        const char* placeholderText;
-    };
-    constexpr BlankTextScene kBlankTextScenes[] = {
-        {"help_chara_1",   "[help line 1]"},
-        {"help_chara_2",   "[help line 2]"},
-        {"help_chara_3",   "[help line 3]"},
-        {"help_text_area", "[world map help text]"},
-        {"progress",       "Loading..."},
-    };
+    //
+    // Phase 355 (text-strip pass): the prior `kBlankTextScenes`
+    // placeholder painter assumed the listed scenes had zero textured
+    // casts and that retail rasterized their content at runtime. A
+    // direct sweep of the YNCP native component map proves otherwise:
+    // every `help_chara_*`, `help_text_area`, `progress` cast in
+    // every in-scope project has hasTexture=true and references a
+    // real DDS (`mat_title_003.dds`, `mat_help_*_en_*.dds`, etc.).
+    // The "blank scenes" the renderer coverage audit reported were
+    // skipped by Phase 291's sanity cap (oversized anchor-relative
+    // quads), not by missing textures. Phase 354 retroactively
+    // unlocked most of those via synthesizeOverrides() and the
+    // active-scene whitelist. Painting placeholder text on top of
+    // the real retail textures was producing the garbled overlay
+    // visible at the bottom of the pre-Phase-355 Title Intro
+    // composite. The painter is removed; real EN-region text strips
+    // (`mat_*_en_*.dds`) come through the texture index automatically.
 
     // Phase 347: pick a BGM cue per active screen so the mirror's
     // demo cycle plays music continuously. Hosts streaming retail
@@ -293,6 +330,160 @@ namespace
             case ui::SgfxScreen::Hub:        return "bgm_act_hub_apotos";
         }
         return "";
+    }
+
+    // Phase 354: per-screen + per-state active-scene whitelist.
+    //
+    // Each retail .yncp project bundles many scenes (a "scene" being
+    // a CSD scene-graph node, e.g. `mm_contentsitem_idle` vs
+    // `mm_contentsitem_select`). The retail screen state machine
+    // activates one subset at a time; rendering ALL scenes of a
+    // project at once is what produced the chaotic overlap visible
+    // in the pre-Phase-354 validation pack (Title Intro showing the
+    // logo doubled, World Map's 32 scenes turning the canvas into
+    // green stripes, etc.).
+    //
+    // The lists below are the steady-state "default view" of each
+    // screen -- what the player sees when no transient sub-overlay
+    // (popup, sub-tab, fanfare) is currently active. Sub-states the
+    // orchestrator already tracks (Pause tab, Results rank) feed
+    // into the appropriate variant below; transient overlays
+    // (Werehog shields, ring-get pop, medal-get pop) are
+    // event-triggered and intentionally omitted from the baseline.
+    //
+    // Empty whitelist == "no filter, render every cast" (host
+    // fallback for projects we haven't catalogued).
+    inline std::vector<std::string_view> activeScenesFor(
+        ui::SgfxScreen screen,
+        const ui::SgfxOrchestrator& orch)
+    {
+        using S  = ui::SgfxScreen;
+        using SM = ui::StageMode;
+        switch (screen)
+        {
+            case S::TitleIntro:
+                // ui_title.yncp: bg + iconic SONIC + globe logo + the
+                // EN-region title band + press-start text + loading
+                // bar. `title_1` is the EN "Unleashed" word-mark
+                // (txt_sonic, txt_unleashed, halos, ™); `title_2` is
+                // the JP "World Adventure" word-mark BUT it also
+                // owns the iconic Earth globe (img_earth) and the
+                // lightning-bolt halo (img_abyss / img_abyss_halo).
+                // SGFX includes BOTH scenes here and uses
+                // castsToSkipFor() to drop title_2's JP text casts
+                // while keeping the globe + lightning. The
+                // `menu` / `menu_scroll` scenes belong to a separate
+                // in-yncp menu state SGFX doesn't use (the actual
+                // title menu lives in ui_mainmenu.yncp).
+                return {"bg", "logo", "title_1", "title_2", "txt", "progress"};
+            case S::Title:
+                // ui_mainmenu.yncp default idle view. The `_intro`
+                // variants are one-shot transitions; `_move` / `_select`
+                // are cursor animations only on row navigation.
+                return {"mm_base", "mm_bg_usual",
+                        "mm_front_usual", "mm_title_usual",
+                        "mm_contentsitem_idle", "mm_contentsitem_text",
+                        "mm_donut_idle"};
+            case S::WorldMap:
+                // ui_worldmap.yncp default state: globe background +
+                // scrollable stage selector + info panel for the
+                // currently-highlighted stage. Skip popup overlays
+                // (`cts_choices_*`, `cts_guide_*`, `cts_stage_window`,
+                // `info_bg_1`, `info_img_*`) -- those only render when
+                // the player opens the corresponding modal.
+                return {"worldmap_background",
+                        "worldmap_header_bg", "worldmap_header_img",
+                        "worldmap_footer_bg", "worldmap_footer_img_A",
+                        "cts_info_bg",
+                        "cts_name", "cts_parts_flag", "cts_parts_sun_moon",
+                        "cts_cursor", "cts_cursor_effect",
+                        "cts_stage_scroll_bar", "cts_stage_scroll_bg",
+                        "cts_stage_select"};
+            case S::Loading:
+                // ui_loading.yncp Miles-Electric PDA panel + load text.
+                // `event_viewer` and `n_2_d` are in-yncp sub-modes the
+                // game switches to for cutscene previews; skip them.
+                return {"bg_1", "bg_2", "pda", "pda_txt", "loadinfo"};
+            case S::StageHud:
+                switch (orch.stageHud.mode)
+                {
+                    case SM::Werehog:
+                    case SM::BossHit:
+                        // ui_playscreen_ev[_hit].yncp Werehog HUD.
+                        // The 15 `shield_NN` scenes are sub-state
+                        // markers (one active at a time, indexing the
+                        // Unleash gauge fill); the `unleash_gauge_effect*`
+                        // scenes are the meter-full burst overlays.
+                        // Both are event-triggered, omitted from
+                        // baseline so the steady-state HUD is readable.
+                        return {"score_count", "ring_count", "player_count",
+                                "u_info", "exp_count",
+                                "life", "life_bg",
+                                "unleash_bar_1", "unleash_bg",
+                                "unleash_body", "unleash_gauge"};
+                    case SM::Boss:
+                        // ui_playscreen_su.yncp: only 3 scenes total
+                        // and all three render together (Sonic gauge +
+                        // Gaia gauge + footer prompts).
+                        return {"footer", "gaia_gauge", "su_sonic_gauge"};
+                    case SM::DaySonic:
+                    default:
+                        // ui_playscreen.yncp Day Sonic HUD baseline.
+                        // `medal_get_*` / `ring_get` are pickup pops.
+                        return {"gauge_frame",
+                                "score_count", "time_count",
+                                "speed_count", "player_count", "exp_count",
+                                "so_ringenagy_gauge", "so_speed_gauge",
+                                "u_info"};
+                }
+            case S::Pause:
+                // ui_pause.yncp -- system-common pause shell that
+                // hosts Status / Skills / Settings sub-tabs. SGFX
+                // captures the Skills sub-tab as the representative
+                // pause snapshot since it's the visually richest
+                // (yellow Sonic Unleashed branded panel + skill grid)
+                // and it's what UnleashedRecomp lands on when you
+                // press Start during gameplay. `bg_2` carries the
+                // panel content; `skill_select` is the highlighted
+                // skill cell ribbon; `skill_scroll_bar_bg` is the
+                // skill list scroll track. The `btn_*`, `num`,
+                // `stick`, `situation_text`, `tag_name_2/3`,
+                // `scroll_bar_bg` scenes are tab/sub-state-conditional
+                // and intentionally omitted from this snapshot.
+                return {"bg_1", "bg_2", "bg_1_select",
+                        "footer_A",
+                        "icon", "tag", "status_title",
+                        "skill_select", "skill_scroll_bar_bg",
+                        "select", "arrow"};
+            case S::Results:
+            {
+                // ui_result.yncp baseline: header + footer + new-record
+                // banner + 6-row score block + the rank-letter scene
+                // matching the cleared rank. (`result_rank_E` is in
+                // the .yncp but isn't one of the 5 retail ranks
+                // ResultsRank exposes -- it's an alt animation block.)
+                std::vector<std::string_view> v = {
+                    "result_title", "result_footer", "result_newR",
+                    "result_num_1", "result_num_2", "result_num_3",
+                    "result_num_4", "result_num_5", "result_num_6",
+                    "result_rank"};
+                switch (orch.results.rank)
+                {
+                    case ui::ResultsRank::S: v.push_back("result_rank_S"); break;
+                    case ui::ResultsRank::A: v.push_back("result_rank_A"); break;
+                    case ui::ResultsRank::B: v.push_back("result_rank_B"); break;
+                    case ui::ResultsRank::C: v.push_back("result_rank_C"); break;
+                    case ui::ResultsRank::D: v.push_back("result_rank_D"); break;
+                }
+                return v;
+            }
+            case S::Hub:
+                // ui_townscreen.yncp: hub-world top bar (info / time /
+                // camera hint) + footer prompts. `time_effect` is an
+                // event burst overlay.
+                return {"info", "footer", "time", "cam"};
+        }
+        return {}; // unknown screen -> no filter
     }
 
     // Map screen -> caption shown at the top of the framebuffer.
@@ -319,14 +510,332 @@ namespace
         return "?";
     }
 
+    // Phase 354: per-screen cast-level skip list. The scene-name
+    // whitelist gets us 95% of the way -- but a few retail .yncp
+    // scenes mix region-specific text casts (e.g. JP word-mark) with
+    // shared graphical casts (globe, lightning bolt) that the EN
+    // build still needs. This helper supplies (sceneName, castName)
+    // pairs to drop AFTER the scene whitelist passes.
+    struct ScenedCastKey
+    {
+        std::string_view sceneName;
+        std::string_view castName;
+    };
+    inline std::vector<ScenedCastKey> castsToSkipFor(
+        ui::SgfxScreen screen,
+        const ui::SgfxOrchestrator& /*orch*/)
+    {
+        if (screen == ui::SgfxScreen::TitleIntro)
+        {
+            // Drop the JP "Sonic World Adventure" text casts from
+            // title_2 -- but keep its img_earth globe, halo, and
+            // lightning-bolt casts since those are shared art the
+            // EN title screen also displays alongside title_1's
+            // "Unleashed" word-mark.
+            return {
+                {"title_2", "txt_KANA"},
+                {"title_2", "txt_adventure"},
+                {"title_2", "txt_world"},
+                {"title_2", "txt_sonic"},
+                {"title_2", "pale"},
+                {"title_2", "txt_tm"},
+            };
+        }
+        return {};
+    }
+
+    // Phase 354: synthesize runtime SetPosition anchors for screens
+    // whose retail .yncp encodes anchor-relative coordinates. Boss
+    // HUD's `su_sonic_gauge` / `gaia_gauge` / `footer` casts ship
+    // with negative scene_left values (the gauge body sits to the
+    // left of an anchor point retail sets at runtime via
+    // CCastNode::SetPosition). The Phase 296 SetPosition harvest
+    // captured anchors for Day-Sonic / Werehog HUD scenes but NOT
+    // these Boss-only ones, so without an override they render
+    // hundreds of pixels off-screen.
+    //
+    // The anchor pixel-positions below are runtime-inferred best
+    // guesses computed from each cast's (sceneLeft, sceneWidth,
+    // sceneTop, sceneHeight) and the desired on-canvas placement
+    // (Sonic gauge top-left, Gaia gauge top-right, footer bottom-
+    // center). Tag: pending-Ghidra -- a future SetPosition harvest
+    // pass on the boss runtime would produce exact retail values.
+    inline std::vector<ui::CsdNativeRuntimeOverride> synthesizeOverrides(
+        ui::SgfxScreen screen,
+        const ui::SgfxOrchestrator& orch,
+        std::uint32_t canvasW,
+        std::uint32_t canvasH)
+    {
+        std::vector<ui::CsdNativeRuntimeOverride> ov;
+        if (screen != ui::SgfxScreen::StageHud) return ov;
+        if (orch.stageHud.mode != ui::StageMode::Boss) return ov;
+        const float w = static_cast<float>(canvasW);
+        const float h = static_cast<float>(canvasH);
+        // Compose: anchor that places body's geometric center at
+        // (cx, cy) given a cast with sceneLeft=L, sceneTop=T,
+        // sceneWidth=Ws, sceneHeight=Hs. Solving:
+        //   anchorX = (cx - L - Ws/2) * w
+        //   anchorY = (cy - T - Hs/2) * h
+        // (Y formula: with sceneTop negative, sceneHeight positive,
+        // anchor sits below the body.)
+        auto pushAt = [&](const char* sceneName,
+                          float cxNorm, float cyNorm,
+                          float L, float Ws, float T, float Hs)
+        {
+            ui::CsdNativeRuntimeOverride o{};
+            o.sceneName = sceneName;
+            o.anchorXPx = (cxNorm - L - Ws * 0.5f) * w;
+            o.anchorYPx = (cyNorm - T - Hs * 0.5f) * h;
+            o.scaleX = 1.0f;
+            o.scaleY = 1.0f;
+            ov.push_back(std::move(o));
+        };
+        // Body cast metrics from yncp_native_component_map.json:
+        //   su_sonic_gauge bg_gauge: L=-0.423, T=-0.179, Ws=0.365, Hs=0.019
+        //   gaia_gauge     bg_gauge: L=-0.423, T=-0.130, Ws=0.365, Hs=0.019
+        //   footer         txt_1   : L=-0.289, T=-0.224, Ws=0.195, Hs=0.133
+        // Desired centers (normalized canvas coords):
+        //   su_sonic_gauge -> top-left quarter (0.25, 0.10)
+        //   gaia_gauge     -> top-right quarter (0.75, 0.10)
+        //   footer         -> bottom-center (0.50, 0.90)
+        pushAt("su_sonic_gauge", 0.25f, 0.10f, -0.423f, 0.365f, -0.179f, 0.019f);
+        pushAt("gaia_gauge",     0.75f, 0.10f, -0.423f, 0.365f, -0.130f, 0.019f);
+        pushAt("footer",         0.50f, 0.90f, -0.289f, 0.195f, -0.224f, 0.133f);
+        return ov;
+    }
+
+    // Phase 365: orchestrator-state overlay. The retail digit / menu
+    // row casts live as multi-cell pattern_index swaps the native
+    // renderer doesn't yet drive, so until that lands we composite
+    // the orchestrator-driven values + menu rows directly using the
+    // Phase 346 stb_truetype font. Every value below comes from the
+    // orchestrator state -- nothing is invented for the overlay.
+    inline void overlayHudState(ui::CsdNativeFramebuffer& fb,
+                                ui::SgfxScreen screen,
+                                const ui::SgfxOrchestrator& orch)
+    {
+        if (!g_smallFont.loaded) return;
+
+        constexpr std::array<std::uint8_t, 4> kWhite{255, 255, 255, 255};
+        constexpr std::array<std::uint8_t, 4> kYellow{255, 220, 64, 255};
+        constexpr std::array<std::uint8_t, 4> kCursor{255, 80, 32, 255};
+
+        char buf[96];
+
+        switch (screen)
+        {
+        case ui::SgfxScreen::Title:
+        {
+            // Right-side yellow strips run vertically down the canvas;
+            // the retail layout has 5 rows centered on these baselines
+            // (measured in the 02_title.png at 640x360 against the
+            // ui_mainmenu.yncp output).
+            constexpr int kRowX     = 410;
+            constexpr int kRowYBase = 24;
+            constexpr int kRowGap   = 56;
+            static constexpr const char* kRowLabels[] = {
+                "NEW FILE", "CONTINUE", "SETTINGS", "DLC", "EXIT",
+            };
+            const auto& tm = orch.title;
+            const std::int32_t cur = tm.cursorIndex;
+            for (int i = 0;
+                 i < static_cast<int>(sizeof(kRowLabels) / sizeof(kRowLabels[0]));
+                 ++i)
+            {
+                if (i < static_cast<int>(tm.optionVisible.size())
+                    && !tm.optionVisible[static_cast<std::size_t>(i)])
+                    continue;
+                const auto color = (i == cur) ? kCursor : kWhite;
+                ui::compositeText(fb, g_smallFont, kRowLabels[i],
+                                  kRowX, kRowYBase + i * kRowGap, color);
+            }
+            break;
+        }
+
+        case ui::SgfxScreen::StageHud:
+        {
+            const auto& s = orch.stageHud;
+            const int xCol = 24;
+            int y = 28;
+            std::snprintf(buf, sizeof(buf), "RING:  %d", s.rings);
+            ui::compositeText(fb, g_smallFont, buf, xCol, y, kYellow); y += 18;
+            std::snprintf(buf, sizeof(buf), "SCORE: %lld",
+                          static_cast<long long>(s.score));
+            ui::compositeText(fb, g_smallFont, buf, xCol, y, kWhite); y += 18;
+            const int totalSec  = static_cast<int>(s.timeSeconds);
+            const int minutes   = totalSec / 60;
+            const int seconds   = totalSec % 60;
+            const int frac100   = static_cast<int>(
+                (s.timeSeconds - static_cast<float>(totalSec)) * 100.0f);
+            std::snprintf(buf, sizeof(buf), "TIME:  %02d:%02d.%02d",
+                          minutes, seconds, frac100);
+            ui::compositeText(fb, g_smallFont, buf, xCol, y, kWhite); y += 18;
+            std::snprintf(buf, sizeof(buf), "LIVES: %d", s.lives);
+            ui::compositeText(fb, g_smallFont, buf, xCol, y, kWhite); y += 18;
+            std::snprintf(buf, sizeof(buf), "SPEED GAUGE: %3d%%",
+                          static_cast<int>(s.speedGaugeFill * 100.0f));
+            ui::compositeText(fb, g_smallFont, buf, xCol, y, kWhite); y += 18;
+            std::snprintf(buf, sizeof(buf), "RING ENERGY: %3d%%",
+                          static_cast<int>(s.ringEnergyGaugeFill * 100.0f));
+            ui::compositeText(fb, g_smallFont, buf, xCol, y, kWhite); y += 18;
+            if (s.mode == ui::StageMode::Werehog
+                || s.mode == ui::StageMode::BossHit)
+            {
+                std::snprintf(buf, sizeof(buf), "DARK GAIA: %3d%%",
+                              static_cast<int>(s.darkGaiaEnergy * 100.0f));
+                ui::compositeText(fb, g_smallFont, buf, xCol, y, kYellow); y += 18;
+                std::snprintf(buf, sizeof(buf), "GRAPPLES: %u",
+                              static_cast<unsigned>(s.outOfControlCount));
+                ui::compositeText(fb, g_smallFont, buf, xCol, y, kWhite); y += 18;
+            }
+            if (s.paused)
+                ui::compositeText(fb, g_smallFont, "[ PAUSED ]",
+                                  xCol, y, kCursor);
+            break;
+        }
+
+        case ui::SgfxScreen::Pause:
+        {
+            const auto& p = orch.pause;
+            int y = 60;
+            // PauseMenuContext drives which rows retail shows; SGFX
+            // mirrors the retail row sets per Phase 323.
+            using Ctx = ui::PauseMenuContext;
+            std::vector<const char*> rows;
+            switch (p.context)
+            {
+            case Ctx::WorldMap:
+                rows = {"CONTINUE", "STATUS", "SKILLS", "SETTINGS", "QUIT"};
+                break;
+            case Ctx::Stage:
+                rows = {"CONTINUE", "RESTART", "SETTINGS", "QUIT"};
+                break;
+            case Ctx::Village:
+            case Ctx::Hub:
+                rows = {"CONTINUE", "STATUS", "INVENTORY",
+                        "SETTINGS", "RETURN"};
+                break;
+            case Ctx::Misc:
+                rows = {"CONTINUE", "SETTINGS", "QUIT"};
+                break;
+            }
+            const int rowsCount = static_cast<int>(rows.size());
+            const int cur       = p.cursorIndex;
+            for (int i = 0; i < rowsCount; ++i)
+            {
+                const auto color = (i == cur) ? kCursor : kWhite;
+                ui::compositeText(fb, g_smallFont, rows[i],
+                                  220, y + i * 28, color);
+            }
+            break;
+        }
+
+        case ui::SgfxScreen::Results:
+        {
+            const auto& r = orch.results;
+            const int xLabel = 220;
+            const int xValue = 360;
+            int y = 60;
+            const char* rankStr = "?";
+            switch (r.rank)
+            {
+            case ui::ResultsRank::S: rankStr = "S"; break;
+            case ui::ResultsRank::A: rankStr = "A"; break;
+            case ui::ResultsRank::B: rankStr = "B"; break;
+            case ui::ResultsRank::C: rankStr = "C"; break;
+            case ui::ResultsRank::D: rankStr = "D"; break;
+            }
+            std::snprintf(buf, sizeof(buf), "RANK: %s", rankStr);
+            ui::compositeText(fb, g_smallFont, buf, xLabel, y, kYellow);
+            y += 28;
+
+            const int totalSec = static_cast<int>(r.timeSeconds);
+            const int minutes  = totalSec / 60;
+            const int seconds  = totalSec % 60;
+            std::snprintf(buf, sizeof(buf), "%02d:%02d", minutes, seconds);
+            ui::compositeText(fb, g_smallFont, "TIME",  xLabel, y, kWhite);
+            ui::compositeText(fb, g_smallFont, buf,     xValue, y, kWhite);
+            y += 26;
+            std::snprintf(buf, sizeof(buf), "%d", r.rings);
+            ui::compositeText(fb, g_smallFont, "RINGS", xLabel, y, kWhite);
+            ui::compositeText(fb, g_smallFont, buf,     xValue, y, kWhite);
+            y += 26;
+            std::snprintf(buf, sizeof(buf), "%lld",
+                          static_cast<long long>(r.specialScore));
+            ui::compositeText(fb, g_smallFont, "SPECIAL", xLabel, y, kWhite);
+            ui::compositeText(fb, g_smallFont, buf,       xValue, y, kWhite);
+            y += 26;
+            std::snprintf(buf, sizeof(buf), "%lld",
+                          static_cast<long long>(r.score));
+            ui::compositeText(fb, g_smallFont, "SCORE", xLabel, y, kWhite);
+            ui::compositeText(fb, g_smallFont, buf,     xValue, y, kWhite);
+            y += 26;
+            std::snprintf(buf, sizeof(buf), "%lld",
+                          static_cast<long long>(r.totalScore));
+            ui::compositeText(fb, g_smallFont, "TOTAL", xLabel, y, kYellow);
+            ui::compositeText(fb, g_smallFont, buf,     xValue, y, kYellow);
+            break;
+        }
+
+        case ui::SgfxScreen::Hub:
+        {
+            const auto& h = orch.hub;
+            const char* modeStr = (h.mode == ui::HubMode::Werehog)
+                ? "Werehog (Night)"
+                : "Day Sonic";
+            const char* overlayStr = "";
+            switch (h.overlay)
+            {
+            case ui::HubOverlay::None:         overlayStr = "exploring"; break;
+            case ui::HubOverlay::BalloonText:  overlayStr = "NPC dialog"; break;
+            case ui::HubOverlay::ShopMenu:     overlayStr = "shop menu"; break;
+            case ui::HubOverlay::StageGate:    overlayStr = "stage gate"; break;
+            case ui::HubOverlay::MissionBrief: overlayStr = "mission brief"; break;
+            case ui::HubOverlay::TownMap:      overlayStr = "town map"; break;
+            }
+            std::snprintf(buf, sizeof(buf), "HUB: %s -- %s",
+                          modeStr, overlayStr);
+            ui::compositeText(fb, g_smallFont, buf, 24, 28, kYellow);
+            const int totalSec = static_cast<int>(h.timeOfDaySeconds);
+            std::snprintf(buf, sizeof(buf), "TOD: %ds", totalSec);
+            ui::compositeText(fb, g_smallFont, buf, 24, 46, kWhite);
+            break;
+        }
+
+        case ui::SgfxScreen::Loading:
+        {
+            ui::compositeText(fb, g_smallFont,
+                              "LOADING NEXT SCREEN...",
+                              24, 28, kYellow);
+            break;
+        }
+
+        case ui::SgfxScreen::WorldMap:
+        {
+            // World Map cursor / continent comes from the orchestrator
+            // state once the WorldMap screen ports land; until then
+            // the static label keeps the screen reading as itself.
+            ui::compositeText(fb, g_smallFont,
+                              "WORLD MAP -- press A to enter stage",
+                              24, 28, kYellow);
+            break;
+        }
+
+        case ui::SgfxScreen::TitleIntro:
+            // TitleIntro is purely texture-driven; no row labels or
+            // counters. Caption already covers it.
+            break;
+        }
+    }
+
     void renderScreenIntoFramebuffer(ui::SgfxScreen screen,
-                                     const ui::StageHudState& stage,
+                                     const ui::SgfxOrchestrator& orch,
                                      ui::CsdNativeFramebuffer& fb)
     {
         // Clear to dark gray (so blank areas read as "rendered, not
         // crashed").
         fb.resize(kCanvasW, kCanvasH, {16, 16, 24, 255});
-        const std::string projectPath = projectPathForScreen(screen, stage);
+        const std::string projectPath = projectPathForScreen(screen, orch.stageHud);
         // Mutable lookup so we can grow the texture cache as the
         // renderer reads new textures on first appearance.
         auto it = g_assetCache.find(projectPath);
@@ -337,31 +846,62 @@ namespace
         }
         if (it == g_assetCache.end() || !it->second.loadedOk) return;
         auto& assets = it->second;
-        for (const auto& cmd : assets.commands)
-            (void)ui::compositeCommand(
-                fb, cmd, g_assetRoot, assets.textureCache, assets.overrides);
 
-        // Phase 346: paint placeholder text into known-blank text
-        // scenes. We iterate the assets' commands looking for cast
-        // sceneNames matching our blank-scene table; if a hit is
-        // found, draw placeholder text near the cast's anchor.
-        if (g_bodyFont.loaded)
+        // Phase 354: drive the composite loop through the per-state
+        // active-scene whitelist so only the scenes the retail screen
+        // state machine would have visible at this moment paint into
+        // the framebuffer. Empty whitelist means "render all" for
+        // projects we haven't catalogued.
+        const auto activeScenes = activeScenesFor(screen, orch);
+        const auto skipCasts   = castsToSkipFor(screen, orch);
+        const bool filterEnabled = !activeScenes.empty();
+        auto sceneActive = [&](const std::string& sn) noexcept
         {
-            for (const auto& cmd : assets.commands)
-            {
-                for (const auto& bts : kBlankTextScenes)
-                {
-                    if (cmd.sceneName != bts.sceneName) continue;
-                    const float canvasW = static_cast<float>(fb.width);
-                    const float canvasH = static_cast<float>(fb.height);
-                    const auto x = static_cast<std::int32_t>(
-                        (cmd.baseTranslationX + cmd.sceneLeft) * canvasW + 4.0f);
-                    const auto y = static_cast<std::int32_t>(
-                        (cmd.baseTranslationY + cmd.sceneTop)  * canvasH + 4.0f);
-                    ui::compositeText(fb, g_bodyFont, bts.placeholderText,
-                                      x, y, {255, 255, 255, 255});
-                }
-            }
+            if (!filterEnabled) return true;
+            for (const auto& a : activeScenes)
+                if (a == sn) return true;
+            return false;
+        };
+        auto castSkipped = [&](const std::string& sn,
+                               const std::string& cn) noexcept
+        {
+            for (const auto& sk : skipCasts)
+                if (sk.sceneName == sn && sk.castName == cn) return true;
+            return false;
+        };
+
+        // Merge baked .yncp overrides (currently unused) with the
+        // per-screen synthesized anchors required by anchor-relative
+        // projects (Boss HUD), plus any replay-driven overrides
+        // sourced from a captured ui_lab_csd_setposition.jsonl.
+        std::vector<ui::CsdNativeRuntimeOverride> mergedOverrides =
+            assets.overrides;
+        const auto synthesized = synthesizeOverrides(screen, orch,
+                                                     fb.width, fb.height);
+        for (const auto& s : synthesized) mergedOverrides.push_back(s);
+
+        // Phase 357: replay overrides. No-op when no log is loaded.
+        // The current replay events use synthesized scene names of
+        // the form "node_<HEX>" because the upstream harvester does
+        // not yet enrich events with scene/cast names; once the
+        // Phase 358 harvester pass lands, the same replay path
+        // provides per-cast overrides keyed by retail scene name.
+        if (!g_csdReplay.events.empty())
+        {
+            const double t = g_csdReplayQueryTime;
+            const auto target = replayTargetTokenFor(screen, orch.stageHud.mode);
+            const auto replayOvs =
+                ui::buildRuntimeOverridesAt(g_csdReplay, t, target);
+            for (const auto& ov : replayOvs)
+                mergedOverrides.push_back(ov);
+        }
+
+        for (const auto& cmd : assets.commands)
+        {
+            if (!sceneActive(cmd.sceneName)) continue;
+            if (castSkipped(cmd.sceneName, cmd.castName)) continue;
+            (void)ui::compositeCommand(
+                fb, cmd, g_assetRoot, assets.textureCache, mergedOverrides);
         }
 
         // Phase 346: top-left screen caption so each variant is
@@ -369,9 +909,22 @@ namespace
         if (g_smallFont.loaded)
         {
             ui::compositeText(fb, g_smallFont,
-                              screenCaption(screen, stage.mode),
+                              screenCaption(screen, orch.stageHud.mode),
                               6, 4, {220, 230, 255, 255});
         }
+
+        // Phase 365: orchestrator-state overlay. The retail digit /
+        // menu-row casts use multi-cell pattern_index swaps the
+        // native renderer does not yet drive (single-cell-per-cast
+        // baseline only). Until that lands, we composite the
+        // orchestrator-driven values + menu rows directly onto the
+        // framebuffer using the Phase 346 stb_truetype font so each
+        // screen reads as a real Sonic Unleashed UI surface instead
+        // of an empty asset shell. Source of every value below is
+        // the orchestrator state -- nothing is invented for the
+        // overlay.
+        if (g_smallFont.loaded)
+            overlayHudState(fb, screen, orch);
     }
 }
 
@@ -389,6 +942,9 @@ int main(int argc, char** argv)
     float demoSeconds = 4.0f;
     int maxFrames = 0; // 0 = unlimited
     fs::path screenshotsDir; // Phase 353: PNG-per-screen dump mode
+    fs::path bgmBankDir;     // Phase 356: pre-converted OGG bank
+    fs::path csdReplayPath;  // Phase 357: ui_lab_csd_setposition.jsonl
+    double   replayTimeSec = -1.0; // <0 means "follow demo cycle clock"
 
     for (int i = 1; i < argc; ++i)
     {
@@ -400,6 +956,9 @@ int main(int argc, char** argv)
         else if (a.rfind("--demo-seconds=", 0) == 0) demoSeconds = std::stof(a.substr(15));
         else if (a.rfind("--frames=", 0) == 0) maxFrames = std::stoi(a.substr(9));
         else if (a.rfind("--screenshots-dir=", 0) == 0) screenshotsDir = a.substr(18);
+        else if (a.rfind("--bgm-bank=", 0) == 0) bgmBankDir = a.substr(11);
+        else if (a.rfind("--csd-replay=", 0) == 0) csdReplayPath = a.substr(13);
+        else if (a.rfind("--replay-time=", 0) == 0) replayTimeSec = std::stod(a.substr(14));
         else if (a == "--help" || a == "-h")
         {
             std::cout << "sgfx_ui_mirror -- SGFX native UI render in a window\n"
@@ -411,7 +970,14 @@ int main(int argc, char** argv)
                       << "  --frames=<n>              exit after N frames\n"
                       << "  --screenshots-dir=<dir>   visit every screen+stage variant once,\n"
                       << "                            dump a PNG per visit, write a manifest,\n"
-                      << "                            then exit (no SDL window opened)\n";
+                      << "                            then exit (no SDL window opened)\n"
+                      << "  --bgm-bank=<dir>          load pre-converted OGG cues from <dir>\n"
+                      << "                            (filename stem == retail cue name)\n"
+                      << "  --csd-replay=<path>       replay UnleashedRecomp's harvested\n"
+                      << "                            ui_lab_csd_setposition.jsonl as the\n"
+                      << "                            renderer's runtime override stream\n"
+                      << "  --replay-time=<seconds>   query the replay log at this absolute\n"
+                      << "                            time (default: follow demo cycle)\n";
             return 0;
         }
     }
@@ -432,13 +998,23 @@ int main(int argc, char** argv)
         buildTextureIndex(assetRoot);
         std::cout << "  texture index size: " << g_textureIndex.size() << "\n";
 
-        // Bake fonts so placeholder labels render in the dumps too.
+        // Phase 357: load replay log if requested.
+        if (!csdReplayPath.empty())
+        {
+            g_csdReplay = ui::loadCsdReplayLog(csdReplayPath);
+            g_csdReplayQueryTime = (replayTimeSec >= 0.0)
+                                   ? replayTimeSec
+                                   : g_csdReplay.lastTimeSeconds;
+            std::cout << "  csd replay: events=" << g_csdReplay.events.size()
+                      << " parseErrors=" << g_csdReplay.parseErrors
+                      << " lastFrame=" << g_csdReplay.lastFrame
+                      << " queryTime=" << g_csdReplayQueryTime << "s\n";
+        }
+
+        // Bake the small font so the top-left screen caption renders.
         const fs::path arial = "C:/Windows/Fonts/arial.ttf";
-        g_bodyFont  = ui::loadFontFromFile(arial, 18.0f);
         g_smallFont = ui::loadFontFromFile(arial, 14.0f);
-        std::cout << "  fonts: body="
-                  << (g_bodyFont.loaded ? "ok" : "missing")
-                  << " small="
+        std::cout << "  fonts: small="
                   << (g_smallFont.loaded ? "ok" : "missing") << "\n";
 
         struct ShotSpec
@@ -466,10 +1042,15 @@ int main(int argc, char** argv)
         fb.resize(kCanvasW, kCanvasH);
 
         std::ofstream manifest(screenshotsDir / "manifest.json");
-        manifest << "{\n  \"phase\": \"353\",\n"
+        manifest << "{\n  \"phase\": \"356\",\n"
                  << "  \"purpose\": \"per-screen composite PNGs from sgfx_ui_mirror's "
-                    "native CSD renderer; open each PNG and compare to the same "
-                    "screen captured from UnleashedRecomp.\",\n"
+                    "native CSD renderer; Phase 354 added active-scene whitelist + "
+                    "per-cast skip + synthesized SetPosition anchors; Phase 355 "
+                    "removed the placeholder text painter so retail EN text "
+                    "strips (mat_*_en_*.dds) come through cleanly; Phase 356 "
+                    "added the OGG BGM bank loader and the in-stage HudItemGet "
+                    "popup state machine (port of D:\\\\SonicWorldAdventure\\\\"
+                    "SWA\\\\source\\\\HUD\\\\Item\\\\HudItemGet.cpp).\",\n"
                  << "  \"canvas\": { \"width\": " << kCanvasW
                  << ", \"height\": " << kCanvasH << " },\n"
                  << "  \"screens\": [\n";
@@ -479,7 +1060,7 @@ int main(int argc, char** argv)
         {
             orch.current = sh.screen;
             orch.stageHud.mode = sh.stageMode;
-            renderScreenIntoFramebuffer(sh.screen, orch.stageHud, fb);
+            renderScreenIntoFramebuffer(sh.screen, orch, fb);
             const fs::path outPath = screenshotsDir / sh.fileName;
             const int rc = stbi_write_png(
                 outPath.string().c_str(),
@@ -546,6 +1127,11 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    // Phase 356: BGM bank lives outside the if-silent block so the
+    // byte buffers stay alive for the whole process lifetime (the
+    // audio player keeps raw pointers into bank.bytes[]).
+    ui::SgfxBgmBank bgmBank;
+
     if (!silent)
     {
         if (!ui::sgfxAudioPlayerInit())
@@ -555,8 +1141,11 @@ int main(int argc, char** argv)
         }
         else
         {
-            // Phase 347: register the embedded OGG blob as the BGM
-            // bytes for every demo cue the orchestrator may mount.
+            // Phase 347 fallback: register the embedded installer
+            // OGG blob as the bytes for every demo cue. This makes
+            // the demo cycle audible even when no real BGM bank is
+            // supplied. If --bgm-bank=<dir> is passed, the loader
+            // below replaces these registrations with real cues.
             const char* kBgmCues[] = {
                 "bgm_sys_title", "bgm_sys_worldmap", "bgm_act_apotos",
                 "bgm_act_hub_apotos", "bgm_sys_result", "bgm_sys_result_ng",
@@ -564,6 +1153,24 @@ int main(int argc, char** argv)
             for (const char* name : kBgmCues)
                 ui::sgfxAudioPlayerRegisterBgm(name, g_installer_music,
                                                sizeof(g_installer_music));
+
+            // Phase 356: load real per-cue OGGs from the host-
+            // supplied bank directory. The bank's filename stems
+            // are the cue names retail uses; loading them after
+            // the fallbacks above lets a partial bank coexist with
+            // the installer-OGG fallback for any cue the host
+            // hasn't pre-converted yet.
+            if (!bgmBankDir.empty())
+            {
+                const auto loaded =
+                    ui::sgfxBgmBankLoadFromDir(bgmBank, bgmBankDir);
+                ui::sgfxBgmBankRegisterAllWithPlayer(bgmBank);
+                std::cout << "  bgm bank: dir=" << bgmBankDir.string()
+                          << " loaded=" << loaded
+                          << " registered=" << bgmBank.registeredCount
+                          << " skipped_non_ogg=" << bgmBank.skippedNonOggCount
+                          << " failed_read=" << bgmBank.failedReadCount << "\n";
+            }
         }
     }
 
@@ -571,17 +1178,25 @@ int main(int argc, char** argv)
     buildTextureIndex(assetRoot);
     std::cout << "  texture index size: " << g_textureIndex.size() << "\n";
 
-    // Phase 346: bake fonts at startup so per-frame text overlays
-    // are O(glyph) per character. Defaults to Windows Arial; if
-    // missing we silently leave g_bodyFont.loaded == false and
-    // the renderer skips the text overlay step.
+    // Phase 357: load replay log if requested.
+    if (!csdReplayPath.empty())
+    {
+        g_csdReplay = ui::loadCsdReplayLog(csdReplayPath);
+        g_csdReplayQueryTime = (replayTimeSec >= 0.0)
+                               ? replayTimeSec
+                               : 0.0; // live mode advances this per frame
+        std::cout << "  csd replay: events=" << g_csdReplay.events.size()
+                  << " parseErrors=" << g_csdReplay.parseErrors
+                  << " lastFrame=" << g_csdReplay.lastFrame << "\n";
+    }
+
+    // Phase 346: bake the small font for the top-left screen caption.
+    // Defaults to Windows Arial; if missing we silently leave
+    // g_smallFont.loaded == false and skip the caption.
     {
         const fs::path arial = "C:/Windows/Fonts/arial.ttf";
-        g_bodyFont  = ui::loadFontFromFile(arial, 18.0f);
         g_smallFont = ui::loadFontFromFile(arial, 14.0f);
-        std::cout << "  fonts: body="
-                  << (g_bodyFont.loaded ? "ok" : "missing")
-                  << " small="
+        std::cout << "  fonts: small="
                   << (g_smallFont.loaded ? "ok" : "missing")
                   << " (path=" << arial.string() << ")\n";
     }
@@ -733,7 +1348,7 @@ int main(int argc, char** argv)
         }
 
         // Render the active screen.
-        renderScreenIntoFramebuffer(orch.current, orch.stageHud, fb);
+        renderScreenIntoFramebuffer(orch.current, orch, fb);
 
         // Blit framebuffer -> SDL_Texture -> present.
         void* pixels = nullptr;
@@ -771,6 +1386,16 @@ int main(int argc, char** argv)
         SDL_RenderPresent(renderer);
 
         ++presentedFrames;
+        // Phase 357: tick the replay clock at ~60fps unless the
+        // user pinned it via --replay-time=<n>.
+        if (!csdReplayPath.empty() && replayTimeSec < 0.0)
+        {
+            g_csdReplayQueryTime += 1.0 / 60.0;
+            // Loop the replay so the demo cycle stays visible.
+            if (g_csdReplay.lastTimeSeconds > 0.0
+                && g_csdReplayQueryTime > g_csdReplay.lastTimeSeconds)
+                g_csdReplayQueryTime = 0.0;
+        }
         if ((presentedFrames % 30) == 0)
         {
             const auto now = std::chrono::steady_clock::now();

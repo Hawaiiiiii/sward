@@ -25,6 +25,7 @@
 #include <ui/installer_wizard.h>
 #include <mod/mod_loader.h>
 #include <preload_executable.h>
+#include <patches/sg_text_overrides.h>
 #include <patches/ui_lab_patches.h>
 
 #ifdef _WIN32
@@ -341,6 +342,13 @@ int main(int argc, char *argv[])
     }
 
     ModLoader::Init();
+
+    // Phase 364: load SG-Preflight per-string text overrides from the
+    // same directory ModLoader::Init resolved. Patches g_locale up front
+    // so every Localise() call after this point honours the overrides;
+    // retail SetText overrides take effect on first call once the guest
+    // is running.
+    SGTextOverrides::EnsureLoaded();
 
     if (!PersistentStorageManager::LoadBinary())
         LOGFN_ERROR("Failed to load persistent storage binary... (status code {})", (int)PersistentStorageManager::BinStatus);

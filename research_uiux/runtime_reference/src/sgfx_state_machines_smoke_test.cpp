@@ -23,6 +23,12 @@
 #include "sward/ui_runtime/sgfx_hud_boss.hpp"
 #include "sward/ui_runtime/sgfx_hud_ex_qte.hpp"
 #include "sward/ui_runtime/sgfx_hud_media_room.hpp"
+#include "sward/ui_runtime/sgfx_hud_item_get.hpp"
+#include "sward/ui_runtime/sgfx_bgm_bank_loader.hpp"
+#include "sward/ui_runtime/sgfx_csd_animation_replay.hpp"
+#include "sward/ui_runtime/sgfx_bridge.hpp"
+#include <filesystem>
+#include <fstream>
 
 #include <iostream>
 #include <string>
@@ -1321,6 +1327,447 @@ static void testMediaRoom()
     }
 }
 
+// ----- SGFX bridge tests (Phase 361) -----
+
+static void testSgfxBridge()
+{
+    using namespace ui;
+    namespace fs = std::filesystem;
+    std::cout << "\n== sgfx bridge ==\n";
+
+    std::error_code ec;
+    const auto root = fs::temp_directory_path(ec) / "sgfx_bridge_smoke";
+    fs::remove_all(root, ec);
+
+    SgfxBridge bridge;
+    expect(bridge.Init(root), "bridge.Init creates dir");
+    expect(fs::exists(root, ec), "bridge.dir exists");
+    expect(fs::exists(root / "events.jsonl", ec), "bridge.events.jsonl touched");
+    expect(!bridge.HasPythonHandshake(), "bridge.no python handshake yet");
+
+    // Tick before any state.json -> no change.
+    expect(!bridge.Tick(), "bridge.Tick returns false without state.json");
+
+    // Write a state.json mimicking what the Python daemon emits.
+    const std::string sampleState = R"({
+  "schema": "sgfx_bridge_state",
+  "version": 1,
+  "updated_at": "2026-05-06T12:34:56Z",
+  "active_bundle": {
+    "id": "G05_C01_V07",
+    "name": "BMW G05 carpaint pack",
+    "path": "/path/to/bundle"
+  },
+  "profiles": [
+    {"id": "G05_C01_V07", "label": "G05 C01 V07", "status": "ready"},
+    {"id": "G06_C01_V03", "label": "G06 C01 V03", "status": "blocked"}
+  ],
+  "actions": [
+    {"id": "anchors_check",   "label": "Anchors Check",   "available": true},
+    {"id": "constants_check", "label": "Constants Check", "available": false}
+  ],
+  "last_validation": {
+    "passed": false,
+    "blockers": 3,
+    "warnings": 12,
+    "evidence_path": "/out/run_2026-05-06_12-34/evidence.html"
+  },
+  "environment": {
+    "raco_ready": true,
+    "blender_ready": false,
+    "python_ready": true
+  }
+})";
+    {
+        std::ofstream f(root / "state.json");
+        f << sampleState;
+    }
+
+    expect(bridge.Tick(), "bridge.Tick parses state.json");
+    expect(bridge.HasPythonHandshake(), "bridge.python handshake observed");
+    const auto& s = bridge.State();
+    expect(s.loaded, "bridge.state loaded");
+    expectEq(s.updatedAt, std::string("2026-05-06T12:34:56Z"),
+             "bridge.updatedAt parsed");
+    expect(s.activeBundleId.has_value(),
+           "bridge.activeBundleId present");
+    expectEq(*s.activeBundleId, std::string("G05_C01_V07"),
+             "bridge.activeBundleId value");
+    expectEq(s.activeBundleName, std::string("BMW G05 carpaint pack"),
+             "bridge.activeBundleName value");
+    expectEq(s.profiles.size(), std::size_t{2}, "bridge.2 profiles");
+    expectEq(s.profiles[0].id, std::string("G05_C01_V07"), "bridge.profile[0].id");
+    expectEq(s.profiles[0].label, std::string("G05 C01 V07"), "bridge.profile[0].label");
+    expectEq(s.profiles[0].status, SgfxBridgeProfileStatus::Ready,
+             "bridge.profile[0].status=Ready");
+    expectEq(s.profiles[1].status, SgfxBridgeProfileStatus::Blocked,
+             "bridge.profile[1].status=Blocked");
+    expectEq(s.actions.size(), std::size_t{2}, "bridge.2 actions");
+    expectEq(s.actions[0].id, std::string("anchors_check"), "bridge.action[0].id");
+    expect(s.actions[0].available, "bridge.action[0].available=true");
+    expect(!s.actions[1].available, "bridge.action[1].available=false");
+    expect(!s.lastValidation.passed, "bridge.lastValidation.passed=false");
+    expectEq(s.lastValidation.blockers, std::int32_t{3},
+             "bridge.lastValidation.blockers=3");
+    expectEq(s.lastValidation.warnings, std::int32_t{12},
+             "bridge.lastValidation.warnings=12");
+    expect(s.environment.racoReady, "bridge.env.racoReady=true");
+    expect(!s.environment.blenderReady, "bridge.env.blenderReady=false");
+    expect(s.environment.pythonReady, "bridge.env.pythonReady=true");
+
+    // Same Tick() with no mtime change -> false.
+    expect(!bridge.Tick(), "bridge.Tick idempotent without mtime change");
+
+    // Emit events; verify they land as JSONL lines.
+    {
+        SgfxBridgeEvent ev;
+        ev.kind = SgfxBridgeEventKind::ScreenEntered;
+        ev.screen = "WorldMap";
+        bridge.EmitEvent(ev);
+    }
+    {
+        SgfxBridgeEvent ev;
+        ev.kind = SgfxBridgeEventKind::MenuAccepted;
+        ev.screen = "Title";
+        ev.rowId = "continue";
+        bridge.EmitEvent(ev);
+    }
+    {
+        SgfxBridgeEvent ev;
+        ev.kind = SgfxBridgeEventKind::ActionRequested;
+        ev.screen = "WorldMap";
+        ev.actionId = "anchors_check";
+        bridge.EmitEvent(ev);
+    }
+
+    std::ifstream evf(root / "events.jsonl");
+    std::string line;
+    int lineCount = 0;
+    bool sawScreenEntered = false, sawMenuAccepted = false, sawActionRequested = false;
+    while (std::getline(evf, line))
+    {
+        if (line.empty()) continue;
+        ++lineCount;
+        if (line.find("\"event\":\"screen_entered\"")  != std::string::npos
+            && line.find("\"screen\":\"WorldMap\"")    != std::string::npos)
+            sawScreenEntered = true;
+        if (line.find("\"event\":\"menu_accepted\"")   != std::string::npos
+            && line.find("\"row_id\":\"continue\"")    != std::string::npos)
+            sawMenuAccepted = true;
+        if (line.find("\"event\":\"action_requested\"") != std::string::npos
+            && line.find("\"action_id\":\"anchors_check\"") != std::string::npos)
+            sawActionRequested = true;
+    }
+    expectEq(lineCount, 3, "bridge.3 event lines emitted");
+    expect(sawScreenEntered, "bridge.screen_entered emitted");
+    expect(sawMenuAccepted, "bridge.menu_accepted emitted");
+    expect(sawActionRequested, "bridge.action_requested emitted");
+
+    // Schema mismatch is rejected gracefully.
+    {
+        std::ofstream f(root / "state.json");
+        f << R"({"schema":"wrong","version":1})";
+    }
+    bridge.Tick(); // mtime changes, but schema mismatch -> state stays loaded
+    // Implementation: reparseState returns false on mismatch and
+    // does NOT clobber m_state. So loaded stays true, profiles stay same.
+    expect(bridge.State().loaded, "bridge.state preserved on schema mismatch");
+    expectEq(bridge.State().profiles.size(), std::size_t{2},
+             "bridge.profiles preserved on schema mismatch");
+
+    fs::remove_all(root, ec);
+}
+
+// ----- CSD animation replay tests (Phase 357) -----
+
+static void testCsdAnimationReplay()
+{
+    using namespace ui;
+    namespace fs = std::filesystem;
+    std::cout << "\n== csd animation replay ==\n";
+
+    std::error_code ec;
+    const auto tempRoot = fs::temp_directory_path(ec) / "sgfx_csd_replay_smoke";
+    fs::remove_all(tempRoot, ec);
+    fs::create_directories(tempRoot, ec);
+    const auto jsonl = tempRoot / "ui_lab_csd_setposition.jsonl";
+
+    // Synthesize a JSONL with a couple of nodes animating across
+    // frames. Format matches EmitCsdSetterEvent at
+    // ui_lab_patches.cpp:12999.
+    {
+        std::ofstream f(jsonl);
+        f << R"({"frame":10,"time":0.16,"kind":"position","node":"0x40A1B200","x":100.0,"y":50.0,"hits":1,"hook":"CSD::CCastNode::SetPosition","target":"title-menu"})" "\n";
+        f << R"({"frame":20,"time":0.33,"kind":"position","node":"0x40A1B200","x":200.0,"y":80.0,"hits":2,"hook":"CSD::CCastNode::SetPosition","target":"title-menu"})" "\n";
+        f << R"({"frame":15,"time":0.25,"kind":"scale","node":"0x40A1B200","x":1.5,"y":1.25,"hits":1,"hook":"CSD::CCastNode::SetScale","target":"title-menu"})" "\n";
+        f << R"({"frame":12,"time":0.20,"kind":"position","node":"0x40A1C400","x":640.0,"y":360.0,"hits":1,"hook":"CSD::CCastNode::SetPosition","target":"world-map"})" "\n";
+        f << R"({"frame":18,"time":0.30,"kind":"uniformScaleOrAlpha","node":"0x40A1C400","x":2.0,"hits":1,"hook":"CSD::CCastNode::SetSingleFloatAt52","target":"world-map"})" "\n";
+        // A malformed line that should be counted as parseError.
+        f << R"({not json})" "\n";
+    }
+
+    // Load + assert event count and lastFrame/lastTimeSeconds.
+    const auto log = loadCsdReplayLog(jsonl);
+    expectEq(csdReplayEventCount(log), std::size_t{5},
+             "csdreplay.5 valid events parsed");
+    expectEq(log.parseErrors, std::size_t{1},
+             "csdreplay.1 malformed line counted");
+    expectEq(log.lastFrame, std::uint32_t{20}, "csdreplay.lastFrame=20");
+    expect(log.lastTimeSeconds > 0.32 && log.lastTimeSeconds < 0.34,
+           "csdreplay.lastTimeSeconds ~= 0.33");
+
+    // Per-target counting.
+    expectEq(csdReplayCountForTarget(log, "title-menu"),
+             std::size_t{3}, "csdreplay.title-menu has 3 events");
+    expectEq(csdReplayCountForTarget(log, "world-map"),
+             std::size_t{2}, "csdreplay.world-map has 2 events");
+
+    // Replay query at t=0.18 (only the first title-menu position
+    // event has fired by then).
+    {
+        const auto ovs = buildRuntimeOverridesAt(log, 0.18, "title-menu");
+        expectEq(ovs.size(), std::size_t{1},
+                 "csdreplay.t=0.18 -> 1 active title-menu node");
+        expect(ovs[0].anchorXPx > 99.0f && ovs[0].anchorXPx < 101.0f,
+               "csdreplay.anchorX ~= 100 at t=0.18");
+        expect(ovs[0].anchorYPx > 49.0f && ovs[0].anchorYPx < 51.0f,
+               "csdreplay.anchorY ~= 50 at t=0.18");
+        // Scale event fires at t=0.25, so scale at t=0.18 is still default.
+        expect(ovs[0].scaleX > 0.99f && ovs[0].scaleX < 1.01f,
+               "csdreplay.scaleX = 1.0 default at t=0.18");
+    }
+
+    // Replay query at t=0.30 -> scale has applied (t=0.25) but the
+    // second position event (t=0.33) hasn't fired yet, so anchor
+    // should still match the t=0.16 capture (100, 50).
+    {
+        const auto ovs = buildRuntimeOverridesAt(log, 0.30, "title-menu");
+        expectEq(ovs.size(), std::size_t{1},
+                 "csdreplay.t=0.30 -> 1 active title-menu node");
+        expect(ovs[0].anchorXPx > 99.0f && ovs[0].anchorXPx < 101.0f,
+               "csdreplay.anchorX still 100 at t=0.30 (next pos at t=0.33)");
+        expect(ovs[0].scaleX > 1.49f && ovs[0].scaleX < 1.51f,
+               "csdreplay.scaleX ~= 1.5 at t=0.30 (scale fired at t=0.25)");
+        expect(ovs[0].scaleY > 1.24f && ovs[0].scaleY < 1.26f,
+               "csdreplay.scaleY ~= 1.25 at t=0.30");
+    }
+    // Replay query at t=0.40 -> latest position event (t=0.33) has
+    // now applied; anchor should be (200, 80).
+    {
+        const auto ovs = buildRuntimeOverridesAt(log, 0.40, "title-menu");
+        expect(ovs[0].anchorXPx > 199.0f && ovs[0].anchorXPx < 201.0f,
+               "csdreplay.anchorX ~= 200 at t=0.40 (latest position fired)");
+        expect(ovs[0].anchorYPx > 79.0f && ovs[0].anchorYPx < 81.0f,
+               "csdreplay.anchorY ~= 80 at t=0.40");
+    }
+
+    // Replay query at t=0.30 with no target filter -> both nodes.
+    {
+        const auto ovs = buildRuntimeOverridesAt(log, 0.30);
+        expectEq(ovs.size(), std::size_t{2},
+                 "csdreplay.t=0.30 + no filter -> 2 nodes");
+    }
+
+    // Replay query at t=0.30 for world-map -> uniformScaleOrAlpha
+    // value 2.0 should be interpreted as scale (>1.05 threshold).
+    {
+        const auto ovs = buildRuntimeOverridesAt(log, 0.30, "world-map");
+        expectEq(ovs.size(), std::size_t{1},
+                 "csdreplay.world-map t=0.30 -> 1 node");
+        expect(ovs[0].scaleX > 1.99f && ovs[0].scaleX < 2.01f,
+               "csdreplay.uniformScale 2.0 -> scaleX=2.0");
+    }
+
+    // Empty / missing file is well-defined.
+    {
+        const auto missing = loadCsdReplayLog(tempRoot / "does_not_exist.jsonl");
+        expectEq(missing.events.size(), std::size_t{0},
+                 "csdreplay.missing file -> 0 events");
+        expectEq(missing.parseErrors, std::size_t{0},
+                 "csdreplay.missing file -> 0 parse errors");
+    }
+
+    fs::remove_all(tempRoot, ec);
+}
+
+// ----- BGM bank loader tests (Phase 356) -----
+
+static void testBgmBankLoader()
+{
+    using namespace ui;
+    namespace fs = std::filesystem;
+    std::cout << "\n== bgm bank loader ==\n";
+
+    // Build a temp directory with a couple of fake .ogg files and
+    // one non-.ogg file the loader should skip.
+    std::error_code ec;
+    const auto tempRoot = fs::temp_directory_path(ec) / "sgfx_bgm_bank_smoke";
+    fs::remove_all(tempRoot, ec);
+    fs::create_directories(tempRoot, ec);
+    auto writeFake = [&](const fs::path& rel, const std::string& payload) {
+        std::ofstream f(tempRoot / rel, std::ios::binary);
+        f.write(payload.data(), static_cast<std::streamsize>(payload.size()));
+    };
+    writeFake("bgm_sys_title.ogg",       "FAKE_OGG_TITLE_BYTES");
+    writeFake("bgm_act_apotos.ogg",      "FAKE_OGG_APOTOS_BYTES_LONGER");
+    writeFake("not_bgm.txt",             "ignore me");
+    fs::create_directories(tempRoot / "subdir", ec);
+    writeFake("subdir/bgm_act_china.ogg", "FAKE_OGG_CHINA");
+
+    // Empty bank, missing dir.
+    {
+        SgfxBgmBank bank;
+        const auto n = sgfxBgmBankLoadFromDir(bank, tempRoot / "does_not_exist");
+        expectEq(n, std::size_t{0}, "bgmbank.missing dir loads 0");
+        expectEq(bank.bytes.size(), std::size_t{0}, "bgmbank.missing dir empty");
+    }
+
+    // Real load.
+    {
+        SgfxBgmBank bank;
+        const auto n = sgfxBgmBankLoadFromDir(bank, tempRoot);
+        expectEq(n, std::size_t{3}, "bgmbank.three .ogg files loaded");
+        expectEq(bank.bytes.size(), std::size_t{3}, "bgmbank.three byte buffers");
+        expectEq(bank.cueNames.size(), std::size_t{3}, "bgmbank.three cue names");
+        expectEq(bank.skippedNonOggCount, std::size_t{1},
+                 "bgmbank.one non-ogg skipped");
+        expectEq(bank.failedReadCount, std::size_t{0}, "bgmbank.no read failures");
+        // Cue names match filename stems.
+        expect(sgfxBgmBankHasCue(bank, "bgm_sys_title"),
+               "bgmbank.has bgm_sys_title");
+        expect(sgfxBgmBankHasCue(bank, "bgm_act_apotos"),
+               "bgmbank.has bgm_act_apotos");
+        expect(sgfxBgmBankHasCue(bank, "bgm_act_china"),
+               "bgmbank.has bgm_act_china");
+        expect(!sgfxBgmBankHasCue(bank, "bgm_nope"),
+               "bgmbank.missing cue lookup negative");
+        // Stable byte addresses across the deque.
+        const auto* p0 = bank.bytes[0].data();
+        const auto* p1 = bank.bytes[1].data();
+        const auto* p2 = bank.bytes[2].data();
+        expect(p0 != nullptr && p1 != nullptr && p2 != nullptr,
+               "bgmbank.byte ptrs non-null");
+        // Force more deque growth and re-check that earlier
+        // pointers are still valid (deque guarantees stability).
+        bank.bytes.push_back({0x01,0x02,0x03});
+        bank.bytes.push_back({0x04});
+        expect(bank.bytes[0].data() == p0, "bgmbank.deque keeps p0 stable");
+        expect(bank.bytes[2].data() == p2, "bgmbank.deque keeps p2 stable");
+    }
+
+    // Stacking calls accumulates.
+    {
+        SgfxBgmBank bank;
+        sgfxBgmBankLoadFromDir(bank, tempRoot);
+        sgfxBgmBankLoadFromDir(bank, tempRoot);
+        expectEq(bank.bytes.size(), std::size_t{6},
+                 "bgmbank.second load doubles entries");
+    }
+
+    fs::remove_all(tempRoot, ec);
+}
+
+// ----- HudItemGet tests (Phase 355) -----
+
+static void testHudItemGet()
+{
+    using namespace ui;
+    std::cout << "\n== hud item get ==\n";
+    // Show -> Intro phase + SFX cue.
+    {
+        ItemGetState s;
+        const auto evs = showItemGet(s, ItemGetKind::SunMedal,
+                                     ItemGetMode::DaySonic, 3, 5);
+        expectEq(s.phase, ItemGetPhase::Intro, "itemget.Show enters Intro");
+        expectEq(s.numerator, 3, "itemget.numerator persisted");
+        expectEq(s.denominator, 5, "itemget.denominator persisted");
+        expectEq(evs.size(), std::size_t{1}, "itemget.Show emits one event");
+        expectEq(evs[0].kind, ItemGetEventKind::Shown, "itemget.Shown event");
+        expectEq(evs[0].sfxCueName, std::string("sys_actstg_itemget"),
+                 "itemget.Shown SFX cue");
+    }
+    // Calling Show while a popup is animating is suppressed.
+    {
+        ItemGetState s;
+        showItemGet(s, ItemGetKind::SunMedal, ItemGetMode::DaySonic, 1, 5);
+        const auto evs = showItemGet(s, ItemGetKind::MoonMedal,
+                                     ItemGetMode::Werehog, 2, 5);
+        expectEq(s.phase, ItemGetPhase::Intro,
+                 "itemget.second show suppressed: still Intro");
+        expectEq(s.kind, ItemGetKind::SunMedal,
+                 "itemget.second show suppressed: kind unchanged");
+        expectEq(evs.size(), std::size_t{1}, "itemget.suppressed emits one event");
+        expectEq(evs[0].kind, ItemGetEventKind::Suppressed,
+                 "itemget.Suppressed event");
+    }
+    // Full lifecycle: Intro -> Usual -> Outro -> Hidden.
+    {
+        ItemGetState s;
+        showItemGet(s, ItemGetKind::ContinentPart, ItemGetMode::DaySonic,
+                    1, 7);
+        // Tick past intro.
+        ItemGetInput in; in.deltaSeconds = s.introDurationSec + 0.01f;
+        const auto e1 = updateItemGetOneFrame(s, in);
+        expectEq(s.phase, ItemGetPhase::Usual, "itemget.Intro->Usual");
+        expectEq(e1.size(), std::size_t{1}, "itemget.UsualReached event count");
+        expectEq(e1[0].kind, ItemGetEventKind::UsualReached,
+                 "itemget.UsualReached");
+        // Tick past usual.
+        in.deltaSeconds = s.usualDurationSec + 0.01f;
+        const auto e2 = updateItemGetOneFrame(s, in);
+        expectEq(s.phase, ItemGetPhase::Outro, "itemget.Usual->Outro");
+        expectEq(e2[0].kind, ItemGetEventKind::OutroStarted,
+                 "itemget.OutroStarted");
+        // Tick past outro.
+        in.deltaSeconds = s.outroDurationSec + 0.01f;
+        const auto e3 = updateItemGetOneFrame(s, in);
+        expectEq(s.phase, ItemGetPhase::Hidden, "itemget.Outro->Hidden");
+        expectEq(e3[0].kind, ItemGetEventKind::Hidden_,
+                 "itemget.Hidden event");
+    }
+    // Werehog mode picks the ev_etf intro track.
+    {
+        ItemGetState s;
+        showItemGet(s, ItemGetKind::SubItem, ItemGetMode::Werehog, 1, 1);
+        expectEq(itemGetAnimationTrack(s),
+                 std::string_view("Intro_ev_etf_Anim"),
+                 "itemget.werehog intro track");
+        s.phase = ItemGetPhase::Usual;
+        expectEq(itemGetAnimationTrack(s),
+                 std::string_view("usual_etf_Anim"),
+                 "itemget.usual track");
+        s.phase = ItemGetPhase::Outro;
+        expectEq(itemGetAnimationTrack(s),
+                 std::string_view("Outro_ev_Anim"),
+                 "itemget.werehog outro track");
+    }
+    // Sub-counter pair persists when supplied.
+    {
+        ItemGetState s;
+        showItemGet(s, ItemGetKind::SunMedal, ItemGetMode::DaySonic,
+                    3, 5, 12, 30);
+        expectEq(s.subNumerator, 12, "itemget.subNumerator");
+        expectEq(s.subDenominator, 30, "itemget.subDenominator");
+    }
+    // Visibility predicate.
+    {
+        ItemGetState s;
+        expect(!isItemGetVisible(s), "itemget.hidden invisible");
+        showItemGet(s, ItemGetKind::SunMedal, ItemGetMode::DaySonic, 1, 5);
+        expect(isItemGetVisible(s), "itemget.intro visible");
+    }
+    // CSD project + scene constants.
+    {
+        expectEq(std::string(kItemGetCsdProject),
+                 std::string("game/SystemCommon/ui_itemresult.yncp"),
+                 "itemget.csd project path");
+        expectEq(std::string(kItemGetSceneContents),
+                 std::string("contents"), "itemget.contents scene");
+        expectEq(std::string(kItemGetSceneTitle),
+                 std::string("iresult_title"), "itemget.title scene");
+    }
+}
+
 int main()
 {
     testPauseMenu();
@@ -1347,6 +1794,10 @@ int main()
     testBossHud();
     testExQte();
     testMediaRoom();
+    testHudItemGet();
+    testBgmBankLoader();
+    testCsdAnimationReplay();
+    testSgfxBridge();
     std::cout << "\nfailures: " << g_failures << "\n";
     return g_failures == 0 ? 0 : 1;
 }

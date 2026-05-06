@@ -37,6 +37,33 @@ namespace UiLab
 
     bool IsEnabled();
     bool IsObserverMode();
+    // Phase 360 + 363: gameplay-skip mode predicate, env-var driven.
+    // See ui_lab_patches.cpp::IsGameplaySkipMode for activation. Wired
+    // at CGameModeStage_patches.cpp::sub_8253B7C0 (CGameModeStage::Update).
+    bool IsGameplaySkipMode();
+    // Phase 363: UI-only input lock predicate. Gameplay-skip implies
+    // this; can also be set independently via SG_PREFLIGHT_UI_ONLY_INPUT.
+    bool IsUiOnlyInputMode();
+    // Phase 363: called from the CGameModeStage::Update hook on first
+    // tick of a new stage instance while gameplay-skip is engaged.
+    // Idempotent within a stage instance. Emits ScreenEntered("Stage:GameplaySkip")
+    // on the SGFX bridge.
+    void OnGameplaySkipStageEntered(uint32_t stageThisAddress);
+    // Phase 363: called from the same hook once the gameplay pad mask is
+    // actually applied. Emits ScreenEntered("Input:UiOnlyLock") once per boot.
+    void OnUiOnlyInputLockApplied(uint32_t stageThisAddress);
+
+    // Phase 361: SGFX <-> sg-preflight bridge emit helpers. Thin
+    // wrappers over a SgfxBridge singleton living in ui_lab_patches.cpp.
+    // Call TickBridge() once per frame from the app update; call the
+    // Emit* helpers from individual UI accept hooks. The singleton
+    // initialises lazily on first use; absent SG_PREFLIGHT_BRIDGE_ENABLE
+    // it stays a no-op so plain UnleashedRecomp users see no overhead.
+    void TickBridge();
+    void EmitBridgeMenuAccepted(std::string_view screen, std::string_view rowId);
+    void EmitBridgeProfileSelected(std::string_view profileId);
+    void EmitBridgeScreenEntered(std::string_view screen);
+    void EmitBridgeQuitRequested();
     bool IsNativeFrameCaptureEnabled();
     bool ShouldBypassStartupPromptBlockers();
     ScreenId GetTarget();

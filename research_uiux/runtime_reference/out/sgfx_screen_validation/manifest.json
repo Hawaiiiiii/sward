@@ -1,6 +1,6 @@
 {
-  "phase": "353",
-  "purpose": "per-screen composite PNGs from sgfx_ui_mirror's native CSD renderer; open each PNG and compare to the same screen captured from UnleashedRecomp.",
+  "phase": "356",
+  "purpose": "per-screen composite PNGs from sgfx_ui_mirror's native CSD renderer; Phase 354 added active-scene whitelist + per-cast skip + synthesized SetPosition anchors; Phase 355 removed the placeholder text painter so retail EN text strips (mat_*_en_*.dds) come through cleanly; Phase 356 added the OGG BGM bank loader and the in-stage HudItemGet popup state machine (port of D:\\SonicWorldAdventure\\SWA\\source\\HUD\\Item\\HudItemGet.cpp).",
   "canvas": { "width": 640, "height": 360 },
   "screens": [
     { "label": "TitleIntro", "file": "01_title_intro.png", "screen": "TitleIntro", "stage_mode": 0, "written": true },

@@ -1,0 +1,133 @@
+# Phase 363 -- SG-Preflight gameplay-skip + UI-only-input lock (final, wired).
+#
+# Supersedes the Phase 360 scaffolding (predicate-only, "operator-assisted"
+# wiring note). This version is fully wired at sub_8253B7C0
+# (CGameModeStage::Update), runtime-proven on 2026-05-06: a fresh build
+# launched with SG_PREFLIGHT_GAMEPLAY_SKIP=1 fired the
+# `screen_entered: Stage:GameplaySkip` event on the SGFX bridge as soon as
+# the auto-loaded save dropped into a stage tick.
+# Phase 366 adds the companion `screen_entered: Input:UiOnlyLock` event from
+# the exact pad-mask site so the input lock has its own runtime proof line.
+#
+# Activation:
+#   $env:SG_PREFLIGHT_GAMEPLAY_SKIP = "1"  # implies UI-only input lock
+#   $env:SG_PREFLIGHT_UI_ONLY_INPUT = "1"  # input lock without bridge emit
+#
+# Behaviour with SG_PREFLIGHT_GAMEPLAY_SKIP=1:
+#   - First CGameModeStage::Update tick of a new stage instance fires
+#     EmitBridgeScreenEntered("Stage:GameplaySkip") on the SGFX bridge so
+#     the daemon can react (e.g. switch to a screensaver-bundle profile).
+#   - Every CGameModeStage::Update tick zeroes the gameplay-relevant pad
+#     bits before calling __imp__ and restores after, so the character
+#     never moves but Pause / Quit-to-WorldMap still work (Start +
+#     Select are kept live).
+#   - Title / WorldMap / Pause / Loading / Options / Results all behave
+#     normally because they tick outside CGameModeStage::Update.
+#
+# ============================================================
+# BLOCK 1 -- UnleashedRecomp/patches/ui_lab_patches.cpp
+#   (replace the existing Phase 360 IsGameplaySkipMode block)
+# ============================================================
+
+namespace UiLab
+{
+    static bool ReadBoolEnv(const char* name)
+    {
+        const char* env = std::getenv(name);
+        if (env == nullptr) return false;
+        const std::string_view v(env);
+        return v == "1" || v == "true" || v == "TRUE";
+    }
+
+    bool IsGameplaySkipMode()
+    {
+        static const bool value = ReadBoolEnv("SG_PREFLIGHT_GAMEPLAY_SKIP");
+        return value;
+    }
+
+    bool IsUiOnlyInputMode()
+    {
+        static const bool value =
+            ReadBoolEnv("SG_PREFLIGHT_UI_ONLY_INPUT") || IsGameplaySkipMode();
+        return value;
+    }
+
+    static std::atomic<uint32_t> g_lastSkipStageThis{0};
+    void OnGameplaySkipStageEntered(uint32_t stageThisAddress)
+    {
+        const uint32_t prev = g_lastSkipStageThis.exchange(
+            stageThisAddress, std::memory_order_acq_rel);
+        if (prev == stageThisAddress) return;
+        EmitBridgeScreenEntered("Stage:GameplaySkip");
+        LOGF_IMPL(Utility, "SG-Preflight",
+                  "gameplay-skip engaged on stage entry (CGameModeStage @ 0x{:08X})",
+                  stageThisAddress);
+    }
+}
+
+# ============================================================
+# BLOCK 2 -- UnleashedRecomp/patches/ui_lab_patches.h
+# ============================================================
+
+namespace UiLab
+{
+    bool IsGameplaySkipMode();
+    bool IsUiOnlyInputMode();
+    void OnGameplaySkipStageEntered(uint32_t stageThisAddress);
+}
+
+# ============================================================
+# BLOCK 3 -- UnleashedRecomp/patches/CGameModeStage_patches.cpp
+#   (extends the existing pause-route hook on sub_8253B7C0)
+# ============================================================
+
+#include <api/SWA.h>
+#include <patches/ui_lab_patches.h>
+
+PPC_FUNC_IMPL(__imp__sub_8253B7C0);
+PPC_FUNC(sub_8253B7C0)
+{
+    UiLab::ApplyPauseRouteInput("CGameModeStage::Update pause gate sub_8253B7C0");
+
+    if (UiLab::IsGameplaySkipMode())
+        UiLab::OnGameplaySkipStageEntered(ctx.r3.u32);
+
+    SWA::SPadState savedPadState{};
+    SWA::SPadState* livePadStateSlot = nullptr;
+    if (UiLab::IsUiOnlyInputMode())
+    {
+        if (auto* pInputState = SWA::CInputState::GetInstance())
+        {
+            const uint32_t idx = pInputState->m_CurrentPadStateIndex.get() & 7u;
+            SWA::SPadState& live = pInputState->m_PadStates[idx];
+            savedPadState = live;
+            livePadStateSlot = &live;
+
+            constexpr uint32_t keepBits =
+                static_cast<uint32_t>(SWA::eKeyState_Start) |
+                static_cast<uint32_t>(SWA::eKeyState_Select);
+
+            const uint32_t down = live.DownState.get();
+            const uint32_t up   = live.UpState.get();
+            const uint32_t tap  = live.TappedState.get();
+            const uint32_t rel  = live.ReleasedState.get();
+
+            live.DownState     = down & keepBits;
+            live.UpState       = (up & keepBits) | (~keepBits);
+            live.TappedState   = tap & keepBits;
+            live.ReleasedState = rel & keepBits;
+
+            live.LeftStickHorizontal  = 0.0f;
+            live.LeftStickVertical    = 0.0f;
+            live.RightStickHorizontal = 0.0f;
+            live.RightStickVertical   = 0.0f;
+            live.LeftTrigger          = 0.0f;
+            live.RightTrigger         = 0.0f;
+        }
+    }
+
+    __imp__sub_8253B7C0(ctx, base);
+
+    if (livePadStateSlot != nullptr)
+        *livePadStateSlot = savedPadState;
+}

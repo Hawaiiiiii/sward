@@ -50,6 +50,7 @@
 #include "sgfx_hud_evil_stage.hpp"
 #include "sgfx_hud_status.hpp"
 #include "sgfx_help_window.hpp"
+#include "sgfx_hud_item_get.hpp"
 
 #include <cstdint>
 #include <string>
@@ -137,6 +138,12 @@ namespace sward::ui_runtime::generated::sgfx_hud
         // sub-state of Pause -> Status (host opens it; not in the
         // screen graph as a top-level destination).
         StatusState        statusOverlay;
+        // Phase 355: in-stage item-pickup popup (CHudItemGet). Active
+        // alongside StageHud when the player picks up a Sun/Moon
+        // medal, continent fragment, or sub-collectible. Lifecycle
+        // is driven by the host via showItemGet() and ticked from
+        // the StageHud per-frame branch below.
+        ItemGetState       itemGet;
     };
 
     namespace detail::orchestrator
@@ -321,6 +328,22 @@ namespace sward::ui_runtime::generated::sgfx_hud
                     o.pause.context = PauseMenuContext::Stage;
                     o.pause.itemCount = 4;
                     switchScreen(o, SgfxScreen::Pause, events);
+                }
+            }
+            // Phase 355: item-pickup popup runs in parallel with the
+            // stage HUD. When visible it animates through Intro ->
+            // Usual -> Outro on its own clock; emits Hidden_ when
+            // it completes so the host can reply with
+            // MsgRequestItemReturn.
+            if (isItemGetVisible(o.itemGet))
+            {
+                ItemGetInput igIn;
+                igIn.deltaSeconds = input.deltaSeconds;
+                const auto igEvents = updateItemGetOneFrame(o.itemGet, igIn);
+                for (const auto& e : igEvents)
+                {
+                    if (!e.sfxCueName.empty())
+                        events.push_back(sfx(SgfxScreen::StageHud, e.sfxCueName));
                 }
             }
             break;

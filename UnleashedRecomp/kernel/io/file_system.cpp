@@ -5,8 +5,12 @@
 #include <kernel/function.h>
 #include <mod/mod_loader.h>
 #include <os/logger.h>
+#include <patches/ui_lab_patches.h>
 #include <user/config.h>
 #include <stdafx.h>
+
+#include <mutex>
+#include <unordered_set>
 
 struct FileHandle : KernelObject
 {
@@ -78,6 +82,47 @@ struct FindHandle : KernelObject
         lpFindFileData->ftLastWriteTime = {};
     }
 };
+
+namespace
+{
+    std::mutex g_sgAssetOverrideHitMutex;
+    std::unordered_set<std::string> g_sgAssetOverrideHits;
+    std::unordered_set<std::string> g_sgAssetFileProbes;
+
+    bool IsSgPreflightLoadLoggingEnabled()
+    {
+        const char* logEnv = std::getenv("SG_PREFLIGHT_LOG_LOADS");
+        return logEnv != nullptr && std::string_view(logEnv) != "0";
+    }
+
+    void EmitSgPreflightAssetOverrideHit(const std::string_view& guestPath, const std::filesystem::path& resolvedPath)
+    {
+        if (!ModLoader::IsSgPreflightOverridePath(resolvedPath)) return;
+
+        std::scoped_lock lock(g_sgAssetOverrideHitMutex);
+        if (g_sgAssetOverrideHits.size() >= 128) return;
+
+        std::string key(guestPath);
+        std::replace(key.begin(), key.end(), '\\', '/');
+        if (!g_sgAssetOverrideHits.emplace(key).second) return;
+
+        UiLab::EmitBridgeScreenEntered("Asset:OverrideHit:" + key);
+    }
+
+    void EmitSgPreflightFileProbe(const std::string_view& guestPath)
+    {
+        if (!IsSgPreflightLoadLoggingEnabled() || guestPath.empty()) return;
+
+        std::scoped_lock lock(g_sgAssetOverrideHitMutex);
+        if (g_sgAssetFileProbes.size() >= 128) return;
+
+        std::string key(guestPath);
+        std::replace(key.begin(), key.end(), '\\', '/');
+        if (!g_sgAssetFileProbes.emplace(key).second) return;
+
+        UiLab::EmitBridgeScreenEntered("Asset:FileProbe:" + key);
+    }
+}
 
 FileHandle* XCreateFileA
 (
@@ -365,6 +410,8 @@ std::filesystem::path FileSystem::ResolvePath(const std::string_view& path, bool
 {
     if (checkForMods)
     {
+        EmitSgPreflightFileProbe(path);
+
         std::filesystem::path resolvedPath = ModLoader::ResolvePath(path);
 
         if (!resolvedPath.empty())
@@ -372,6 +419,7 @@ std::filesystem::path FileSystem::ResolvePath(const std::string_view& path, bool
             if (ModLoader::s_isLogTypeConsole)
                 LOGF_IMPL(Utility, "Mod Loader", "Loading file: \"{}\"", reinterpret_cast<const char*>(resolvedPath.u8string().c_str()));
 
+            EmitSgPreflightAssetOverrideHit(path, resolvedPath);
             return resolvedPath;
         }
     }
