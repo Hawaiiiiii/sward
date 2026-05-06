@@ -4,7 +4,11 @@
 #include <patches/ui_lab_patches.h>
 
 #include <cctype>
+#include <cstdlib>
+#include <mutex>
 #include <string>
+#include <string_view>
+#include <unordered_set>
 
 namespace
 {
@@ -38,6 +42,44 @@ std::string TryReadGuestAsciiString(uint32_t textAddress)
 
     return text;
 }
+
+// Phase 367b: SG_PREFLIGHT_LOG_SETTEXT=1 turns on a bounded probe that
+// emits one `Text:CsdSetTextSample:<literal>` bridge event per unique
+// ASCII literal SetText'd by retail SU. Bounded to the first
+// kSetTextSampleLimit unique literals per process boot so the bridge
+// events.jsonl never grows unbounded. Used only to discover which
+// literals retail SU passes through `sub_830BF640::SetText` so the
+// proof's override pack can target keys that actually fire (the Title
+// menu rows are pre-baked into ui_title.yncp and never go through
+// SetText, so this probe is the canonical way to find live keys).
+namespace
+{
+constexpr std::size_t kSetTextSampleLimit = 64;
+std::unordered_set<std::string> g_setTextSampleSet;
+std::mutex g_setTextSampleMutex;
+
+bool IsSetTextSampleEnabled()
+{
+    static const bool enabled = []
+    {
+        const char* env = std::getenv("SG_PREFLIGHT_LOG_SETTEXT");
+        return env != nullptr && std::string_view(env) == "1";
+    }();
+    return enabled;
+}
+
+void EmitSetTextSampleIfFirst(std::string_view literal)
+{
+    if (!IsSetTextSampleEnabled() || literal.empty()) return;
+
+    std::scoped_lock lock(g_setTextSampleMutex);
+    if (g_setTextSampleSet.size() >= kSetTextSampleLimit) return;
+    if (!g_setTextSampleSet.emplace(literal).second) return;
+
+    UiLab::EmitBridgeScreenEntered(
+        "Text:CsdSetTextSample:" + std::string(literal));
+}
+} // namespace
 
 std::string TryReadGuestUtf16String(uint32_t textAddress)
 {
@@ -81,6 +123,11 @@ PPC_FUNC(sub_830BF640)
     std::string textUtf8 = TryReadGuestAsciiString(originalTextAddress);
     if (textUtf8.empty())
         textUtf8 = TryReadGuestUtf16String(originalTextAddress);
+
+    // Phase 367b: probe (env-gated) emits one bridge sample per unique
+    // SetText literal so the operator can populate the override pack
+    // with literals that actually fire at runtime.
+    EmitSetTextSampleIfFirst(textUtf8);
 
     // Phase 364: per-string text override. If the override map has an
     // entry for the original literal, point r4 at a guest-heap-resident

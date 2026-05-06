@@ -53,4 +53,22 @@ namespace SGTextOverrides
     // calls). The caller may pass this directly to PPC code expecting
     // a guest char* pointer.
     uint32_t TryGetOverrideGuestPtr(std::string_view original);
+
+    // Phase 367b: host-side proof emit. Called by Localise() the first
+    // time it returns an override-backed string for a given key. Emits
+    // exactly one bridge event per unique key per process boot:
+    //
+    //   screen_entered: "Text:HostOverrideHit:<key>"
+    //
+    // The event name is intentionally distinct from the guest CSD
+    // SetText path's `Text:CsdOverrideHit:<original>` so that bridge
+    // consumers can tell which override consumer fired. There is no
+    // synthetic boot-time probe -- this only fires on real Localise()
+    // calls from UR's UI code (button guide, message windows,
+    // installer wizard, options menu, etc.).
+    //
+    // Bounded volume = number of override keys actually requested via
+    // Localise() during the session. Cheap (one unordered_set lookup
+    // on the hot path; the emit only fires on the first hit).
+    void NoteHostHitForKey(std::string_view key);
 }

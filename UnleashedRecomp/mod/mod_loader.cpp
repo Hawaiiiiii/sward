@@ -30,6 +30,10 @@ static std::vector<Mod> g_mods;
 static std::filesystem::path g_sgPreflightOverrideDir;
 static ankerl::unordered_dense::map<std::string, std::filesystem::path> g_sgPreflightLooseOverrideIndex;
 static ankerl::unordered_dense::set<std::string> g_sgPreflightObservedArchiveEntries;
+// Phase 367b: dedup set for `Asset:VisibleOverrideHit:<assetName>`
+// emits triggered by ResolvePath() returning an override file. One
+// event per unique guest path per process boot.
+static ankerl::unordered_dense::set<std::string> g_sgPreflightVisibleOverrideHits;
 
 static std::string NormalizeSgPreflightAssetKey(std::string_view value)
 {
@@ -92,6 +96,11 @@ std::filesystem::path ModLoader::ResolvePath(std::string_view path)
 {
     std::string_view root;
 
+    // Phase 367b: keep a copy of the full guest path (root + relative)
+    // for the visible-override emit so the bridge event matches what
+    // retail UI actually requested.
+    const std::string_view fullPath = path;
+
     size_t sepIndex = path.find(":\\");
     if (sepIndex != std::string_view::npos)
     {
@@ -101,6 +110,24 @@ std::filesystem::path ModLoader::ResolvePath(std::string_view path)
 
     if (root == "save")
     {
+        // Phase 367b: SG_PREFLIGHT_NO_AUTOLOAD=1 makes the save root
+        // unreachable, which forces retail SU's CTitleStateMenu to
+        // present the New Save row instead of an auto-resumeable
+        // Continue. UI Lab's `--ui-lab=title-menu` routing then sits
+        // at the menu indefinitely (cursor=0, accept suppressed),
+        // letting the runtime SetText every Title CSD literal so the
+        // Phase 364 CsdNodeText hook can fire `Text:CsdOverrideHit`.
+        // This is the deterministic auto-load-suppression variant of
+        // task 4; it is non-destructive (the user's SYS-DATA file on
+        // disk is never touched, and the env unset restores normal
+        // save loading) and is read once per call so toggling at
+        // launch time picks it up cleanly.
+        if (const char* env = std::getenv("SG_PREFLIGHT_NO_AUTOLOAD");
+            env != nullptr && std::string_view(env) == "1")
+        {
+            return {};
+        }
+
         if (!ModLoader::s_saveFilePath.empty())
         {
             if (path == "SYS-DATA")
@@ -126,7 +153,7 @@ std::filesystem::path ModLoader::ResolvePath(std::string_view path)
     std::replace(pathStr.begin(), pathStr.end(), '\\', '/');
     std::filesystem::path fsPath(std::move(pathStr));
 
-    bool canBeMerged = 
+    bool canBeMerged =
         path.find(".arl") == (path.size() - 4) ||
         path.find(".ar.") == (path.size() - 6) ||
         path.find(".ar") == (path.size() - 3);
@@ -140,7 +167,33 @@ std::filesystem::path ModLoader::ResolvePath(std::string_view path)
         {
             std::filesystem::path modPath = includeDir / fsPath;
             if (std::filesystem::exists(modPath))
+            {
+                // Phase 367b: emit `Asset:VisibleOverrideHit:<fullPath>`
+                // when the override mod that wins resolution lives
+                // under the SG-Preflight override dir, AND only the
+                // first time per unique guest path. This is the
+                // user-visible asset lane: ResolvePath is the loose
+                // file substitution that retail UR's loaders call when
+                // they fopen() an asset by guest path. The matching
+                // loose-asset-from-archive lane (sub_82E0B500) emits
+                // the older `Asset:OverrideHit:<assetName>` event;
+                // distinguishing the two events lets bridge consumers
+                // tell that the override produced a real visible
+                // substitution rather than just an archive-entry
+                // replacement.
+                if (!g_sgPreflightOverrideDir.empty() &&
+                    ModLoader::IsSgPreflightOverridePath(modPath))
+                {
+                    std::string assetKey(fullPath);
+                    std::replace(assetKey.begin(), assetKey.end(), '\\', '/');
+                    if (g_sgPreflightVisibleOverrideHits.emplace(assetKey).second)
+                    {
+                        UiLab::EmitBridgeScreenEntered(
+                            "Asset:VisibleOverrideHit:" + assetKey);
+                    }
+                }
                 return s_cache.emplace(hash, modPath).first->second;
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 #include <user/config.h>
 #include <locale/locale.h>
+#include <patches/sg_text_overrides.h>
 
 /*
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LOCALISATION NOTES !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -869,7 +870,13 @@ std::string& Localise(const std::string_view& key)
             languageFindResult = localeFindResult->second.find(ELanguage::English);
 
         if (languageFindResult != localeFindResult->second.end())
+        {
+            // Phase 367: emit one Text:OverrideHit:<key> bridge event
+            // the first time Localise() resolves an override-backed key.
+            // No-op when no override is registered for the key.
+            SGTextOverrides::NoteHostHitForKey(key);
             return languageFindResult->second;
+        }
     }
 
     return g_localeMissing;

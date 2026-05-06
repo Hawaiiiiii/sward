@@ -16,6 +16,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <nlohmann/json.hpp>
 
@@ -31,6 +32,13 @@ namespace
     // originals that map to the same override share one allocation.
     static std::unordered_map<std::string, uint32_t> g_guestStringCache;
     static std::mutex g_guestStringCacheMutex;
+
+    // Phase 367: host-side hit dedup set. Each override key is emitted
+    // at most once per process boot via the bridge. Mirrors the existing
+    // guest-side cache semantics but is keyed by the override key
+    // (not value), since Localise() callers ask for keys.
+    static std::unordered_set<std::string> g_hostHitSet;
+    static std::mutex g_hostHitMutex;
 
     static std::atomic<bool> g_loaded{false};
     static std::once_flag g_loadOnce;
@@ -116,6 +124,7 @@ namespace
         // event per process boot.
         UiLab::EmitBridgeScreenEntered(
             "Text:OverridesLoaded:" + std::to_string(loaded));
+
     }
 }
 
@@ -159,12 +168,40 @@ namespace SGTextOverrides
         const uint32_t guestAddr = g_memory.MapVirtual(hostBuf);
         g_guestStringCache.emplace(*override, guestAddr);
 
-        // Phase 364: emit bridge event the first time each override is
-        // resolved into guest memory. Bounded volume = at most one event
-        // per unique override key per process boot. Lets the daemon
-        // observe which overrides are actually firing in the running UI.
+        // Phase 364 / 367b: emit a bridge event the first time each
+        // override is resolved into guest memory. Phase 367b renames
+        // the event from the original `Text:OverrideHit:<original>`
+        // to `Text:CsdOverrideHit:<original>` so it is distinguishable
+        // from host-side `Text:HostOverrideHit:<key>` (Localise path)
+        // and from any boot-time loader probes. Bounded volume = at
+        // most one event per unique original literal per process boot.
         UiLab::EmitBridgeScreenEntered(
-            "Text:OverrideHit:" + std::string(original));
+            "Text:CsdOverrideHit:" + std::string(original));
         return guestAddr;
+    }
+
+    void NoteHostHitForKey(std::string_view key)
+    {
+        if (!g_loaded.load(std::memory_order_acquire)) return;
+
+        // Heterogeneous-lookup-friendly path: only enter the locked
+        // section if the override map has the key, and only allocate a
+        // std::string for the dedup set on the actual first hit.
+        if (g_overrides.find(std::string(key)) == g_overrides.end())
+            return;
+
+        {
+            std::scoped_lock lock(g_hostHitMutex);
+            auto [it, inserted] = g_hostHitSet.emplace(key);
+            if (!inserted) return;
+        }
+
+        // Phase 367b: explicit `Text:HostOverrideHit:<key>` so the
+        // host-side Localise() path is distinguishable from the
+        // guest-side CSD SetText path (`Text:CsdOverrideHit:<original>`)
+        // and from boot-time markers (`Text:OverridesLoaded:<count>`).
+        // The dedup set above makes this exactly-once per key per boot.
+        UiLab::EmitBridgeScreenEntered(
+            "Text:HostOverrideHit:" + std::string(key));
     }
 }
