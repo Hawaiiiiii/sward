@@ -1,0 +1,23 @@
+{
+  "phase": "353",
+  "purpose": "per-screen composite PNGs from sgfx_ui_mirror's native CSD renderer; open each PNG and compare to the same screen captured from UnleashedRecomp.",
+  "canvas": { "width": 640, "height": 360 },
+  "screens": [
+    { "label": "TitleIntro", "file": "01_title_intro.png", "screen": "TitleIntro", "stage_mode": 0, "written": true },
+    { "label": "Title", "file": "02_title.png", "screen": "Title", "stage_mode": 0, "written": true },
+    { "label": "WorldMap", "file": "03_world_map.png", "screen": "WorldMap", "stage_mode": 0, "written": true },
+    { "label": "Loading", "file": "04_loading.png", "screen": "Loading", "stage_mode": 0, "written": true },
+    { "label": "StageHud Day", "file": "05_stage_hud_day.png", "screen": "StageHud", "stage_mode": 0, "written": true },
+    { "label": "StageHud Werehog", "file": "06_stage_hud_werehog.png", "screen": "StageHud", "stage_mode": 1, "written": true },
+    { "label": "StageHud Boss", "file": "07_stage_hud_boss.png", "screen": "StageHud", "stage_mode": 2, "written": true },
+    { "label": "Pause", "file": "08_pause.png", "screen": "Pause", "stage_mode": 0, "written": true },
+    { "label": "Results", "file": "09_results.png", "screen": "Results", "stage_mode": 0, "written": true },
+    { "label": "Hub", "file": "10_hub.png", "screen": "Hub", "stage_mode": 0, "written": true }
+  ],
+  "comparison_workflow": [
+    "1. Open each PNG in this directory.",
+    "2. Capture the same screen from UnleashedRecomp (e.g. via Win+PrintScreen).",
+    "3. Side-by-side compare: layout, colors, text positions, asset choice.",
+    "4. Note deltas in sgfx_visual_validation_findings.md if present."
+  ]
+}

@@ -37,6 +37,10 @@
 // Phase 347: real BGM byte blob.
 #include "res/music/installer.ogg.h"
 
+// Phase 353: PNG screenshot writer (single header, public domain).
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -384,6 +388,7 @@ int main(int argc, char** argv)
     std::string forceScreen;
     float demoSeconds = 4.0f;
     int maxFrames = 0; // 0 = unlimited
+    fs::path screenshotsDir; // Phase 353: PNG-per-screen dump mode
 
     for (int i = 1; i < argc; ++i)
     {
@@ -394,6 +399,7 @@ int main(int argc, char** argv)
         else if (a.rfind("--screen=", 0) == 0) forceScreen = a.substr(9);
         else if (a.rfind("--demo-seconds=", 0) == 0) demoSeconds = std::stof(a.substr(15));
         else if (a.rfind("--frames=", 0) == 0) maxFrames = std::stoi(a.substr(9));
+        else if (a.rfind("--screenshots-dir=", 0) == 0) screenshotsDir = a.substr(18);
         else if (a == "--help" || a == "-h")
         {
             std::cout << "sgfx_ui_mirror -- SGFX native UI render in a window\n"
@@ -401,12 +407,106 @@ int main(int argc, char** argv)
                       << "  --jsonl=<path>            tail UnleashedRecomp's ui_lab_events.jsonl\n"
                       << "  --asset-root=<dir>        retail .yncp / .dds asset root\n"
                       << "  --screen=<name>           force a screen (Title/WorldMap/...)\n"
-                      << "  --demo-seconds=<n>        per-screen dwell in demo cycle\n";
+                      << "  --demo-seconds=<n>        per-screen dwell in demo cycle\n"
+                      << "  --frames=<n>              exit after N frames\n"
+                      << "  --screenshots-dir=<dir>   visit every screen+stage variant once,\n"
+                      << "                            dump a PNG per visit, write a manifest,\n"
+                      << "                            then exit (no SDL window opened)\n";
             return 0;
         }
     }
 
     g_assetRoot = assetRoot;
+
+    // Phase 353: screenshots-dir mode runs HEADLESS -- no SDL window,
+    // no audio. Visits every screen + stage variant, renders to a
+    // framebuffer, dumps PNG per visit, writes a JSON manifest,
+    // then exits. Lets the user open the PNGs directly to compare
+    // visually against UnleashedRecomp without juggling two windows.
+    if (!screenshotsDir.empty())
+    {
+        std::error_code ec;
+        fs::create_directories(screenshotsDir, ec);
+
+        std::cout << "scanning asset textures under " << assetRoot << " ...\n";
+        buildTextureIndex(assetRoot);
+        std::cout << "  texture index size: " << g_textureIndex.size() << "\n";
+
+        // Bake fonts so placeholder labels render in the dumps too.
+        const fs::path arial = "C:/Windows/Fonts/arial.ttf";
+        g_bodyFont  = ui::loadFontFromFile(arial, 18.0f);
+        g_smallFont = ui::loadFontFromFile(arial, 14.0f);
+        std::cout << "  fonts: body="
+                  << (g_bodyFont.loaded ? "ok" : "missing")
+                  << " small="
+                  << (g_smallFont.loaded ? "ok" : "missing") << "\n";
+
+        struct ShotSpec
+        {
+            ui::SgfxScreen screen;
+            ui::StageMode  stageMode;
+            const char*    label;
+            const char*    fileName;
+        };
+        const ShotSpec kShots[] = {
+            { ui::SgfxScreen::TitleIntro, ui::StageMode::DaySonic, "TitleIntro",       "01_title_intro.png" },
+            { ui::SgfxScreen::Title,      ui::StageMode::DaySonic, "Title",            "02_title.png" },
+            { ui::SgfxScreen::WorldMap,   ui::StageMode::DaySonic, "WorldMap",         "03_world_map.png" },
+            { ui::SgfxScreen::Loading,    ui::StageMode::DaySonic, "Loading",          "04_loading.png" },
+            { ui::SgfxScreen::StageHud,   ui::StageMode::DaySonic, "StageHud Day",     "05_stage_hud_day.png" },
+            { ui::SgfxScreen::StageHud,   ui::StageMode::Werehog,  "StageHud Werehog", "06_stage_hud_werehog.png" },
+            { ui::SgfxScreen::StageHud,   ui::StageMode::Boss,     "StageHud Boss",    "07_stage_hud_boss.png" },
+            { ui::SgfxScreen::Pause,      ui::StageMode::DaySonic, "Pause",            "08_pause.png" },
+            { ui::SgfxScreen::Results,    ui::StageMode::DaySonic, "Results",          "09_results.png" },
+            { ui::SgfxScreen::Hub,        ui::StageMode::DaySonic, "Hub",              "10_hub.png" },
+        };
+
+        ui::SgfxOrchestrator orch;
+        ui::CsdNativeFramebuffer fb;
+        fb.resize(kCanvasW, kCanvasH);
+
+        std::ofstream manifest(screenshotsDir / "manifest.json");
+        manifest << "{\n  \"phase\": \"353\",\n"
+                 << "  \"purpose\": \"per-screen composite PNGs from sgfx_ui_mirror's "
+                    "native CSD renderer; open each PNG and compare to the same "
+                    "screen captured from UnleashedRecomp.\",\n"
+                 << "  \"canvas\": { \"width\": " << kCanvasW
+                 << ", \"height\": " << kCanvasH << " },\n"
+                 << "  \"screens\": [\n";
+
+        bool first = true;
+        for (const auto& sh : kShots)
+        {
+            orch.current = sh.screen;
+            orch.stageHud.mode = sh.stageMode;
+            renderScreenIntoFramebuffer(sh.screen, orch.stageHud, fb);
+            const fs::path outPath = screenshotsDir / sh.fileName;
+            const int rc = stbi_write_png(
+                outPath.string().c_str(),
+                static_cast<int>(fb.width), static_cast<int>(fb.height),
+                4, fb.rgba.data(), static_cast<int>(fb.width * 4));
+            const bool ok = (rc != 0);
+            std::cout << "  [shot] " << sh.label
+                      << " -> " << outPath.string()
+                      << " (" << (ok ? "ok" : "FAILED") << ")\n";
+            if (!first) manifest << ",\n";
+            first = false;
+            manifest << "    { \"label\": \"" << sh.label
+                     << "\", \"file\": \"" << sh.fileName
+                     << "\", \"screen\": \"" << specFor(sh.screen).friendlyName
+                     << "\", \"stage_mode\": " << static_cast<int>(sh.stageMode)
+                     << ", \"written\": " << (ok ? "true" : "false") << " }";
+        }
+        manifest << "\n  ],\n"
+                 << "  \"comparison_workflow\": [\n"
+                 << "    \"1. Open each PNG in this directory.\",\n"
+                 << "    \"2. Capture the same screen from UnleashedRecomp (e.g. via Win+PrintScreen).\",\n"
+                 << "    \"3. Side-by-side compare: layout, colors, text positions, asset choice.\",\n"
+                 << "    \"4. Note deltas in sgfx_visual_validation_findings.md if present.\"\n"
+                 << "  ]\n}\n";
+        std::cout << "  manifest: " << (screenshotsDir / "manifest.json").string() << "\n";
+        return 0;
+    }
 
     if (SDL_Init(SDL_INIT_VIDEO | (silent ? 0 : SDL_INIT_AUDIO)) != 0)
     {
