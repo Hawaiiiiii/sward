@@ -59,6 +59,12 @@ namespace SGTextOverrides
     // counts changed.
     void Reload();
 
+    // Phase 371C: monotonic counter of successful Reload() calls.
+    // Used by the in-game QA panel to display how many times the
+    // text manifest has been re-read since boot. Atomic load is
+    // safe to call from the render thread.
+    uint64_t GetReloadCount();
+
     // Host-side override lookup for diagnostics. Copies the
     // replacement string out while the immutable snapshot is still
     // held alive, so the caller never receives a pointer into data

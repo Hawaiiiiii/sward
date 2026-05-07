@@ -29,6 +29,7 @@
 #include <ui/black_bar.h>
 #include <patches/aspect_ratio_patches.h>
 #include <patches/sg_asset_overrides.h>
+#include <patches/sg_qa_panel.h>
 #include <patches/ui_lab_patches.h>
 #include <user/config.h>
 #include <sdl_listener.h>
@@ -2682,6 +2683,7 @@ static void DrawImGui()
     Fader::Draw();
     BlackBar::Draw();
     UiLab::DrawOverlay();
+    SGQAPanel::Draw();
 
     assert(ImGui::GetBackgroundDrawList()->_ClipRectStack.Size == 1 && "Some clip rects were not removed from the stack!");
 

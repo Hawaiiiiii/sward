@@ -36,6 +36,8 @@ namespace
     static std::shared_ptr<const PackSnapshot> g_snapshot;
     static std::atomic<bool> g_loaded{false};
     static std::once_flag g_loadOnce;
+    // Phase 371C: monotonic Reload() counter for the QA panel.
+    static std::atomic<uint64_t> g_reloadCount{0};
 
     // Sentinel returned by `GetLooseFiles()` when no snapshot has
     // been built yet OR the snapshot has no entries. Avoids a
@@ -345,8 +347,16 @@ namespace SGPack
     {
         if (!g_loaded.load(std::memory_order_acquire)) return;
         auto fresh = BuildSnapshot(/*reloadEvent=*/true);
-        std::unique_lock lock(g_snapshotMutex);
-        g_snapshot = std::move(fresh);
+        {
+            std::unique_lock lock(g_snapshotMutex);
+            g_snapshot = std::move(fresh);
+        }
+        g_reloadCount.fetch_add(1, std::memory_order_acq_rel);
+    }
+
+    uint64_t GetReloadCount()
+    {
+        return g_reloadCount.load(std::memory_order_acquire);
     }
 
     bool IsActive()

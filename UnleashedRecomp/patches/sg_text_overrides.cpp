@@ -81,6 +81,9 @@ namespace
     static std::mutex g_activeCsdProjectsMutex;
 
     static std::atomic<bool> g_loaded{false};
+    // Phase 371C: monotonic counter incremented on every successful
+    // Reload(). Read by SGQAPanel for the in-game status display.
+    static std::atomic<uint64_t> g_reloadCount{0};
     static std::once_flag g_loadOnce;
 
     static std::filesystem::path ResolveOverrideDir()
@@ -297,6 +300,12 @@ namespace SGTextOverrides
             std::unique_lock lock(g_snapshotMutex);
             g_snapshot = std::move(fresh);
         }
+        g_reloadCount.fetch_add(1, std::memory_order_acq_rel);
+    }
+
+    uint64_t GetReloadCount()
+    {
+        return g_reloadCount.load(std::memory_order_acquire);
     }
 
     bool TryGetOverride(std::string_view original, std::string* outOverride)

@@ -53,6 +53,8 @@ namespace
     static std::mutex g_pictureHitsMutex;
     static std::atomic<bool> g_loaded{false};
     static std::once_flag g_loadOnce;
+    // Phase 371C: monotonic Reload() counter for the QA panel.
+    static std::atomic<uint64_t> g_reloadCount{0};
 
     static std::filesystem::path ResolveOverrideDir()
     {
@@ -240,6 +242,13 @@ namespace SGAssetOverrides
         // bridge stream.
         UiLab::EmitBridgeScreenEntered(
             "Asset:PixelOverridesReloaded:" + std::to_string(count));
+
+        g_reloadCount.fetch_add(1, std::memory_order_acq_rel);
+    }
+
+    uint64_t GetReloadCount()
+    {
+        return g_reloadCount.load(std::memory_order_acquire);
     }
 
     PixelOverrideHandle TryGetPixelOverride(std::string_view pictureName)

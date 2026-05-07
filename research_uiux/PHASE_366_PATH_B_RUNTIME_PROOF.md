@@ -1392,3 +1392,152 @@ Phase 367b / 368 / 369A / 369B / 370A / 370B / 370C / 371A runners
 continue to pass unchanged. `route` is OPTIONAL: a pack_meta.json
 without it leaves UR's `Pack:Route` silent and the launcher
 defaults to `title` (`NO_AUTOLOAD=1`), matching pre-371B behavior.
+
+---
+
+## Phase 371C -- in-game ImGui QA panel
+
+Phase 371A made the shell exportable + launchable; 371B made it
+safe across tickets. 371C surfaces the pack metadata + reload state
+*inside* the running game so the QA operator can read them without
+flipping to a separate terminal -- and so a screenshot of the
+running shell carries everything needed to identify the pack.
+
+### What 371C adds
+
+| Layer | Path | Role |
+|---|---|---|
+| UR | [`UnleashedRecomp/patches/sg_qa_panel.h`](../UnleashedRecomp/patches/sg_qa_panel.h) / [`.cpp`](../UnleashedRecomp/patches/sg_qa_panel.cpp) | New `SGQAPanel::Draw()` overlay called from the per-frame ImGui pump. Reads pack metadata via `SGPack::TryGetTicket() / TryGetProject() / TryGetPhase() / TryGetRoute()`, reads reload counters via `SGTextOverrides::GetReloadCount() / SGAssetOverrides::GetReloadCount() / SGPack::GetReloadCount()`. Emits `QAPanel:Active:<ticket>:<route>` exactly once on first draw and `QAPanel:ReloadCounts:<text>:<asset>:<pack>` whenever the displayed counters change. Top-right pinned, semi-transparent (alpha 0.55), no-decoration, no-saved-settings, no-focus, no-move, no-inputs, no-nav. |
+| UR | [`UnleashedRecomp/patches/sg_text_overrides.h`](../UnleashedRecomp/patches/sg_text_overrides.h) / [`.cpp`](../UnleashedRecomp/patches/sg_text_overrides.cpp), [`sg_asset_overrides.h`](../UnleashedRecomp/patches/sg_asset_overrides.h) / [`.cpp`](../UnleashedRecomp/patches/sg_asset_overrides.cpp), [`sg_pack.h`](../UnleashedRecomp/patches/sg_pack.h) / [`.cpp`](../UnleashedRecomp/patches/sg_pack.cpp) | Added `static std::atomic<uint64_t> g_reloadCount` to each loader's anonymous namespace, incremented at the end of every successful `Reload()`. New `GetReloadCount()` accessor returns the current value via `memory_order_acquire` -- safe to call from the render thread. |
+| UR | [`UnleashedRecomp/gpu/video.cpp`](../UnleashedRecomp/gpu/video.cpp) | Calls `SGQAPanel::Draw()` immediately after `UiLab::DrawOverlay()` so the QA panel composes with (rather than fights) the existing operator overlay. New `#include <patches/sg_qa_panel.h>`. |
+| UR | [`UnleashedRecomp/CMakeLists.txt`](../UnleashedRecomp/CMakeLists.txt) | Adds `patches/sg_qa_panel.cpp` to the `UNLEASHED_RECOMP_CXX_SOURCES` list. |
+| Proof | [`research_uiux/runtime_reference/tools/phase371c_path_b_proof.ps1`](runtime_reference/tools/phase371c_path_b_proof.ps1) | Two sub-tests: (1) launch with no `SG_PREFLIGHT_QA_PANEL`, assert `QAPanel:Active:<ticket>:title` fires (auto-on path), mid-run text re-export triggers `Text:ScopedRulesReloaded:4`, and the panel emits `QAPanel:ReloadCounts:<text>:<asset>:<pack>` with `text > 0`; (2) launch with `SG_PREFLIGHT_QA_PANEL=0`, assert `QAPanel:Active:` does NOT appear (env opt-out). Save backup/restore between sub-tests. |
+
+### Visibility resolution (`ShouldDraw()` semantics)
+
+| `SG_PREFLIGHT_QA_PANEL` | `SGPack::TryGetTicket()` | Result |
+|---|---|---|
+| (unset) | nullptr (no pack_meta) | hidden |
+| (unset) | non-null | visible (auto-on for staged tickets) |
+| `0` / `false` / `off` | any | hidden (forced off) |
+| anything else | any | visible (forced on; placeholders shown when no pack_meta) |
+
+Vanilla UR boots stay overlay-clean: no pack_meta means no panel
+emit and no rendering cost. The forced-on mode exists for the rare
+case where the operator wants the panel without staging metadata
+(e.g. testing the panel rendering itself).
+
+### Phase 371C acceptance gates (each fails with a distinct exit code)
+
+| Code | Gate | Description |
+|---:|---|---|
+| 2 | build / deploy | `_phase367_build.bat` failed or exe missing |
+| 3 | exporter output | Pack files missing on disk |
+| 4 | `Pack:Meta:<t>:<p>:<ph>` | Boot-time metadata emit (regression of Phase 371A) |
+| 5 | `Pack:Route:title` | Boot-time route emit (regression of Phase 371B) |
+| 6 | `QAPanel:Active:<ticket>:<route>` | Panel reached a render frame in the auto-on sub-test |
+| 7 | `Text:ScopedRulesReloaded:4` + `QAPanel:ReloadCounts:<text>...` | Mid-run re-export drove a reload and the panel observed a non-zero text reload counter |
+| 8 | env opt-out | With `SG_PREFLIGHT_QA_PANEL=0`, `QAPanel:Active` did NOT fire |
+| 9 | native frame | No BMP captured (UR never rendered) |
+
+### Runtime-proven evidence (2026-05-08 run)
+
+```
+Auto-on sub-test:
+  pack-meta:    True
+  pack-route:   True
+  qa-active:    True       <-- QAPanel:Active:IDCEVODEV-960073:title
+  text-reload:  True (1.55s end-to-end through exporter re-export)
+
+Env-off sub-test (SG_PREFLIGHT_QA_PANEL=0):
+  qa-active:    False      <-- panel correctly suppressed
+```
+
+| Gate | Pass |
+|---|---|
+| Pack:Meta | True |
+| Pack:Route:title | True |
+| QAPanel:Active (auto-on) | True |
+| Text:ScopedRulesReloaded:4 | True |
+| QAPanel:ReloadCounts text>0 | True |
+| QA panel env-disable opt-out | True |
+| Native frame written | True |
+
+### Event taxonomy added in Phase 371C
+
+| Event | Emitter | When |
+|---|---|---|
+| `QAPanel:Active:<ticket>:<route>` | `SGQAPanel::Draw` (via `g_activeEmitted.exchange`) | Exactly once per process boot, after the first ImGui Begin/End pair that actually got rendered. The exchange is the once-emit gate; it stays true for the rest of the session even if visibility flips later. `<ticket>` and `<route>` are read at the same call site as the panel's text labels, so the event always reflects what the panel is showing. |
+| `QAPanel:ReloadCounts:<text>:<asset>:<pack>` | `SGQAPanel::Draw` | Once on first draw and then only when the displayed reload counters change. This is intentionally low-rate so the bridge gets direct evidence of the same counters the operator sees without per-frame spam. |
+
+### Decisions honored
+
+- **Auto-on for staged tickets, not for everyone.** Operator only
+  needs to set up `pack_meta.json` once; the panel appears as a
+  side-effect of using the SGFX shell. Vanilla UR stays clean.
+- **Once-per-session event emit, not per-frame.** A panel that
+  emits `Active` every frame would flood the bridge stream.
+  `g_activeEmitted` uses atomic `exchange(true, acq_rel)` so the
+  first-ever draw wins the gate exactly once.
+- **Counter wiring is observed through the panel.** We can't easily
+  verify panel pixels through the bridge, so the proof asserts both
+  `Text:ScopedRulesReloaded` after a mid-run edit and a subsequent
+  `QAPanel:ReloadCounts:<text>:<asset>:<pack>` event with
+  `text > 0`. That second event is emitted by the panel draw path
+  after reading the same atomics it displays.
+- **Top-right placement, not center.** UI Lab's runtime bridge
+  status overlay lives in the top-left region. Placing the QA
+  panel top-right keeps both visible during a 2-overlay screenshot.
+- **No keyboard toggle for 371C.** F-key toggles risk colliding
+  with UR's existing input handlers. Env var is the toggle today;
+  if a runtime toggle becomes necessary, a dedicated key-binding
+  is a small follow-up.
+- **`memory_order_acquire` reads** so the render thread sees a
+  consistent view of the counters even when a watcher thread
+  increments mid-frame.
+
+### Honest gaps
+
+- **No screenshot proof of pixels.** The runtime gate is
+  `QAPanel:Active`, which proves the draw call ran but not that
+  the pixels reached the framebuffer in a recognisable form.
+  Visual verification still requires eyes-on-screen during a run.
+  A future beat could add a pixel-sampling step (read the
+  swapchain region the panel occupies, check for non-default
+  color content) but that is deeper rendering hookwork than this
+  beat warranted.
+- **Panel is read-only.** No interactive elements (no "reload
+  pack" button, no log filter). Hooking ImGui input into UR's
+  existing input plumbing without disturbing gameplay input is
+  out of scope for the visibility beat; it can be added later
+  via a dedicated input gate.
+- **No font scaling.** The panel uses ImGui's default font; on a
+  4K display it appears small. UR's other overlays use the same
+  default, so this is consistent rather than a 371C-specific gap,
+  but worth flagging.
+
+### Fresh verification command
+
+```powershell
+# Full Phase 371C proof (auto-on + env-off sub-tests):
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\phase371c_path_b_proof.ps1 `
+    -AutoExitSeconds 45 -ReloadTimeoutSeconds 8
+
+# Interactive launch with the panel visible (auto-on; ticket present):
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\sgfx_shell_launch.ps1 `
+    -Ticket "IDCEVODEV-960073" -Project "BMW SGFX QA Shell" -Route title
+
+# Interactive launch with the panel forced off (clean screenshot):
+$env:SG_PREFLIGHT_QA_PANEL = '0'
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\sgfx_shell_launch.ps1 `
+    -Ticket "IDCEVODEV-960073" -Project "BMW SGFX QA Shell" -Route title
+```
+
+Phase 367b / 368 / 369A / 369B / 370A / 370B / 370C / 371A / 371B
+runners continue to pass unchanged. The QA panel is overlay-only
+and never observes or mutates game state -- its visibility flag
+short-circuits at the top of `SGQAPanel::Draw()`, so disabled
+runs do not even pay the ImGui Begin/End cost.

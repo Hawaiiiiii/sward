@@ -68,6 +68,9 @@ namespace SGPack
     // manifest.
     void Reload();
 
+    // Phase 371C: monotonic Reload() counter for the QA panel.
+    uint64_t GetReloadCount();
+
     // True when the override dir contains an `sgfx_pack.json` that
     // parsed successfully (regardless of whether any lane fields
     // were present). Text/asset/loose loaders test this BEFORE

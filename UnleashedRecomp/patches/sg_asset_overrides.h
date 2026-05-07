@@ -66,6 +66,10 @@ namespace SGAssetOverrides
     // from "no change" by tracking previous count).
     void Reload();
 
+    // Phase 371C: monotonic counter of successful Reload() calls,
+    // surfaced to the in-game QA panel.
+    uint64_t GetReloadCount();
+
     // Phase 369A pixel-override lookup. Returns a handle whose
     // `data` member is non-null iff the picture name has an
     // override. The caller must keep the handle alive for the
