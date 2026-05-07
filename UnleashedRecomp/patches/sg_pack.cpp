@@ -43,6 +43,29 @@ namespace
     // snapshot pointer has been swapped out under them.
     static const std::vector<std::filesystem::path> kEmptyLooseFiles{};
 
+    // Phase 371A: pack metadata read once at EnsureLoaded() time.
+    // Stored as plain strings (not behind a snapshot) because it is
+    // identifier-grade data: ticket / project / phase. We do NOT
+    // hot-reload these because changing the ticket mid-run would
+    // make any QA evidence already captured ambiguous. If the
+    // operator wants to change ticket, they restart UR.
+    static std::string g_metaTicket;
+    static std::string g_metaProject;
+    static std::string g_metaPhase;
+    static std::atomic<bool> g_metaLoaded{false};
+
+    static std::string ScrubBridgeField(std::string s)
+    {
+        // Mirror SGBranding's pipe scrub: the bridge event encoding
+        // uses `:` and `|` as field separators; replace both with
+        // `_` so consumer parsers stay unambiguous.
+        for (char& c : s)
+        {
+            if (c == '|' || c == ':') c = '_';
+        }
+        return s;
+    }
+
     static std::filesystem::path ResolveOverrideDir()
     {
         if (const char* env = std::getenv("SG_PREFLIGHT_OVERRIDE_DIR");
@@ -202,6 +225,64 @@ namespace
     }
 }
 
+namespace
+{
+    // Phase 371A: read pack_meta.json once at EnsureLoaded() time.
+    // Best-effort: missing file = silent no-op. Malformed file =
+    // log + no-op (no event emit, no rejection event -- the meta
+    // file is purely informational and not on the override path).
+    static void LoadPackMetaOnce()
+    {
+        const auto overrideDir = ResolveOverrideDir();
+        if (overrideDir.empty()) return;
+
+        const auto metaPath = overrideDir / "pack_meta.json";
+        std::error_code ec;
+        if (!std::filesystem::is_regular_file(metaPath, ec)) return;
+
+        std::ifstream stream(metaPath, std::ios::binary);
+        if (!stream.is_open()) return;
+
+        nlohmann::json doc;
+        try
+        {
+            stream >> doc;
+        }
+        catch (const nlohmann::json::exception& e)
+        {
+            LOGF_IMPL(Utility, "SG-Preflight",
+                      "pack_meta: parse error in \"{}\": {}",
+                      reinterpret_cast<const char*>(metaPath.u8string().c_str()),
+                      e.what());
+            return;
+        }
+        if (!doc.is_object()) return;
+
+        const auto readStr = [&](const char* key) -> std::string
+        {
+            auto it = doc.find(key);
+            if (it == doc.end() || !it->is_string()) return {};
+            return ScrubBridgeField(it->get<std::string>());
+        };
+
+        g_metaTicket  = readStr("ticket");
+        g_metaProject = readStr("project");
+        g_metaPhase   = readStr("phase");
+        g_metaLoaded.store(true, std::memory_order_release);
+
+        const std::string ticket  = g_metaTicket.empty()  ? "_" : g_metaTicket;
+        const std::string project = g_metaProject.empty() ? "_" : g_metaProject;
+        const std::string phase   = g_metaPhase.empty()   ? "_" : g_metaPhase;
+
+        LOGF_IMPL(Utility, "SG-Preflight",
+                  "pack_meta: loaded ticket=\"{}\" project=\"{}\" phase=\"{}\"",
+                  ticket, project, phase);
+
+        UiLab::EmitBridgeScreenEntered(
+            "Pack:Meta:" + ticket + ":" + project + ":" + phase);
+    }
+}
+
 namespace SGPack
 {
     void EnsureLoaded()
@@ -212,7 +293,33 @@ namespace SGPack
             std::unique_lock lock(g_snapshotMutex);
             g_snapshot = std::move(fresh);
             g_loaded.store(true, std::memory_order_release);
+            // Sibling metadata file: read once. Independent of the
+            // override-lane snapshot but loaded in the same
+            // EnsureLoaded call so the bridge sees a coherent
+            // boot-time pack state in events.jsonl.
+            LoadPackMetaOnce();
         });
+    }
+
+    const std::string* TryGetTicket()
+    {
+        if (!g_metaLoaded.load(std::memory_order_acquire)) return nullptr;
+        if (g_metaTicket.empty()) return nullptr;
+        return &g_metaTicket;
+    }
+
+    const std::string* TryGetProject()
+    {
+        if (!g_metaLoaded.load(std::memory_order_acquire)) return nullptr;
+        if (g_metaProject.empty()) return nullptr;
+        return &g_metaProject;
+    }
+
+    const std::string* TryGetPhase()
+    {
+        if (!g_metaLoaded.load(std::memory_order_acquire)) return nullptr;
+        if (g_metaPhase.empty()) return nullptr;
+        return &g_metaPhase;
     }
 
     void Reload()

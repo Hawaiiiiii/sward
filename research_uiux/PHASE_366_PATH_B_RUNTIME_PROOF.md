@@ -1104,3 +1104,122 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 Phase 367b / 368 / 369A / 369B / 370A / 370B runners still pass
 unchanged. The watcher is OFF by default (env-gated), so vanilla
 UR launches and the older runners are not affected.
+
+---
+
+## Phase 371A -- SGFX Pack Exporter + one-click Shell launcher
+
+Phase 370A/B/C proved the engine could read, route, and reload an
+override pack. Phase 371A turns that capability into a *product*: an
+operator-facing exporter that builds a complete pack from CLI args
+and a one-click launcher that runs UR as a branded SGFX shell with
+save isolation and event tailing -- no manual env-var spelling, no
+hand-stitched manifests, no risk of overwriting save progress.
+
+### What 371A adds
+
+| Layer | Path | Role |
+|---|---|---|
+| Exporter | [`research_uiux/runtime_reference/tools/sgfx_pack_exporter.ps1`](runtime_reference/tools/sgfx_pack_exporter.ps1) | Pure-PowerShell pack producer. Inputs: ticket / project / phase / scoped-rules JSON / pixel-override DDS / branding paths. Outputs the full `<OutputDir>/{sgfx_pack.json, pack_meta.json, text/, pictures/, sgfx_branding/, loose/, pack_export.log}` tree. |
+| Launcher | [`research_uiux/runtime_reference/tools/sgfx_shell_launch.ps1`](runtime_reference/tools/sgfx_shell_launch.ps1) | One-click runner. Calls the exporter (unless `-SkipExport`), backs up `%APPDATA%\UnleashedRecomp\save\` (SHA-256 verified), sets every `SG_PREFLIGHT_*` env var, copies `UnleashedRecomp.exe` -> `SgfxShell.exe` (taskbar/process branding), launches, and tails `events.jsonl` translating raw events into human lines (`[meta] ticket=... project=...`, `[pack] reloaded -- ...`, etc.). On exit/Ctrl+C it deletes the branded copy and restores the save backup if hashes diverged. |
+| Pack metadata | [`UnleashedRecomp/patches/sg_pack.h`](../UnleashedRecomp/patches/sg_pack.h) / [`.cpp`](../UnleashedRecomp/patches/sg_pack.cpp) | New `pack_meta.json` reader (boot-time, not in the snapshot path). Emits `Pack:Meta:<ticket>:<project>:<phase>` and exposes `TryGetTicket() / TryGetProject() / TryGetPhase()` accessors that future in-game QA panels can read. |
+| Proof | [`research_uiux/runtime_reference/tools/phase371_path_b_proof.ps1`](runtime_reference/tools/phase371_path_b_proof.ps1) | End-to-end runner: builds UR, runs the exporter, validates 7 expected files on disk, launches via env-branding, asserts boot events, re-runs the exporter mid-run with a different rule count, asserts `Text:ScopedRulesReloaded:<m>` arrives within 8s, verifies save SHA. |
+
+### Exporter output layout
+
+```
+<OutputDir>/
+  sgfx_pack.json                   -- pack index (branding + lane paths)
+  pack_meta.json                   -- ticket/project/phase metadata
+  text/sgfx_text.json              -- scoped CSD rules (v2 schema)
+  pictures/sgfx_pictures.json      -- pixel override manifest
+  pictures/logo_sonicteam_override.dds
+  sgfx_branding/icon.png           -- window icon (PNG via stb_image)
+  sgfx_branding/logo.png           -- decorative; reserved for future panel
+  loose/<...>                      -- explicit loose-file substitutions (when provided)
+  pack_export.log                  -- audit trail of what was written
+```
+
+### Phase 371A acceptance gates (each fails with a distinct exit code)
+
+| Code | Gate | Description |
+|---:|---|---|
+| 2 | build / deploy | `_phase367_build.bat` failed or `UnleashedRecomp.exe` missing. |
+| 3 | exporter output | Any of the 7 expected output files missing, or `pack_meta.json` round-trip mismatch (ticket/project/phase). |
+| 4 | `Pack:Meta:<t>:<p>:<ph>` | Bridge event missing within 20s of launch. |
+| 5 | `Pack:Loaded` + `Branding:Active` | Either missing within 15s. |
+| 6 | `Text:ScopedRulesLoaded:4` | Initial scoped-rule count diverged from what the exporter wrote. |
+| 7 | `Text:ScopedRulesReloaded:6` | Mid-run re-export did not trigger a hot reload within 8s. |
+| 8 | save restored | Save SHA differed pre/post and the restore did not match the pre snapshot. |
+| 9 | native frame | No BMP captured under EvidenceDir; UR never reached a render frame. |
+
+### Runtime-proven evidence (2026-05-07 run)
+
+```
+{"screen":"Pack:Loaded:sgfx_text.json:sgfx_pictures.json:0"}
+{"screen":"Pack:Meta:IDCEVODEV-960073:BMW SGFX QA Shell:371A"}
+{"screen":"Text:ScopedRulesLoaded:4"}
+{"screen":"Asset:PixelOverridesLoaded:1"}
+{"screen":"Branding:Active:SGFX QA Shell -- IDCEVODEV-960073|icon.png|SGFX 0.5 (Phase 371A)"}
+{"screen":"HotReload:WatcherStarted"}
+{"screen":"Text:ScopedRulesReloaded:6"}
+```
+
+| Gate | Pass |
+|---|---|
+| Pack:Meta | True |
+| Pack:Loaded | True |
+| Branding:Active | True |
+| Text:ScopedRulesLoaded:4 | True |
+| Text:ScopedRulesReloaded:6 | True (1.55 s end-to-end through exporter re-run) |
+| Save restored | True (save SHA unchanged) |
+| Native frame written | True |
+
+### Event taxonomy added in Phase 371A
+
+| Event | Emitter | When |
+|---|---|---|
+| `Pack:Meta:<ticket>:<project>:<phase>` | `SGPack::EnsureLoaded` (via `LoadPackMetaOnce`) | Once at boot, after the lane snapshot is built. Fields are scrubbed of `:` / `\|` characters; empty fields become `_` so the parser remains unambiguous. |
+
+`TryGetTicket() / TryGetProject() / TryGetPhase()` are exposed for
+the future in-game QA panel (Phase 371C). They return `nullptr` when
+no `pack_meta.json` was present, so unmodified UR boots with no
+pack stay free of metadata-related output.
+
+### Decisions honored
+
+- **No round-trip through `ConvertTo-Json` on the array fields** in the exporter. PowerShell's serializer wraps `[ordered]@{}` array values as `{ "value":[...], "Count":N }`, which UR's nlohmann::json parser would reject. The exporter emits `text/sgfx_text.json` and `sgfx_pack.json` as literal templated strings with each rule and loose-file entry compiled to compact JSON via `ConvertTo-Json -Compress` on the leaf value only. Result: clean JSON arrays, regardless of PowerShell's in-memory representation.
+- **`pack_meta.json` is read once and NOT hot-reloaded.** Changing the ticket mid-run would make any QA evidence already captured ambiguous. Operators who need a different ticket restart UR.
+- **Save restore is mandatory in the launcher.** SHA-256 pre/post compare; if hashes diverged and a backup was made, restore in the `finally` block (covers Ctrl+C and forced kills).
+- **Branded exe copy is `SgfxShell.exe`**, deleted on exit so the install dir is left in vanilla state.
+- **Tail loop is human-readable.** Each known event prefix maps to a short status line (`[meta]`, `[pack]`, `[text]`, `[pix]`, `[hot]`); unknown events are dropped (the operator does not need to see every loader debug emit). Raw `events.jsonl` is preserved under EvidenceDir for post-mortem.
+
+### Honest gaps (still pending product layer)
+
+- **No in-game QA panel yet.** `TryGetTicket() / TryGetProject() / TryGetPhase()` are exposed but not surfaced visually. That is Phase 371C (ImGui panel showing ticket / pack status / reload counters).
+- **No per-ticket save isolation.** The launcher backs up + restores the global save dir. A future Phase 371B should redirect `%APPDATA%\UnleashedRecomp\save\` to a per-ticket subdir so two QA sessions can run in alternation without restoring between switches.
+- **No route selector** ("open Title shell" / "open World Map shell" / "open HUD shell"). Pack consumers still rely on whichever screen UR boots into. Route presets are a Phase 371B beat.
+- **3D car mesh QA viewport** is not part of 371A and stays in Path A territory: it requires ImGui-side rendering or a native viewport, fed from the `sg-preflight` model dirs. Out of scope for the "make the SGFX shell a tool" beat.
+
+### Fresh verification command
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\phase371_path_b_proof.ps1 `
+    -AutoExitSeconds 60 `
+    -ReloadTimeoutSeconds 8
+```
+
+For interactive QA use (no proof, no auto-kill, just launch the shell):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\sgfx_shell_launch.ps1 `
+    -Ticket "IDCEVODEV-960073" -Project "BMW SGFX QA Shell"
+```
+
+All Phase 367b / 368 / 369A / 369B / 370A / 370B / 370C runners
+continue to pass unchanged. `pack_meta.json` is OPTIONAL: when the
+operator stages a pack without it (the legacy 370B/C layout),
+`Pack:Meta` simply does not fire and every other lane behaves
+exactly as before.
