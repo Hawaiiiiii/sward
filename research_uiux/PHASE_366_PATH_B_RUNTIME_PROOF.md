@@ -591,3 +591,151 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 ```
 
 Phase 367b / Phase 368 runners still pass unchanged.
+
+## Phase 370A -- host branding (window/icon/build-label/exe-name)
+
+Phase 370A is the first slice of the SGFX-shell branding tier. The
+goal: let the shell advertise its own identity at the host layer
+without rewriting PE resources. Three things change at the host:
+the SDL window title, the SDL window icon, and a logged build-label
+string that travels through the bridge as proof. A fourth piece --
+the launcher-side exe rename -- is filesystem-only and runs from
+[`_sgfx_shell_launch.bat`](../_sgfx_shell_launch.bat).
+
+### Configuration sources (precedence)
+
+1. Environment variables (set per launch by the operator):
+   - `SGFX_SHELL_WINDOW_TITLE` -> SDL window title text
+   - `SGFX_SHELL_BUILD_LABEL`  -> build label string
+   - `SGFX_SHELL_EXE_NAME`     -> launcher-only; copy
+     `UnleashedRecomp.exe` to this filename in the install dir and
+     launch the copy. Default `SGFX_Shell.exe`. Original
+     `UnleashedRecomp.exe` is left untouched.
+2. `<SG_PREFLIGHT_OVERRIDE_DIR>/sgfx_pack.json` -> `branding`
+   section (when env vars are not set):
+
+   ```json
+   {
+     "version": 1,
+     "branding": {
+       "window_title": "SGFX Shell -- Phase 370A",
+       "build_label":  "SGFX 0.4 (Phase 370A)",
+       "icon":         "sgfx_branding/icon.png"
+     }
+   }
+   ```
+3. Auto-discovery for the icon: when neither env nor pack points
+   at one, the loader looks for
+   `<override>/sgfx_branding/icon.png` then
+   `<override>/sgfx_branding/icon.bmp` and uses whichever exists.
+
+Phase 370A's `sgfx_pack.json` reading is intentionally restricted to
+the `branding` section. The text/asset lane redirection through
+`sgfx_pack.json` (where the pack would supersede the flat
+`sg_text_overrides.json` / `sg_asset_overrides.json` loaders) is
+the Phase 370B beat. A pack with only a `branding` section co-exists
+with the existing flat-file loaders without changing their behavior.
+
+### Event taxonomy additions
+
+| Event | Source | Cardinality |
+|---|---|---|
+| `Branding:Active:<title>\|<icon>\|<label>` | `sg_branding.cpp::DoLoad()` -- emitted on first `EnsureLoaded()` call when ANY override is configured | once per process |
+
+Pipe (`\|`) is the field separator. The loader replaces any literal
+pipes inside user-provided strings with underscores so the bridge
+event's three sub-fields stay parseable. Empty fields collapse to
+the empty string between separators.
+
+### Phase 370A acceptance gates
+
+The runner [`research_uiux/runtime_reference/tools/phase370a_path_b_proof.ps1`](runtime_reference/tools/phase370a_path_b_proof.ps1)
+exits 0 only when ALL of:
+
+| Exit | Reason |
+|---|---|
+| 0 | all gates passed |
+| 2 | build / deploy / launch failed |
+| 3 | `Branding:Active` missing from events.jsonl |
+| 4 | Win32 `FindWindow` / `GetWindowText` did not see the configured title within the timeout (the SDL window's title decoration suffix is tolerated -- the gate is substring-contains, not equality) |
+| 5 | no native BMP captured |
+| 6 | `SGFX_SHELL_EXE_NAME` copy missing in install dir after the launcher ran |
+| 7 | `Branding:Active` payload's `<title>\|<icon>\|<label>` fields did not match the configured values |
+
+The runner inlines the launcher's filesystem-and-env logic so the
+runtime proof is deterministic. The `_sgfx_shell_launch.bat` file
+ships the same logic for end-user use; the proof exercises every
+host-side branding path the launcher would set.
+
+### What's runtime-proven (Phase 370A, 2026-05-07)
+
+Captured in
+[research_uiux/runtime_reference/out/phase370a_path_b_proof/](runtime_reference/out/phase370a_path_b_proof/):
+
+```json
+{
+  "expected_title":          "SGFX Shell - Phase 370A",
+  "expected_build_label":    "SGFX 0.4 (Phase 370A)",
+  "expected_exe_name":       "Phase370A_SGFX_Shell.exe",
+  "branding_active_payload": "SGFX Shell - Phase 370A|icon.png|SGFX 0.4 (Phase 370A)",
+  "observed_window_title":   "SGFX Shell - Phase 370A - [2560x1600]",
+  "branded_exe_exists":      true,
+  "icon_png_bytes":           620,
+  "native_frames_written":    1,
+  "elapsed_seconds":          31
+}
+```
+
+- **runtime-proven**: `Branding:Active:SGFX Shell - Phase 370A|icon.png|SGFX 0.4 (Phase 370A)`
+  fires once on boot, with all three sub-fields populated from the
+  env vars + the auto-discovered pack icon path.
+- **runtime-proven**: Win32 `FindWindow` + `GetWindowText` saw the
+  OS-advertised window title `SGFX Shell - Phase 370A - [2560x1600]`.
+  The `- [2560x1600]` suffix is appended by
+  `GameWindow::Update`'s resize hook (it decorates the title with
+  the current resolution); the gate's substring-contains check
+  ignores that decoration. The title swap survived through SDL ->
+  Win32 -> DWM intact.
+- **runtime-proven**: the icon override path applied. The loader
+  decoded the 620-byte PNG via `stbi_load_from_memory`, wrapped it
+  in an `SDL_Surface` via `SDL_CreateRGBSurfaceWithFormatFrom`, and
+  passed it to `SDL_SetWindowIcon` before the embedded UR icon
+  fallback could run. Visual confirmation is in
+  [phase370a_screen_grab.bmp](runtime_reference/out/phase370a_path_b_proof/phase370a_screen_grab.bmp).
+- **runtime-proven**: build-label override logged to console at
+  boot via the SG-Preflight logger and round-tripped through the
+  `Branding:Active` payload. The git-derived `g_versionString`
+  global is intentionally left alone.
+- **runtime-proven**: `Phase370A_SGFX_Shell.exe` was created in the
+  install dir as a side-by-side copy of `UnleashedRecomp.exe` and
+  launched as the proof's runtime; both files exist at run end. A
+  `pkill UnleashedRecomp` workflow still works for the unmodified
+  runtime.
+- **runtime-proven**: save backup engaged. `SYS-DATA` changed during
+  the 31-second branding window and was restored from the pre-run
+  snapshot; `ACH-DATA` and `EXT-DATA` were SHA-256 unchanged.
+
+### Phase 370A file layout
+
+| Path | Purpose |
+|---|---|
+| [`UnleashedRecomp/patches/sg_branding.h`](../UnleashedRecomp/patches/sg_branding.h) | Public branding API (TryGetWindowTitle / TryGetIconPath / TryGetBuildLabel / EnsureLoaded). |
+| [`UnleashedRecomp/patches/sg_branding.cpp`](../UnleashedRecomp/patches/sg_branding.cpp) | Loader: env vars first, then `sgfx_pack.json::branding`, then `<override>/sgfx_branding/icon.{png,bmp}` auto-discovery. Emits `Branding:Active:<title>\|<icon>\|<label>` once per process. |
+| [`UnleashedRecomp/ui/game_window.cpp`](../UnleashedRecomp/ui/game_window.cpp) | `GameWindow::GetTitle()` consults `SGBranding::TryGetWindowTitle()` first; `SetIcon(bool isNight)` checks `TryGetIconPath()` and decodes PNG via stb_image / BMP via SDL_LoadBMP_RW before falling through to the embedded UR icon. |
+| [`UnleashedRecomp/main.cpp`](../UnleashedRecomp/main.cpp) | Calls `SGBranding::EnsureLoaded()` after the text/asset overrides and BEFORE `Video::CreateHostDevice` so the SDL window picks up the title and icon at create time. Logs the build-label override at boot when configured. |
+| [`UnleashedRecomp/CMakeLists.txt`](../UnleashedRecomp/CMakeLists.txt) | Adds `patches/sg_branding.cpp` to the source list. |
+| [`_sgfx_shell_launch.bat`](../_sgfx_shell_launch.bat) | Honors `SGFX_SHELL_EXE_NAME` (default `SGFX_Shell.exe`): re-copies `UnleashedRecomp.exe` to that filename on every launch and runs the copy. Also passes through `SGFX_SHELL_WINDOW_TITLE` / `SGFX_SHELL_BUILD_LABEL` env vars to the launched process. |
+| [`research_uiux/runtime_reference/tools/phase370a_path_b_proof.ps1`](runtime_reference/tools/phase370a_path_b_proof.ps1) | Phase 370A runner: stages a branding-only `sgfx_pack.json` + synthesised PNG icon, copies the exe to `Phase370A_SGFX_Shell.exe`, launches, queries the Win32 window title, captures a BMP, restores save snapshot, runs the gates. |
+
+### Fresh verification command
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\phase370a_path_b_proof.ps1 `
+    -AutoExitSeconds 30
+```
+
+Stop here for review. Phase 370B (sgfx_pack.json full lane
+redirection with traversal guards) and Phase 370C (hot reload via
+shared_ptr immutable snapshots + mtime polling) are queued but not
+implemented in this commit.

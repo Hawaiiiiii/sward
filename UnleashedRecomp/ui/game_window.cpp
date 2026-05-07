@@ -4,6 +4,7 @@
 #include <os/user.h>
 #include <os/version.h>
 #include <app.h>
+#include <patches/sg_branding.h>
 #include <sdl_listener.h>
 #include <SDL_syswm.h>
 
@@ -14,6 +15,10 @@
 
 #include <res/images/game_icon.bmp.h>
 #include <res/images/game_icon_night.bmp.h>
+#include <cctype>
+#include <fstream>
+#include <stb_image.h>
+#include <vector>
 
 bool m_isFullscreenKeyReleased = true;
 bool m_isResizing = false;
@@ -268,6 +273,98 @@ void GameWindow::SetIcon(void* pIconBmp, size_t iconSize)
 
 void GameWindow::SetIcon(bool isNight)
 {
+    // Phase 370A: SGFX-shell icon override. When the override pack
+    // contains `sgfx_branding/icon.{png,bmp}` (or sgfx_pack.json
+    // points at one), load that file from disk and use it instead
+    // of the UR-embedded BMP. PNG goes through stb_image (already
+    // linked); BMP routes through SDL_LoadBMP_RW. The original
+    // day/night embedded fallback runs only when no override file
+    // is configured, so a vanilla UR boot is byte-for-byte
+    // unchanged.
+    if (auto iconPath = SGBranding::TryGetIconPath();
+        !iconPath.empty())
+    {
+        const std::string ext = iconPath.extension().string();
+        const std::string extLower = [&]
+        {
+            std::string s = ext;
+            for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            return s;
+        }();
+
+        const auto pathU8 = iconPath.u8string();
+        std::ifstream stream(iconPath, std::ios::binary);
+        if (stream.is_open())
+        {
+            stream.seekg(0, std::ios::end);
+            const auto endPos = stream.tellg();
+            if (endPos <= 0)
+            {
+                LOGF_ERROR("SGFX branding: icon file \"{}\" is empty or unreadable",
+                           reinterpret_cast<const char*>(pathU8.c_str()));
+            }
+            else
+            {
+                const auto size = static_cast<std::size_t>(endPos);
+                stream.seekg(0, std::ios::beg);
+                std::vector<unsigned char> bytes(size);
+                stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(size));
+                stream.close();
+
+                SDL_Surface* surface = nullptr;
+                bool iconApplied = false;
+                if (extLower == ".png")
+                {
+                    int w = 0, h = 0, c = 0;
+                    unsigned char* pixels = stbi_load_from_memory(
+                        bytes.data(), static_cast<int>(bytes.size()), &w, &h, &c, 4);
+                    if (pixels != nullptr)
+                    {
+                        surface = SDL_CreateRGBSurfaceWithFormatFrom(
+                            pixels, w, h, 32, w * 4, SDL_PIXELFORMAT_RGBA32);
+                        if (surface != nullptr)
+                        {
+                            SDL_SetWindowIcon(s_pWindow, surface);
+                            SDL_FreeSurface(surface);
+                            iconApplied = true;
+                        }
+                        stbi_image_free(pixels);
+                    }
+                    else
+                    {
+                        LOGF_ERROR("SGFX branding: failed to decode PNG icon \"{}\": {}",
+                                   reinterpret_cast<const char*>(pathU8.c_str()),
+                                   stbi_failure_reason());
+                    }
+                }
+                else if (extLower == ".bmp")
+                {
+                    surface = SDL_LoadBMP_RW(SDL_RWFromMem(bytes.data(), static_cast<int>(bytes.size())), 1);
+                    if (surface != nullptr)
+                    {
+                        SDL_SetWindowIcon(s_pWindow, surface);
+                        SDL_FreeSurface(surface);
+                        iconApplied = true;
+                    }
+                    else
+                    {
+                        LOGF_ERROR("SGFX branding: failed to load BMP icon \"{}\": {}",
+                                   reinterpret_cast<const char*>(pathU8.c_str()),
+                                   SDL_GetError());
+                    }
+                }
+                else
+                {
+                    LOGF_ERROR("SGFX branding: unsupported icon extension \"{}\" (use .png or .bmp)",
+                               ext);
+                }
+
+                if (iconApplied)
+                    return;
+            }
+        }
+    }
+
     if (isNight)
     {
         SetIcon(g_game_icon_night, sizeof(g_game_icon_night));
@@ -280,6 +377,18 @@ void GameWindow::SetIcon(bool isNight)
 
 const char* GameWindow::GetTitle()
 {
+    // Phase 370A: SGFX-shell window title override. The branding
+    // loader reads SGFX_SHELL_WINDOW_TITLE / sgfx_pack.json once at
+    // boot and caches the result; this lookup is just a pointer
+    // dereference. When no override is configured, fall through to
+    // the existing official-title / "Unleashed Recompiled" path so
+    // a vanilla UR launch shows its normal title.
+    if (auto branded = SGBranding::TryGetWindowTitle();
+        branded != nullptr && !branded->empty())
+    {
+        return branded->c_str();
+    }
+
     if (Config::UseOfficialTitleOnTitleBar)
     {
         auto isSWA = Config::Language == ELanguage::Japanese;

@@ -151,6 +151,7 @@ set(UNLEASHED_RECOMP_PATCHES_CXX_SOURCES
     "patches/player_patches.cpp"
     "patches/resident_patches.cpp"
     "patches/sg_asset_overrides.cpp"
+    "patches/sg_branding.cpp"
     "patches/sg_text_overrides.cpp"
     "patches/ui_lab_patches.cpp"
     "patches/video_patches.cpp"

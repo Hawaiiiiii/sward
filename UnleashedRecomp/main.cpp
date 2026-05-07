@@ -25,6 +25,7 @@
 #include <ui/installer_wizard.h>
 #include <mod/mod_loader.h>
 #include <preload_executable.h>
+#include <patches/sg_branding.h>
 #include <patches/sg_text_overrides.h>
 #include <patches/sg_asset_overrides.h>
 #include <patches/ui_lab_patches.h>
@@ -357,6 +358,28 @@ int main(int argc, char *argv[])
     // I/O. Idempotent and a no-op when sg_asset_overrides.json is
     // absent.
     SGAssetOverrides::EnsureLoaded();
+
+    // Phase 370A: SGFX-shell host branding (window title / icon /
+    // build label). Must happen BEFORE Video::CreateHostDevice
+    // because GameWindow::Init reads SGBranding::TryGetWindowTitle
+    // and TryGetIconPath when it creates the SDL window. The loader
+    // also emits a one-shot `Branding:Active:<title>|<icon>|<label>`
+    // bridge event when any override is configured, so the proof
+    // script can verify branding without polling Win32 APIs from
+    // outside the runtime.
+    SGBranding::EnsureLoaded();
+    if (auto buildLabel = SGBranding::TryGetBuildLabel();
+        buildLabel != nullptr && !buildLabel->empty())
+    {
+        // Phase 370A: log the build label override so it appears in
+        // the console banner / log file alongside the auto-generated
+        // version line. The git-derived `g_versionString` global is
+        // intentionally NOT mutated -- a pack-author override should
+        // not silently rewrite the recompiled binary's identity.
+        LOGF_IMPL(Utility, "SG-Preflight",
+                  "branding: build label override = \"{}\"",
+                  *buildLabel);
+    }
 
     if (!PersistentStorageManager::LoadBinary())
         LOGFN_ERROR("Failed to load persistent storage binary... (status code {})", (int)PersistentStorageManager::BinStatus);
