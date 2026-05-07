@@ -1223,3 +1223,172 @@ continue to pass unchanged. `pack_meta.json` is OPTIONAL: when the
 operator stages a pack without it (the legacy 370B/C layout),
 `Pack:Meta` simply does not fire and every other lane behaves
 exactly as before.
+
+---
+
+## Phase 371B -- per-ticket save isolation + route presets
+
+Phase 371A made the SGFX shell launchable in one click. Phase 371B
+makes it *safe* to run two QA sessions back-to-back: each ticket
+gets its own save sandbox that lives under the pack dir, and the
+operator's real save is bulletproof across crashes (verified
+SHA-256 round-trip; quarantine kept on disk if the restore fails).
+Route metadata propagates through the pack so the future in-game
+QA panel and the launcher's `NO_AUTOLOAD` flag share one source of
+truth.
+
+### What 371B adds
+
+| Layer | Path | Role |
+|---|---|---|
+| UR | [`UnleashedRecomp/patches/sg_pack.h`](../UnleashedRecomp/patches/sg_pack.h) / [`.cpp`](../UnleashedRecomp/patches/sg_pack.cpp) | Reads `route` from `pack_meta.json`, emits `Pack:Route:<r>` (separate event from `Pack:Meta:` so consumers that only want route changes do not have to parse the longer payload), exposes `TryGetRoute()` accessor. |
+| Exporter | [`research_uiux/runtime_reference/tools/sgfx_pack_exporter.ps1`](runtime_reference/tools/sgfx_pack_exporter.ps1) | Adds `-Route` param (`title \| auto \| worldmap \| hud \| results`, default `title`) and writes it into `pack_meta.json`. `-Force` no longer wipes the entire OutputDir -- it is now scoped to the exporter-owned subtree (`sgfx_pack.json`, `pack_meta.json`, `pack_export.log`, `text/`, `pictures/`, `sgfx_branding/`, `loose/`). The launcher-owned `save/` sandbox dir is preserved across re-exports. |
+| Launcher | [`research_uiux/runtime_reference/tools/sgfx_shell_launch.ps1`](runtime_reference/tools/sgfx_shell_launch.ps1) | Three new responsibilities: (1) quarantine the real save under a stable, timestamped `%LOCALAPPDATA%\UR\sgfx_real_save_quarantine\<ts>_<rand>\` dir; (2) overlay the per-ticket sandbox at `<PackDir>/save/` onto `%APPDATA%\UR\save\` before launch and capture it back on exit (writing `sandbox_meta.json` alongside); (3) resolve route -> `SG_PREFLIGHT_NO_AUTOLOAD` value (route `title` -> `1`, all others -> `0`). The cleanup block verifies the restored real save's SHA-256 matches the pre-quarantine snapshot AND the live dir contains exactly the same set of files; if either check fails, the quarantine is kept on disk. The internal tail helper was renamed from `Pump-Events` to `Read-PendingEvents` to satisfy PSScriptAnalyzer's approved-verb rule. |
+| Proof | [`research_uiux/runtime_reference/tools/phase371b_path_b_proof.ps1`](runtime_reference/tools/phase371b_path_b_proof.ps1) | Two-ticket back-and-forth: run A (NO_AUTOLOAD=1) with empty sandbox -> plant marker bytes in `<packA>/save/SYS-DATA` -> run B with empty sandbox -> assert B's sandbox does NOT contain the marker -> run A again -> assert marker round-tripped through overlay/capture. SHA-checks the real save against the pristine baseline after every run; verifies no quarantine dirs are left in the proof-specific quarantine root at the end. |
+
+### Save-isolation flow
+
+```
+pre-launch:
+  %APPDATA%\UnleashedRecomp\save\          --quarantine-->  %LOCALAPPDATA%\..\sgfx_real_save_quarantine\<ts>\
+  <PackDir>/save/SYS-DATA (etc)             --overlay------>  %APPDATA%\UnleashedRecomp\save\
+  (artifacts NOT in the sandbox are removed from the live dir so a
+   prior ticket's leftovers cannot leak into this one)
+
+run:
+  UR writes / reads against the live save dir as normal
+
+post-launch (always runs through the launcher's `finally` block):
+  %APPDATA%\..\save\                        --capture------>  <PackDir>/save/  (+ sandbox_meta.json)
+  live dir wiped
+  quarantine                                --restore------>  %APPDATA%\..\save\
+  SHA-256 verify: restored == pre-quarantine
+  if verified: quarantine deleted; else: quarantine kept for manual recovery
+```
+
+Under route `title` (`SG_PREFLIGHT_NO_AUTOLOAD=1`), UR cannot reach
+the `save:` mount, so it neither reads nor writes save artifacts.
+This is what makes the round-trip deterministic: bytes the operator
+plants in `<PackDir>/save/SYS-DATA` between runs survive verbatim
+through the next overlay -> live -> capture cycle.
+
+### Phase 371B acceptance gates (each fails with a distinct exit code)
+
+| Code | Gate | Description |
+|---:|---|---|
+| 2 | build / deploy | `_phase367_build.bat` failed or exe missing |
+| 3 | pristine save baseline | `%APPDATA%\..\save\` had nothing readable; runner synthesises 3 stub files when this is the case |
+| 4 | `Pack:Route:title` (run A1) | Route plumbing broken (exporter -> pack_meta -> UR emit) |
+| 5 | marker plant | Could not write to `<packA>/save/SYS-DATA` after run A1 |
+| 6 | `Pack:Route:title` (run B) | Same as 4 for ticket B |
+| 7 | cross-ticket isolation | `<packB>/save/SYS-DATA` contained the planted marker (B saw A's data) |
+| 8 | real save SHA stable mid-test | `%APPDATA%\..\save\` SHA diverged from pristine after run A1 or run B |
+| 9 | marker round-trip | Marker bytes did not survive the second A run's overlay -> capture cycle |
+| 10 | quarantine cleanup | Orphan dirs left under the proof-specific quarantine root after the final run |
+| 11 | real save SHA stable end-of-test | `%APPDATA%\..\save\` SHA diverged from pristine after run A2 |
+
+### Runtime-proven evidence (2026-05-08 run)
+
+```
+Run A1: [route] title    [sand] captured 0 artifact(s) (sandbox empty)
+Run B1: [route] title    [sand] captured 0 artifact(s) (sandbox empty)
+        <packB>/save/SYS-DATA: absent (marker NOT present)
+Run A2: [route] title    [sand] captured 1 artifact(s) (marker round-tripped)
+[save] real save restored + verified; clearing quarantine  (after every run)
+```
+
+| Gate | Pass |
+|---|---|
+| Pack:Route:title (run A1) | True |
+| Marker plant | True |
+| Pack:Route:title (run B) | True |
+| Cross-isolation (B did not see A) | True |
+| Marker survived A round-trip | True |
+| Real save SHA == S0 (after each run) | True |
+| Quarantine cleared (no orphans) | True |
+
+### Event taxonomy added in Phase 371B
+
+| Event | Emitter | When |
+|---|---|---|
+| `Pack:Route:<route>` | `SGPack::EnsureLoaded` (via `LoadPackMetaOnce`) | Once at boot, only when `pack_meta.json` declares a non-empty `route` field. Fields are scrubbed of `:` and `\|` before emit. Recognised values: `title`, `auto`, `worldmap`, `hud`, `results`. UR neither validates nor acts on the value beyond emit + accessor; the launcher decides which env-var combo applies. |
+
+`SGPack::TryGetRoute()` is exposed for the future in-game QA panel
+(Phase 371C). Returns `nullptr` when no `pack_meta.json` is staged
+or when its `route` field is empty / missing.
+
+### Decisions honored
+
+- **Quarantine root is stable**, NOT under `EvidenceDir`. The
+  operator may delete the evidence dir between runs; a prior
+  quarantine must remain reachable for recovery, so it lives at
+  `%LOCALAPPDATA%\UnleashedRecomp\sgfx_real_save_quarantine\<ts>_<rand>\`.
+  The proof runner passes its own dedicated quarantine root
+  (`sgfx_real_save_quarantine_phase371b_proof`) so it never
+  deletes recovery quarantines left by interrupted manual launches.
+- **SHA-256 verify is strict.** Both directions: every key in the
+  pre-quarantine snapshot must be present and hash-equal in the
+  restored live dir, AND every key in the restored live dir must
+  appear in the pre-quarantine snapshot. The second check catches
+  the case where the sandbox capture failed to clear an extra
+  artifact before the restore overwrote the others.
+- **Sandbox sync is artifact-allowlisted.** Only `SYS-DATA`,
+  `ACH-DATA`, `EXT-DATA` are copied between `<PackDir>/save/` and
+  `%APPDATA%\..\save\`. Anything else under the sandbox dir
+  (`sandbox_meta.json`, etc.) stays inside the pack and is not
+  exposed to the live save dir.
+- **Exporter `-Force` is scoped, not nuclear.** It now wipes only
+  the seven exporter-owned paths so the launcher-owned `save/`
+  sandbox dir survives every re-export.
+- **Quarantine is only deleted after a verified restore.** If the
+  verify fails, the timestamped quarantine stays on disk so the
+  operator can copy SYS-DATA back manually. The launcher prints
+  the path with a yellow warning so it is impossible to miss.
+- **Route is metadata, not behaviour.** UR does not act on
+  `route` -- only the launcher does (mapping route to NO_AUTOLOAD).
+  This lets the future QA panel show route information without
+  any new game-state hooks.
+- **`Pack:Route:` is a separate event** from `Pack:Meta:` so
+  bridge consumers that only care about route changes do not
+  have to parse the longer Meta payload. Both fire at boot when
+  the pack staged either field.
+
+### Honest gaps
+
+- **`worldmap` / `hud` / `results` routes still need captured save
+  states.** The launcher will set `NO_AUTOLOAD=0` for these routes,
+  but UR will only resume into the captured state if the operator
+  has previously played into it once and let the sandbox capture
+  fire. This phase ships the *mechanism*; populating the per-route
+  save sandboxes is operator work (or a future capture-helper
+  beat that snapshot UR's save mid-session).
+- **Route validation is lax** -- UR accepts any string in `route`
+  and emits it as-is (after `:` / `|` scrubbing). The exporter's
+  `[ValidateSet]` enforces the canonical set, but a hand-edited
+  `pack_meta.json` could put anything in there. The bridge
+  consumer is the source of truth for valid values today.
+- **No mutex on the sandbox dir.** If the operator launches the
+  shell twice for the same ticket simultaneously, the two runs
+  will race over `<PackDir>/save/`. The launcher does not detect
+  or prevent this; out of scope for the "make per-ticket
+  isolation real" beat. If it becomes an operational issue, a
+  lock-file under the pack dir is the obvious next step.
+
+### Fresh verification command
+
+```powershell
+# Phase 371B isolation proof:
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\phase371b_path_b_proof.ps1 `
+    -RunLifetimeSeconds 12
+
+# One-click launch with a route preset:
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\sgfx_shell_launch.ps1 `
+    -Ticket "IDCEVODEV-960073" -Project "BMW SGFX QA Shell" -Route title
+```
+
+Phase 367b / 368 / 369A / 369B / 370A / 370B / 370C / 371A runners
+continue to pass unchanged. `route` is OPTIONAL: a pack_meta.json
+without it leaves UR's `Pack:Route` silent and the launcher
+defaults to `title` (`NO_AUTOLOAD=1`), matching pre-371B behavior.

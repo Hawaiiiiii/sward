@@ -43,15 +43,17 @@ namespace
     // snapshot pointer has been swapped out under them.
     static const std::vector<std::filesystem::path> kEmptyLooseFiles{};
 
-    // Phase 371A: pack metadata read once at EnsureLoaded() time.
+    // Phase 371A/B: pack metadata read once at EnsureLoaded() time.
     // Stored as plain strings (not behind a snapshot) because it is
-    // identifier-grade data: ticket / project / phase. We do NOT
-    // hot-reload these because changing the ticket mid-run would
-    // make any QA evidence already captured ambiguous. If the
-    // operator wants to change ticket, they restart UR.
+    // identifier-grade data: ticket / project / phase / route. We
+    // do NOT hot-reload these because changing the ticket or route
+    // mid-run would make any QA evidence already captured
+    // ambiguous. If the operator wants to change ticket or route,
+    // they restart UR.
     static std::string g_metaTicket;
     static std::string g_metaProject;
     static std::string g_metaPhase;
+    static std::string g_metaRoute;
     static std::atomic<bool> g_metaLoaded{false};
 
     static std::string ScrubBridgeField(std::string s)
@@ -268,6 +270,7 @@ namespace
         g_metaTicket  = readStr("ticket");
         g_metaProject = readStr("project");
         g_metaPhase   = readStr("phase");
+        g_metaRoute   = readStr("route");
         g_metaLoaded.store(true, std::memory_order_release);
 
         const std::string ticket  = g_metaTicket.empty()  ? "_" : g_metaTicket;
@@ -275,11 +278,20 @@ namespace
         const std::string phase   = g_metaPhase.empty()   ? "_" : g_metaPhase;
 
         LOGF_IMPL(Utility, "SG-Preflight",
-                  "pack_meta: loaded ticket=\"{}\" project=\"{}\" phase=\"{}\"",
-                  ticket, project, phase);
+                  "pack_meta: loaded ticket=\"{}\" project=\"{}\" phase=\"{}\" route=\"{}\"",
+                  ticket, project, phase,
+                  g_metaRoute.empty() ? "_" : g_metaRoute);
 
         UiLab::EmitBridgeScreenEntered(
             "Pack:Meta:" + ticket + ":" + project + ":" + phase);
+
+        // Route is emitted as a separate event so consumers that
+        // only care about route changes do not have to parse the
+        // (longer, more variable) Pack:Meta payload.
+        if (!g_metaRoute.empty())
+        {
+            UiLab::EmitBridgeScreenEntered("Pack:Route:" + g_metaRoute);
+        }
     }
 }
 
@@ -320,6 +332,13 @@ namespace SGPack
         if (!g_metaLoaded.load(std::memory_order_acquire)) return nullptr;
         if (g_metaPhase.empty()) return nullptr;
         return &g_metaPhase;
+    }
+
+    const std::string* TryGetRoute()
+    {
+        if (!g_metaLoaded.load(std::memory_order_acquire)) return nullptr;
+        if (g_metaRoute.empty()) return nullptr;
+        return &g_metaRoute;
     }
 
     void Reload()

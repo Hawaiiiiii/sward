@@ -1,37 +1,46 @@
-# Phase 371A -- SGFX Shell launcher (one-click).
+# Phase 371A/B -- SGFX Shell launcher (one-click).
 #
 # Goal: turn UnleashedRecomp into a shell tool the operator can
 # invoke without remembering env-var spelling, save backup, exe
 # branding, or hot-reload toggles.
 #
+# Phase 371B additions:
+#   - per-ticket save sandbox at <PackDir>/save/. UR's live save
+#     dir (%APPDATA%\UnleashedRecomp\save\) is QUARANTINED to
+#     %LOCALAPPDATA%\UnleashedRecomp\sgfx_real_save_quarantine\<ts>\
+#     before launch. The sandbox is copied OVER the live save
+#     dir; UR writes through normally. After exit, the live save
+#     dir is captured back into the pack's sandbox, then the real
+#     save is restored (SHA-256 verified). Quarantine is only
+#     deleted after a verified restore -- if anything fails the
+#     operator has the timestamped quarantine folder to recover.
+#   - route preset (-Route or pack_meta.route): selects the
+#     SG_PREFLIGHT_NO_AUTOLOAD value. `title` -> 1 (boot stays at
+#     Title). All others -> 0 (UR resumes from the per-ticket
+#     sandbox, which the operator captured by playing into the
+#     desired state once).
+#
 # What it does:
 #   1. Calls sgfx_pack_exporter.ps1 to produce a fresh pack at
 #      -PackDir (default %LOCALAPPDATA%\UnleashedRecomp\sg_overrides_sgfx_shell).
-#   2. Backs up the SU save dir under the evidence dir (SHA-256
-#      verified). Restores on exit, including Ctrl+C / kill.
-#   3. Sets the SGFX-shell env vars (SG_PREFLIGHT_OVERRIDE_DIR,
-#      _HOT_RELOAD, _NO_AUTOLOAD, _GAMEPLAY_SKIP, _UI_ONLY_INPUT).
-#   4. Copies UnleashedRecomp.exe -> SgfxShell.exe so the taskbar
-#      and process list show the SGFX brand.
+#   2. Quarantines the real save (SHA-256 baseline) and overlays
+#      the per-ticket sandbox (Phase 371B).
+#   3. Sets SGFX-shell env vars (SG_PREFLIGHT_OVERRIDE_DIR,
+#      _HOT_RELOAD, _NO_AUTOLOAD route-driven, _GAMEPLAY_SKIP,
+#      _UI_ONLY_INPUT).
+#   4. Copies UnleashedRecomp.exe -> SgfxShell.exe (taskbar/process
+#      branding); deletes on exit.
 #   5. Resets events.jsonl and launches.
-#   6. Tails events.jsonl with a human-readable status line:
-#        [boot] Pack:Meta:<ticket>:<project>
-#        [boot] Branding:Active:<title>|<icon>|<label>
-#        [pack] loaded -- text=sgfx_text.json asset=sgfx_pictures.json loose=0
-#        [text] 5 scoped rules
-#        [pix]  1 picture
-#      and re-prints relevant Pack:Reloaded / Text:ScopedRulesReloaded
-#      events as the operator iterates.
+#   6. Tails events.jsonl with a human-readable status line.
+#   7. On exit (including Ctrl+C / kill): syncs the live save dir
+#      back into the pack sandbox, restores the real save from
+#      quarantine, verifies SHA-256.
 #
 # Usage:
-#   # Use whatever pack is already at PackDir (no re-export).
 #   .\sgfx_shell_launch.ps1 -SkipExport
-#
-#   # Fresh pack from CLI args, then launch.
 #   .\sgfx_shell_launch.ps1 -Ticket "IDCEVODEV-960073" -Project "BMW SGFX"
-#
-#   # Use a pre-built pack at a custom location.
 #   .\sgfx_shell_launch.ps1 -PackDir "D:\packs\bmw_g65" -SkipExport
+#   .\sgfx_shell_launch.ps1 -Ticket "IDCEVODEV-960073" -Route worldmap
 
 [CmdletBinding()]
 param(
@@ -40,7 +49,7 @@ param(
     # Forwarded to the exporter when -SkipExport is not set.
     [string]$Ticket = '',
     [string]$Project = '',
-    [string]$Phase = '371A',
+    [string]$Phase = '371B',
     [string]$ScopedRulesJson = '',
     [string]$LogoSonicteamReplacement = '',
     [string]$WindowTitle = '',
@@ -48,18 +57,35 @@ param(
     [string]$IconPath = '',
     [string]$LogoPath = '',
 
+    # Phase 371B: route preset.
+    #   title    -> NO_AUTOLOAD=1 (boot stays at Title screen)
+    #   auto / worldmap / hud / results -> NO_AUTOLOAD=0
+    #     (UR resumes from the per-ticket sandbox; the operator
+    #      captures the desired state by playing into it once
+    #      with `title` and exiting cleanly).
+    # When -Route is left at '' and pack_meta.json declares a route,
+    # the pack value is used. CLI -Route always wins when both set.
+    [ValidateSet('','title','auto','worldmap','hud','results')]
+    [string]$Route = '',
+
     [switch]$SkipExport,
 
     # Auto-kill UR after this many seconds. 0 = wait until UR exits
     # naturally (operator closes the window or Ctrl+C the runner).
     [int]$Lifetime = 0,
 
-    # Disable save backup/restore. Only set this when you have already
-    # isolated the save dir externally; otherwise live runs that
-    # advance the save will overwrite real progress.
+    # Disable real-save quarantine + restore. Only set this when
+    # you have already isolated the save dir externally.
     [switch]$NoSaveBackup,
 
+    # Disable per-ticket sandbox sync (overlay + capture). Useful
+    # when you want the launcher to behave like 371A (real save
+    # quarantine only, no per-ticket persistence). The sandbox dir
+    # under <PackDir>/save/ is left untouched.
+    [switch]$NoSandboxSync,
+
     [string]$EvidenceDir = '',
+    [string]$QuarantineRoot = '',
     [string]$RepoRoot = ''
 )
 
@@ -72,10 +98,18 @@ if (-not $RepoRoot -or $RepoRoot -eq '') {
     $RepoRoot  = (Resolve-Path (Join-Path $scriptDir '..\..\..')).ProviderPath
 }
 
-$installDir = Join-Path $RepoRoot 'Unleashed Recomp - Windows (Complete Installation) 1.0.3'
-$bridgeDir  = Join-Path $env:APPDATA 'UnleashedRecomp\sgfx_bridge'
-$saveDir    = Join-Path $env:APPDATA 'UnleashedRecomp\save'
-$exporter   = Join-Path (Split-Path -Parent $PSCommandPath) 'sgfx_pack_exporter.ps1'
+$installDir   = Join-Path $RepoRoot 'Unleashed Recomp - Windows (Complete Installation) 1.0.3'
+$bridgeDir    = Join-Path $env:APPDATA 'UnleashedRecomp\sgfx_bridge'
+$saveDir      = Join-Path $env:APPDATA 'UnleashedRecomp\save'
+$exporter     = Join-Path (Split-Path -Parent $PSCommandPath) 'sgfx_pack_exporter.ps1'
+# Phase 371B: stable quarantine root (never under EvidenceDir, which
+# the operator may delete between runs). Always under %LOCALAPPDATA%
+# so the real save can be recovered manually even after a crash.
+if (-not $QuarantineRoot -or $QuarantineRoot -eq '') {
+    $quarantineRoot = Join-Path $env:LOCALAPPDATA 'UnleashedRecomp\sgfx_real_save_quarantine'
+} else {
+    $quarantineRoot = $QuarantineRoot
+}
 
 if (-not $PackDir -or $PackDir -eq '') {
     $PackDir = Join-Path $env:LOCALAPPDATA 'UnleashedRecomp\sg_overrides_sgfx_shell'
@@ -129,6 +163,31 @@ function Restore-Save {
     }
 }
 
+# Phase 371B helpers ------------------------------------------------------
+
+# Read pack_meta.json and return the route field, or '' if missing.
+function Read-PackRoute {
+    param([string]$PackDirPath)
+    $meta = Join-Path $PackDirPath 'pack_meta.json'
+    if (-not (Test-Path -LiteralPath $meta)) { return '' }
+    try {
+        $doc = Get-Content -LiteralPath $meta -Raw | ConvertFrom-Json
+    } catch { return '' }
+    if ($null -eq $doc -or -not $doc.route) { return '' }
+    return [string]$doc.route
+}
+
+# Map route -> NO_AUTOLOAD value. `title` keeps UR at the boot
+# screen; everything else lets UR resume whatever state the
+# per-ticket sandbox carries.
+function Resolve-NoAutoload {
+    param([string]$RouteValue)
+    if ([string]::IsNullOrWhiteSpace($RouteValue)) { return '1' }
+    if ($RouteValue -ieq 'title') { return '1' }
+    return '0'
+}
+
+
 # --- 1. Export pack -------------------------------------------------------
 
 if (-not $SkipExport) {
@@ -140,6 +199,12 @@ if (-not $SkipExport) {
         '-Phase',     $Phase,
         '-Force'
     )
+    # Pass -Route only when the operator gave one explicitly. The
+    # exporter's default ('title') applies otherwise -- which is
+    # what the launcher's NO_AUTOLOAD resolution would pick anyway,
+    # so the resulting pack_meta.route stays consistent with the
+    # launched env.
+    if ($Route)                   { $exporterArgs += @('-Route', $Route) }
     if ($ScopedRulesJson)         { $exporterArgs += @('-ScopedRulesJson', $ScopedRulesJson) }
     if ($LogoSonicteamReplacement){ $exporterArgs += @('-LogoSonicteamReplacement', $LogoSonicteamReplacement) }
     if ($WindowTitle)             { $exporterArgs += @('-WindowTitle', $WindowTitle) }
@@ -158,26 +223,88 @@ if (-not (Test-Path -LiteralPath (Join-Path $PackDir 'sgfx_pack.json'))) {
     throw "Pack at $PackDir is missing sgfx_pack.json. Re-run without -SkipExport."
 }
 
-# --- 2. Save backup (SHA-256 verified) -----------------------------------
+# --- 2. Real-save quarantine + per-ticket sandbox overlay ---------------
 
-$saveBackupDir = $null
-$saveSnapshotPre = @{}
+# Phase 371B isolation flow:
+#   real save  --quarantine-->  %LOCALAPPDATA%\..\sgfx_real_save_quarantine\<ts>\
+#   <pack>/save/  --overlay-->  %APPDATA%\..\save\
+#
+# UR runs against the per-ticket overlay. After exit:
+#   %APPDATA%\..\save\  --capture-->  <pack>/save/   (sandbox sync)
+#   quarantine          --restore-->  %APPDATA%\..\save\
+#
+# `$saveSnapshotPre` keeps the SHA of the pre-quarantine real save
+# so the post-run restore can verify it landed correctly.
+
+$saveBackupDir   = $null   # legacy 371A name; reused for the quarantine path
+$saveSnapshotPre = [ordered]@{}
+$packSandboxDir  = Join-Path $PackDir 'save'
+
 if (-not $NoSaveBackup) {
-    Write-Banner 'Backing up save'
+    Write-Banner 'Quarantining real save'
     $saveSnapshotPre = Get-SaveSnapshot -Dir $saveDir
-    $saveBackupDir = Join-Path $EvidenceDir ("save_backup_" + (Get-Date -Format 'yyyyMMdd_HHmmss'))
+    if (-not (Test-Path -LiteralPath $quarantineRoot)) {
+        New-Item -ItemType Directory -Path $quarantineRoot -Force | Out-Null
+    }
+    $saveBackupDir = Join-Path $quarantineRoot ((Get-Date -Format 'yyyyMMdd_HHmmss') + '_' + [guid]::NewGuid().ToString('N').Substring(0,8))
     if ($saveSnapshotPre.Count -gt 0) {
         New-Item -ItemType Directory -Path $saveBackupDir -Force | Out-Null
-        foreach ($name in $saveSnapshotPre.Keys) {
+        foreach ($name in @($saveSnapshotPre.Keys)) {
             Copy-Item -LiteralPath $saveSnapshotPre[$name].Path `
                       -Destination (Join-Path $saveBackupDir $name) -Force
         }
-        Write-Host "  backed up $($saveSnapshotPre.Count) files to $saveBackupDir"
+        Write-Host "  quarantined $($saveSnapshotPre.Count) files to $saveBackupDir"
     } else {
-        Write-Host "  no save files to back up"
+        # Still create the dir so the restore step has a stable
+        # marker even when the operator had no save data to start.
+        New-Item -ItemType Directory -Path $saveBackupDir -Force | Out-Null
+        Write-Host "  no real save to quarantine"
     }
 } else {
-    Write-Banner 'NoSaveBackup: skipping save backup (operator-managed)'
+    Write-Banner 'NoSaveBackup: skipping quarantine (operator-managed)'
+}
+
+if (-not $NoSandboxSync) {
+    Write-Banner 'Overlaying per-ticket sandbox'
+    if (-not (Test-Path -LiteralPath $saveDir)) {
+        New-Item -ItemType Directory -Path $saveDir -Force | Out-Null
+    }
+    if (Test-Path -LiteralPath $packSandboxDir) {
+        # Only sync the three known SU save artifacts. Anything
+        # extra in the sandbox dir (sandbox_meta.json, etc.) stays
+        # under <pack>/save/ untouched.
+        $copied = 0
+        foreach ($name in 'SYS-DATA','ACH-DATA','EXT-DATA') {
+            $src = Join-Path $packSandboxDir $name
+            if (Test-Path -LiteralPath $src) {
+                Copy-Item -LiteralPath $src -Destination (Join-Path $saveDir $name) -Force
+                $copied++
+            } else {
+                # Sandbox does not declare this file: leave the
+                # quarantined real-save artifact NOT present in
+                # the live dir. Otherwise an old SYS-DATA from a
+                # different ticket would leak into this one.
+                $live = Join-Path $saveDir $name
+                if (Test-Path -LiteralPath $live) {
+                    Remove-Item -LiteralPath $live -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+        Write-Host "  overlaid $copied artifact(s) from $packSandboxDir"
+    } else {
+        # First time this ticket runs: clear the live dir so UR
+        # boots without leaking the (already quarantined) real
+        # save into this ticket's view.
+        foreach ($name in 'SYS-DATA','ACH-DATA','EXT-DATA') {
+            $live = Join-Path $saveDir $name
+            if (Test-Path -LiteralPath $live) {
+                Remove-Item -LiteralPath $live -Force -ErrorAction SilentlyContinue
+            }
+        }
+        Write-Host "  sandbox empty for this ticket; live save cleared (will be captured on exit)"
+    }
+} else {
+    Write-Banner 'NoSandboxSync: leaving live save dir untouched after quarantine'
 }
 
 # --- 3. Reset bridge events.jsonl ----------------------------------------
@@ -194,9 +321,20 @@ Set-Content -LiteralPath $eventsPath -Value '' -Encoding ASCII
 # --- 4. Set env vars + branded exe copy ----------------------------------
 
 Write-Banner "Configuring SGFX env"
+# Route precedence: explicit -Route wins; otherwise pack_meta.json's
+# `route` field; otherwise default to `title` (NO_AUTOLOAD=1).
+$effectiveRoute = $Route
+if ([string]::IsNullOrWhiteSpace($effectiveRoute)) {
+    $effectiveRoute = Read-PackRoute -PackDirPath $PackDir
+}
+if ([string]::IsNullOrWhiteSpace($effectiveRoute)) {
+    $effectiveRoute = 'title'
+}
+$noAutoloadValue = Resolve-NoAutoload -RouteValue $effectiveRoute
+
 $env:SG_PREFLIGHT_OVERRIDE_DIR  = $PackDir
 $env:SG_PREFLIGHT_HOT_RELOAD    = '1'
-$env:SG_PREFLIGHT_NO_AUTOLOAD   = '1'
+$env:SG_PREFLIGHT_NO_AUTOLOAD   = $noAutoloadValue
 $env:SG_PREFLIGHT_GAMEPLAY_SKIP = '1'
 $env:SG_PREFLIGHT_UI_ONLY_INPUT = '1'
 $env:SG_PREFLIGHT_LOG_LOADS     = '1'
@@ -207,7 +345,7 @@ Remove-Item Env:SGFX_SHELL_BUILD_LABEL    -ErrorAction SilentlyContinue
 
 Write-Host "  SG_PREFLIGHT_OVERRIDE_DIR  = $PackDir"
 Write-Host "  SG_PREFLIGHT_HOT_RELOAD    = 1"
-Write-Host "  SG_PREFLIGHT_NO_AUTOLOAD   = 1"
+Write-Host "  SG_PREFLIGHT_NO_AUTOLOAD   = $noAutoloadValue  (route: $effectiveRoute)"
 Write-Host "  SG_PREFLIGHT_GAMEPLAY_SKIP = 1"
 Write-Host "  SG_PREFLIGHT_UI_ONLY_INPUT = 1"
 
@@ -253,6 +391,10 @@ function Format-Event {
         $phase   = if ($parts.Count -gt 2) { $parts[2] } else { '_' }
         return "[meta] ticket=$ticket project=$project phase=$phase"
     }
+    if ($screen -like 'Pack:Route:*') {
+        $route = $screen.Substring('Pack:Route:'.Length)
+        return "[route] $route"
+    }
     if ($screen -like 'Pack:Loaded:*') {
         return "[pack] $screen"
     }
@@ -295,7 +437,7 @@ function Format-Event {
     return $null
 }
 
-function Pump-Events {
+function Read-PendingEvents {
     if (-not (Test-Path -LiteralPath $eventsPath)) { return }
     $size = (Get-Item -LiteralPath $eventsPath).Length
     if ($size -le $lastBytes) { return }
@@ -324,7 +466,7 @@ Write-Host "(Ctrl+C to stop; UR will be killed and save will be restored.)"
 
 try {
     while (-not $proc.HasExited) {
-        Pump-Events
+        Read-PendingEvents
         if ($Lifetime -gt 0) {
             $elapsed = ((Get-Date) - $startedAt).TotalSeconds
             if ($elapsed -ge $Lifetime) {
@@ -336,7 +478,7 @@ try {
         }
         Start-Sleep -Milliseconds 500
     }
-    Pump-Events
+    Read-PendingEvents
 }
 finally {
     if ($proc -and -not $proc.HasExited) {
@@ -347,27 +489,98 @@ finally {
     } elseif ($proc) {
         try { $proc.WaitForExit(1000) | Out-Null } catch {}
     }
-    Pump-Events
+    Read-PendingEvents
     if ($shellExe -and (Test-Path -LiteralPath $shellExe)) {
         Remove-Item -LiteralPath $shellExe -Force -ErrorAction SilentlyContinue
     }
 
-    # Restore save if backup exists and post-run hashes differ.
+    # --- Phase 371B post-run flow ----------------------------------------
+    #
+    #   1. Capture the live save dir back into the per-ticket
+    #      sandbox at <pack>/save/. (Skipped under -NoSandboxSync.)
+    #   2. Restore the real save from quarantine, then verify the
+    #      live save dir's SHA matches the pre-quarantine snapshot.
+    #   3. Only delete the quarantine after a verified restore.
+    #      A failed verify keeps the timestamped quarantine on disk
+    #      so the operator can recover manually.
+
+    if (-not $NoSandboxSync) {
+        try {
+            if (-not (Test-Path -LiteralPath $packSandboxDir)) {
+                New-Item -ItemType Directory -Path $packSandboxDir -Force | Out-Null
+            }
+            $captured = 0
+            foreach ($name in 'SYS-DATA','ACH-DATA','EXT-DATA') {
+                $live = Join-Path $saveDir $name
+                $dst  = Join-Path $packSandboxDir $name
+                if (Test-Path -LiteralPath $live) {
+                    Copy-Item -LiteralPath $live -Destination $dst -Force
+                    $captured++
+                } elseif (Test-Path -LiteralPath $dst) {
+                    # Live file vanished during the run while the
+                    # sandbox had a copy: drop the stale sandbox
+                    # entry so two tickets do not see each other's
+                    # ghost files.
+                    Remove-Item -LiteralPath $dst -Force -ErrorAction SilentlyContinue
+                }
+            }
+            $sandboxMeta = [ordered]@{
+                version          = 1
+                ticket           = $Ticket
+                project          = $Project
+                phase            = $Phase
+                route            = $effectiveRoute
+                captured_at      = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+                captured_files   = $captured
+            }
+            $sandboxMetaPath = Join-Path $packSandboxDir 'sandbox_meta.json'
+            $sandboxMeta | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $sandboxMetaPath -Encoding UTF8
+            Write-Host "[sand] captured $captured artifact(s) to $packSandboxDir"
+        } catch {
+            Write-Host "[sand] WARN: sandbox capture failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+
     if (-not $NoSaveBackup -and $saveBackupDir -and (Test-Path -LiteralPath $saveBackupDir)) {
-        $post = Get-SaveSnapshot -Dir $saveDir
-        $changed = $false
+        # First, clear the live save dir of whatever the run left
+        # behind. We will re-stamp it from the quarantine; any
+        # artifact the quarantine doesn't contain belongs to the
+        # sandbox and must NOT bleed into the real save.
+        foreach ($name in 'SYS-DATA','ACH-DATA','EXT-DATA') {
+            $live = Join-Path $saveDir $name
+            if (Test-Path -LiteralPath $live) {
+                Remove-Item -LiteralPath $live -Force -ErrorAction SilentlyContinue
+            }
+        }
+        Restore-Save -BackupDir $saveBackupDir -LiveDir $saveDir
+
+        # Verify SHA-256 against the pre-quarantine snapshot.
+        $verified = $true
+        $verifyPost = Get-SaveSnapshot -Dir $saveDir
         foreach ($name in @($saveSnapshotPre.Keys)) {
-            if (-not $post.Contains($name) -or
-                $post[$name].Hash -ne $saveSnapshotPre[$name].Hash) {
-                $changed = $true
+            if (-not $verifyPost.Contains($name) -or
+                $verifyPost[$name].Hash -ne $saveSnapshotPre[$name].Hash) {
+                $verified = $false
+                Write-Host "[save] FAIL verify: $name SHA mismatch after restore" -ForegroundColor Red
                 break
             }
         }
-        if ($changed) {
-            Write-Host "[save] save changed during run; restoring backup" -ForegroundColor Yellow
-            Restore-Save -BackupDir $saveBackupDir -LiveDir $saveDir
+        # Also catch the case where the restore left an extra file
+        # behind that the quarantine did not have (e.g. sandbox
+        # leaked through). Keys-equal check covers both directions.
+        foreach ($name in @($verifyPost.Keys)) {
+            if (-not $saveSnapshotPre.Contains($name)) {
+                $verified = $false
+                Write-Host "[save] FAIL verify: extra file $name present after restore" -ForegroundColor Red
+                break
+            }
+        }
+
+        if ($verified) {
+            Write-Host "[save] real save restored + verified; clearing quarantine"
+            Remove-Item -LiteralPath $saveBackupDir -Recurse -Force -ErrorAction SilentlyContinue
         } else {
-            Write-Host "[save] save unchanged across run (good)"
+            Write-Host "[save] verification failed; quarantine kept at $saveBackupDir" -ForegroundColor Yellow
         }
     }
 }

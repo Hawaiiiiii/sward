@@ -93,32 +93,44 @@ namespace SGPack
     // "auto-discover everything") -- the pack is authoritative.
     const std::vector<std::filesystem::path>& GetLooseFiles();
 
-    // Phase 371A: pack metadata (ticket / project / phase / etc.).
+    // Phase 371A/B: pack metadata (ticket / project / phase / route).
     //
     // When `<override-dir>/pack_meta.json` is present at boot, the
     // loader parses it alongside `sgfx_pack.json` and emits a single
     //   `Pack:Meta:<ticket>:<project>:<phase>`
     // bridge event so the Python bridge daemon and any future
     // in-game QA panel can identify which pack the operator
-    // staged. The event uses `_` for empty fields. `pack_meta.json`
-    // is OPTIONAL and the absence of it does not affect any other
-    // pack lane behavior.
+    // staged. When `route` is also present, a separate
+    //   `Pack:Route:<route>`
+    // event is emitted (Phase 371B). The events use `_` for empty
+    // fields. `pack_meta.json` is OPTIONAL and the absence of it
+    // does not affect any other pack lane behavior.
     //
     // Schema (all fields optional, all strings):
     //   {
     //     "version":  1,
     //     "ticket":   "IDCEVODEV-960073",
     //     "project":  "BMW SGFX QA Shell",
-    //     "phase":    "371A",
+    //     "phase":    "371B",
+    //     "route":    "title",          // Phase 371B
     //     "exporter": "sgfx_pack_exporter.ps1",
     //     "exported_at": "2026-05-07T15:30:00Z"
     //   }
     //
-    // Pipe characters in the user-controlled fields are scrubbed
-    // before the bridge emit, mirroring the SGBranding event encoding.
+    // Recognised `route` values: "title", "auto", "worldmap",
+    // "hud", "results". The route is informational from UR's
+    // perspective -- the launcher decides which env-var combo
+    // (`SG_PREFLIGHT_NO_AUTOLOAD`, etc.) to apply for a given
+    // route -- so UR neither validates nor acts on the value
+    // beyond emitting the event and exposing the accessor.
+    //
+    // Pipe and colon characters in the user-controlled fields are
+    // scrubbed before the bridge emit, mirroring the SGBranding
+    // event encoding.
     const std::string* TryGetTicket();
     const std::string* TryGetProject();
     const std::string* TryGetPhase();
+    const std::string* TryGetRoute();
 
     // Helper used by both this loader and SGBranding to resolve a
     // pack-relative path against an override-dir base, with the
