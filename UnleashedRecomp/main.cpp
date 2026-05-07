@@ -26,6 +26,7 @@
 #include <mod/mod_loader.h>
 #include <preload_executable.h>
 #include <patches/sg_branding.h>
+#include <patches/sg_pack.h>
 #include <patches/sg_text_overrides.h>
 #include <patches/sg_asset_overrides.h>
 #include <patches/ui_lab_patches.h>
@@ -342,6 +343,13 @@ int main(int argc, char *argv[])
             std::_Exit(0);
         }
     }
+
+    // Phase 370B: load sgfx_pack.json BEFORE ModLoader::Init so
+    // mod_loader can scope its loose-file index to the pack's
+    // explicit `loose_files` list. The text and asset loaders also
+    // consult SGPack::IsActive() to decide whether to use a pack-
+    // pointed manifest or fall through to the legacy flat file.
+    SGPack::EnsureLoaded();
 
     ModLoader::Init();
 

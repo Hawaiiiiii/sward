@@ -1,6 +1,7 @@
 #include "sg_asset_overrides.h"
 
 #include <os/logger.h>
+#include <patches/sg_pack.h>
 #include <patches/ui_lab_patches.h>
 #include <user/paths.h>
 
@@ -55,7 +56,29 @@ namespace
         const auto overrideDir = ResolveOverrideDir();
         if (overrideDir.empty()) return;
 
-        const auto manifest = overrideDir / "sg_asset_overrides.json";
+        // Phase 370B: when sgfx_pack.json is present, the pack is
+        // authoritative -- read the pack-pointed manifest path
+        // instead of the legacy flat file. A pack with no
+        // `asset_overrides` key means "no asset overrides in this
+        // pack"; emit the boot marker with zero count and exit.
+        std::filesystem::path manifest;
+        if (SGPack::IsActive())
+        {
+            manifest = SGPack::TryGetAssetOverridesPath();
+            if (manifest.empty())
+            {
+                LOGF_IMPL(Utility, "SG-Preflight",
+                          "asset overrides: pack active with no asset_overrides; "
+                          "skipping flat-file fallback");
+                UiLab::EmitBridgeScreenEntered("Asset:PixelOverridesLoaded:0");
+                return;
+            }
+        }
+        else
+        {
+            manifest = overrideDir / "sg_asset_overrides.json";
+        }
+
         std::error_code ec;
         if (!std::filesystem::is_regular_file(manifest, ec)) return;
 

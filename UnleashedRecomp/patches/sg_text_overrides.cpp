@@ -5,6 +5,7 @@
 #include <user/paths.h>
 #include <locale/locale.h>
 #include <os/logger.h>
+#include <patches/sg_pack.h>
 #include <patches/ui_lab_patches.h>
 
 #include <atomic>
@@ -94,7 +95,32 @@ namespace
         const auto overrideDir = ResolveOverrideDir();
         if (overrideDir.empty()) return;
 
-        const auto manifest = overrideDir / "sg_text_overrides.json";
+        // Phase 370B: when sgfx_pack.json is present, the pack is
+        // authoritative -- the loader uses the pack-pointed manifest
+        // path and does NOT fall back to the legacy flat file. A
+        // pack with no `text_overrides` key means "no text overrides
+        // in this pack"; the loader exits without loading anything.
+        // Only when the pack is absent do we read the legacy flat
+        // `sg_text_overrides.json`.
+        std::filesystem::path manifest;
+        if (SGPack::IsActive())
+        {
+            manifest = SGPack::TryGetTextOverridesPath();
+            if (manifest.empty())
+            {
+                LOGF_IMPL(Utility, "SG-Preflight",
+                          "text overrides: pack active with no text_overrides; "
+                          "skipping flat-file fallback");
+                UiLab::EmitBridgeScreenEntered("Text:OverridesLoaded:0");
+                UiLab::EmitBridgeScreenEntered("Text:ScopedRulesLoaded:0");
+                return;
+            }
+        }
+        else
+        {
+            manifest = overrideDir / "sg_text_overrides.json";
+        }
+
         std::error_code ec;
         if (!std::filesystem::is_regular_file(manifest, ec)) return;
 

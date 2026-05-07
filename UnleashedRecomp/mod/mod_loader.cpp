@@ -9,6 +9,7 @@
 #include <user/paths.h>
 #include <os/logger.h>
 #include <os/process.h>
+#include <patches/sg_pack.h>
 #include <patches/ui_lab_patches.h>
 #include <xxHashMap.h>
 
@@ -46,10 +47,73 @@ static std::string NormalizeSgPreflightAssetKey(std::string_view value)
     return key;
 }
 
+static void IndexLooseOverrideFile(const std::filesystem::path& overrideDir,
+                                   const std::filesystem::path& path)
+{
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(path, ec)) return;
+
+    const auto filename = path.filename().u8string();
+    const auto rel = path.lexically_relative(overrideDir).generic_u8string();
+    const std::string relKey = NormalizeSgPreflightAssetKey(
+        std::string_view(reinterpret_cast<const char*>(rel.data()), rel.size()));
+    g_sgPreflightLooseOverrideIndex[relKey] = path;
+
+    const std::string fileKey = NormalizeSgPreflightAssetKey(
+        std::string_view(reinterpret_cast<const char*>(filename.data()), filename.size()));
+    auto [it, inserted] = g_sgPreflightLooseOverrideIndex.emplace(fileKey, path);
+    if (!inserted && it->second != path)
+        it->second.clear();
+}
+
+static bool IsPackLooseOverrideAllowed(std::string_view guestPath,
+                                       const std::filesystem::path& candidate)
+{
+    if (!SGPack::IsActive())
+        return true;
+
+    const std::string relKey = NormalizeSgPreflightAssetKey(guestPath);
+    auto it = g_sgPreflightLooseOverrideIndex.find(relKey);
+    if (it == g_sgPreflightLooseOverrideIndex.end() || it->second.empty())
+        return false;
+
+    std::error_code ec;
+    const auto allowed = std::filesystem::weakly_canonical(it->second, ec);
+    if (ec) return false;
+
+    const auto resolved = std::filesystem::weakly_canonical(candidate, ec);
+    if (ec) return false;
+
+    return allowed == resolved;
+}
+
 static void IndexSgPreflightLooseOverrides(const std::filesystem::path& overrideDir)
 {
     g_sgPreflightLooseOverrideIndex.clear();
 
+    // Phase 370B: when sgfx_pack.json is present, scope the loose-
+    // override index to ONLY the files the pack explicitly lists in
+    // its `loose_files` array. ResolvePath() uses the same whitelist
+    // for direct loose-file substitutions below. A pack-active
+    // configuration with no `loose_files` key means "no loose-file
+    // substitutions" -- the index stays empty rather than falling
+    // back to whole-dir auto-discovery, because the pack is
+    // authoritative for every override lane it controls.
+    if (SGPack::IsActive())
+    {
+        const auto& packLooseFiles = SGPack::GetLooseFiles();
+        for (const auto& entry : packLooseFiles)
+        {
+            IndexLooseOverrideFile(overrideDir, entry);
+        }
+        LOGF_IMPL(Utility, "SG-Preflight",
+                  "loose overrides: pack-scoped index, {} entries",
+                  packLooseFiles.size());
+        return;
+    }
+
+    // Pack absent: legacy auto-discovery scans the whole override
+    // dir. Phase 370B does not break flat-file packs.
     std::error_code ec;
     for (const auto& entry : std::filesystem::recursive_directory_iterator(overrideDir, ec))
     {
@@ -58,19 +122,13 @@ static void IndexSgPreflightLooseOverrides(const std::filesystem::path& override
 
         const auto path = entry.path();
         const auto filename = path.filename().u8string();
-        if (filename == u8"sg_text_overrides.json" || filename == u8"README.md")
+        if (filename == u8"sg_text_overrides.json" ||
+            filename == u8"sg_asset_overrides.json" ||
+            filename == u8"sgfx_pack.json" ||
+            filename == u8"README.md")
             continue;
 
-        const auto rel = path.lexically_relative(overrideDir).generic_u8string();
-        const std::string relKey = NormalizeSgPreflightAssetKey(
-            std::string_view(reinterpret_cast<const char*>(rel.data()), rel.size()));
-        g_sgPreflightLooseOverrideIndex[relKey] = path;
-
-        const std::string fileKey = NormalizeSgPreflightAssetKey(
-            std::string_view(reinterpret_cast<const char*>(filename.data()), filename.size()));
-        auto [it, inserted] = g_sgPreflightLooseOverrideIndex.emplace(fileKey, path);
-        if (!inserted && it->second != path)
-            it->second.clear();
+        IndexLooseOverrideFile(overrideDir, path);
     }
 }
 
@@ -166,6 +224,13 @@ std::filesystem::path ModLoader::ResolvePath(std::string_view path)
         for (auto& includeDir : mod.includeDirs)
         {
             std::filesystem::path modPath = includeDir / fsPath;
+            if (!g_sgPreflightOverrideDir.empty() &&
+                ModLoader::IsSgPreflightOverridePath(modPath) &&
+                !IsPackLooseOverrideAllowed(pathStr, modPath))
+            {
+                continue;
+            }
+
             if (std::filesystem::exists(modPath))
             {
                 // Phase 367b: emit `Asset:VisibleOverrideHit:<fullPath>`

@@ -735,7 +735,189 @@ powershell -NoProfile -ExecutionPolicy Bypass `
     -AutoExitSeconds 30
 ```
 
-Stop here for review. Phase 370B (sgfx_pack.json full lane
-redirection with traversal guards) and Phase 370C (hot reload via
-shared_ptr immutable snapshots + mtime polling) are queued but not
-implemented in this commit.
+## Phase 370B -- sgfx_pack.json as the primary pack index
+
+Phase 370B promotes `sgfx_pack.json` from "branding-only sidecar"
+(Phase 370A) to the primary index for every override lane the pack
+declares. When the pack is present, its `text_overrides` /
+`asset_overrides` / `loose_files` paths drive the loaders, and the
+legacy flat `sg_text_overrides.json` / `sg_asset_overrides.json`
+files in the same dir are NOT auto-loaded -- the pack is
+authoritative for every lane it controls. That authority includes
+both loose-file paths: the archive-entry loose index and the direct
+`ResolvePath()` visible substitution path are both scoped to
+`loose_files`. When the pack is absent,
+the existing flat-file behavior runs unchanged (Phase 367b/369A/B
+proofs still pass).
+
+Path traversal is blocked at parse time: every relative path in the
+pack is resolved with `weakly_canonical`, rejected when it escapes
+the override-dir base or contains a `..` component, and the
+rejection is published as a `Pack:Rejected:<reason>:<raw>` bridge
+event so the operator can debug a malformed pack from
+events.jsonl.
+
+### Pack schema (Phase 370B fields; Phase 370A `branding` still read by SGBranding)
+
+```json
+{
+  "version": 1,
+  "name":        "...",
+  "description": "...",
+  "branding":        { ... },                      // Phase 370A
+  "text_overrides":  "text/sgfx_text.json",        // optional
+  "asset_overrides": "pictures/sgfx_pictures.json",
+  "loose_files":     ["Loading/logo_sonicteam.dds"]
+}
+```
+
+`text_overrides` / `asset_overrides` are pack-relative paths to v1
+or v2 manifests in the existing schemas. `loose_files` is an
+array of pack-relative paths whose entries become the WHITELIST
+that mod_loader uses when it scopes its loose-asset index. Each
+loose-file entry must be at the canonical guest-relative path under
+the override dir (`<override>/Loading/logo_sonicteam.dds` matches
+when retail SU's loader asks for `game:\Loading\logo_sonicteam.dds`).
+
+### Boot order
+
+1. `SGPack::EnsureLoaded()` -- in `main.cpp`, BEFORE `ModLoader::Init`
+   so the loose-asset indexer can scope to pack loose_files.
+2. `ModLoader::Init()` -- consults `SGPack::IsActive()` and
+   `SGPack::GetLooseFiles()` when building the loose-asset index.
+3. `SGTextOverrides::EnsureLoaded()` -- consults
+   `SGPack::TryGetTextOverridesPath()`; falls back to flat only
+   when no pack.
+4. `SGAssetOverrides::EnsureLoaded()` -- same dispatch via
+   `SGPack::TryGetAssetOverridesPath()`.
+5. `SGBranding::EnsureLoaded()` -- already reads the same pack's
+   `branding` section since Phase 370A.
+
+### Event taxonomy additions
+
+| Event | Source | Cardinality |
+|---|---|---|
+| `Pack:Loaded:<text\|none>:<asset\|none>:<looseCount>` | `sg_pack.cpp::DoLoad()` after the pack parses successfully | once per process when pack present |
+| `Pack:Rejected:<reason>:<raw>` | same site, when a relative path fails the traversal guard | once per rejected path |
+
+### Phase 370B acceptance gates
+
+The runner [`research_uiux/runtime_reference/tools/phase370b_path_b_proof.ps1`](runtime_reference/tools/phase370b_path_b_proof.ps1)
+runs two sub-tests in sequence and exits 0 only when ALL gates pass:
+
+| Exit | Reason |
+|---|---|
+| 0 | all gates passed |
+| 2 | build / deploy / launch failed |
+| 3 | `Pack:Loaded` missing in test A (pack didn't parse) |
+| 4 | pack-pointed text manifest didn't load OR no scoped hit fired |
+| 5 | pack-pointed asset manifest didn't fire `Asset:PixelOverrideHit` |
+| 6 | pack-pointed loose file didn't fire `Asset:VisibleOverrideHit` |
+| 7 | decoy flat file's content WAS loaded (lane fallback leaked) |
+| 8 | path-traversal test did not emit `Pack:Rejected` events OR escape leaked |
+| 9 | no native BMP captured |
+
+Test A stages a pack alongside DECOY flat files (`sg_text_overrides.json`
+with `99 -> DECOY_FLAT_99` and `sg_asset_overrides.json` with
+`logo_havok -> ...`) to prove the legacy lane is suppressed.
+Test B re-stages the pack with `text_overrides: "../escape_text.json"`,
+`loose_files: ["../escape_loose.dds"]` etc. and writes the actual
+escape targets at the pack's parent dir to verify the rejection is
+geometric (`..` blocked) rather than just file-not-found.
+
+### What's runtime-proven (Phase 370B, 2026-05-07)
+
+Captured in
+[research_uiux/runtime_reference/out/phase370b_path_b_proof/](runtime_reference/out/phase370b_path_b_proof/):
+
+```json
+{
+  "pack_loaded_payload":         "sgfx_text.json:sgfx_pictures.json:1",
+  "text_overrides_loaded":        0,
+  "text_scoped_rules_loaded":     7,
+  "asset_pixel_overrides_loaded": 1,
+  "scoped_hits":                 ["99@status","999999@status","[200]@status","7@status"],
+  "global_hits":                 [],
+  "pixel_hits":                  ["logo_sonicteam"],
+  "visible_hits":                ["game:/Loading/logo_sonicteam.dds"],
+  "pack_rejected_events": [
+    "text_overrides:../escape_text.json",
+    "asset_overrides:../escape_text.json",
+    "loose_files:../escape_loose.dds"
+  ],
+  "escape_leaked":  false,
+  "native_frames_written": 1,
+  "elapsed_seconds_a":     61
+}
+```
+
+- **runtime-proven**: `Pack:Loaded:sgfx_text.json:sgfx_pictures.json:1`
+  fires once -- the pack parsed, the text and asset paths
+  passed the traversal guard, and one loose file was registered.
+- **runtime-proven**: `Text:ScopedRulesLoaded:7` confirms the
+  pack-pointed text manifest at `text/sgfx_text.json` loaded its 7
+  scoped rules. `Text:OverridesLoaded:0` confirms the loader did
+  NOT fall through to the legacy flat `sg_text_overrides.json`
+  decoy that sat in the same dir.
+- **runtime-proven**: `Text:CsdScopedOverrideHit @status` fired for
+  4 of the 7 staged literals (`99`, `999999`, `[200]`, `7`)
+  during the 60 s gameplay window -- the pack lane drove SetText
+  override resolution end-to-end.
+- **runtime-proven**: `Text:CsdOverrideHit:99` was NEVER observed
+  -- the decoy flat file's `99 -> DECOY_FLAT_99` global rule did
+  not load. The pack lane's authority over the text path is
+  enforced.
+- **runtime-proven**: `Asset:PixelOverridesLoaded:1` +
+  `Asset:PixelOverrideHit:logo_sonicteam` -- the pack-pointed
+  asset manifest at `pictures/sgfx_pictures.json` bound the user's
+  `res/logo_sgfx.dds` at the SonicTeam picture slot through
+  `MakePictureData`. The decoy flat manifest's `logo_havok` entry
+  did NOT fire a hit.
+- **runtime-proven**: `Asset:VisibleOverrideHit:game:/Loading/logo_sonicteam.dds`
+  -- the pack's loose_file at the canonical guest path under the
+  override dir was substituted by `ModLoader::ResolvePath`, AND
+  the loose-asset index for `sub_82E0B500` was scoped to the
+  pack's whitelist (other files in the dir, like the decoy flat
+  manifests, were not indexed as substitutions).
+- **runtime-proven**: 3 `Pack:Rejected` events emitted for the
+  three traversal paths (`text_overrides`, `asset_overrides`,
+  `loose_files`). The `escape_leaked` heuristic (search the
+  events.jsonl for the decoy text key `99`, the marker
+  `ESCAPE_TEXT_LEAKED`, or any `Asset:OverrideHit` for the escape
+  DDS) returned false, so no traversal target reached the runtime.
+  The negative test also places a real
+  `<override>/Loading/logo_sonicteam.dds` file outside the pack's
+  `loose_files` list and verifies no
+  `Asset:VisibleOverrideHit:game:/Loading/logo_sonicteam.dds` event
+  appears, proving the direct `ResolvePath()` lane is pack-scoped too.
+- **runtime-proven**: save backup safety net engaged across both
+  sub-tests; SYS-DATA was modified by retail SU's auto-resume
+  flow and restored from the snapshot. ACH-DATA / EXT-DATA
+  unchanged. Real save data untouched.
+
+### Phase 370B file layout
+
+| Path | Purpose |
+|---|---|
+| [`UnleashedRecomp/patches/sg_pack.h`](../UnleashedRecomp/patches/sg_pack.h) | Public API: `EnsureLoaded`, `IsActive`, `TryGetTextOverridesPath`, `TryGetAssetOverridesPath`, `GetLooseFiles`, `ResolveRelativeUnderBase` (shared traversal-guard helper). |
+| [`UnleashedRecomp/patches/sg_pack.cpp`](../UnleashedRecomp/patches/sg_pack.cpp) | Loader: parses `sgfx_pack.json`, traversal-guards every relative path with `weakly_canonical` + explicit `..` rejection, emits `Pack:Loaded:<text\|none>:<asset\|none>:<looseCount>` and one `Pack:Rejected:<reason>:<raw>` per rejected path. |
+| [`UnleashedRecomp/patches/sg_text_overrides.cpp`](../UnleashedRecomp/patches/sg_text_overrides.cpp) | `DoLoad` consults `SGPack::IsActive()`/`TryGetTextOverridesPath()`. Pack-active + no-text-path emits `Text:OverridesLoaded:0` + `Text:ScopedRulesLoaded:0` so consumers see "pack is authoritative, no overrides declared" rather than silent missing-loader. |
+| [`UnleashedRecomp/patches/sg_asset_overrides.cpp`](../UnleashedRecomp/patches/sg_asset_overrides.cpp) | Mirrors the text-loader dispatch through `SGPack::TryGetAssetOverridesPath()`. |
+| [`UnleashedRecomp/mod/mod_loader.cpp`](../UnleashedRecomp/mod/mod_loader.cpp) | `IndexSgPreflightLooseOverrides`: when `SGPack::IsActive()`, scope the loose-asset index to exactly the files in `SGPack::GetLooseFiles()`. `ResolvePath()` checks the same whitelist before allowing a direct visible loose-file substitution. Else fall back to whole-dir auto-discovery (skipping `sgfx_pack.json` / `sg_text_overrides.json` / `sg_asset_overrides.json` / `README.md` so meta-files never get indexed as overrides even in flat-file mode). |
+| [`UnleashedRecomp/main.cpp`](../UnleashedRecomp/main.cpp) | `SGPack::EnsureLoaded()` runs BEFORE `ModLoader::Init` so the indexer sees the pack's loose-files list. |
+| [`UnleashedRecomp/CMakeLists.txt`](../UnleashedRecomp/CMakeLists.txt) | Adds `patches/sg_pack.cpp` to the source list. |
+| [`research_uiux/runtime_reference/tools/phase370b_path_b_proof.ps1`](runtime_reference/tools/phase370b_path_b_proof.ps1) | Phase 370B runner: positive sub-test (pack drives all three lanes, decoys do not) + path-traversal negative sub-test (`..` paths rejected, escape targets do not leak). |
+
+### Fresh verification command
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\phase370b_path_b_proof.ps1 `
+    -AutoExitSecondsA 60 `
+    -AutoExitSecondsB 12
+```
+
+Stop here for review. Phase 370C (hot reload via shared_ptr
+immutable snapshots + mtime polling) is queued but not implemented
+in this commit. Phase 367b / 368 / 369A / 369B / 370A runners
+still pass unchanged.
