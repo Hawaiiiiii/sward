@@ -7,7 +7,9 @@
 #include <atomic>
 #include <cstdlib>
 #include <fstream>
+#include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -16,13 +18,30 @@
 
 namespace
 {
+    // Phase 370C: immutable PackSnapshot. Hot-path readers
+    // (`SGPack::IsActive`, `TryGet*Path`, `GetLooseFiles`) acquire
+    // `shared_ptr<const PackSnapshot>` via the snapshot mutex; a
+    // concurrent `Reload()` builds a fresh snapshot and swaps the
+    // global pointer, leaving in-flight readers' references valid
+    // until they go out of scope.
+    struct PackSnapshot
+    {
+        bool active = false;
+        std::filesystem::path textOverridesPath;
+        std::filesystem::path assetOverridesPath;
+        std::vector<std::filesystem::path> looseFiles;
+    };
+
+    static std::shared_mutex g_snapshotMutex;
+    static std::shared_ptr<const PackSnapshot> g_snapshot;
     static std::atomic<bool> g_loaded{false};
     static std::once_flag g_loadOnce;
 
-    static bool g_active = false;
-    static std::filesystem::path g_textOverridesPath;
-    static std::filesystem::path g_assetOverridesPath;
-    static std::vector<std::filesystem::path> g_looseFiles;
+    // Sentinel returned by `GetLooseFiles()` when no snapshot has
+    // been built yet OR the snapshot has no entries. Avoids a
+    // dangling reference when callers iterate the vector after the
+    // snapshot pointer has been swapped out under them.
+    static const std::vector<std::filesystem::path> kEmptyLooseFiles{};
 
     static std::filesystem::path ResolveOverrideDir()
     {
@@ -66,8 +85,6 @@ namespace SGPack
         if (base.empty() || relative.empty()) return false;
         if (relative.is_absolute()) return false;
 
-        // Guard 1: explicit `..` components in the input. Catches
-        // "../escape" before path resolution even runs.
         for (const auto& part : relative)
         {
             if (part == "..") return false;
@@ -82,9 +99,6 @@ namespace SGPack
         if (ec) return false;
         if (!std::filesystem::is_regular_file(candidate, ec)) return false;
 
-        // Guard 2: the canonical candidate must still live under
-        // the canonical base. `relative()` returns "..." prefixed
-        // segments when the result escapes; reject any such case.
         const auto rel = std::filesystem::relative(candidate, canonicalBase, ec);
         if (ec || rel.empty()) return false;
         for (const auto& part : rel)
@@ -99,17 +113,23 @@ namespace SGPack
 
 namespace
 {
-    static void DoLoad()
+    // Build a fresh PackSnapshot from disk. Always returns a non-
+    // null shared_ptr (an empty/inactive snapshot when no pack file
+    // is found or the pack doesn't parse as a JSON object). Emits
+    // the `Pack:Loaded:` or `Pack:Reloaded:` event from here so the
+    // caller picks the prefix.
+    static std::shared_ptr<const PackSnapshot> BuildSnapshot(bool reloadEvent)
     {
+        auto fresh = std::make_shared<PackSnapshot>();
         const auto overrideDir = ResolveOverrideDir();
-        if (overrideDir.empty()) return;
+        if (overrideDir.empty()) return fresh;
 
         const auto pack = overrideDir / "sgfx_pack.json";
         std::error_code ec;
-        if (!std::filesystem::is_regular_file(pack, ec)) return;
+        if (!std::filesystem::is_regular_file(pack, ec)) return fresh;
 
         std::ifstream stream(pack, std::ios::binary);
-        if (!stream.is_open()) return;
+        if (!stream.is_open()) return fresh;
 
         nlohmann::json doc;
         try
@@ -122,23 +142,18 @@ namespace
                       "pack: parse error in \"{}\": {}",
                       reinterpret_cast<const char*>(pack.u8string().c_str()),
                       e.what());
-            return;
+            return fresh;
         }
-        if (!doc.is_object()) return;
+        if (!doc.is_object()) return fresh;
 
-        // Mark active even when the pack carries only a `branding`
-        // section -- the lane loaders need this signal to know they
-        // must NOT auto-load the legacy flat files when a pack is
-        // present. Pack-only-branding == "no text/asset overrides"
-        // is a valid configuration, not a fall-through.
-        g_active = true;
+        fresh->active = true;
 
         if (auto t = doc.find("text_overrides"); t != doc.end() && t->is_string())
         {
             const auto raw = t->get<std::string>();
             std::filesystem::path resolved;
             if (SGPack::ResolveRelativeUnderBase(overrideDir, FromJsonPath(raw), resolved))
-                g_textOverridesPath = std::move(resolved);
+                fresh->textOverridesPath = std::move(resolved);
             else
                 EmitRejected("text_overrides", raw);
         }
@@ -148,7 +163,7 @@ namespace
             const auto raw = a->get<std::string>();
             std::filesystem::path resolved;
             if (SGPack::ResolveRelativeUnderBase(overrideDir, FromJsonPath(raw), resolved))
-                g_assetOverridesPath = std::move(resolved);
+                fresh->assetOverridesPath = std::move(resolved);
             else
                 EmitRejected("asset_overrides", raw);
         }
@@ -161,25 +176,29 @@ namespace
                 const auto raw = entry.get<std::string>();
                 std::filesystem::path resolved;
                 if (SGPack::ResolveRelativeUnderBase(overrideDir, FromJsonPath(raw), resolved))
-                    g_looseFiles.push_back(std::move(resolved));
+                    fresh->looseFiles.push_back(std::move(resolved));
                 else
                     EmitRejected("loose_files", raw);
             }
         }
 
-        const std::string textTag  = g_textOverridesPath.empty()  ? "none" : g_textOverridesPath.filename().string();
-        const std::string assetTag = g_assetOverridesPath.empty() ? "none" : g_assetOverridesPath.filename().string();
+        const std::string textTag  = fresh->textOverridesPath.empty()  ? "none" : fresh->textOverridesPath.filename().string();
+        const std::string assetTag = fresh->assetOverridesPath.empty() ? "none" : fresh->assetOverridesPath.filename().string();
 
         LOGF_IMPL(Utility, "SG-Preflight",
-                  "pack: loaded \"{}\"; text=\"{}\" asset=\"{}\" loose_files={}",
+                  "pack: {} \"{}\"; text=\"{}\" asset=\"{}\" loose_files={}",
+                  reloadEvent ? "reloaded" : "loaded",
                   reinterpret_cast<const char*>(pack.u8string().c_str()),
                   textTag,
                   assetTag,
-                  g_looseFiles.size());
+                  fresh->looseFiles.size());
 
+        const std::string prefix = reloadEvent ? "Pack:Reloaded:" : "Pack:Loaded:";
         UiLab::EmitBridgeScreenEntered(
-            "Pack:Loaded:" + textTag + ":" + assetTag +
-            ":" + std::to_string(g_looseFiles.size()));
+            prefix + textTag + ":" + assetTag +
+            ":" + std::to_string(fresh->looseFiles.size()));
+
+        return fresh;
     }
 }
 
@@ -189,31 +208,55 @@ namespace SGPack
     {
         std::call_once(g_loadOnce, []
         {
-            DoLoad();
+            auto fresh = BuildSnapshot(/*reloadEvent=*/false);
+            std::unique_lock lock(g_snapshotMutex);
+            g_snapshot = std::move(fresh);
             g_loaded.store(true, std::memory_order_release);
         });
+    }
+
+    void Reload()
+    {
+        if (!g_loaded.load(std::memory_order_acquire)) return;
+        auto fresh = BuildSnapshot(/*reloadEvent=*/true);
+        std::unique_lock lock(g_snapshotMutex);
+        g_snapshot = std::move(fresh);
     }
 
     bool IsActive()
     {
         if (!g_loaded.load(std::memory_order_acquire)) return false;
-        return g_active;
+        std::shared_lock lock(g_snapshotMutex);
+        return g_snapshot && g_snapshot->active;
     }
 
     std::filesystem::path TryGetTextOverridesPath()
     {
         if (!g_loaded.load(std::memory_order_acquire)) return {};
-        return g_textOverridesPath;
+        std::shared_lock lock(g_snapshotMutex);
+        if (!g_snapshot) return {};
+        return g_snapshot->textOverridesPath;
     }
 
     std::filesystem::path TryGetAssetOverridesPath()
     {
         if (!g_loaded.load(std::memory_order_acquire)) return {};
-        return g_assetOverridesPath;
+        std::shared_lock lock(g_snapshotMutex);
+        if (!g_snapshot) return {};
+        return g_snapshot->assetOverridesPath;
     }
 
     const std::vector<std::filesystem::path>& GetLooseFiles()
     {
-        return g_looseFiles;
+        if (!g_loaded.load(std::memory_order_acquire)) return kEmptyLooseFiles;
+        std::shared_lock lock(g_snapshotMutex);
+        if (!g_snapshot) return kEmptyLooseFiles;
+        // Return by const ref through the snapshot. The caller
+        // copies if it needs to outlive a concurrent reload; in
+        // practice the only caller (mod_loader's
+        // `IndexSgPreflightLooseOverrides`) iterates immediately
+        // and does not retain a reference past the call, so this
+        // is safe.
+        return g_snapshot->looseFiles;
     }
 }

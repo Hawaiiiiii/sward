@@ -917,7 +917,190 @@ powershell -NoProfile -ExecutionPolicy Bypass `
     -AutoExitSecondsB 12
 ```
 
-Stop here for review. Phase 370C (hot reload via shared_ptr
-immutable snapshots + mtime polling) is queued but not implemented
-in this commit. Phase 367b / 368 / 369A / 369B / 370A runners
-still pass unchanged.
+## Phase 370C -- hot reload via immutable snapshots + mtime polling
+
+Phase 370C lets the SGFX shell re-read its override manifests at
+runtime without restarting UR. Three pieces:
+
+1. Every override loader (pack, text, asset) now holds its state
+   in an immutable `Snapshot` struct under a `shared_mutex`-
+   protected `std::shared_ptr<const Snapshot>` global. Hot-path
+   readers acquire a shared_ptr copy under the read lock and
+   release the lock immediately; subsequent map/vector lookups go
+   through the local shared_ptr. A concurrent reload that builds a
+   fresh snapshot and swaps the global pointer leaves in-flight
+   readers' references valid until they go out of scope.
+2. `gpu/video.cpp::MakePictureData` now takes a
+   `SGAssetOverrides::PixelOverrideHandle` (an opaque keep-alive
+   that holds the snapshot reference) for the entire `LoadTexture`
+   lifetime. The handle's destructor drops the snapshot ref AFTER
+   the GPU upload, so a hot-reload that swaps the picture cache
+   mid-decode cannot dangle the bytes pointer.
+3. A single `sg_hot_reload.cpp` watcher thread polls
+   `last_write_time` on `sgfx_pack.json` + the active text /
+   asset manifest paths every 500 ms, applies a 250 ms debounce,
+   then dispatches `SGPack::Reload()` -> `SGTextOverrides::Reload()`
+   -> `SGAssetOverrides::Reload()` (cascading from pack, since a
+   pack reload may have changed the text/asset paths). Watcher
+   spawns only when `SG_PREFLIGHT_HOT_RELOAD=1` is set, so vanilla
+   UR launches keep the cost at zero.
+
+### Lifetime contract for pixel overrides
+
+The `MakePictureData` hook now holds an opaque
+`PixelOverrideHandle`:
+
+```cpp
+SGAssetOverrides::PixelOverrideHandle overrideHandle;
+bool pixelOverrideApplied = false;
+if (!pictureName.empty())
+{
+    overrideHandle = SGAssetOverrides::TryGetPixelOverride(pictureName);
+    if (overrideHandle.data != nullptr)
+    {
+        data = const_cast<uint8_t*>(overrideHandle.data);
+        dataSize = static_cast<uint32_t>(overrideHandle.size);
+        pixelOverrideApplied = true;
+    }
+}
+// ... LoadTexture(texture, data, dataSize, {}) -- handle still in scope
+// ... when MakePictureData returns, handle dies, snapshot ref drops
+```
+
+The handle's `keepAlive` member (a `std::shared_ptr<const void>`)
+holds a reference to the immutable `PictureSnapshot` that owned
+the override bytes at lookup time. Until the handle is destroyed,
+the snapshot stays alive even if a concurrent reload has already
+swapped the global pointer to a fresh one. Once the handle dies,
+the OLD snapshot's refcount drops; if no other handle holds it,
+the bytes deallocate.
+
+### Reload semantics
+
+| State | Reload behavior |
+|---|---|
+| Text overrides map (v1 strings) | New manifest's strings replace the old map atomically. Existing `g_locale` writes are NOT rolled back -- a removed override leaves its prior locale value in `g_locale`. New entries DO get applied to `g_locale` on reload (so a fresh override propagates). |
+| Scoped text rules (v2) | Vector swapped atomically. `FindMatchingScopedRule` reads through the snapshot, so an in-flight lookup that took an old snapshot ref keeps its old rules valid until it returns. |
+| Guest-string cache (`g_guestStringCache`) | NEVER evicted across reloads -- guest pointers given out by previous reload(s) must stay valid forever. A reload that introduces a new replacement value grows the cache; a reload that drops a replacement leaves the old guest copy resident (bounded by total unique replacements observed across the session). |
+| Hit-dedup sets (`g_hostHitSet`, `g_scopedHitSet`, `g_pictureHits`) | NOT reset across reloads. A re-bound key does not re-emit a hit event. Consumers infer "still active" from the absence of a teardown event. |
+| Pixel overrides (PictureSnapshot) | New snapshot, new bytes. Already-uploaded GPU textures keep showing the OLD pixels until the calling CSD project is unloaded and re-instantiated -- this is "reload accepted; visible after scene recreate", not instant GPU texture replacement. |
+| Pack snapshot | New snapshot, new lane paths. The watcher's path-tracking helper re-resolves the text/asset watch paths after a pack reload, so a pack edit that points at a different text manifest correctly re-targets the text watcher. |
+
+### Watcher mechanics
+
+- Polling interval: **500 ms**. Catches editor saves within at most one cycle.
+- Debounce: **250 ms**. After detecting an mtime change, the watcher waits 250 ms and re-stats. Only when the second stat returns the SAME mtime does it dispatch -- catches editor save patterns that touch the file twice in quick succession (truncate-then-write).
+- Single thread for all manifests; sleep-and-stat loop, no native filesystem-events APIs (`ReadDirectoryChangesW` is left for a later phase if polling overhead becomes measurable, but at 500 ms the cost is negligible).
+- Stop flag is checked on every loop iteration; `atexit()` registers `SGHotReload::Stop()` so the thread joins cleanly on UR exit.
+
+### Event taxonomy additions
+
+| Event | Source | Cardinality |
+|---|---|---|
+| `HotReload:WatcherStarted` | `sg_hot_reload.cpp::WatcherLoop` first iteration | once per process when `SG_PREFLIGHT_HOT_RELOAD=1` |
+| `Pack:Reloaded:<text\|none>:<asset\|none>:<looseCount>` | `SGPack::Reload` after the snapshot swap | once per pack mtime change |
+| `Text:OverridesReloaded:<count>` | `SGTextOverrides::Reload` -- always emitted, even when count == 0 | once per text manifest mtime change |
+| `Text:ScopedRulesReloaded:<count>` | same site, paired emit | once per text manifest mtime change |
+| `Asset:PixelOverridesReloaded:<count>` | `SGAssetOverrides::Reload` after snapshot swap | once per asset manifest mtime change |
+
+### Phase 370C acceptance gates
+
+The runner [`research_uiux/runtime_reference/tools/phase370c_path_b_proof.ps1`](runtime_reference/tools/phase370c_path_b_proof.ps1)
+exits 0 only when ALL of:
+
+| Exit | Reason |
+|---|---|
+| 0 | all gates passed |
+| 2 | build / deploy / launch failed |
+| 3 | `HotReload:WatcherStarted` missing -- watcher never began polling |
+| 4 | initial `Pack:Loaded` / `Text:ScopedRulesLoaded:3` / `Asset:PixelOverridesLoaded:1` markers missing |
+| 5 | `Text:ScopedRulesReloaded:5` not observed within `$ReloadTimeoutSeconds` after manifest edit |
+| 6 | reload elapsed exceeded the budget |
+| 7 | `Pack:Reloaded` not observed after pack edit |
+| 8 | `Asset:PixelOverridesReloaded:2` not observed after asset manifest edit |
+| 9 | no native BMP captured |
+
+The runner stages an initial pack with **3** scoped text rules + **1** picture override, launches UR, waits for the watcher boot marker + initial loader markers, then mid-run rewrites:
+- `text/sgfx_text.json` with **5** rules → expects `Text:ScopedRulesReloaded:5`
+- `pictures/sgfx_pictures.json` with **2** pictures → expects `Asset:PixelOverridesReloaded:2`
+- `sgfx_pack.json` with new description → expects `Pack:Reloaded:`
+
+Each reload event must arrive within 5 seconds of the file write.
+
+### What's runtime-proven (Phase 370C, 2026-05-07)
+
+Captured in
+[research_uiux/runtime_reference/out/phase370c_path_b_proof/](runtime_reference/out/phase370c_path_b_proof/):
+
+```json
+{
+  "watcher_started":              true,
+  "initial_pack_loaded":          true,
+  "initial_text_scoped_loaded_3": true,
+  "initial_pixel_loaded_1":       true,
+  "text_scoped_reloaded_5":       true,
+  "text_reload_elapsed_seconds":  1.07,
+  "asset_pixel_reloaded_2":       true,
+  "asset_reload_elapsed_seconds": 1.05,
+  "pack_reloaded":                true,
+  "pack_reload_elapsed_seconds":  1.05,
+  "native_frames_written":        1,
+  "elapsed_seconds":              60
+}
+```
+
+- **runtime-proven**: `HotReload:WatcherStarted` fires once after
+  the watcher thread spawns -- the env-gated start path works.
+- **runtime-proven**: initial boot markers (`Pack:Loaded:...`,
+  `Text:ScopedRulesLoaded:3`, `Asset:PixelOverridesLoaded:1`) all
+  fire BEFORE any reload, confirming the snapshot-installer path
+  still works under the refactor.
+- **runtime-proven**: the runner rewrites
+  `text/sgfx_text.json` with 5 rules; the watcher detects the
+  mtime change, debounces, dispatches `SGTextOverrides::Reload()`,
+  and `Text:ScopedRulesReloaded:5` lands in events.jsonl
+  **1.07 seconds** after the file write -- well under the
+  5-second budget. `Text:OverridesReloaded:0` also fires (no
+  global v1 entries this run).
+- **runtime-proven**: the runner rewrites
+  `pictures/sgfx_pictures.json` with 2 pictures;
+  `Asset:PixelOverridesReloaded:2` fires in **1.05 s**. The new
+  picture cache is live for any subsequent `MakePictureData`
+  call; in-flight reads of the old snapshot are kept alive by
+  `PixelOverrideHandle::keepAlive` until they release.
+- **runtime-proven**: the runner rewrites `sgfx_pack.json`;
+  `Pack:Reloaded:...` fires in **1.05 s**. The watcher
+  re-resolves the text/asset watch paths after the pack reload
+  so a pack-driven path swap correctly re-targets future
+  manifest watches.
+- **runtime-proven**: save backup safety net engaged. SYS-DATA
+  was modified by retail SU's auto-resume during the 60-second
+  window and restored from the pre-run snapshot. Real save data
+  untouched.
+
+### Phase 370C file layout
+
+| Path | Purpose |
+|---|---|
+| [`UnleashedRecomp/patches/sg_hot_reload.h`](../UnleashedRecomp/patches/sg_hot_reload.h) | Public `SGHotReload::Start()` / `Stop()` API. |
+| [`UnleashedRecomp/patches/sg_hot_reload.cpp`](../UnleashedRecomp/patches/sg_hot_reload.cpp) | Watcher thread: 500 ms mtime poll + 250 ms debounce; tracks pack + text + asset paths; cascades reload through `SGPack::Reload` -> `SGTextOverrides::Reload` -> `SGAssetOverrides::Reload`. Emits `HotReload:WatcherStarted` once at thread start. |
+| [`UnleashedRecomp/patches/sg_pack.h`](../UnleashedRecomp/patches/sg_pack.h) / [`.cpp`](../UnleashedRecomp/patches/sg_pack.cpp) | `Reload()` added; PackSnapshot behind `shared_mutex` + `shared_ptr<const PackSnapshot>`. Emits `Pack:Reloaded:` distinct from boot's `Pack:Loaded:`. |
+| [`UnleashedRecomp/patches/sg_text_overrides.h`](../UnleashedRecomp/patches/sg_text_overrides.h) / [`.cpp`](../UnleashedRecomp/patches/sg_text_overrides.cpp) | `Reload()` added; TextSnapshot holds the v1 overrides map + v2 scoped rules. Hot-path lookups (`TryGetOverride`, `TryGetOverrideGuestPtrScoped`) acquire a `shared_ptr` copy and copy the replacement string OUT of the snapshot before allocating the guest-heap copy, so the snapshot ref is dropped before the guest cache mutex is taken. Emits `Text:OverridesReloaded:` and `Text:ScopedRulesReloaded:`. |
+| [`UnleashedRecomp/patches/sg_asset_overrides.h`](../UnleashedRecomp/patches/sg_asset_overrides.h) / [`.cpp`](../UnleashedRecomp/patches/sg_asset_overrides.cpp) | `TryGetPixelOverride` now returns `PixelOverrideHandle` with a `shared_ptr<const void>` keep-alive. `Reload()` added; emits `Asset:PixelOverridesReloaded:`. |
+| [`UnleashedRecomp/gpu/video.cpp`](../UnleashedRecomp/gpu/video.cpp) | `MakePictureData` holds the handle for the LoadTexture lifetime; the snapshot keep-alive prevents bytes from being freed mid-decode by a concurrent reload. |
+| [`UnleashedRecomp/main.cpp`](../UnleashedRecomp/main.cpp) | Calls `SGHotReload::Start()` AFTER all `EnsureLoaded()` calls so the watcher has snapshots to compare against on its first poll. Registers `SGHotReload::Stop` via `std::atexit` for clean shutdown. |
+| [`UnleashedRecomp/CMakeLists.txt`](../UnleashedRecomp/CMakeLists.txt) | Adds `patches/sg_hot_reload.cpp` to the source list. |
+| [`research_uiux/runtime_reference/tools/phase370c_path_b_proof.ps1`](runtime_reference/tools/phase370c_path_b_proof.ps1) | Phase 370C runner: stages initial 3-rule pack, launches UR with `SG_PREFLIGHT_HOT_RELOAD=1`, waits for boot markers, edits text+asset+pack manifests in turn, asserts each reload event fires within 5 s. |
+
+### Fresh verification command
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\phase370c_path_b_proof.ps1 `
+    -AutoExitSeconds 60 `
+    -ReloadTimeoutSeconds 5
+```
+
+Phase 367b / 368 / 369A / 369B / 370A / 370B runners still pass
+unchanged. The watcher is OFF by default (env-gated), so vanilla
+UR launches and the older runners are not affected.

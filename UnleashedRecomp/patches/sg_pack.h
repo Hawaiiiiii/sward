@@ -57,6 +57,17 @@ namespace SGPack
     // internally).
     void EnsureLoaded();
 
+    // Phase 370C: post-boot hot reload. Re-reads `sgfx_pack.json`,
+    // rebuilds the immutable PackSnapshot, atomically swaps it
+    // under the snapshot mutex, and emits
+    //   `Pack:Reloaded:<text|none>:<asset|none>:<looseCount>`
+    // (always, even when nothing changed). The cascade to the
+    // text/asset loaders is the watcher's job -- this entry point
+    // only refreshes the pack's own state so subsequent
+    // `TryGet*Path()` and `GetLooseFiles()` calls reflect the new
+    // manifest.
+    void Reload();
+
     // True when the override dir contains an `sgfx_pack.json` that
     // parsed successfully (regardless of whether any lane fields
     // were present). Text/asset/loose loaders test this BEFORE

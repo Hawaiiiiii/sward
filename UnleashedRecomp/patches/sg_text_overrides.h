@@ -43,9 +43,27 @@ namespace SGTextOverrides
     // immediately.
     void EnsureLoaded();
 
-    // Host-side override lookup. Returns nullptr if no override.
-    // Used by Localise() before falling back to g_locale.
-    const std::string* TryGetOverride(std::string_view original);
+    // Phase 370C: post-boot hot reload. Re-reads the manifest and
+    // builds a fresh immutable TextSnapshot (overrides map +
+    // scoped rules), then atomically swaps it in under the
+    // snapshot mutex. In-flight `TryGetOverride*` calls that hold
+    // the old shared_ptr keep their old rule data alive until they
+    // return. The cumulative `g_locale` writes from previous
+    // load(s) are NOT rolled back -- removing an override at
+    // reload time leaves the prior locale string in place; the
+    // next Localise() call returns whatever g_locale currently
+    // holds. Always emits both
+    //   `Text:OverridesReloaded:<count>`
+    //   `Text:ScopedRulesReloaded:<count>`
+    // so the bridge stream proves the reload fired even when no
+    // counts changed.
+    void Reload();
+
+    // Host-side override lookup for diagnostics. Copies the
+    // replacement string out while the immutable snapshot is still
+    // held alive, so the caller never receives a pointer into data
+    // that a concurrent reload could free.
+    bool TryGetOverride(std::string_view original, std::string* outOverride);
 
     // Guest-side override lookup. Returns 0 if no override; otherwise
     // a guest virtual address of a permanent UTF-8 copy of the override

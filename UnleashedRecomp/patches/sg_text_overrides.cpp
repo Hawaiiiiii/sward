@@ -13,7 +13,9 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -24,49 +26,57 @@
 
 namespace
 {
-    // Stable, host-side store of override strings keyed by the original
-    // literal value. The keys also live here as std::string so they are
-    // safe to refer to via std::string_view from g_locale.
-    static std::unordered_map<std::string, std::string> g_overrides;
-
-    // Lazy guest-heap copies for retail SetText hooks. The cache is keyed
-    // by the override value (not the original key) so two different
-    // originals that map to the same override share one allocation.
-    static std::unordered_map<std::string, uint32_t> g_guestStringCache;
-    static std::mutex g_guestStringCacheMutex;
-
-    // Phase 367: host-side hit dedup set. Each override key is emitted
-    // at most once per process boot via the bridge. Mirrors the existing
-    // guest-side cache semantics but is keyed by the override key
-    // (not value), since Localise() callers ask for keys.
-    static std::unordered_set<std::string> g_hostHitSet;
-    static std::mutex g_hostHitMutex;
-
-    // Phase 369B: scoped text override rules. Each rule replaces a
-    // literal only when at least one currently-active CSD project
-    // name contains the rule's `csd_project_substring`. Rules are
-    // evaluated in declaration order; the first matching rule wins.
+    // Phase 369B: scoped text override rule.
     struct ScopedTextRule
     {
         std::string literal;
         std::string projectSubstring;
         std::string replacement;
     };
-    static std::vector<ScopedTextRule> g_scopedRules;
 
-    // Phase 369B: scoped match dedup set. Keyed by `<literal>@<scope>`
-    // so the same literal hit through two different scope rules emits
-    // two distinct events.
+    // Phase 370C: immutable snapshot of the loadable text override
+    // state. Hot-path readers obtain a `shared_ptr<const TextSnapshot>`
+    // and look up rules from there; a concurrent `Reload()` swaps in a
+    // fresh snapshot without invalidating the in-flight readers'
+    // references.
+    struct TextSnapshot
+    {
+        // Global v1 lane.
+        std::unordered_map<std::string, std::string> overrides;
+        // v2 scoped lane.
+        std::vector<ScopedTextRule> scopedRules;
+    };
+
+    // Snapshot is read under a shared_mutex. Hot-path readers copy
+    // the shared_ptr while holding the read lock, then release the
+    // lock immediately -- subsequent map/vector accesses go through
+    // the local shared_ptr keep-alive without any further locking.
+    static std::shared_mutex g_snapshotMutex;
+    static std::shared_ptr<const TextSnapshot> g_snapshot;
+
+    // Lazy guest-heap copies for retail SetText hooks. The cache is
+    // keyed by the override VALUE (not the original key) so two
+    // distinct originals that map to the same replacement share one
+    // allocation. Entries are NEVER evicted -- guest pointers given
+    // out by previous Reload()s must stay valid for the lifetime of
+    // the process. A reload that introduces a new replacement value
+    // grows the cache; a reload that drops a replacement leaves the
+    // old guest copy resident (acceptable: bounded by total unique
+    // replacements observed across all reloads).
+    static std::unordered_map<std::string, uint32_t> g_guestStringCache;
+    static std::mutex g_guestStringCacheMutex;
+
+    // Phase 367: host-side hit dedup set. Each override key emits at
+    // most once per process boot. NOT reset on Reload().
+    static std::unordered_set<std::string> g_hostHitSet;
+    static std::mutex g_hostHitMutex;
+
+    // Phase 369B: scoped match dedup set. Keyed by `<literal>@<scope>`.
+    // NOT reset on Reload().
     static std::unordered_set<std::string> g_scopedHitSet;
     static std::mutex g_scopedHitMutex;
 
-    // Phase 369B: active CSD project tracker. Set is appended-to by
-    // `MarkCsdProjectActive` (called from ui_lab_patches at every
-    // CSD project make) and never shrinks during the process's life
-    // -- retail SU rarely unloads CSD projects mid-session, and the
-    // dedup-set semantics of the scope match make a one-way set
-    // safer than maintaining add/remove balance through every retail
-    // hook callsite.
+    // Phase 369B: active CSD project tracker. Append-only.
     static std::unordered_set<std::string> g_activeCsdProjects;
     static std::mutex g_activeCsdProjectsMutex;
 
@@ -90,18 +100,22 @@ namespace
         return {};
     }
 
-    static void DoLoad()
+    // Build a fresh TextSnapshot from disk. Always returns a non-
+    // null shared_ptr (an empty snapshot when no manifest is found
+    // or parse fails). Emits the boot/reload count markers from
+    // here so the caller decides which event prefix to use.
+    static std::shared_ptr<const TextSnapshot> BuildSnapshot(bool reloadEvent,
+                                                             std::size_t* outOverridesCount,
+                                                             std::size_t* outScopedCount)
     {
-        const auto overrideDir = ResolveOverrideDir();
-        if (overrideDir.empty()) return;
+        if (outOverridesCount) *outOverridesCount = 0;
+        if (outScopedCount)    *outScopedCount    = 0;
 
-        // Phase 370B: when sgfx_pack.json is present, the pack is
-        // authoritative -- the loader uses the pack-pointed manifest
-        // path and does NOT fall back to the legacy flat file. A
-        // pack with no `text_overrides` key means "no text overrides
-        // in this pack"; the loader exits without loading anything.
-        // Only when the pack is absent do we read the legacy flat
-        // `sg_text_overrides.json`.
+        auto fresh = std::make_shared<TextSnapshot>();
+        const auto overrideDir = ResolveOverrideDir();
+        if (overrideDir.empty()) return fresh;
+
+        // Phase 370B: pack supersedes flat-file fallback.
         std::filesystem::path manifest;
         if (SGPack::IsActive())
         {
@@ -111,9 +125,11 @@ namespace
                 LOGF_IMPL(Utility, "SG-Preflight",
                           "text overrides: pack active with no text_overrides; "
                           "skipping flat-file fallback");
-                UiLab::EmitBridgeScreenEntered("Text:OverridesLoaded:0");
-                UiLab::EmitBridgeScreenEntered("Text:ScopedRulesLoaded:0");
-                return;
+                const std::string prefix = reloadEvent ? "Text:OverridesReloaded:" : "Text:OverridesLoaded:";
+                const std::string scopedPrefix = reloadEvent ? "Text:ScopedRulesReloaded:" : "Text:ScopedRulesLoaded:";
+                UiLab::EmitBridgeScreenEntered(prefix + "0");
+                UiLab::EmitBridgeScreenEntered(scopedPrefix + "0");
+                return fresh;
             }
         }
         else
@@ -122,10 +138,10 @@ namespace
         }
 
         std::error_code ec;
-        if (!std::filesystem::is_regular_file(manifest, ec)) return;
+        if (!std::filesystem::is_regular_file(manifest, ec)) return fresh;
 
         std::ifstream stream(manifest, std::ios::binary);
-        if (!stream.is_open()) return;
+        if (!stream.is_open()) return fresh;
 
         nlohmann::json doc;
         try
@@ -138,10 +154,9 @@ namespace
                       "text overrides: parse error in \"{}\": {}",
                       reinterpret_cast<const char*>(manifest.u8string().c_str()),
                       e.what());
-            return;
+            return fresh;
         }
-
-        if (!doc.is_object()) return;
+        if (!doc.is_object()) return fresh;
 
         size_t loaded = 0;
         const auto stringsIt = doc.find("strings");
@@ -150,13 +165,11 @@ namespace
             for (const auto& [k, v] : stringsIt->items())
             {
                 if (!v.is_string()) continue;
-                g_overrides.emplace(k, v.get<std::string>());
+                fresh->overrides.emplace(k, v.get<std::string>());
                 ++loaded;
             }
         }
 
-        // Phase 369B: parse `scoped_rules` array. v1 packs without
-        // this key still work -- we just leave g_scopedRules empty.
         size_t scopedLoaded = 0;
         const auto scopedIt = doc.find("scoped_rules");
         if (scopedIt != doc.end() && scopedIt->is_array())
@@ -177,15 +190,38 @@ namespace
                 entry.replacement      = replIt->get<std::string>();
                 if (entry.literal.empty() || entry.projectSubstring.empty())
                     continue;
-                g_scopedRules.push_back(std::move(entry));
+                fresh->scopedRules.push_back(std::move(entry));
                 ++scopedLoaded;
             }
         }
 
-        // Apply overrides to g_locale so Localise() returns the override
-        // for any matching key. We insert the same value for every
-        // language so the override wins regardless of Config::Language.
-        for (const auto& [key, value] : g_overrides)
+        if (outOverridesCount) *outOverridesCount = loaded;
+        if (outScopedCount)    *outScopedCount    = scopedLoaded;
+
+        LOGF_IMPL(Utility, "SG-Preflight",
+                  "text overrides: {} {} string(s) + {} scoped rule(s) from \"{}\"",
+                  reloadEvent ? "reloaded" : "loaded",
+                  loaded,
+                  scopedLoaded,
+                  reinterpret_cast<const char*>(manifest.u8string().c_str()));
+
+        const std::string prefix       = reloadEvent ? "Text:OverridesReloaded:" : "Text:OverridesLoaded:";
+        const std::string scopedPrefix = reloadEvent ? "Text:ScopedRulesReloaded:" : "Text:ScopedRulesLoaded:";
+        UiLab::EmitBridgeScreenEntered(prefix + std::to_string(loaded));
+        UiLab::EmitBridgeScreenEntered(scopedPrefix + std::to_string(scopedLoaded));
+
+        return fresh;
+    }
+
+    // Apply the snapshot's overrides to the host-side g_locale map.
+    // Boot-time only -- a Reload() does not roll back prior writes
+    // (g_locale is not undo-able), so a removed override at reload
+    // time keeps its previously-applied locale value. New overrides
+    // added at reload do NOT propagate to g_locale; the
+    // documentation calls this out explicitly.
+    static void ApplyToLocale(const TextSnapshot& snap)
+    {
+        for (const auto& [key, value] : snap.overrides)
         {
             auto& langMap = g_locale[std::string_view(key)];
             for (auto lang : { ELanguage::English, ELanguage::Japanese,
@@ -195,28 +231,12 @@ namespace
                 langMap[lang] = value;
             }
         }
+    }
 
-        LOGF_IMPL(Utility, "SG-Preflight",
-                  "text overrides: loaded {} string(s) + {} scoped rule(s) from \"{}\"",
-                  loaded,
-                  scopedLoaded,
-                  reinterpret_cast<const char*>(manifest.u8string().c_str()));
-
-        // Phase 364: runtime-prove the loader fired by emitting one
-        // bridge event with the loaded count baked into the screen
-        // identifier. The daemon will see e.g. screen_entered:
-        //   "Text:OverridesLoaded:6". Bounded volume: exactly one
-        // event per process boot.
-        UiLab::EmitBridgeScreenEntered(
-            "Text:OverridesLoaded:" + std::to_string(loaded));
-
-        // Phase 369B: separate marker for scoped rule count so a
-        // bridge consumer can distinguish "v1 pack, no scopes" from
-        // "v2 pack, N scoped rules". Always emitted (even when zero)
-        // so consumers can detect whether the manifest understood
-        // the v2 schema vs. silently ignored the `scoped_rules` key.
-        UiLab::EmitBridgeScreenEntered(
-            "Text:ScopedRulesLoaded:" + std::to_string(scopedLoaded));
+    static std::shared_ptr<const TextSnapshot> AcquireSnapshot()
+    {
+        std::shared_lock lock(g_snapshotMutex);
+        return g_snapshot;
     }
 
     static bool ScopeMatchesAnyActiveProject(const std::string& projectSubstring)
@@ -230,9 +250,10 @@ namespace
         return false;
     }
 
-    static const ScopedTextRule* FindMatchingScopedRule(std::string_view original)
+    static const ScopedTextRule* FindMatchingScopedRule(
+        const TextSnapshot& snap, std::string_view original)
     {
-        for (const auto& rule : g_scopedRules)
+        for (const auto& rule : snap.scopedRules)
         {
             if (rule.literal != original) continue;
             if (ScopeMatchesAnyActiveProject(rule.projectSubstring))
@@ -248,29 +269,51 @@ namespace SGTextOverrides
     {
         std::call_once(g_loadOnce, []
         {
-            DoLoad();
+            std::size_t loaded = 0;
+            std::size_t scoped = 0;
+            auto fresh = BuildSnapshot(/*reloadEvent=*/false, &loaded, &scoped);
+            ApplyToLocale(*fresh);
+            {
+                std::unique_lock lock(g_snapshotMutex);
+                g_snapshot = std::move(fresh);
+            }
             g_loaded.store(true, std::memory_order_release);
         });
     }
 
-    const std::string* TryGetOverride(std::string_view original)
+    void Reload()
     {
-        if (!g_loaded.load(std::memory_order_acquire)) return nullptr;
-        // unordered_map<std::string, ...>::find on string_view is
-        // C++20 heterogenous lookup; fall back to constructing a key
-        // string for portability with this map type.
-        auto it = g_overrides.find(std::string(original));
-        if (it == g_overrides.end()) return nullptr;
-        return &it->second;
+        if (!g_loaded.load(std::memory_order_acquire)) return;
+
+        std::size_t loaded = 0;
+        std::size_t scoped = 0;
+        auto fresh = BuildSnapshot(/*reloadEvent=*/true, &loaded, &scoped);
+        // Apply the new manifest's overrides to g_locale on top of
+        // any prior writes. Removed entries are NOT undone (the
+        // header documents this); the next reload that re-adds the
+        // entry will overwrite g_locale again.
+        ApplyToLocale(*fresh);
+        {
+            std::unique_lock lock(g_snapshotMutex);
+            g_snapshot = std::move(fresh);
+        }
+    }
+
+    bool TryGetOverride(std::string_view original, std::string* outOverride)
+    {
+        if (outOverride == nullptr) return false;
+        outOverride->clear();
+        if (!g_loaded.load(std::memory_order_acquire)) return false;
+        auto snap = AcquireSnapshot();
+        if (!snap) return false;
+        auto it = snap->overrides.find(std::string(original));
+        if (it == snap->overrides.end()) return false;
+        *outOverride = it->second;
+        return true;
     }
 
     uint32_t TryGetOverrideGuestPtr(std::string_view original)
     {
-        // Phase 369B: now a thin wrapper over the scoped variant so
-        // both callers (Phase 364 and any new Phase 369B caller)
-        // share a single allocation cache and emit policy. The out-
-        // scope string is discarded here; callers that want the
-        // scope context use the scoped variant directly.
         std::string scopeDiscard;
         return TryGetOverrideGuestPtrScoped(original, &scopeDiscard);
     }
@@ -281,11 +324,10 @@ namespace SGTextOverrides
         if (outScopeSubstring) outScopeSubstring->clear();
         if (!g_loaded.load(std::memory_order_acquire)) return 0;
 
-        // Phase 369B: scoped rules are tried first because they are
-        // narrower than the global lane. The first matching rule (in
-        // declaration order) wins; if no rule scope-matches, fall
-        // through to the v1 global map.
-        const ScopedTextRule* matched = FindMatchingScopedRule(original);
+        auto snap = AcquireSnapshot();
+        if (!snap) return 0;
+
+        const ScopedTextRule* matched = FindMatchingScopedRule(*snap, original);
         const std::string* replacement = nullptr;
         if (matched != nullptr)
         {
@@ -294,13 +336,19 @@ namespace SGTextOverrides
         }
         else
         {
-            const std::string* global = TryGetOverride(original);
-            if (global == nullptr) return 0;
-            replacement = global;
+            auto it = snap->overrides.find(std::string(original));
+            if (it == snap->overrides.end()) return 0;
+            replacement = &it->second;
         }
 
+        // Copy the replacement OUT of the snapshot before we drop
+        // our shared_ptr ref. The guest-string cache key must
+        // outlive the snapshot, and the guest copy itself lives
+        // on g_userHeap which is process-lifetime.
+        const std::string replacementCopy = *replacement;
+
         std::scoped_lock lock(g_guestStringCacheMutex);
-        auto cacheIt = g_guestStringCache.find(*replacement);
+        auto cacheIt = g_guestStringCache.find(replacementCopy);
         const bool freshAlloc = (cacheIt == g_guestStringCache.end());
         uint32_t guestAddr = 0;
         if (!freshAlloc)
@@ -309,19 +357,15 @@ namespace SGTextOverrides
         }
         else
         {
-            const size_t bytes = replacement->size() + 1;
+            const size_t bytes = replacementCopy.size() + 1;
             void* hostBuf = g_userHeap.Alloc(bytes);
             if (hostBuf == nullptr) return 0;
-            std::memcpy(hostBuf, replacement->data(), replacement->size());
-            static_cast<char*>(hostBuf)[replacement->size()] = '\0';
+            std::memcpy(hostBuf, replacementCopy.data(), replacementCopy.size());
+            static_cast<char*>(hostBuf)[replacementCopy.size()] = '\0';
             guestAddr = g_memory.MapVirtual(hostBuf);
-            g_guestStringCache.emplace(*replacement, guestAddr);
+            g_guestStringCache.emplace(replacementCopy, guestAddr);
         }
 
-        // Phase 364 / 367b / 369B: distinct emit per lane so bridge
-        // consumers can tell scoped hits from global hits. Both
-        // emits are deduped (per literal, or per literal+scope) so
-        // event volume stays bounded.
         if (matched != nullptr)
         {
             const std::string scopedKey =
@@ -335,8 +379,6 @@ namespace SGTextOverrides
         }
         else
         {
-            // Phase 364 dedup is on the value-cache (one emit per
-            // unique replacement). Preserve that contract.
             if (freshAlloc)
             {
                 UiLab::EmitBridgeScreenEntered(
@@ -354,12 +396,6 @@ namespace SGTextOverrides
             std::scoped_lock lock(g_activeCsdProjectsMutex);
             inserted = g_activeCsdProjects.emplace(projectName).second;
         }
-        // Phase 369B diagnostic: emit one bridge event per UNIQUE
-        // project name so the proof script can see exactly which
-        // project names retail SU registered during the run. Lets
-        // the operator validate scoped-rule substrings against the
-        // real names instead of guessing. Bounded volume = number of
-        // distinct CSD projects loaded per process boot.
         if (inserted)
         {
             UiLab::EmitBridgeScreenEntered(
@@ -371,10 +407,9 @@ namespace SGTextOverrides
     {
         if (!g_loaded.load(std::memory_order_acquire)) return;
 
-        // Heterogeneous-lookup-friendly path: only enter the locked
-        // section if the override map has the key, and only allocate a
-        // std::string for the dedup set on the actual first hit.
-        if (g_overrides.find(std::string(key)) == g_overrides.end())
+        auto snap = AcquireSnapshot();
+        if (!snap) return;
+        if (snap->overrides.find(std::string(key)) == snap->overrides.end())
             return;
 
         {
@@ -383,11 +418,6 @@ namespace SGTextOverrides
             if (!inserted) return;
         }
 
-        // Phase 367b: explicit `Text:HostOverrideHit:<key>` so the
-        // host-side Localise() path is distinguishable from the
-        // guest-side CSD SetText path (`Text:CsdOverrideHit:<original>`)
-        // and from boot-time markers (`Text:OverridesLoaded:<count>`).
-        // The dedup set above makes this exactly-once per key per boot.
         UiLab::EmitBridgeScreenEntered(
             "Text:HostOverrideHit:" + std::string(key));
     }

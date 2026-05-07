@@ -26,6 +26,7 @@
 #include <mod/mod_loader.h>
 #include <preload_executable.h>
 #include <patches/sg_branding.h>
+#include <patches/sg_hot_reload.h>
 #include <patches/sg_pack.h>
 #include <patches/sg_text_overrides.h>
 #include <patches/sg_asset_overrides.h>
@@ -388,6 +389,13 @@ int main(int argc, char *argv[])
                   "branding: build label override = \"{}\"",
                   *buildLabel);
     }
+
+    // Phase 370C: start the hot-reload watcher AFTER every loader's
+    // EnsureLoaded() has installed its initial snapshot. The watcher
+    // only spawns its thread when SG_PREFLIGHT_HOT_RELOAD=1; without
+    // the env, this is a cheap no-op for vanilla UR launches.
+    SGHotReload::Start();
+    std::atexit([] { SGHotReload::Stop(); });
 
     if (!PersistentStorageManager::LoadBinary())
         LOGFN_ERROR("Failed to load persistent storage binary... (status code {})", (int)PersistentStorageManager::BinStatus);

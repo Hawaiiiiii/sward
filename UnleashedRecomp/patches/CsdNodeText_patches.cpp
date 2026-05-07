@@ -152,11 +152,11 @@ PPC_FUNC(sub_830BF640)
 
     if (overrideApplied)
     {
-        const std::string* overrideText = SGTextOverrides::TryGetOverride(textUtf8);
+        std::string overrideText;
         UiLab::OnCsdNodeSetText(
             nodeAddress,
             effectiveTextAddress,
-            overrideText != nullptr ? *overrideText : textUtf8,
+            SGTextOverrides::TryGetOverride(textUtf8, &overrideText) ? overrideText : textUtf8,
             "CSD::CNode::SetText/sub_830BF640+override");
     }
     else

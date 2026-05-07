@@ -11,7 +11,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -28,7 +30,25 @@ namespace
         std::filesystem::path source;
     };
 
-    static std::unordered_map<std::string, PictureOverride> g_pictureOverrides;
+    // Phase 370C: immutable snapshot. The hot path obtains a
+    // `shared_ptr<const PictureSnapshot>` so a concurrent reload
+    // that builds a fresh snapshot and swaps the global pointer
+    // CANNOT free the bytes a caller is still reading. Old
+    // snapshots stay alive on the heap until every handle that
+    // referenced them is destroyed.
+    struct PictureSnapshot
+    {
+        std::unordered_map<std::string, PictureOverride> pictures;
+    };
+
+    // The active snapshot is read under a shared_mutex (read lock
+    // is cheap; write lock taken only at boot + reload). Using
+    // shared_ptr-by-value-copy from the read side means the hot
+    // path never holds the lock past the copy -- the copied
+    // shared_ptr keeps the snapshot alive on its own.
+    static std::shared_mutex g_snapshotMutex;
+    static std::shared_ptr<const PictureSnapshot> g_snapshot;
+
     static std::unordered_set<std::string> g_pictureHits;
     static std::mutex g_pictureHitsMutex;
     static std::atomic<bool> g_loaded{false};
@@ -51,16 +71,22 @@ namespace
         return {};
     }
 
-    static void DoLoad()
+    static void EmitLoadedMarkerIfRequested(bool emitLoadedMarker, std::size_t count)
+    {
+        if (!emitLoadedMarker) return;
+        UiLab::EmitBridgeScreenEntered(
+            "Asset:PixelOverridesLoaded:" + std::to_string(count));
+    }
+
+    static std::shared_ptr<const PictureSnapshot> BuildSnapshot(bool emitLoadedMarker)
     {
         const auto overrideDir = ResolveOverrideDir();
-        if (overrideDir.empty()) return;
+        if (overrideDir.empty()) return std::make_shared<const PictureSnapshot>();
 
-        // Phase 370B: when sgfx_pack.json is present, the pack is
-        // authoritative -- read the pack-pointed manifest path
-        // instead of the legacy flat file. A pack with no
-        // `asset_overrides` key means "no asset overrides in this
-        // pack"; emit the boot marker with zero count and exit.
+        // Phase 370B: when sgfx_pack.json is present, read the pack-
+        // pointed manifest path. A pack with no `asset_overrides`
+        // key means "no asset overrides in this pack"; emit the
+        // boot marker with zero count and return an empty snapshot.
         std::filesystem::path manifest;
         if (SGPack::IsActive())
         {
@@ -70,8 +96,8 @@ namespace
                 LOGF_IMPL(Utility, "SG-Preflight",
                           "asset overrides: pack active with no asset_overrides; "
                           "skipping flat-file fallback");
-                UiLab::EmitBridgeScreenEntered("Asset:PixelOverridesLoaded:0");
-                return;
+                EmitLoadedMarkerIfRequested(emitLoadedMarker, 0);
+                return std::make_shared<const PictureSnapshot>();
             }
         }
         else
@@ -80,10 +106,12 @@ namespace
         }
 
         std::error_code ec;
-        if (!std::filesystem::is_regular_file(manifest, ec)) return;
+        if (!std::filesystem::is_regular_file(manifest, ec))
+            return std::make_shared<const PictureSnapshot>();
 
         std::ifstream stream(manifest, std::ios::binary);
-        if (!stream.is_open()) return;
+        if (!stream.is_open())
+            return std::make_shared<const PictureSnapshot>();
 
         nlohmann::json doc;
         try
@@ -96,13 +124,15 @@ namespace
                       "asset overrides: parse error in \"{}\": {}",
                       reinterpret_cast<const char*>(manifest.u8string().c_str()),
                       e.what());
-            return;
+            return std::make_shared<const PictureSnapshot>();
         }
 
-        if (!doc.is_object()) return;
+        if (!doc.is_object()) return std::make_shared<const PictureSnapshot>();
         const auto pics = doc.find("pictures");
-        if (pics == doc.end() || !pics->is_object()) return;
+        if (pics == doc.end() || !pics->is_object())
+            return std::make_shared<const PictureSnapshot>();
 
+        auto fresh = std::make_shared<PictureSnapshot>();
         std::size_t loaded = 0;
         for (const auto& [name, value] : pics->items())
         {
@@ -130,20 +160,13 @@ namespace
             if (endPos < static_cast<std::streamoff>(4))
             {
                 LOGF_IMPL(Utility, "SG-Preflight",
-                          "asset overrides: \"{}\" is too small to be a DDS "
-                          "(file at \"{}\")",
-                          name,
-                          reinterpret_cast<const char*>(absPath.u8string().c_str()));
+                          "asset overrides: \"{}\" is too small to be a DDS",
+                          name);
                 continue;
             }
             const auto fileSize = static_cast<std::size_t>(endPos);
             file.seekg(0, std::ios::beg);
 
-            // Reject files that are not raw DDS magic. Phase 369A
-            // routes pixel overrides through ddspp post-LZX-decompress;
-            // an LZX-magic file at this lane would be re-decompressed
-            // as garbage. Loud-fail at load time so the operator
-            // knows to either swap to a raw DDS or wrap-encode.
             std::array<char, 4> magic{};
             file.read(magic.data(), magic.size());
             const bool isDdsMagic = magic[0] == 'D' && magic[1] == 'D'
@@ -152,10 +175,8 @@ namespace
             {
                 LOGF_IMPL(Utility, "SG-Preflight",
                           "asset overrides: \"{}\" is not raw DDS magic; "
-                          "Phase 369A pixel-override path requires raw DDS "
-                          "(file at \"{}\")",
-                          name,
-                          reinterpret_cast<const char*>(absPath.u8string().c_str()));
+                          "Phase 369A pixel-override path requires raw DDS",
+                          name);
                 continue;
             }
             file.seekg(0, std::ios::beg);
@@ -173,7 +194,7 @@ namespace
                 continue;
             }
 
-            g_pictureOverrides.emplace(name, std::move(entry));
+            fresh->pictures.emplace(name, std::move(entry));
             ++loaded;
         }
 
@@ -182,11 +203,9 @@ namespace
                   loaded,
                   reinterpret_cast<const char*>(manifest.u8string().c_str()));
 
-        // Phase 369A boot marker. Distinct event name so consumers
-        // can tell pixel-lane loads from the older
-        // `Text:OverridesLoaded` text-lane marker.
-        UiLab::EmitBridgeScreenEntered(
-            "Asset:PixelOverridesLoaded:" + std::to_string(loaded));
+        EmitLoadedMarkerIfRequested(emitLoadedMarker, loaded);
+
+        return fresh;
     }
 }
 
@@ -196,25 +215,54 @@ namespace SGAssetOverrides
     {
         std::call_once(g_loadOnce, []
         {
-            DoLoad();
+            auto fresh = BuildSnapshot(/*emitLoadedMarker=*/true);
+            std::unique_lock lock(g_snapshotMutex);
+            g_snapshot = std::move(fresh);
             g_loaded.store(true, std::memory_order_release);
         });
     }
 
-    bool TryGetPixelOverride(std::string_view pictureName,
-                             const uint8_t** outData,
-                             std::size_t* outDataSize)
+    void Reload()
     {
-        if (!g_loaded.load(std::memory_order_acquire)) return false;
-        if (pictureName.empty() || outData == nullptr || outDataSize == nullptr)
-            return false;
+        if (!g_loaded.load(std::memory_order_acquire)) return;
 
-        auto it = g_pictureOverrides.find(std::string(pictureName));
-        if (it == g_pictureOverrides.end()) return false;
+        auto fresh = BuildSnapshot(/*emitLoadedMarker=*/false);
+        const std::size_t count = fresh ? fresh->pictures.size() : 0;
+        {
+            std::unique_lock lock(g_snapshotMutex);
+            g_snapshot = std::move(fresh);
+        }
 
-        *outData = it->second.bytes.data();
-        *outDataSize = it->second.bytes.size();
-        return true;
+        // Phase 370C: dedicated reload event so consumers can tell
+        // a hot-reload from the boot-time PixelOverridesLoaded.
+        // Always emitted, even when count == 0, so a "reload that
+        // dropped all overrides" is still observable from the
+        // bridge stream.
+        UiLab::EmitBridgeScreenEntered(
+            "Asset:PixelOverridesReloaded:" + std::to_string(count));
+    }
+
+    PixelOverrideHandle TryGetPixelOverride(std::string_view pictureName)
+    {
+        PixelOverrideHandle out;
+        if (!g_loaded.load(std::memory_order_acquire)) return out;
+        if (pictureName.empty()) return out;
+
+        std::shared_ptr<const PictureSnapshot> snap;
+        {
+            std::shared_lock lock(g_snapshotMutex);
+            snap = g_snapshot;
+        }
+        if (!snap) return out;
+
+        auto it = snap->pictures.find(std::string(pictureName));
+        if (it == snap->pictures.end()) return out;
+
+        out.data      = it->second.bytes.data();
+        out.size      = it->second.bytes.size();
+        out.keepAlive = std::shared_ptr<const void>(
+            std::move(snap), static_cast<const void*>(snap.get()));
+        return out;
     }
 
     void NoteHitForPicture(std::string_view pictureName)

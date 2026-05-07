@@ -6422,15 +6422,24 @@ static void MakePictureData(GuestPictureData* pictureData, uint8_t* data, uint32
             if (nameC != nullptr)
                 pictureName = std::string_view(nameC);
         }
-        const uint8_t* overrideData = nullptr;
-        std::size_t overrideSize = 0;
-        const bool pixelOverrideApplied =
-            !pictureName.empty() &&
-            SGAssetOverrides::TryGetPixelOverride(pictureName, &overrideData, &overrideSize);
-        if (pixelOverrideApplied)
+        // Phase 370C: hold the override handle for the ENTIRE
+        // LoadTexture lifetime. The handle keeps the immutable
+        // PictureSnapshot that owns the override bytes alive in the
+        // shared_ptr graph until this stack frame exits, so a
+        // concurrent hot-reload that swaps the global snapshot
+        // cannot free the bytes mid-decode. Without the handle,
+        // raw `data` would dangle.
+        SGAssetOverrides::PixelOverrideHandle overrideHandle;
+        bool pixelOverrideApplied = false;
+        if (!pictureName.empty())
         {
-            data = const_cast<uint8_t*>(overrideData);
-            dataSize = static_cast<uint32_t>(overrideSize);
+            overrideHandle = SGAssetOverrides::TryGetPixelOverride(pictureName);
+            if (overrideHandle.data != nullptr)
+            {
+                data = const_cast<uint8_t*>(overrideHandle.data);
+                dataSize = static_cast<uint32_t>(overrideHandle.size);
+                pixelOverrideApplied = true;
+            }
         }
 
         GuestTexture texture(ResourceType::Texture);
