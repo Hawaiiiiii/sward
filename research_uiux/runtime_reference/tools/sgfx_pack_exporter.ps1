@@ -65,8 +65,25 @@ param(
     # When set, the in-game `logo_sonicteam` picture is replaced
     # with this DDS file. This is the simplest way to verify the
     # pack is live: the Title screen logo flips to the operator's
-    # branding asset.
+    # branding asset. Equivalent to a one-element -PictureOverrides
+    # entry with Guest='logo_sonicteam'; either form works.
     [string]$LogoSonicteamReplacement = '',
+
+    # Phase 372: explicit picture overrides. Each entry is a
+    # hashtable with `Guest` (the retail SU CTexturePicture name
+    # the engine looks up at MakePictureData time) and `Source`
+    # (an absolute path to a raw DDS file the exporter copies
+    # into the pack's `pictures/` subdir). When both this and
+    # `-LogoSonicteamReplacement` are provided, both are merged;
+    # if a Guest collision occurs the first entry wins and the
+    # second emits an Add-Log warning.
+    #
+    # Schema example:
+    #   -PictureOverrides @(
+    #       @{ Guest='logo_sonicteam'; Source='C:\..\bmw_logo.dds' },
+    #       @{ Guest='logo_havok';     Source='C:\..\bmw_aux.dds'  }
+    #   )
+    [object[]]$PictureOverrides = @(),
 
     # Path to a JSON file containing a scoped-rules array, e.g.:
     #   [{ "literal":"99","csd_project_substring":"status",
@@ -156,7 +173,14 @@ if (-not $LogoPath -or $LogoPath -eq '') {
     $LogoPath = Join-Path $resDir 'logo_sgfx.png'
 }
 if (-not $LogoSonicteamReplacement -or $LogoSonicteamReplacement -eq '') {
-    $LogoSonicteamReplacement = Join-Path $resDir 'logo_sgfx.dds'
+    # Phase 372: only apply the convenience default when the caller
+    # is NOT driving the picture lane via -PictureOverrides. The
+    # author tool builds an explicit picture list that may or may
+    # not contain logo_sonicteam, and the default-fill would race
+    # the dedup either way.
+    if (-not $PictureOverrides -or $PictureOverrides.Count -eq 0) {
+        $LogoSonicteamReplacement = Join-Path $resDir 'logo_sgfx.dds'
+    }
 }
 
 # Default WindowTitle / BuildLabel derive from ticket if provided so
@@ -310,13 +334,59 @@ $picsDoc = [ordered]@{
     pictures = [ordered]@{}
 }
 
+# Build a unified list of {Guest, Source} entries from both legacy
+# `-LogoSonicteamReplacement` and Phase 372 `-PictureOverrides`.
+# Legacy entry ALWAYS appears first so a -PictureOverrides entry
+# for the same Guest is treated as the duplicate and skipped with
+# a warning. This keeps backward compatibility deterministic.
+$pictureEntries = New-Object System.Collections.Generic.List[object]
 if ($LogoSonicteamReplacement -and (Test-Path -LiteralPath $LogoSonicteamReplacement)) {
-    $picCopy = Join-Path $picsDir 'logo_sonicteam_override.dds'
-    Copy-Item -LiteralPath $LogoSonicteamReplacement -Destination $picCopy -Force
-    $picsDoc.pictures['logo_sonicteam'] = 'pictures/logo_sonicteam_override.dds'
-    Add-Log "logo_sonicteam override staged: $LogoSonicteamReplacement"
-} else {
-    Add-Log "logo_sonicteam override: none"
+    $pictureEntries.Add(@{ Guest = 'logo_sonicteam'; Source = $LogoSonicteamReplacement })
+}
+foreach ($entry in $PictureOverrides) {
+    if ($null -eq $entry) { continue }
+    $g = $null; $s = $null
+    if ($entry -is [hashtable]) {
+        $g = [string]$entry['Guest']
+        $s = [string]$entry['Source']
+    } elseif ($entry.Guest -and $entry.Source) {
+        $g = [string]$entry.Guest
+        $s = [string]$entry.Source
+    }
+    if (-not $g -or -not $s) {
+        Add-Log "WARN: skipping malformed PictureOverrides entry"
+        continue
+    }
+    if (-not (Test-Path -LiteralPath $s)) {
+        Add-Log "WARN: picture source missing, skipping: $s"
+        continue
+    }
+    $pictureEntries.Add(@{ Guest = $g; Source = $s })
+}
+
+# Stage each entry, deduping by Guest. Filenames on disk are
+# `<guest>_override.dds` so two entries with the same Guest would
+# collide; the dedup rule is "first one wins, second one warns".
+foreach ($entry in $pictureEntries) {
+    $guest  = [string]$entry.Guest
+    $source = [string]$entry.Source
+    if ($picsDoc.pictures.Contains($guest)) {
+        Add-Log "WARN: duplicate Guest '$guest' (first wins): $source skipped"
+        continue
+    }
+    # Sanitise the Guest into a filename component. Retail picture
+    # names are already lowercase ASCII without separators in
+    # practice, but we strip anything path-ish defensively so a
+    # malformed input cannot escape the pictures/ subdir.
+    $safeGuest = ($guest -replace '[^A-Za-z0-9_\-]','_')
+    $filename  = "${safeGuest}_override.dds"
+    $picCopy   = Join-Path $picsDir $filename
+    Copy-Item -LiteralPath $source -Destination $picCopy -Force
+    $picsDoc.pictures[$guest] = "pictures/$filename"
+    Add-Log "picture override staged: guest='$guest' source='$source' -> $filename"
+}
+if ($pictureEntries.Count -eq 0) {
+    Add-Log "picture overrides: none"
 }
 
 $picsJson = $picsDoc | ConvertTo-Json -Depth 6

@@ -1541,3 +1541,187 @@ runners continue to pass unchanged. The QA panel is overlay-only
 and never observes or mutates game state -- its visibility flag
 short-circuits at the top of `SGQAPanel::Draw()`, so disabled
 runs do not even pay the ImGui Begin/End cost.
+
+---
+
+## Phase 372 -- BMW Pack Authoring from sg-preflight project data
+
+Phase 367b through 371C built the SGFX shell and proved it could
+read, route, reload, and surface a pack. Phase 372 turns the pack
+itself into a generated artifact: an operator authors ONE BMW QA
+project file per ticket/profile (sitting next to the existing
+sg-preflight rule configs), the authoring tool resolves all
+paths/templates and produces the pack via the existing exporter,
+the launcher runs it. No more hand-edited
+`{ "version":2, "scoped_rules":[...] }` JSON; rule rationales are
+captured in the project file and copied verbatim into the pack
+audit log. This is the layer the user described as "where it
+starts feeling like a proper department tool."
+
+### What 372 adds
+
+| Layer | Path | Role |
+|---|---|---|
+| Schema | [`sg-preflight/config/bmw_qa_g65.json`](../../sg-preflight/config/bmw_qa_g65.json) | Sample BMW QA project file. Schema id `sgfx_bmw_qa_pack`, version 1. Holds ticket / project / route, branding templates, scoped text rules with `rationale` fields, and picture overrides referencing assets by relative or absolute path. Lives next to the existing sg-preflight rule configs so the SGFX QA workflow co-locates with the rest of preflight. |
+| Author tool | [`research_uiux/runtime_reference/tools/sgfx_author_from_preflight.ps1`](runtime_reference/tools/sgfx_author_from_preflight.ps1) | Reads a BMW QA project file, validates the schema, expands `${ticket}` / `${project}` / `${profile_id}` templates, resolves relative paths against the project file's directory (or accepts absolute paths), invokes `sgfx_pack_exporter.ps1` via hashtable splatting, and appends the operator's rationale fields to `pack_export.log` so future-them remembers WHY each rule exists. |
+| Exporter | [`research_uiux/runtime_reference/tools/sgfx_pack_exporter.ps1`](runtime_reference/tools/sgfx_pack_exporter.ps1) | Gained `-PictureOverrides` param: array of `@{Guest;Source}` entries. Multiple picture swaps in one pack, deduped by Guest with first-wins semantics. Legacy `-LogoSonicteamReplacement` continues to work as a one-element shortcut, and now ONLY auto-fills its default when the caller is not driving the picture lane via `-PictureOverrides`. |
+| Proof | [`research_uiux/runtime_reference/tools/phase372_path_b_proof.ps1`](runtime_reference/tools/phase372_path_b_proof.ps1) | End-to-end: synthesises a self-contained BMW QA project file in EvidenceDir, runs the author tool, validates pack files + `pack_meta.json` round-trip + rationale appendix in `pack_export.log`, launches the shell, asserts boot events (Pack:Meta / Pack:Route / Text:ScopedRulesLoaded:4 / QAPanel:Active), edits the project file mid-run (4->5 rules) + re-runs author tool, asserts `Text:ScopedRulesReloaded:5`, verifies real save SHA, and runs a NEGATIVE sub-test where a project file with an unscoped rule MUST be rejected by the author tool with an error mentioning `csd_project_substring` (anti-regression for the Phase 367b "BMW999 everywhere" issue). |
+
+### BMW QA project file schema (`sgfx_bmw_qa_pack` v1)
+
+```jsonc
+{
+  "schema": "sgfx_bmw_qa_pack",
+  "version": 1,
+
+  "profile_id": "g65",
+  "ticket":  "IDCEVODEV-960073",   // mandatory
+  "project": "BMW G65 ...",        // mandatory
+  "route":   "title",              // mandatory: title|auto|worldmap|hud|results
+
+  "branding": {
+    "window_title_template": "${project} (${ticket})",
+    "build_label_template":  "SGFX 0.6 (Phase 372 / ${profile_id})",
+    "icon_relative":         "../assets/g65_icon.png",
+    "logo_relative":         "../assets/g65_logo.png"
+  },
+
+  "scoped_text_rules": [
+    {
+      "literal":               "99",
+      "csd_project_substring": "status",       // MANDATORY -- enforced
+      "replacement":           "G65",
+      "rationale":             "..."           // optional, copied to log
+    }
+  ],
+
+  "picture_overrides": [
+    {
+      "guest_picture":   "logo_sonicteam",
+      "source_relative": "../assets/g65_logo.dds",
+      "rationale":       "..."
+    }
+  ]
+}
+```
+
+### Validation rules enforced by the author tool
+
+| Check | Error path |
+|---|---|
+| `schema == "sgfx_bmw_qa_pack"`, `version == 1` | Reject with explicit message |
+| `ticket`, `project`, `route` non-empty (or overridden via CLI) | Reject |
+| `route` in `{ title, auto, worldmap, hud, results }` | Reject |
+| Every `scoped_text_rules[*]` has non-empty `csd_project_substring` | **Reject with the magic string `csd_project_substring` in the error message** -- this is the Phase 367b regression guard the negative sub-test asserts |
+| Every `scoped_text_rules[*]` has non-empty `literal` and `replacement` | Reject |
+| Every `picture_overrides[*]` has `guest_picture` + an existing source file | Reject |
+| Every `branding.icon_relative` / `logo_relative` resolves to an existing file | Warn + skip (non-fatal; the exporter falls back to its own defaults) |
+
+### Phase 372 acceptance gates (each fails with a distinct exit code)
+
+| Code | Gate | Description |
+|---:|---|---|
+| 2 | build / deploy | `_phase367_build.bat` failed or exe missing |
+| 3 | author output | Authoring tool didn't produce expected files; OR `pack_export.log` lacks the rationale appendix |
+| 4 | pack_meta round-trip | Ticket / project / route / phase in `pack_meta.json` diverged from the BMW QA project file |
+| 5 | `Pack:Meta:<t>:<p>:372` | Boot-time metadata emit |
+| 6 | `Pack:Route:title` | Boot-time route emit |
+| 7 | `Text:ScopedRulesLoaded:4` | Initial rule count from project file reached UR intact |
+| 8 | `QAPanel:Active:<ticket>:title` | In-game QA panel visible (regression of Phase 371C) |
+| 9 | `Text:ScopedRulesReloaded:5` | Mid-run re-author with 5th rule triggered hot reload |
+| 10 | save SHA stable | Real save unchanged across runs (regression of Phase 371B) |
+| 11 | unscoped-rule rejection | Negative sub-test: a project file with an unscoped rule is rejected AND the error message names `csd_project_substring` |
+| 12 | native frame | UR rendered at least one BMP under EvidenceDir |
+
+### Runtime-proven evidence (2026-05-08 run)
+
+```
+[author] plan
+  ticket:       IDCEVODEV-960073
+  project:      BMW G65 IDCevo SGFX QA Shell
+  route:        title
+  profile_id:   g65
+  windowTitle:  BMW G65 IDCevo SGFX QA Shell (IDCEVODEV-960073)
+  buildLabel:   SGFX 0.6 (Phase 372 / g65)
+  rules:        4
+  pictures:     1
+[exporter] wrote sgfx_pack.json + pack_meta.json + text/sgfx_text.json + pictures/sgfx_pictures.json + sgfx_branding/icon.png + pack_export.log
+
+[boot]
+  Pack:Loaded:sgfx_text.json:sgfx_pictures.json:0
+  Pack:Meta:IDCEVODEV-960073:BMW G65 IDCevo SGFX QA Shell:372
+  Pack:Route:title
+  Text:ScopedRulesLoaded:4
+  Asset:PixelOverridesLoaded:1
+  Branding:Active:BMW G65 IDCevo SGFX QA Shell (IDCEVODEV-960073)|icon.png|SGFX 0.6 (Phase 372 / g65)
+  HotReload:WatcherStarted
+  QAPanel:Active:IDCEVODEV-960073:title
+
+[mid-run author re-export adds rule "0"@status]
+  Text:ScopedRulesReloaded:5    (1.93s end-to-end)
+
+[negative sub-test]
+  author rejected unscoped rule with error including 'csd_project_substring'
+```
+
+| Gate | Pass |
+|---|---|
+| Pack files produced | True |
+| pack_meta round-trip | True |
+| Pack:Meta | True |
+| Pack:Route:title | True |
+| Text:ScopedRulesLoaded:4 | True |
+| QAPanel:Active | True |
+| Text:ScopedRulesReloaded:5 | True |
+| Save SHA unchanged | True |
+| Unscoped rule rejected (with magic-string error) | True |
+| Native frame written | True |
+
+### Decisions honored
+
+- **BMW QA project file lives WITH sg-preflight, not inside UR's repo.** Operators author there because that's where they author everything else; the SGFX shell is just one consumer of the same project.
+- **No Python changes to sg-preflight.** The authoring tool is pure PowerShell; sg-preflight stays intact and the BMW QA file is pure-data JSON. If sg-preflight later wants to generate the BMW QA file from its profile model, that becomes a separate Python feature -- the authoring tool is downstream of whatever produces the file.
+- **Rationale appendix in `pack_export.log`.** Every rule's `rationale` field gets copied verbatim into the pack's audit log, so a future operator opening the pack dir sees both WHAT was overridden and WHY.
+- **Unscoped-rule rejection is enforced AT AUTHOR TIME, not just at runtime.** The check fires before UR ever sees the manifest. The error message intentionally names `csd_project_substring` so the proof's regex can verify the gate, and so the operator's editor / IDE can highlight the right field.
+- **Hashtable splatting, not array splatting.** Earlier array-based `& $exporter @args` had values-with-dashes get misparsed as parameter names; switching to a hashtable forces name-based binding and removes positional ambiguity.
+- **Path resolution accepts both relative and absolute.** Relative paths anchor on the project file's directory (portable across checkouts -- the sg-preflight sample uses this). Absolute paths are accepted unchanged (useful when synthesising project files in temp dirs, which the proof does).
+- **Exporter's `-Force` is now scoped** (Phase 371B carry-over reaffirmed). The author tool passes `-Force` so re-running on the same OutputDir refreshes manifests but preserves the launcher-owned `save/` sandbox.
+- **Legacy `-LogoSonicteamReplacement` still works.** Phase 371A/B/C runners still pass against the new exporter unchanged. The default-fill of `LogoSonicteamReplacement` only kicks in when neither the legacy flag nor `-PictureOverrides` was provided, so author-tool callers never get a phantom default `logo_sonicteam` entry colliding with their explicit picture map.
+- **Negative sub-test runs in the same proof.** A separate "anti-regression" test would invite drift; bundling it into Phase 372 means every run reaffirms the unscoped-rule guard.
+
+### Honest gaps
+
+- **Schema is hand-edited JSON.** No GUI, no auto-completion. The validation messages are explicit but the authoring loop today is "edit JSON, re-run author tool, watch for errors." A future beat could add a JSON Schema file (separate from the runtime check) so VS Code shows inline validation.
+- **No bulk-rule generator.** If an operator needs 50 scoped rules, they write 50 entries by hand. There is no helper that, e.g., scans retail SU's CSD trees and proposes literals for each project. That's the natural Phase 373 if the rule volume grows.
+- **No backwards-compat for older schema versions.** `version: 1` is hard-coded. Adding `version: 2` would require an explicit migration path that this beat does not provide.
+- **Branding template variables are limited.** Today: `${ticket}`, `${project}`, `${profile_id}`. No `${date}`, `${user}`, `${profile_label}`. Adding more is one-line each but every variable a future operator wants must be declared explicitly to keep templating predictable.
+- **No "verify pack matches project file" tool.** Once the pack is generated, there is no way to ask "does this on-disk pack still represent project file X?" beyond comparing `pack_meta.exported_at` timestamps. A `sgfx_verify_pack.ps1` tool that re-runs the author with `-DryRun` and diffs would be a clean follow-up.
+- **The proof's negative sub-test only covers the unscoped-rule case.** The other validation rules (missing literal, missing replacement, missing source file) are exercised by the author tool's code paths but not asserted by the proof. They each have explicit `throw` calls; if any regress, only operator-time discovery catches it. A multi-case negative test rig would close that gap.
+
+### Fresh verification command
+
+```powershell
+# Full Phase 372 proof:
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\phase372_path_b_proof.ps1 `
+    -AutoExitSeconds 45 -ReloadTimeoutSeconds 8
+
+# Author a pack from the sample BMW QA project file:
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\sgfx_author_from_preflight.ps1 `
+    -ProjectFile "C:\Users\DavidErikGarciaArena\Downloads\sg-preflight\config\bmw_qa_g65.json" `
+    -OutputDir "$env:LOCALAPPDATA\UnleashedRecomp\sg_overrides_bmw_g65" `
+    -Force
+
+# Then launch the resulting pack via the 371B launcher:
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\sgfx_shell_launch.ps1 `
+    -PackDir "$env:LOCALAPPDATA\UnleashedRecomp\sg_overrides_bmw_g65" `
+    -SkipExport
+```
+
+Phase 367b / 368 / 369A / 369B / 370A / 370B / 370C / 371A / 371B
+/ 371C runners all continue to pass unchanged. The author tool is
+purely additive: existing packs hand-stitched by prior runners are
+still valid, and the exporter's CLI surface gained one optional
+parameter (`-PictureOverrides`) without changing any existing one.
