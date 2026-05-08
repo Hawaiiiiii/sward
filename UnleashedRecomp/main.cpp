@@ -28,6 +28,7 @@
 #include <patches/sg_branding.h>
 #include <patches/sg_hot_reload.h>
 #include <patches/sg_pack.h>
+#include <patches/sg_preflight_state.h>
 #include <patches/sg_text_overrides.h>
 #include <patches/sg_asset_overrides.h>
 #include <patches/ui_lab_patches.h>
@@ -389,6 +390,15 @@ int main(int argc, char *argv[])
                   "branding: build label override = \"{}\"",
                   *buildLabel);
     }
+
+    // Phase 373: load the sg-preflight bridge state so the QA panel
+    // can surface ticket / profile / action count / latest-run
+    // status. Reads SG_PREFLIGHT_STATE_JSON (or the pack-relative
+    // fallback). Always emits exactly one bridge event:
+    //   - SgPreflightState:Loaded:<profile>:<actionCount> on success
+    //   - SgPreflightState:Missing:<reason> on absent/parse-error
+    // No-op when neither env var nor the fallback file exists.
+    SGPreflightState::EnsureLoaded();
 
     // Phase 370C: start the hot-reload watcher AFTER every loader's
     // EnsureLoaded() has installed its initial snapshot. The watcher

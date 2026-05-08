@@ -84,6 +84,20 @@ param(
     # under <PackDir>/save/ is left untouched.
     [switch]$NoSandboxSync,
 
+    # Phase 373: sg-preflight runtime bridge. When -SgPreflightRoot
+    # points at the operator's sg-preflight checkout, the launcher
+    # invokes sgfx_preflight_bridge_export.ps1 BEFORE launch to
+    # write <PackDir>/sg_preflight_state.json, and exports
+    # SG_PREFLIGHT_STATE_JSON pointing at that file so UR's state
+    # loader can surface it in the QA panel. Empty string disables
+    # the bridge step (no state file written, env var unset).
+    # -PreflightProfile selects which sg-preflight profile the bridge
+    # filters actions for; defaulted to "G65" if blank.
+    # Named PreflightProfile (not Profile) because $Profile is a
+    # PowerShell automatic variable.
+    [string]$SgPreflightRoot = '',
+    [string]$PreflightProfile = '',
+
     [string]$EvidenceDir = '',
     [string]$QuarantineRoot = '',
     [string]$RepoRoot = ''
@@ -221,6 +235,42 @@ if (-not $SkipExport) {
 
 if (-not (Test-Path -LiteralPath (Join-Path $PackDir 'sgfx_pack.json'))) {
     throw "Pack at $PackDir is missing sgfx_pack.json. Re-run without -SkipExport."
+}
+
+# --- 1b. Phase 373: sg-preflight bridge state -------------------------
+
+# When -SgPreflightRoot is set, run the bridge export to dump the
+# real sg-preflight CLI output (profiles / actions / checkers /
+# workflow) into <PackDir>/sg_preflight_state.json. UR's loader
+# reads this via SG_PREFLIGHT_STATE_JSON and the QA panel surfaces
+# the selected profile + action count + first warning.
+$preflightStatePath = Join-Path $PackDir 'sg_preflight_state.json'
+if ($SgPreflightRoot -and (Test-Path -LiteralPath $SgPreflightRoot)) {
+    Write-Banner "Exporting sg-preflight bridge state"
+    $bridgeScript = Join-Path (Split-Path -Parent $PSCommandPath) 'sgfx_preflight_bridge_export.ps1'
+    if (-not (Test-Path -LiteralPath $bridgeScript)) {
+        throw "Bridge export script not found: $bridgeScript"
+    }
+    $effectiveProfile = if ($PreflightProfile) { $PreflightProfile } else { 'G65' }
+    & $bridgeScript `
+        -SgPreflightRoot $SgPreflightRoot `
+        -OutputPath      $preflightStatePath `
+        -Profile         $effectiveProfile `
+        -Ticket          $Ticket `
+        -Project         $Project | Out-Host
+    $env:SG_PREFLIGHT_STATE_JSON = $preflightStatePath
+    Write-Host "  SG_PREFLIGHT_STATE_JSON = $preflightStatePath"
+} else {
+    if ($SgPreflightRoot) {
+        Write-Host "[warn] -SgPreflightRoot set but path missing: $SgPreflightRoot" -ForegroundColor Yellow
+    }
+    # Make sure stale env or stale pack-local state from a previous
+    # invocation does not leak into a bridge-disabled shell. UR has
+    # a pack-relative fallback path, so clearing only the env var is
+    # not enough once a pack has previously been launched with
+    # -SgPreflightRoot.
+    Remove-Item Env:SG_PREFLIGHT_STATE_JSON -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $preflightStatePath -Force -ErrorAction SilentlyContinue
 }
 
 # --- 2. Real-save quarantine + per-ticket sandbox overlay ---------------
@@ -433,6 +483,18 @@ function Format-Event {
     }
     if ($screen -like 'HotReload:WatcherStarted*') {
         return "[hot]  watcher started (mtime+debounce)"
+    }
+    if ($screen -like 'SgPreflightState:Loaded:*') {
+        $rest = $screen.Substring('SgPreflightState:Loaded:'.Length)
+        return "[pre]  state loaded -- $rest"
+    }
+    if ($screen -like 'SgPreflightState:Missing:*') {
+        $reason = $screen.Substring('SgPreflightState:Missing:'.Length)
+        return "[pre]  state MISSING ($reason)"
+    }
+    if ($screen -like 'QAPanel:SgPreflightState:*') {
+        $rest = $screen.Substring('QAPanel:SgPreflightState:'.Length)
+        return "[panel] sg-preflight: $rest"
     }
     return $null
 }

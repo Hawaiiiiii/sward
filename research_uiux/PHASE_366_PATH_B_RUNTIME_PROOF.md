@@ -1725,3 +1725,241 @@ Phase 367b / 368 / 369A / 369B / 370A / 370B / 370C / 371A / 371B
 purely additive: existing packs hand-stitched by prior runners are
 still valid, and the exporter's CLI surface gained one optional
 parameter (`-PictureOverrides`) without changing any existing one.
+
+---
+
+## Phase 373 -- sg-preflight runtime bridge + SGFX rebrand audit
+
+Phase 372 wired the SGFX shell to a BMW QA project file. Phase 373
+makes the shell consume the OPERATOR'S sg-preflight checkout
+directly: ticket / project / route / actions metadata flow from
+sg-preflight's real CLI through a bridge JSON file into UR, where
+the QA panel surfaces them at runtime. The shell is no longer
+"Sonic with swapped text/assets" -- it's a window into the same
+sg-preflight project the rest of the BMW QA workflow uses.
+
+### What 373 adds
+
+| Layer | Path | Role |
+|---|---|---|
+| Bridge | [`research_uiux/runtime_reference/tools/sgfx_preflight_bridge_export.ps1`](runtime_reference/tools/sgfx_preflight_bridge_export.ps1) | Calls the real sg-preflight CLI (`list-profiles`, `list-actions`, `list-checkers`, `workflow-status`) via the operator's `.venv` and writes a consolidated `sgfx_preflight_state` v1 document to `<PackDir>/sg_preflight_state.json`. Filters `actions` to the selected profile + workspace-scoped entries. CLI failures become `warnings[]` entries, never aborts: a missing sg-preflight venv still produces a valid state document with the failure reason, so UR boots resilient. Atomic write via `*.tmp + Move-Item` so a concurrent UR boot never reads a half-written file. |
+| Launcher | [`research_uiux/runtime_reference/tools/sgfx_shell_launch.ps1`](runtime_reference/tools/sgfx_shell_launch.ps1) | New `-SgPreflightRoot` and `-PreflightProfile` params (named `PreflightProfile` because `$Profile` is a PowerShell automatic). When `-SgPreflightRoot` is set, the launcher invokes the bridge export between pack-export and save-quarantine, then exports `SG_PREFLIGHT_STATE_JSON` for UR. Empty / missing root cleanly clears the env so the loader emits `Missing:path_absent`. |
+| UR | [`UnleashedRecomp/patches/sg_preflight_state.h`](../UnleashedRecomp/patches/sg_preflight_state.h) / [`.cpp`](../UnleashedRecomp/patches/sg_preflight_state.cpp) | New `SGPreflightState::EnsureLoaded()` reads `SG_PREFLIGHT_STATE_JSON` (or the `<override>/sg_preflight_state.json` fallback), validates the schema gate, and exposes accessors for selected profile / source root / latest run / first warning / action count. Emits `SgPreflightState:Loaded:<profile>:<actionCount>` on success or `SgPreflightState:Missing:<reason>` on absence. Failure modes are intentionally non-fatal -- vanilla UR boots stay overlay-clean. |
+| UR | [`UnleashedRecomp/main.cpp`](../UnleashedRecomp/main.cpp) | `SGPreflightState::EnsureLoaded()` runs after `SGBranding::EnsureLoaded()` so the panel can read both at first frame. New `#include <patches/sg_preflight_state.h>`. |
+| UR | [`UnleashedRecomp/patches/sg_qa_panel.cpp`](../UnleashedRecomp/patches/sg_qa_panel.cpp) | Panel renders a new section: `preflight profile / source / actions / latest run / first warning`. Placeholders shown when state is missing. Emits `QAPanel:SgPreflightState:<profile>:<actionCount>` exactly once on the first frame where the loader is populated -- separate gate from `QAPanel:Active` so deferred-load paths still get a clean panel-side proof event. |
+| UR | [`UnleashedRecomp/CMakeLists.txt`](../UnleashedRecomp/CMakeLists.txt) | Adds `patches/sg_preflight_state.cpp` to the source list. |
+| Coverage | [`research_uiux/SGFX_REBRAND_COVERAGE.md`](SGFX_REBRAND_COVERAGE.md) | Manual inventory: every place the shell still looks/sounds like Sonic, classified by replacement mechanism (`text-scoped` / `pixel` / `loose` / `branding` / `csd-route` / `audio-hook` / `unknown-probe`). Honest split between what's covered today and what needs new hooks. |
+| Proof | [`research_uiux/runtime_reference/tools/phase373_path_b_proof.ps1`](runtime_reference/tools/phase373_path_b_proof.ps1) | End-to-end: build -> author G65 pack via Phase 372 tool -> patch pack_meta phase to 373 -> run bridge export against real sg-preflight (`C:\Users\...\Downloads\sg-preflight`) -> launch UR with `SG_PREFLIGHT_STATE_JSON` -> assert boot events -> assert panel emit -> verify rebrand coverage report exists -> verify save SHA -> capture native frame. |
+
+### Bridge state schema (`sgfx_preflight_state` v1)
+
+```jsonc
+{
+  "schema": "sgfx_preflight_state",
+  "version": 1,
+  "source_root":      "C:/.../sg-preflight",
+  "python":           "C:/.../sg-preflight/.venv/Scripts/python.exe",
+  "generated_at_utc": "2026-05-08T...Z",
+  "selected_profile": "G65",
+  "ticket":  "IDCEVODEV-960073",
+  "project": "BMW G65 IDCevo SGFX QA Shell",
+  "profiles": [ /* full sg-preflight list-profiles output, all profiles */ ],
+  "actions":  [ /* sg-preflight list-actions output, filtered to:
+                   action.profile_id == selected_profile  OR
+                   action.profile_id is empty AND scope == "workspace"
+                */ ],
+  "checkers": [ /* sg-preflight list-checkers output, all */ ],
+  "workflow": [ /* sg-preflight workflow-status output, all */ ],
+  "latest_run":     null,
+  "evidence_paths": [],
+  "warnings": [ /* "[<step>] sg-preflight exited <code>; <stderr>" or
+                   "[filter] -Profile <X> matched no actions" */ ]
+}
+```
+
+UR's loader reads only the headline fields (`selected_profile`,
+`source_root`, `actions[].length`, `latest_run.status`,
+`warnings[0]`). The full arrays stay in the JSON for the Python
+bridge daemon and any future consumer that wants richer surfaces
+without UR re-parsing them.
+
+### Phase 373 acceptance gates (each fails with a distinct exit code)
+
+| Code | Gate | Description |
+|---:|---|---|
+| 2 | build / deploy | `_phase367_build.bat` failed or exe missing |
+| 3 | bridge export | sg-preflight CLI failed AND no valid state file produced; OR schema/profile/actions shape mismatch |
+| 4 | `Pack:Meta:<t>:<p>:373` | Boot-time metadata emit (regression of Phase 371A + 372) |
+| 5 | `Pack:Route:title` | Boot-time route emit (regression of Phase 371B) |
+| 6 | `SgPreflightState:Loaded:G65:<n>` | UR loader read the bridge state and matched both profile and action count |
+| 7 | `QAPanel:SgPreflightState:G65:<n>` | The panel surfaced the state at render time (proves the new panel section reached a frame) |
+| 8 | rebrand coverage report | `research_uiux/SGFX_REBRAND_COVERAGE.md` exists and is non-trivially populated (>1 KB) |
+| 9 | save SHA stable | Real save unchanged across the run (regression of Phase 371B) |
+| 10 | native frame | UR rendered at least one BMP under EvidenceDir |
+
+### Runtime-proven evidence (2026-05-08 run)
+
+```
+[bridge] state written
+  output:           ...\sg_overrides_phase373\sg_preflight_state.json
+  source root:      C:\Users\DavidErikGarciaArena\Downloads\sg-preflight
+  python:           ...\sg-preflight\.venv\Scripts\python.exe
+  selected profile: G65
+  profiles:         19
+  actions (filt):   10 of 118
+  checkers:         9
+  workflow areas:   6
+  warnings:         0
+
+[boot]
+  Pack:Loaded:sgfx_text.json:sgfx_pictures.json:0
+  Pack:Meta:IDCEVODEV-960073:BMW G65 IDCevo SGFX QA Shell:373
+  Pack:Route:title
+  Text:ScopedRulesLoaded:2
+  Asset:PixelOverridesLoaded:1
+  Branding:Active:BMW G65 IDCevo SGFX QA Shell (IDCEVODEV-960073)|icon.png|SGFX 0.7 (Phase 373 / g65)
+  HotReload:WatcherStarted
+  SgPreflightState:Loaded:G65:10
+  QAPanel:Active:IDCEVODEV-960073:title
+  QAPanel:SgPreflightState:G65:10
+```
+
+| Gate | Pass |
+|---|---|
+| Bridge state JSON valid | True (schema=`sgfx_preflight_state`, profile=G65, actions=10) |
+| Pack:Meta:...:373 | True |
+| Pack:Route:title | True |
+| SgPreflightState:Loaded:G65:10 | True |
+| QAPanel:SgPreflightState:G65:10 | True |
+| Rebrand coverage report | True (10151 bytes) |
+| Save SHA unchanged | True |
+| Native frame written | True |
+
+### Event taxonomy added in Phase 373
+
+| Event | Emitter | When |
+|---|---|---|
+| `SgPreflightState:Loaded:<profile>:<actionCount>` | `SGPreflightState::EnsureLoaded` | Once at boot, when the state file exists, parses, and matches the schema gate. `<profile>` is `_` when the file's `selected_profile` is empty. |
+| `SgPreflightState:Missing:<reason>` | same | Once at boot when the loader fails. Reasons are stable, machine-readable tokens: `path_absent`, `open_failed`, `parse_error`, `not_object`, `schema_mismatch`. |
+| `QAPanel:SgPreflightState:<profile>:<actionCount>` | `SGQAPanel::Draw` | Exactly once on the first frame where `SGPreflightState::IsLoaded()` returns true. Separate from `QAPanel:Active` so deferred-load paths (env not set at boot but appearing later) still produce a panel-side proof event. |
+
+### Decisions honored
+
+- **Bridge does NOT duplicate sg-preflight logic.** Every value in
+  `sg_preflight_state.json` is pass-through from the real CLI. If
+  sg-preflight's schema changes, the bridge's output changes with
+  it -- no reverse-engineered transformations to drift.
+- **Failures degrade to warnings, not aborts.** Operators without a
+  working sg-preflight venv still get the SGFX shell; they just
+  see `(no preflight state)` placeholders in the panel and a
+  `SgPreflightState:Missing:<reason>` event in the bridge stream.
+- **Atomic write to the state file.** The bridge writes
+  `<output>.tmp` then `Move-Item -Force`. A UR boot reading the
+  file mid-rewrite never sees a half-written document.
+- **UR loader reads HEADLINE fields only.** The full
+  `profiles/actions/checkers/workflow` arrays stay in the JSON
+  for downstream consumers (Python bridge daemon, future panels)
+  but UR keeps a tiny in-memory footprint: 4 strings + 1 size_t.
+- **Schema gate, not version gate.** The loader rejects a missing
+  or wrong `schema` field but accepts any `version` (today only
+  `1` is shipped; future versions will gate explicitly when they
+  diverge enough to need it).
+- **Panel emit is a separate gate from `QAPanel:Active`.** Both
+  fire once per session; the preflight gate is conditional on
+  `SGPreflightState::IsLoaded()`. A pack with no bridge state
+  still emits `QAPanel:Active` (panel rendered) but does NOT emit
+  `QAPanel:SgPreflightState:` (no preflight to surface).
+- **Proof patches `pack_meta.phase` directly to `373`.** The
+  Phase 372 author tool defaults to `phase=372` because that's
+  its CLI default; the BMW QA project schema doesn't carry a
+  phase field today. Patching `pack_meta.json` post-author keeps
+  the proof's gate string deterministic without growing the
+  schema for a one-line value.
+- **`SG_PREFLIGHT_STATE_JSON` env precedence over the convention
+  path.** The launcher always writes the file at
+  `<PackDir>/sg_preflight_state.json` AND sets the env var
+  pointing there. The env path takes precedence so an external
+  bridge daemon writing to a different location can override.
+- **`$PreflightProfile` not `$Profile`.** PowerShell's automatic
+  `$Profile` variable refers to the user's profile script;
+  shadowing it triggers PSScriptAnalyzer warnings and confuses
+  any `Test-Path $PROFILE` debugging that runs in the same
+  session. Renamed for safety.
+- **Rebrand audit is a hand-written checklist, not a generator.**
+  The user asked for "the practical 'stop seeing Sonic stuff'
+  checklist" -- a generator would be a different problem (CSD
+  tree walker, picture-name enumerator). The static doc captures
+  what's known today and explicitly flags `unknown-probe` items
+  as needing a runtime probe before mechanism choice.
+
+### Honest gaps
+
+- **`latest_run` is null today.** sg-preflight has run history via
+  `qa_actions.list_recent_action_records`, but capturing it would
+  require either an additional CLI subcommand or direct Python
+  import. Not in scope for the bridge MVP; the loader handles it
+  cleanly when populated.
+- **Bridge does not run actions.** The bridge READS sg-preflight
+  state but never invokes anything that mutates state. Action
+  triggering (e.g. "run repo_checker_idcevo from inside the
+  shell") is a future beat -- it requires both an in-game button
+  AND a launcher-side action runner. This phase ships display
+  only.
+- **Panel does not list individual actions.** Showing 10+ rows
+  inside a tiny ImGui overlay would compete with the rest of the
+  pack metadata. A scrollable child window or a separate "actions"
+  panel is a future beat. The action COUNT is shown today; the
+  array is in the JSON for any future consumer that wants it.
+- **No invalidation when the state file changes mid-run.**
+  `EnsureLoaded` uses `std::call_once`, so a re-export of
+  `sg_preflight_state.json` while UR is running does NOT update
+  the panel. Hot-reload of preflight state would need the same
+  shared_ptr-snapshot pattern Phase 370C built for the override
+  lanes; deferred to a later beat because preflight metadata is
+  identifier-grade (changing it mid-run would make any captured
+  evidence ambiguous, same reason `pack_meta.json` is read-once).
+- **Rebrand audit is human-curated.** The matrix in
+  `SGFX_REBRAND_COVERAGE.md` is correct as of 2026-05-08 and
+  Phase 373's runtime evidence, but it can drift the moment a
+  new screen is exercised. A future generator could walk the
+  bridge events log and tally actually-observed surfaces, but
+  for now the doc explicitly times-tamps "last updated as part
+  of Phase 373."
+- **Sg-preflight venv is a precondition, not bootstrapped.** The
+  bridge tries `.venv\Scripts\python.exe` then `.venv_bmw_ci\...`
+  then PATH `python`. If none has the required deps installed
+  (`openpyxl`, `fastapi`, etc.), all four CLI probes fail and the
+  state file ships empty arrays + four `warnings[]` entries. The
+  bridge does NOT pip-install missing deps; that decision belongs
+  to the operator's IT setup, not the SGFX shell.
+
+### Fresh verification command
+
+```powershell
+# Full Phase 373 proof:
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\phase373_path_b_proof.ps1 `
+    -AutoExitSeconds 45
+
+# Bridge export only (useful for sg-preflight smoke):
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\sgfx_preflight_bridge_export.ps1 `
+    -SgPreflightRoot "C:\Users\DavidErikGarciaArena\Downloads\sg-preflight" `
+    -OutputPath "$env:TEMP\sgfx_preflight_state_smoke.json" `
+    -Profile G65
+
+# Interactive launch with sg-preflight state surfaced in the panel:
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File research_uiux\runtime_reference\tools\sgfx_shell_launch.ps1 `
+    -Ticket "IDCEVODEV-960073" -Project "BMW G65 IDCevo SGFX QA Shell" `
+    -Route title `
+    -SgPreflightRoot "C:\Users\DavidErikGarciaArena\Downloads\sg-preflight" `
+    -PreflightProfile G65
+```
+
+Phase 367b / 368 / 369A / 369B / 370A / 370B / 370C / 371A / 371B
+/ 371C / 372 runners all continue to pass unchanged. The bridge,
+the loader, and the panel section are purely additive: a pack
+without `sg_preflight_state.json` (any pre-373 pack) leaves UR
+emitting `SgPreflightState:Missing:path_absent` and the panel
+showing `(no state file)` -- nothing else changes.
