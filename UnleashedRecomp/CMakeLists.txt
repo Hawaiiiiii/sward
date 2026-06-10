@@ -132,6 +132,7 @@ set(UNLEASHED_RECOMP_PATCHES_CXX_SOURCES
     "patches/aspect_ratio_patches.cpp"
     "patches/audio_patches.cpp"
     "patches/camera_patches.cpp"
+    "patches/csd_capture.cpp"
     "patches/CGameModeStageTitle_patches.cpp"
     "patches/CHudPause_patches.cpp"
     "patches/CTitleStateIntro_patches.cpp"

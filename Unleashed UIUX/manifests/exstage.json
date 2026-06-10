@@ -1,0 +1,34 @@
+{
+  "screen": "exstage",
+  "stem": "ui_exstage",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/exstage/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_exstage"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "hit_counter_bg_c",
+      "tex": "mat_hit_001.png",
+      "rect": [
+        10,
+        16,
+        350,
+        9
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.96094,
+        0.96484,
+        0.96484,
+        1.0
+      ]
+    }
+  ]
+}

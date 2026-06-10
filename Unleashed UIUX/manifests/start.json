@@ -1,0 +1,52 @@
+{
+  "screen": "start",
+  "stem": "ui_start",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/start/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_start"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "start_img",
+      "tex": "mat_start_en_001.png",
+      "rect": [
+        288,
+        88,
+        704,
+        544
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.59375,
+        0.84961,
+        0.67969,
+        0.91602
+      ]
+    },
+    {
+      "id": "clear",
+      "tex": "mat_start_en_001.png",
+      "rect": [
+        84,
+        324,
+        512,
+        72
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.14648,
+        1.0,
+        0.28711
+      ]
+    }
+  ]
+}

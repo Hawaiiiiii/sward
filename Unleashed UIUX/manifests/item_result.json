@@ -1,0 +1,124 @@
+{
+  "screen": "item_result",
+  "stem": "ui_itemresult",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/item_result/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_itemresult"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "iresult_title_title_bg",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        0,
+        54,
+        720,
+        71
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.00977,
+        -0.00781,
+        0.01953,
+        0.12891
+      ]
+    },
+    {
+      "id": "iresult_title_title_txt_s",
+      "tex": "mat_result_en_001.png",
+      "rect": [
+        252,
+        68,
+        340,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.6875,
+        0.66406,
+        0.76562
+      ]
+    },
+    {
+      "id": "contents",
+      "tex": "mat_comon_006.png",
+      "rect": [
+        252,
+        235,
+        772,
+        263
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.5,
+        0.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "id": "window_bg",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        195,
+        265,
+        1085,
+        211
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.63086,
+        0.20117,
+        0.66504,
+        0.66016
+      ]
+    },
+    {
+      "id": "result_footer_btn_a",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        856,
+        618,
+        40,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.07812,
+        0.07812
+      ]
+    },
+    {
+      "id": "result_footer_next_txt",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        896,
+        625,
+        128,
+        25
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.18555,
+        1.0,
+        0.23438
+      ]
+    }
+  ]
+}

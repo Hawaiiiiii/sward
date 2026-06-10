@@ -9,6 +9,7 @@
 #include "aspect_ratio_patches.h"
 #include "camera_patches.h"
 #include "inspire_patches.h"
+#include "csd_capture.h"
 
 // These are here for now to not recompile basically all of the project.
 namespace Chao::CSD
@@ -88,6 +89,7 @@ static void EmplacePath(const void* key, const std::string_view& value)
 {
     std::lock_guard lock(g_pathMutex);
     g_paths.emplace(key, HashStr(value));
+    CsdCapture::SetPath(key, value); // keep the readable string (g_paths stores only a hash)
 }
 
 static void TraverseCast(Chao::CSD::Scene* scene, uint32_t castNodeIndex, Chao::CSD::CastNode* castNode, uint32_t castIndex, const std::string& parentPath)
@@ -172,6 +174,7 @@ PPC_FUNC(sub_825E2E60)
         auto upper = g_paths.lower_bound(key + fileSize);
 
         g_paths.erase(lower, upper);
+        CsdCapture::ErasePathRange(key, key + fileSize);
     }
 
     __imp__sub_825E2E60(ctx, base);
@@ -905,6 +908,7 @@ static std::optional<CsdModifier> g_castNodeModifier;
 void RenderCsdCastNodeMidAsmHook(PPCRegister& r10, PPCRegister& r27)
 {
     g_castNodeModifier = FindModifier(r10.u32 + r27.u32);
+    CsdCapture::NoteCurrentNode(g_memory.Translate(r10.u32 + r27.u32));
 }
 
 static std::optional<CsdModifier> g_castModifier;
@@ -912,6 +916,7 @@ static std::optional<CsdModifier> g_castModifier;
 void RenderCsdCastMidAsmHook(PPCRegister& r4)
 {
     g_castModifier = FindModifier(r4.u32);
+    CsdCapture::NoteCurrentCast(g_memory.Translate(r4.u32));
 }
 
 static void Draw(PPCContext& ctx, uint8_t* base, PPCFunc* original, uint32_t stride)
@@ -952,6 +957,12 @@ static void Draw(PPCContext& ctx, uint8_t* base, PPCFunc* original, uint32_t str
 
         return;
     }
+
+    // Optional runtime UI capture (inert unless SWA_CSD_CAPTURE is set). Read the cast's
+    // vertices here, while ctx.r4 still points at the original 1280x720 reference-space
+    // quad (the aspect transform below writes to a stack copy, not to ctx.r4).
+    if (CsdCapture::Enabled())
+        CsdCapture::RecordDraw(base + ctx.r4.u32, ctx.r5.u32, stride, stride == 0x14);
 
     if (Config::UIAlignmentMode == EUIAlignmentMode::Centre)
     {

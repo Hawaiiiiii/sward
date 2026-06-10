@@ -1,0 +1,13 @@
+{
+  "screen": "sonic_hud",
+  "stem": "ui_playscreen",
+  "ref": [1280, 720],
+  "assetBase": "assets/sonic_hud/",
+  "notes": "Day-stage HUD. No background node — gameplay renders behind. Counter/gauge/sidecar nodes only.",
+  "nodes": [
+    { "id": "counters_tl", "tex": "playscreen_counters.png", "rect": [32, 28, 470, 84], "z": 4, "fit": "contain" },
+    { "id": "gauge_bl", "tex": "playscreen_gauge.png", "rect": [32, 556, 440, 120], "z": 4, "fit": "contain" },
+    { "id": "ring_bl", "tex": "playscreen_ring.png", "rect": [32, 486, 220, 64], "z": 4, "fit": "contain" },
+    { "id": "sidecar_br", "tex": "playscreen_medal.png", "rect": [968, 568, 280, 112], "z": 4, "fit": "contain" }
+  ]
+}

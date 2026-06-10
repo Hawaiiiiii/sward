@@ -1,0 +1,13 @@
+{
+  "screen": "title",
+  "stem": "ui_mainmenu",
+  "ref": [1280, 720],
+  "assetBase": "assets/title/",
+  "notes": "Node rects are authored in 1280x720 reference space (same space the recomp's Scale() works in). Extract/convert PNGs into assets/title/ named as 'tex' below; present files auto-load, missing ones become drop targets.",
+  "nodes": [
+    { "id": "mm_bg_intro", "tex": "ui_mm_base.png", "rect": [0, 0, 1280, 720], "z": 1, "fit": "cover" },
+    { "id": "mm_logo", "tex": "ui_mm_logo.png", "rect": [300, 110, 680, 300], "z": 3, "fit": "contain" },
+    { "id": "mm_pressstart", "tex": "ui_mm_pressstart.png", "rect": [470, 560, 340, 64], "z": 4, "fit": "contain" },
+    { "type": "text", "id": "copyright", "text": "© your project", "rect": [440, 670, 400, 30], "z": 4, "size": 2.2, "align": "center", "color": "#cfd6df" }
+  ]
+}

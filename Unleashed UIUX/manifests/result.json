@@ -1,0 +1,322 @@
+{
+  "screen": "result",
+  "stem": "ui_result",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/result/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_result"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "result_num_1_tag_bg",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        202,
+        155,
+        1078,
+        47
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19141,
+        0.03125,
+        0.24512,
+        0.12305
+      ]
+    },
+    {
+      "id": "result_num_1_tag",
+      "tex": "mat_result_en_001.png",
+      "rect": [
+        689,
+        165,
+        100,
+        23
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19531,
+        0.0,
+        0.39062,
+        0.04492
+      ]
+    },
+    {
+      "id": "result_num_2_tag_bg",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        202,
+        222,
+        1078,
+        47
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19141,
+        0.03125,
+        0.24512,
+        0.12305
+      ]
+    },
+    {
+      "id": "result_num_2_tag",
+      "tex": "mat_result_en_001.png",
+      "rect": [
+        689,
+        232,
+        100,
+        23
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19531,
+        0.0,
+        0.39062,
+        0.04492
+      ]
+    },
+    {
+      "id": "result_num_3_tag_bg",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        202,
+        289,
+        1078,
+        47
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19141,
+        0.03125,
+        0.24512,
+        0.12305
+      ]
+    },
+    {
+      "id": "result_num_3_tag",
+      "tex": "mat_result_en_001.png",
+      "rect": [
+        689,
+        299,
+        100,
+        23
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19531,
+        0.0,
+        0.39062,
+        0.04492
+      ]
+    },
+    {
+      "id": "result_num_4_tag_bg",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        202,
+        356,
+        1078,
+        47
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19141,
+        0.03125,
+        0.24512,
+        0.12305
+      ]
+    },
+    {
+      "id": "result_num_4_tag",
+      "tex": "mat_result_en_001.png",
+      "rect": [
+        689,
+        366,
+        100,
+        23
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19531,
+        0.0,
+        0.39062,
+        0.04492
+      ]
+    },
+    {
+      "id": "result_rank_s_rank_img_s_brilliance",
+      "tex": "mat_result_comon_003.png",
+      "rect": [
+        282,
+        380,
+        293,
+        309
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.21484,
+        0.02344,
+        0.60547,
+        0.80469
+      ]
+    },
+    {
+      "id": "result_num_5_tag_bg",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        202,
+        423,
+        1078,
+        47
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19141,
+        0.03125,
+        0.24512,
+        0.12305
+      ]
+    },
+    {
+      "id": "result_num_5_tag",
+      "tex": "mat_result_en_001.png",
+      "rect": [
+        689,
+        433,
+        100,
+        23
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19531,
+        0.0,
+        0.39062,
+        0.04492
+      ]
+    },
+    {
+      "id": "result_rank_s_rank_img_s_base_brilliance1",
+      "tex": "mat_result_comon_002.png",
+      "rect": [
+        346,
+        458,
+        150,
+        150
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.29297,
+        0.29297
+      ]
+    },
+    {
+      "id": "result_num_6_tag_bg",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        202,
+        489,
+        1078,
+        47
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19141,
+        0.03125,
+        0.24512,
+        0.12305
+      ]
+    },
+    {
+      "id": "result_num_6_tag",
+      "tex": "mat_result_en_001.png",
+      "rect": [
+        689,
+        500,
+        100,
+        23
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.78125,
+        0.0,
+        0.97656,
+        0.04492
+      ]
+    },
+    {
+      "id": "result_rank_rank_txt",
+      "tex": "mat_result_en_001.png",
+      "rect": [
+        278,
+        531,
+        192,
+        25
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.33984,
+        0.375,
+        0.38867
+      ]
+    },
+    {
+      "id": "result_footer_btn_a",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        856,
+        618,
+        40,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.07812,
+        0.07812
+      ]
+    },
+    {
+      "id": "result_footer_next_txt",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        896,
+        625,
+        128,
+        25
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.18555,
+        1.0,
+        0.23438
+      ]
+    }
+  ]
+}

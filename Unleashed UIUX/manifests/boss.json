@@ -1,0 +1,71 @@
+{
+  "screen": "boss",
+  "stem": "ui_boss_gauge",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/boss/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_boss_gauge",
+    "ui_boss_name"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "gauge_2_position_hd",
+      "tex": "mat_boss_common_001.png",
+      "rect": [
+        0,
+        79,
+        443,
+        18
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.85938,
+        0.57812,
+        0.875,
+        0.71875
+      ]
+    },
+    {
+      "id": "name_so",
+      "tex": "mat_boss_en_001.png",
+      "rect": [
+        40,
+        461,
+        1007,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.39062,
+        0.67188,
+        0.46875
+      ]
+    },
+    {
+      "id": "name_so_bg",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        0,
+        462,
+        82,
+        38
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.00195,
+        0.51953,
+        0.10254,
+        0.61328
+      ]
+    }
+  ]
+}

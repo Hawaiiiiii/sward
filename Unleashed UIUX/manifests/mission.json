@@ -1,0 +1,88 @@
+{
+  "screen": "mission",
+  "stem": "ui_misson",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/mission/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_misson"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "bg_b1",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        433,
+        306,
+        415,
+        111
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.6123,
+        0.20117,
+        0.61719,
+        0.66016
+      ]
+    },
+    {
+      "id": "select",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        0,
+        310,
+        1280,
+        50
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.69141,
+        0.3125,
+        0.70215,
+        0.41016
+      ]
+    },
+    {
+      "id": "footer_b_btn_a",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        857,
+        618,
+        40,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.07812,
+        0.07812
+      ]
+    },
+    {
+      "id": "footer_b_txt",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        897,
+        625,
+        128,
+        25
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.00977,
+        1.0,
+        0.05859
+      ]
+    }
+  ]
+}

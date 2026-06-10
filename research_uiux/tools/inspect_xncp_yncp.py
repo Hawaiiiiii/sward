@@ -265,11 +265,27 @@ def decode_animation_flags(flags: int) -> list[str]:
     return [name for bit, name in ANIMATION_FLAG_BITS if flags & bit]
 
 
-def parse_keyframe(view: BinaryView, offset: int, endian: str) -> dict[str, Any]:
+# Color and per-corner Gradient tracks store a packed 32-bit RGBA color in the
+# value word (same encoding as CastInfo.color, i.e. 0xRRGGBBAA). Reading that word
+# as an IEEE-754 float (as every other track legitimately is) yields NaN/±1e38
+# garbage, which downstream NaN-scrubbing then flattens to 0 — silently zeroing the
+# alpha of every faded cast. So decode those tracks' value as the raw u32 instead.
+COLOR_TRACK_TYPES = frozenset(
+    ("Color", "GradientTL", "GradientBL", "GradientTR", "GradientBR")
+)
+
+
+def parse_keyframe(
+    view: BinaryView, offset: int, endian: str, track_type: str | None = None
+) -> dict[str, Any]:
     keyframe_type = view.u32(offset + 8, endian)
+    if track_type in COLOR_TRACK_TYPES:
+        value: Any = view.u32(offset + 4, endian)  # packed 0xRRGGBBAA
+    else:
+        value = round_float(view.f32(offset + 4, endian))
     return {
         "frame": view.u32(offset, endian),
-        "value": round_float(view.f32(offset + 4, endian)),
+        "value": value,
         "type": KEYFRAME_TYPE_NAMES.get(keyframe_type, f"Unknown_{keyframe_type}"),
         "in_tangent": round_float(view.f32(offset + 12, endian)),
         "out_tangent": round_float(view.f32(offset + 16, endian)),
@@ -281,7 +297,7 @@ def parse_cast_animation_subdata(view: BinaryView, offset: int, origin: int, end
     keyframe_count = view.u32(offset + 4, endian)
     data_offset = view.u32(offset + 8, endian)
     keyframes = [
-        parse_keyframe(view, origin + data_offset + (24 * index), endian)
+        parse_keyframe(view, origin + data_offset + (24 * index), endian, track_type)
         for index in range(keyframe_count)
     ] if data_offset else []
     return {

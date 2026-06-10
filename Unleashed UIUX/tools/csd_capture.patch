@@ -1,0 +1,103 @@
+diff --git a/UnleashedRecomp/CMakeLists.txt b/UnleashedRecomp/CMakeLists.txt
+index d6d41a0..4be4a74 100644
+--- a/UnleashedRecomp/CMakeLists.txt
++++ b/UnleashedRecomp/CMakeLists.txt
+@@ -132,6 +132,7 @@ set(UNLEASHED_RECOMP_PATCHES_CXX_SOURCES
+     "patches/aspect_ratio_patches.cpp"
+     "patches/audio_patches.cpp"
+     "patches/camera_patches.cpp"
++    "patches/csd_capture.cpp"
+     "patches/CGameModeStageTitle_patches.cpp"
+     "patches/CHudPause_patches.cpp"
+     "patches/CTitleStateIntro_patches.cpp"
+diff --git a/UnleashedRecomp/gpu/video.cpp b/UnleashedRecomp/gpu/video.cpp
+index 2333dfb..6fbf0b1 100644
+--- a/UnleashedRecomp/gpu/video.cpp
++++ b/UnleashedRecomp/gpu/video.cpp
+@@ -17,6 +17,7 @@
+ #include <res/font/im_font_atlas.dds.h>
+ #include <shader/shader_cache.h>
+ #include <SWA.h>
++#include <patches/csd_capture.h>
+ #include <ui/achievement_menu.h>
+ #include <ui/achievement_overlay.h>
+ #include <ui/button_guide.h>
+@@ -185,6 +186,10 @@ static uint32_t g_pixelShaderConstants[0x380];
+ static SharedConstants g_sharedConstants;
+ static GuestTexture* g_textures[16];
+ static RenderSamplerDesc g_samplerDescs[16];
++
++// Exposed for the optional CSD capture (patches/csd_capture.cpp): the texture bound to
++// sampler slot 0 at draw time. CSD binds its picture's texture right before the draw.
++const void* SWA_CsdBoundTexture0() { return g_textures[0]; }
+ static bool g_scissorTestEnable = false;
+ static RenderRect g_scissorRect;
+ static RenderVertexBufferView g_vertexBufferViews[16];
+@@ -5877,6 +5882,10 @@ static void MakePictureData(GuestPictureData* pictureData, uint8_t* data, uint32
+ 
+             pictureData->texture = g_memory.MapVirtual(g_userHeap.AllocPhysical<GuestTexture>(std::move(texture)));
+             pictureData->type = 0;
++
++            // Record GuestTexture* -> name for the optional CSD capture (inert unless enabled).
++            CsdCapture::RegisterTexture(g_memory.Translate(pictureData->texture),
++                reinterpret_cast<const char*>(g_memory.Translate(pictureData->name + 2)));
+         }
+     }
+ }
+diff --git a/UnleashedRecomp/patches/aspect_ratio_patches.cpp b/UnleashedRecomp/patches/aspect_ratio_patches.cpp
+index 02f49ee..0824d0b 100644
+--- a/UnleashedRecomp/patches/aspect_ratio_patches.cpp
++++ b/UnleashedRecomp/patches/aspect_ratio_patches.cpp
+@@ -9,6 +9,7 @@
+ #include "aspect_ratio_patches.h"
+ #include "camera_patches.h"
+ #include "inspire_patches.h"
++#include "csd_capture.h"
+ 
+ // These are here for now to not recompile basically all of the project.
+ namespace Chao::CSD
+@@ -88,6 +89,7 @@ static void EmplacePath(const void* key, const std::string_view& value)
+ {
+     std::lock_guard lock(g_pathMutex);
+     g_paths.emplace(key, HashStr(value));
++    CsdCapture::SetPath(key, value); // keep the readable string (g_paths stores only a hash)
+ }
+ 
+ static void TraverseCast(Chao::CSD::Scene* scene, uint32_t castNodeIndex, Chao::CSD::CastNode* castNode, uint32_t castIndex, const std::string& parentPath)
+@@ -172,6 +174,7 @@ PPC_FUNC(sub_825E2E60)
+         auto upper = g_paths.lower_bound(key + fileSize);
+ 
+         g_paths.erase(lower, upper);
++        CsdCapture::ErasePathRange(key, key + fileSize);
+     }
+ 
+     __imp__sub_825E2E60(ctx, base);
+@@ -905,6 +908,7 @@ static std::optional<CsdModifier> g_castNodeModifier;
+ void RenderCsdCastNodeMidAsmHook(PPCRegister& r10, PPCRegister& r27)
+ {
+     g_castNodeModifier = FindModifier(r10.u32 + r27.u32);
++    CsdCapture::NoteCurrentNode(g_memory.Translate(r10.u32 + r27.u32));
+ }
+ 
+ static std::optional<CsdModifier> g_castModifier;
+@@ -912,6 +916,7 @@ static std::optional<CsdModifier> g_castModifier;
+ void RenderCsdCastMidAsmHook(PPCRegister& r4)
+ {
+     g_castModifier = FindModifier(r4.u32);
++    CsdCapture::NoteCurrentCast(g_memory.Translate(r4.u32));
+ }
+ 
+ static void Draw(PPCContext& ctx, uint8_t* base, PPCFunc* original, uint32_t stride)
+@@ -953,6 +958,12 @@ static void Draw(PPCContext& ctx, uint8_t* base, PPCFunc* original, uint32_t str
+         return;
+     }
+ 
++    // Optional runtime UI capture (inert unless SWA_CSD_CAPTURE is set). Read the cast's
++    // vertices here, while ctx.r4 still points at the original 1280x720 reference-space
++    // quad (the aspect transform below writes to a stack copy, not to ctx.r4).
++    if (CsdCapture::Enabled())
++        CsdCapture::RecordDraw(base + ctx.r4.u32, ctx.r5.u32, stride, stride == 0x14);
++
+     if (Config::UIAlignmentMode == EUIAlignmentMode::Centre)
+     {
+         if (g_aspectRatio >= WIDE_ASPECT_RATIO)

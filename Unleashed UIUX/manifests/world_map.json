@@ -1,0 +1,650 @@
+{
+  "screen": "world_map",
+  "stem": "ui_worldmap",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/world_map/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_worldmap"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "worldmap_header_bg_header_bg",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        0,
+        0,
+        1280,
+        110
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.0,
+        0.02344,
+        0.21484
+      ]
+    },
+    {
+      "id": "worldmap_header_img_map_logo",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        1075,
+        54,
+        127,
+        53
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.52539,
+        0.19922,
+        0.77344,
+        0.30273
+      ]
+    },
+    {
+      "id": "worldmap_header_img_head_icon",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        75,
+        58,
+        50,
+        45
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.4707,
+        0.00391,
+        0.56836,
+        0.0918
+      ]
+    },
+    {
+      "id": "worldmap_header_img_head_title",
+      "tex": "mat_worldmap_en_003.png",
+      "rect": [
+        260,
+        65,
+        448,
+        37
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.80078,
+        1.0
+      ]
+    },
+    {
+      "id": "info_img_1_info_icon_sonic",
+      "tex": "mat_comon_001.png",
+      "rect": [
+        264,
+        113,
+        47,
+        47
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.5,
+        1.0
+      ]
+    },
+    {
+      "id": "cts_guide_bg_gud_icon",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        1156,
+        115,
+        50,
+        70
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.3418,
+        0.13672,
+        0.43945,
+        0.27344
+      ]
+    },
+    {
+      "id": "info_bg_1_position_01",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        0,
+        118,
+        432,
+        36
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.80273,
+        0.3457,
+        0.87305,
+        0.36328
+      ],
+      "alpha": 0.251
+    },
+    {
+      "id": "cts_info_bg_position_1",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        45,
+        118,
+        224,
+        35
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.85742,
+        0.21484,
+        0.87305,
+        0.23047
+      ]
+    },
+    {
+      "id": "cts_stage_window",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        276,
+        118,
+        405,
+        486
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.10352,
+        0.29297,
+        0.12305,
+        0.30273
+      ]
+    },
+    {
+      "id": "cts_guide_bg_bg_position",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        1012,
+        118,
+        268,
+        486
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.80273,
+        0.29297,
+        0.87305,
+        0.36328
+      ]
+    },
+    {
+      "id": "cts_parts_flag",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        294,
+        136,
+        61,
+        59
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.93555,
+        0.06836,
+        0.99805
+      ]
+    },
+    {
+      "id": "cts_guide_ss_noise_position",
+      "tex": "mat_worldmap_ss_001.png",
+      "rect": [
+        723,
+        140,
+        270,
+        135
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.66113,
+        0.59668,
+        0.79297,
+        0.66309
+      ]
+    },
+    {
+      "id": "cts_name_2",
+      "tex": "mat_worldmap_en_002.png",
+      "rect": [
+        314,
+        144,
+        256,
+        30
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.5,
+        0.0,
+        1.0,
+        0.05859
+      ]
+    },
+    {
+      "id": "info_img_2_info_icon_ring",
+      "tex": "mat_comon_002.png",
+      "rect": [
+        268,
+        156,
+        42,
+        42
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.05859,
+        0.46875
+      ]
+    },
+    {
+      "id": "info_bg_1_position_02",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        0,
+        161,
+        432,
+        36
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.80273,
+        0.3457,
+        0.87305,
+        0.36328
+      ],
+      "alpha": 0.251
+    },
+    {
+      "id": "cts_info_bg_position_2",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        45,
+        161,
+        233,
+        35
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.85742,
+        0.21484,
+        0.87305,
+        0.23047
+      ]
+    },
+    {
+      "id": "cts_stage_select",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        294,
+        198,
+        350,
+        50
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.85938,
+        0.19727,
+        0.86914,
+        0.20703
+      ]
+    },
+    {
+      "id": "info_img_3_info_icon_sunmedal",
+      "tex": "mat_comon_003.png",
+      "rect": [
+        268,
+        199,
+        42,
+        42
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.05859,
+        0.46875
+      ]
+    },
+    {
+      "id": "info_bg_1_position_03",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        0,
+        204,
+        432,
+        36
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.80273,
+        0.3457,
+        0.87305,
+        0.36328
+      ],
+      "alpha": 0.251
+    },
+    {
+      "id": "cts_info_bg_position_3",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        45,
+        204,
+        224,
+        35
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.85742,
+        0.21484,
+        0.87305,
+        0.23047
+      ]
+    },
+    {
+      "id": "info_img_4_info_icon_moonmedal",
+      "tex": "mat_comon_004.png",
+      "rect": [
+        268,
+        242,
+        42,
+        42
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.05859,
+        0.46875
+      ]
+    },
+    {
+      "id": "info_bg_1_position_04",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        0,
+        247,
+        432,
+        36
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.80273,
+        0.3457,
+        0.87305,
+        0.36328
+      ],
+      "alpha": 0.251
+    },
+    {
+      "id": "cts_info_bg_position_4",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        45,
+        247,
+        233,
+        35
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.85742,
+        0.21484,
+        0.87305,
+        0.23047
+      ]
+    },
+    {
+      "id": "cts_parts_sun_moon",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        659,
+        320,
+        33,
+        33
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.00195,
+        0.87109,
+        0.06641,
+        0.93555
+      ]
+    },
+    {
+      "id": "worldmap_background_bg_txt_position",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        508,
+        334,
+        254,
+        55
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.52539,
+        0.0918,
+        0.77344,
+        0.19922
+      ]
+    },
+    {
+      "id": "cts_name",
+      "tex": "mat_worldmap_002.png",
+      "rect": [
+        320,
+        346,
+        265,
+        54
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        1.0,
+        0.84375
+      ]
+    },
+    {
+      "id": "cts_guide_1_hiscore",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        723,
+        421,
+        272,
+        22
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.14453,
+        0.98828,
+        0.41016,
+        0.99414
+      ]
+    },
+    {
+      "id": "cts_guide_2_besttime",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        723,
+        466,
+        272,
+        22
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.14453,
+        0.98828,
+        0.41016,
+        0.99414
+      ]
+    },
+    {
+      "id": "cts_guide_3_rank",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        723,
+        491,
+        272,
+        56
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.14453,
+        0.98828,
+        0.41016,
+        0.99414
+      ]
+    },
+    {
+      "id": "worldmap_footer_bg_footer_bg",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        0,
+        500,
+        1280,
+        139
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.0,
+        0.02344,
+        0.21484
+      ]
+    },
+    {
+      "id": "cts_guide_4_misson",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        723,
+        513,
+        128,
+        33
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.21484,
+        0.3125,
+        0.32227,
+        0.41992
+      ]
+    },
+    {
+      "id": "cts_guide_5_medal_sun_position",
+      "tex": "mat_comon_003.png",
+      "rect": [
+        722,
+        549,
+        129,
+        33
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.05859,
+        0.46875
+      ]
+    },
+    {
+      "id": "cts_guide_5_medal_moon_position",
+      "tex": "mat_comon_004.png",
+      "rect": [
+        866,
+        549,
+        129,
+        33
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.05859,
+        0.46875
+      ]
+    },
+    {
+      "id": "worldmap_footer_img_a_head_icon",
+      "tex": "mat_mainmenu_common_001.png",
+      "rect": [
+        75,
+        613,
+        50,
+        70
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.10742,
+        0.0,
+        0.20508,
+        0.13672
+      ]
+    },
+    {
+      "id": "worldmap_footer_img_a_btn",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        374,
+        618,
+        650,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.07812,
+        0.07812
+      ]
+    }
+  ]
+}
