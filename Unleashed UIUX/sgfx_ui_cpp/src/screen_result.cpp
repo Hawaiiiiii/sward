@@ -29,11 +29,19 @@ using namespace ui;
 namespace {
 
 int g_glyphTex = -1;   // controller glyph atlas (for the (A) footer glyph)
+int g_rankTex  = -1;   // mat_result_comon_002: the REAL metal rank letters (2x3 grid)
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 
 struct UV { float u0, v0, u1, v1; };
 const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
 constexpr float GTW = 512.0f, GTH = 512.0f;
+// tight sub-rects measured from the atlas alpha (same table as result_ex)
+const char* const RANK_NAME[6] = { "S", "A", "B", "C", "D", "E" };
+const UV RANK_UV[6] = {
+    { 0.0293f, 0.0234f, 0.2656f, 0.2695f }, { 0.3203f, 0.0254f, 0.5625f, 0.2676f },
+    { 0.0273f, 0.3262f, 0.2617f, 0.5566f }, { 0.3125f, 0.3203f, 0.5703f, 0.5625f },
+    { 0.0293f, 0.6113f, 0.2656f, 0.8438f }, { 0.3281f, 0.6191f, 0.5547f, 0.8379f },
+};
 
 // ---- palette (sampled from the live capture) --------------------------------
 const uint32_t C_RAIL      = RGBA(66, 84, 134, 235);     // header rail navy
@@ -80,6 +88,7 @@ const char* g_rank = "C";
 
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
+    if (g_rankTex  < 0) g_rankTex  = gfx::loadTexture("assets/result/mat_result_comon_002.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");
@@ -184,23 +193,30 @@ void Draw(double openSec) {
             DrawText({ 248, 545 }, 22.0f, WithAlpha(C_WHITE, rkT), "RANK");
             ResetTextShear();
             ResetFont();
-            // gold letter pops with an overshoot: scale 1.6 -> 1.0
+            // rank letter pops with an overshoot: scale 1.6 -> 1.0 about its centre
             // measured letter bbox (331,433)-(484,609): ~153 wide x 176 tall
             const float s = 1.0f + (1.0f - rkT) * 0.6f;
-            const float hh = 176 * s;
-            SetFont(g_fDF);
-            SetTextShear(0.10f);
-            SetTextStretchX(1.25f);
-            const float ps = hh * 1.42f;
-            const V2 rp = { 408 - hh * 0.45f, 609 - hh * 1.28f };
-            for (int dy = -1; dy <= 1; ++dy)
-                for (int dx = -1; dx <= 1; ++dx)
-                    if (dx || dy)
-                        DrawText({ rp.x + dx * 3.0f, rp.y + dy * 3.0f }, ps, WithAlpha(RGBA(60, 36, 6, 255), rkT), g_rank);
-            DrawTextGradient(rp, ps, WithAlpha(C_RANK_GOLD_T, rkT), WithAlpha(C_RANK_GOLD_B, rkT), g_rank);
-            ResetTextStretchX();
-            ResetTextShear();
-            ResetFont();
+            const float cx = 407.5f, cy = 521.0f, hw = 67.0f * s, hh = 84.0f * s;
+            int ri = 0; while (ri < 5 && RANK_NAME[ri][0] != g_rank[0]) ++ri;
+            if (g_rankTex >= 0) {   // the REAL metal letter art, warm-gold tinted (as captured)
+                DrawImage(g_rankTex, { cx - hw, cy - hh }, { cx + hw, cy + hh },
+                          { RANK_UV[ri].u0, RANK_UV[ri].v0 }, { RANK_UV[ri].u1, RANK_UV[ri].v1 },
+                          WithAlpha(RGBA(232, 188, 110, 255), rkT));
+            } else {                // fallback: chrome-recipe letter
+                SetFont(g_fDF);
+                SetTextShear(0.10f);
+                SetTextStretchX(1.25f);
+                const float ps = hh * 2.0f * 1.42f;
+                const V2 rp = { cx - hh * 0.9f, cy + hh - hh * 2.0f * 1.28f };
+                for (int dy = -1; dy <= 1; ++dy)
+                    for (int dx = -1; dx <= 1; ++dx)
+                        if (dx || dy)
+                            DrawText({ rp.x + dx * 3.0f, rp.y + dy * 3.0f }, ps, WithAlpha(RGBA(60, 36, 6, 255), rkT), g_rank);
+                DrawTextGradient(rp, ps, WithAlpha(C_RANK_GOLD_T, rkT), WithAlpha(C_RANK_GOLD_B, rkT), g_rank);
+                ResetTextStretchX();
+                ResetTextShear();
+                ResetFont();
+            }
         }
     }
 
