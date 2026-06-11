@@ -82,12 +82,19 @@ void SolidQuad(V2 a, V2 b, V2 c, V2 d, uint32_t col) {
 }
 
 void Draw(double openSec) {
-    const float t = (float)ComputeMotion(openSec, 0.0, 12.0);
-    // dimmed hub (the World Map behind pause): dark gradient + faint stars + dim overlay
+    // MEASURED open animation (live capture session8 @78s, 60fps frame terms):
+    // the dim snaps in over ~2 frames; the EMPTY chamfered panel scales up
+    // ~0.83 -> 1.0 while alpha-fading over ~6 frames (a translucent ghost frame
+    // with no text); ALL content (banner + menu + footer) pops in at frames
+    // 8..10. Total open ~= 0.15 s.
+    const float dimT   = (float)ComputeMotion(openSec, 0.0, 2.0);
+    const float panelT = (float)ComputeMotion(openSec, 0.0, 6.0);
+    const float t      = (float)ComputeMotion(openSec, 8.0, 2.0);   // content pop
+    // stand-in for the live scene behind pause (the real game keeps rendering it)
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_T, C_BG_B);
     uint32_t s = 0x1357acefu;
     for (int i = 0; i < 70; ++i) { s = s*1664525u+1013904223u; float x=(float)((s>>9)%1280); s=s*1664525u+1013904223u; float y=(float)((s>>9)%720); DrawRect({x,y},{x+1,y+1}, WithAlpha(C_STAR, 0.5f)); }
-    DrawRect({ 0, 0 }, { REF_W, REF_H }, C_DIM);
+    DrawRect({ 0, 0 }, { REF_W, REF_H }, WithAlpha(C_DIM, dimT));
 
     // ---- gold banner (parallelogram, 45 deg slanted right edge) ----
     // measured from _ref_pause.png: vertical olive->amber gradient; the WORLD MAP
@@ -123,18 +130,25 @@ void Draw(double openSec) {
     ResetTextShear();
 
     // ---- grey menu panel (hexagon: top-left + bottom-right chamfered) ----
-    DrawVGradient({ PX0, PY0 }, { PX1, PY1 }, WithAlpha(C_PANEL_T, t), WithAlpha(C_PANEL_B, t));
-    uint32_t bd = WithAlpha(C_PANEL_BD, t), bdd = WithAlpha(C_PANEL_BDD, t);
-    DrawRect({ PX0, PY0 }, { PX1, PY0 + 2 }, bd);      // top border
-    DrawRect({ PX0, PY1 - 2 }, { PX1, PY1 }, bdd);     // bottom border
-    DrawRect({ PX0, PY0 }, { PX0 + 2, PY1 }, bd);      // left border
-    DrawRect({ PX1 - 2, PY0 }, { PX1, PY1 }, bdd);     // right border
+    // ghost-frame open: the panel scales 0.83 -> 1.0 about its centre while its
+    // alpha ramps with panelT (it appears as an empty translucent frame first).
+    const float ps9 = 0.83f + 0.17f * panelT;
+    const float pcx = (PX0 + PX1) * 0.5f, pcy = (PY0 + PY1) * 0.5f;
+    const float x0 = pcx - (pcx - PX0) * ps9, x1 = pcx + (PX1 - pcx) * ps9;
+    const float y0 = pcy - (pcy - PY0) * ps9, y1 = pcy + (PY1 - pcy) * ps9;
+    const float ch = CHAMFER * ps9;
+    DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(C_PANEL_T, panelT), WithAlpha(C_PANEL_B, panelT));
+    uint32_t bd = WithAlpha(C_PANEL_BD, panelT), bdd = WithAlpha(C_PANEL_BDD, panelT);
+    DrawRect({ x0, y0 }, { x1, y0 + 2 }, bd);      // top border
+    DrawRect({ x0, y1 - 2 }, { x1, y1 }, bdd);     // bottom border
+    DrawRect({ x0, y0 }, { x0 + 2, y1 }, bd);      // left border
+    DrawRect({ x1 - 2, y0 }, { x1, y1 }, bdd);     // right border
     // chamfers: erase the TL + BR corner triangles back to (dimmed) background
-    SolidQuad({ PX0, PY0 }, { PX0 + CHAMFER, PY0 }, { PX0, PY0 + CHAMFER }, { PX0, PY0 }, C_ERASE_T);
-    SolidQuad({ PX1 - CHAMFER, PY1 }, { PX1, PY1 }, { PX1, PY1 - CHAMFER }, { PX1 - CHAMFER, PY1 }, C_ERASE_B);
+    SolidQuad({ x0, y0 }, { x0 + ch, y0 }, { x0, y0 + ch }, { x0, y0 }, WithAlpha(C_ERASE_T, panelT));
+    SolidQuad({ x1 - ch, y1 }, { x1, y1 }, { x1, y1 - ch }, { x1 - ch, y1 }, WithAlpha(C_ERASE_B, panelT));
     // bright diagonal edge along each chamfer (2px)
-    SolidQuad({ PX0 + CHAMFER, PY0 }, { PX0 + CHAMFER + 2, PY0 + 2 }, { PX0 + 2, PY0 + CHAMFER + 2 }, { PX0, PY0 + CHAMFER }, bd);
-    SolidQuad({ PX1 - CHAMFER, PY1 }, { PX1 - CHAMFER - 2, PY1 - 2 }, { PX1 - 2, PY1 - CHAMFER - 2 }, { PX1, PY1 - CHAMFER }, bdd);
+    SolidQuad({ x0 + ch, y0 }, { x0 + ch + 2, y0 + 2 }, { x0 + 2, y0 + ch + 2 }, { x0, y0 + ch }, bd);
+    SolidQuad({ x1 - ch, y1 }, { x1 - ch - 2, y1 - 2 }, { x1 - 2, y1 - ch - 2 }, { x1, y1 - ch }, bdd);
 
     // ---- menu items ----
     SetFont(g_fRodin);

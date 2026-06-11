@@ -123,6 +123,16 @@ void CsdCapture::RecordDraw(const uint8_t* verts, uint32_t count, uint32_t strid
         g_out.open("csd_capture.jsonl", std::ios::out | std::ios::trunc);
         g_outOpen = true;
     }
+    // The stream can silently go bad under sustained load (observed live: the
+    // log froze mid-session while the game kept running, dropping every record
+    // afterwards). Recover by clearing the error state and reopening in append
+    // mode rather than failing silently forever.
+    if (!g_out.good())
+    {
+        g_out.clear();
+        g_out.close();
+        g_out.open("csd_capture.jsonl", std::ios::out | std::ios::app);
+    }
     if (!g_out.is_open())
         return;
 
