@@ -25,6 +25,11 @@ struct ScreenDef {
     void (*Draw)(double openSeconds);    // openSeconds = ui::Now() at the moment the screen opened
     void (*Input)(const ScreenInput&);   // optional (may be null): per-frame navigation/state
     void (*Reset)();                     // optional (may be null): re-init state when (re)opened
+    // optional (may be null): poll-and-clear navigation request — the screen
+    // returns a target screen id when the player activates something that leads
+    // elsewhere in the runtime game's flow ("@back" = pop to the previous
+    // screen). The host drives the measured wipe transition + switch.
+    const char* (*Nav)();
 };
 
 const ScreenDef*  FindScreen(const char* id);

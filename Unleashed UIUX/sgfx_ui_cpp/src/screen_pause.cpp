@@ -38,6 +38,7 @@ enum SubView { SV_NONE = 0, SV_ACHIEVEMENTS, SV_INVENTORY };
 int g_sub = SV_NONE;
 int g_achSel = 0;          // selected achievement row (of the 4 visible)
 int g_invSel = 2;          // selected inventory row (capture shows row 3)
+const char* g_nav = nullptr;
 
 // palette — colours sampled from _ref_pause.png
 const uint32_t C_DIM      = RGBA(0, 0, 0, 150);          // hub dim overlay
@@ -75,12 +76,12 @@ void Init() {
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");      // real game MSDF (sub-screens)
     if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
 }
-void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; g_sub = SV_NONE; g_achSel = 0; g_invSel = 2; }
+void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; g_sub = SV_NONE; g_achSel = 0; g_invSel = 2; g_nav = nullptr; }
 void Input(const ScreenInput& in) {
     if (g_confirm) {
         if (in.up || in.down) g_confirmSel ^= 1;
+        if (in.accept && g_confirmSel == 0) { g_confirm = false; g_nav = "loading>mediaroom"; }   // Yes -> the lab
         if (in.cancel || (in.accept && g_confirmSel == 1)) { g_confirm = false; g_confirmSel = 1; }
-        // accept on Yes would transition to the lab (handled by the host app)
         return;
     }
     if (g_sub == SV_ACHIEVEMENTS) {
@@ -97,10 +98,21 @@ void Input(const ScreenInput& in) {
     }
     if (in.up)   g_sel = (g_sel + N_ITEMS - 1) % N_ITEMS;
     if (in.down) g_sel = (g_sel + 1) % N_ITEMS;
-    if (in.accept && g_sel == 4) { g_confirm = true; g_confirmSel = 1; }   // Go to the Lab
-    if (in.accept && g_sel == 2) g_sub = SV_INVENTORY;                      // Inventory
-    if (in.tabLeft) g_sub = SV_ACHIEVEMENTS;                                // (Back) Achievements
+    if (in.accept) {
+        switch (g_sel) {                       // the runtime pause flow
+            case 0: g_nav = "@back"; break;                          // Resume
+            case 1: g_nav = "status"; break;                         // Status
+            case 2: g_sub = SV_INVENTORY; break;                     // Inventory (sub-screen)
+            case 4: g_confirm = true; g_confirmSel = 1; break;       // Go to the Lab
+            case 5: g_nav = "options"; break;                        // Options
+            case 6: g_nav = "world_map"; break;                      // Quit Game
+            default: break;                                          // Skills (not built)
+        }
+    }
+    if (in.cancel) g_nav = "@back";                                  // B resumes, like retail
+    if (in.tabLeft) g_sub = SV_ACHIEVEMENTS;                          // (Back) Achievements
 }
+const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
 // solid (untextured) quad from 4 explicit corners (TL,TR,BR,BL) — used for the
 // slanted title banner and the chamfer corner triangles (degenerate -> triangle).
@@ -443,3 +455,4 @@ void PauseInit() { Init(); }
 void PauseDraw(double openSeconds) { Draw(openSeconds); }
 void PauseInput(const ScreenInput& in) { Input(in); }
 void PauseReset() { Reset(); }
+const char* PauseNav() { return Nav(); }

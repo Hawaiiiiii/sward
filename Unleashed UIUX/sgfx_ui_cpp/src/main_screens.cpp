@@ -182,7 +182,10 @@ int main(int argc, char** argv) {
         // Optional scripted input (argv[5]): one navigation step per character,
         // applied in the past so the final frame shows the settled result.
         //   u/d/l/r = d-pad, a = accept (A), b = cancel (B), q/e = LB/RB
-        if (argc >= 6 && scr->Input) {
+        // Flow edges apply INSTANTLY here (no wipe), so navigation chains are
+        // verifiable headlessly: e.g. `--shot pause 3 out.png da` renders STATUS.
+        if (argc >= 6) {
+            const ScreenDef* shotStack[16]; int shotDepth = 0;
             const char* keys = argv[5];
             for (int i = 0; keys[i]; ++i) {
                 ui::BeginFrame(0.5 + i * 0.25);
@@ -194,7 +197,25 @@ int main(int argc, char** argv) {
                     case 'q': in.tabLeft = true; break;  case 'e': in.tabRight = true; break;
                     default: break;
                 }
-                scr->Input(in);
+                if (scr->Input) scr->Input(in);
+                if (scr->Nav) {
+                    if (const char* tgt = scr->Nav()) {
+                        const ScreenDef* next = nullptr;
+                        if (strcmp(tgt, "@back") == 0) {
+                            if (shotDepth > 0) next = shotStack[--shotDepth];
+                        } else {
+                            const char* dest = tgt;
+                            if (const char* p = strchr(tgt, '>')) dest = p + 1;   // skip the loading hop headlessly
+                            next = FindScreen(dest);
+                            if (next && shotDepth < 16) shotStack[shotDepth++] = scr;
+                        }
+                        if (next) {
+                            scr = next;
+                            if (scr->Init) scr->Init();
+                            if (scr->Reset) scr->Reset();
+                        }
+                    }
+                }
             }
         }
         // SGFX_FADE forces the transition overlay (static+letterbox+black) for headless verification.
@@ -244,6 +265,9 @@ int main(int argc, char** argv) {
     double transStart = 0.0;                        // absNow when the current phase began
     const ScreenDef* transTarget = nullptr;         // screen to switch to once black
     bool   replayPending = false;
+    // ---- the runtime flow: back-stack + loading chains ("loading>target") ----
+    const ScreenDef* navStack[16]; int navDepth = 0;
+    const ScreenDef* afterLoading = nullptr;        // destination once the loader has run
 
     while (run) {
         double absNow = (SDL_GetPerformanceCounter() - tStart) / freq;
@@ -290,6 +314,33 @@ int main(int argc, char** argv) {
         if (in.tabLeft || in.tabRight)               audio::Play(audio::SFX_TAB);     // LB/RB: form/category switch
         if (in.accept)                               audio::Play(audio::SFX_DECIDE);
         if (in.cancel)                               audio::Play(audio::SFX_CANCEL);
+
+        // ---- the runtime flow: screens request navigation; the host runs the
+        //      measured chevron wipe + the loading hops + the back-stack ----
+        if (transPhase == 0 && scr->Nav) {
+            if (const char* tgt = scr->Nav()) {
+                const ScreenDef* next = nullptr;
+                if (strcmp(tgt, "@back") == 0) {
+                    if (navDepth > 0) next = navStack[--navDepth];
+                } else {
+                    const char* dest = tgt;
+                    if (const char* p = strchr(tgt, '>')) {            // chain: hop via the loader
+                        static char hop[32];
+                        snprintf(hop, sizeof hop, "%.*s", (int)(p - tgt), tgt);
+                        afterLoading = FindScreen(p + 1);
+                        dest = hop;
+                    }
+                    next = FindScreen(dest);
+                    if (next && navDepth < 16) navStack[navDepth++] = scr;
+                }
+                if (next) { transTarget = next; transPhase = 2; transStart = absNow; }
+            }
+        }
+        // the loader runs ~2.8 s, then chains on to its destination (retail pacing)
+        if (transPhase == 0 && afterLoading && (scr->id && strstr(scr->id, "load")) && now > 2.8) {
+            transTarget = afterLoading; afterLoading = nullptr;
+            transPhase = 2; transStart = absNow;
+        }
         drawFrame(openSec, fade, absNow);
     }
     audio::Shutdown(); ui::Shutdown(); gfx::shutdown(); SDL_DestroyWindow(win); SDL_Quit();

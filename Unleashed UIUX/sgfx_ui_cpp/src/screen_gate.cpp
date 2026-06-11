@@ -235,12 +235,14 @@ void SwitchAct(int dir) {
     g_switchStart = Now();
 }
 
+const char* g_nav = nullptr;
 void Input(const ScreenInput& in) {
     if (in.left  || in.tabLeft)  SwitchAct(-1);
     if (in.right || in.tabRight) SwitchAct(+1);
-    if (in.accept) g_startStart = Now();     // "START" (standalone: a flash)
-    // cancel: would back out to the world map in-game; no-op in the standalone build.
+    if (in.accept) { g_startStart = Now(); g_nav = "loading>sonic_hud"; }   // START -> the stage
+    if (in.cancel) g_nav = "@back";                                          // back to the hub
 }
+const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
 // ---- aspect-preserving image fit into a box ---------------------------------
 // Draws the atlas sub-rect (uv) centred inside [bx,by,bx+bw,by+bh], scaled to fit,
@@ -495,3 +497,4 @@ void GateInit() { Init(); }
 void GateDraw(double openSeconds) { Draw(openSeconds); }
 void GateInput(const ScreenInput& in) { Input(in); }
 void GateReset() { Reset(); }
+const char* GateNav() { return Nav(); }

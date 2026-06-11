@@ -77,6 +77,7 @@ constexpr float GRID = 9.0f;
 
 bool g_popup = false;     // "Go to the village / Select stage"
 int  g_popupSel = 0;
+const char* g_nav = nullptr;
 
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
@@ -84,15 +85,20 @@ void Init() {
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");
 }
-void Reset() { g_popup = false; g_popupSel = 0; }
+void Reset() { g_popup = false; g_popupSel = 0; g_nav = nullptr; }
 void Input(const ScreenInput& in) {
     if (g_popup) {
         if (in.up || in.down) g_popupSel ^= 1;
-        if (in.cancel || in.accept) { g_popup = false; g_popupSel = 0; }
+        if (in.accept) {   // the runtime flow: village hub or stage select
+            g_nav = (g_popupSel == 0) ? "loading>town" : "gate";
+            g_popup = false; g_popupSel = 0;
+        }
+        if (in.cancel) { g_popup = false; g_popupSel = 0; }
         return;
     }
     if (in.accept) { g_popup = true; g_popupSel = 0; }
 }
+const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
 void DrawGridPanel(float x0, float y0, float x1, float y1, float t) {
     DrawRect({ x0, y0 }, { x1, y1 }, WithAlpha(C_PANEL, t));
@@ -322,3 +328,4 @@ void WorldMapInit() { Init(); }
 void WorldMapDraw(double openSeconds) { Draw(openSeconds); }
 void WorldMapInput(const ScreenInput& in) { Input(in); }
 void WorldMapReset() { Reset(); }
+const char* WorldMapNav() { return Nav(); }

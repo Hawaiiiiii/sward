@@ -100,6 +100,7 @@ add_executable(sgfx_screens
     src/screen_installer.cpp
     src/screen_boot_loading.cpp
     src/screen_boot_title.cpp
+    src/screen_boot_logos.cpp
     src/screen_viewport3d.cpp
     src/gfx_d3d12.cpp
     "${RECOMP_ROOT}/UnleashedRecomp/gpu/rhi/plume_d3d12.cpp"

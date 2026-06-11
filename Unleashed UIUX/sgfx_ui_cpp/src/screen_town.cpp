@@ -183,6 +183,7 @@ void Reset() {
     g_moveStart = -100.0; g_msgStart = -100.0; g_msg = "";
 }
 
+const char* g_nav = nullptr;
 void Input(const ScreenInput& in) {
     if (in.up || in.down) {
         g_prevSel = g_sel;
@@ -196,13 +197,17 @@ void Input(const ScreenInput& in) {
         if (a.kind == ACT_PASS) {
             g_night = !g_night;
             g_msg = g_night ? "Night falls over the town." : "The sun rises over the town.";
-        } else {
+        } else if (a.kind == ACT_SHOP)   { g_nav = "shop"; }              // the runtime flow
+        else if (a.kind == ACT_TALK)     { g_nav = "balloon"; }
+        else if (a.kind == ACT_DEPART)   { g_nav = "loading>world_map"; }
+        else {
             g_msg = a.info1;
         }
         g_msgStart = Now();
     }
-    // cancel: would close the town menu in-game; no-op in the standalone build.
+    // cancel: closes the town menu back to free-roam in-game; no-op here.
 }
+const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
 // ---- aspect-preserving image fit into a box (status / world_map idiom) ------
 // Draws the atlas sub-rect (uv) centred inside [bx,by,bx+bw,by+bh], scaled to fit,
@@ -400,3 +405,4 @@ void TownInit() { Init(); }
 void TownDraw(double openSeconds) { Draw(openSeconds); }
 void TownInput(const ScreenInput& in) { Input(in); }
 void TownReset() { Reset(); }
+const char* TownNav() { return Nav(); }

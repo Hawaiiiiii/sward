@@ -58,6 +58,7 @@ const uint32_t C_LAND    = RGBA(103, 129, 111, 235), C_CLOUD = RGBA(218, 232, 23
 enum BootState { BT_PRESS_START = 0, BT_AUTOSAVE, BT_MENU };
 int g_state = BT_PRESS_START;
 int g_entry = 0;
+const char* g_nav = nullptr;
 const char* const ENTRIES[] = { "CONTINUE", "NEW GAME", "OPTIONS" };
 constexpr int N_ENTRIES = 3;
 
@@ -66,15 +67,23 @@ void Init() {
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");
     if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
 }
-void Reset() { g_state = BT_PRESS_START; g_entry = 0; }
+void Reset() { g_state = BT_PRESS_START; g_entry = 0; g_nav = nullptr; }
 void Input(const ScreenInput& in) {
-    if (in.accept) { if (g_state < BT_MENU) g_state++; }
+    if (in.accept) {
+        if (g_state < BT_MENU) {
+            g_state++;
+        } else {   // carousel accept -> the runtime flow
+            if (g_entry == 2) g_nav = "options";
+            else              g_nav = "world_map";   // CONTINUE / NEW GAME
+        }
+    }
     if (in.cancel) g_state = BT_PRESS_START;
     if (g_state == BT_MENU) {
         if (in.left)  g_entry = (g_entry + N_ENTRIES - 1) % N_ENTRIES;
         if (in.right) g_entry = (g_entry + 1) % N_ENTRIES;
     }
 }
+const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
 void Starfield(float a) {
     DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 255));
@@ -258,3 +267,4 @@ void BootTitleInit() { Init(); }
 void BootTitleDraw(double openSeconds) { Draw(openSeconds); }
 void BootTitleInput(const ScreenInput& in) { Input(in); }
 void BootTitleReset() { Reset(); }
+const char* BootTitleNav() { return Nav(); }
