@@ -30,7 +30,9 @@ const UV GLYPH_LB = { 0.32617f, 0.00781f, 0.46094f, 0.07812f };
 
 const char* const ITEMS[] = { "Resume", "Status", "Inventory", "Skills", "Go to the Lab", "Options", "Quit Game" };
 constexpr int N_ITEMS = 7;
-int g_sel = 0;   // default selection on open = "Resume" (verified from PAUSE video t=13s)
+int  g_sel = 0;        // default selection on open = "Resume" (verified from PAUSE video t=13s)
+bool g_confirm = false;    // "Enter the Lab?" Yes/No dialog (opens from Go to the Lab)
+int  g_confirmSel = 1;     // 0 = Yes, 1 = No (the capture shows No selected by default)
 
 // palette — colours sampled from _ref_pause.png
 const uint32_t C_DIM      = RGBA(0, 0, 0, 150);          // hub dim overlay
@@ -67,10 +69,17 @@ void Init() {
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");      // real game MSDF
     if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
 }
-void Reset() { g_sel = 0; }
+void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; }
 void Input(const ScreenInput& in) {
+    if (g_confirm) {
+        if (in.up || in.down) g_confirmSel ^= 1;
+        if (in.cancel || (in.accept && g_confirmSel == 1)) { g_confirm = false; g_confirmSel = 1; }
+        // accept on Yes would transition to the lab (handled by the host app)
+        return;
+    }
     if (in.up)   g_sel = (g_sel + N_ITEMS - 1) % N_ITEMS;
     if (in.down) g_sel = (g_sel + 1) % N_ITEMS;
+    if (in.accept && g_sel == 4) { g_confirm = true; g_confirmSel = 1; }   // Go to the Lab
 }
 
 // solid (untextured) quad from 4 explicit corners (TL,TR,BR,BL) — used for the
@@ -79,6 +88,92 @@ void SolidQuad(V2 a, V2 b, V2 c, V2 d, uint32_t col) {
     const V2 corners[4] = { a, b, c, d };
     const V2 uv[4] = { {0,0},{1,0},{1,1},{0,1} };
     DrawImageQuad(-1, corners, uv, col, false);
+}
+
+// the gold WORLD-MAP banner + ghost wordmark + italic chrome PAUSE (measured)
+void DrawBanner(float t) {
+    {
+        const V2 bc[4] = { { 0, 28 }, { 528, 28 }, { 472, 88 }, { 0, 88 } };
+        const uint32_t bcol[4] = { WithAlpha(C_BAN_T, t), WithAlpha(C_BAN_T, t),
+                                   WithAlpha(C_BAN_B, t), WithAlpha(C_BAN_B, t) };
+        DrawQuadGradient(bc, bcol);
+        DrawRect({ 0, 28 }, { 528, 29.5f }, WithAlpha(RGBA(110, 100, 14, 255), t));
+        const V2 sc2[4] = { { 538, 28 }, { 547, 28 }, { 491, 88 }, { 482, 88 } };
+        const uint32_t scol[4] = { WithAlpha(C_BAN_T, t * 0.85f), WithAlpha(C_BAN_T, t * 0.85f),
+                                   WithAlpha(C_BAN_B, t * 0.85f), WithAlpha(C_BAN_B, t * 0.85f) };
+        DrawQuadGradient(sc2, scol);
+    }
+    SetFont(g_fDF);
+    SetTextShear(0.24f);
+    SetTextStretchX(1.37f);   // the game's wordmark face is far wider than DFSoGei
+    DrawText({ 128, 38 }, 40.0f, WithAlpha(C_GHOST, t), "WORLD MAP");      // ghost wordmark
+    {   // chrome PAUSE: 8-direction outline ring, then the gradient face
+        const V2 pp = { 212.5f, 28.0f }; const float ps = 68.0f;
+        for (int dy = -1; dy <= 1; ++dy)
+            for (int dx = -1; dx <= 1; ++dx)
+                if (dx || dy)
+                    DrawText({ pp.x + dx * 3.0f, pp.y + dy * 3.0f }, ps, WithAlpha(C_CHR_OUT, t), "PAUSE");
+        DrawTextGradient(pp, ps, WithAlpha(C_CHR_T, t), WithAlpha(C_CHR_B, t), "PAUSE");
+    }
+    ResetTextStretchX();
+    ResetTextShear();
+}
+
+// "Enter the Lab?" confirm — two stacked chamfered plates (measured spec in
+// game_captures/WM_PAUSE_SUBSTATE_SPEC.md): grey back prompt plate (TL chamfer)
+// + silver front dialog (TL+BR chamfers) with engraved Yes and a gold-pill No.
+void DrawConfirm(float a) {
+    const uint32_t SCENE_DK = RGBA(3, 5, 2, 255);   // chamfer erase = dimmed scene
+    // back prompt plate (497.3,302.7) 284x111.3, TL chamfer 22
+    DrawVGradient({ 497.3f, 302.7f }, { 781.3f, 414.0f },
+                  WithAlpha(RGBA(92, 93, 95, 255), a), WithAlpha(RGBA(60, 62, 60, 255), a));
+    DrawRect({ 497.3f, 302.7f }, { 781.3f, 304.0f }, WithAlpha(RGBA(118, 119, 121, 255), a));
+    DrawRect({ 497.3f, 412.7f }, { 781.3f, 414.0f }, WithAlpha(RGBA(110, 112, 110, 255), a));
+    SolidQuad({ 497.3f, 302.7f }, { 519.3f, 302.7f }, { 497.3f, 324.7f }, { 497.3f, 302.7f }, SCENE_DK);
+    // prompt: engraved dark grey (light bevel under dark core)
+    SetFont(g_fRodin);
+    {
+        const char* P = "Enter the Lab?";
+        float w = MeasureText(26.0f, P).x;
+        DrawText({ 639 - w * 0.5f + 1, 351.3f + 1 }, 26.0f, WithAlpha(RGBA(106, 105, 107, 255), a), P);
+        DrawText({ 639 - w * 0.5f, 351.3f }, 26.0f, WithAlpha(RGBA(42, 44, 44, 255), a), P);
+    }
+    // front dialog (541.3,280.7) 196.7x157.3, chamfers TL+BR 22, silver border
+    const float dx0 = 541.3f, dy0 = 280.7f, dx1 = 738.0f, dy1 = 438.0f, ch = 22.0f;
+    DrawVGradient({ dx0, dy0 }, { dx1, dy1 },
+                  WithAlpha(RGBA(158, 160, 160, 255), a), WithAlpha(RGBA(105, 107, 107, 255), a));
+    SolidQuad({ dx0, dy0 }, { dx0 + ch, dy0 }, { dx0, dy0 + ch }, { dx0, dy0 }, SCENE_DK);
+    SolidQuad({ dx1 - ch, dy1 }, { dx1, dy1 }, { dx1, dy1 - ch }, { dx1 - ch, dy1 }, SCENE_DK);
+    uint32_t bd = WithAlpha(RGBA(224, 226, 226, 255), a);
+    DrawRect({ dx0 + ch, dy0 }, { dx1, dy0 + 1.5f }, bd);
+    DrawRect({ dx0, dy1 - 1.5f }, { dx1 - ch, dy1 }, bd);
+    DrawRect({ dx0, dy0 + ch }, { dx0 + 1.5f, dy1 }, bd);
+    DrawRect({ dx1 - 1.5f, dy0 }, { dx1, dy1 - ch }, bd);
+    SolidQuad({ dx0 + ch, dy0 }, { dx0 + ch + 2, dy0 + 2 }, { dx0 + 2, dy0 + ch + 2 }, { dx0, dy0 + ch }, bd);
+    SolidQuad({ dx1 - ch, dy1 }, { dx1 - ch - 2, dy1 - 2 }, { dx1 - 2, dy1 - ch - 2 }, { dx1, dy1 - ch }, bd);
+    // options: Yes (engraved) / No (gold pill, dark-maroon text); 0=Yes 1=No
+    auto option = [&](const char* s, float cy, bool selTxt) {
+        float w = MeasureText(24.0f, s).x;
+        if (selTxt) {
+            DrawText({ 640.3f - w * 0.5f, cy }, 24.0f, WithAlpha(RGBA(120, 44, 0, 255), a), s);
+            DrawText({ 639.6f - w * 0.5f, cy - 0.7f }, 24.0f, WithAlpha(RGBA(18, 14, 16, 255), a), s);
+        } else {
+            DrawText({ 640.3f - w * 0.5f + 1, cy + 1 }, 24.0f, WithAlpha(RGBA(219, 219, 219, 255), a), s);
+            DrawText({ 639.3f - w * 0.5f, cy }, 24.0f, WithAlpha(RGBA(15, 15, 15, 255), a), s);
+        }
+    };
+    if (g_confirmSel == 0) {   // gold pill behind Yes
+        DrawVGradient({ 560, 323 }, { 720.7f, 361.7f },
+                      WithAlpha(RGBA(150, 147, 100, 255), a), WithAlpha(RGBA(169, 146, 62, 255), a));
+        DrawRect({ 560, 323 }, { 720.7f, 324.5f }, WithAlpha(RGBA(196, 192, 150, 255), a));
+    } else {                    // gold pill behind No (the captured default)
+        DrawVGradient({ 560, 372 }, { 720.7f, 410.7f },
+                      WithAlpha(RGBA(150, 147, 100, 255), a), WithAlpha(RGBA(169, 146, 62, 255), a));
+        DrawRect({ 560, 372 }, { 720.7f, 373.5f }, WithAlpha(RGBA(196, 192, 150, 255), a));
+    }
+    option("Yes", 326.0f, g_confirmSel == 0);
+    option("No", 375.3f, g_confirmSel == 1);
+    ResetFont();
 }
 
 void Draw(double openSec) {
@@ -94,40 +189,24 @@ void Draw(double openSec) {
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_T, C_BG_B);
     uint32_t s = 0x1357acefu;
     for (int i = 0; i < 70; ++i) { s = s*1664525u+1013904223u; float x=(float)((s>>9)%1280); s=s*1664525u+1013904223u; float y=(float)((s>>9)%720); DrawRect({x,y},{x+1,y+1}, WithAlpha(C_STAR, 0.5f)); }
+
+    // ---- "Enter the Lab?" confirm sub-state: the item list is REPLACED by the
+    //      dialog stack; banner dims WITH the scene (~44% black); footer stays lit
+    if (g_confirm) {
+        DrawBanner(1.0f);
+        DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 112));
+        DrawConfirm(1.0f);
+        SetFont(g_fRodin);
+        float hcy = 668;
+        auto cg = [&](const UV& g, float x){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, C_WHITE); return x+gw+8; };
+        float hx = 700; hx = cg(GLYPH_A, hx); DrawText({hx,hcy-13},24.0f,C_FOOTER,"Select");
+        hx = 895; hx = cg(GLYPH_B, hx); DrawText({hx,hcy-13},24.0f,C_FOOTER,"Back");
+        ResetFont();
+        return;
+    }
     DrawRect({ 0, 0 }, { REF_W, REF_H }, WithAlpha(C_DIM, dimT));
 
-    // ---- gold banner (parallelogram, 45 deg slanted right edge) ----
-    // measured from _ref_pause.png: vertical olive->amber gradient; the WORLD MAP
-    // wordmark stays ghosted in darker gold; PAUSE is stamped over it in italic
-    // chrome (white->silver gradient face + near-black outline), bbox 219..456 x 39..73.
-    {
-        const V2 bc[4] = { { 0, 28 }, { 528, 28 }, { 472, 88 }, { 0, 88 } };
-        const uint32_t bcol[4] = { WithAlpha(C_BAN_T, t), WithAlpha(C_BAN_T, t),
-                                   WithAlpha(C_BAN_B, t), WithAlpha(C_BAN_B, t) };
-        DrawQuadGradient(bc, bcol);
-        // thin dark line along the banner's top edge (measured in ref)
-        DrawRect({ 0, 28 }, { 528, 29.5f }, WithAlpha(RGBA(110, 100, 14, 255), t));
-        // detached slanted highlight sliver just beyond the right slant
-        const V2 sc2[4] = { { 538, 28 }, { 547, 28 }, { 491, 88 }, { 482, 88 } };
-        const uint32_t scol[4] = { WithAlpha(C_BAN_T, t * 0.85f), WithAlpha(C_BAN_T, t * 0.85f),
-                                   WithAlpha(C_BAN_B, t * 0.85f), WithAlpha(C_BAN_B, t * 0.85f) };
-        DrawQuadGradient(sc2, scol);
-    }
-    SetFont(g_fDF);
-    SetTextShear(0.24f);
-    SetTextStretchX(1.37f);   // the game's wordmark face is far wider than DFSoGei
-    DrawText({ 128, 38 }, 40.0f, WithAlpha(C_GHOST, t), "WORLD MAP");      // ghost wordmark
-    {   // chrome PAUSE: 8-direction outline ring, then the gradient face
-        // sized/positioned so the face bbox lands at the measured 219..456 x 39..73
-        const V2 pp = { 212.5f, 28.0f }; const float ps = 68.0f;
-        for (int dy = -1; dy <= 1; ++dy)
-            for (int dx = -1; dx <= 1; ++dx)
-                if (dx || dy)
-                    DrawText({ pp.x + dx * 3.0f, pp.y + dy * 3.0f }, ps, WithAlpha(C_CHR_OUT, t), "PAUSE");
-        DrawTextGradient(pp, ps, WithAlpha(C_CHR_T, t), WithAlpha(C_CHR_B, t), "PAUSE");
-    }
-    ResetTextStretchX();
-    ResetTextShear();
+    DrawBanner(t);
 
     // ---- grey menu panel (hexagon: top-left + bottom-right chamfered) ----
     // ghost-frame open: the panel scales 0.83 -> 1.0 about its centre while its
