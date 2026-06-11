@@ -1,106 +1,223 @@
 // =============================================================================
-// screen_result.cpp — the stage Result screen, reconstructed as clean C++ in the
-// UnleashedRecomp idiom. Row Y positions are the real values parsed from the game
-// layout (ui_result.yncp -> manifests/result.json): six stat bars at y =
-// 155/222/289/356/423/489 (47px tall), a rank badge at the left, a footer prompt.
-// Bars/labels are procedural for now; swap DrawVGradient/DrawText for DrawImage on
-// mat_result_comon_*/mat_result_en_* for final 1:1 (assets last).
+// screen_result.cpp — the day-stage RESULTS tally, re-authored 1:1 from LIVE
+// capture (session11 @66-192s; spec stills result_settled_fullres /
+// result_rank_settled; geometry measured frame-by-frame, footage px / 1.5):
+//   * the LIVE 3D scene stays behind (Sonic + Chip posing) — here a sky/scene
+//     placeholder slot;
+//   * top rail: navy band (66,84,134) y63..101 from the left edge to x635 with
+//     a bright blue-white edge line under it; italic chrome "RESULTS" wordmark
+//     on the rail (x263..536, cap y72..92), SLIDES IN left->right (~0.5 s);
+//   * five stat rows (TIME/RINGS/SPEED/ENEMY/TRICKS): slanted navy
+//     parallelogram label plates (white outline, green italic label) in a
+//     DIAGONAL CASCADE (each row +12 px right), h 41.3, pitch 66.7, first top
+//     y188; value digits italic chrome, LEFT-aligned ~17 px after each plate;
+//     rows build top->bottom (~0.4 s) after the wordmark; values TALLY-count;
+//   * TOTAL row: green gradient plate (40,142,90)->(66,161,113), navy text,
+//     at y512 (taller, ~58), counts after the stat tally;
+//   * RANK: green strip + a BIG gold rank letter at (331,433)-(484,609),
+//     scale-pop reveal after the total lands;
+//   * footer: (A) Next, bottom-right.
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include <cstdio>
+#include <cstring>
+#include <cmath>
+#include <algorithm>
 
 using namespace ui;
-
 namespace {
 
-// real per-row top Y (reference px) from the parsed layout
-constexpr float ROW_Y[6]   = { 155, 222, 289, 356, 423, 489 };
-constexpr float ROW_H      = 47.0f;
-constexpr float BAR_L      = 150.0f, BAR_R = 980.0f;     // narrowed to clear the rank column
-constexpr float LABEL_X    = 184.0f, VALUE_R = 950.0f;
+int g_glyphTex = -1;   // controller glyph atlas (for the (A) footer glyph)
+int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 
-constexpr double TITLE_FRAMES = 16.0;
-constexpr double ROW_STAGGER  = 4.0;     // frames between rows sliding in
-constexpr double ROW_FRAMES   = 14.0;
-constexpr double RANK_DELAY    = 30.0;   // rank pops after the rows
-constexpr double RANK_FRAMES   = 18.0;
+struct UV { float u0, v0, u1, v1; };
+const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
+constexpr float GTW = 512.0f, GTH = 512.0f;
 
-struct Stat { const char* label; const char* value; };
-const Stat STATS[6] = {
-    { "TIME",        "01:23.45" },
-    { "RINGS",       "120"      },
-    { "SCORE",       "45,600"   },
-    { "SPEED BONUS", "10,000"   },
-    { "RING BONUS",  "12,000"   },
-    { "TOTAL",       "67,600"   },
+// ---- palette (sampled from the live capture) --------------------------------
+const uint32_t C_RAIL      = RGBA(66, 84, 134, 235);     // header rail navy
+const uint32_t C_RAIL_EDGE = RGBA(169, 188, 234, 255);   // bright under-edge line
+const uint32_t C_PLATE_T   = RGBA(54, 85, 146, 215);     // stat plate navy top
+const uint32_t C_PLATE_B   = RGBA(41, 61, 116, 215);     // stat plate navy bottom
+const uint32_t C_PLATE_BD  = RGBA(235, 240, 248, 255);   // plate white outline
+const uint32_t C_LABEL     = RGBA(95, 225, 115, 255);    // green italic label
+const uint32_t C_TOTAL_T   = RGBA(66, 161, 113, 235);    // TOTAL green top
+const uint32_t C_TOTAL_B   = RGBA(40, 142, 90, 235);     // TOTAL green bottom
+const uint32_t C_TOTAL_TXT = RGBA(16, 42, 64, 255);      // navy TOTAL text
+const uint32_t C_CHR_T     = RGBA(244, 246, 250, 255);   // chrome digits top
+const uint32_t C_CHR_B     = RGBA(170, 178, 192, 255);   // chrome digits bottom
+const uint32_t C_CHR_OUT   = RGBA(20, 24, 34, 255);      // digit outline
+const uint32_t C_RANK_GOLD_T = RGBA(238, 196, 92, 255);  // rank letter gold
+const uint32_t C_RANK_GOLD_B = RGBA(168, 116, 28, 255);
+const uint32_t C_WHITE     = RGBA(255, 255, 255, 255);
+// scene placeholder (the real game keeps the 3D goal scene live behind)
+const uint32_t C_SKY_T = RGBA(96, 158, 208, 255), C_SKY_B = RGBA(176, 208, 228, 255);
+const uint32_t C_GROUND = RGBA(214, 216, 212, 255);
+
+// ---- measured layout (1280x720 reference) -----------------------------------
+constexpr float RAIL_Y0 = 63, RAIL_Y1 = 101, RAIL_X1 = 635;
+constexpr float WM_X = 263, WM_CAPTOP = 72;             // wordmark target position
+constexpr float ROW_X0 = 619, ROW_W = 214;              // first label plate rect
+constexpr float ROW_TOP0 = 188, ROW_H = 41.3f, ROW_PITCH = 66.7f;
+constexpr float ROW_XSTEP = 12;                          // diagonal cascade per row
+constexpr float VAL_GAP = 17;                            // digits start after plate
+constexpr float TOT_TOP = 512, TOT_H = 58;
+constexpr float SLANT = 10;                              // plate edge slant (px over h)
+constexpr int   N_ROWS = 5;
+
+struct Row { const char* label; int value; const char* fmt; };
+// sample data = the captured run, so renders diff directly against the footage
+Row ROWS[N_ROWS] = {
+    { "TIME",   18176, "time" },   // 03:01.76 stored as CENTISECONDS (valid mid-tally)
+    { "RINGS",  10100, "num" },
+    { "SPEED",   9162, "num" },
+    { "ENEMY",   4800, "num" },
+    { "TRICKS",  9451, "num" },
 };
-
-const uint32_t COL_BG_TOP  = RGBA(10, 16, 30, 255);
-const uint32_t COL_BG_BOT  = RGBA(4, 7, 14, 255);
-const uint32_t COL_BAR_TOP = RGBA(30, 52, 92, 210);
-const uint32_t COL_BAR_BOT = RGBA(14, 26, 50, 210);
-const uint32_t COL_BAR_TOT = RGBA(150, 110, 30, 230);   // TOTAL row tinted gold
-const uint32_t COL_LABEL   = RGBA(206, 222, 240, 255);
-const uint32_t COL_VALUE   = RGBA(255, 255, 255, 255);
-const uint32_t COL_TITLE   = RGBA(255, 209, 74, 255);
-const uint32_t COL_RANK    = RGBA(255, 224, 92, 255);
-const uint32_t COL_RULE    = RGBA(120, 170, 230, 90);
-
-static int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
+int g_total = 90336;
+const char* g_rank = "C";
 
 void Init() {
+    if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");
 }
 
-void Draw(double openSec) {
-    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, COL_BG_TOP, COL_BG_BOT);
+// slanted parallelogram plate (italic lean: top edge shifted right by SLANT)
+void Plate(float x, float y, float w, float h, uint32_t cT, uint32_t cB, uint32_t bd, float a) {
+    const V2 c[4] = { { x + SLANT, y }, { x + w + SLANT, y }, { x + w, y + h }, { x, y + h } };
+    const uint32_t col[4] = { WithAlpha(cT, a), WithAlpha(cT, a), WithAlpha(cB, a), WithAlpha(cB, a) };
+    DrawQuadGradient(c, col);
+    auto edge = [&](V2 p0, V2 p1, V2 p2, V2 p3) {
+        const V2 e[4] = { p0, p1, p2, p3 };
+        const uint32_t ec[4] = { WithAlpha(bd, a), WithAlpha(bd, a), WithAlpha(bd, a), WithAlpha(bd, a) };
+        DrawQuadGradient(e, ec);
+    };
+    edge({ x + SLANT, y }, { x + w + SLANT, y }, { x + w + SLANT - 0.4f, y + 2 }, { x + SLANT - 0.4f, y + 2 });
+    edge({ x + 0.4f, y + h - 2 }, { x + w + 0.4f, y + h - 2 }, { x + w, y + h }, { x, y + h });
+    edge({ x + SLANT, y }, { x + SLANT + 2, y }, { x + 2, y + h }, { x, y + h });
+    edge({ x + w + SLANT - 2, y }, { x + w + SLANT, y }, { x + w, y + h }, { x + w - 2, y + h });
+}
 
-    // title
-    float titleT = (float)ComputeMotion(openSec, 0.0, TITLE_FRAMES);
+// italic chrome text (the game's wordmark/digit treatment)
+void Chrome(V2 pos, float px, const char* s, float a, float stretch = 1.2f) {
     SetFont(g_fDF);
-    DrawTextBevel({ 150, 70 - (1.0f - titleT) * 16.0f }, 46.0f, WithAlpha(COL_TITLE, titleT), "RESULT");
-    DrawRect({ 150, 122 }, { BAR_R, 124 }, WithAlpha(COL_RULE, titleT));
-
-    // stat rows (slide in from the right, staggered)
-    for (int i = 0; i < 6; ++i) {
-        float t = (float)ComputeMotion(openSec, 8.0 + i * ROW_STAGGER, ROW_FRAMES);
-        if (t <= 0.0f) continue;
-        float slide = (1.0f - t) * 60.0f;     // ease in from +60px right
-        float top = ROW_Y[i];
-        bool total = (i == 5);
-        // real Unleashed silver-chrome bar (gold-tinted for the TOTAL row)
-        DrawGameWindow({ BAR_L + slide, top }, { BAR_R + slide, top + ROW_H }, 0.0f, t,
-                       total ? 0xFFA07828u : 0xFF4A608Cu);
-        SetFont(g_fSeurat);
-        DrawTextAligned({ LABEL_X + slide, top }, { 700, top + ROW_H }, total ? 30.0f : 27.0f,
-                        WithAlpha(COL_LABEL, t), STATS[i].label, Align::Left, true, true);
-        SetFont(g_fRodin);
-        DrawTextAligned({ 700, top }, { VALUE_R + slide, top + ROW_H }, total ? 32.0f : 28.0f,
-                        WithAlpha(COL_VALUE, t), STATS[i].value, Align::Right, true, true);
-    }
-
-    // rank panel (right column, beside the stat bars) — pops in after the rows
-    float rankT = (float)ComputeMotion(openSec, RANK_DELAY, RANK_FRAMES);
-    if (rankT > 0.0f) {
-        const float rx = 1010.0f, ry = 250.0f, rw = 240.0f, rh = 240.0f;
-        DrawGameWindow({ rx, ry }, { rx + rw, ry + rh }, 0.0f, rankT);   // real chrome frame
-        SetFont(g_fRodin);
-        DrawTextAligned({ rx, ry - 42 }, { rx + rw, ry - 8 }, 24.0f,
-                        WithAlpha(COL_LABEL, rankT), "RANK", Align::Center, true, true);
-        SetFont(g_fDF);
-        DrawTextAligned({ rx, ry }, { rx + rw, ry + rh }, 150.0f * rankT,
-                        WithAlpha(COL_RANK, rankT), "S", Align::Center, true, true);
-    }
-
-    // footer prompt
-    float footT = (float)ComputeMotion(openSec, RANK_DELAY + 6.0, ROW_FRAMES);
-    float footPulse = footT * Breathe(Now(), 0.55f, 1.0f, 1.3f);   // gentle call-to-action pulse
-    SetFont(g_fRodin);
-    DrawTextAligned({ 760, 620 }, { 1100, 660 }, 24.0f, WithAlpha(RGBA(210, 222, 240, 230), footPulse),
-                    "(A) NEXT", Align::Right, true, true);
+    SetTextShear(0.24f);
+    SetTextStretchX(stretch);
+    for (int dy = -1; dy <= 1; ++dy)
+        for (int dx = -1; dx <= 1; ++dx)
+            if (dx || dy)
+                DrawText({ pos.x + dx * 2.0f, pos.y + dy * 2.0f }, px, WithAlpha(C_CHR_OUT, a), s);
+    DrawTextGradient(pos, px, WithAlpha(C_CHR_T, a), WithAlpha(C_CHR_B, a), s);
+    ResetTextStretchX();
+    ResetTextShear();
     ResetFont();
+}
+
+void FormatValue(const Row& r, int v, char* buf, size_t n) {
+    if (!strcmp(r.fmt, "time")) {   // v = centiseconds -> mm:ss:cc (always valid mid-tally)
+        snprintf(buf, n, "%02d:%02d:%02d", v / 6000, (v / 100) % 60, v % 100);
+    } else {
+        snprintf(buf, n, "%d", v);
+    }
+}
+
+void Draw(double openSec) {
+    // ---- scene placeholder (live 3D goal scene slot) ----
+    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SKY_T, C_SKY_B);
+    DrawVGradient({ 0, 560 }, { REF_W, REF_H }, C_GROUND, RGBA(190, 192, 188, 255));
+
+    // ---- entrance timeline (measured): wordmark slides ~0.5 s; rows build
+    //      top->bottom after it; tally counts ~1.2 s; rank pops after total ----
+    const float wmT = (float)ComputeMotion(openSec, 0.0, 30.0);
+    DrawRect({ 0, RAIL_Y0 }, { RAIL_X1, RAIL_Y1 }, WithAlpha(C_RAIL, wmT));
+    DrawRect({ 0, RAIL_Y1 + 1 }, { RAIL_X1, RAIL_Y1 + 3.5f }, WithAlpha(C_RAIL_EDGE, wmT));
+    {
+        float wx = Lerp(-220.0f, WM_X, wmT);   // slides in from off-left
+        Chrome({ wx, WM_CAPTOP - 12 }, 48.0f, "RESULTS", wmT, 1.70f);
+    }
+
+    for (int i = 0; i < N_ROWS; ++i) {
+        const float rowT = (float)ComputeMotion(openSec, 26.0 + i * 5.0, 10.0);
+        if (rowT <= 0.0f) continue;
+        const float x = ROW_X0 + i * ROW_XSTEP;
+        const float y = ROW_TOP0 + i * ROW_PITCH;
+        Plate(x, y, ROW_W, ROW_H, C_PLATE_T, C_PLATE_B, C_PLATE_BD, rowT);
+        SetFont(g_fSeurat);
+        SetTextShear(0.20f);
+        DrawText({ x + 38, y + (ROW_H - 24) * 0.5f }, 24.0f, WithAlpha(C_LABEL, rowT), ROWS[i].label);
+        ResetTextShear();
+        ResetFont();
+        // tally: value counts 0 -> final over ~1.2 s once all rows are in
+        const float tallyT = (float)ComputeMotion(openSec, 60.0 + i * 3.0, 72.0);
+        char buf[24];
+        FormatValue(ROWS[i], (int)std::lround(ROWS[i].value * tallyT), buf, sizeof buf);
+        Chrome({ x + ROW_W + SLANT + VAL_GAP, y + ROW_H * 0.5f - 16 }, 32.0f, buf, rowT);
+    }
+
+    // ---- TOTAL (green plate; counts after the stat tally) ----
+    {
+        const float totT = (float)ComputeMotion(openSec, 50.0, 10.0);
+        if (totT > 0.0f) {
+            const float x = ROW_X0 + N_ROWS * ROW_XSTEP;
+            Plate(x, TOT_TOP, ROW_W, TOT_H, C_TOTAL_T, C_TOTAL_B, C_PLATE_BD, totT);
+            SetFont(g_fRodin);
+            SetTextShear(0.20f);
+            DrawText({ x + 40, TOT_TOP + (TOT_H - 26) * 0.5f }, 26.0f, WithAlpha(C_TOTAL_TXT, totT), "TOTAL");
+            ResetTextShear();
+            ResetFont();
+            const float totTally = (float)ComputeMotion(openSec, 132.0, 40.0);
+            char buf[16]; snprintf(buf, sizeof buf, "%d", (int)std::lround(g_total * totTally));
+            Chrome({ x + ROW_W + SLANT + VAL_GAP, TOT_TOP + TOT_H * 0.5f - 18 }, 36.0f, buf, totT);
+        }
+    }
+
+    // ---- RANK reveal: green strip + the big gold letter (scale pop) ----
+    {
+        const float rkT = (float)ComputeMotion(openSec, 178.0, 10.0);
+        if (rkT > 0.0f) {
+            Plate(214, 540, 150, 34, RGBA(52, 150, 96, 230), RGBA(34, 120, 70, 230), C_PLATE_BD, rkT);
+            SetFont(g_fSeurat);
+            SetTextShear(0.20f);
+            DrawText({ 248, 545 }, 22.0f, WithAlpha(C_WHITE, rkT), "RANK");
+            ResetTextShear();
+            ResetFont();
+            // gold letter pops with an overshoot: scale 1.6 -> 1.0
+            // measured letter bbox (331,433)-(484,609): ~153 wide x 176 tall
+            const float s = 1.0f + (1.0f - rkT) * 0.6f;
+            const float hh = 176 * s;
+            SetFont(g_fDF);
+            SetTextShear(0.10f);
+            SetTextStretchX(1.25f);
+            const float ps = hh * 1.42f;
+            const V2 rp = { 408 - hh * 0.45f, 609 - hh * 1.28f };
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                    if (dx || dy)
+                        DrawText({ rp.x + dx * 3.0f, rp.y + dy * 3.0f }, ps, WithAlpha(RGBA(60, 36, 6, 255), rkT), g_rank);
+            DrawTextGradient(rp, ps, WithAlpha(C_RANK_GOLD_T, rkT), WithAlpha(C_RANK_GOLD_B, rkT), g_rank);
+            ResetTextStretchX();
+            ResetTextShear();
+            ResetFont();
+        }
+    }
+
+    // ---- footer: (A) Next ----
+    {
+        const float fT = (float)ComputeMotion(openSec, 60.0, 10.0);
+        float hx = 1126, hcy = 706;
+        if (g_glyphTex >= 0) {
+            float asp = ((GLYPH_A.u1 - GLYPH_A.u0) * GTW) / ((GLYPH_A.v1 - GLYPH_A.v0) * GTH), gh = 28.0f, gw = gh * asp;
+            DrawImage(g_glyphTex, { hx, hcy - gh * 0.5f }, { hx + gw, hcy + gh * 0.5f },
+                      { GLYPH_A.u0, GLYPH_A.v0 }, { GLYPH_A.u1, GLYPH_A.v1 }, WithAlpha(C_WHITE, fT));
+            hx += gw + 8;
+        }
+        SetFont(g_fRodin);
+        DrawText({ hx, hcy - 12 }, 22.0f, WithAlpha(C_WHITE, fT), "Next");
+        ResetFont();
+    }
 }
 
 } // namespace
