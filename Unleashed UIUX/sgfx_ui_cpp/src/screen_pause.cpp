@@ -21,7 +21,7 @@
 using namespace ui;
 namespace {
 
-int g_fRodin = 0, g_fDF = 0, g_glyphTex = -1;
+int g_fRodin = 0, g_fSeurat = 0, g_fDF = 0, g_glyphTex = -1;
 struct UV { float u0, v0, u1, v1; };
 constexpr float GTW = 512.0f, GTH = 512.0f;
 const UV GLYPH_A  = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
@@ -33,6 +33,11 @@ constexpr int N_ITEMS = 7;
 int  g_sel = 0;        // default selection on open = "Resume" (verified from PAUSE video t=13s)
 bool g_confirm = false;    // "Enter the Lab?" Yes/No dialog (opens from Go to the Lab)
 int  g_confirmSel = 1;     // 0 = Yes, 1 = No (the capture shows No selected by default)
+// sub-screens (measured spec: game_captures/PAUSE_SUBSCREEN_SPEC.md)
+enum SubView { SV_NONE = 0, SV_ACHIEVEMENTS, SV_INVENTORY };
+int g_sub = SV_NONE;
+int g_achSel = 0;          // selected achievement row (of the 4 visible)
+int g_invSel = 2;          // selected inventory row (capture shows row 3)
 
 // palette — colours sampled from _ref_pause.png
 const uint32_t C_DIM      = RGBA(0, 0, 0, 150);          // hub dim overlay
@@ -67,9 +72,10 @@ void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/pause/mat_comon_x360_001.png");
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");      // real game MSDF
+    if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");      // real game MSDF (sub-screens)
     if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
 }
-void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; }
+void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; g_sub = SV_NONE; g_achSel = 0; g_invSel = 2; }
 void Input(const ScreenInput& in) {
     if (g_confirm) {
         if (in.up || in.down) g_confirmSel ^= 1;
@@ -77,9 +83,23 @@ void Input(const ScreenInput& in) {
         // accept on Yes would transition to the lab (handled by the host app)
         return;
     }
+    if (g_sub == SV_ACHIEVEMENTS) {
+        if (in.up)   g_achSel = std::max(0, g_achSel - 1);
+        if (in.down) g_achSel = std::min(3, g_achSel + 1);
+        if (in.cancel) g_sub = SV_NONE;
+        return;
+    }
+    if (g_sub == SV_INVENTORY) {
+        if (in.up)   g_invSel = std::max(0, g_invSel - 1);
+        if (in.down) g_invSel = std::min(6, g_invSel + 1);
+        if (in.cancel) g_sub = SV_NONE;
+        return;
+    }
     if (in.up)   g_sel = (g_sel + N_ITEMS - 1) % N_ITEMS;
     if (in.down) g_sel = (g_sel + 1) % N_ITEMS;
     if (in.accept && g_sel == 4) { g_confirm = true; g_confirmSel = 1; }   // Go to the Lab
+    if (in.accept && g_sel == 2) g_sub = SV_INVENTORY;                      // Inventory
+    if (in.tabLeft) g_sub = SV_ACHIEVEMENTS;                                // (Back) Achievements
 }
 
 // solid (untextured) quad from 4 explicit corners (TL,TR,BR,BL) — used for the
@@ -176,6 +196,146 @@ void DrawConfirm(float a) {
     ResetFont();
 }
 
+// ---- pause sub-screens (Achievements / Inventory) — measured spec in
+// ---- game_captures/PAUSE_SUBSCREEN_SPEC.md ----------------------------------
+const uint32_t SUB_SCENE_DK = RGBA(3, 5, 2, 255);
+
+// the shared plate grammar: TL+BR 45-deg chamfers, silver double border,
+// grey vertical gradient (152,153,158)->(110,108,108)
+void SubPanel(float x0, float y0, float x1, float y1, float ch, float a) {
+    DrawVGradient({ x0, y0 }, { x1, y1 },
+                  WithAlpha(RGBA(152, 153, 158, 255), a), WithAlpha(RGBA(110, 108, 108, 255), a));
+    SolidQuad({ x0, y0 }, { x0 + ch, y0 }, { x0, y0 + ch }, { x0, y0 }, SUB_SCENE_DK);
+    SolidQuad({ x1 - ch, y1 }, { x1, y1 }, { x1, y1 - ch }, { x1 - ch, y1 }, SUB_SCENE_DK);
+    uint32_t bd = WithAlpha(RGBA(218, 222, 222, 255), a);
+    DrawRect({ x0 + ch, y0 }, { x1, y0 + 2.7f }, bd);
+    DrawRect({ x0, y1 - 2.7f }, { x1 - ch, y1 }, bd);
+    DrawRect({ x0, y0 + ch }, { x0 + 2.7f, y1 }, bd);
+    DrawRect({ x1 - 2.7f, y0 }, { x1, y1 - ch }, bd);
+    SolidQuad({ x0 + ch, y0 }, { x0 + ch + 2.7f, y0 + 2.7f }, { x0 + 2.7f, y0 + ch + 2.7f }, { x0, y0 + ch }, bd);
+    SolidQuad({ x1 - ch, y1 }, { x1 - ch - 2.7f, y1 - 2.7f }, { x1 - 2.7f, y1 - ch - 2.7f }, { x1, y1 - ch }, bd);
+}
+
+// section label plate: TL chamfer + italic-slant right end, white italic caps
+void LabelPlate(float x0, float y0, float x1, float y1, const char* text, float a) {
+    const float ch = 21.0f, slant = (y1 - y0) * 0.49f * 0.6f;
+    const V2 c[4] = { { x0 + ch, y0 }, { x1, y0 }, { x1 - slant, y1 }, { x0, y1 } };
+    const uint32_t fT = WithAlpha(RGBA(110, 111, 111, 255), a), fB = WithAlpha(RGBA(72, 72, 72, 255), a);
+    const uint32_t col[4] = { fT, fT, fB, fB };
+    DrawQuadGradient(c, col);
+    SolidQuad({ x0, y0 }, { x0 + ch, y0 }, { x0, y0 + ch }, { x0, y0 }, SUB_SCENE_DK);
+    DrawRect({ x0 + ch, y0 }, { x1, y0 + 2 }, WithAlpha(RGBA(208, 210, 210, 255), a));
+    DrawRect({ x0 + ch, y0 + 2 }, { x1, y0 + 5 }, WithAlpha(RGBA(165, 165, 165, 255), a));
+    SetFont(g_fRodin);
+    SetTextShear(0.18f);
+    float w = MeasureText(24.0f, text).x;
+    DrawText({ x0 + 27 + 1.5f, y0 + 11 + 1.5f }, 24.0f, WithAlpha(RGBA(15, 15, 15, 255), a), text);
+    DrawText({ x0 + 27, y0 + 11 }, 24.0f, WithAlpha(RGBA(236, 236, 236, 255), a), text);
+    (void)w;
+    ResetTextShear();
+    ResetFont();
+}
+
+void SubScrollbar(float x0, float y0, float x1, float y1, float handleY, float handleH, float a) {
+    DrawRect({ x0 - 1.3f, y0 - 1.3f }, { x1 + 1.3f, y1 + 1.3f }, WithAlpha(RGBA(196, 198, 198, 255), a));
+    DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(RGBA(121, 123, 123, 255), a), WithAlpha(RGBA(107, 107, 107, 255), a));
+    float hx0 = x0 + ((x1 - x0) - 8.7f) * 0.5f;
+    DrawRect({ hx0, handleY }, { hx0 + 8.7f, handleY + handleH }, WithAlpha(RGBA(237, 237, 237, 255), a));
+}
+
+void SubFooter(bool withSelect, float a) {
+    SetFont(g_fRodin);
+    float hcy = 637;
+    auto cg = [&](const UV& g, float x){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=31.3f, gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE, a)); return x+gw+10; };
+    if (withSelect) { float hx = cg(GLYPH_A, 683.3f); DrawText({ hx, hcy - 13 }, 24.0f, WithAlpha(C_FOOTER, a), "Select"); }
+    float hx = cg(GLYPH_B, 861.3f); DrawText({ hx, hcy - 13 }, 24.0f, WithAlpha(C_FOOTER, a), "Back");
+    ResetFont();
+}
+
+void DrawAchievements(float a) {
+    LabelPlate(255.3f, 137.3f, 540.0f, 184.7f, "ACHIEVEMENTS", a);
+    // counter "50 / 50" + trophy slot (gold art drops in)
+    SetFont(g_fRodin);
+    DrawTextShadow({ 888, 152 }, 22.0f, WithAlpha(C_WHITE, a), "50 / 50");
+    DrawVGradient({ 989.3f, 140 }, { 1016.7f, 182 }, WithAlpha(RGBA(195, 155, 65, 255), a), WithAlpha(RGBA(138, 127, 49, 255), a));
+    // main panel + 4 rows (pitch 94.7 from y209.3)
+    SubPanel(255.3f, 191.3f, 1023.3f, 598.7f, 24.0f, a);
+    struct Ach { const char* name; const char* date; const char* desc; };
+    const Ach ROWS[4] = {
+        { "Blue Meteor",   "2025/03/03 02:20", "Reached the Goal of Windmill Isle, Act 2 as" },
+        { "Hyperdrive",    "2025/03/03 01:57", "Have mastered the Lightspeed Dash techniq" },
+        { "Partly Cloudy", "2025/03/03 01:52", "Collected half of the Sun Medals" },
+        { "Half Moon",     "2025/03/03 01:49", "Collected half of the Moon Medals" },
+    };
+    for (int i = 0; i < 4; ++i) {
+        const float ry = 209.3f + i * 94.7f;
+        const bool sel = (i == g_achSel);
+        if (i) DrawRect({ 268.7f, ry - 0.7f }, { 986.7f, ry + 0.7f }, WithAlpha(RGBA(175, 176, 178, 255), a));
+        if (sel) {   // opaque yellow plate filling the cell, small TL/BR chamfers
+            DrawVGradient({ 268.7f, ry }, { 986.7f, ry + 94.7f },
+                          WithAlpha(RGBA(196, 194, 90, 255), a), WithAlpha(RGBA(184, 170, 88, 255), a));
+            SolidQuad({ 268.7f, ry }, { 278.7f, ry }, { 268.7f, ry + 10 }, { 268.7f, ry }, WithAlpha(RGBA(140, 141, 144, 255), a));
+            SolidQuad({ 977.7f, ry + 94.7f }, { 986.7f, ry + 94.7f }, { 986.7f, ry + 85.7f }, { 977.7f, ry + 94.7f }, WithAlpha(RGBA(122, 120, 118, 255), a));
+        }
+        // icon slot (achievement art drops in)
+        DrawRect({ 294, ry + 19.3f }, { 354, ry + 79.3f }, WithAlpha(RGBA(29, 28, 30, 255), a));
+        // name (yellow, outlined)
+        SetFont(g_fSeurat);
+        DrawText({ 392 + 1.3f, ry + 22 + 1.3f }, 24.0f, WithAlpha(RGBA(15, 15, 15, 255), a), ROWS[i].name);
+        DrawText({ 392, ry + 22 }, 24.0f, WithAlpha(RGBA(242, 230, 18, 255), a), ROWS[i].name);
+        // date stamp plate
+        DrawRect({ 825.3f, ry + 20 }, { 976.7f, ry + 46 }, WithAlpha(RGBA(20, 20, 22, 140), a));
+        SetFont(g_fRodin);
+        DrawTextAligned({ 825.3f, ry + 20 }, { 976.7f, ry + 46 }, 15.0f, WithAlpha(RGBA(238, 238, 238, 255), a), ROWS[i].date, Align::Center, true, false);
+        // description (white; near-black on the selected plate)
+        SetFont(g_fSeurat);
+        DrawText({ 391.3f, ry + 54.7f }, 20.0f,
+                 WithAlpha(sel ? RGBA(30, 27, 20, 255) : RGBA(245, 245, 245, 255), a), ROWS[i].desc);
+    }
+    ResetFont();
+    SubScrollbar(992, 209.3f, 1006, 576, 436 - (3 - g_achSel) * 12.0f, 29.3f, a);
+    SubFooter(false, a);
+}
+
+void DrawInventory(float a) {
+    LabelPlate(228.0f, 140.0f, 427.0f, 188.0f, "INVENTORY", a);
+    // list panel + detail panel (abutting, dark seam)
+    SubPanel(230.0f, 194.0f, 769.3f, 599.3f, 23.3f, a);
+    DrawRect({ 769.3f, 194 }, { 772.0f, 417.3f }, WithAlpha(RGBA(32, 33, 35, 255), a));
+    SubPanel(772.0f, 194.0f, 1050.7f, 417.3f, 23.7f, a);
+    // item render slot in the detail panel (SEGA art drops in)
+    SetFont(g_fSeurat);
+    DrawTextAligned({ 780, 203 }, { 1011, 367 }, 15.0f, WithAlpha(RGBA(86, 88, 92, 255), a), "ITEM RENDER", Align::Center, true, false);
+    const char* ITEMS_INV[7] = { "Big G Steak", "Popcake", "Nuclear Taquo", "Empire Coffee",
+                                 "Banana", "Tropic Juice", "Live Honker" };
+    for (int i = 0; i < 7; ++i) {
+        const float ty = 232.7f + i * 50.0f;        // row text band top
+        const bool sel = (i == g_invSel);
+        if (sel) {   // borderless yellow bar, soft top fade, inset in the 50px cell
+            DrawVGradient({ 245.3f, ty - 10 }, { 726.7f, ty - 3 },
+                          WithAlpha(RGBA(180, 172, 110, 0), a), WithAlpha(RGBA(180, 172, 110, 255), a));
+            DrawVGradient({ 245.3f, ty - 3 }, { 726.7f, ty + 36 },
+                          WithAlpha(RGBA(180, 172, 110, 255), a), WithAlpha(RGBA(195, 186, 106, 255), a));
+            DrawRect({ 245.3f, ty + 36 }, { 726.7f, ty + 38 }, WithAlpha(RGBA(190, 170, 90, 255), a));
+        }
+        // food icon slot
+        DrawRect({ 270, ty + 0.6f }, { 309.3f, ty + 27.3f }, WithAlpha(RGBA(196, 156, 84, 255), a));
+        // name (white; saturated orange when selected)
+        SetFont(g_fSeurat);
+        uint32_t nameCol = sel ? RGBA(234, 126, 3, 255) : RGBA(245, 243, 244, 255);
+        DrawText({ 326.7f + 1.3f, ty + 1.3f }, 24.0f, WithAlpha(RGBA(20, 14, 8, 255), a), ITEMS_INV[i]);
+        DrawText({ 326.7f, ty }, 24.0f, WithAlpha(nameCol, a), ITEMS_INV[i]);
+        // x glyph + count (right-aligned at 705.3)
+        SetFont(g_fRodin);
+        DrawText({ 616, ty + 2 }, 20.0f, WithAlpha(RGBA(211, 212, 216, 255), a), "x");
+        float cw = MeasureText(24.0f, "99").x;
+        DrawText({ 705.3f - cw, ty }, 24.0f, WithAlpha(RGBA(225, 226, 228, 255), a), "99");
+    }
+    ResetFont();
+    SubScrollbar(737.3f, 217.3f, 750.7f, 586, 377.3f - (2 - g_invSel) * 14.0f, 31.3f, a);
+    SubFooter(true, a);
+}
+
 void Draw(double openSec) {
     // MEASURED open animation (live capture session8 @78s, 60fps frame terms):
     // the dim snaps in over ~2 frames; the EMPTY chamfered panel scales up
@@ -189,6 +349,15 @@ void Draw(double openSec) {
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_T, C_BG_B);
     uint32_t s = 0x1357acefu;
     for (int i = 0; i < 70; ++i) { s = s*1664525u+1013904223u; float x=(float)((s>>9)%1280); s=s*1664525u+1013904223u; float y=(float)((s>>9)%720); DrawRect({x,y},{x+1,y+1}, WithAlpha(C_STAR, 0.5f)); }
+
+    // ---- Achievements / Inventory sub-screens (scene+banner dim ~50%) ----
+    if (g_sub != SV_NONE) {
+        DrawBanner(1.0f);
+        DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 128));
+        if (g_sub == SV_ACHIEVEMENTS) DrawAchievements(1.0f);
+        else                          DrawInventory(1.0f);
+        return;
+    }
 
     // ---- "Enter the Lab?" confirm sub-state: the item list is REPLACED by the
     //      dialog stack; banner dims WITH the scene (~44% black); footer stays lit
