@@ -34,10 +34,12 @@ void ExStageInit();       void ExStageDraw(double);       void ExStageInput(cons
 void WorldMapHelpInit();  void WorldMapHelpDraw(double);  void WorldMapHelpInput(const ScreenInput&);  void WorldMapHelpReset();
 void InstallerInit();     void InstallerDraw(double);     void InstallerInput(const ScreenInput&);     void InstallerReset();
 void BootLoadingInit();   void BootLoadingDraw(double);   void BootLoadingInput(const ScreenInput&);   void BootLoadingReset();
+void BootTitleInit();     void BootTitleDraw(double);     void BootTitleInput(const ScreenInput&);     void BootTitleReset();
 
 static const ScreenDef g_screens[] = {
     { "installer", &InstallerInit, &InstallerDraw, &InstallerInput, &InstallerReset },
     { "boot_loading", &BootLoadingInit, &BootLoadingDraw, &BootLoadingInput, &BootLoadingReset },
+    { "boot_title", &BootTitleInit, &BootTitleDraw, &BootTitleInput, &BootTitleReset },
     { "title",     &TitleInit,    &TitleDraw,    &TitleInput,    &TitleReset    },
     { "world_map", &WorldMapInit, &WorldMapDraw, &WorldMapInput, &WorldMapReset },
     { "status",    &StatusInit,   &StatusDraw,   &StatusInput,   &StatusReset   },

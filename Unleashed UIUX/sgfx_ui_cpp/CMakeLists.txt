@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+﻿cmake_minimum_required(VERSION 3.20)
 project(sgfx_ui CXX C)   # C enabled for thirdparty/stb/stb_vorbis.c (OGG decode)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -63,7 +63,7 @@ add_custom_command(TARGET sgfx_ui POST_BUILD
         "${AGILITY_DLL}" "$<TARGET_FILE_DIR:sgfx_ui>/D3D12/D3D12Core.dll")
 
 # -----------------------------------------------------------------------------
-# sgfx_screens — the clean, hand-written screen reconstruction (UnleashedRecomp
+# sgfx_screens â€” the clean, hand-written screen reconstruction (UnleashedRecomp
 # ui/options_menu methodology): each screen is a C++ module drawn through the
 # sgfxui helper layer onto the same CSD GPU path. Shares the plume/SDL/stb setup.
 # -----------------------------------------------------------------------------
@@ -98,6 +98,7 @@ add_executable(sgfx_screens
     src/screen_world_map_help.cpp
     src/screen_installer.cpp
     src/screen_boot_loading.cpp
+    src/screen_boot_title.cpp
     src/gfx_d3d12.cpp
     "${RECOMP_ROOT}/UnleashedRecomp/gpu/rhi/plume_d3d12.cpp"
     "${RECOMP_ROOT}/thirdparty/D3D12MemoryAllocator/src/D3D12MemAlloc.cpp")
