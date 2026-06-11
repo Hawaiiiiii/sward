@@ -17,6 +17,8 @@
 #include "csd_vs.hlsl.dxil.h"          // g_csd_vs_dxil
 #include "csd_filter_ps.hlsl.dxil.h"   // g_csd_filter_ps_dxil
 #include "csd_modifier_ps.hlsl.dxil.h" // g_csd_modifier_ps_dxil (csd_filter_ps + per-quad ShaderModifier)
+#include "mesh_vs.hlsl.dxil.h"         // g_mesh_vs_dxil (the 3D viewport pass)
+#include "mesh_ps.hlsl.dxil.h"         // g_mesh_ps_dxil
 
 #include "stb_image.h"                 // declarations only (impl lives in main.cpp)
 
@@ -61,6 +63,8 @@ struct State {
 
     std::unique_ptr<RenderTexture>   msaa;        // multisample color target (CSD draws here)
     std::unique_ptr<RenderFramebuffer> msaaFB;
+    std::unique_ptr<RenderTexture>   depth;       // multisample depth (the 3D mesh pass)
+    std::unique_ptr<RenderFramebuffer> fb3D;      // color + depth
     std::unique_ptr<RenderTexture>   resolveTex;  // headless single-sample resolve dest
     std::unique_ptr<RenderBuffer>    readback;    // headless CPU-readable copy
     uint32_t readbackRowBytes = 0;
@@ -80,7 +84,21 @@ struct State {
 
     std::vector<gfx::Quad> pending;
     float clear[4] = {0.04f, 0.05f, 0.06f, 1.0f};
+
+    // ---- 3D mesh pass state ----
+    std::unique_ptr<RenderPipelineLayout> meshLayout;
+    std::unique_ptr<RenderShader> meshVS, meshPS;
+    std::unique_ptr<RenderPipeline> pMesh;
+    std::unique_ptr<RenderBuffer> meshCB;          // per-draw constants ring
+    void* meshCBPtr = nullptr;
+    uint32_t rdMesh = 0;
+    struct MeshBuf { std::unique_ptr<RenderBuffer> vb, ib; uint32_t indexCount = 0; uint32_t vbSize = 0; };
+    std::vector<MeshBuf> meshes;
+    std::vector<gfx::MeshDraw> pending3d;
 } S;
+
+constexpr uint32_t MESH_CB_STRIDE = 256;           // 176 bytes used, 256-aligned
+constexpr uint32_t MAX_MESH_DRAWS = 256;
 
 bool g_dbg = false;   // set from env SGFX_DEBUG at init
 #define DBG(...) do{ if(g_dbg){ fprintf(stderr,"[gfx] " __VA_ARGS__); fputc('\n',stderr); fflush(stderr);} }while(0)
@@ -198,6 +216,60 @@ bool buildPipeline() {
     return true;
 }
 
+// The 3D mesh pipeline: own layout (same bindless set shapes as the CSD one, so
+// the existing texture/sampler sets bind directly) + one root CBV of per-draw
+// constants; depth-tested/written against the new MSAA depth target.
+bool buildMeshPipeline() {
+    RenderDescriptorSetBuilder texB;  texB.begin();  texB.addTexture(0, MAX_TEX);   texB.end(true, MAX_TEX);
+    RenderDescriptorSetBuilder d1;    d1.begin();    d1.addTexture(0, 1);           d1.end(true, 1);
+    RenderDescriptorSetBuilder d2;    d2.begin();    d2.addTexture(0, 1);           d2.end(true, 1);
+    RenderDescriptorSetBuilder sampB; sampB.begin(); sampB.addSampler(0, MAX_SAMP); sampB.end(true, MAX_SAMP);
+
+    RenderPipelineLayoutBuilder lb; lb.begin(false, true);
+    lb.addDescriptorSet(texB);   // set 0 -> space0 (textures)
+    lb.addDescriptorSet(d1);     // set 1 -> space1 (unused)
+    lb.addDescriptorSet(d2);     // set 2 -> space2 (unused)
+    lb.addDescriptorSet(sampB);  // set 3 -> space3 (samplers)
+    S.rdMesh = lb.addRootDescriptor(0, 4, RenderRootDescriptorType::CONSTANT_BUFFER);   // b0 space4
+    lb.end();
+    S.meshLayout = lb.create(S.device.get());
+    if (!S.meshLayout) { fprintf(stderr, "[gfx] mesh layout failed\n"); return false; }
+
+    S.meshVS = S.device->createShader(g_mesh_vs_dxil, sizeof(g_mesh_vs_dxil), "main", RenderShaderFormat::DXIL);
+    S.meshPS = S.device->createShader(g_mesh_ps_dxil, sizeof(g_mesh_ps_dxil), "main", RenderShaderFormat::DXIL);
+    if (!S.meshVS || !S.meshPS) { fprintf(stderr, "[gfx] mesh shader create failed\n"); return false; }
+
+    RenderInputElement elems[] = {
+        RenderInputElement("POSITION", 0, 0,  RenderFormat::R32G32B32_FLOAT, 0, 0),
+        RenderInputElement("NORMAL",   0, 1,  RenderFormat::R32G32B32_FLOAT, 0, 12),
+        RenderInputElement("TEXCOORD", 0, 2,  RenderFormat::R32G32_FLOAT,    0, 24),
+    };
+    RenderInputSlot slot(0, sizeof(gfx::MeshVertex));
+
+    RenderGraphicsPipelineDesc pd;
+    pd.pipelineLayout = S.meshLayout.get();
+    pd.vertexShader = S.meshVS.get();
+    pd.pixelShader = S.meshPS.get();
+    pd.renderTargetFormat[0] = RT_FMT;
+    pd.renderTargetCount = 1;
+    pd.renderTargetBlend[0] = RenderBlendDesc::AlphaBlend();
+    pd.multisampling.sampleCount = S.samples;
+    pd.depthEnabled = true;
+    pd.depthWriteEnabled = true;
+    pd.depthFunction = RenderComparisonFunction::LESS_EQUAL;   // plume's default is NEVER!
+    pd.depthTargetFormat = RenderFormat::D32_FLOAT;
+    pd.cullMode = RenderCullMode::NONE;   // robust for any winding; convex bodies self-sort via depth
+    pd.primitiveTopology = RenderPrimitiveTopology::TRIANGLE_LIST;
+    pd.inputElements = elems; pd.inputElementsCount = 3;
+    pd.inputSlots = &slot;    pd.inputSlotsCount = 1;
+    S.pMesh = S.device->createGraphicsPipeline(pd);
+    if (!S.pMesh) { fprintf(stderr, "[gfx] mesh pipeline failed\n"); return false; }
+
+    S.meshCB = S.device->createBuffer(RenderBufferDesc::UploadBuffer((uint64_t)MESH_CB_STRIDE * MAX_MESH_DRAWS, RenderBufferFlag::CONSTANT));
+    S.meshCBPtr = S.meshCB->map();
+    return S.meshCBPtr != nullptr;
+}
+
 // Resolve (or copy when 1x) the MSAA target into `dst`, leaving dst in `after`.
 void resolveInto(RenderTexture* dst, RenderTextureLayout after) {
     if (S.samples > 1) {
@@ -250,6 +322,10 @@ bool init(void* hwnd, int width, int height, bool headless, int msaa) {
     const RenderTexture* fbColor[1] = { S.msaa.get() };
     DBG("create framebuffer...");
     S.msaaFB = S.device->createFramebuffer(RenderFramebufferDesc(fbColor, 1));
+    DBG("create depth target...");
+    RenderClearValue dcv = RenderClearValue::Depth(RenderDepth(1.0f), RenderFormat::D32_FLOAT);
+    S.depth = S.device->createTexture(RenderTextureDesc::DepthTarget(width, height, RenderFormat::D32_FLOAT, RenderMultisampling(S.samples), &dcv));
+    S.fb3D = S.device->createFramebuffer(RenderFramebufferDesc(fbColor, 1, S.depth.get()));
 
     DBG("targets...");
     if (headless) {
@@ -266,6 +342,8 @@ bool init(void* hwnd, int width, int height, bool headless, int msaa) {
     S.canDraw = buildPipeline();
     if (!S.canDraw) fprintf(stderr, "[gfx] pipeline unavailable — clear-only mode\n");
     DBG("buildPipeline done canDraw=%d", (int)S.canDraw);
+    if (S.canDraw && !buildMeshPipeline())
+        fprintf(stderr, "[gfx] mesh pipeline unavailable — 3D pass disabled\n");
 
     // slot 0 = 1x1 opaque white (for untextured / solid quads)
     if (S.canDraw) { const uint8_t white[4] = {255,255,255,255}; uploadTexture(white, 1, 1); }
@@ -296,6 +374,24 @@ int loadTextureRGBA(const uint8_t* rgba, int w, int h) {
 }
 
 int sampleCount() { return (int)S.samples; }
+
+int createMesh(const MeshVertex* verts, int vertCount, const uint16_t* indices, int indexCount) {
+    if (!S.canDraw || !S.pMesh || !verts || !indices || vertCount <= 0 || indexCount <= 0) return -1;
+    State::MeshBuf mb;
+    mb.vb = S.device->createBuffer(RenderBufferDesc::UploadBuffer((uint64_t)sizeof(MeshVertex) * vertCount, RenderBufferFlag::VERTEX));
+    mb.ib = S.device->createBuffer(RenderBufferDesc::UploadBuffer((uint64_t)sizeof(uint16_t) * indexCount, RenderBufferFlag::INDEX));
+    if (!mb.vb || !mb.ib) return -1;
+    if (void* p = mb.vb->map()) { memcpy(p, verts, sizeof(MeshVertex) * vertCount); mb.vb->unmap(); }
+    if (void* p = mb.ib->map()) { memcpy(p, indices, sizeof(uint16_t) * indexCount); mb.ib->unmap(); }
+    mb.indexCount = (uint32_t)indexCount;
+    mb.vbSize = (uint32_t)(sizeof(MeshVertex) * vertCount);
+    S.meshes.push_back(std::move(mb));
+    return (int)S.meshes.size() - 1;
+}
+
+void drawMesh(const MeshDraw& draw) {
+    if (S.pending3d.size() < MAX_MESH_DRAWS) S.pending3d.push_back(draw);
+}
 
 void beginFrame(float r, float g, float b, float a) {
     S.clear[0]=r; S.clear[1]=g; S.clear[2]=b; S.clear[3]=a;
@@ -338,10 +434,50 @@ void endFrame() {
     DBG("buffers filled, begin record");
     S.cmd->begin();
     S.cmd->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(S.msaa.get(), RenderTextureLayout::COLOR_WRITE));
-    S.cmd->setFramebuffer(S.msaaFB.get());
+    const bool any3d = S.canDraw && S.pMesh && !S.pending3d.empty();
+    DBG("mesh pass: %zu draws (pMesh=%d meshes=%zu)", S.pending3d.size(), (int)(S.pMesh != nullptr), S.meshes.size());
+    if (any3d) {
+        S.cmd->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(S.depth.get(), RenderTextureLayout::DEPTH_WRITE));
+        S.cmd->setFramebuffer(S.fb3D.get());
+    } else {
+        S.cmd->setFramebuffer(S.msaaFB.get());
+    }
     S.cmd->clearColor(0, RenderColor(S.clear[0], S.clear[1], S.clear[2], S.clear[3]));
     S.cmd->setViewports(RenderViewport(0, 0, (float)S.w, (float)S.h));
     S.cmd->setScissors(RenderRect(0, 0, S.w, S.h));
+
+    // ---- 3D mesh pass (depth on), UNDER the UI quads ----
+    if (any3d) {
+        S.cmd->clearDepth(true, 1.0f);
+        S.cmd->setGraphicsPipelineLayout(S.meshLayout.get());
+        S.cmd->setGraphicsDescriptorSet(S.texSet.get(), 0);
+        S.cmd->setGraphicsDescriptorSet(S.sampSet.get(), 3);
+        S.cmd->setPipeline(S.pMesh.get());
+        uint8_t* mc = (uint8_t*)S.meshCBPtr;
+        const uint32_t m = (uint32_t)S.pending3d.size();
+        for (uint32_t i = 0; i < m; ++i) {
+            const MeshDraw& d = S.pending3d[i];
+            if (d.mesh < 0 || d.mesh >= (int)S.meshes.size()) continue;
+            const State::MeshBuf& mb = S.meshes[d.mesh];
+            uint8_t* e = mc + (size_t)i * MESH_CB_STRIDE;
+            memcpy(e + 0,   d.mvp, 64);
+            memcpy(e + 64,  d.model, 64);
+            memcpy(e + 128, d.lightDir, 16);
+            memcpy(e + 144, d.baseColor, 16);
+            uint32_t misc[4] = { (d.texIndex < 0 || d.texIndex >= (int)S.textures.size()) ? 0u : (uint32_t)d.texIndex, 0, 0, 0 };
+            memcpy(e + 160, misc, 16);
+            S.cmd->setGraphicsRootDescriptor(S.meshCB->at((uint64_t)i * MESH_CB_STRIDE), S.rdMesh);
+            RenderVertexBufferView vbv(mb.vb->at(0), mb.vbSize);
+            RenderInputSlot vslot(0, sizeof(MeshVertex));
+            RenderIndexBufferView ibv(mb.ib->at(0), sizeof(uint16_t) * mb.indexCount, RenderFormat::R16_UINT);
+            S.cmd->setVertexBuffers(0, &vbv, 1, &vslot);
+            S.cmd->setIndexBuffer(&ibv);
+            S.cmd->drawIndexedInstanced(mb.indexCount, 1, 0, 0, 0);
+        }
+        // hand the (already cleared) color target over to the quad pass, no depth
+        S.cmd->setFramebuffer(S.msaaFB.get());
+    }
+    S.pending3d.clear();
 
     if (S.canDraw && n) {
         S.cmd->setGraphicsPipelineLayout(S.layout.get());
@@ -408,6 +544,9 @@ void shutdown() {
     if (S.device) S.device->waitIdle();
     // Destroy in dependency order: every D3D12 resource before the device that owns it.
     S.textures.clear(); S.texViews.clear();
+    S.meshes.clear(); S.meshCB.reset(); S.pMesh.reset();
+    S.meshVS.reset(); S.meshPS.reset(); S.meshLayout.reset();
+    S.fb3D.reset(); S.depth.reset();
     S.vb.reset(); S.ib.reset(); S.vsCB.reset(); S.psCB.reset(); S.sharedCB.reset();
     S.pAlpha.reset(); S.pAdditive.reset(); S.vs.reset(); S.ps.reset();
     S.sampler.reset(); S.texSet.reset(); S.sampSet.reset(); S.layout.reset();

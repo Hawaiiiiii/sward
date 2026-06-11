@@ -49,6 +49,24 @@ void clearTextures();   // drop all loaded textures (on screen switch)
 
 int  sampleCount();     // resolved MSAA sample count actually in use
 
+// ---- the real 3D pass (depth-buffered; the QA-viewport seed) -----------------
+// Meshes render UNDER the UI quads each frame: mesh pass (depth on, cleared
+// every frame) -> quad pass (no depth). Matrices are row-major float[16] with
+// the row-vector convention (pos * M).
+struct MeshVertex { float px, py, pz, nx, ny, nz, u, v; };
+struct MeshDraw {
+    int   mesh = -1;
+    float mvp[16];        // model * view * proj
+    float model[16];      // for the normal transform
+    float lightDir[4];    // xyz = towards the light (normalized), w = ambient
+    float baseColor[4];   // multiplies the texture (white when untextured)
+    int   texIndex = -1;  // bindless texture slot; -1 = untextured
+};
+// Upload a static mesh; returns a handle (-1 on failure).
+int  createMesh(const MeshVertex* verts, int vertCount, const uint16_t* indices, int indexCount);
+// Queue a mesh for this frame (call during the screen's Draw; consumed by endFrame).
+void drawMesh(const MeshDraw& draw);
+
 // Per-frame: beginFrame(clear) -> drawQuads(...) (any number) -> endFrame().
 void beginFrame(float r, float g, float b, float a);
 void drawQuads(const Quad* quads, int count);
