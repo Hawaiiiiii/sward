@@ -115,11 +115,18 @@ void HeaderStrip(const char* title, float a) {
     // left art-deco pinstripes + curl hint (procedural approximation)
     for (int i = 0; i < 3; ++i)
         DrawRect({ 8, 70.0f + i * 9 }, { 214, 71.5f + i * 9 }, WithAlpha(C_HDR_GOLD, a * 0.9f));
-    // beveled slab title at the measured x
+    // beveled slab title at the measured x (ref band ~270 wide x 29 tall):
+    // olive-brown outline ring first, then the cream->gold bevel face
     SetFont(g_fDF);
+    SetTextStretchX(1.12f);
+    for (int dy = -1; dy <= 1; ++dy)
+        for (int dx = -1; dx <= 1; ++dx)
+            if (dx || dy)
+                DrawText({ 278.0f + dx * 1.5f, 64.0f + dy * 1.5f }, 40.0f, WithAlpha(C_TITLE_OUT, a), title);
     SetModifier(MOD_TITLE_BEVEL);
-    DrawTextGradient({ 278, 66 }, 36.0f, WithAlpha(C_TITLE_T, a), WithAlpha(C_TITLE_B, a), title);
+    DrawTextGradient({ 278, 64 }, 40.0f, WithAlpha(C_TITLE_T, a), WithAlpha(C_TITLE_B, a), title);
     ResetModifier();
+    ResetTextStretchX();
     ResetFont();
     // "Pickle's Room" oval seal (procedural: rings + italic script)
     const float cx = 968, cy = 81.5f, rx = 48, ry = 41.5f;
@@ -168,14 +175,22 @@ void ParchmentPanel(float a) {
     };
     hook(236.7f, 139.0f, 1, 1); hook(1043.3f, 139.0f, -1, 1);
     hook(236.7f, 592.0f, 1, -1); hook(1043.3f, 592.0f, -1, -1);
-    // mottled parchment interior: base + soft tonal streaks
+    // mottled parchment interior: base + soft tonal streaks + fine ageing specks
     DrawVGradient({ INT_X0, INT_Y0 }, { INT_X1, INT_Y1 }, WithAlpha(C_PARCH_HI, a), WithAlpha(C_PARCH, a));
     uint32_t s = 0x9e3779b9u;
-    for (int i = 0; i < 14; ++i) {
+    for (int i = 0; i < 26; ++i) {
         s = s * 1664525u + 1013904223u; float x = INT_X0 + (float)((s >> 8) % (int)(INT_X1 - INT_X0 - 60));
         s = s * 1664525u + 1013904223u; float y = INT_Y0 + (float)((s >> 8) % (int)(INT_Y1 - INT_Y0 - 90));
-        s = s * 1664525u + 1013904223u; float w = 30 + (float)((s >> 8) % 50);
-        DrawRect({ x, y }, { x + w, y + 70 }, WithAlpha(C_PARCH_LO, a * 0.18f));
+        s = s * 1664525u + 1013904223u; float w = 24 + (float)((s >> 8) % 60);
+        s = s * 1664525u + 1013904223u; float h = 40 + (float)((s >> 8) % 60);
+        DrawRect({ x, y }, { x + w, y + h }, WithAlpha(C_PARCH_LO, a * 0.14f));
+    }
+    for (int i = 0; i < 120; ++i) {   // fine specks (aged-paper grain)
+        s = s * 1664525u + 1013904223u; float x = INT_X0 + (float)((s >> 8) % (int)(INT_X1 - INT_X0 - 4));
+        s = s * 1664525u + 1013904223u; float y = INT_Y0 + (float)((s >> 8) % (int)(INT_Y1 - INT_Y0 - 4));
+        s = s * 1664525u + 1013904223u; bool dark = ((s >> 10) & 1) != 0;
+        DrawRect({ x, y }, { x + 2.0f, y + 2.0f },
+                 WithAlpha(dark ? C_PARCH_LO : C_PARCH_HI, a * 0.5f));
     }
 }
 

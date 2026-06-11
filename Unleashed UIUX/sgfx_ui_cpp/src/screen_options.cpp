@@ -219,7 +219,9 @@ void Draw(double openSec) {
 
     // ---- title ----
     SetFont(g_fDF);
+    SetTextStretchX(1.30f);   // the ref OPTIONS is ~30% wider than DFSoGei's natural set
     DrawTextBevel({ 122, 56 }, 48.0f, WithAlpha(C_TITLE, t), "OPTIONS");
+    ResetTextStretchX();
 
     // ---- panels ----
     DrawContainer(SP_X0, SP_Y0, SP_X1, SP_Y1, true, t);
@@ -228,9 +230,10 @@ void Draw(double openSec) {
     // ---- tabs (SYSTEM/INPUT/AUDIO/VIDEO) ----
     {
         SetFont(g_fDF);
+        SetTextStretchX(1.30f);   // ref tabs are wider too (MeasureText ignores stretch -> scale widths)
         float clipW = (SP_X1 - GRID*2) - CLIP_X;     // 826-51 = 775
         float widths[CATEGORY_COUNT], sum = 0;
-        for (int i = 0; i < CATEGORY_COUNT; ++i) { widths[i] = MeasureText(32.0f, CATEGORIES[i].name).x; sum += widths[i]; }
+        for (int i = 0; i < CATEGORY_COUNT; ++i) { widths[i] = MeasureText(32.0f, CATEGORIES[i].name).x * 1.30f; sum += widths[i]; }
         float pad = (clipW - sum) / (CATEGORY_COUNT + 1);
         float x = CLIP_X + pad;
         for (int i = 0; i < CATEGORY_COUNT; ++i) {
@@ -246,6 +249,7 @@ void Draw(double openSec) {
             else    DrawText({ x, ty }, 32.0f, WithAlpha(C_TAB_OFF, t), CATEGORIES[i].name);
             x += widths[i] + pad;
         }
+        ResetTextStretchX();
     }
 
     // ---- selected-row gold->green diagonal bar (eased) ----

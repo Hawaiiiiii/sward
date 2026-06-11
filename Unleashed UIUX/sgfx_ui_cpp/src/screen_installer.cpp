@@ -1,5 +1,5 @@
-// =============================================================================
-// screen_installer.cpp — the UnleashedRecomp INSTALLER (Language-Select page),
+﻿// =============================================================================
+// screen_installer.cpp â€” the UnleashedRecomp INSTALLER (Language-Select page),
 // ported PIXEL- and MOTION-exact from ui/installer_wizard.cpp (the literal code
 // that drew it). 1280x720 WIDE so Scale(n)==n, GRID_SIZE=9. Every rect/colour/font
 // and the full STAGGERED entrance timeline are transcribed from that source.
@@ -9,7 +9,7 @@
 // "INSTALLER" title (DFSoGei 48 @122/288,54.5); Miles icon (256,80); right
 // CHECKERBOARD green container (main 514,227-1040,473 + side ->1280) with a 3x2
 // language-pill grid (250x22, cols x522/x780.5, rows y441/410/379, bottom-up:
-// FRANÇAIS/DEUTSCH/ENGLISH | ESPAÑOL/ITALIANO/日本語; ENGLISH default-lit) + a
+// FRANÃ‡AIS/DEUTSCH/ENGLISH | ESPAÃ‘OL/ITALIANO/æ—¥æœ¬èªž; ENGLISH default-lit) + a
 // right-aligned NEXT pill; footer Select/Quit guide; version bottom-right.
 // Entrance (frames@60, sqrt ease-out, ComputeMotion(openSec,offset,total)):
 //   scanlines 0/15, miles 10/15, title 15/30, borders 15/23, image 25/15,
@@ -164,13 +164,13 @@ void Draw(double openSec) {
             float lx = cx0 + 14, ly = py0 + (PILL_H - 14) * 0.5f + 1;
             if (sel) DrawRect({ lx-5, ly-5 }, { lx+19, ly+19 }, WithAlpha(C_GLOW, mInner));
             DrawRect({ lx, ly }, { lx + 14, ly + 14 }, WithAlpha(sel ? C_LIGHT_ON : C_LIGHT_OFF, mInner));
-            SetFont(g_fDF);
+            SetFont(g_fSeurat);   // MSDF: crisp at 20px (DFSoGei SDF goes blocky this small)
             DrawTextAligned({ cx0 + 36, py0 }, { cx1 - 8, py1 }, 20.0f, WithAlpha(C_PILL_TXT, mInner), LANGS[i], Align::Left, true, true);
         }
         // NEXT pill (right-aligned under panel)
         float nx1 = 1035.5f, ny0 = 477, ny1 = 499, nw = 118;
         DrawPill(nx1 - nw, ny0, nx1, ny1, false, mInner);
-        SetFont(g_fDF);
+        SetFont(g_fSeurat);
         DrawTextAligned({ nx1 - nw + 8, ny0 }, { nx1 - 8, ny1 }, 20.0f, WithAlpha(C_PILL_TXT, mInner), "NEXT", Align::Center, true, true);
     }
 

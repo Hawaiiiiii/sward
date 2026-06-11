@@ -1,7 +1,7 @@
-// =============================================================================
-// screen_item_result.cpp â€” the Item-Get Results screen shown after a stage,
+﻿// =============================================================================
+// screen_item_result.cpp Ã¢â‚¬â€ the Item-Get Results screen shown after a stage,
 // re-authored as clean hand-written C++ in the UnleashedRecomp ui/options_menu
-// idiom (NOT a CSD node dump â€” the raw item_result.json smears mat_result_comon_001
+// idiom (NOT a CSD node dump Ã¢â‚¬â€ the raw item_result.json smears mat_result_comon_001
 // 9-slice arms to w=857 and stretches 16px plates). Layout lives in named 1280x720
 // constants; the list panel is a bounded window drawn from the REAL Sonic Unleashed
 // silver-chrome frame via ui::DrawGameWindow (the same frame the shop/result use).
@@ -39,10 +39,10 @@ struct UV { float u0, v0, u1, v1; };
 
 // ---- real-art atlases -------------------------------------------------------
 const char* const ASSET_BASE = "assets/item_result/";
-int g_titleTex  = -1;   // mat_result_en_001    (512x512) â€” gold "RESULTS" wordmark
-int g_iconTex   = -1;   // mat_comon_006        (256x128) â€” Sun / Moon medallion icons
-int g_numTex    = -1;   // mat_comon_num_001    (512x64)  â€” metal digit plates
-int g_glyphTex  = -1;   // mat_comon_x360_001   (512x512) â€” Xbox button glyphs
+int g_titleTex  = -1;   // mat_result_en_001    (512x512) Ã¢â‚¬â€ gold "RESULTS" wordmark
+int g_iconTex   = -1;   // mat_comon_006        (256x128) Ã¢â‚¬â€ Sun / Moon medallion icons
+int g_numTex    = -1;   // mat_comon_num_001    (512x64)  Ã¢â‚¬â€ metal digit plates
+int g_glyphTex  = -1;   // mat_comon_x360_001   (512x512) Ã¢â‚¬â€ Xbox button glyphs
 
 // ---- fonts (real game MSDF + DFSoGei SDF title font) ------------------------
 static int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
@@ -53,21 +53,21 @@ constexpr float ICON_TEX_W  = 256.0f, ICON_TEX_H  = 128.0f;
 constexpr float NUM_TEX_W   = 512.0f, NUM_TEX_H   = 64.0f;
 constexpr float GLYPH_TEX_W = 512.0f, GLYPH_TEX_H = 512.0f;
 
-// gold "RESULTS" wordmark â€” tight box measured from mat_result_en_001 (px 1,353..288,391)
+// gold "RESULTS" wordmark Ã¢â‚¬â€ tight box measured from mat_result_en_001 (px 1,353..288,391)
 const UV TITLE_UV = { 0.00195f, 0.68945f, 0.56250f, 0.76367f };
 
-// Sun / Moon medallion icons â€” tight opaque boxes measured from mat_comon_006.
+// Sun / Moon medallion icons Ã¢â‚¬â€ tight opaque boxes measured from mat_comon_006.
 // (left cell = Sun Medallion, right cell = Moon Medallion; each ~119x120 px)
 const UV ICON_SUN  = { 0.02344f, 0.02344f, 0.48828f, 0.96094f };   // px (6,3)-(125,123)
 const UV ICON_MOON = { 0.51953f, 0.03125f, 0.98438f, 0.96875f };   // px (133,4)-(252,124)
 
-// metal "(A)" button glyph â€” tight box from mat_comon_x360_001 (px 0,1..37,39)
+// metal "(A)" button glyph Ã¢â‚¬â€ tight box from mat_comon_x360_001 (px 0,1..37,39)
 const UV GLYPH_A = { 0.0f, 0.00195f, 0.07227f, 0.07617f };
 
 // digit plates 0..9 from mat_comon_num_001 top row. Per-glyph x-spans measured from
 // the atlas; all share ONE common cap-height y-band (px 1..29, v 0.01562..0.45312)
 // so the digits sit on a single baseline (digit 9's small tail dips ~4px past this
-// band and is gently clipped â€” invisible at the on-screen sizes used here).
+// band and is gently clipped Ã¢â‚¬â€ invisible at the on-screen sizes used here).
 constexpr float NUM_CELL_PXH = 28.0f;   // shared digit-cell pixel height (px 1..29)
 const UV NUM_DIGIT[10] = {
     /* 0 */ { 0.00195f, 0.01562f, 0.05273f, 0.45312f },   // px  1..27
@@ -313,7 +313,7 @@ void Draw(double openSec) {
         bool selected = (i == g_sel);
         const CollectedItem& it = ITEMS[i];
 
-        // icon plate (dark inset) â€” always a bounded plate, never an unclipped quad
+        // icon plate (dark inset) Ã¢â‚¬â€ always a bounded plate, never an unclipped quad
         float ix = rowL + 12.0f + slide;
         float iy = top + (ROW_H - ICON_BOX) * 0.5f;
         DrawRect({ ix, iy }, { ix + ICON_BOX, iy + ICON_BOX }, WithAlpha(COL_PLATE, rt));
@@ -353,7 +353,7 @@ void Draw(double openSec) {
 
     // ===== FOOTER: real (A) glyph + NEXT ======================================
     {
-        float cy = 632.0f;
+        float cy = 674.0f;   // clear of the TOTAL bar (594..648)
         float gh = 34.0f;
         float fx = 760.0f;
         SetFont(g_fRodin);   // footer button-guide text uses Rodin

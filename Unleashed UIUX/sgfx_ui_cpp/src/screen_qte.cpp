@@ -1,6 +1,6 @@
-// =============================================================================
-// screen_qte.cpp â€” the Quick-Time-Event prompt, re-authored as clean hand-written
-// C++ in the UnleashedRecomp ui/options_menu idiom (NOT a CSD node dump â€” the raw
+﻿// =============================================================================
+// screen_qte.cpp Ã¢â‚¬â€ the Quick-Time-Event prompt, re-authored as clean hand-written
+// C++ in the UnleashedRecomp ui/options_menu idiom (NOT a CSD node dump Ã¢â‚¬â€ the raw
 // qte.json is a pile of low-alpha ghost copies of the same button glyph). This is
 // a dramatic, centered prompt:
 //   * a LARGE green (A) button glyph (REAL Xbox art, mat_comon_x360_001), pulsing,
@@ -35,9 +35,9 @@ struct UV { float u0, v0, u1, v1; };
 
 // ---- real-art atlases -------------------------------------------------------
 const char* const ASSET_BASE = "assets/qte/";
-int g_glyphTex = -1;   // mat_comon_x360_001 (512x512) â€” Xbox button glyphs
-int g_dangerTex = -1;  // mat_qte_001        (128x128) â€” bomb / hazard triangle
-int g_wordTex   = -1;  // mat_qte_en_001     (256x256) â€” NICE/GREAT!/COOL!!/YOU FAILED
+int g_glyphTex = -1;   // mat_comon_x360_001 (512x512) Ã¢â‚¬â€ Xbox button glyphs
+int g_dangerTex = -1;  // mat_qte_001        (128x128) Ã¢â‚¬â€ bomb / hazard triangle
+int g_wordTex   = -1;  // mat_qte_en_001     (256x256) Ã¢â‚¬â€ NICE/GREAT!/COOL!!/YOU FAILED
 
 // ---- fonts (real game faces) -------------------------------------------------
 int g_fRodin = 0, g_fDF = 0;
@@ -46,7 +46,7 @@ constexpr float GLYPH_TEX_W = 512.0f, GLYPH_TEX_H = 512.0f;
 constexpr float DANGER_TEX_W = 128.0f, DANGER_TEX_H = 128.0f;
 constexpr float WORD_TEX_W = 256.0f, WORD_TEX_H = 256.0f;
 
-// LARGE green (A) button â€” tight opaque box measured from the atlas alpha
+// LARGE green (A) button Ã¢â‚¬â€ tight opaque box measured from the atlas alpha
 // (lower-left big-button grid). aspect w/h ~= 1.034.
 const UV GLYPH_A_BIG = { 0.00195f, 0.54883f, 0.12109f, 0.66406f };
 // small footer glyphs (top-row grid)
@@ -55,7 +55,7 @@ const UV GLYPH_B_SM  = { 0.07227f, 0.00195f, 0.14258f, 0.07617f }; // B sits rig
 const UV GLYPH_LB_SM = { 0.34766f, 0.00977f, 0.48828f, 0.07812f };
 const UV GLYPH_RB_SM = { 0.50391f, 0.00977f, 0.61719f, 0.07812f };
 
-// danger / bomb triangle â€” fills almost the whole 128x128 atlas
+// danger / bomb triangle Ã¢â‚¬â€ fills almost the whole 128x128 atlas
 const UV DANGER_UV = { 0.0078f, 0.0078f, 0.9844f, 0.9531f };
 
 // result wordmark bands (measured): 0=NICE 1=GREAT! 2=COOL!! 3=YOU FAILED
@@ -225,7 +225,7 @@ void Draw(double openSec) {
 
     // ===== centered prompt ===================================================
     if (g_phase == ARMED) {
-        // timing ring (procedural) â€” depletes around the button
+        // timing ring (procedural) Ã¢â‚¬â€ depletes around the button
         DrawTimingRing(CX, CY, RING_R, RING_W, remain, ringA, warn);
 
         // danger / bomb accent above the button (real art), gently bobbing
@@ -233,7 +233,7 @@ void Draw(double openSec) {
             float bob = 6.0f * (float)std::sin(now * 2.2);
             float dz = 64.0f;
             DrawFitted(g_dangerTex, DANGER_UV, DANGER_TEX_W, DANGER_TEX_H,
-                       CX - dz * 0.5f, CY - RING_R - 86.0f + bob, dz, dz,
+                       CX - dz * 0.5f, CY - RING_R - 108.0f + bob, dz, dz,   // clear of PRESS!
                        WithAlpha(COL_WHITE, promptT));
         }
 

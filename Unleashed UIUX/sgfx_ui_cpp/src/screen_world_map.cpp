@@ -254,7 +254,7 @@ void Draw(double openSec) {
     // ---- gold "WORLD MAP" title on a green-grid band ----
     DrawGridPanel(8, 56, 408, 104, t);
     SetFont(g_fDF);
-    DrawTextBevel({ 30, 60 }, 30.0f, WithAlpha(C_TITLE, t), "WORLD MAP");
+    DrawTextBevel({ 30, 65 }, 30.0f, WithAlpha(C_TITLE, t), "WORLD MAP");   // centred in the band
 
     // ---- left totals column ----
     DrawGridPanel(TOT_X0, TOT_Y0, TOT_X1, TOT_Y1, t);

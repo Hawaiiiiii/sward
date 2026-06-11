@@ -132,9 +132,15 @@ void Draw(double openSec) {
         for (int i = 0; i < 8; ++i) {
             const V2& p0 = loop[i]; const V2& p1 = loop[(i + 1) % 8];
             V2 n = { (p1.y - p0.y), (p0.x - p1.x) };
-            float len = std::sqrt(n.x * n.x + n.y * n.y); n.x = n.x / len * 7; n.y = n.y / len * 7;
-            const V2 q[4] = { p0, p1, { p1.x + n.x, p1.y + n.y }, { p0.x + n.x, p0.y + n.y } };
-            const uint32_t qc[4] = { C_WIRE, C_WIRE, WithAlpha(C_WIRE, 0.6f), WithAlpha(C_WIRE, 0.6f) };
+            float len = std::sqrt(n.x * n.x + n.y * n.y); n.x /= len; n.y /= len;
+            // thick glowing ribbon (the ref path is a fat luminous band, not a wire)
+            const V2 g4[4] = { { p0.x - n.x * 4, p0.y - n.y * 4 }, { p1.x - n.x * 4, p1.y - n.y * 4 },
+                               { p1.x + n.x * 18, p1.y + n.y * 18 }, { p0.x + n.x * 18, p0.y + n.y * 18 } };
+            const uint32_t gc[4] = { WithAlpha(C_WIRE, 0.25f), WithAlpha(C_WIRE, 0.25f),
+                                     WithAlpha(C_WIRE, 0.25f), WithAlpha(C_WIRE, 0.25f) };
+            DrawQuadGradient(g4, gc, true);
+            const V2 q[4] = { p0, p1, { p1.x + n.x * 13, p1.y + n.y * 13 }, { p0.x + n.x * 13, p0.y + n.y * 13 } };
+            const uint32_t qc[4] = { C_WIRE, C_WIRE, WithAlpha(C_WIRE, 0.75f), WithAlpha(C_WIRE, 0.75f) };
             DrawQuadGradient(q, qc);
         }
         // wireframe building hints
@@ -147,11 +153,16 @@ void Draw(double openSec) {
         bld(620, 520, 56, 70); bld(806, 500, 44, 52);
     }
 
-    // ---- gold landmark medallion slots ----
+    // ---- gold landmark medallion slots (rounded: stepped-octagon stack) ----
     auto medallion = [&](float cx, float cy) {
-        DrawRect({ cx - 17, cy - 17 }, { cx + 17, cy + 17 }, WithAlpha(RGBA(40, 30, 8, 255), 0.8f));
-        DrawRect({ cx - 15, cy - 15 }, { cx + 15, cy + 15 }, C_GOLD);
-        DrawRect({ cx - 10, cy - 10 }, { cx + 10, cy + 10 }, RGBA(150, 116, 36, 255));
+        auto disc = [&](float r, uint32_t col) {
+            DrawRect({ cx - r * 0.62f, cy - r }, { cx + r * 0.62f, cy + r }, col);
+            DrawRect({ cx - r, cy - r * 0.62f }, { cx + r, cy + r * 0.62f }, col);
+            DrawRect({ cx - r * 0.88f, cy - r * 0.88f }, { cx + r * 0.88f, cy + r * 0.88f }, col);
+        };
+        disc(18, WithAlpha(RGBA(40, 30, 8, 255), 0.8f));
+        disc(15, C_GOLD);
+        disc(9, RGBA(150, 116, 36, 255));
     };
     medallion(404, 432); medallion(700, 330); medallion(914, 348);
 
