@@ -15,6 +15,7 @@
 // Real fonts: Seurat MSDF (desc), NewRodin MSDF (numbers), DFSoGei (title/name).
 // =============================================================================
 #include "sgfxui.h"
+#include "globe3d.h"
 #include "screen.h"
 #include <cstdio>
 #include <cstring>
@@ -249,7 +250,22 @@ void Draw(double openSec) {
     uint32_t s = 0x2468ace1u;
     for (int i = 0; i < 110; ++i) { s = s*1664525u+1013904223u; float x=(float)((s>>9)%1280); s=s*1664525u+1013904223u; float y=(float)((s>>9)%720); s=s*1664525u+1013904223u; int b=50+(int)((s>>9)%160); DrawRect({x,y},{x+1,y+1}, WithAlpha(RGBA(b,b,b,255), t*0.7f)); }
 
-    DrawGlobe(GLOBE_CX, GLOBE_CY, GLOBE_R * (0.6f + 0.4f * t), t);
+    // the 3D Earth hub: real tessellated sphere, slow spin (matches the live
+    // capture's idle rotation), with the continent stage-markers riding it
+    {
+        static const GlobeMarker MK[] = {
+            { 23.0f, 38.0f, 0xFF2EE04C, 7.0f },   // "apotos"
+            { 12.0f, 45.0f, 0xFF2EE04C, 7.0f },   // "spagonia"
+            { -75.0f, 42.0f, 0xFF2EE04C, 7.0f },  // "empire city"
+            { 31.0f, 30.0f, 0xFF2EE04C, 7.0f },   // "mazuri"
+            { 103.0f, 1.5f, 0xFF2EE04C, 7.0f },   // "chun-nan"
+            { -42.0f, 72.0f, 0xFFE0B22E, 8.0f },  // "holoska" (selected gold)
+            { 138.0f, 36.0f, 0xFF2EE04C, 7.0f },  // "eggmanland"
+        };
+        DrawGlobe3D(GLOBE_CX, GLOBE_CY, GLOBE_R * (0.6f + 0.4f * t),
+                    (float)(Now() * 6.0),   // ~6 deg/s idle spin
+                    0.55f, 0.45f, 0.7f, MK, 7, t);
+    }
 
     // ---- gold "WORLD MAP" title on a green-grid band ----
     DrawGridPanel(8, 56, 408, 104, t);

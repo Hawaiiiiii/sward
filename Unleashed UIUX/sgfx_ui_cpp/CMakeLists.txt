@@ -70,6 +70,7 @@ add_custom_command(TARGET sgfx_ui POST_BUILD
 add_executable(sgfx_screens
     src/main_screens.cpp
     src/sgfxui.cpp
+    src/globe3d.cpp
     src/audio.cpp
     src/csd_player.cpp
     "${RECOMP_ROOT}/thirdparty/stb/stb_vorbis.c"

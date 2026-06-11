@@ -16,6 +16,7 @@
 // Accept advances press_start -> autosave -> menu; left/right cycles entries.
 // =============================================================================
 #include "sgfxui.h"
+#include "globe3d.h"
 #include "screen.h"
 #include <cstdio>
 #include <cmath>
@@ -137,22 +138,9 @@ void Copyright(float a) {
 }
 
 void Earth(float a) {
-    const float cx = 652, cy = 371.3f, r = 186.7f;
-    const int N = 72;
-    for (int i = 0; i < N; ++i) {
-        float yy = cy - r + (2 * r) * i / (float)N;
-        float dy = (yy - cy) / r, hw = r * std::sqrt(std::max(0.0f, 1.0f - dy * dy));
-        if (hw <= 0) continue;
-        float f = (yy - (cy - r)) / (2 * r);
-        // lit from the lower-right: darken the top-left limb
-        uint32_t c = ColourLerp(C_OCEAN_T, C_OCEAN_B, 1.0f - f * 0.8f);
-        DrawRect({ cx - hw, yy }, { cx + hw, yy + (2 * r / N) + 1 }, WithAlpha(c, a));
-    }
-    auto blob = [&](float ax, float ay, float w, float h, uint32_t col) {
-        DrawRect({ cx + ax, cy + ay }, { cx + ax + w, cy + ay + h }, WithAlpha(col, a));
-    };
-    blob(-60, -90, 100, 70, C_LAND); blob(20, 10, 120, 90, C_LAND); blob(-130, 30, 80, 60, C_LAND);
-    blob(-20, -140, 130, 26, C_CLOUD); blob(40, -40, 110, 18, C_CLOUD); blob(-110, 90, 120, 20, C_CLOUD);
+    // real 3D sphere (measured disc: centre (652,371.3), r 186.7), lit from the
+    // lower-right exactly as the capture shows, drifting slowly
+    DrawGlobe3D(652, 371.3f, 186.7f, (float)(Now() * 3.0), 0.6f, -0.35f, 0.72f, nullptr, 0, a);
 }
 
 void LetterboxBands(float a) {
