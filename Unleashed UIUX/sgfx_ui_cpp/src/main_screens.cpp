@@ -149,19 +149,27 @@ int main(int argc, char** argv) {
         static const bool wantScan = [] { const char* e = getenv("SGFX_SCANLINES"); return e && e[0] == '1'; }();
         if (wantScan) ui::DrawScanlines({ 0, 0 }, { ui::REF_W, ui::REF_H }, ui::RGBA(0, 0, 0, 16), 3.0f);
         if (fade > 0.001f) {
-            ui::DrawRect({ 0, 0 }, { ui::REF_W, ui::REF_H }, ui::RGBA(0, 0, 0, int(fade * 255.0f)));   // black dip
-            if (noiseTex >= 0) {                                                                       // TV static
-                int idx = int(absT * 30.0) % (NOISE_CELLS * NOISE_CELLS);
-                if (idx < 0) idx += NOISE_CELLS * NOISE_CELLS;
-                int cx = idx % NOISE_CELLS, cy = idx / NOISE_CELLS;
-                float c = 1.0f / NOISE_CELLS;
-                ui::DrawImage(noiseTex, { 0, 0 }, { ui::REF_W, ui::REF_H },
-                              { cx * c, cy * c }, { (cx + 1) * c, (cy + 1) * c },
-                              ui::RGBA(255, 255, 255, int(fade * 150.0f)), /*additive*/ true);
+            // Default transition = the GAME's measured chevron-band wipe (live
+            // capture, gate->loading). The old TV-static/letterbox stylization
+            // stays available behind SGFX_STATIC=1.
+            static const bool wantStatic = [] { const char* e = getenv("SGFX_STATIC"); return e && e[0] == '1'; }();
+            if (!wantStatic) {
+                ui::DrawChevronWipe(fade);
+            } else {
+                ui::DrawRect({ 0, 0 }, { ui::REF_W, ui::REF_H }, ui::RGBA(0, 0, 0, int(fade * 255.0f)));   // black dip
+                if (noiseTex >= 0) {                                                                       // TV static
+                    int idx = int(absT * 30.0) % (NOISE_CELLS * NOISE_CELLS);
+                    if (idx < 0) idx += NOISE_CELLS * NOISE_CELLS;
+                    int cx = idx % NOISE_CELLS, cy = idx / NOISE_CELLS;
+                    float c = 1.0f / NOISE_CELLS;
+                    ui::DrawImage(noiseTex, { 0, 0 }, { ui::REF_W, ui::REF_H },
+                                  { cx * c, cy * c }, { (cx + 1) * c, (cy + 1) * c },
+                                  ui::RGBA(255, 255, 255, int(fade * 150.0f)), /*additive*/ true);
+                }
+                float bar = fade * 72.0f;                                                                  // letterbox bars
+                ui::DrawRect({ 0, 0 }, { ui::REF_W, bar }, ui::RGBA(0, 0, 0, 255));
+                ui::DrawRect({ 0, ui::REF_H - bar }, { ui::REF_W, ui::REF_H }, ui::RGBA(0, 0, 0, 255));
             }
-            float bar = fade * 72.0f;                                                                  // letterbox bars
-            ui::DrawRect({ 0, 0 }, { ui::REF_W, bar }, ui::RGBA(0, 0, 0, 255));
-            ui::DrawRect({ 0, ui::REF_H - bar }, { ui::REF_W, ui::REF_H }, ui::RGBA(0, 0, 0, 255));
         }
         gfx::Quad* q = nullptr; int n = 0; ui::Flush(q, n);
         gfx::beginFrame(0.10f, 0.12f, 0.16f, 1.0f);   // stand-in gameplay backdrop
@@ -231,7 +239,7 @@ int main(int argc, char** argv) {
     Uint64 tStart = SDL_GetPerformanceCounter();   // fixed clock for transition fades
     Uint64 t0 = tStart;                            // per-screen intro clock (reset on open)
     double openSec = 0.0;
-    const double FADE = 0.26;                       // fade-to/from-black duration (seconds)
+    const double FADE = 0.32;                       // wipe duration (measured ~0.32 s live)
     int    transPhase = 1;                          // 0 idle, 1 fade-in, 2 fade-out (switch pending)
     double transStart = 0.0;                        // absNow when the current phase began
     const ScreenDef* transTarget = nullptr;         // screen to switch to once black

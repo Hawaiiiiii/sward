@@ -534,6 +534,48 @@ void DrawTextGradient(V2 pos, float pxSize, uint32_t colTop, uint32_t colBottom,
             g_quads[i].color[k] = ColourLerp(colTop, colBottom, (g_quads[i].py[k] - y0) / (y1 - y0));
 }
 
+void DrawChevronWipe(float progress) {
+    if (progress <= 0.001f) return;
+    // band layout measured from the live wipe (heights sum to 720; directions
+    // alternate; staggers <= 0.35 so every band completes by progress 1)
+    struct Band { float y0, h, stagger; bool fromLeft; };
+    static const Band B[7] = {
+        { 0,    96, 0.00f, true  }, { 96,  120, 0.10f, false }, { 216,  86, 0.22f, true },
+        { 302, 130, 0.05f, false }, { 432,  96, 0.15f, true  }, { 528, 104, 0.28f, false },
+        { 632,  88, 0.08f, true  },
+    };
+    const float CH = 70.0f, SHARD = 58.0f;   // arrowhead length; shard lead distance
+    const uint32_t BK = 0xFF000000u;
+    for (const Band& b : B) {
+        float lp = std::clamp((progress * 1.35f - b.stagger) / 1.0f, 0.0f, 1.0f);
+        if (lp <= 0.0f) continue;
+        const float y0 = b.y0, y1 = b.y0 + b.h, ym = b.y0 + b.h * 0.5f;
+        // edge travels across the full width plus both tips
+        const float span = REF_W + 2.0f * CH + SHARD;
+        auto tip = [&](float e, float a, bool left) {
+            // arrowhead: two triangles meeting at (e, ym); body side at e -/+ CH
+            const float bx = left ? e - CH : e + CH;
+            const uint32_t c = WithAlpha(BK, a);
+            const V2 q1[4] = { { bx, y0 }, { e, ym }, { bx, ym }, { bx, y0 } };
+            const V2 q2[4] = { { bx, ym }, { e, ym }, { bx, y1 }, { bx, ym } };
+            const uint32_t qc[4] = { c, c, c, c };
+            DrawQuadGradient(q1, qc);
+            DrawQuadGradient(q2, qc);
+        };
+        if (b.fromLeft) {
+            const float e = -CH - SHARD + span * lp;      // arrow tip x
+            if (e - CH > 0) DrawRect({ 0, y0 }, { std::min(e - CH, (float)REF_W), y1 }, BK);
+            tip(e, 1.0f, true);
+            tip(std::min(e + SHARD, (float)REF_W + CH), 0.45f, true);   // leading shard
+        } else {
+            const float e = REF_W + CH + SHARD - span * lp;
+            if (e + CH < REF_W) DrawRect({ std::max(e + CH, 0.0f), y0 }, { REF_W, y1 }, BK);
+            tip(e, 1.0f, false);
+            tip(std::max(e - SHARD, -CH), 0.45f, false);
+        }
+    }
+}
+
 void DrawQuadGradient(const V2 corners[4], const uint32_t cols[4], bool additive) {
     gfx::Quad q;
     const float uvx[4] = { 0, 1, 1, 0 }, uvy[4] = { 0, 0, 1, 1 };

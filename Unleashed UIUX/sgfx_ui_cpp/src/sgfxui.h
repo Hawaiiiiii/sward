@@ -152,5 +152,10 @@ void DrawQuadGradient(const V2 corners[4], const uint32_t cols[4], bool additive
 // shaded bitmap-font glyphs and sprite fills.
 void DrawImageVGradient(int tex, V2 min, V2 max, V2 uv0, V2 uv1,
                         uint32_t colTop, uint32_t colBottom, bool additive = false);
+// The game's screen-wipe transition (measured from the live gate->loading
+// capture): staggered horizontal black bands sweep across in alternating
+// directions, each led by an arrowhead tip with a translucent shard ahead.
+// progress 0 = clear, 1 = fully covered. Works symmetrically for in/out.
+void DrawChevronWipe(float progress);
 
 } // namespace ui
