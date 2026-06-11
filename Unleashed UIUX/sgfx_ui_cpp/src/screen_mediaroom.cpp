@@ -1,560 +1,365 @@
 // =============================================================================
-// screen_mediaroom.cpp â€” the Media Room / gallery (sound test + movies + art),
-// re-authored as clean hand-written C++ in the UnleashedRecomp ui/options_menu
-// idiom (NOT a CSD node dump â€” the raw mediaroom.json is mostly broken stretch-
-// arms: dozens of |x|>1300, w>1300 quads from the 9-slice list cells). Layout
-// lives in named 1280x720 constants; the entry list and the preview/info pane are
-// bounded windows drawn from the REAL Sonic Unleashed silver-chrome frame via
-// ui::DrawGameWindow. The distinctive retail art is the REAL extracted atlases
-// this screen actually ships with:
-//   * the oval "now playing" emblem               (mat_media_common_001, z55),
-//   * the gold filigree / swoosh ornaments        (mat_media_common_001 / _002),
-//   * the per-region art-gallery thumbnails        (mat_worldmap_ss_002, a 3x3 grid),
-//   * the gold digit strip for track numbers       (mat_media_num_001),
-//   * the Xbox A / B / LB / RB button glyphs        (mat_comon_x360_001, top row),
-// placed at deliberate sane rects with aspect preserved (bounded gradient windows
-// are the graceful fallback when an atlas is missing, like world_map/options).
-//
-// Fully interactive + stateful like options_menu / the shop:
-//   * Q/E (LB/RB) switch the CATEGORY -> MUSIC / MOVIE / ART, each with its own
-//     entry list + preview content,
-//   * Up/Down move the cursor over the entry rows (eased highlight + scrollbar),
-//   * (A) plays / views the selected entry (a transient "NOW PLAYING" / "VIEWING"
-//     flash; for MUSIC it latches a now-playing track shown in the preview pane),
-//   * (B) backs out (no-op in the standalone build).
+// screen_mediaroom.cpp — Professor Pickle's lab menus, re-authored 1:1 from
+// LIVE capture (session20; spec stills mediaroom_{encyclopedia,theater,
+// soundtrack}.png; full numeric spec in game_captures/MEDIAROOM_SPEC.md).
+// The real menus are PARCHMENT/BOOK-styled panels floating over the live 3D
+// lab — NOT the chrome-window style this file used before:
+//   * shared chrome: full-width header strip (cream/gold rules over a green
+//     gradient field) with a beveled slab title at x278, gold pinstripe +
+//     curl ornaments, the "Pickle's Room" oval seal; a parchment panel
+//     (220,121)-(1060,613) with a brown pinstripe frame, a white keyline
+//     with corner hooks, and a mottled paper interior (185,176,140);
+//   * ENCYCLOPEDIA text page: portrait slot on the left half, flag icon +
+//     entry title on a faint highlight band, ruled double-lines (pitch 33)
+//     with body text, a green page plaque "003 / 098" with gold curls, and
+//     gold page chevrons straddling the panel edges;
+//   * ENCYCLOPEDIA art page (LB/RB "Switch"): one large borderless image
+//     slot, plaque "023 / 071";
+//   * SOUNDTRACK: a 3x4 grid of video-still thumbnails (cell 152x82.7,
+//     pitch 176x104.7 from (284,167.3)), sunken shadows + cream borders,
+//     a white-gold selection ring with corner brackets + pulsing glow +
+//     flag badge, a maroon scrollbar, divider rules and a caption line.
+// Tab keys cycle the three views (the in-game lab walks between stations).
+// Art slots (portraits, stills) stay empty per the art/structure boundary.
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
-
 #include <cstdio>
-#include <string>
-#include <algorithm>
 #include <cmath>
+#include <algorithm>
 
 using namespace ui;
-
 namespace {
 
-// ---- per-element UV sub-rect (normalized atlas coords) ----------------------
+int g_glyphTex = -1;
+int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
+
 struct UV { float u0, v0, u1, v1; };
-
-// ---- data model -------------------------------------------------------------
-// A category (MUSIC / MOVIE / ART) owns a set of entries. MUSIC entries carry an
-// artist + duration (sound test); MOVIE entries carry a length; ART entries carry
-// a caption + a thumbnail cell in the worldmap flag atlas (reused as gallery art).
-enum CatKind { CAT_MUSIC = 0, CAT_MOVIE = 1, CAT_ART = 2, CAT_COUNT = 3 };
-
-struct Entry {
-    const char* name;
-    const char* sub;       // artist (music) / source (movie) / caption (art)
-    int         seconds;   // track / clip length in whole seconds (-1 = n/a)
-    int         thumb;      // art-thumbnail cell index 0..8 (-1 = none)
-};
-
-struct Category {
-    const char*  name;
-    CatKind      kind;
-    const Entry* entries;
-    int          count;
-};
-
-// ---- MUSIC (sound test) -----------------------------------------------------
-const Entry MUSIC[] = {
-    { "Endless Possibility",  "Bowling for Soup", 230, -1 },
-    { "Windmill Isle - Day",  "Tomoya Ohtani",    188, -1 },
-    { "Apotos - Night",       "Tomoya Ohtani",    201, -1 },
-    { "Rooftop Run - Day",    "Tomoya Ohtani",    214, -1 },
-    { "Cool Edge - Day",      "Tomoya Ohtani",    176, -1 },
-    { "Dragon Road - Night",  "Tomoya Ohtani",    223, -1 },
-    { "Eggmanland",           "Tomoya Ohtani",    245, -1 },
-    { "The World Adventure",  "Tomoya Ohtani",    258, -1 },
-    { "Dear My Friend",       "Hideaki Kobayashi",272, -1 },
-};
-// ---- MOVIE (event gallery) --------------------------------------------------
-const Entry MOVIE[] = {
-    { "Opening",              "Event 01", 142, -1 },
-    { "The Werehog Awakens",  "Event 03", 96,  -1 },
-    { "Meeting Chip",         "Event 05", 88,  -1 },
-    { "Professor Pickle",     "Event 09", 110, -1 },
-    { "The Gaia Temples",     "Event 14", 134, -1 },
-    { "Dark Gaia Rises",      "Event 22", 158, -1 },
-    { "Ending",               "Event 27", 176, -1 },
-};
-// ---- ART (souvenirs / concept gallery) â€” thumb = worldmap flag cell ---------
-const Entry ART[] = {
-    { "Apotos Concept",       "White Island sketch", -1, 0 },
-    { "Spagonia Rooftops",    "Orange roofs study",  -1, 1 },
-    { "Chun-nan Vista",       "Dragon Road art",     -1, 2 },
-    { "Mazuri Savannah",      "Citadel concept",     -1, 3 },
-    { "Holoska Ice",          "Cool Edge study",     -1, 4 },
-    { "Shamar Sands",         "Arid Sands art",      -1, 5 },
-    { "Adabat Jungle",        "Jungle Joyride art",  -1, 6 },
-    { "Empire City",          "Skyscraper study",    -1, 7 },
-    { "Eggmanland",           "Final concept",       -1, 8 },
-};
-
-const Category CATEGORIES[CAT_COUNT] = {
-    { "MUSIC", CAT_MUSIC, MUSIC, (int)(sizeof(MUSIC) / sizeof(Entry)) },
-    { "MOVIE", CAT_MOVIE, MOVIE, (int)(sizeof(MOVIE) / sizeof(Entry)) },
-    { "ART",   CAT_ART,   ART,   (int)(sizeof(ART)   / sizeof(Entry)) },
-};
-
-// ---- real-art atlases -------------------------------------------------------
-const char* const ASSET_BASE = "assets/mediaroom/";
-int g_ornTex   = -1;   // mat_media_common_001 (oval emblem + gold filigree)
-int g_numTex   = -1;   // mat_media_num_001    (gold digit strip)
-int g_glyphTex = -1;   // mat_comon_x360_001   (Xbox button glyphs)
-int g_thumbTex = -1;   // mat_worldmap_ss_002  (3x3 cell grid -> gallery thumbnails)
-
-// ---- real-game fonts (MSDF sweep) --------------------------------------------
-static int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
-
-// atlas pixel sizes (for aspect-correct fitting)
-constexpr float ORN_TEX_W   = 256.0f, ORN_TEX_H   = 512.0f;
-constexpr float NUM_TEX_W   = 256.0f, NUM_TEX_H   = 32.0f;
-constexpr float GLYPH_TEX_W = 512.0f, GLYPH_TEX_H = 512.0f;
-constexpr float THUMB_TEX_W = 512.0f, THUMB_TEX_H = 512.0f;
-
-// oval "Dickle's Room" / now-playing emblem in mat_media_common_001 (z55 node).
-const UV EMBLEM_UV   = { 0.53516f, 0.56445f, 0.99609f, 0.72656f };
-// gold filigree scroll, lower-left of mat_media_common_001 (z214/z215 node).
-const UV FILIGREE_UV = { 0.0f, 0.66406f, 0.31641f, 0.79102f };
-
-// Xbox glyphs â€” top row of mat_comon_x360_001 (same atlas/layout as options/world_map).
+constexpr float GTW = 512.0f, GTH = 512.0f;
 const UV GLYPH_A  = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
 const UV GLYPH_B  = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
 const UV GLYPH_LB = { 0.32617f, 0.00781f, 0.46094f, 0.07812f };
 const UV GLYPH_RB = { 0.48242f, 0.00781f, 0.61523f, 0.07812f };
 
-// digit cells in mat_media_num_001 â€” 11 even cells across (0..9 then '/').
-// glyphs occupy ~the full 32px height; cell width ~ 1/11 of the strip.
-UV NumUV(int d) {            // d in 0..9
-    const float cw = 1.0f / 11.0f;
-    float u0 = d * cw + 0.004f, u1 = (d + 1) * cw - 0.004f;
-    return { u0, 0.031f, u1, 0.969f };
-}
+// ---- palette (sampled from the capture; MEDIAROOM_SPEC.md) -------------------
+const uint32_t C_PARCH     = RGBA(185, 176, 140, 255);   // parchment mean
+const uint32_t C_PARCH_HI  = RGBA(196, 185, 151, 255);
+const uint32_t C_PARCH_LO  = RGBA(174, 166, 132, 255);
+const uint32_t C_FRAME_BRN = RGBA(58, 38, 14, 255);      // frame band brown
+const uint32_t C_PINSTRIPE = RGBA(228, 212, 166, 255);   // cream pinstripe
+const uint32_t C_KEYLINE   = RGBA(236, 233, 225, 255);   // white keyline
+const uint32_t C_RULE      = RGBA(215, 206, 165, 255);   // embossed ruled line
+const uint32_t C_TEXT      = RGBA(9, 5, 5, 255);         // near-black body text
+const uint32_t C_HDR_T     = RGBA(88, 93, 70, 235);      // header green field
+const uint32_t C_HDR_B     = RGBA(56, 67, 46, 235);
+const uint32_t C_HDR_CREAM = RGBA(227, 214, 180, 255);
+const uint32_t C_HDR_GOLD  = RGBA(204, 181, 89, 255);
+const uint32_t C_TITLE_T   = RGBA(238, 236, 233, 255);   // beveled title slab
+const uint32_t C_TITLE_B   = RGBA(190, 160, 90, 255);
+const uint32_t C_TITLE_OUT = RGBA(65, 62, 39, 255);
+const uint32_t C_PLQ_GREEN = RGBA(94, 101, 69, 255);     // page plaque field
+const uint32_t C_PLQ_GOLD  = RGBA(228, 199, 69, 255);
+const uint32_t C_CNT_T     = RGBA(243, 235, 200, 255);   // counter digits bevel
+const uint32_t C_CNT_B     = RGBA(168, 175, 155, 255);
+const uint32_t C_CHEV      = RGBA(235, 220, 87, 255);    // page chevron gold
+const uint32_t C_CHEV_FADE = RGBA(191, 176, 139, 255);
+const uint32_t C_THUMB_BD  = RGBA(209, 204, 184, 255);   // thumb cream border
+const uint32_t C_THUMB_SH  = RGBA(150, 141, 112, 255);   // sunken shadow
+const uint32_t C_SEL_W     = RGBA(240, 237, 242, 255);   // selection ring white
+const uint32_t C_SEL_G     = RGBA(250, 238, 110, 255);   // selection ring gold
+const uint32_t C_SEL_GLOW  = RGBA(231, 182, 111, 255);   // pulsing warm glow
+const uint32_t C_SCR_T     = RGBA(87, 35, 21, 255);      // scrollbar maroon
+const uint32_t C_SCR_B     = RGBA(34, 16, 14, 255);
+const uint32_t C_SCR_HND   = RGBA(214, 204, 181, 255);
+const uint32_t C_FLAG_BLUE = RGBA(50, 96, 185, 255);     // flag badge field
+const uint32_t C_SEAL_GRN  = RGBA(60, 80, 50, 255);      // Pickle's Room seal
+const uint32_t C_WHITE     = RGBA(255, 255, 255, 255);
+// lab-scene placeholder (the real game renders the 3D library behind)
+const uint32_t C_LAB_T = RGBA(96, 74, 52, 255), C_LAB_B = RGBA(58, 42, 30, 255);
 
-// worldmap flag cells (3x3 grid in mat_worldmap_ss_002), reused as art thumbnails.
-const UV THUMB_UV[9] = {
-    { 0.55664f, 0.00195f, 0.83008f, 0.18359f },  // top-right cell (anchor flag)
-    { 0.00195f, 0.00195f, 0.27539f, 0.18359f },  // top-left (crest)
-    { 0.27930f, 0.18750f, 0.55273f, 0.36914f },  // mid (eagle)
-    { 0.27930f, 0.37305f, 0.55273f, 0.55469f },  // bottom-mid (baobab)
-    { 0.00195f, 0.18750f, 0.27539f, 0.36914f },  // mid-left (sun)
-    { 0.27930f, 0.00195f, 0.55273f, 0.18359f },  // top-mid (gear)
-    { 0.55664f, 0.18750f, 0.83008f, 0.36914f },  // mid-right (bands)
-    { 0.00195f, 0.37305f, 0.27539f, 0.55469f },  // bottom-left (US stripes)
-    { 0.55664f, 0.37305f, 0.83008f, 0.55469f },  // bottom-right (skull)
-};
+// ---- shared panel geometry (measured) ----------------------------------------
+constexpr float PNL_X0 = 220.0f, PNL_Y0 = 121.3f, PNL_X1 = 1060.0f, PNL_Y1 = 612.7f;
+constexpr float INT_X0 = 237.3f, INT_Y0 = 139.3f, INT_X1 = 1042.0f, INT_Y1 = 594.0f;
 
-// ---- layout (reference px) --------------------------------------------------
-constexpr float TITLE_X = 150.0f, TITLE_Y = 50.0f, RULE_Y = 118.0f;
-
-constexpr float LIST_X = 150.0f, LIST_Y = 150.0f, LIST_W = 600.0f, LIST_H = 410.0f;
-constexpr float INFO_X = 780.0f, INFO_Y = 150.0f, INFO_W = 350.0f, INFO_H = 410.0f;
-constexpr float HEADER_H = 52.0f;          // caption strip atop each window
-constexpr float ROW_H    = 58.0f;
-constexpr int   VISIBLE_ROWS = 6;          // up to 9 entries -> the list scrolls
-constexpr float ROW_PAD  = 12.0f;
-
-// preview thumbnail plate inside the info window (ART category)
-constexpr float THUMB_X = 798.0f, THUMB_Y = 218.0f, THUMB_W = 314.0f, THUMB_H = 168.0f;
-
-// ---- entrance tuning (frames @60fps) ----------------------------------------
-constexpr double TITLE_FRAMES = 14.0;
-constexpr double LIST_FRAMES  = 16.0;
-constexpr double INFO_OFFSET  = 4.0,  INFO_FRAMES = 14.0;
-constexpr double FOOT_OFFSET  = 10.0, FOOT_FRAMES = 12.0;
-constexpr double SELECT_MOVE_FRAMES = 8.0;
-
-// ---- palette (shared with pause/result/shop/status/options/world_map) -------
-const uint32_t COL_BG_TOP   = RGBA(12, 20, 38, 255);
-const uint32_t COL_BG_BOT   = RGBA(5, 9, 18, 255);
-const uint32_t COL_SEL_TOP  = RGBA(64, 150, 235, 225);
-const uint32_t COL_SEL_BOT  = RGBA(28, 92, 180, 225);
-const uint32_t COL_TITLE    = RGBA(255, 209, 74, 255);
-const uint32_t COL_TEXT     = RGBA(214, 226, 240, 255);
-const uint32_t COL_TEXT_SEL = RGBA(255, 255, 255, 255);
-const uint32_t COL_DESC     = RGBA(178, 194, 214, 255);
-const uint32_t COL_RULE     = RGBA(120, 170, 230, 90);
-const uint32_t COL_PLATE    = RGBA(6, 10, 20, 235);     // dark plate behind a thumbnail
-const uint32_t COL_TIME     = RGBA(255, 209, 74, 255);   // duration / number (gold)
-const uint32_t COL_NOWPLAY  = RGBA(120, 230, 140, 255);  // now-playing accent
-const uint32_t COL_OK       = RGBA(120, 230, 140, 255);
-const uint32_t COL_FOOTER   = RGBA(190, 205, 225, 220);
-const uint32_t COL_TAB_ON   = RGBA(255, 209, 74, 255);
-const uint32_t COL_TAB_OFF  = RGBA(120, 134, 158, 255);
-const uint32_t COL_WHITE    = RGBA(255, 255, 255, 255);
-const uint32_t COL_SEG_TOP  = RGBA(120, 200, 255, 255);  // progress bar fill
-const uint32_t COL_SEG_BOT  = RGBA(40, 120, 210, 255);
-const uint32_t COL_SEG_EMPTY= RGBA(36, 46, 64, 220);
-
-// ---- interactive state ------------------------------------------------------
-int    g_cat = 0;                  // selected category (tab)
-int    g_sel = 0, g_prevSel = 0;   // selected entry within the category
-int    g_scroll = 0;
-double g_moveStart = -100.0;        // Now() when the highlight last moved
-double g_msgStart  = -100.0;        // Now() of the last play/view flash
-int    g_nowCat = -1, g_nowIdx = -1;// latched now-playing MUSIC track
-double g_nowStart = -100.0;          // Now() the latched track started (for the elapsed clock)
-
-const Category& Cat()  { return CATEGORIES[g_cat]; }
-int   EntryCount()     { return Cat().count; }
-const Entry& Sel()     { return Cat().entries[std::clamp(g_sel, 0, EntryCount() - 1)]; }
-
-float ScrollLimit() { return (float)std::max(0, EntryCount() - VISIBLE_ROWS); }
-
-void ClampScrollToSel() {
-    if (g_sel < g_scroll) g_scroll = g_sel;
-    if (g_sel > g_scroll + VISIBLE_ROWS - 1) g_scroll = g_sel - VISIBLE_ROWS + 1;
-    g_scroll = std::clamp(g_scroll, 0, (int)ScrollLimit());
-}
-
-// seconds -> "M:SS"
-void TimeStr(int sec, char* out, int n) {
-    if (sec < 0) { std::snprintf(out, n, "--:--"); return; }
-    std::snprintf(out, n, "%d:%02d", sec / 60, sec % 60);
-}
+enum View { VIEW_ENCY_TEXT = 0, VIEW_ENCY_ART, VIEW_SOUND, VIEW_COUNT };
+int g_view = VIEW_ENCY_TEXT;
+int g_selR = 2, g_selC = 3;     // soundtrack selection (matches the capture)
 
 void Init() {
-    GameFrameTex();   // lazy-load the shared chrome frame used by DrawGameWindow
-    if (g_ornTex   < 0) g_ornTex   = gfx::loadTexture(std::string(ASSET_BASE) + "mat_media_common_001.png");
-    if (g_numTex   < 0) g_numTex   = gfx::loadTexture(std::string(ASSET_BASE) + "mat_media_num_001.png");
-    if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture(std::string(ASSET_BASE) + "mat_comon_x360_001.png");
-    if (g_thumbTex < 0) g_thumbTex = gfx::loadTexture(std::string(ASSET_BASE) + "mat_worldmap_ss_002.png");
+    if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");
 }
-
-void Reset() {
-    g_cat = 0; g_sel = 0; g_prevSel = 0; g_scroll = 0;
-    g_moveStart = -100.0; g_msgStart = -100.0;
-    g_nowCat = -1; g_nowIdx = -1; g_nowStart = -100.0;
+void Reset() { g_view = VIEW_ENCY_TEXT; g_selR = 2; g_selC = 3; }
+void Input(const ScreenInput& in) {
+    if (in.tabRight) g_view = (g_view + 1) % VIEW_COUNT;
+    if (in.tabLeft)  g_view = (g_view + VIEW_COUNT - 1) % VIEW_COUNT;
+    if (g_view == VIEW_SOUND) {
+        if (in.left)  g_selC = std::max(0, g_selC - 1);
+        if (in.right) g_selC = std::min(3, g_selC + 1);
+        if (in.up)    g_selR = std::max(0, g_selR - 1);
+        if (in.down)  g_selR = std::min(2, g_selR + 1);
+    }
 }
 
-void Input(const ScreenInput& in) {
-    if (in.up || in.down) {
-        g_prevSel = g_sel;
-        if (in.up)   g_sel = std::max(0, g_sel - 1);
-        if (in.down) g_sel = std::min(EntryCount() - 1, g_sel + 1);
-        ClampScrollToSel();
-        g_moveStart = Now();
-    }
-    if (in.tabLeft || in.tabRight) {
-        if (in.tabLeft)  g_cat = (g_cat + CAT_COUNT - 1) % CAT_COUNT;
-        if (in.tabRight) g_cat = (g_cat + 1) % CAT_COUNT;
-        g_sel = 0; g_prevSel = 0; g_scroll = 0;   // reset the entry cursor for the new tab
-        g_moveStart = Now();
-    }
-    if (in.accept) {                               // play / view the selected entry
-        g_msgStart = Now();
-        if (Cat().kind == CAT_MUSIC) {             // latch a now-playing track
-            g_nowCat = g_cat; g_nowIdx = g_sel; g_nowStart = Now();
+// ---- shared chrome ------------------------------------------------------------
+void HeaderStrip(const char* title, float a) {
+    // layered rules over a green gradient field (y 56..110.7)
+    DrawRect({ 0, 57.3f }, { REF_W, 59.3f }, WithAlpha(C_HDR_CREAM, a));
+    DrawRect({ 0, 60.0f }, { REF_W, 62.3f }, WithAlpha(RGBA(95, 75, 40, 255), a));
+    DrawRect({ 0, 62.7f }, { REF_W, 64.7f }, WithAlpha(C_HDR_GOLD, a));
+    DrawVGradient({ 0, 65.3f }, { REF_W, 100.7f }, WithAlpha(C_HDR_T, a), WithAlpha(C_HDR_B, a));
+    DrawRect({ 0, 101.3f }, { REF_W, 104.7f }, WithAlpha(C_HDR_CREAM, a));
+    DrawRect({ 0, 108.0f }, { REF_W, 110.0f }, WithAlpha(C_HDR_GOLD, a));
+    // left art-deco pinstripes + curl hint (procedural approximation)
+    for (int i = 0; i < 3; ++i)
+        DrawRect({ 8, 70.0f + i * 9 }, { 214, 71.5f + i * 9 }, WithAlpha(C_HDR_GOLD, a * 0.9f));
+    // beveled slab title at the measured x
+    SetFont(g_fDF);
+    SetModifier(MOD_TITLE_BEVEL);
+    DrawTextGradient({ 278, 66 }, 36.0f, WithAlpha(C_TITLE_T, a), WithAlpha(C_TITLE_B, a), title);
+    ResetModifier();
+    ResetFont();
+    // "Pickle's Room" oval seal (procedural: rings + italic script)
+    const float cx = 968, cy = 81.5f, rx = 48, ry = 41.5f;
+    for (int ring = 0; ring < 3; ++ring) {
+        float fx = rx - ring * 5, fy = ry - ring * 5;
+        uint32_t col = (ring == 1) ? C_HDR_CREAM : (ring == 0 ? RGBA(40, 52, 34, 255) : C_SEAL_GRN);
+        for (int s = 0; s < 28; ++s) {   // coarse ellipse from short bars
+            float a0 = (float)s / 28.0f * 6.2831853f, a1 = (float)(s + 1) / 28.0f * 6.2831853f;
+            V2 p0 = { cx + std::cos(a0) * fx, cy + std::sin(a0) * fy };
+            V2 p1 = { cx + std::cos(a1) * fx, cy + std::sin(a1) * fy };
+            V2 n  = { (p1.y - p0.y) * 0.18f, (p0.x - p1.x) * 0.18f };
+            const V2 q[4] = { p0, p1, { p1.x + n.x, p1.y + n.y }, { p0.x + n.x, p0.y + n.y } };
+            const uint32_t qc[4] = { WithAlpha(col, a), WithAlpha(col, a), WithAlpha(col, a), WithAlpha(col, a) };
+            DrawQuadGradient(q, qc);
+        }
+        if (ring == 2) {   // fill the innermost
+            DrawRect({ cx - fx * 0.78f, cy - fy * 0.78f }, { cx + fx * 0.78f, cy + fy * 0.78f }, WithAlpha(C_SEAL_GRN, a));
         }
     }
-    // cancel: would back out to the menu in-game; no-op in the standalone build.
+    SetFont(g_fSeurat);
+    SetTextShear(0.30f);
+    DrawText({ cx - 36, cy - 16 }, 14.0f, WithAlpha(C_HDR_GOLD, a), "Pickle's");
+    DrawText({ cx - 26, cy + 1 },  14.0f, WithAlpha(C_HDR_GOLD, a), "Room");
+    ResetTextShear();
+    ResetFont();
+    for (int i = 0; i < 3; ++i)
+        DrawRect({ 1040, 70.0f + i * 9 }, { REF_W - 8, 71.5f + i * 9 }, WithAlpha(C_HDR_GOLD, a * 0.9f));
 }
 
-// ---- aspect-preserving image fit into a box (world_map idiom) ---------------
-void DrawFitted(int tex, const UV& uv, float texW, float texH,
-                float bx, float by, float bw, float bh,
-                float t, uint32_t col, float vAnchor = 0.5f, float slide = 0.0f) {
-    if (tex < 0 || t <= 0.0f) return;
-    float artW = (uv.u1 - uv.u0) * texW;
-    float artH = (uv.v1 - uv.v0) * texH;
-    if (artW <= 0.0f || artH <= 0.0f) return;
-    float scale = std::min(bw / artW, bh / artH);
-    float w = artW * scale, h = artH * scale;
-    float x = bx + (bw - w) * 0.5f;
-    float y = by + (bh - h) * vAnchor + slide;
-    DrawImage(tex, { x, y }, { x + w, y + h }, { uv.u0, uv.v0 }, { uv.u1, uv.v1 }, WithAlpha(col, t));
-}
-
-// a bounded window from the REAL game frame (9-slice), tinted blue-silver, with a
-// brighter header strip â€” the recomp's DrawPauseContainer technique on Unleashed art.
-void DrawWindow(float x, float y, float w, float h, float t, const char* caption) {
-    DrawGameWindow({ x, y }, { x + w, y + h }, HEADER_H, t);
-    DrawRect({ x + 12, y + HEADER_H - 2 }, { x + w - 12, y + HEADER_H }, WithAlpha(COL_RULE, t));
-    if (caption) {
-        SetFont(g_fDF);
-        DrawTextAligned({ x + 18, y }, { x + w - 14, y + HEADER_H }, 26.0f,
-                        WithAlpha(COL_TITLE, t), caption, Align::Left, true, true);
+void ParchmentPanel(float a) {
+    // brown frame band with cream pinstripes (simplified: band + 2 stripes)
+    DrawRect({ PNL_X0 + 4, PNL_Y0 }, { PNL_X1 - 4, PNL_Y1 }, WithAlpha(C_FRAME_BRN, a));
+    DrawRect({ PNL_X0 + 6, PNL_Y0 + 2 }, { PNL_X1 - 6, PNL_Y0 + 4 }, WithAlpha(C_PINSTRIPE, a));
+    DrawRect({ PNL_X0 + 6, PNL_Y1 - 4 }, { PNL_X1 - 6, PNL_Y1 - 2 }, WithAlpha(C_PINSTRIPE, a));
+    DrawRect({ PNL_X0 + 8, PNL_Y0 + 6 }, { PNL_X0 + 10, PNL_Y1 - 6 }, WithAlpha(C_PINSTRIPE, a));
+    DrawRect({ PNL_X1 - 10, PNL_Y0 + 6 }, { PNL_X1 - 8, PNL_Y1 - 6 }, WithAlpha(C_PINSTRIPE, a));
+    // white keyline: outside the side bands, inside the top/bottom bands
+    DrawRect({ PNL_X0, PNL_Y0 }, { PNL_X0 + 3.3f, PNL_Y1 }, WithAlpha(C_KEYLINE, a));
+    DrawRect({ PNL_X1 - 3.3f, PNL_Y0 }, { PNL_X1, PNL_Y1 }, WithAlpha(C_KEYLINE, a));
+    DrawRect({ PNL_X0, 134.0f }, { PNL_X1, 136.7f }, WithAlpha(C_KEYLINE, a));
+    DrawRect({ PNL_X0, 597.3f }, { PNL_X1, 599.3f }, WithAlpha(C_KEYLINE, a));
+    // corner hooks (stepped Greek-key hint)
+    auto hook = [&](float hx, float hy, float sx, float sy) {
+        DrawRect({ hx, hy }, { hx + 15 * sx, hy + 2.5f * sy }, WithAlpha(C_KEYLINE, a));
+        DrawRect({ hx + 12.5f * sx, hy }, { hx + 15 * sx, hy + 15 * sy }, WithAlpha(C_KEYLINE, a));
+    };
+    hook(236.7f, 139.0f, 1, 1); hook(1043.3f, 139.0f, -1, 1);
+    hook(236.7f, 592.0f, 1, -1); hook(1043.3f, 592.0f, -1, -1);
+    // mottled parchment interior: base + soft tonal streaks
+    DrawVGradient({ INT_X0, INT_Y0 }, { INT_X1, INT_Y1 }, WithAlpha(C_PARCH_HI, a), WithAlpha(C_PARCH, a));
+    uint32_t s = 0x9e3779b9u;
+    for (int i = 0; i < 14; ++i) {
+        s = s * 1664525u + 1013904223u; float x = INT_X0 + (float)((s >> 8) % (int)(INT_X1 - INT_X0 - 60));
+        s = s * 1664525u + 1013904223u; float y = INT_Y0 + (float)((s >> 8) % (int)(INT_Y1 - INT_Y0 - 90));
+        s = s * 1664525u + 1013904223u; float w = 30 + (float)((s >> 8) % 50);
+        DrawRect({ x, y }, { x + w, y + 70 }, WithAlpha(C_PARCH_LO, a * 0.18f));
     }
 }
 
-// gold track-number from the real digit strip (mat_media_num_001), right of `x`.
-// Returns the x just past the drawn digits. Falls back to atlas-less no-op.
-float DrawNum(int value, float x, float cy, float gh, float t) {
-    if (g_numTex < 0 || t <= 0.0f) return x;
-    char buf[8]; std::snprintf(buf, sizeof(buf), "%02d", std::clamp(value, 0, 99));
-    float digW = gh * ((1.0f / 11.0f - 0.008f) * NUM_TEX_W) / (0.938f * NUM_TEX_H);
-    for (const char* p = buf; *p; ++p) {
-        if (*p < '0' || *p > '9') continue;
-        UV u = NumUV(*p - '0');
-        DrawImage(g_numTex, { x, cy - gh * 0.5f }, { x + digW, cy + gh * 0.5f },
-                  { u.u0, u.v0 }, { u.u1, u.v1 }, WithAlpha(COL_WHITE, t));
-        x += digW + 1.0f;
-    }
-    return x;
-}
-
-// one footer hint: real button glyph + ASCII label, left-to-right (world_map idiom).
-float DrawHint(float x, float cy, const UV& g, float gAspect, const char* label, float t) {
-    const float gh = 30.0f;
-    if (g_glyphTex >= 0) {
-        float gw = gh * gAspect;
-        DrawImage(g_glyphTex, { x, cy - gh * 0.5f }, { x + gw, cy + gh * 0.5f },
-                  { g.u0, g.v0 }, { g.u1, g.v1 }, WithAlpha(COL_WHITE, t));
-        x += gw + 8.0f;
+void PagePlaque(const char* counter, float a) {
+    // olive plaque overlapping the bottom frame, gold rules + flanking curls
+    DrawRect({ 440, 582.7f }, { 841.3f, 584.0f }, WithAlpha(RGBA(224, 215, 166, 255), a));
+    DrawRect({ 440, 584.0f }, { 841.3f, 606.0f }, WithAlpha(C_PLQ_GREEN, a));
+    DrawRect({ 440, 606.0f }, { 841.3f, 609.0f }, WithAlpha(C_PLQ_GOLD, a));
+    DrawRect({ 440, 609.7f }, { 841.3f, 612.0f }, WithAlpha(RGBA(224, 215, 166, 255), a));
+    for (int sgn = 0; sgn < 2; ++sgn) {   // curl ornament hint: 3 nested bars
+        float bx = sgn ? 733.3f : 464.0f;
+        for (int i = 0; i < 3; ++i)
+            DrawRect({ bx + i * 6, 590.0f + i * 3 }, { bx + 82 - i * 12, 592.0f + i * 3 }, WithAlpha(C_HDR_GOLD, a));
     }
     SetFont(g_fRodin);
-    DrawText({ x, cy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, t), label);
-    x += MeasureText(22.0f, label).x + 34.0f;
-    return x;
+    float w = MeasureText(24.0f, counter).x;
+    DrawTextGradient({ 640.7f - w * 0.5f, 586.0f }, 24.0f, WithAlpha(C_CNT_T, a), WithAlpha(C_CNT_B, a), counter);
+    ResetFont();
 }
 
-// a slim progress bar (filled fraction f in [0,1]).
-void DrawProgress(float x, float y, float w, float h, float f, float t) {
-    DrawRect({ x, y }, { x + w, y + h }, WithAlpha(COL_SEG_EMPTY, t));
-    float fw = w * std::clamp(f, 0.0f, 1.0f);
-    if (fw > 1.0f)
-        DrawVGradient({ x, y }, { x + fw, y + h }, WithAlpha(COL_SEG_TOP, t), WithAlpha(COL_SEG_BOT, t));
+void PageChevrons(float a, double now) {
+    const float nudge = Breathe(now, 0.0f, 4.0f, 1.2f);   // sliding pulse
+    auto chev = [&](float vx, float vy, float dir) {
+        for (int i = 0; i < 3; ++i) {   // three nested arms
+            float t = 26.0f + i * 14.0f;
+            uint32_t col = (i == 0) ? C_CHEV : C_CHEV_FADE;
+            float ax = vx + dir * (t * 0.55f + nudge), ay0 = vy - t, ay1 = vy + t;
+            const V2 q1[4] = { { ax, ay0 }, { ax + dir * 9, ay0 + 5 }, { vx + dir * nudge + dir * 9, vy }, { vx + dir * nudge, vy } };
+            const V2 q2[4] = { { vx + dir * nudge, vy }, { vx + dir * nudge + dir * 9, vy }, { ax + dir * 9, ay1 - 5 }, { ax, ay1 } };
+            const uint32_t qc[4] = { WithAlpha(col, a), WithAlpha(col, a), WithAlpha(col, a), WithAlpha(col, a) };
+            DrawQuadGradient(q1, qc); DrawQuadGradient(q2, qc);
+        }
+    };
+    chev(192.0f, 366.0f, +1);    // left "<" (vertex at the panel edge, opens right)
+    chev(1068.0f, 366.0f, -1);   // right ">"
+}
+
+void Glyph(const UV& g, float x, float cy, float gh, float a, float* outRight = nullptr) {
+    if (g_glyphTex < 0) return;
+    float asp = ((g.u1 - g.u0) * GTW) / ((g.v1 - g.v0) * GTH), gw = gh * asp;
+    DrawImage(g_glyphTex, { x, cy - gh * 0.5f }, { x + gw, cy + gh * 0.5f },
+              { g.u0, g.v0 }, { g.u1, g.v1 }, WithAlpha(C_WHITE, a));
+    if (outRight) *outRight = x + gw;
+}
+
+void FooterEncy(float a) {
+    const float cy = 640;
+    float r = 0;
+    Glyph(GLYPH_LB, 256, cy, 32, a, &r);
+    SetFont(g_fRodin);
+    DrawText({ 341, cy - 12 }, 22.0f, WithAlpha(C_WHITE, a), "Switch");
+    Glyph(GLYPH_RB, 452, cy, 32, a, &r);
+    Glyph(GLYPH_B, 858, cy, 34, a, &r);
+    DrawText({ 902, cy - 12 }, 22.0f, WithAlpha(C_WHITE, a), "Back");
+    ResetFont();
+}
+void FooterSound(float a) {
+    const float cy = 638;
+    SetFont(g_fRodin);
+    Glyph(GLYPH_A, 684, cy, 32, a);
+    DrawText({ 725, cy - 12 }, 22.0f, WithAlpha(C_WHITE, a), "Select");
+    Glyph(GLYPH_B, 858, cy, 34, a);
+    DrawText({ 902, cy - 12 }, 22.0f, WithAlpha(C_WHITE, a), "Back");
+    ResetFont();
+}
+
+// ---- views ---------------------------------------------------------------------
+void DrawEncyText(float a, double now) {
+    // portrait slot (user art drops in): contact shadow + faint slot hint
+    DrawRect({ 360, 565 }, { 480, 592 }, WithAlpha(RGBA(120, 110, 84, 255), a * 0.45f));
+    DrawRect({ 343, 267 }, { 496, 592 }, WithAlpha(C_PARCH_LO, a * 0.35f));
+    SetFont(g_fSeurat);
+    DrawTextAligned({ 343, 267 }, { 496, 592 }, 14.0f, WithAlpha(RGBA(130, 120, 95, 255), a), "PORTRAIT", Align::Center, true, false);
+    // title band + flag icon + entry name
+    DrawRect({ 496.7f, 177.3f }, { 793.3f, 212.0f }, WithAlpha(C_WHITE, a * 0.18f));
+    DrawRect({ 501.3f, 174.7f }, { 563.3f, 208.0f }, WithAlpha(C_FLAG_BLUE, a));          // flag field
+    for (int i = 0; i < 4; ++i)
+        DrawRect({ 505, 179.0f + i * 7.5f }, { 559, 181.5f + i * 7.5f }, WithAlpha(C_WHITE, a * 0.85f));
+    DrawRect({ 501.3f, 174.7f }, { 563.3f, 176.0f }, WithAlpha(C_WHITE, a));               // flag outline hint
+    DrawText({ 568.7f, 178 }, 26.0f, WithAlpha(C_TEXT, a), "Alexis");
+    // ruled double-lines + body text (pitch 33, pairs 6.7 apart, x 507..973)
+    const char* L[] = { "Lambros's son, a", "wild, unruly boy.", "",
+                        "Alexis hardly ever", "sees his father,",
+                        "and can't help but", "miss him at times." };
+    for (int i = 0; i < 9; ++i) {
+        float ry = 278.0f + i * 33.0f;
+        DrawRect({ 506.7f, ry }, { 973, ry + 1.3f }, WithAlpha(C_RULE, a));
+        DrawRect({ 506.7f, ry + 6.7f }, { 973, ry + 8.0f }, WithAlpha(C_RULE, a));
+    }
+    for (int i = 0; i < 7; ++i)
+        if (L[i][0])
+            DrawText({ 513.3f, 278.0f + i * 33.0f - 22.5f }, 22.0f, WithAlpha(C_TEXT, a), L[i]);
+    ResetFont();
+    PagePlaque("003 / 098", a);
+    PageChevrons(a, now);
+}
+
+void DrawEncyArt(float a, double now) {
+    // large borderless image slot, horizontally centred on the interior
+    DrawRect({ 338.7f, 149.3f }, { 939.3f, 572.0f }, WithAlpha(RGBA(46, 58, 84, 255), a));
+    SetFont(g_fSeurat);
+    DrawTextAligned({ 338.7f, 149.3f }, { 939.3f, 572.0f }, 16.0f,
+                    WithAlpha(RGBA(120, 134, 160, 255), a), "ARTWORK", Align::Center, true, false);
+    ResetFont();
+    PagePlaque("023 / 071", a);
+    PageChevrons(a, now);
+}
+
+void DrawSoundtrack(float a, double now) {
+    // 3x4 grid: image 152 x 82.7, origin (284,167.3), pitch (176,104.7)
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 4; ++c) {
+            const float x = 284.0f + 176.0f * c, y = 167.3f + 104.7f * r;
+            // sunken shadow (left/right/bottom)
+            DrawRect({ x - 4, y + 3 }, { x, y + 86.7f }, WithAlpha(C_THUMB_SH, a));
+            DrawRect({ x + 152, y + 3 }, { x + 156, y + 86.7f }, WithAlpha(C_THUMB_SH, a));
+            DrawRect({ x - 4, y + 82.7f }, { x + 156, y + 86.7f }, WithAlpha(C_THUMB_SH, a));
+            // cream border + image slot
+            DrawRect({ x - 2, y - 2 }, { x + 154, y + 84.7f }, WithAlpha(C_THUMB_BD, a));
+            DrawVGradient({ x, y }, { x + 152, y + 82.7f },
+                          WithAlpha(RGBA(70, 84, 110, 255), a), WithAlpha(RGBA(38, 48, 66, 255), a));
+            // gold scroll-curl + note ornament hint (bottom-right quadrant)
+            DrawRect({ x + 96, y + 58 }, { x + 132, y + 61 }, WithAlpha(RGBA(190, 157, 107, 255), a));
+            DrawRect({ x + 124, y + 46 }, { x + 127, y + 64 }, WithAlpha(RGBA(190, 157, 107, 255), a));
+        }
+    }
+    // selection ring on (g_selR, g_selC): rails + corner brackets + pulsing glow
+    {
+        const float x = 284.0f + 176.0f * g_selC, y = 167.3f + 104.7f * g_selR;
+        const float glow = Breathe(now, 0.35f, 0.9f, 1.1f);
+        DrawRect({ x - 14.7f, y - 20.7f }, { x + 164.7f, y + 96.0f }, WithAlpha(C_SEL_GLOW, a * glow * 0.35f), true);
+        auto rail = [&](float rx0, float ry0, float rx1, float ry1) {
+            DrawRect({ rx0, ry0 }, { rx1, ry1 }, WithAlpha(C_SEL_G, a));
+            DrawRect({ rx0, ry0 }, { rx0 + (rx1 - rx0), ry0 + 1.3f }, WithAlpha(C_SEL_W, a));
+            DrawRect({ rx0, ry1 - 1.3f }, { rx1, ry1 }, WithAlpha(C_SEL_W, a));
+        };
+        rail(x - 8.0f, y - 13.3f, x - 0.7f, y + 97.3f);            // left rail
+        rail(x + 152.7f, y - 13.3f, x + 160.0f, y + 97.3f);        // right rail
+        // corner bracket arms (top/bottom edges open in the middle)
+        rail(x - 13.3f, y - 13.3f, x + 20.0f, y - 1.3f);
+        rail(x + 129.3f, y - 13.3f, x + 163.3f, y - 1.3f);
+        rail(x - 13.3f, y + 82.0f, x + 20.0f, y + 97.3f);
+        rail(x + 129.3f, y + 82.0f, x + 163.3f, y + 97.3f);
+        // flag badge top-left of the selected thumb
+        DrawRect({ x + 5.3f, y - 0.7f }, { x + 74.0f, y + 46.7f }, WithAlpha(C_FLAG_BLUE, a));
+        DrawRect({ x + 5.3f, y - 0.7f }, { x + 74.0f, y + 1.0f }, WithAlpha(C_WHITE, a));
+        DrawRect({ x + 20, y + 12 }, { x + 58, y + 34 }, WithAlpha(RGBA(201, 122, 101, 255), a));
+    }
+    // maroon scrollbar (track + cream handle at the captured 61%)
+    DrawRect({ 985.3f, 158.7f }, { 987.3f, 471.3f }, WithAlpha(C_PINSTRIPE, a));
+    DrawRect({ 1000.0f, 158.7f }, { 1001.3f, 471.3f }, WithAlpha(C_PINSTRIPE, a));
+    DrawVGradient({ 988.0f, 158.7f }, { 999.3f, 471.3f }, WithAlpha(C_SCR_T, a), WithAlpha(C_SCR_B, a));
+    DrawRect({ 988.0f, 332.7f }, { 999.3f, 389.3f }, WithAlpha(C_SCR_HND, a));
+    // divider rules + caption + its ruled lines
+    DrawRect({ 266.7f, 461.3f }, { 973.3f, 462.6f }, WithAlpha(C_RULE, a));
+    DrawRect({ 266.7f, 468.0f }, { 973.3f, 469.3f }, WithAlpha(C_RULE, a));
+    SetFont(g_fSeurat);
+    DrawText({ 280.7f, 494.0f }, 26.0f, WithAlpha(RGBA(16, 11, 0, 255), a), "Spagonia - Day");
+    ResetFont();
+    DrawRect({ 266.7f, 515.3f }, { 973.3f, 516.6f }, WithAlpha(C_RULE, a));
+    DrawRect({ 266.7f, 522.7f }, { 973.3f, 524.0f }, WithAlpha(C_RULE, a));
+    DrawRect({ 266.7f, 548.7f }, { 973.3f, 550.0f }, WithAlpha(C_RULE, a));
+    DrawRect({ 266.7f, 557.3f }, { 973.3f, 558.6f }, WithAlpha(C_RULE, a));
 }
 
 void Draw(double openSec) {
-    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, COL_BG_TOP, COL_BG_BOT);
+    const double now = Now();
+    const float a = (float)ComputeMotion(openSec, 0.0, 10.0);
+    // lab-scene placeholder (warm library tones; real game = live 3D room)
+    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_LAB_T, C_LAB_B);
+    DrawRect({ 0, 540 }, { REF_W, REF_H }, RGBA(44, 32, 24, 255));
 
-    const Category& c = Cat();
-    const float titleT = (float)ComputeMotion(openSec, 0.0, TITLE_FRAMES);
-    const float listT  = (float)ComputeMotion(openSec, 0.0, LIST_FRAMES);
-    const float infoT  = (float)ComputeMotion(openSec, INFO_OFFSET, INFO_FRAMES);
-    const float footT  = (float)ComputeMotion(openSec, FOOT_OFFSET, FOOT_FRAMES);
-
-    // ---- title + gold filigree ornament + category tabs ----
-    SetFont(g_fDF);
-    DrawTextShadow({ TITLE_X, TITLE_Y - (1.0f - titleT) * 16.0f }, 46.0f,
-                   WithAlpha(COL_TITLE, titleT), "MEDIA ROOM");
-    DrawRect({ TITLE_X, RULE_Y }, { 1130.0f, RULE_Y + 2.0f }, WithAlpha(COL_RULE, titleT));
-
-    // real gold filigree scroll tucked just past the title word
-    if (g_ornTex >= 0 && titleT > 0.0f) {
-        float aspect = ((FILIGREE_UV.u1 - FILIGREE_UV.u0) * ORN_TEX_W) /
-                       ((FILIGREE_UV.v1 - FILIGREE_UV.v0) * ORN_TEX_H);
-        float fh = 40.0f, fw = fh * aspect;
-        float fx = TITLE_X + MeasureText(46.0f, "MEDIA ROOM").x + 24.0f;
-        float fy = TITLE_Y + 8.0f - (1.0f - titleT) * 10.0f;
-        DrawImage(g_ornTex, { fx, fy }, { fx + fw, fy + fh },
-                  { FILIGREE_UV.u0, FILIGREE_UV.v0 }, { FILIGREE_UV.u1, FILIGREE_UV.v1 },
-                  WithAlpha(COL_WHITE, titleT));
+    const char* title = (g_view == VIEW_SOUND) ? "Soundtrack" : "Encyclopedia";
+    HeaderStrip(title, a);
+    ParchmentPanel(a);
+    switch (g_view) {
+        case VIEW_ENCY_TEXT: DrawEncyText(a, now); FooterEncy(a); break;
+        case VIEW_ENCY_ART:  DrawEncyArt(a, now);  FooterEncy(a); break;
+        default:             DrawSoundtrack(a, now); FooterSound(a); break;
     }
-
-    // tab row across the top-right: MUSIC | MOVIE | ART (LB/RB switch)
-    {
-        const float tabsR = 1130.0f, tabsTop = TITLE_Y + 8.0f, tabsBot = TITLE_Y + 44.0f;
-        const float gap = 22.0f;
-        SetFont(g_fDF);
-        float widths[CAT_COUNT], total = 0.0f;
-        for (int i = 0; i < CAT_COUNT; ++i) {
-            widths[i] = MeasureText(24.0f, CATEGORIES[i].name).x;
-            total += widths[i] + (i ? gap : 0.0f);
-        }
-        float x = tabsR - total;
-        for (int i = 0; i < CAT_COUNT; ++i) {
-            uint32_t col = (i == g_cat) ? COL_TAB_ON : COL_TAB_OFF;
-            DrawTextAligned({ x, tabsTop }, { x + widths[i], tabsBot }, 24.0f,
-                            WithAlpha(col, titleT), CATEGORIES[i].name, Align::Left, true, true);
-            if (i == g_cat)
-                DrawRect({ x, tabsBot - 2.0f }, { x + widths[i], tabsBot }, WithAlpha(COL_TAB_ON, titleT));
-            x += widths[i] + gap;
-        }
-    }
-
-    // ===== LEFT: ENTRY LIST WINDOW ===========================================
-    const float listSlide = (1.0f - listT) * 24.0f;
-    const float lx = LIST_X, ly = LIST_Y + listSlide;
-    {
-        char cap[24]; std::snprintf(cap, sizeof(cap), "%s LIST", c.name);
-        DrawWindow(lx, ly, LIST_W, LIST_H, listT, cap);
-    }
-
-    const float rowsTop = ly + HEADER_H + 10.0f;
-    const float rowL = lx + ROW_PAD, rowR = lx + LIST_W - ROW_PAD;
-
-    // eased selection highlight (clamped to the visible window) â€” shop idiom
-    if (listT > 0.5f) {
-        float moveT = (float)ComputeMotion(g_moveStart, 0.0, SELECT_MOVE_FRAMES);
-        float prevSlot = std::clamp((float)(g_prevSel - g_scroll), 0.0f, (float)(VISIBLE_ROWS - 1));
-        float curSlot  = std::clamp((float)(g_sel     - g_scroll), 0.0f, (float)(VISIBLE_ROWS - 1));
-        float slot = Lerp(prevSlot, curSlot, moveT);
-        float hy = rowsTop + slot * ROW_H;
-        DrawVGradient({ rowL, hy + 3 }, { rowR, hy + ROW_H - 5 },
-                      WithAlpha(COL_SEL_TOP, listT), WithAlpha(COL_SEL_BOT, listT));
-    }
-
-    // visible entry rows: index # + name (left) + duration/now-playing (right)
-    for (int row = 0; row < VISIBLE_ROWS; ++row) {
-        int idx = g_scroll + row;
-        if (idx >= EntryCount()) break;
-        const Entry& e = c.entries[idx];
-        float top = rowsTop + row * ROW_H;
-        float cy  = top + ROW_H * 0.5f;
-        bool selected   = (idx == g_sel);
-        bool nowPlaying = (g_nowCat == g_cat && g_nowIdx == idx);
-
-        // gold track number from the real digit strip
-        DrawNum(idx + 1, rowL + 14, cy, 26.0f, listT);
-
-        SetFont(g_fSeurat);
-        DrawTextAligned({ rowL + 70, top }, { rowR - 130, top + ROW_H }, 26.0f,
-                        WithAlpha(selected ? COL_TEXT_SEL : COL_TEXT, listT),
-                        e.name, Align::Left, true, true);
-
-        SetFont(g_fRodin);
-        if (nowPlaying) {
-            DrawTextAligned({ rowR - 130, top }, { rowR - 10, top + ROW_H }, 20.0f,
-                            WithAlpha(COL_NOWPLAY, listT), "PLAYING", Align::Right, true, true);
-        } else if (e.seconds >= 0) {
-            char tb[12]; TimeStr(e.seconds, tb, sizeof(tb));
-            DrawTextAligned({ rowR - 110, top }, { rowR - 10, top + ROW_H }, 22.0f,
-                            WithAlpha(selected ? COL_TIME : COL_DESC, listT),
-                            tb, Align::Right, true, true);
-        } else {
-            DrawTextAligned({ rowR - 130, top }, { rowR - 10, top + ROW_H }, 20.0f,
-                            WithAlpha(selected ? COL_TIME : COL_DESC, listT),
-                            "VIEW", Align::Right, true, true);
-        }
-    }
-
-    // scrollbar (only when the list overflows the window)
-    if (EntryCount() > VISIBLE_ROWS && listT > 0.5f) {
-        float trackX = lx + LIST_W - 7.0f, trackTop = rowsTop, trackH = VISIBLE_ROWS * ROW_H;
-        DrawRect({ trackX, trackTop }, { trackX + 3, trackTop + trackH }, WithAlpha(COL_RULE, listT));
-        float frac = (float)VISIBLE_ROWS / (float)EntryCount();
-        float thumbH = trackH * frac;
-        float denom = ScrollLimit(); if (denom < 1.0f) denom = 1.0f;
-        float thumbY = trackTop + (trackH - thumbH) * ((float)g_scroll / denom);
-        DrawRect({ trackX, thumbY }, { trackX + 3, thumbY + thumbH }, WithAlpha(COL_SEL_TOP, listT));
-    }
-
-    // ===== RIGHT: PREVIEW / INFO WINDOW ======================================
-    const float ix = INFO_X, iy = INFO_Y + (1.0f - infoT) * 24.0f;
-    DrawWindow(ix, iy, INFO_W, INFO_H, infoT, "PREVIEW");
-
-    const Entry& sel = Sel();
-    const float contentTop = iy + HEADER_H + 14.0f;
-
-    if (c.kind == CAT_ART) {
-        // dark plate + real gallery thumbnail (aspect-fit), inset under the header
-        DrawRect({ THUMB_X, THUMB_Y }, { THUMB_X + THUMB_W, THUMB_Y + THUMB_H }, WithAlpha(COL_PLATE, infoT));
-        if (sel.thumb >= 0 && sel.thumb < 9)
-            DrawFitted(g_thumbTex, THUMB_UV[sel.thumb], THUMB_TEX_W, THUMB_TEX_H,
-                       THUMB_X, THUMB_Y, THUMB_W, THUMB_H, infoT, COL_WHITE, 0.5f);
-        DrawRect({ THUMB_X, THUMB_Y }, { THUMB_X + THUMB_W, THUMB_Y + 2 }, WithAlpha(COL_RULE, infoT));
-        DrawRect({ THUMB_X, THUMB_Y + THUMB_H - 2 }, { THUMB_X + THUMB_W, THUMB_Y + THUMB_H }, WithAlpha(COL_RULE, infoT));
-
-        float ty = THUMB_Y + THUMB_H + 18.0f;
-        SetFont(g_fSeurat);
-        DrawTextAligned({ ix + 20, ty }, { ix + INFO_W - 16, ty + 36 }, 28.0f,
-                        WithAlpha(COL_TEXT_SEL, infoT), sel.name, Align::Left, true, true);
-        DrawText({ ix + 22, ty + 42 }, 20.0f, WithAlpha(COL_DESC, infoT), sel.sub);
-        char idxb[24]; std::snprintf(idxb, sizeof(idxb), "PIECE  %d / %d", g_sel + 1, EntryCount());
-        SetFont(g_fRodin);
-        DrawText({ ix + 22, iy + INFO_H - 56 }, 22.0f, WithAlpha(COL_TIME, infoT), idxb);
-    } else {
-        // MUSIC / MOVIE: real oval emblem + now-playing (music) or clip info (movie)
-        if (g_ornTex >= 0 && infoT > 0.0f) {
-            float aspect = ((EMBLEM_UV.u1 - EMBLEM_UV.u0) * ORN_TEX_W) /
-                           ((EMBLEM_UV.v1 - EMBLEM_UV.v0) * ORN_TEX_H);
-            float ew = INFO_W - 80.0f, eh = ew / aspect;
-            float ex = ix + (INFO_W - ew) * 0.5f, ey = contentTop + 6.0f;
-            DrawImage(g_ornTex, { ex, ey }, { ex + ew, ey + eh },
-                      { EMBLEM_UV.u0, EMBLEM_UV.v0 }, { EMBLEM_UV.u1, EMBLEM_UV.v1 },
-                      WithAlpha(COL_WHITE, infoT));
-        }
-
-        float ty = contentTop + 116.0f;
-        const char* label = (c.kind == CAT_MUSIC) ? "TRACK" : "EVENT";
-        SetFont(g_fRodin);
-        DrawText({ ix + 22, ty }, 19.0f, WithAlpha(COL_DESC, infoT), label);
-        SetFont(g_fSeurat);
-        DrawTextAligned({ ix + 20, ty + 22 }, { ix + INFO_W - 16, ty + 60 }, 27.0f,
-                        WithAlpha(COL_TEXT_SEL, infoT), sel.name, Align::Left, true, true);
-        DrawText({ ix + 22, ty + 64 }, 20.0f, WithAlpha(COL_DESC, infoT), sel.sub);
-
-        // duration line
-        {
-            char tb[12], line[24];
-            TimeStr(sel.seconds, tb, sizeof(tb));
-            std::snprintf(line, sizeof(line), "LENGTH  %s", tb);
-            SetFont(g_fRodin);
-            DrawText({ ix + 22, ty + 100 }, 22.0f, WithAlpha(COL_TIME, infoT), line);
-        }
-
-        // now-playing block (MUSIC only, when a track is latched): live elapsed
-        // clock + a looping progress bar driven by ui::Now() (continuous anim).
-        if (c.kind == CAT_MUSIC && g_nowCat == g_cat && g_nowIdx >= 0 && g_nowIdx < EntryCount()) {
-            const Entry& np = c.entries[g_nowIdx];
-            float by = ty + 142.0f;
-            DrawRect({ ix + 18, by - 6 }, { ix + INFO_W - 18, by - 4 }, WithAlpha(COL_RULE, infoT));
-            SetFont(g_fRodin);
-            DrawText({ ix + 22, by }, 19.0f, WithAlpha(COL_NOWPLAY, infoT), "NOW PLAYING");
-            SetFont(g_fSeurat);
-            DrawTextAligned({ ix + 20, by + 22 }, { ix + INFO_W - 16, by + 56 }, 23.0f,
-                            WithAlpha(COL_TEXT_SEL, infoT), np.name, Align::Left, true, true);
-
-            // elapsed time wraps over the track length; progress bar tracks it.
-            float dur = (np.seconds > 0) ? (float)np.seconds : 1.0f;
-            float elapsed = (float)std::fmod(std::max(0.0, Now() - g_nowStart), (double)dur);
-            float frac = elapsed / dur;
-            char eb[12], db[12], line[28];
-            TimeStr((int)elapsed, eb, sizeof(eb));
-            TimeStr(np.seconds, db, sizeof(db));
-            std::snprintf(line, sizeof(line), "%s / %s", eb, db);
-            DrawProgress(ix + 22, by + 64, INFO_W - 44, 8.0f, frac, infoT);
-            SetFont(g_fRodin);
-            DrawTextAligned({ ix + 20, by + 76 }, { ix + INFO_W - 18, by + 100 }, 20.0f,
-                            WithAlpha(COL_DESC, infoT), line, Align::Right, true, true);
-        }
-    }
-
-    // ===== FOOTER (real glyph + label hints) =================================
-    {
-        float hx = TITLE_X, hcy = 632.0f;
-        const float aAsp  = ((GLYPH_A.u1  - GLYPH_A.u0)  * GLYPH_TEX_W) / ((GLYPH_A.v1  - GLYPH_A.v0)  * GLYPH_TEX_H);
-        const float bAsp  = ((GLYPH_B.u1  - GLYPH_B.u0)  * GLYPH_TEX_W) / ((GLYPH_B.v1  - GLYPH_B.v0)  * GLYPH_TEX_H);
-        const float lrAsp = ((GLYPH_LB.u1 - GLYPH_LB.u0) * GLYPH_TEX_W) / ((GLYPH_LB.v1 - GLYPH_LB.v0) * GLYPH_TEX_H);
-
-        // [Up/Down] is keyboard-only -> ASCII; pad actions use real glyphs.
-        SetFont(g_fRodin);
-        DrawText({ hx, hcy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, footT), "[Up/Down] Select");
-        hx += MeasureText(22.0f, "[Up/Down] Select").x + 34.0f;
-        const char* aLabel = (c.kind == CAT_MUSIC) ? "Play" : (c.kind == CAT_MOVIE ? "Watch" : "View");
-        hx = DrawHint(hx, hcy, GLYPH_A,  aAsp,  aLabel,       footT);
-        hx = DrawHint(hx, hcy, GLYPH_B,  bAsp,  "Back",       footT);
-        hx = DrawHint(hx, hcy, GLYPH_LB, lrAsp, "",           footT);
-        hx = DrawHint(hx, hcy, GLYPH_RB, lrAsp, "Category",   footT);
-    }
-
-    // ===== transient play / view flash =======================================
-    double age = Now() - g_msgStart;
-    if (g_msgStart > 0.0 && age < 1.4) {
-        float ma = std::min(1.0f, (float)((1.4 - age) / 0.4));
-        char line[80];
-        const char* verb = (c.kind == CAT_MUSIC) ? "Now playing" :
-                           (c.kind == CAT_MOVIE) ? "Playing event" : "Viewing";
-        std::snprintf(line, sizeof(line), "%s: %s", verb, sel.name);
-        SetFont(g_fSeurat);
-        DrawTextAligned({ LIST_X, 570 }, { 1130, 600 }, 24.0f,
-                        WithAlpha(COL_OK, ma), line, Align::Center, true, true);
-    }
-
-    ResetFont();
 }
 
 } // namespace
 
-// ---- exposed to the registry ------------------------------------------------
 void MediaRoomInit() { Init(); }
 void MediaRoomDraw(double openSeconds) { Draw(openSeconds); }
 void MediaRoomInput(const ScreenInput& in) { Input(in); }
