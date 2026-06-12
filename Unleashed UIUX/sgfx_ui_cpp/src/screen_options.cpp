@@ -23,6 +23,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "settings.h"
 
 #include <cstdio>
 #include <cstring>
@@ -154,16 +155,35 @@ int       ValMax(const Option& o) { return o.kind == TOGGLE ? 1 : std::max(0, o.
 // (row labels + description), FOT-NewRodinPro-DB (values + footer + version), DFHeiStd-W7
 // (~DFSoGeiStd, the title + tabs). Baked once into the sgfxui multi-font registry.
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
+
+// persistent option values: key "opt_<cat>_<row>" in sgfx_settings.ini
+void LoadSavedValues() {
+    char key[48];
+    for (int c = 0; c < CATEGORY_COUNT; ++c)
+        for (int i = 0; i < CATEGORIES[c].optCount; ++i) {
+            Option& o = CATEGORIES[c].opts[i];
+            snprintf(key, sizeof key, "opt_%d_%d", c, i);
+            o.val = std::clamp(settings::GetInt(key, o.val), 0, ValMax(o));
+        }
+}
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");      // real game MSDF (im_font_atlas)
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");    // real game MSDF
     if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");   // real DFSoGeiStd-W7 (title + tabs)
+    static bool loaded = false;
+    if (!loaded) { LoadSavedValues(); loaded = true; }
 }
 void Reset() { g_cat = 0; g_sel = 6; g_prevSel = 6; g_moveStart = -100.0; }
 void Input(const ScreenInput& in) {
     if (in.up || in.down) { g_prevSel = g_sel; if (in.up) g_sel = std::max(0, g_sel - 1); if (in.down) g_sel = std::min(OptCount()-1, g_sel+1); g_moveStart = Now(); }
-    if (in.left || in.right) { Option& o = Opt(std::clamp(g_sel,0,OptCount()-1)); o.val = std::clamp(o.val + (in.right?1:-1), 0, ValMax(o)); }
+    if (in.left || in.right) {
+        Option& o = Opt(std::clamp(g_sel,0,OptCount()-1));
+        o.val = std::clamp(o.val + (in.right?1:-1), 0, ValMax(o));
+        char key[48];
+        snprintf(key, sizeof key, "opt_%d_%d", g_cat, std::clamp(g_sel,0,OptCount()-1));
+        settings::SetInt(key, o.val);                 // persists immediately
+    }
     if (in.tabLeft || in.tabRight) { g_cat = (g_cat + (in.tabRight?1:CATEGORY_COUNT-1)) % CATEGORY_COUNT; g_sel = g_prevSel = std::min(g_sel, OptCount()-1); g_moveStart = Now(); }
 }
 

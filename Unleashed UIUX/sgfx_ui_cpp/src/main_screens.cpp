@@ -21,6 +21,7 @@
 #include "sgfxui.h"
 #include "screen.h"
 #include "audio.h"
+#include "settings.h"
 #include "csd_player.h"
 
 #include <cstdio>
@@ -95,7 +96,7 @@ static constexpr int NOISE_CELLS = 4;   // 4x4 grid -> 16 static frames
 
 int main(int argc, char** argv) {
     bool shot = false, csdMode = false;
-    std::string id = "pause", out;
+    std::string id = "boot_logos", out;     // bare launch = the game's boot flow
     double shotSec = 1.0;
 
     // --csd <id> [<sec> <out.png>]  -> render the REAL game CSD layout/animation (true 1:1).
@@ -117,9 +118,18 @@ int main(int argc, char** argv) {
 
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) { fprintf(stderr, "SDL init: %s\n", SDL_GetError()); return 1; }
+    // ---- persistent window placement: display / fullscreen / size ----
+    settings::Load();
+    int dispCount = SDL_GetNumVideoDisplays();
+    int disp = settings::GetInt("display", 0);
+    if (disp < 0 || disp >= dispCount) disp = 0;
+    int winW = settings::GetInt("win_w", W), winH = settings::GetInt("win_h", H);
+    bool fullscreen = settings::GetInt("fullscreen", 0) != 0;
     SDL_Window* win = SDL_CreateWindow("sgfx_screens — clean C++ UI (D3D12)",
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, W, H,
+        SDL_WINDOWPOS_CENTERED_DISPLAY(disp), SDL_WINDOWPOS_CENTERED_DISPLAY(disp),
+        shot ? W : winW, shot ? H : winH,
         SDL_WINDOW_RESIZABLE | (shot ? SDL_WINDOW_HIDDEN : 0));
+    if (!shot && fullscreen) SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN_DESKTOP);
 
     void* hwnd = nullptr;
     SDL_SysWMinfo wm; SDL_VERSION(&wm.version);
@@ -278,6 +288,19 @@ int main(int argc, char** argv) {
             else if (e.type == SDL_KEYDOWN) {
                 SDL_Keycode k = e.key.keysym.sym;
                 if (k == SDLK_ESCAPE) { run = false; }
+                else if (k == SDLK_F11) {                    // borderless fullscreen toggle
+                    fullscreen = !fullscreen;
+                    SDL_SetWindowFullscreen(win, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+                    settings::SetInt("fullscreen", fullscreen ? 1 : 0);
+                }
+                else if (k == SDLK_F9) {                     // hop to the next monitor
+                    disp = (disp + 1) % SDL_GetNumVideoDisplays();
+                    bool wasFs = fullscreen;
+                    if (wasFs) SDL_SetWindowFullscreen(win, 0);
+                    SDL_SetWindowPosition(win, SDL_WINDOWPOS_CENTERED_DISPLAY(disp), SDL_WINDOWPOS_CENTERED_DISPLAY(disp));
+                    if (wasFs) SDL_SetWindowFullscreen(win, SDL_WINDOW_FULLSCREEN_DESKTOP);
+                    settings::SetInt("display", disp);
+                }
                 else if (transPhase != 0) { /* ignore input mid-transition */ }
                 else if (k == SDLK_SPACE) {                 // replay current screen (fades)
                     replayPending = true; transPhase = 2; transStart = absNow;
@@ -342,6 +365,11 @@ int main(int argc, char** argv) {
             transPhase = 2; transStart = absNow;
         }
         drawFrame(openSec, fade, absNow);
+    }
+    // persist the windowed size on the way out
+    if (!fullscreen) {
+        int cw, chh; SDL_GetWindowSize(win, &cw, &chh);
+        settings::SetInt("win_w", cw); settings::SetInt("win_h", chh);
     }
     audio::Shutdown(); ui::Shutdown(); gfx::shutdown(); SDL_DestroyWindow(win); SDL_Quit();
     return 0;
