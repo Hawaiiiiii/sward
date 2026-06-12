@@ -6,6 +6,7 @@
 // pipeline content (glTF meshes) loads next. Left/Right orbit; Up/Down zoom.
 // =============================================================================
 #include "sgfxui.h"
+#include "gltf_loader.h"
 #include "screen.h"
 #include <cstdio>
 #include <cstring>
@@ -18,6 +19,7 @@ namespace {
 int g_fRodin = 0, g_fDF = 0;
 int g_cube = -1, g_floor = -1;
 float g_orbit = 35.0f, g_dist = 9.0f;
+gltf::Model g_model;          // the RaCo-pipeline content slot (assets/viewport/)
 
 // ---- minimal row-vector matrix math (pos * M; row-major float[16]) ----------
 void matIdentity(float* m) { for (int i = 0; i < 16; ++i) m[i] = (i % 5 == 0) ? 1.0f : 0.0f; }
@@ -89,6 +91,10 @@ void Init() {
     if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
     if (g_cube < 0)  g_cube  = makeCube();
     if (g_floor < 0) g_floor = makeFloor();
+    if (!g_model.ok) {   // the RaCo content slot: .glb preferred, .gltf fallback
+        g_model = gltf::Load("assets/viewport/sample.glb");
+        if (!g_model.ok) g_model = gltf::Load("assets/viewport/sample.gltf");
+    }
 }
 void Reset() { g_orbit = 35.0f; g_dist = 9.0f; }
 void Input(const ScreenInput& in) {
@@ -132,7 +138,33 @@ void Draw(double openSec) {
         matScale(s, 8.0f, 0.012f, 0.012f); matTranslate(t, 0, 0.0f, i * 2.0f); matMul(m, s, t);
         Submit(g_cube, m, 0.05f, 0.42f, 0.10f, -1, view, proj);
     }
-    {   // hero cube (slowly spinning) + two satellites
+    if (g_model.ok) {
+        // RaCo glTF content: auto-fit the bbox to ~3.5 units, slow turntable
+        const float cx = (g_model.bboxMin[0] + g_model.bboxMax[0]) * 0.5f;
+        const float cyy = (g_model.bboxMin[1] + g_model.bboxMax[1]) * 0.5f;
+        const float cz = (g_model.bboxMin[2] + g_model.bboxMax[2]) * 0.5f;
+        const float ext = std::max({ g_model.bboxMax[0] - g_model.bboxMin[0],
+                                     g_model.bboxMax[1] - g_model.bboxMin[1],
+                                     g_model.bboxMax[2] - g_model.bboxMin[2], 0.001f });
+        const float fit = 3.5f / ext;
+        float ctr[16], rot[16], lift[16];
+        matTranslate(ctr, -cx, -cyy, -cz);
+        matRotY(rot, (float)(now * 0.5));
+        matScale(s, fit, fit, fit);
+        matTranslate(lift, 0, 1.4f, 0);
+        matMul(m, ctr, s); matMul(m, m, rot); matMul(m, m, lift);
+        for (const auto& p : g_model.prims) {
+            gfx::MeshDraw d;
+            d.mesh = p.mesh;
+            float vp[16]; matMul(vp, view, proj);
+            matMul(d.mvp, m, vp);
+            memcpy(d.model, m, sizeof d.model);
+            d.lightDir[0] = 0.45f; d.lightDir[1] = 0.8f; d.lightDir[2] = -0.35f; d.lightDir[3] = 0.30f;
+            memcpy(d.baseColor, p.baseColor, sizeof d.baseColor);
+            d.texIndex = p.texIndex;
+            gfx::drawMesh(d);
+        }
+    } else {   // demo scene when no model is supplied
         float rot[16];
         matRotY(rot, (float)(now * 0.6));
         matScale(s, 1.0f, 1.0f, 1.0f); matTranslate(t, 0, 1.0f, 0);
@@ -151,7 +183,9 @@ void Draw(double openSec) {
     DrawText({ 30, 70 }, 18.0f, WithAlpha(RGBA(180, 200, 220, 255), a),
              "plume mesh pass: depth + perspective + directional light");
     DrawTextAligned({ 0, 676 }, { REF_W, 706 }, 20.0f, WithAlpha(RGBA(224, 238, 226, 255), a),
-                    "[Left/Right] Orbit   [Up/Down] Zoom   -   glTF (RaCo) slot next", Align::Center, true, true);
+                    g_model.ok ? "[Left/Right] Orbit   [Up/Down] Zoom   -   glTF: assets/viewport/sample"
+                               : "[Left/Right] Orbit   [Up/Down] Zoom   -   drop a model at assets/viewport/sample.glb",
+                    Align::Center, true, true);
     ResetFont();
 }
 

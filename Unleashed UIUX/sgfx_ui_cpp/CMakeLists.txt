@@ -71,6 +71,7 @@ add_executable(sgfx_screens
     src/main_screens.cpp
     src/sgfxui.cpp
     src/globe3d.cpp
+    src/gltf_loader.cpp
     src/audio.cpp
     src/csd_player.cpp
     "${RECOMP_ROOT}/thirdparty/stb/stb_vorbis.c"
