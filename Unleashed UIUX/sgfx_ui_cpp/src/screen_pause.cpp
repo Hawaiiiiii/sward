@@ -38,6 +38,8 @@ enum SubView { SV_NONE = 0, SV_ACHIEVEMENTS, SV_INVENTORY };
 int g_sub = SV_NONE;
 int g_achSel = 0;          // selected achievement row (of the 4 visible)
 int g_invSel = 2;          // selected inventory row (capture shows row 3)
+bool g_invPopup = false;   // "Give to Sonic / Give to Chip" (measured popup)
+int  g_invPopupSel = 0;
 const char* g_nav = nullptr;
 
 // palette — colours sampled from _ref_pause.png
@@ -76,7 +78,7 @@ void Init() {
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");      // real game MSDF (sub-screens)
     if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
 }
-void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; g_sub = SV_NONE; g_achSel = 0; g_invSel = 2; g_nav = nullptr; }
+void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; g_sub = SV_NONE; g_achSel = 0; g_invSel = 2; g_invPopup = false; g_invPopupSel = 0; g_nav = nullptr; }
 void Input(const ScreenInput& in) {
     if (g_confirm) {
         if (in.up || in.down) g_confirmSel ^= 1;
@@ -91,8 +93,14 @@ void Input(const ScreenInput& in) {
         return;
     }
     if (g_sub == SV_INVENTORY) {
+        if (g_invPopup) {   // "Give to Sonic / Give to Chip"
+            if (in.up || in.down) g_invPopupSel ^= 1;
+            if (in.accept || in.cancel) g_invPopup = false;
+            return;
+        }
         if (in.up)   g_invSel = std::max(0, g_invSel - 1);
         if (in.down) g_invSel = std::min(6, g_invSel + 1);
+        if (in.accept) { g_invPopup = true; g_invPopupSel = 0; }
         if (in.cancel) g_sub = SV_NONE;
         return;
     }
@@ -346,6 +354,30 @@ void DrawInventory(float a) {
     ResetFont();
     SubScrollbar(737.3f, 217.3f, 750.7f, 586, 377.3f - (2 - g_invSel) * 14.0f, 31.3f, a);
     SubFooter(true, a);
+
+    // ---- "Give to Sonic / Give to Chip" popup (measured: a small grey dialog
+    //      beside the selected row, GOLD highlight band on the chosen option) ----
+    if (g_invPopup) {
+        const float ty = 232.7f + g_invSel * 50.0f;
+        const float px0 = 430, py0 = std::min(ty - 6.0f, 540.0f), px1 = 624, py1 = py0 + 78;
+        DrawVGradient({ px0, py0 }, { px1, py1 }, WithAlpha(RGBA(168, 170, 170, 248), a), WithAlpha(RGBA(118, 120, 120, 248), a));
+        DrawRect({ px0, py0 }, { px1, py0 + 2 }, WithAlpha(RGBA(222, 224, 224, 255), a));
+        DrawRect({ px0, py1 - 2 }, { px1, py1 }, WithAlpha(RGBA(210, 212, 212, 255), a));
+        const char* OPT[2] = { "Give to Sonic", "Give to Chip" };
+        const float rowY[2] = { py0 + 10, py0 + 44 };
+        DrawVGradient({ px0 + 8, rowY[g_invPopupSel] - 4 }, { px1 - 8, rowY[g_invPopupSel] + 26 },
+                      WithAlpha(RGBA(238, 204, 92, 250), a), WithAlpha(RGBA(206, 160, 44, 250), a));
+        SetFont(g_fSeurat);
+        for (int i = 0; i < 2; ++i) {
+            bool sel = (i == g_invPopupSel);
+            float w = MeasureText(20.0f, OPT[i]).x;
+            DrawText({ (px0 + px1) * 0.5f - w * 0.5f + 1, rowY[i] + 1 }, 20.0f,
+                     WithAlpha(sel ? RGBA(120, 90, 20, 255) : RGBA(24, 24, 24, 200), a), OPT[i]);
+            DrawText({ (px0 + px1) * 0.5f - w * 0.5f, rowY[i] }, 20.0f,
+                     WithAlpha(sel ? RGBA(40, 28, 4, 255) : RGBA(238, 238, 238, 255), a), OPT[i]);
+        }
+        ResetFont();
+    }
 }
 
 void Draw(double openSec) {
