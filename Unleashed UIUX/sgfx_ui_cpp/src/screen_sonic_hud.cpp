@@ -41,6 +41,7 @@ int g_gaugeTex = -1;   // ui_ps1_gauge1         (gold tire + rainbow boost bar)
 
 // ---- real game fonts (MSDF) -------------------------------------------------
 static int g_fRodin = 0;   // rodin_db: values / footer control hints
+static int g_fDF = 0;      // DFSoGei: the READY overlay wordmark
 
 struct UV { float u0, v0, u1, v1; };
 
@@ -145,6 +146,7 @@ void Init() {
     if (g_enTex    < 0) g_enTex    = gfx::loadTexture(std::string(ASSET_BASE) + "mat_playscreen_en_001.png");
     if (g_gaugeTex < 0) g_gaugeTex = gfx::loadTexture(std::string(ASSET_BASE) + "ui_ps1_gauge1.png");
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");
+    if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
 }
 
 void Reset() {
@@ -239,12 +241,45 @@ void DrawBoostGauge(float fill, float t) {
     }
 }
 
+// the stage-start READY overlay (live capture s09 @173-174s): an italic chrome
+// wordmark with motion-streak trails that sweeps THROUGH the screen — in fast,
+// a short hold at ref (552..792, 152..205), then out right.
+void DrawReadyOverlay(double el) {
+    if (el > 1.7) return;
+    // sweep position: slide in 0..0.25s, hold to 1.3s, slide out 1.3..1.7s
+    float x = 640.0f;
+    float a = 1.0f;
+    if (el < 0.25)      { float p = (float)(el / 0.25); p = 1.0f - (1.0f - p) * (1.0f - p); x = -300.0f + (640.0f + 300.0f) * p; a = p; }
+    else if (el > 1.3)  { float p = (float)((el - 1.3) / 0.4); p *= p; x = 640.0f + 940.0f * p; a = 1.0f - p * 0.6f; }
+    SetFont(g_fDF);
+    SetTextShear(0.24f);
+    SetTextStretchX(1.35f);
+    const char* R = "READY";
+    float w = MeasureText(52.0f, R).x * 1.35f;
+    const V2 rp = { x - w * 0.5f, 150.0f };
+    // motion streaks (additive bars trailing the wordmark through its band)
+    for (int i = 0; i < 3; ++i) {
+        float sy = 162.0f + i * 16.0f;
+        DrawRect({ rp.x - 220.0f + i * 40.0f, sy }, { rp.x + w * 0.5f, sy + 3.0f },
+                 WithAlpha(RGBA(180, 205, 235, 255), a * 0.28f), true);
+    }
+    for (int dy = -1; dy <= 1; ++dy)
+        for (int dx = -1; dx <= 1; ++dx)
+            if (dx || dy)
+                DrawText({ rp.x + dx * 2.5f, rp.y + dy * 2.5f }, 52.0f, WithAlpha(RGBA(16, 22, 38, 255), a), R);
+    DrawTextGradient(rp, 52.0f, WithAlpha(RGBA(238, 244, 252, 255), a), WithAlpha(RGBA(140, 165, 205, 255), a), R);
+    ResetTextStretchX();
+    ResetTextShear();
+    ResetFont();
+}
+
 void Draw(double openSec) {
     // NO background fill: the HUD is a transparent overlay over gameplay.
 
     const float clusterT = (float)ComputeMotion(openSec, 0.0, CLUSTER_FRAMES);
     const float gaugeT   = (float)ComputeMotion(openSec, GAUGE_OFFSET, GAUGE_FRAMES);
     const float footT    = (float)ComputeMotion(openSec, FOOT_OFFSET, FOOT_FRAMES);
+    DrawReadyOverlay(Now() - openSec >= 0 ? (Now() - openSec) : 0.0);
 
     // ---- top-left score / ring cluster ----
     // Sonic-head ring emblem (real art), slides in from the left.
