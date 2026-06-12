@@ -9,6 +9,7 @@
 #include "globe3d.h"
 #include <cmath>
 #include <algorithm>
+#include <vector>
 
 namespace ui {
 namespace {
@@ -18,6 +19,27 @@ constexpr float TILT = 0.40f;                  // ~23 deg axial tilt (radians)
 constexpr float CAM_D = 4.0f;                  // camera distance in radii
 
 int g_earthTex = -2;                            // -2 = not probed yet
+int g_glowTex = -2;                             // procedural radial halo (built once)
+
+int buildGlowTexture() {
+    // 128x128 radial intensity map: peak at the limb (d ~0.74), soft falloff
+    // outwards — drawn ADDITIVELY, so RGB carries the intensity.
+    const int N = 128;
+    std::vector<uint8_t> px((size_t)N * N * 4, 0);
+    for (int y = 0; y < N; ++y) {
+        for (int x = 0; x < N; ++x) {
+            float dx = (x + 0.5f) / N * 2.0f - 1.0f, dy = (y + 0.5f) / N * 2.0f - 1.0f;
+            float d = std::sqrt(dx * dx + dy * dy);
+            float rim = std::exp(-((d - 0.74f) * (d - 0.74f)) / (0.018f));     // limb band
+            float halo = (d > 0.74f) ? std::exp(-(d - 0.74f) * 7.5f) : rim;    // outer fade
+            float v = std::max(rim, halo) * ((d > 1.0f) ? std::max(0.0f, 1.3f - d) * 2.0f : 1.0f);
+            v = std::clamp(v, 0.0f, 1.0f);
+            uint8_t* p = &px[((size_t)y * N + x) * 4];
+            p[0] = (uint8_t)(120 * v); p[1] = (uint8_t)(180 * v); p[2] = (uint8_t)(255 * v); p[3] = 255;
+        }
+    }
+    return gfx::loadTextureRGBA(px.data(), N, N);
+}
 
 struct V3 { float x, y, z; };
 
@@ -67,12 +89,17 @@ void DrawGlobe3D(float cx, float cy, float r, float yawDeg,
                  float sunX, float sunY, float sunZ,
                  const GlobeMarker* markers, int markerCount, float alpha) {
     if (g_earthTex == -2) g_earthTex = gfx::loadTexture("assets/globe/earth.png");
+    if (g_glowTex == -2) g_glowTex = buildGlowTexture();
     const float yaw = yawDeg * 0.0174533f;
     float sl = std::sqrt(sunX * sunX + sunY * sunY + sunZ * sunZ);
     const float sx = sunX / sl, sy = sunY / sl, sz = sunZ / sl;
 
-    // (atmosphere rim glow needs a radial texture to read right — a flat rect
-    //  shows its corners; deferred to the texture-slot polish pass)
+    // atmosphere: an additive radial halo hugging the limb (procedural texture)
+    if (g_glowTex >= 0) {
+        const float gr = r * 1.32f;
+        DrawImage(g_glowTex, { cx - gr, cy - gr }, { cx + gr, cy + gr },
+                  { 0, 0 }, { 1, 1 }, WithAlpha(RGBA(255, 255, 255, 255), alpha * 0.85f), true);
+    }
 
     (void)0;   // patch colours are shaded per-face below
     for (int j = 0; j < SEG_LAT; ++j) {
