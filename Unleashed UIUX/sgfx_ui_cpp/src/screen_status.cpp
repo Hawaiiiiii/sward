@@ -1,279 +1,216 @@
 // =============================================================================
-// screen_status.cpp — the Status / abilities screen, re-authored as clean
-// hand-written C++ in the UnleashedRecomp ui/options_menu idiom (NOT a CSD node
-// dump — the old transcription smeared unclipped 9-slice stretch-arms across the
-// screen). Layout lives in named 1280x720 constants; the stat panel is a bounded
-// gradient window; gauges are drawn procedurally. The distinctive game art that
-// makes this read as retail — the Werehog / Sonic hero portrait and the matching
-// "SONIC THE WEREHOG" / "...HEDGEHOG" wordmark — is the REAL extracted atlas
-// (mat_comon_005, mat_status_common_001), placed at deliberate sane rects.
-//
-// Fully interactive + stateful like options_menu:
-//   * Q/E (LB/RB) switch the DAY (Sonic) / NIGHT (Werehog) form -> portrait, logo,
-//     stat set and EXP pool all change,
-//   * Up/Down move the cursor over the ability rows (eased highlight),
-//   * (A) spends EXP to level the selected ability up (gauge fills live),
-//   * a live LV / EXP readout.
+// screen_status.cpp — the STATUS screen, re-authored 1:1 from LIVE capture
+// (s09 67-134s; spec stills status_page1/2/3; stack/header crops measured):
+//   * a form-colored gradient RAIL from the left edge (day = blue, night =
+//     purple) ending in a swoosh tail, with the italic chrome STATUS wordmark
+//     at the shared x263 convention;
+//   * the LIVE 3D scene stays behind (character render right, Chip floating
+//     by the stack — slots here);
+//   * the stat stack (left): a magenta EXP row (plate + gem slot + gold-fill
+//     bar + chrome xN count), then per-form rows (Sonic: SPEED / RING ENERGY;
+//     Werehog: COMBAT / STRENGTH / LIFE / UNLEASH / SHIELD) — each a dark
+//     chamfered plate (white top rim, outlined italic label, magenta chrome
+//     MAX) with a slanted gold-fill bar tail; pitch 64; the SELECTED row
+//     shifts left and gains a white rim;
+//   * the form wordmark (SONIC THE HEDGEHOG / WEREHOG) top-right (art slot);
+//   * footer: [Up/Down] Select  (A) Level Up  (Q/E) Switch Form  (B) Back.
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
-
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <algorithm>
 
 using namespace ui;
-
 namespace {
 
-// ---- forms ------------------------------------------------------------------
-enum Form { NIGHT = 0, DAY = 1, FORM_COUNT };   // NIGHT (Werehog) is the iconic status look
-constexpr int STAT_COUNT = 4;
-constexpr int MAX_LV = 10;
-
-struct FormData {
-    const char* name;
-    const char* stats[STAT_COUNT];
-};
-const FormData FORMS[FORM_COUNT] = {
-    { "WEREHOG", { "LIFE", "STRENGTH", "UNLEASH", "SHIELD" } },
-    { "SONIC",   { "LIFE", "RING ENERGY", "SPEED", "BOOST" } },
-};
-
-// ---- real-art atlases -------------------------------------------------------
-// mat_comon_005 is 1024x512 (Werehog portrait left, day-Sonic right);
-// mat_status_common_001 is 256x256 (HEDGEHOG wordmark top, WEREHOG wordmark below).
-const char* const ASSET_BASE = "assets/status/";
-int g_portraitTex = -1, g_logoTex = -1;
-
-// ---- fonts --------------------------------------------------------------
-static int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
+int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
+int g_glyphTex = -1;
 
 struct UV { float u0, v0, u1, v1; };
-// tight per-element opaque boxes measured from the atlas alpha channel
-// (the atlas also holds a white chevron at u>0.71 — excluded)
-const UV PORTRAIT_UV[FORM_COUNT] = {
-    /* NIGHT werehog */ { 0.002f, 0.012f, 0.400f, 0.611f },
-    /* DAY   sonic   */ { 0.410f, 0.004f, 0.696f, 0.654f },
+constexpr float GTW = 512.0f, GTH = 512.0f;
+const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
+const UV GLYPH_B = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
+
+// ---- palette (sampled from the capture) --------------------------------------
+const uint32_t C_RAIL_D_T = RGBA(104, 142, 206, 235);   // day rail (blue)
+const uint32_t C_RAIL_D_B = RGBA(44, 78, 148, 235);
+const uint32_t C_RAIL_N_T = RGBA(152, 132, 186, 235);   // night rail (purple)
+const uint32_t C_RAIL_N_B = RGBA(86, 56, 126, 235);
+const uint32_t C_RAIL_EDGE = RGBA(228, 160, 220, 255);  // thin pink edge line
+const uint32_t C_CHR_T   = RGBA(244, 246, 250, 255);    // chrome wordmark/labels
+const uint32_t C_CHR_B   = RGBA(168, 176, 190, 255);
+const uint32_t C_CHR_OUT = RGBA(22, 24, 36, 255);
+const uint32_t C_PLATE_T = RGBA(74, 58, 110, 225);      // stat plate (dark violet)
+const uint32_t C_PLATE_B = RGBA(40, 30, 64, 225);
+const uint32_t C_PLATE_RIM = RGBA(225, 220, 240, 255);  // white top rim
+const uint32_t C_EXP_T   = RGBA(232, 60, 150, 235);     // EXP plate magenta
+const uint32_t C_EXP_B   = RGBA(160, 24, 96, 235);
+const uint32_t C_TROUGH  = RGBA(26, 20, 40, 220);       // bar trough
+const uint32_t C_GOLD_T  = RGBA(252, 214, 74, 255);     // bar gold fill
+const uint32_t C_GOLD_B  = RGBA(222, 158, 22, 255);
+const uint32_t C_MAX_T   = RGBA(255, 120, 190, 255);    // "MAX" magenta chrome
+const uint32_t C_MAX_B   = RGBA(208, 40, 120, 255);
+const uint32_t C_WHITE   = RGBA(255, 255, 255, 255);
+const uint32_t C_SKY_T = RGBA(86, 140, 210, 255), C_SKY_B = RGBA(170, 205, 235, 255);
+
+// ---- measured layout (ref px) -------------------------------------------------
+constexpr float RAIL_Y0 = 50, RAIL_Y1 = 107, RAIL_X1 = 607;
+constexpr float WM_X = 263, WM_TOP = 60;
+constexpr float EXP_Y = 168;                 // EXP row top
+constexpr float ROW_Y0 = 233;                // first stat row top
+constexpr float ROW_PITCH = 64, PLATE_H = 42;
+constexpr float PLATE_X = 180, PLATE_W = 188;
+constexpr float BAR_END = 560, SLANT = 12;
+
+struct Row { const char* label; float fill; };   // fill 0..1 (1 = MAX)
+const Row SONIC_ROWS[] = {
+    { "SPEED", 1.0f }, { "RING ENERGY", 1.0f },
 };
-const UV LOGO_UV[FORM_COUNT] = {
-    /* NIGHT werehog */ { 0.0f, 0.430f, 0.859f, 0.800f },
-    /* DAY   hedgehog*/ { 0.0f, 0.000f, 0.859f, 0.367f },
+const Row WEREHOG_ROWS[] = {
+    { "COMBAT", 1.0f }, { "STRENGTH", 1.0f }, { "LIFE", 1.0f },
+    { "UNLEASH", 1.0f }, { "SHIELD", 1.0f },
 };
-// pixel aspect (w/h) of each sub-rect, so the portrait isn't stretched.
-float PortraitAspect(Form f) {
-    const UV& u = PORTRAIT_UV[f];
-    return ((u.u1 - u.u0) * 1024.0f) / ((u.v1 - u.v0) * 512.0f);
-}
-float LogoAspect(Form f) {
-    const UV& u = LOGO_UV[f];
-    return ((u.u1 - u.u0) * 256.0f) / ((u.v1 - u.v0) * 256.0f);
-}
 
-// ---- layout (reference px) --------------------------------------------------
-constexpr float TITLE_X = 150.0f, TITLE_Y = 50.0f, RULE_Y = 118.0f;
-constexpr float PANEL_X = 150.0f, PANEL_Y = 175.0f, PANEL_W = 560.0f, PANEL_H = 400.0f;
-constexpr float HEADER_H = 52.0f;
-constexpr float ROW_TOP  = PANEL_Y + HEADER_H + 78.0f;   // first ability row (below LV/EXP line)
-constexpr float ROW_H    = 64.0f;
-
-// ---- entrance tuning (frames) -----------------------------------------------
-constexpr double PANEL_FRAMES = 16.0, PORTRAIT_OFFSET = 3.0, PORTRAIT_FRAMES = 16.0;
-constexpr double LOGO_OFFSET = 6.0, LOGO_FRAMES = 14.0, FOOT_OFFSET = 10.0, FOOT_FRAMES = 12.0;
-constexpr double SELECT_MOVE_FRAMES = 8.0;
-
-// ---- palette ----------------------------------------------------------------
-const uint32_t COL_BG_TOP    = RGBA(14, 18, 30, 255);
-const uint32_t COL_BG_BOT    = RGBA(5, 7, 13, 255);
-const uint32_t COL_PANEL_TOP = RGBA(18, 30, 52, 232);
-const uint32_t COL_PANEL_BOT = RGBA(8, 14, 26, 232);
-const uint32_t COL_HEAD_TOP  = RGBA(28, 52, 92, 244);
-const uint32_t COL_HEAD_BOT  = RGBA(16, 30, 56, 244);
-const uint32_t COL_SEL_TOP   = RGBA(64, 150, 235, 220);
-const uint32_t COL_SEL_BOT   = RGBA(28, 92, 180, 220);
-const uint32_t COL_TITLE     = RGBA(255, 209, 74, 255);
-const uint32_t COL_TEXT      = RGBA(214, 226, 240, 255);
-const uint32_t COL_TEXT_SEL  = RGBA(255, 255, 255, 255);
-const uint32_t COL_RULE      = RGBA(120, 170, 230, 90);
-const uint32_t COL_SEG_TOP   = RGBA(120, 200, 255, 255);   // filled gauge segment
-const uint32_t COL_SEG_BOT   = RGBA(40, 120, 210, 255);
-const uint32_t COL_SEG_EMPTY = RGBA(36, 46, 64, 220);
-const uint32_t COL_EXP       = RGBA(255, 209, 74, 255);
-const uint32_t COL_FOOTER    = RGBA(190, 205, 225, 220);
-const uint32_t COL_TAB_ON    = RGBA(255, 209, 74, 255);
-const uint32_t COL_TAB_OFF   = RGBA(120, 134, 158, 255);
-
-// ---- interactive state ------------------------------------------------------
-int    g_form = NIGHT;
-int    g_sel = 0, g_prevSel = 0;
-double g_moveStart = -100.0;
-int    g_lv[FORM_COUNT][STAT_COUNT]  = { { 7, 6, 5, 4 }, { 6, 5, 7, 8 } };
-int    g_exp[FORM_COUNT]             = { 1500, 1200 };
-
-void Commafy(int v, char* out, int n) {
-    char raw[16]; std::snprintf(raw, sizeof(raw), "%d", v);
-    int len = (int)std::strlen(raw), o = 0;
-    for (int i = 0; i < len && o < n - 1; ++i) {
-        if (i > 0 && (len - i) % 3 == 0 && o < n - 1) out[o++] = ',';
-        out[o++] = raw[i];
-    }
-    out[o] = '\0';
-}
-int LevelCost(int lv) { return lv * 100; }            // cost to go from lv -> lv+1
-int CharacterLevel(int f) {                            // overall LV = sum of ability levels
-    int s = 0; for (int i = 0; i < STAT_COUNT; ++i) s += g_lv[f][i]; return s;
-}
+bool g_night = false;
+int  g_sel = 0;
+int  g_expCount = 99;
 
 void Init() {
-    if (g_portraitTex < 0) g_portraitTex = gfx::loadTexture(std::string(ASSET_BASE) + "mat_comon_005.png");
-    if (g_logoTex < 0)     g_logoTex     = gfx::loadTexture(std::string(ASSET_BASE) + "mat_status_common_001.png");
+    if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");
 }
-
-void Reset() { g_form = NIGHT; g_sel = 0; g_prevSel = 0; g_moveStart = -100.0;
-               g_lv[0][0]=7; g_lv[0][1]=6; g_lv[0][2]=5; g_lv[0][3]=4;
-               g_lv[1][0]=6; g_lv[1][1]=5; g_lv[1][2]=7; g_lv[1][3]=8;
-               g_exp[0]=1500; g_exp[1]=1200; }
-
+void Reset() { g_night = false; g_sel = 0; }
 void Input(const ScreenInput& in) {
-    if (in.up || in.down) {
-        g_prevSel = g_sel;
-        if (in.up)   g_sel = (g_sel + STAT_COUNT - 1) % STAT_COUNT;
-        else         g_sel = (g_sel + 1) % STAT_COUNT;
-        g_moveStart = Now();
-    }
-    if (in.tabLeft || in.tabRight) { g_form ^= 1; }       // two forms: either tab toggles
-    if (in.accept) {                                       // spend EXP to level up
-        int lv = g_lv[g_form][g_sel];
-        int cost = LevelCost(lv);
-        if (lv < MAX_LV && g_exp[g_form] >= cost) { g_lv[g_form][g_sel] = lv + 1; g_exp[g_form] -= cost; }
-    }
-    // cancel: would back out in-game; no-op here.
+    int n = g_night ? 5 : 2;
+    if (in.up)   g_sel = std::max(0, g_sel - 1);
+    if (in.down) g_sel = std::min(n - 1, g_sel + 1);
+    if (in.tabLeft || in.tabRight) { g_night = !g_night; g_sel = 0; }
+    // (A) Level Up: stats are showcased at MAX, matching the captured save
 }
 
-// a bounded window from the REAL game frame (9-slice) with a header caption strip
-void DrawWindow(float x, float y, float w, float h, float t, const char* caption) {
-    DrawGameWindow({ x, y }, { x + w, y + h }, HEADER_H, t);
-    DrawRect({ x + 12, y + HEADER_H - 2 }, { x + w - 12, y + HEADER_H }, WithAlpha(COL_RULE, t));
-    if (caption) {
-        SetFont(g_fDF);
-        DrawTextAligned({ x + 18, y }, { x + w - 14, y + HEADER_H }, 26.0f,
-                        WithAlpha(COL_TITLE, t), caption, Align::Left, true, true);
-    }
+// italic chrome text (shared recipe)
+void Chrome(V2 pos, float px, const char* s, float a, uint32_t tT, uint32_t tB, float stretch = 1.3f) {
+    SetFont(g_fDF);
+    SetTextShear(0.24f);
+    SetTextStretchX(stretch);
+    for (int dy = -1; dy <= 1; ++dy)
+        for (int dx = -1; dx <= 1; ++dx)
+            if (dx || dy)
+                DrawText({ pos.x + dx * 2.0f, pos.y + dy * 2.0f }, px, WithAlpha(C_CHR_OUT, a), s);
+    DrawTextGradient(pos, px, WithAlpha(tT, a), WithAlpha(tB, a), s);
+    ResetTextStretchX();
+    ResetTextShear();
+    ResetFont();
 }
 
-// a 10-segment ability gauge; `level` segments are filled
-void DrawGauge(float x, float y, float w, float h, int level, float t) {
-    const float gap = 3.0f;
-    const float segW = (w - gap * (MAX_LV - 1)) / MAX_LV;
-    for (int i = 0; i < MAX_LV; ++i) {
-        float sx = x + i * (segW + gap);
-        if (i < level)
-            DrawVGradient({ sx, y }, { sx + segW, y + h }, WithAlpha(COL_SEG_TOP, t), WithAlpha(COL_SEG_BOT, t));
-        else
-            DrawRect({ sx, y }, { sx + segW, y + h }, WithAlpha(COL_SEG_EMPTY, t));
+// a slanted stat plate + bar tail. sel shifts it left with a white rim.
+void StatRow(float y, const char* label, float fill, bool sel, float a, bool exp) {
+    const float xoff = sel ? -12.0f : 0.0f;
+    const float x0 = PLATE_X + xoff;
+    const uint32_t pT = exp ? C_EXP_T : C_PLATE_T, pB = exp ? C_EXP_B : C_PLATE_B;
+    // label plate (parallelogram)
+    const V2 pc[4] = { { x0 + SLANT, y }, { x0 + PLATE_W + SLANT, y }, { x0 + PLATE_W, y + PLATE_H }, { x0, y + PLATE_H } };
+    const uint32_t pcol[4] = { WithAlpha(pT, a), WithAlpha(pT, a), WithAlpha(pB, a), WithAlpha(pB, a) };
+    DrawQuadGradient(pc, pcol);
+    DrawRect({ x0 + SLANT, y }, { x0 + PLATE_W + SLANT, y + 2 }, WithAlpha(C_PLATE_RIM, a));   // top rim
+    if (sel) {   // white selection rim around the plate
+        DrawRect({ x0, y + PLATE_H - 2 }, { x0 + PLATE_W, y + PLATE_H }, WithAlpha(C_WHITE, a));
+        DrawRect({ x0 + 1, y }, { x0 + 3, y + PLATE_H }, WithAlpha(C_WHITE, a * 0.8f));
     }
+    // bar tail: trough + gold fill, slanted italic end
+    const float bx0 = x0 + PLATE_W + SLANT + 4, bx1 = BAR_END + xoff;
+    const V2 tc[4] = { { bx0, y + 8 }, { bx1 + SLANT, y + 8 }, { bx1, y + PLATE_H - 6 }, { bx0 - 6, y + PLATE_H - 6 } };
+    const uint32_t tcol[4] = { WithAlpha(C_TROUGH, a), WithAlpha(C_TROUGH, a), WithAlpha(C_TROUGH, a), WithAlpha(C_TROUGH, a) };
+    DrawQuadGradient(tc, tcol);
+    if (fill > 0.0f) {
+        const float fx1 = bx0 + (bx1 - bx0) * fill;
+        const V2 fc[4] = { { bx0, y + 10 }, { fx1 + SLANT * fill, y + 10 }, { fx1, y + PLATE_H - 8 }, { bx0 - 4, y + PLATE_H - 8 } };
+        const uint32_t fcol[4] = { WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_B, a), WithAlpha(C_GOLD_B, a) };
+        DrawQuadGradient(fc, fcol);
+    }
+    // label (white outlined italic) + MAX (magenta chrome) when full
+    SetFont(g_fSeurat);
+    SetTextShear(0.18f);
+    DrawText({ x0 + 22 + 1.5f, y + 9 + 1.5f }, 22.0f, WithAlpha(RGBA(16, 12, 24, 255), a), label);
+    DrawText({ x0 + 22, y + 9 }, 22.0f, WithAlpha(C_WHITE, a), label);
+    ResetTextShear();
+    ResetFont();
+    if (!exp && fill >= 1.0f)
+        Chrome({ x0 + PLATE_W - 32, y + 6 }, 26.0f, "MAX", a, C_MAX_T, C_MAX_B, 1.15f);
 }
 
 void Draw(double openSec) {
-    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, COL_BG_TOP, COL_BG_BOT);
+    const float a = (float)ComputeMotion(openSec, 0.0, 10.0);
+    const float rowT = (float)ComputeMotion(openSec, 4.0, 10.0);
 
-    const Form f = (Form)g_form;
-    const float titleT = (float)ComputeMotion(openSec, 0.0, 14.0);
-    const float panelT = (float)ComputeMotion(openSec, 0.0, PANEL_FRAMES);
-    const float portT  = (float)ComputeMotion(openSec, PORTRAIT_OFFSET, PORTRAIT_FRAMES);
-    const float logoT  = (float)ComputeMotion(openSec, LOGO_OFFSET, LOGO_FRAMES);
-    const float footT  = (float)ComputeMotion(openSec, FOOT_OFFSET, FOOT_FRAMES);
+    // live 3D scene slot (sky placeholder + ground band)
+    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SKY_T, C_SKY_B);
+    DrawRect({ 0, 600 }, { REF_W, REF_H }, RGBA(208, 212, 208, 255));
+    SetFont(g_fSeurat);
+    DrawTextAligned({ 860, 240 }, { 1200, 560 }, 14.0f, WithAlpha(RGBA(120, 140, 165, 255), a),
+                    "( character render: live 3D )", Align::Center, true, false);
+    ResetFont();
 
-    // ---- title + form tabs ----
-    SetFont(g_fDF);
-    DrawTextBevel({ TITLE_X, TITLE_Y - (1.0f - titleT) * 16.0f }, 46.0f,
-                  WithAlpha(COL_TITLE, titleT), "STATUS");
-    DrawRect({ TITLE_X, RULE_Y }, { 1130.0f, RULE_Y + 2.0f }, WithAlpha(COL_RULE, titleT));
-    // tab indicator (top-right): NIGHT | DAY
-    DrawTextAligned({ 740, TITLE_Y + 8 }, { 920, TITLE_Y + 44 }, 24.0f,
-                    WithAlpha(f == NIGHT ? COL_TAB_ON : COL_TAB_OFF, titleT), "NIGHT", Align::Right, true, true);
-    DrawTextAligned({ 928, TITLE_Y + 8 }, { 948, TITLE_Y + 44 }, 24.0f,
-                    WithAlpha(COL_TAB_OFF, titleT), "/", Align::Center, true, true);
-    DrawTextAligned({ 956, TITLE_Y + 8 }, { 1130, TITLE_Y + 44 }, 24.0f,
-                    WithAlpha(f == DAY ? COL_TAB_ON : COL_TAB_OFF, titleT), "DAY", Align::Left, true, true);
+    // ---- form-colored header rail + swoosh + chrome STATUS ----
+    const uint32_t railT = g_night ? C_RAIL_N_T : C_RAIL_D_T;
+    const uint32_t railB = g_night ? C_RAIL_N_B : C_RAIL_D_B;
+    DrawVGradient({ 0, RAIL_Y0 }, { RAIL_X1 - 60, RAIL_Y1 }, WithAlpha(railT, a), WithAlpha(railB, a));
+    {   // swoosh tail: a tapering quad + upward curl hint
+        const V2 sw[4] = { { RAIL_X1 - 60, RAIL_Y0 }, { RAIL_X1, RAIL_Y0 + 14 }, { RAIL_X1 - 18, RAIL_Y1 - 8 }, { RAIL_X1 - 60, RAIL_Y1 } };
+        const uint32_t sc[4] = { WithAlpha(railT, a), WithAlpha(C_RAIL_EDGE, a * 0.8f), WithAlpha(railB, a), WithAlpha(railB, a) };
+        DrawQuadGradient(sw, sc);
+        const V2 curl[4] = { { RAIL_X1 - 8, RAIL_Y0 + 4 }, { RAIL_X1 + 16, RAIL_Y0 - 6 }, { RAIL_X1 + 10, RAIL_Y0 + 8 }, { RAIL_X1 - 12, RAIL_Y0 + 16 } };
+        const uint32_t cc[4] = { WithAlpha(C_RAIL_EDGE, a), WithAlpha(C_RAIL_EDGE, a * 0.4f), WithAlpha(C_RAIL_EDGE, a * 0.4f), WithAlpha(C_RAIL_EDGE, a) };
+        DrawQuadGradient(curl, cc);
+    }
+    DrawRect({ 0, RAIL_Y0 }, { RAIL_X1 - 60, RAIL_Y0 + 1.5f }, WithAlpha(C_RAIL_EDGE, a * 0.7f));
+    Chrome({ WM_X, WM_TOP }, 46.0f, "STATUS", a, C_CHR_T, C_CHR_B, 1.5f);
 
-    // ---- ability panel (left) ----
-    const float px = PANEL_X, py = PANEL_Y + (1.0f - panelT) * 24.0f;
-    DrawWindow(px, py, PANEL_W, PANEL_H, panelT, "ABILITIES");
+    // ---- form wordmark slot (top-right; SEGA art drops in) ----
+    DrawRect({ 950, 36 }, { 1240, 120 }, WithAlpha(RGBA(30, 24, 48, 120), a));
+    SetFont(g_fSeurat);
+    DrawTextAligned({ 950, 36 }, { 1240, 120 }, 14.0f, WithAlpha(RGBA(190, 180, 210, 255), a),
+                    g_night ? "SONIC THE WEREHOG (art slot)" : "SONIC THE HEDGEHOG (art slot)",
+                    Align::Center, true, false);
+    ResetFont();
 
-    // LV / EXP readout line
-    {
-        char expbuf[16], line[48];
-        Commafy(g_exp[f], expbuf, sizeof(expbuf));
-        std::snprintf(line, sizeof(line), "LV  %d", CharacterLevel(f));
-        SetFont(g_fRodin);
-        DrawText({ px + 22, py + HEADER_H + 16 }, 26.0f, WithAlpha(COL_TEXT_SEL, panelT), line);
-        std::snprintf(line, sizeof(line), "EXP  %s", expbuf);
-        DrawTextAligned({ px + 200, py + HEADER_H + 12 }, { px + PANEL_W - 20, py + HEADER_H + 48 }, 26.0f,
-                        WithAlpha(COL_EXP, panelT), line, Align::Right, true, true);
+    // ---- EXP row: magenta plate + gem slot + bar + chrome count ----
+    if (rowT > 0.0f) {
+        StatRow(EXP_Y, "EXP.", 0.82f, false, rowT, true);
+        // gem slot riding the plate's right end
+        DrawRect({ PLATE_X + PLATE_W - 8, EXP_Y - 10 }, { PLATE_X + PLATE_W + 18, EXP_Y + 16 }, WithAlpha(RGBA(255, 226, 120, 230), rowT));
+        char buf[8]; snprintf(buf, sizeof buf, "x%d", g_expCount);
+        Chrome({ BAR_END + 16, EXP_Y + 4 }, 30.0f, buf, rowT, C_CHR_T, C_CHR_B, 1.2f);
     }
 
-    const float rowTop = py + HEADER_H + 78.0f;
-    const float rowL = px + 16.0f, rowR = px + PANEL_W - 16.0f;
-
-    // selection highlight (eased)
-    if (panelT > 0.5f) {
-        float moveT = (float)ComputeMotion(g_moveStart, 0.0, SELECT_MOVE_FRAMES);
-        float slot = Lerp((float)g_prevSel, (float)g_sel, moveT);
-        float hy = rowTop + slot * ROW_H;
-        DrawVGradient({ rowL, hy + 2 }, { rowR, hy + ROW_H - 6 },
-                      WithAlpha(COL_SEL_TOP, panelT), WithAlpha(COL_SEL_BOT, panelT));
-    }
-
-    // ability rows: label + 10-seg gauge + Lv N
-    for (int i = 0; i < STAT_COUNT; ++i) {
-        float top = rowTop + i * ROW_H;
-        bool selected = (i == g_sel);
-        SetFont(g_fSeurat);
-        DrawText({ rowL + 16, top + 6 }, 24.0f,
-                 WithAlpha(selected ? COL_TEXT_SEL : COL_TEXT, panelT), FORMS[f].stats[i]);
-        DrawGauge(rowL + 200, top + 14, 250.0f, 22.0f, g_lv[f][i], panelT);
-        char lvb[12]; std::snprintf(lvb, sizeof(lvb), "Lv %d", g_lv[f][i]);
-        SetFont(g_fRodin);
-        DrawTextAligned({ rowR - 70, top + 6 }, { rowR - 6, top + 34 }, 22.0f,
-                        WithAlpha(selected ? COL_TEXT_SEL : COL_TEXT, panelT), lvb, Align::Right, true, true);
-    }
-
-    // ---- hero portrait (right, real art) — fit into a fixed box, bottom-anchored ----
-    if (g_portraitTex >= 0 && portT > 0.0f) {
-        const UV& u = PORTRAIT_UV[f];
-        const float boxX = 728.0f, boxY = 232.0f, boxW = 452.0f, boxH = 392.0f;
-        float artW = (u.u1 - u.u0) * 1024.0f, artH = (u.v1 - u.v0) * 512.0f;
-        float scale = std::min(boxW / artW, boxH / artH);
-        float pw = artW * scale, ph = artH * scale;
-        float prx = boxX + (boxW - pw) * 0.5f;
-        float pry = boxY + (boxH - ph) + (1.0f - portT) * 18.0f;   // bottom-anchored + slide
-        DrawImage(g_portraitTex, { prx, pry }, { prx + pw, pry + ph },
-                  { u.u0, u.v0 }, { u.u1, u.v1 }, WithAlpha(RGBA(255,255,255,255), portT));
-    }
-
-    // ---- form wordmark (real art, above the portrait) ----
-    if (g_logoTex >= 0 && logoT > 0.0f) {
-        const UV& u = LOGO_UV[f];
-        float lw = 300.0f, lh = lw / LogoAspect(f);
-        float lxp = 770.0f, lyp = 150.0f - (1.0f - logoT) * 12.0f;
-        DrawImage(g_logoTex, { lxp, lyp }, { lxp + lw, lyp + lh },
-                  { u.u0, u.v0 }, { u.u1, u.v1 }, WithAlpha(RGBA(255,255,255,255), logoT));
+    // ---- per-form stat rows (staggered entrance) ----
+    const Row* rows = g_night ? WEREHOG_ROWS : SONIC_ROWS;
+    const int n = g_night ? 5 : 2;
+    for (int i = 0; i < n; ++i) {
+        const float rt = (float)ComputeMotion(openSec, 6.0 + i * 3.0, 8.0);
+        if (rt > 0.0f) StatRow(ROW_Y0 + i * ROW_PITCH, rows[i].label, rows[i].fill, i == g_sel, rt, false);
     }
 
     // ---- footer ----
-    SetFont(g_fRodin);
-    DrawTextAligned({ TITLE_X, 612 }, { 1130, 656 }, 22.0f, WithAlpha(COL_FOOTER, footT),
-                    "[Up/Down] Select   (A) Level Up   (Q/E) Switch Form   (B) Back", Align::Left, true, true);
-    ResetFont();
+    {
+        SetFont(g_fRodin);
+        float hcy = 688;
+        auto glyph = [&](const UV& g, float x){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=28.0f, gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,a)); return x+gw+8; };
+        float hx = 150;
+        DrawText({ hx, hcy - 12 }, 20.0f, WithAlpha(C_WHITE, a), "[Up/Down] Select"); hx += 220;
+        hx = glyph(GLYPH_A, hx); DrawText({ hx, hcy - 12 }, 20.0f, WithAlpha(C_WHITE, a), "Level Up"); hx += 130;
+        DrawText({ hx, hcy - 12 }, 20.0f, WithAlpha(C_WHITE, a), "(Q/E) Switch Form"); hx += 230;
+        hx = glyph(GLYPH_B, hx); DrawText({ hx, hcy - 12 }, 20.0f, WithAlpha(C_WHITE, a), "Back");
+        ResetFont();
+    }
 }
 
 } // namespace
 
-// ---- exposed to the registry ------------------------------------------------
 void StatusInit() { Init(); }
 void StatusDraw(double openSeconds) { Draw(openSeconds); }
 void StatusInput(const ScreenInput& in) { Input(in); }
