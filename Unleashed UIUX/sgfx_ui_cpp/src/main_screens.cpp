@@ -14,8 +14,14 @@
 // (cancel), Q/E = LB/RB (tab), Space replays the intro, 1-9 switch screens, Esc quits.
 // =============================================================================
 #define SDL_MAIN_HANDLED
+#define NOMINMAX                 // keep std::max/min usable; no windows.h min/max macros
+#define WIN32_LEAN_AND_MEAN
 #include <SDL.h>
 #include <SDL_syswm.h>
+#include <windows.h>
+#include <psapi.h>          // GetProcessMemoryInfo (soak-mode working-set sampling)
+#pragma comment(lib, "psapi.lib")
+#include <algorithm>        // std::max
 
 #include "gfx_d3d12.h"
 #include "sgfxui.h"
@@ -95,16 +101,22 @@ static int MakeNoiseTexture() {
 static constexpr int NOISE_CELLS = 4;   // 4x4 grid -> 16 static frames
 
 int main(int argc, char** argv) {
-    bool shot = false, csdMode = false;
+    bool shot = false, csdMode = false, soak = false;
     std::string id = "boot_logos", out;     // bare launch = the game's boot flow
-    double shotSec = 1.0;
+    double shotSec = 1.0, soakSeconds = 20.0;
 
     // --csd <id> [<sec> <out.png>]  -> render the REAL game CSD layout/animation (true 1:1).
+    // --soak [seconds]              -> headless integration soak: cycle every screen
+    //                                  through OpenScreen/Reset/Draw + transitions under
+    //                                  synthetic input, reporting frames + memory growth.
     if (argc >= 3 && std::strcmp(argv[1], "--csd") == 0) {
         csdMode = true; id = argv[2];
         if (argc >= 5) { shot = true; shotSec = atof(argv[3]); out = argv[4]; }
     } else if (argc >= 5 && std::strcmp(argv[1], "--shot") == 0) {
         shot = true; id = argv[2]; shotSec = atof(argv[3]); out = argv[4];
+    } else if (argc >= 2 && std::strcmp(argv[1], "--soak") == 0) {
+        soak = true; shot = true;   // headless + hidden window, no audio
+        if (argc >= 3) soakSeconds = atof(argv[2]);
     } else if (argc >= 2) {
         id = argv[1];
     }
@@ -187,6 +199,70 @@ int main(int argc, char** argv) {
         gfx::endFrame();
         return n;
     };
+
+    // ---- integration soak: cycle every screen through the full Init/Reset/Draw/
+    //      switch/transition path under synthetic input, watching for crashes and
+    //      memory growth (the production-readiness gate component verification
+    //      can't reach) ----
+    if (soak) {
+        int nScr = 0; const ScreenDef* screens = AllScreens(nScr);
+        auto procMemMB = [] {
+            PROCESS_MEMORY_COUNTERS pmc{}; pmc.cb = sizeof(pmc);
+            GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
+            return (double)pmc.WorkingSetSize / (1024.0 * 1024.0);
+        };
+        const double startMem = procMemMB();
+        double peakMem = startMem, synth = 0.0;
+        uint64_t frames = 0; int opens = 0, navFires = 0;
+        uint32_t rng = 0x9e3779b9u;
+        auto rnd = [&] { rng = rng * 1664525u + 1013904223u; return rng; };
+        const double t0 = (double)SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
+        int si = 0; scr = &screens[si]; OpenScreen(scr);
+        double memAtHalf = 0.0;
+        for (;;) {
+            double wall = (double)SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency() - t0;
+            if (wall >= soakSeconds) break;
+            if (memAtHalf == 0.0 && wall >= soakSeconds * 0.5) memAtHalf = procMemMB();
+            // draw the active screen for a burst of frames with random navigation,
+            // firing the leading frames as an in-progress transition (exercises the
+            // chevron-wipe path too)
+            for (int f = 0; f < 24; ++f) {
+                synth += 1.0 / 60.0;
+                ui::BeginFrame(synth);
+                ScreenInput in{};
+                switch (rnd() % 10) {
+                    case 0: in.up = true; break;      case 1: in.down = true; break;
+                    case 2: in.left = true; break;    case 3: in.right = true; break;
+                    case 4: in.accept = true; break;  case 5: in.cancel = true; break;
+                    case 6: in.tabLeft = true; break; case 7: in.tabRight = true; break;
+                    default: break;   // idle frames (exercise loops/animations)
+                }
+                if (scr->Input) scr->Input(in);
+                if (scr->Nav) { if (scr->Nav()) navFires++; }   // drain nav requests
+                float fade = (f < 6) ? (1.0f - f / 6.0f) : 0.0f;
+                drawFrame(synth, fade, synth);
+                ++frames;
+            }
+            // advance to the next screen — exercises OpenScreen (texture load on
+            // first visit, Reset, BGM-select guard) and the bindless heap growth
+            si = (si + 1) % nScr; scr = &screens[si]; OpenScreen(scr); ++opens;
+            double m = procMemMB(); if (m > peakMem) peakMem = m;
+        }
+        const double endMem = procMemMB();
+        // steady-state growth = change over the SECOND half only (the first half is
+        // one-time texture warm-up as each screen's atlas loads into the heap)
+        const double warmup = std::max(memAtHalf, startMem) - startMem;
+        const double steady = endMem - std::max(memAtHalf, startMem);
+        const double steadyPerMin = (soakSeconds > 0 ? steady * 60.0 / (soakSeconds * 0.5) : 0.0);
+        printf("\n[soak] %.0fs done: %llu frames, %d screen-opens (%d screens x %d cycles), %d nav-fires\n",
+               soakSeconds, (unsigned long long)frames, opens, nScr, opens / (nScr ? nScr : 1), navFires);
+        printf("[soak] memory MB: start %.1f | warm-up +%.1f (one-time texture load) | steady-state +%.2f (peak %.1f)\n",
+               startMem, warmup, steady, peakMem);
+        printf("[soak] steady-state growth %.2f MB/min -> verdict: %s\n", steadyPerMin,
+               (steady < 4.0) ? "STABLE (no leak; bounded warm-up then flat)" : "REVIEW (memory still climbing post-warm-up)");
+        audio::Shutdown(); ui::Shutdown(); gfx::shutdown(); SDL_DestroyWindow(win); SDL_Quit();
+        return 0;
+    }
 
     if (shot) {
         // Optional scripted input (argv[5]): one navigation step per character,
