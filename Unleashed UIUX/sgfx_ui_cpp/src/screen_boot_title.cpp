@@ -115,17 +115,36 @@ void LogoSlot(float a) {
     ResetFont();
 }
 
+// a horizontal CAPSULE (semicircular ends) with a vertical gradient, drawn as
+// row strips so the rounded ends and the gradient come for free.
+void CapsuleVGrad(float x0, float y0, float x1, float y1, uint32_t cTop, uint32_t cBot, float a) {
+    const float r = (y1 - y0) * 0.5f, cy = (y0 + y1) * 0.5f;
+    const float lc = x0 + r, rc = x1 - r;     // end-cap centres
+    const int N = 26;
+    for (int i = 0; i < N; ++i) {
+        float sy0 = y0 + (y1 - y0) * i / N, sy1 = y0 + (y1 - y0) * (i + 1) / N;
+        float dy = (std::max(std::fabs(sy0 - cy), std::fabs(sy1 - cy))) / r;
+        float inset = (dy >= 1.0f) ? r : r - r * std::sqrt(std::max(0.0f, 1.0f - dy * dy));
+        float f0 = (sy0 - y0) / (y1 - y0), f1 = (sy1 - y0) / (y1 - y0);
+        uint32_t c0 = WithAlpha(ColourLerp(cTop, cBot, f0), a);
+        uint32_t c1 = WithAlpha(ColourLerp(cTop, cBot, f1), a);
+        const V2 q[4] = { { lc - r + inset, sy0 }, { rc + r - inset, sy0 }, { rc + r - inset, sy1 }, { lc - r + inset, sy1 } };
+        const uint32_t qc[4] = { c0, c0, c1, c1 };
+        DrawQuadGradient(q, qc);
+    }
+}
+
 // the measured PRESS START capsule button with its animated green glow
 void PressStart(double now, float a) {
     const float glowPulse = Breathe(now, 0.4f, 1.0f, 1.0f);
-    // green glow (additive, larger than the ring, strongest at the ends)
-    DrawRect({ 427.3f, 466.7f }, { 815.3f, 572.0f }, WithAlpha(C_GLOW, a * glowPulse * 0.22f), true);
-    DrawRect({ 460, 480 }, { 782, 560 }, WithAlpha(C_GLOW, a * glowPulse * 0.30f), true);
-    // metallic ring: capsule approximated with a chamfered band
-    DrawVGradient({ 490.7f, 494.7f }, { 790.7f, 548.7f }, WithAlpha(C_RING_HI, a), WithAlpha(C_RING, a));
-    // inner yellow capsule (glossy belly low-center)
-    DrawVGradient({ 498.7f, 504.7f }, { 781.3f, 524.0f }, WithAlpha(C_CAP_TOP, a), WithAlpha(C_CAP_PEAK, a));
-    DrawVGradient({ 498.7f, 524.0f }, { 781.3f, 535.3f }, WithAlpha(C_CAP_PEAK, a), WithAlpha(RGBA(150, 143, 48, 255), a));
+    // green glow (additive, larger than the ring, strongest at the ends) — soft
+    DrawRect({ 440, 470 }, { 800, 568 }, WithAlpha(C_GLOW, a * glowPulse * 0.16f), true);
+    DrawRect({ 470, 482 }, { 770, 556 }, WithAlpha(C_GLOW, a * glowPulse * 0.22f), true);
+    // metallic ring capsule (thin rim) + inner yellow capsule, both rounded ends
+    CapsuleVGrad(490.7f, 494.7f, 790.7f, 548.7f, C_RING_HI, C_RING, a);
+    CapsuleVGrad(499.0f, 503.0f, 782.0f, 540.0f, C_CAP_TOP, C_CAP_PEAK, a);
+    // glossy belly highlight (a brighter mid strip)
+    CapsuleVGrad(510.0f, 514.0f, 771.0f, 528.0f, C_CAP_PEAK, RGBA(255, 246, 150, 255), a * 0.6f);
     // outline-style PRESS START (dark olive ring + capsule-yellow inner)
     SetFont(g_fRodin);
     const char* PS = "PRESS START";

@@ -73,15 +73,15 @@ void Draw(double openSec) {
                     "( NPC render: live 3D )", Align::Center, true, false);
     ResetFont();
 
-    // ---- rings counter slot (top-left HUD remnant) ----
-    DrawRect({ 96, 36 }, { 116, 56 }, WithAlpha(C_RING, a));
+    // ---- rings counter slot (top-left HUD, title-safe inset) ----
+    DrawRect({ 250, 36 }, { 272, 58 }, WithAlpha(C_RING, a));
     SetFont(g_fRodin);
-    DrawTextShadow({ 128, 36 }, 22.0f, WithAlpha(C_WHITE, a), "999999");
+    DrawTextShadow({ 284, 36 }, 22.0f, WithAlpha(C_WHITE, a), "999999");
     ResetFont();
 
-    // ---- speaker nameplate: gold rounded pill, top-right ----
+    // ---- speaker nameplate: gold rounded pill, upper-right of centre ----
     {
-        const float x0 = 872, y0 = 29, x1 = 1188, y1 = 64;
+        const float x0 = 768, y0 = 38, x1 = 1066, y1 = 80;
         DrawVGradient({ x0 + 4, y0 }, { x1 - 4, y1 }, WithAlpha(C_PILL_T, a), WithAlpha(C_PILL_B, a));
         DrawRect({ x0, y0 + 4 }, { x0 + 4, y1 - 4 }, WithAlpha(C_PILL_B, a));     // rounded-end hint
         DrawRect({ x1 - 4, y0 + 4 }, { x1, y1 - 4 }, WithAlpha(C_PILL_B, a));
@@ -89,37 +89,37 @@ void Draw(double openSec) {
         SetFont(g_fSeurat);
         const char* NAME = "Don Fachio's Apotos";
         float w = MeasureText(22.0f, NAME).x;
-        DrawText({ (x0 + x1) * 0.5f - w * 0.5f, y0 + 7 }, 22.0f, WithAlpha(C_PILL_TXT, a), NAME);
+        DrawText({ (x0 + x1) * 0.5f - w * 0.5f, y0 + 10 }, 22.0f, WithAlpha(C_PILL_TXT, a), NAME);
         ResetFont();
     }
 
-    // ---- the silver dialogue balloon (TL+BR chamfer, no tail) ----
+    // ---- the silver dialogue balloon (TL+BR chamfer, no tail), lower third ----
     {
-        const float x0 = 120, y0 = 237, x1 = 760, y1 = 312, ch = 18;
+        const float x0 = 208, y0 = 445, x1 = 1093, y1 = 613, ch = 20;
         const float bT = (float)ComputeMotion(openSec, 2.0, 8.0);
         DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(C_BAL_T, bT), WithAlpha(C_BAL_B, bT));
         // chamfer cuts back to the scene (approximate with sky tone)
         const V2 c1[4] = { { x0, y0 }, { x0 + ch, y0 }, { x0, y0 + ch }, { x0, y0 } };
         const V2 c2[4] = { { x1 - ch, y1 }, { x1, y1 }, { x1, y1 - ch }, { x1 - ch, y1 } };
-        const uint32_t sky[4] = { WithAlpha(C_SKY_T, bT), WithAlpha(C_SKY_T, bT), WithAlpha(C_SKY_T, bT), WithAlpha(C_SKY_T, bT) };
+        const uint32_t sky[4] = { WithAlpha(C_SKY_B, bT), WithAlpha(C_SKY_B, bT), WithAlpha(C_SKY_B, bT), WithAlpha(C_SKY_B, bT) };
         DrawQuadGradient(c1, sky); DrawQuadGradient(c2, sky);
         uint32_t bd = WithAlpha(C_BAL_BD, bT);
         DrawRect({ x0 + ch, y0 }, { x1, y0 + 2 }, bd);
         DrawRect({ x0, y1 - 2 }, { x1 - ch, y1 }, bd);
         DrawRect({ x0, y0 + ch }, { x0 + 2, y1 }, bd);
         DrawRect({ x1 - 2, y0 }, { x1, y1 - ch }, bd);
-        // two outlined dialogue lines
+        // two outlined dialogue lines, upper area of the window (room below for a 3rd)
         SetFont(g_fSeurat);
         const Line2& L = SCRIPT[g_line];
         auto line = [&](const char* s, float ly) {
             for (int dy = -1; dy <= 1; ++dy)
                 for (int dx = -1; dx <= 1; ++dx)
                     if (dx || dy)
-                        DrawText({ 152 + dx * 1.4f, ly + dy * 1.4f }, 22.0f, WithAlpha(C_TXT_OUT, bT), s);
-            DrawText({ 152, ly }, 22.0f, WithAlpha(C_TXT, bT), s);
+                        DrawText({ x0 + 36 + dx * 1.4f, ly + dy * 1.4f }, 24.0f, WithAlpha(C_TXT_OUT, bT), s);
+            DrawText({ x0 + 36, ly }, 24.0f, WithAlpha(C_TXT, bT), s);
         };
-        line(L.a, 250);
-        line(L.b, 278);
+        line(L.a, y0 + 28);
+        line(L.b, y0 + 62);
         ResetFont();
     }
 
