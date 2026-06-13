@@ -62,8 +62,8 @@ const uint32_t C_SKY_T = RGBA(86, 140, 210, 255), C_SKY_B = RGBA(170, 205, 235, 
 constexpr float RAIL_Y0 = 50, RAIL_Y1 = 107, RAIL_X1 = 607;
 constexpr float WM_X = 263, WM_TOP = 60;
 constexpr float EXP_Y = 168;                 // EXP row top
-constexpr float ROW_Y0 = 233;                // first stat row top
-constexpr float ROW_PITCH = 64, PLATE_H = 42;
+constexpr float ROW_Y0 = 226;                // first stat row top
+constexpr float ROW_PITCH = 54, PLATE_H = 40;   // tight, compact stack (matches real)
 constexpr float PLATE_X = 180, PLATE_W = 188;
 constexpr float BAR_END = 560, SLANT = 12;
 
@@ -162,9 +162,10 @@ void Draw(double openSec) {
     const float a = (float)ComputeMotion(openSec, 0.0, 10.0);
     const float rowT = (float)ComputeMotion(openSec, 4.0, 10.0);
 
-    // live 3D scene slot (sky placeholder + ground band)
+    // live 3D scene slot (sky placeholder + soft ground gradient — no hard slab
+    // behind the footer prompts)
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SKY_T, C_SKY_B);
-    DrawRect({ 0, 600 }, { REF_W, REF_H }, RGBA(208, 212, 208, 255));
+    DrawVGradient({ 0, 560 }, { REF_W, REF_H }, WithAlpha(RGBA(200, 206, 204, 255), 0.55f), WithAlpha(RGBA(150, 158, 156, 255), 0.55f));
     SetFont(g_fSeurat);
     DrawTextAligned({ 860, 240 }, { 1200, 560 }, 14.0f, WithAlpha(RGBA(120, 140, 165, 255), a),
                     "( character render: live 3D )", Align::Center, true, false);

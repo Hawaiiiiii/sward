@@ -194,12 +194,18 @@ void Draw(double openSec) {
         SetFont(g_fRodin);
         DrawText({ 276, 395 }, 16.0f, WithAlpha(RGBA(225, 228, 232, 255), panT), "MEDALS");
         char buf[16];
-        DrawRect({ 432, 392 }, { 452, 412 }, WithAlpha(C_SUN, panT));
-        snprintf(buf, sizeof buf, "%d / %d", act.sun, act.sunMax);
-        DrawText({ 464, 394 }, 18.0f, WithAlpha(C_VALUE, panT), buf);
-        DrawRect({ 432, 420 }, { 452, 440 }, WithAlpha(C_MOON, panT));
-        snprintf(buf, sizeof buf, "%d / %d", act.moon, act.moonMax);
-        DrawText({ 464, 422 }, 18.0f, WithAlpha(C_VALUE, panT), buf);
+        // medal counts RIGHT-aligned into the value column (right edge x600),
+        // each medal icon sitting just left of its count
+        const float MEDAL_R = 600;
+        auto medal = [&](float y, uint32_t icol, int got, int tot) {
+            snprintf(buf, sizeof buf, "%d / %d", got, tot);
+            float w = MeasureText(18.0f, buf).x;
+            float cxn = MEDAL_R - w;
+            DrawRect({ cxn - 30, y - 2 }, { cxn - 10, y + 18 }, WithAlpha(icol, panT));
+            DrawText({ cxn, y }, 18.0f, WithAlpha(C_VALUE, panT), buf);
+        };
+        medal(394, C_SUN, act.sun, act.sunMax);
+        medal(422, C_MOON, act.moon, act.moonMax);
         // RANK label
         DrawRect({ 266, 452 }, { 412, 476 }, WithAlpha(C_LBLPLATE, panT));
         DrawText({ 276, 455 }, 16.0f, WithAlpha(RGBA(225, 228, 232, 255), panT), "RANK");
@@ -249,20 +255,22 @@ void Draw(double openSec) {
     //      the pause confirm — measured from gate_confirm_popup.png) ----
     if (g_popup) {
         DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 110));
-        // screen-centred, TL+BR chamfered grey dialog with a silver border
-        const float px0 = 538, py0 = 282, px1 = 756, py1 = 440, pch = 20, cx = (px0 + px1) * 0.5f;
+        // screen-centred, tighter TL+BR chamfered grey dialog (flatter, dimmer
+        // border — closer to the real near-borderless box)
+        const float px0 = 554, py0 = 296, px1 = 740, py1 = 414, pch = 16, cx = (px0 + px1) * 0.5f;
         DrawVGradient({ px0, py0 }, { px1, py1 },
-                      RGBA(158, 160, 160, 245), RGBA(105, 107, 107, 245));
+                      RGBA(128, 130, 132, 238), RGBA(96, 98, 100, 238));
         const V2 c1[4] = { { px0, py0 }, { px0 + pch, py0 }, { px0, py0 + pch }, { px0, py0 } };
         const V2 c2[4] = { { px1 - pch, py1 }, { px1, py1 }, { px1, py1 - pch }, { px1 - pch, py1 } };
         const uint32_t dk[4] = { RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110) };
         DrawQuadGradient(c1, dk); DrawQuadGradient(c2, dk);
-        DrawRect({ px0 + pch, py0 }, { px1, py0 + 2 }, C_BORDER);
-        DrawRect({ px0, py1 - 2 }, { px1 - pch, py1 }, C_BORDER);
-        DrawRect({ px0, py0 + pch }, { px0 + 2, py1 }, C_BORDER);
-        DrawRect({ px1 - 2, py0 }, { px1, py1 - pch }, C_BORDER);
+        uint32_t pbd = RGBA(168, 170, 172, 220);
+        DrawRect({ px0 + pch, py0 }, { px1, py0 + 1.5f }, pbd);
+        DrawRect({ px0, py1 - 1.5f }, { px1 - pch, py1 }, pbd);
+        DrawRect({ px0, py0 + pch }, { px0 + 1.5f, py1 }, pbd);
+        DrawRect({ px1 - 1.5f, py0 }, { px1, py1 - pch }, pbd);
         const char* OPT[2] = { "Play Stage", "Cancel" };
-        const float rowY[2] = { py0 + 28, py0 + 82 };
+        const float rowY[2] = { py0 + 22, py0 + 66 };
         DrawVGradient({ px0 + 14, rowY[g_popupSel] - 6 }, { px1 - 14, rowY[g_popupSel] + 32 },
                       RGBA(244, 210, 70, 250), RGBA(222, 172, 34, 250));
         SetFont(g_fRodin);

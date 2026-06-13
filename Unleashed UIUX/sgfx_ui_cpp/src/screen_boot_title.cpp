@@ -137,11 +137,10 @@ void CapsuleVGrad(float x0, float y0, float x1, float y1, uint32_t cTop, uint32_
 // the measured PRESS START capsule button with its animated green glow
 void PressStart(double now, float a) {
     const float glowPulse = Breathe(now, 0.4f, 1.0f, 1.0f);
-    // CAPSULE-shaped green glow (additive, concentric, soft) — follows the pill,
-    // no rectangular backing
-    CapsuleVGrad(470, 478, 812, 566, C_GLOW, C_GLOW, a * glowPulse * 0.10f, true);
-    CapsuleVGrad(480, 486, 802, 558, C_GLOW, C_GLOW, a * glowPulse * 0.13f, true);
-    CapsuleVGrad(486, 491, 796, 552, C_GLOW, C_GLOW, a * glowPulse * 0.16f, true);
+    // CAPSULE-shaped green glow (additive, concentric, soft + restrained) —
+    // follows the pill closely, no heavy bloom, no rectangular backing
+    CapsuleVGrad(478, 484, 804, 560, C_GLOW, C_GLOW, a * glowPulse * 0.07f, true);
+    CapsuleVGrad(484, 489, 798, 554, C_GLOW, C_GLOW, a * glowPulse * 0.10f, true);
     // metallic ring capsule (thin rim) + inner yellow capsule, both rounded ends
     CapsuleVGrad(490.7f, 494.7f, 790.7f, 548.7f, C_RING_HI, C_RING, a);
     CapsuleVGrad(499.0f, 503.0f, 782.0f, 540.0f, C_CAP_TOP, C_CAP_PEAK, a);
