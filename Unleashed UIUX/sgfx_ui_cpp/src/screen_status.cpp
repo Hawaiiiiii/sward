@@ -45,8 +45,11 @@ const uint32_t C_CHR_OUT = RGBA(22, 24, 36, 255);
 const uint32_t C_PLATE_T = RGBA(74, 58, 110, 225);      // stat plate (dark violet)
 const uint32_t C_PLATE_B = RGBA(40, 30, 64, 225);
 const uint32_t C_PLATE_RIM = RGBA(225, 220, 240, 255);  // white top rim
-const uint32_t C_EXP_T   = RGBA(232, 60, 150, 235);     // EXP plate magenta
-const uint32_t C_EXP_B   = RGBA(160, 24, 96, 235);
+const uint32_t C_EXP_N_T = RGBA(232, 60, 150, 235);     // EXP plate magenta (night/Werehog)
+const uint32_t C_EXP_N_B = RGBA(160, 24, 96, 235);
+const uint32_t C_EXP_D_T = RGBA(60, 150, 232, 235);     // EXP plate blue (day/Sonic)
+const uint32_t C_EXP_D_B = RGBA(24, 88, 168, 235);
+const uint32_t C_EXP_RIM = RGBA(176, 226, 255, 255);    // light-cyan EXP top border (day)
 const uint32_t C_TROUGH  = RGBA(26, 20, 40, 220);       // bar trough
 const uint32_t C_GOLD_T  = RGBA(252, 214, 74, 255);     // bar gold fill
 const uint32_t C_GOLD_B  = RGBA(222, 158, 22, 255);
@@ -85,9 +88,9 @@ void Init() {
 }
 void Reset() { g_night = false; g_sel = 0; }
 void Input(const ScreenInput& in) {
-    int n = g_night ? 5 : 2;
+    int n = g_night ? 5 : 2;   // stat rows; the QUIT plate is index n (selectable)
     if (in.up)   g_sel = std::max(0, g_sel - 1);
-    if (in.down) g_sel = std::min(n - 1, g_sel + 1);
+    if (in.down) g_sel = std::min(n, g_sel + 1);
     if (in.tabLeft || in.tabRight) { g_night = !g_night; g_sel = 0; }
     // (A) Level Up: stats are showcased at MAX, matching the captured save
 }
@@ -111,12 +114,18 @@ void Chrome(V2 pos, float px, const char* s, float a, uint32_t tT, uint32_t tB, 
 void StatRow(float y, const char* label, float fill, bool sel, float a, bool exp) {
     const float xoff = sel ? -12.0f : 0.0f;
     const float x0 = PLATE_X + xoff;
-    const uint32_t pT = exp ? C_EXP_T : C_PLATE_T, pB = exp ? C_EXP_B : C_PLATE_B;
+    // EXP plate colour is FORM-dependent: blue (day/Sonic) vs magenta (night/Werehog)
+    uint32_t pT, pB, rim = C_PLATE_RIM;
+    if (exp) {
+        pT = g_night ? C_EXP_N_T : C_EXP_D_T;
+        pB = g_night ? C_EXP_N_B : C_EXP_D_B;
+        rim = g_night ? C_PLATE_RIM : C_EXP_RIM;
+    } else { pT = C_PLATE_T; pB = C_PLATE_B; }
     // label plate (parallelogram)
     const V2 pc[4] = { { x0 + SLANT, y }, { x0 + PLATE_W + SLANT, y }, { x0 + PLATE_W, y + PLATE_H }, { x0, y + PLATE_H } };
     const uint32_t pcol[4] = { WithAlpha(pT, a), WithAlpha(pT, a), WithAlpha(pB, a), WithAlpha(pB, a) };
     DrawQuadGradient(pc, pcol);
-    DrawRect({ x0 + SLANT, y }, { x0 + PLATE_W + SLANT, y + 2 }, WithAlpha(C_PLATE_RIM, a));   // top rim
+    DrawRect({ x0 + SLANT, y }, { x0 + PLATE_W + SLANT, y + 2 }, WithAlpha(rim, a));   // top rim
     if (sel) {   // white selection rim around the plate
         DrawRect({ x0, y + PLATE_H - 2 }, { x0 + PLATE_W, y + PLATE_H }, WithAlpha(C_WHITE, a));
         DrawRect({ x0 + 1, y }, { x0 + 3, y + PLATE_H }, WithAlpha(C_WHITE, a * 0.8f));
@@ -132,15 +141,21 @@ void StatRow(float y, const char* label, float fill, bool sel, float a, bool exp
         const uint32_t fcol[4] = { WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_B, a), WithAlpha(C_GOLD_B, a) };
         DrawQuadGradient(fc, fcol);
     }
-    // label (white outlined italic) + MAX (magenta chrome) when full
+    // label (white outlined italic), AUTO-FIT so longer labels (RING ENERGY)
+    // never overrun the MAX badge zone
+    const float maxZone = (!exp && fill >= 1.0f) ? 46.0f : 12.0f;   // reserve for MAX
+    const float availW = PLATE_W - 24.0f - maxZone;
     SetFont(g_fSeurat);
     SetTextShear(0.18f);
-    DrawText({ x0 + 22 + 1.5f, y + 9 + 1.5f }, 22.0f, WithAlpha(RGBA(16, 12, 24, 255), a), label);
-    DrawText({ x0 + 22, y + 9 }, 22.0f, WithAlpha(C_WHITE, a), label);
+    float fsz = 22.0f;
+    while (fsz > 14.0f && MeasureText(fsz, label).x > availW) fsz -= 1.0f;
+    const float ly = y + 9 + (22.0f - fsz) * 0.5f;
+    DrawText({ x0 + 22 + 1.5f, ly + 1.5f }, fsz, WithAlpha(RGBA(16, 12, 24, 255), a), label);
+    DrawText({ x0 + 22, ly }, fsz, WithAlpha(C_WHITE, a), label);
     ResetTextShear();
     ResetFont();
     if (!exp && fill >= 1.0f)
-        Chrome({ x0 + PLATE_W - 32, y + 6 }, 26.0f, "MAX", a, C_MAX_T, C_MAX_B, 1.15f);
+        Chrome({ x0 + PLATE_W - 36, y + 6 }, 24.0f, "MAX", a, C_MAX_T, C_MAX_B, 1.1f);
 }
 
 void Draw(double openSec) {
@@ -193,6 +208,31 @@ void Draw(double openSec) {
     for (int i = 0; i < n; ++i) {
         const float rt = (float)ComputeMotion(openSec, 6.0 + i * 3.0, 8.0);
         if (rt > 0.0f) StatRow(ROW_Y0 + i * ROW_PITCH, rows[i].label, rows[i].fill, i == g_sel, rt, false);
+    }
+
+    // ---- QUIT plate below the stat list (a small chamfered button + curl tail) ----
+    {
+        const float qt = (float)ComputeMotion(openSec, 6.0 + n * 3.0, 8.0);
+        if (qt > 0.0f) {
+            const float qy = ROW_Y0 + n * ROW_PITCH + 6, qx = PLATE_X, qw = 132, qh = 38;
+            const bool qsel = (g_sel == n);
+            const float qx0 = qsel ? qx - 12 : qx;
+            uint32_t qT = g_night ? RGBA(96, 64, 140, 235) : RGBA(56, 104, 168, 235);
+            uint32_t qB = g_night ? RGBA(58, 36, 96, 235)  : RGBA(28, 60, 116, 235);
+            const V2 qc[4] = { { qx0 + SLANT, qy }, { qx0 + qw + SLANT, qy }, { qx0 + qw, qy + qh }, { qx0, qy + qh } };
+            const uint32_t qcol[4] = { WithAlpha(qT, qt), WithAlpha(qT, qt), WithAlpha(qB, qt), WithAlpha(qB, qt) };
+            DrawQuadGradient(qc, qcol);
+            DrawRect({ qx0 + SLANT, qy }, { qx0 + qw + SLANT, qy + 2 }, WithAlpha(C_PLATE_RIM, qt));
+            if (qsel) DrawRect({ qx0, qy + qh - 2 }, { qx0 + qw, qy + qh }, WithAlpha(C_WHITE, qt));
+            // little curl tail at the right
+            DrawRect({ qx0 + qw + SLANT, qy + qh * 0.4f }, { qx0 + qw + SLANT + 14, qy + qh * 0.4f + 3 }, WithAlpha(qT, qt));
+            SetFont(g_fSeurat);
+            SetTextShear(0.18f);
+            DrawText({ qx0 + 26 + 1.5f, qy + 8 + 1.5f }, 22.0f, WithAlpha(RGBA(14, 14, 22, 255), qt), "QUIT");
+            DrawText({ qx0 + 26, qy + 8 }, 22.0f, WithAlpha(C_WHITE, qt), "QUIT");
+            ResetTextShear();
+            ResetFont();
+        }
     }
 
     // ---- footer ----
