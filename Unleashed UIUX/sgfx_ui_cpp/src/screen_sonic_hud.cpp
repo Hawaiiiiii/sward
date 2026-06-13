@@ -292,13 +292,21 @@ void Draw(double openSec) {
                   WithAlpha(COL_WHITE, clusterT));
     }
 
-    // SCORE label + digits (top row of the cluster)
-    DrawLabel(LBL_SCORE, CL_LABEL_X, SCORE_LBL_Y, 14.0f, clusterT);
-    DrawNumber(g_score, NUM_X + 300.0f, SCORE_NUM_Y, DIGIT_H, clusterT);
-
+    // cluster order (real HUD): TIME / RINGS / SCORE, top to bottom
+    // TIME row (label drawn with the font; value is the stage clock)
+    if (clusterT > 0.0f) {
+        SetFont(g_fRodin);
+        DrawTextShadow({ CL_LABEL_X, 44.0f }, 14.0f, WithAlpha(COL_FOOTER, clusterT), "TIME");
+        ResetFont();
+        DrawNumber(0, NUM_X + 300.0f, 62.0f, DIGIT_H * 0.86f, clusterT);   // 00:00:00-style readout
+    }
     // RINGS label + count (second row)
     DrawLabel(LBL_RINGS, CL_LABEL_X, RINGS_LBL_Y, 14.0f, clusterT);
     DrawNumber(g_rings, NUM_X + 300.0f, RINGS_NUM_Y, DIGIT_H, clusterT);
+
+    // SCORE label + digits (third row)
+    DrawLabel(LBL_SCORE, CL_LABEL_X, 158.0f, 14.0f, clusterT);
+    DrawNumber(g_score, NUM_X + 300.0f, 176.0f, DIGIT_H, clusterT);
 
     // ---- bottom boost gauge (eased fill) ----
     float displayBoost = g_boost;
@@ -315,11 +323,15 @@ void Draw(double openSec) {
     }
     DrawBoostGauge(displayBoost, gaugeT);
 
-    // ---- footer control hint (sits just under the boost track, on-screen) ----
-    SetFont(g_fRodin);
-    DrawTextAligned({ TIRE_X, 668 }, { 760, 700 }, 20.0f, WithAlpha(COL_FOOTER, footT),
-                    "(A) Boost   [Up] Ring   [L/R] Meter", Align::Left, true, true);
-    ResetFont();
+    // RING ENERGY label + ring-count readout beside the boost gauge (the real HUD
+    // labels the long bar and shows a small ring count)
+    if (gaugeT > 0.0f) {
+        SetFont(g_fRodin);
+        DrawTextShadow({ TIRE_X + 44.0f, 642.0f }, 13.0f, WithAlpha(COL_FOOTER, gaugeT), "RING ENERGY");
+        ResetFont();
+        DrawNumber(g_rings % 1000, TIRE_X + 40.0f, 664.0f, DIGIT_H * 0.7f, gaugeT);
+    }
+    (void)footT;
 }
 
 } // namespace

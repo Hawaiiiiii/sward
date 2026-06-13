@@ -123,13 +123,13 @@ void Draw(double openSec) {
         ResetFont();
     }
 
-    // ---- footer: (A) Next  (B) Back ----
+    // ---- footer: (A) Next  (B) Back — bottom-right, under the dialogue box ----
     {
         SetFont(g_fRodin);
-        float hcy = 668;
+        float hcy = 638;
         auto glyph = [&](const UV& g, float x){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,a)); return x+gw+8; };
-        float hx = 560; hx = glyph(GLYPH_A, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Next");
-        hx = 760; hx = glyph(GLYPH_B, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Back");
+        float hx = 858; hx = glyph(GLYPH_A, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Next");
+        hx = 992; hx = glyph(GLYPH_B, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Back");
         ResetFont();
     }
 }

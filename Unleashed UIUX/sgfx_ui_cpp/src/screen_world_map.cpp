@@ -284,7 +284,7 @@ void Draw(double openSec) {
     {
         struct Row { uint32_t icol; bool ring; const char* val; } rows[] = {
             { C_LIVES, false, "99" }, { C_RING, true, "999999" },
-            { C_SUN, true, "180" }, { C_MOON, true, "180" },
+            { C_SUN, true, "7 [200]" }, { C_MOON, true, "7 [200]" },   // medal: collected [total]
         };
         SetFont(g_fRodin);
         for (int i = 0; i < 4; ++i) {

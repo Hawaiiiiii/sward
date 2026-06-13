@@ -117,7 +117,7 @@ void LogoSlot(float a) {
 
 // a horizontal CAPSULE (semicircular ends) with a vertical gradient, drawn as
 // row strips so the rounded ends and the gradient come for free.
-void CapsuleVGrad(float x0, float y0, float x1, float y1, uint32_t cTop, uint32_t cBot, float a) {
+void CapsuleVGrad(float x0, float y0, float x1, float y1, uint32_t cTop, uint32_t cBot, float a, bool additive = false) {
     const float r = (y1 - y0) * 0.5f, cy = (y0 + y1) * 0.5f;
     const float lc = x0 + r, rc = x1 - r;     // end-cap centres
     const int N = 26;
@@ -130,16 +130,18 @@ void CapsuleVGrad(float x0, float y0, float x1, float y1, uint32_t cTop, uint32_
         uint32_t c1 = WithAlpha(ColourLerp(cTop, cBot, f1), a);
         const V2 q[4] = { { lc - r + inset, sy0 }, { rc + r - inset, sy0 }, { rc + r - inset, sy1 }, { lc - r + inset, sy1 } };
         const uint32_t qc[4] = { c0, c0, c1, c1 };
-        DrawQuadGradient(q, qc);
+        DrawQuadGradient(q, qc, additive);
     }
 }
 
 // the measured PRESS START capsule button with its animated green glow
 void PressStart(double now, float a) {
     const float glowPulse = Breathe(now, 0.4f, 1.0f, 1.0f);
-    // green glow (additive, larger than the ring, strongest at the ends) — soft
-    DrawRect({ 440, 470 }, { 800, 568 }, WithAlpha(C_GLOW, a * glowPulse * 0.16f), true);
-    DrawRect({ 470, 482 }, { 770, 556 }, WithAlpha(C_GLOW, a * glowPulse * 0.22f), true);
+    // CAPSULE-shaped green glow (additive, concentric, soft) — follows the pill,
+    // no rectangular backing
+    CapsuleVGrad(470, 478, 812, 566, C_GLOW, C_GLOW, a * glowPulse * 0.10f, true);
+    CapsuleVGrad(480, 486, 802, 558, C_GLOW, C_GLOW, a * glowPulse * 0.13f, true);
+    CapsuleVGrad(486, 491, 796, 552, C_GLOW, C_GLOW, a * glowPulse * 0.16f, true);
     // metallic ring capsule (thin rim) + inner yellow capsule, both rounded ends
     CapsuleVGrad(490.7f, 494.7f, 790.7f, 548.7f, C_RING_HI, C_RING, a);
     CapsuleVGrad(499.0f, 503.0f, 782.0f, 540.0f, C_CAP_TOP, C_CAP_PEAK, a);
