@@ -252,22 +252,23 @@ void DrawReadyOverlay(double el) {
     if (el < 0.25)      { float p = (float)(el / 0.25); p = 1.0f - (1.0f - p) * (1.0f - p); x = -300.0f + (640.0f + 300.0f) * p; a = p; }
     else if (el > 1.3)  { float p = (float)((el - 1.3) / 0.4); p *= p; x = 640.0f + 940.0f * p; a = 1.0f - p * 0.6f; }
     SetFont(g_fDF);
-    SetTextShear(0.24f);
-    SetTextStretchX(1.35f);
+    SetTextShear(0.26f);
+    SetTextStretchX(1.45f);
     const char* R = "READY";
-    float w = MeasureText(52.0f, R).x * 1.35f;
-    const V2 rp = { x - w * 0.5f, 150.0f };
+    const float fsz = 78.0f;                       // large banner (~38% screen width)
+    float w = MeasureText(fsz, R).x * 1.45f;
+    const V2 rp = { x - w * 0.5f, 312.0f };         // vertical centre of the screen
     // motion streaks (additive bars trailing the wordmark through its band)
-    for (int i = 0; i < 3; ++i) {
-        float sy = 162.0f + i * 16.0f;
-        DrawRect({ rp.x - 220.0f + i * 40.0f, sy }, { rp.x + w * 0.5f, sy + 3.0f },
-                 WithAlpha(RGBA(180, 205, 235, 255), a * 0.28f), true);
+    for (int i = 0; i < 4; ++i) {
+        float sy = 332.0f + i * 22.0f;
+        DrawRect({ rp.x - 300.0f + i * 50.0f, sy }, { rp.x + w * 0.5f, sy + 4.0f },
+                 WithAlpha(RGBA(180, 205, 235, 255), a * 0.26f), true);
     }
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (dx || dy)
-                DrawText({ rp.x + dx * 2.5f, rp.y + dy * 2.5f }, 52.0f, WithAlpha(RGBA(16, 22, 38, 255), a), R);
-    DrawTextGradient(rp, 52.0f, WithAlpha(RGBA(238, 244, 252, 255), a), WithAlpha(RGBA(140, 165, 205, 255), a), R);
+                DrawText({ rp.x + dx * 3.0f, rp.y + dy * 3.0f }, fsz, WithAlpha(RGBA(16, 22, 38, 255), a), R);
+    DrawTextGradient(rp, fsz, WithAlpha(RGBA(238, 244, 252, 255), a), WithAlpha(RGBA(140, 165, 205, 255), a), R);
     ResetTextStretchX();
     ResetTextShear();
     ResetFont();

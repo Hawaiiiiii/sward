@@ -364,10 +364,9 @@ void Draw(double openSec) {
         PushClip({ ix0 - 2, clipY0 }, { ix1 + 2, clipY1 });
         float dy = textTop - scroll;
         for (const std::string& ln : lines) {
-            if (!ln.empty() && dy + lineH > clipY0 && dy < clipY1) {
-                float lw = MeasureText(fsz, ln.c_str()).x;
-                DrawText({ ix0 + (wrapW - lw) * 0.5f, dy }, fsz, WithAlpha(C_DESC, t), ln.c_str());
-            }
+            // LEFT-aligned at a fixed margin (verified against the live capture)
+            if (!ln.empty() && dy + lineH > clipY0 && dy < clipY1)
+                DrawText({ ix0, dy }, fsz, WithAlpha(C_DESC, t), ln.c_str());
             dy += lineH;
         }
         PopClip();
