@@ -141,75 +141,103 @@ void Draw(double openSec) {
     DrawVGradient({ 760, 60 }, { 980, 560 }, WithAlpha(C_WARP, 0.55f), WithAlpha(RGBA(255, 220, 120, 255), 0.25f));
     DrawRect({ 700, 540 }, { 1040, 600 }, RGBA(170, 150, 120, 255));
 
-    // ---- gold band + two-line chrome wordmark ----
-    DrawVGradient({ 0, 61 }, { REF_W, 69 }, WithAlpha(C_BAND_T, a), WithAlpha(C_BAND_M, a));
-    DrawVGradient({ 0, 69 }, { REF_W, 77 }, WithAlpha(C_BAND_M, a), WithAlpha(C_BAND_B, a));
-    Chrome({ 253, 50 }, 42.0f, "STAGE", a);
-    Chrome({ 274, 88 }, 42.0f, "SELECT", a);
+    // ---- thick angled gold ribbon (from the left edge, slanted right cut) +
+    //      two-line chrome wordmark sitting on it ----
+    {
+        const V2 rb[4] = { { 0, 50 }, { 632, 50 }, { 590, 110 }, { 0, 110 } };
+        const uint32_t rc[4] = { WithAlpha(C_BAND_T, a), WithAlpha(C_BAND_M, a), WithAlpha(C_BAND_B, a), WithAlpha(C_BAND_B, a) };
+        DrawQuadGradient(rb, rc);
+        DrawRect({ 0, 50 }, { 632, 52.5f }, WithAlpha(RGBA(252, 236, 150, 255), a));   // bright top edge
+        const V2 sl[4] = { { 642, 50 }, { 654, 50 }, { 612, 110 }, { 600, 110 } };     // detached slash
+        const uint32_t sc[4] = { WithAlpha(C_BAND_M, a), WithAlpha(C_BAND_M, a), WithAlpha(C_BAND_B, a), WithAlpha(C_BAND_B, a) };
+        DrawQuadGradient(sl, sc);
+    }
+    Chrome({ 250, 46 }, 40.0f, "STAGE", a);
+    Chrome({ 270, 82 }, 40.0f, "SELECT", a);
 
-    // ---- stage-name plate ----
     if (panT > 0.0f) {
-        NamePlate(273, 183, 557, 220, panT);
+        const Act& act = ACTS[g_act];
+        // ---- wide act panel (x253-1058) with chamfered right corners ----
+        const float px0 = 253, py0 = 188, px1 = 1058, py1 = 540, pch = 24;
+        DrawVGradient({ px0, py0 }, { px1, py1 }, WithAlpha(C_PANEL_T, panT), WithAlpha(C_PANEL_B, panT));
+        // chamfer the top-right + bottom-right corners back to the scene
+        const V2 ctr[4] = { { px1 - pch, py0 }, { px1, py0 }, { px1, py0 + pch }, { px1 - pch, py0 } };
+        const V2 cbr[4] = { { px1 - pch, py1 }, { px1, py1 }, { px1, py1 - pch }, { px1 - pch, py1 } };
+        const uint32_t st[4] = { WithAlpha(C_STONE_B, panT), WithAlpha(C_STONE_B, panT), WithAlpha(C_STONE_B, panT), WithAlpha(C_STONE_B, panT) };
+        DrawQuadGradient(ctr, st); DrawQuadGradient(cbr, st);
+        DrawRect({ px0, py0 }, { px1 - pch, py0 + 2 }, WithAlpha(C_BORDER, panT));
+
+        // stage-name plate (top-left of the panel)
+        NamePlate(273, 200, 557, 237, panT);
         SetFont(g_fSeurat);
         SetTextShear(0.18f);
-        DrawText({ 300 + 1.5f, 189 + 1.5f }, 24.0f, WithAlpha(RGBA(14, 14, 16, 255), panT), "Windmill Isle");
-        DrawText({ 300, 189 }, 24.0f, WithAlpha(C_WHITE, panT), "Windmill Isle");
+        DrawText({ 300 + 1.5f, 206 + 1.5f }, 24.0f, WithAlpha(RGBA(14, 14, 16, 255), panT), "Windmill Isle");
+        DrawText({ 300, 206 }, 24.0f, WithAlpha(C_WHITE, panT), "Windmill Isle");
         ResetTextShear();
+        // Act N header
+        DrawText({ 280 + 1.5f, 258 + 1.5f }, 28.0f, WithAlpha(RGBA(14, 14, 16, 255), panT), act.name);
+        DrawText({ 280, 258 }, 28.0f, WithAlpha(C_WHITE, panT), act.name);
+        DrawRect({ 266, 300 }, { 620, 301.5f }, WithAlpha(C_BORDER, panT * 0.6f));
         ResetFont();
-
-        // ---- act panel ----
-        const Act& act = ACTS[g_act];
-        DrawVGradient({ 253, 233 }, { 600, 470 }, WithAlpha(C_PANEL_T, panT), WithAlpha(C_PANEL_B, panT));
-        DrawRect({ 253, 233 }, { 600, 235 }, WithAlpha(C_BORDER, panT));
-        // header: Act N
-        SetFont(g_fSeurat);
-        DrawText({ 280 + 1.5f, 246 + 1.5f }, 28.0f, WithAlpha(RGBA(14, 14, 16, 255), panT), act.name);
-        DrawText({ 280, 246 }, 28.0f, WithAlpha(C_WHITE, panT), act.name);
-        DrawRect({ 266, 284 }, { 588, 285.5f }, WithAlpha(C_BORDER, panT * 0.6f));
-        ResetFont();
-        // stat rows: label plate + chrome value
+        // stat rows: label plate + chrome value (left column)
         auto stat = [&](float y, const char* lbl, const char* val) {
-            DrawRect({ 266, y }, { 396, y + 24 }, WithAlpha(C_LBLPLATE, panT));
+            DrawRect({ 266, y }, { 412, y + 24 }, WithAlpha(C_LBLPLATE, panT));
             SetFont(g_fRodin);
             DrawText({ 276, y + 3 }, 16.0f, WithAlpha(RGBA(225, 228, 232, 255), panT), lbl);
             ResetFont();
-            Chrome({ 410, y - 4 }, 26.0f, val, panT);
+            Chrome({ 430, y - 4 }, 26.0f, val, panT);
         };
-        stat(296, "HIGH SCORE", act.hiScore);
-        stat(330, "BEST TIME", act.bestTime);
-        // medal rows (icon slots + counts)
-        DrawRect({ 266, 364 }, { 396, 388 }, WithAlpha(C_LBLPLATE, panT));
+        stat(316, "HIGH SCORE", act.hiScore);
+        stat(352, "BEST TIME", act.bestTime);
+        // medal rows
+        DrawRect({ 266, 392 }, { 412, 416 }, WithAlpha(C_LBLPLATE, panT));
         SetFont(g_fRodin);
-        DrawText({ 276, 367 }, 16.0f, WithAlpha(RGBA(225, 228, 232, 255), panT), "MEDALS");
+        DrawText({ 276, 395 }, 16.0f, WithAlpha(RGBA(225, 228, 232, 255), panT), "MEDALS");
         char buf[16];
-        DrawRect({ 412, 364 }, { 432, 384 }, WithAlpha(C_SUN, panT));
+        DrawRect({ 432, 392 }, { 452, 412 }, WithAlpha(C_SUN, panT));
         snprintf(buf, sizeof buf, "%d / %d", act.sun, act.sunMax);
-        DrawText({ 444, 366 }, 18.0f, WithAlpha(C_VALUE, panT), buf);
-        DrawRect({ 412, 396 }, { 432, 416 }, WithAlpha(C_MOON, panT));
+        DrawText({ 464, 394 }, 18.0f, WithAlpha(C_VALUE, panT), buf);
+        DrawRect({ 432, 420 }, { 452, 440 }, WithAlpha(C_MOON, panT));
         snprintf(buf, sizeof buf, "%d / %d", act.moon, act.moonMax);
-        DrawText({ 444, 398 }, 18.0f, WithAlpha(C_VALUE, panT), buf);
+        DrawText({ 464, 422 }, 18.0f, WithAlpha(C_VALUE, panT), buf);
+        // RANK label
+        DrawRect({ 266, 452 }, { 412, 476 }, WithAlpha(C_LBLPLATE, panT));
+        DrawText({ 276, 455 }, 16.0f, WithAlpha(RGBA(225, 228, 232, 255), panT), "RANK");
         ResetFont();
-        // screenshot slot + the big metallic rank letter
-        DrawVGradient({ 444, 244 }, { 588, 326 }, WithAlpha(RGBA(60, 76, 98, 255), panT), WithAlpha(RGBA(30, 40, 54, 255), panT));
+        // stage screenshot slot (lower-right, ~330x190) + S-rank overlapping its bottom
+        DrawVGradient({ 680, 320 }, { 1010, 510 }, WithAlpha(RGBA(60, 76, 98, 255), panT), WithAlpha(RGBA(30, 40, 54, 255), panT));
+        DrawRect({ 680, 320 }, { 1010, 322 }, WithAlpha(C_BORDER, panT));
         SetFont(g_fSeurat);
-        DrawTextAligned({ 444, 244 }, { 588, 326 }, 12.0f, WithAlpha(RGBA(140, 156, 176, 255), panT),
+        DrawTextAligned({ 680, 320 }, { 1010, 510 }, 13.0f, WithAlpha(RGBA(140, 156, 176, 255), panT),
                         "STAGE PHOTO", Align::Center, true, false);
         ResetFont();
         if (g_rankTex >= 0)
-            DrawImage(g_rankTex, { 466, 318 }, { 580, 452 },
+            DrawImage(g_rankTex, { 808, 392 }, { 952, 526 },
                       { RANK_UV[act.rank].u0, RANK_UV[act.rank].v0 }, { RANK_UV[act.rank].u1, RANK_UV[act.rank].v1 },
-                      WithAlpha(RGBA(225, 228, 235, 255), panT * 0.92f));
+                      WithAlpha(RGBA(228, 230, 236, 255), panT * 0.95f));
+
+        // ---- carousel act arrows flanking the panel ----
+        if (!g_popup) {
+            const float ay = 385;
+            const V2 la[4] = { { 240, ay - 18 }, { 240, ay + 18 }, { 218, ay }, { 240, ay - 18 } };
+            const V2 ra[4] = { { 1042, ay - 18 }, { 1042, ay + 18 }, { 1064, ay }, { 1042, ay - 18 } };
+            const uint32_t arc[4] = { WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT) };
+            DrawQuadGradient(la, arc); DrawQuadGradient(ra, arc);
+        }
     }
 
     // ---- footer: [LB] Switch [RB]   (A) Select   (B) Back ----
+    //      (the LB/RB switch entry is hidden while the confirm popup is open) ----
     {
         SetFont(g_fRodin);
         float hcy = 660;
         auto glyph = [&](const UV& g, float x, float gh){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,a)); return x+gw+8; };
-        float hx = 300;
-        hx = glyph(GLYPH_LB, hx, 28);
-        DrawText({ hx, hcy - 11 }, 20.0f, WithAlpha(C_WHITE, a), "Switch"); hx += 90;
-        hx = glyph(GLYPH_RB, hx, 28); hx += 60;
+        float hx = g_popup ? 520 : 300;
+        if (!g_popup) {
+            hx = glyph(GLYPH_LB, hx, 28);
+            DrawText({ hx, hcy - 11 }, 20.0f, WithAlpha(C_WHITE, a), "Switch"); hx += 90;
+            hx = glyph(GLYPH_RB, hx, 28); hx += 60;
+        }
         hx = glyph(GLYPH_A, hx, 30);
         DrawText({ hx, hcy - 11 }, 20.0f, WithAlpha(C_WHITE, a), "Select"); hx += 110;
         hx = glyph(GLYPH_B, hx, 30);
@@ -221,24 +249,30 @@ void Draw(double openSec) {
     //      the pause confirm — measured from gate_confirm_popup.png) ----
     if (g_popup) {
         DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 110));
-        const float px0 = 648, py0 = 186, px1 = 902, py1 = 300;
+        // screen-centred, TL+BR chamfered grey dialog with a silver border
+        const float px0 = 538, py0 = 282, px1 = 756, py1 = 440, pch = 20, cx = (px0 + px1) * 0.5f;
         DrawVGradient({ px0, py0 }, { px1, py1 },
                       RGBA(158, 160, 160, 245), RGBA(105, 107, 107, 245));
-        DrawRect({ px0, py0 }, { px1, py0 + 2 }, C_BORDER);
-        DrawRect({ px0, py1 - 2 }, { px1, py1 }, C_BORDER);
+        const V2 c1[4] = { { px0, py0 }, { px0 + pch, py0 }, { px0, py0 + pch }, { px0, py0 } };
+        const V2 c2[4] = { { px1 - pch, py1 }, { px1, py1 }, { px1, py1 - pch }, { px1 - pch, py1 } };
+        const uint32_t dk[4] = { RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110) };
+        DrawQuadGradient(c1, dk); DrawQuadGradient(c2, dk);
+        DrawRect({ px0 + pch, py0 }, { px1, py0 + 2 }, C_BORDER);
+        DrawRect({ px0, py1 - 2 }, { px1 - pch, py1 }, C_BORDER);
+        DrawRect({ px0, py0 + pch }, { px0 + 2, py1 }, C_BORDER);
+        DrawRect({ px1 - 2, py0 }, { px1, py1 - pch }, C_BORDER);
         const char* OPT[2] = { "Play Stage", "Cancel" };
-        const float rowY[2] = { 206, 252 };
-        // light highlight band on the selected row
+        const float rowY[2] = { py0 + 28, py0 + 82 };
         DrawVGradient({ px0 + 14, rowY[g_popupSel] - 6 }, { px1 - 14, rowY[g_popupSel] + 32 },
-                      RGBA(228, 226, 214, 250), RGBA(196, 190, 168, 250));
+                      RGBA(244, 210, 70, 250), RGBA(222, 172, 34, 250));
         SetFont(g_fRodin);
         for (int i = 0; i < 2; ++i) {
             float w = MeasureText(24.0f, OPT[i]).x;
             bool sel = (i == g_popupSel);
-            DrawText({ 775 - w * 0.5f + 1, rowY[i] + 1 }, 24.0f,
-                     sel ? RGBA(120, 110, 70, 255) : RGBA(20, 20, 20, 200), OPT[i]);
-            DrawText({ 775 - w * 0.5f, rowY[i] }, 24.0f,
-                     sel ? RGBA(34, 30, 16, 255) : RGBA(235, 235, 235, 255), OPT[i]);
+            DrawText({ cx - w * 0.5f + 1, rowY[i] + 1 }, 24.0f,
+                     sel ? RGBA(120, 80, 18, 255) : RGBA(20, 20, 20, 200), OPT[i]);
+            DrawText({ cx - w * 0.5f, rowY[i] }, 24.0f,
+                     sel ? RGBA(40, 28, 6, 255) : RGBA(235, 235, 235, 255), OPT[i]);
         }
         ResetFont();
     }
