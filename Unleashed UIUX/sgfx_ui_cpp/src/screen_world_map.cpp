@@ -273,13 +273,14 @@ void Draw(double openSec) {
                     0.55f, 0.45f, 0.7f, MK, 7, t);
     }
 
-    // ---- gold "WORLD MAP" title on a green-grid band ----
-    DrawGridPanel(8, 56, 408, 104, t);
+    // ---- free-floating gold beveled "WORLD MAP" title (no panel box) ----
     SetFont(g_fDF);
-    DrawTextBevel({ 30, 65 }, 30.0f, WithAlpha(C_TITLE, t), "WORLD MAP");   // centred in the band
+    SetTextStretchX(1.15f);
+    DrawTextBevel({ 16, 28 }, 38.0f, WithAlpha(C_TITLE, t), "WORLD MAP");
+    ResetTextStretchX();
 
-    // ---- left totals column ----
-    DrawGridPanel(TOT_X0, TOT_Y0, TOT_X1, TOT_Y1, t);
+    // ---- left totals column: a flush LED-dot strip (icon + bright number),
+    //      no chrome frame box, no row separators (matches the real HUD) ----
     {
         struct Row { uint32_t icol; bool ring; const char* val; } rows[] = {
             { C_LIVES, false, "99" }, { C_RING, true, "999999" },
@@ -288,22 +289,25 @@ void Draw(double openSec) {
         SetFont(g_fRodin);
         for (int i = 0; i < 4; ++i) {
             float cy = TROW0 + i * TPITCH;
-            if (i) DrawRect({ TOT_X0 + GRID, cy - TPITCH*0.5f }, { TOT_X1 - GRID, cy - TPITCH*0.5f + 1 }, WithAlpha(C_LINE, t * 0.6f));
-            DrawIconSlot(70, cy, 14, rows[i].icol, rows[i].ring, t);
-            DrawText({ 118, cy - 13 }, 24.0f, WithAlpha(C_NUM, t), rows[i].val);
+            DrawIconSlot(40, cy, 14, rows[i].icol, rows[i].ring, t);
+            DrawText({ 78, cy - 13 }, 24.0f, WithAlpha(C_NUM, t), rows[i].val);
         }
     }
 
     DrawStageLabel(t);
     DrawStageInfo(t);
 
-    // ---- footer (Pass Time / Select) ----
+    // ---- bottom legend band (full-width olive gradient + bright top edge) ----
+    DrawRect({ 0, 612 }, { REF_W, 614 }, WithAlpha(RGBA(140, 168, 90, 220), t));
+    DrawVGradient({ 0, 614 }, { REF_W, REF_H }, WithAlpha(RGBA(36, 48, 18, 200), t), WithAlpha(RGBA(20, 28, 8, 160), t));
+
+    // ---- footer (Pass Time / Select), centred on the band ----
     {
         SetFont(g_fRodin);
-        float hx = 470, hcy = 690;
+        float hx = 598, hcy = 640;
         auto glyph = [&](const UV& g){ if (g_glyphTex<0) return; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=26.0f, gw=gh*asp; DrawImage(g_glyphTex,{hx,hcy-gh*0.5f},{hx+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,t)); hx+=gw+6; };
-        auto word=[&](const char* w,float pad){ DrawText({hx,hcy-11},20.0f,WithAlpha(C_FOOTER,t),w); hx+=MeasureText(20.0f,w).x+pad; };
-        if (g_popup) { hx = 540; glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Back", 10); }
+        auto word=[&](const char* w,float pad){ DrawText({hx,hcy-11},20.0f,WithAlpha(C_WHITE,t),w); hx+=MeasureText(20.0f,w).x+pad; };
+        if (g_popup) { hx = 700; glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Back", 10); }
         else         { glyph(GLYPH_X); word("Pass Time", 40); glyph(GLYPH_A); word("Select", 10); }
         ResetFont();
     }
@@ -314,9 +318,9 @@ void Draw(double openSec) {
         // measured: footer stays FULL bright -> draw popup dim first, then redraw footer
         DrawPopup();
         SetFont(g_fRodin);
-        float hx = 540, hcy = 690;
+        float hx = 700, hcy = 640;
         auto glyph = [&](const UV& g){ if (g_glyphTex<0) return; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=26.0f, gw=gh*asp; DrawImage(g_glyphTex,{hx,hcy-gh*0.5f},{hx+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, C_WHITE); hx+=gw+6; };
-        auto word=[&](const char* w,float pad){ DrawText({hx,hcy-11},20.0f,C_FOOTER,w); hx+=MeasureText(20.0f,w).x+pad; };
+        auto word=[&](const char* w,float pad){ DrawText({hx,hcy-11},20.0f,C_WHITE,w); hx+=MeasureText(20.0f,w).x+pad; };
         glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Back", 10);
         ResetFont();
     }
