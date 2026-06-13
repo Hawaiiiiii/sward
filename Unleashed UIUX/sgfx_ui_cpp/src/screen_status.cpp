@@ -194,8 +194,9 @@ void Draw(double openSec) {
                     Align::Center, true, false);
     ResetFont();
 
-    // ---- top-right medal-level gauge chips (two stacked: Sun + Moon) ----
-    {
+    // ---- top-right medal-level gauge chips (Werehog/night form only; the day
+    //      form's top-right is empty scene) ----
+    if (g_night) {
         SetFont(g_fRodin);
         auto lvchip = [&](float cy, uint32_t icol) {
             // medal icon
