@@ -130,6 +130,15 @@ void SolidQuad(V2 a, V2 b, V2 c, V2 d, uint32_t col) {
     DrawImageQuad(-1, corners, uv, col, false);
 }
 
+// full-width translucent letterbox bands framing every pause state (measured:
+// top band y0..78 + bottom band y642..720, each with a light olive edge line)
+void DrawPauseBands(float t) {
+    DrawRect({ 0, 0 }, { REF_W, 76 }, WithAlpha(RGBA(10, 12, 6, 150), t));
+    DrawRect({ 0, 76 }, { REF_W, 78.5f }, WithAlpha(RGBA(168, 172, 120, 255), t));
+    DrawRect({ 0, 642 }, { REF_W, 644.5f }, WithAlpha(RGBA(168, 172, 120, 255), t));
+    DrawRect({ 0, 644.5f }, { REF_W, REF_H }, WithAlpha(RGBA(10, 12, 6, 150), t));
+}
+
 // the gold WORLD-MAP banner + ghost wordmark + italic chrome PAUSE (measured)
 void DrawBanner(float t) {
     {
@@ -191,25 +200,27 @@ void DrawConfirm(float a) {
     DrawRect({ dx1 - 1.5f, dy0 }, { dx1, dy1 - ch }, bd);
     SolidQuad({ dx0 + ch, dy0 }, { dx0 + ch + 2, dy0 + 2 }, { dx0 + 2, dy0 + ch + 2 }, { dx0, dy0 + ch }, bd);
     SolidQuad({ dx1 - ch, dy1 }, { dx1 - ch - 2, dy1 - 2 }, { dx1 - 2, dy1 - ch - 2 }, { dx1, dy1 - ch }, bd);
-    // options: Yes (engraved) / No (gold pill, dark-maroon text); 0=Yes 1=No
+    // options: unselected = white fill + dark outline; SELECTED = orange fill +
+    // dark outline on a bright rounded-end yellow bar (verified vs the capture)
     auto option = [&](const char* s, float cy, bool selTxt) {
         float w = MeasureText(24.0f, s).x;
-        if (selTxt) {
-            DrawText({ 640.3f - w * 0.5f, cy }, 24.0f, WithAlpha(RGBA(120, 44, 0, 255), a), s);
-            DrawText({ 639.6f - w * 0.5f, cy - 0.7f }, 24.0f, WithAlpha(RGBA(18, 14, 16, 255), a), s);
-        } else {
-            DrawText({ 640.3f - w * 0.5f + 1, cy + 1 }, 24.0f, WithAlpha(RGBA(219, 219, 219, 255), a), s);
-            DrawText({ 639.3f - w * 0.5f, cy }, 24.0f, WithAlpha(RGBA(15, 15, 15, 255), a), s);
-        }
+        float lx = 640.3f - w * 0.5f;
+        for (int dy = -1; dy <= 1; ++dy)
+            for (int dx = -1; dx <= 1; ++dx)
+                if (dx || dy)
+                    DrawText({ lx + dx * 1.4f, cy + dy * 1.4f }, 24.0f, WithAlpha(RGBA(20, 16, 10, 255), a), s);
+        DrawText({ lx, cy }, 24.0f,
+                 WithAlpha(selTxt ? RGBA(238, 120, 18, 255) : RGBA(238, 238, 238, 255), a), s);
     };
-    if (g_confirmSel == 0) {   // gold pill behind Yes
-        DrawVGradient({ 560, 323 }, { 720.7f, 361.7f },
-                      WithAlpha(RGBA(150, 147, 100, 255), a), WithAlpha(RGBA(169, 146, 62, 255), a));
-        DrawRect({ 560, 323 }, { 720.7f, 324.5f }, WithAlpha(RGBA(196, 192, 150, 255), a));
-    } else {                    // gold pill behind No (the captured default)
-        DrawVGradient({ 560, 372 }, { 720.7f, 410.7f },
-                      WithAlpha(RGBA(150, 147, 100, 255), a), WithAlpha(RGBA(169, 146, 62, 255), a));
-        DrawRect({ 560, 372 }, { 720.7f, 373.5f }, WithAlpha(RGBA(196, 192, 150, 255), a));
+    {   // bright yellow selection bar with a lighter top edge + rounded-end hint
+        const float by0 = (g_confirmSel == 0) ? 320.0f : 369.0f, by1 = by0 + 43.0f;
+        DrawVGradient({ 562, by0 + 3 }, { 718.7f, by1 - 3 },
+                      WithAlpha(RGBA(244, 210, 70, 255), a), WithAlpha(RGBA(222, 172, 34, 255), a));
+        DrawVGradient({ 566, by0 }, { 714.7f, by0 + 3 },
+                      WithAlpha(RGBA(252, 236, 150, 255), a), WithAlpha(RGBA(244, 210, 70, 255), a));
+        DrawRect({ 566, by1 - 3 }, { 714.7f, by1 }, WithAlpha(RGBA(206, 152, 26, 255), a));
+        DrawRect({ 558, by0 + 8 }, { 562, by1 - 8 }, WithAlpha(RGBA(238, 196, 52, 255), a));
+        DrawRect({ 718.7f, by0 + 8 }, { 722.7f, by1 - 8 }, WithAlpha(RGBA(238, 196, 52, 255), a));
     }
     option("Yes", 326.0f, g_confirmSel == 0);
     option("No", 375.3f, g_confirmSel == 1);
@@ -394,10 +405,11 @@ void Draw(double openSec) {
     uint32_t s = 0x1357acefu;
     for (int i = 0; i < 70; ++i) { s = s*1664525u+1013904223u; float x=(float)((s>>9)%1280); s=s*1664525u+1013904223u; float y=(float)((s>>9)%720); DrawRect({x,y},{x+1,y+1}, WithAlpha(C_STAR, 0.5f)); }
 
-    // ---- Achievements / Inventory sub-screens (scene+banner dim ~50%) ----
+    // ---- Achievements / Inventory sub-screens (scene dims; banner stays lit) ----
     if (g_sub != SV_NONE) {
-        DrawBanner(1.0f);
         DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 128));
+        DrawPauseBands(1.0f);
+        DrawBanner(1.0f);
         if (g_sub == SV_ACHIEVEMENTS) DrawAchievements(1.0f);
         else                          DrawInventory(1.0f);
         return;
@@ -408,6 +420,7 @@ void Draw(double openSec) {
     if (g_confirm) {
         DrawBanner(1.0f);
         DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 112));
+        DrawPauseBands(1.0f);
         DrawConfirm(1.0f);
         SetFont(g_fRodin);
         float hcy = 668;
@@ -418,6 +431,7 @@ void Draw(double openSec) {
         return;
     }
     DrawRect({ 0, 0 }, { REF_W, REF_H }, WithAlpha(C_DIM, dimT));
+    DrawPauseBands(dimT);
 
     DrawBanner(t);
 

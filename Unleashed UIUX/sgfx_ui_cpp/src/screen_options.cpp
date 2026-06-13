@@ -311,14 +311,16 @@ void Draw(double openSec) {
     // then it shows the dark placeholder. Matches options_menu's preview thumbnail.
     {
         float ix0 = IP_X0 + 18, ix1 = IP_X1 - 17;
-        float ty0 = IP_Y0 + 18 + 4.5f, th = (ix1 - ix0) * 0.46f, ty1 = ty0 + th;
-        DrawRect({ ix0, ty0 }, { ix1, ty1 }, WithAlpha(RGBA(18,28,22,255), t));   // image placeholder fill
-        uint32_t gb = WithAlpha(RGBA(0,168,46,255), t); const float L = 2.0f;     // bright-green border
-        DrawRect({ ix0, ty0 }, { ix1, ty0 + L }, gb);
-        DrawRect({ ix0, ty1 - L }, { ix1, ty1 }, gb);
-        DrawRect({ ix0, ty0 }, { ix0 + L, ty1 }, gb);
-        DrawRect({ ix1 - L, ty0 }, { ix1, ty1 }, gb);
-        DrawTextAligned({ ix0, ty0 }, { ix1, ty1 }, 15.0f, WithAlpha(RGBA(110,140,116,255), t), "PREVIEW", Align::Center, true, true);
+        // preview box: the real video thumb is 240x140 (~16:9), centred in the panel
+        float pvx0 = (IP_X0 + IP_X1) * 0.5f - 120.0f, pvx1 = pvx0 + 240.0f;
+        float ty0 = IP_Y0 + 18 + 4.5f, ty1 = ty0 + 140.0f;
+        DrawRect({ pvx0, ty0 }, { pvx1, ty1 }, WithAlpha(RGBA(18,28,22,255), t));   // image placeholder fill
+        uint32_t gb = WithAlpha(RGBA(0,168,46,255), t); const float L = 2.0f;       // bright-green border
+        DrawRect({ pvx0, ty0 }, { pvx1, ty0 + L }, gb);
+        DrawRect({ pvx0, ty1 - L }, { pvx1, ty1 }, gb);
+        DrawRect({ pvx0, ty0 }, { pvx0 + L, ty1 }, gb);
+        DrawRect({ pvx1 - L, ty0 }, { pvx1, ty1 }, gb);
+        DrawTextAligned({ pvx0, ty0 }, { pvx1, ty1 }, 15.0f, WithAlpha(RGBA(110,140,116,255), t), "PREVIEW", Align::Center, true, true);
         const Option& s = Opt(std::clamp(g_sel, 0, OptCount() - 1));
         // description: centred word-wrapped paragraph, Seurat 28 white, line spacing 5,
         // per-value description appended after a blank line, clipped to the panel with

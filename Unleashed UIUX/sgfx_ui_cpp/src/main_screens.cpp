@@ -236,6 +236,7 @@ int main(int argc, char** argv) {
         int n = drawFrame(csdMode ? shotSec : 0.0, shotFade, shotSec);
         std::vector<unsigned char> px((size_t)W * H * 4);
         gfx::readbackRGBA(px.data(), W, H);
+        for (size_t i = 3; i < px.size(); i += 4) px[i] = 255;   // opaque screenshots
         stbi_write_png(out.c_str(), W, H, 4, px.data(), W * 4);
         printf("wrote %s (%s=%s t=%.2fs, %d quads, MSAA x%d)\n",
                out.c_str(), csdMode ? "csd" : "screen", id.c_str(), shotSec, n, gfx::sampleCount());
