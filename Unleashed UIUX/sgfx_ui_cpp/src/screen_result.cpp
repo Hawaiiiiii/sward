@@ -148,30 +148,43 @@ void Draw(double openSec) {
         Chrome({ wx, WM_CAPTOP - 12 }, 48.0f, "RESULTS", wmT, 1.70f);
     }
 
+    const float VAL_R = 1090;   // common right edge the value strips align to
+    const uint32_t C_VSTRIP_T = RGBA(18, 26, 44, 180), C_VSTRIP_B = RGBA(8, 14, 28, 180);
     for (int i = 0; i < N_ROWS; ++i) {
         const float rowT = (float)ComputeMotion(openSec, 26.0 + i * 5.0, 10.0);
         if (rowT <= 0.0f) continue;
         const float x = ROW_X0 + i * ROW_XSTEP;
         const float y = ROW_TOP0 + i * ROW_PITCH;
+        // long dark translucent value strip extending from the plate to VAL_R
+        const float sx0 = x + ROW_W + SLANT - 6;
+        const V2 vs[4] = { { sx0 + SLANT, y + 4 }, { VAL_R, y + 4 }, { VAL_R, y + ROW_H - 4 }, { sx0, y + ROW_H - 4 } };
+        const uint32_t vsc[4] = { WithAlpha(C_VSTRIP_T, rowT), WithAlpha(C_VSTRIP_T, rowT), WithAlpha(C_VSTRIP_B, rowT), WithAlpha(C_VSTRIP_B, rowT) };
+        DrawQuadGradient(vs, vsc);
+        DrawRect({ sx0 + SLANT, y + 4 }, { VAL_R, y + 5.5f }, WithAlpha(RGBA(120, 140, 175, 200), rowT));   // thin top edge
         Plate(x, y, ROW_W, ROW_H, C_PLATE_T, C_PLATE_B, C_PLATE_BD, rowT);
         SetFont(g_fSeurat);
         SetTextShear(0.20f);
         DrawText({ x + 38, y + (ROW_H - 24) * 0.5f }, 24.0f, WithAlpha(C_LABEL, rowT), ROWS[i].label);
         ResetTextShear();
         ResetFont();
-        // tally: value counts 0 -> final over ~1.2 s once all rows are in
+        // tally value, RIGHT-aligned inside the strip to the common edge
         const float tallyT = (float)ComputeMotion(openSec, 60.0 + i * 3.0, 72.0);
         char buf[24];
         FormatValue(ROWS[i], (int)std::lround(ROWS[i].value * tallyT), buf, sizeof buf);
-        Chrome({ x + ROW_W + SLANT + VAL_GAP, y + ROW_H * 0.5f - 16 }, 32.0f, buf, rowT);
+        SetFont(g_fDF);
+        SetTextShear(0.24f); SetTextStretchX(1.2f);
+        float vw = MeasureText(32.0f, buf).x * 1.2f;
+        ResetTextStretchX(); ResetTextShear(); ResetFont();
+        Chrome({ VAL_R - vw - 18, y + ROW_H * 0.5f - 16 }, 32.0f, buf, rowT);
     }
 
-    // ---- TOTAL (green plate; counts after the stat tally) ----
+    // ---- TOTAL (one long green bar stepping LEFT, value right-aligned inside) ----
     {
         const float totT = (float)ComputeMotion(openSec, 50.0, 10.0);
         if (totT > 0.0f) {
-            const float x = ROW_X0 + N_ROWS * ROW_XSTEP;
-            Plate(x, TOT_TOP, ROW_W, TOT_H, C_TOTAL_T, C_TOTAL_B, C_PLATE_BD, totT);
+            const float x = ROW_X0 - 8;   // steps back left of the TIME row
+            const float tw = VAL_R - x - SLANT - 8;
+            Plate(x, TOT_TOP, tw, TOT_H, C_TOTAL_T, C_TOTAL_B, C_PLATE_BD, totT);
             SetFont(g_fRodin);
             SetTextShear(0.20f);
             DrawText({ x + 40, TOT_TOP + (TOT_H - 26) * 0.5f }, 26.0f, WithAlpha(C_TOTAL_TXT, totT), "TOTAL");
@@ -179,18 +192,27 @@ void Draw(double openSec) {
             ResetFont();
             const float totTally = (float)ComputeMotion(openSec, 132.0, 40.0);
             char buf[16]; snprintf(buf, sizeof buf, "%d", (int)std::lround(g_total * totTally));
-            Chrome({ x + ROW_W + SLANT + VAL_GAP, TOT_TOP + TOT_H * 0.5f - 18 }, 36.0f, buf, totT);
+            SetFont(g_fDF); SetTextShear(0.24f); SetTextStretchX(1.2f);
+            float vw = MeasureText(36.0f, buf).x * 1.2f;
+            ResetTextStretchX(); ResetTextShear(); ResetFont();
+            Chrome({ VAL_R - vw - 18, TOT_TOP + TOT_H * 0.5f - 18 }, 36.0f, buf, totT);
         }
     }
 
-    // ---- RANK reveal: green strip + the big gold letter (scale pop) ----
+    // ---- RANK reveal: wide teal band behind the big gold letter (scale pop) ----
     {
         const float rkT = (float)ComputeMotion(openSec, 178.0, 10.0);
         if (rkT > 0.0f) {
-            Plate(214, 540, 150, 34, RGBA(52, 150, 96, 230), RGBA(34, 120, 70, 230), C_PLATE_BD, rkT);
+            // wide layered teal gradient band spanning behind the rank letter
+            DrawVGradient({ 0, 470 }, { 560, 478 }, WithAlpha(RGBA(70, 168, 150, 220), rkT), WithAlpha(RGBA(70, 168, 150, 220), rkT));
+            DrawVGradient({ 0, 478 }, { 560, 572 }, WithAlpha(RGBA(40, 110, 104, 200), rkT), WithAlpha(RGBA(22, 70, 70, 200), rkT));
             SetFont(g_fSeurat);
-            SetTextShear(0.20f);
-            DrawText({ 248, 545 }, 22.0f, WithAlpha(C_WHITE, rkT), "RANK");
+            SetTextShear(0.22f);
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                    if (dx || dy)
+                        DrawText({ 214 + dx * 1.4f, 526 + dy * 1.4f }, 24.0f, WithAlpha(RGBA(12, 30, 28, 255), rkT), "RANK");
+            DrawText({ 214, 526 }, 24.0f, WithAlpha(C_WHITE, rkT), "RANK");
             ResetTextShear();
             ResetFont();
             // rank letter pops with an overshoot: scale 1.6 -> 1.0 about its centre
@@ -220,10 +242,10 @@ void Draw(double openSec) {
         }
     }
 
-    // ---- footer: (A) Next ----
+    // ---- footer: (A) Next (below the TOTAL value, ~70% / 87%) ----
     {
         const float fT = (float)ComputeMotion(openSec, 60.0, 10.0);
-        float hx = 1126, hcy = 706;
+        float hx = 896, hcy = 626;
         if (g_glyphTex >= 0) {
             float asp = ((GLYPH_A.u1 - GLYPH_A.u0) * GTW) / ((GLYPH_A.v1 - GLYPH_A.v0) * GTH), gh = 28.0f, gw = gh * asp;
             DrawImage(g_glyphTex, { hx, hcy - gh * 0.5f }, { hx + gw, hcy + gh * 0.5f },
