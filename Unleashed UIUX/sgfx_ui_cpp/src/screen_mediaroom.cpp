@@ -371,6 +371,20 @@ void Draw(double openSec) {
         case VIEW_ENCY_ART:  DrawEncyArt(a, now);  FooterEncy(a); break;
         default:             DrawSoundtrack(a, now); FooterSound(a); break;
     }
+    // persistent hub medal-level HUD (top-left, in front of the panel frame):
+    // two stacked rows, Sun then Moon, each = medal icon + "Lv7 [200]"
+    {
+        SetFont(g_fSeurat);
+        auto chip = [&](float cy, uint32_t icol, const char* txt) {
+            DrawRect({ 112, cy - 12 }, { 136, cy + 12 }, WithAlpha(RGBA(40, 30, 8, 230), a));
+            DrawRect({ 114, cy - 10 }, { 134, cy + 10 }, WithAlpha(icol, a));
+            DrawRect({ 119, cy - 5 }, { 129, cy + 5 }, WithAlpha(RGBA(150, 116, 36, 255), a));
+            DrawTextShadow({ 144, cy - 9 }, 16.0f, WithAlpha(RGBA(244, 240, 230, 255), a), txt);
+        };
+        chip(140, RGBA(214, 96, 40, 255), "Lv7 [200]");    // sun
+        chip(176, RGBA(64, 120, 210, 255), "Lv7 [200]");   // moon
+        ResetFont();
+    }
 }
 
 } // namespace

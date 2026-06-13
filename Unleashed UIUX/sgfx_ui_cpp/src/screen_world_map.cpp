@@ -273,14 +273,27 @@ void Draw(double openSec) {
                     0.55f, 0.45f, 0.7f, MK, 7, t);
     }
 
-    // ---- free-floating gold beveled "WORLD MAP" title (no panel box) ----
+    // ---- top-left green LED-circuit panel backing the title + counters
+    //      (subtle lit-cell grid, no bright chevron border / no separators) ----
+    {
+        const float gx0 = 0, gy0 = 56, gx1 = 300, gy1 = 290;
+        DrawRect({ gx0, gy0 }, { gx1, gy1 }, WithAlpha(RGBA(4, 18, 5, 230), t));
+        for (float yy = gy0 + 2; yy < gy1 - 2; yy += 8.0f)
+            for (float xx = gx0 + 2; xx < gx1 - 2; xx += 16.0f) {
+                DrawRect({ xx, yy + 1.5f }, { xx + 14, yy + 3.0f }, WithAlpha(RGBA(16, 55, 20, 255), t));
+                DrawRect({ xx, yy + 4.5f }, { xx + 14, yy + 6.0f }, WithAlpha(RGBA(16, 55, 20, 200), t));
+            }
+        DrawRect({ gx0, gy1 - 2 }, { gx1, gy1 }, WithAlpha(RGBA(20, 81, 18, 255), t));   // bottom rail
+    }
+
+    // ---- gold beveled "WORLD MAP" title on the LED grid ----
     SetFont(g_fDF);
     SetTextStretchX(1.15f);
-    DrawTextBevel({ 16, 28 }, 38.0f, WithAlpha(C_TITLE, t), "WORLD MAP");
+    DrawTextBevel({ 16, 64 }, 34.0f, WithAlpha(C_TITLE, t), "WORLD MAP");
     ResetTextStretchX();
 
-    // ---- left totals column: a flush LED-dot strip (icon + bright number),
-    //      no chrome frame box, no row separators (matches the real HUD) ----
+    // ---- left totals column: icon + bright number rows on the LED grid
+    //      (no chrome frame box, no row separators) ----
     {
         struct Row { uint32_t icol; bool ring; const char* val; } rows[] = {
             { C_LIVES, false, "99" }, { C_RING, true, "999999" },

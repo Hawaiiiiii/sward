@@ -185,13 +185,29 @@ void Draw(double openSec) {
     DrawRect({ 0, RAIL_Y0 }, { RAIL_X1 - 60, RAIL_Y0 + 1.5f }, WithAlpha(C_RAIL_EDGE, a * 0.7f));
     Chrome({ WM_X, WM_TOP }, 46.0f, "STATUS", a, C_CHR_T, C_CHR_B, 1.5f);
 
-    // ---- form wordmark slot (top-right; SEGA art drops in) ----
-    DrawRect({ 950, 36 }, { 1240, 120 }, WithAlpha(RGBA(30, 24, 48, 120), a));
+    // ---- form wordmark slot (mid-right; SEGA art drops in) ----
+    DrawRect({ 950, 470 }, { 1240, 554 }, WithAlpha(RGBA(30, 24, 48, 120), a));
     SetFont(g_fSeurat);
-    DrawTextAligned({ 950, 36 }, { 1240, 120 }, 14.0f, WithAlpha(RGBA(190, 180, 210, 255), a),
+    DrawTextAligned({ 950, 470 }, { 1240, 554 }, 14.0f, WithAlpha(RGBA(190, 180, 210, 255), a),
                     g_night ? "SONIC THE WEREHOG (art slot)" : "SONIC THE HEDGEHOG (art slot)",
                     Align::Center, true, false);
     ResetFont();
+
+    // ---- top-right medal-level gauge chips (two stacked: Sun + Moon) ----
+    {
+        SetFont(g_fRodin);
+        auto lvchip = [&](float cy, uint32_t icol) {
+            // medal icon
+            DrawRect({ 928, cy - 13 }, { 954, cy + 13 }, WithAlpha(RGBA(60, 50, 70, 230), a));
+            DrawRect({ 930, cy - 11 }, { 952, cy + 11 }, WithAlpha(icol, a));
+            // grey rounded capsule frame + gold fill bar
+            DrawVGradient({ 962, cy - 11 }, { 1100, cy + 11 }, WithAlpha(RGBA(196, 200, 206, 235), a), WithAlpha(RGBA(140, 144, 150, 235), a));
+            DrawVGradient({ 966, cy - 7 }, { 1052, cy + 7 }, WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_B, a));
+        };
+        lvchip(140, RGBA(214, 96, 40, 255));    // sun
+        lvchip(176, RGBA(64, 120, 210, 255));   // moon
+        ResetFont();
+    }
 
     // ---- EXP row: magenta plate + gem slot + bar + chrome count ----
     if (rowT > 0.0f) {
