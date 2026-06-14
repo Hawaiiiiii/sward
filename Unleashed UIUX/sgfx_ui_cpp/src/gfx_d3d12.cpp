@@ -39,7 +39,7 @@ constexpr RenderFormat RT_FMT  = RenderFormat::B8G8R8A8_UNORM;  // matches BACKB
 constexpr RenderFormat TEX_FMT = RenderFormat::R8G8B8A8_UNORM;  // stb gives tight RGBA
 constexpr uint32_t MAX_TEX   = 1024;
 constexpr uint32_t MAX_SAMP  = 4;
-constexpr uint32_t MAX_QUADS = 4096;
+constexpr uint32_t MAX_QUADS = 12288;   // 3x: the 3D globe screens emit ~4.5k quads; uint16 index ceiling is 16384
 constexpr uint32_t SHARED_STRIDE = 512;   // >=276 bytes of SharedConstants, 256-aligned
 constexpr uint32_t VS_CB_SIZE = 4096;     // guest VertexShaderConstants file (0x400 dwords)
 

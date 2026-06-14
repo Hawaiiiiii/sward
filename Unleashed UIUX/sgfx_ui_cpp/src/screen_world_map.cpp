@@ -235,12 +235,10 @@ void DrawPopup() {
     DrawRect({ 472, 276 }, { 808, 428 }, C_POP_FILL);
     ResetModifier();
     const char* OPT[2] = { "Go to the village", "Select stage" };
-    // highlight box on the selected row (gradient + scanlines)
+    // highlight box on the selected row (smooth gradient — real game has no scanlines here)
     {
         float hy = (g_popupSel == 0) ? 290.7f : 361.4f;
-        SetModifier(MOD_SCANLINE);
         DrawVGradient({ 484.7f, hy }, { 795.4f, hy + 50.7f }, C_POP_HI_T, C_POP_HI_B);
-        ResetModifier();
     }
     SetFont(g_fRodin);
     for (int i = 0; i < 2; ++i) {
@@ -276,7 +274,7 @@ void Draw(double openSec) {
     // ---- top-left green LED-circuit panel backing the title + counters
     //      (subtle lit-cell grid, no bright chevron border / no separators) ----
     {
-        const float gx0 = 0, gy0 = 56, gx1 = 300, gy1 = 290;
+        const float gx0 = 0, gy0 = 56, gx1 = 430, gy1 = 290;
         DrawRect({ gx0, gy0 }, { gx1, gy1 }, WithAlpha(RGBA(4, 18, 5, 230), t));
         for (float yy = gy0 + 2; yy < gy1 - 2; yy += 8.0f)
             for (float xx = gx0 + 2; xx < gx1 - 2; xx += 16.0f) {
@@ -286,24 +284,23 @@ void Draw(double openSec) {
         DrawRect({ gx0, gy1 - 2 }, { gx1, gy1 }, WithAlpha(RGBA(20, 81, 18, 255), t));   // bottom rail
     }
 
-    // ---- gold beveled "WORLD MAP" title on the LED grid ----
+    // ---- gold beveled "WORLD MAP" title (inset ~124px, bigger, wider tracking) ----
     SetFont(g_fDF);
-    SetTextStretchX(1.15f);
-    DrawTextBevel({ 16, 64 }, 34.0f, WithAlpha(C_TITLE, t), "WORLD MAP");
+    SetTextStretchX(1.45f);
+    DrawTextBevel({ 124, 62 }, 42.0f, WithAlpha(C_TITLE, t), "WORLD MAP");
     ResetTextStretchX();
 
-    // ---- left totals column: icon + bright number rows on the LED grid
-    //      (no chrome frame box, no row separators) ----
+    // ---- left totals column: icon + bright number rows, inset on the LED grid ----
     {
         struct Row { uint32_t icol; bool ring; const char* val; } rows[] = {
             { C_LIVES, false, "99" }, { C_RING, true, "999999" },
-            { C_SUN, true, "7 [200]" }, { C_MOON, true, "7 [200]" },   // medal: collected [total]
+            { C_SUN, true, "lv 7 (200)" }, { C_MOON, true, "lv 7 (200)" },
         };
         SetFont(g_fRodin);
         for (int i = 0; i < 4; ++i) {
             float cy = TROW0 + i * TPITCH;
-            DrawIconSlot(40, cy, 14, rows[i].icol, rows[i].ring, t);
-            DrawText({ 78, cy - 13 }, 24.0f, WithAlpha(C_NUM, t), rows[i].val);
+            DrawIconSlot(140, cy, 14, rows[i].icol, rows[i].ring, t);
+            DrawText({ 178, cy - 13 }, 24.0f, WithAlpha(C_NUM, t), rows[i].val);
         }
     }
 
@@ -318,8 +315,8 @@ void Draw(double openSec) {
     {
         SetFont(g_fRodin);
         float hx = 598, hcy = 640;
-        auto glyph = [&](const UV& g){ if (g_glyphTex<0) return; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=26.0f, gw=gh*asp; DrawImage(g_glyphTex,{hx,hcy-gh*0.5f},{hx+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,t)); hx+=gw+6; };
-        auto word=[&](const char* w,float pad){ DrawText({hx,hcy-11},20.0f,WithAlpha(C_WHITE,t),w); hx+=MeasureText(20.0f,w).x+pad; };
+        auto glyph = [&](const UV& g){ if (g_glyphTex<0) return; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{hx,hcy-gh*0.5f},{hx+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,t)); hx+=gw+6; };
+        auto word=[&](const char* w,float pad){ DrawText({hx,hcy-12},23.0f,WithAlpha(C_WHITE,t),w); hx+=MeasureText(23.0f,w).x+pad; };
         if (g_popup) { hx = 700; glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Back", 10); }
         else         { glyph(GLYPH_X); word("Pass Time", 40); glyph(GLYPH_A); word("Select", 10); }
         ResetFont();
@@ -332,8 +329,8 @@ void Draw(double openSec) {
         DrawPopup();
         SetFont(g_fRodin);
         float hx = 700, hcy = 640;
-        auto glyph = [&](const UV& g){ if (g_glyphTex<0) return; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=26.0f, gw=gh*asp; DrawImage(g_glyphTex,{hx,hcy-gh*0.5f},{hx+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, C_WHITE); hx+=gw+6; };
-        auto word=[&](const char* w,float pad){ DrawText({hx,hcy-11},20.0f,C_WHITE,w); hx+=MeasureText(20.0f,w).x+pad; };
+        auto glyph = [&](const UV& g){ if (g_glyphTex<0) return; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{hx,hcy-gh*0.5f},{hx+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, C_WHITE); hx+=gw+6; };
+        auto word=[&](const char* w,float pad){ DrawText({hx,hcy-12},23.0f,C_WHITE,w); hx+=MeasureText(23.0f,w).x+pad; };
         glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Back", 10);
         ResetFont();
     }
