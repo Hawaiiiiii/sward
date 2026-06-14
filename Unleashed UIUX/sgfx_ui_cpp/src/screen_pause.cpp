@@ -175,9 +175,9 @@ void DrawConfirm(float a) {
     const uint32_t SCENE_DK = RGBA(3, 5, 2, 255);   // chamfer erase = dimmed scene
     // back prompt plate (497.3,302.7) 284x111.3, TL chamfer 22
     DrawVGradient({ 497.3f, 302.7f }, { 781.3f, 414.0f },
-                  WithAlpha(RGBA(92, 93, 95, 255), a), WithAlpha(RGBA(60, 62, 60, 255), a));
-    DrawRect({ 497.3f, 302.7f }, { 781.3f, 304.0f }, WithAlpha(RGBA(118, 119, 121, 255), a));
-    DrawRect({ 497.3f, 412.7f }, { 781.3f, 414.0f }, WithAlpha(RGBA(110, 112, 110, 255), a));
+                  WithAlpha(RGBA(116, 120, 124, 255), a), WithAlpha(RGBA(96, 100, 104, 255), a));
+    DrawRect({ 497.3f, 302.7f }, { 781.3f, 304.0f }, WithAlpha(RGBA(140, 142, 144, 255), a));
+    DrawRect({ 497.3f, 412.7f }, { 781.3f, 414.0f }, WithAlpha(RGBA(112, 114, 116, 255), a));
     SolidQuad({ 497.3f, 302.7f }, { 519.3f, 302.7f }, { 497.3f, 324.7f }, { 497.3f, 302.7f }, SCENE_DK);
     // prompt: engraved dark grey (light bevel under dark core)
     SetFont(g_fRodin);
@@ -190,7 +190,7 @@ void DrawConfirm(float a) {
     // front dialog (541.3,280.7) 196.7x157.3, chamfers TL+BR 22, silver border
     const float dx0 = 541.3f, dy0 = 280.7f, dx1 = 738.0f, dy1 = 438.0f, ch = 22.0f;
     DrawVGradient({ dx0, dy0 }, { dx1, dy1 },
-                  WithAlpha(RGBA(158, 160, 160, 255), a), WithAlpha(RGBA(105, 107, 107, 255), a));
+                  WithAlpha(RGBA(164, 165, 166, 255), a), WithAlpha(RGBA(140, 141, 142, 255), a));
     SolidQuad({ dx0, dy0 }, { dx0 + ch, dy0 }, { dx0, dy0 + ch }, { dx0, dy0 }, SCENE_DK);
     SolidQuad({ dx1 - ch, dy1 }, { dx1, dy1 }, { dx1, dy1 - ch }, { dx1 - ch, dy1 }, SCENE_DK);
     uint32_t bd = WithAlpha(RGBA(224, 226, 226, 255), a);
@@ -370,7 +370,7 @@ void DrawInventory(float a) {
     //      beside the selected row, GOLD highlight band on the chosen option) ----
     if (g_invPopup) {
         const float ty = 232.7f + g_invSel * 50.0f;
-        const float px0 = 430, py0 = std::min(ty - 6.0f, 540.0f), px1 = 624, py1 = py0 + 78;
+        const float px0 = 486, py0 = std::min(ty - 6.0f, 540.0f), px1 = 680, py1 = py0 + 78;
         DrawVGradient({ px0, py0 }, { px1, py1 }, WithAlpha(RGBA(168, 170, 170, 248), a), WithAlpha(RGBA(118, 120, 120, 248), a));
         DrawRect({ px0, py0 }, { px1, py0 + 2 }, WithAlpha(RGBA(222, 224, 224, 255), a));
         DrawRect({ px0, py1 - 2 }, { px1, py1 }, WithAlpha(RGBA(210, 212, 212, 255), a));
