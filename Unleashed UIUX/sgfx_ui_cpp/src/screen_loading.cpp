@@ -166,19 +166,19 @@ void Draw(double openSec) {
     // close the loop. f in [0,1]: 0 = near/bottom, 1 = far/top apex.
     {
         const float yNear = 553, yApex = 341;            // near/front edge / far apex
-        const float cxApex = 585;                        // far apex x (loop closes here)
+        const float cxApex = 640;                        // far apex x (loop closes here; real loop is centred ~640)
         // centreline y by depth: ease so bands bunch toward the far apex (perspective).
         // f=0 -> near band (y~553), f=1 -> far apex (y~341); the widest band (f~0.62)
         // lands y~450-466 as measured. Power 1.4 keeps the bunching gentle.
         auto loopY  = [&](float f) { return yNear + (yApex - yNear) * std::pow(f, 1.4f); };
         // ring centre x drifts from near (573) toward the far apex (585)
-        auto loopCx = [&](float f) { return 573.0f + (cxApex - 573.0f) * f; };
+        auto loopCx = [&](float f) { return 632.0f + (cxApex - 632.0f) * f; };
         // OUTER ellipse half-width: small at the near lip, peaks (~216 about centre
         // ~581 -> arms 357 / 789) at the WIDEST band y~458 (f~0.66), then pinches to 0
         // at the far apex. A skewed sine cap rounds the near lip and the far apex.
         auto outerHalf = [&](float f) {
             float e = std::sin(3.14159265f * std::pow(f, 0.60f));  // 0 at caps, peak ~f0.62
-            return 216.0f * std::pow(e, 0.96f);
+            return 285.0f * std::pow(e, 0.96f);   // arms reach ~357/925 about centre 640
         };
         // INNER ellipse half-width: the hollow. Zero through the whole near lip
         // (f<~0.18, so the front of the loop reads SOLID across y[480-520]) and zero

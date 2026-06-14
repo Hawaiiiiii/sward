@@ -168,8 +168,8 @@ void Draw(double openSec) {
         // dark-bottom green shading (face g ~218 -> ~147), at the measured rect.
         DrawImageVGradient(g_wordTex, { 650, 568 }, { 969, 602 },
                            { WM_U0, WM_V0 }, { WM_U1, WM_V1 },
-                           WithAlpha(RGBA(76, 218, 16, 255), pulse),
-                           WithAlpha(RGBA(50, 147, 10, 255), pulse));
+                           WithAlpha(RGBA(48, 130, 12, 255), pulse),
+                           WithAlpha(RGBA(34, 95, 10, 255), pulse));
     } else {
         // re-skin path (custom SGFX strings): the proportional bitmap font, bolded
         const char* txt = "NOW LOADING";

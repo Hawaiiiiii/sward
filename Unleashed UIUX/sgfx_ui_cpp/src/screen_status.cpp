@@ -210,16 +210,16 @@ void Draw(double openSec) {
     if (g_night) {
         auto lvchip = [&](float cy) {
             // silver capsule track (rounded ends) with the lv label seated left
-            DrawVGradient({ 928, cy - 12 }, { 1110, cy + 12 }, WithAlpha(RGBA(206, 210, 214, 235), a), WithAlpha(RGBA(150, 154, 160, 235), a));
-            DrawRect({ 924, cy - 6 }, { 932, cy + 6 }, WithAlpha(RGBA(180, 184, 190, 235), a));   // rounded-end hint
-            DrawRect({ 1106, cy - 6 }, { 1114, cy + 6 }, WithAlpha(RGBA(180, 184, 190, 235), a));
+            DrawVGradient({ 818, cy - 12 }, { 1000, cy + 12 }, WithAlpha(RGBA(206, 210, 214, 235), a), WithAlpha(RGBA(150, 154, 160, 235), a));
+            DrawRect({ 814, cy - 6 }, { 822, cy + 6 }, WithAlpha(RGBA(180, 184, 190, 235), a));   // rounded-end hint
+            DrawRect({ 996, cy - 6 }, { 1004, cy + 6 }, WithAlpha(RGBA(180, 184, 190, 235), a));
             // "lv 7" label (small lv + larger 7)
             SetFont(g_fRodin);
-            DrawTextShadow({ 936, cy - 6 }, 12.0f, WithAlpha(RGBA(70, 72, 78, 255), a), "lv");
-            DrawText({ 952, cy - 11 }, 22.0f, WithAlpha(RGBA(40, 42, 48, 255), a), "7");
+            DrawTextShadow({ 826, cy - 6 }, 12.0f, WithAlpha(RGBA(70, 72, 78, 255), a), "lv");
+            DrawText({ 842, cy - 11 }, 22.0f, WithAlpha(RGBA(40, 42, 48, 255), a), "7");
             ResetFont();
             // yellow pill gauge fill (rounded), right of the label
-            DrawVGradient({ 974, cy - 7 }, { 1098, cy + 7 }, WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_B, a));
+            DrawVGradient({ 864, cy - 7 }, { 988, cy + 7 }, WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_B, a));
         };
         lvchip(140); lvchip(176);
     }

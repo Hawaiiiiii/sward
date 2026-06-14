@@ -231,7 +231,7 @@ void Draw(double openSec) {
             if (g_rankTex >= 0) {   // the REAL metal letter art, warm-gold tinted (as captured)
                 DrawImage(g_rankTex, { cx - hw, cy - hh }, { cx + hw, cy + hh },
                           { RANK_UV[ri].u0, RANK_UV[ri].v0 }, { RANK_UV[ri].u1, RANK_UV[ri].v1 },
-                          WithAlpha(RGBA(232, 188, 110, 255), rkT));
+                          WithAlpha(RGBA(255, 194, 84, 255), rkT));   // stronger warm-gold tint (was washed-out silver)
             } else {                // fallback: chrome-recipe letter
                 SetFont(g_fDF);
                 SetTextShear(0.10f);

@@ -54,8 +54,8 @@ const uint32_t C_HDR_T     = RGBA(88, 93, 70, 235);      // header green field
 const uint32_t C_HDR_B     = RGBA(56, 67, 46, 235);
 const uint32_t C_HDR_CREAM = RGBA(227, 214, 180, 255);
 const uint32_t C_HDR_GOLD  = RGBA(204, 181, 89, 255);
-const uint32_t C_TITLE_T   = RGBA(244, 243, 240, 255);   // beveled title slab (white, per capture)
-const uint32_t C_TITLE_B   = RGBA(212, 206, 184, 255);   // faint warm tint, NOT gold
+const uint32_t C_TITLE_T   = RGBA(232, 206, 108, 255);   // beveled title slab — GOLD (measured real ~193,172,91)
+const uint32_t C_TITLE_B   = RGBA(196, 162, 72, 255);    // gold bottom bevel
 const uint32_t C_TITLE_OUT = RGBA(65, 62, 39, 255);
 const uint32_t C_PLQ_GREEN = RGBA(95, 91, 56, 255);      // page counter band = olive (G near R, not brown)
 const uint32_t C_PLQ_GOLD  = RGBA(228, 199, 69, 255);
@@ -118,13 +118,13 @@ void HeaderStrip(const char* title, float a) {
     // beveled slab title at the measured x (ref band ~270 wide x 29 tall):
     // olive-brown outline ring first, then the cream->gold bevel face
     SetFont(g_fDF);
-    SetTextStretchX(1.3f);   // wider glyph span to reach ~279px (per capture)
+    SetTextStretchX(1.05f);   // measured real gold wordmark is compact (~140px ink), left-anchored
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (dx || dy)
-                DrawText({ 278.0f + dx * 1.5f, 68.0f + dy * 1.5f }, 40.0f, WithAlpha(C_TITLE_OUT, a), title);
+                DrawText({ 140.0f + dx * 1.2f, 70.0f + dy * 1.2f }, 27.0f, WithAlpha(C_TITLE_OUT, a), title);
     SetModifier(MOD_TITLE_BEVEL);
-    DrawTextGradient({ 278, 68 }, 40.0f, WithAlpha(C_TITLE_T, a), WithAlpha(C_TITLE_B, a), title);
+    DrawTextGradient({ 140, 70 }, 27.0f, WithAlpha(C_TITLE_T, a), WithAlpha(C_TITLE_B, a), title);
     ResetModifier();
     ResetTextStretchX();
     ResetFont();

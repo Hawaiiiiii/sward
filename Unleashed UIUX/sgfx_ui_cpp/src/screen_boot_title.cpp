@@ -152,13 +152,13 @@ void PressStart(double now, float a) {
     // outline-style PRESS START (dark olive ring + capsule-yellow inner)
     SetFont(g_fRodin);
     const char* PS = "PRESS START";
-    float w = MeasureText(31.5f, PS).x;
-    float px = 640 - w * 0.5f, py = 504.0f;
+    float w = MeasureText(22.0f, PS).x;
+    float px = 640 - w * 0.5f, py = 512.0f;   // ~20px caps fit the y506-534 fill with the real ~9px margin
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (dx || dy)
-                DrawText({ px + dx * 2.3f, py + dy * 2.3f }, 31.5f, WithAlpha(C_PS_OUT, a), PS);
-    DrawText({ px, py }, 31.5f, WithAlpha(C_CAP_PEAK, a), PS);
+                DrawText({ px + dx * 1.2f, py + dy * 1.2f }, 22.0f, WithAlpha(C_PS_OUT, a), PS);
+    DrawText({ px, py }, 22.0f, WithAlpha(C_CAP_PEAK, a), PS);
     ResetFont();
 }
 
