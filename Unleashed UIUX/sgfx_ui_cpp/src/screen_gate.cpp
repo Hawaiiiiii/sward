@@ -136,10 +136,63 @@ void Draw(double openSec) {
     const float a = (float)ComputeMotion(openSec, 0.0, 10.0);
     const float panT = (float)ComputeMotion(openSec, 4.0, 10.0);
 
-    // ---- live scene slot: temple stone + warp glow column ----
-    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_STONE_T, C_STONE_B);
-    DrawVGradient({ 760, 60 }, { 980, 560 }, WithAlpha(C_WARP, 0.55f), WithAlpha(RGBA(255, 220, 120, 255), 0.25f));
-    DrawRect({ 700, 540 }, { 1040, 600 }, RGBA(170, 150, 120, 255));
+    // ---- live scene slot: Gaia-temple interior — stone walls, a glowing warp
+    //      portal cylinder (upper centre, behind the panel) and an ornate rune-
+    //      ring stone platform at the base (matches the gate_stage_select scene) ----
+    {
+        // stone temple backdrop + faint side pillars for depth
+        DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_STONE_T, C_STONE_B);
+        DrawVGradient({ 24, 0 }, { 150, REF_H }, WithAlpha(RGBA(130, 128, 122, 255), 0.32f), WithAlpha(RGBA(100, 98, 92, 255), 0.32f));
+        DrawVGradient({ 1130, 0 }, { 1256, REF_H }, WithAlpha(RGBA(130, 128, 122, 255), 0.32f), WithAlpha(RGBA(100, 98, 92, 255), 0.32f));
+
+        // additive vertical-gradient bar (top->bottom alpha fade)
+        auto vbar = [&](float x0, float y0, float x1, float y1, uint32_t top, uint32_t bot) {
+            const V2 q[4] = { { x0, y0 }, { x1, y0 }, { x1, y1 }, { x0, y1 } };
+            const uint32_t c[4] = { top, top, bot, bot };
+            DrawQuadGradient(q, c, true);
+        };
+        // filled perspective ellipse via horizontal strips
+        auto ellipse = [&](float cx, float cy, float rx, float ry, uint32_t col) {
+            const int N = 22;
+            for (int i = 0; i < N; ++i) {
+                float y0 = cy - ry + (2 * ry) * i / N, y1 = cy - ry + (2 * ry) * (i + 1) / N;
+                float ym = (y0 + y1) * 0.5f - cy;
+                float t = 1.0f - (ym * ym) / (ry * ry); if (t < 0) t = 0;
+                float hw = rx * std::sqrt(t);
+                DrawRect({ cx - hw, y0 }, { cx + hw, y1 }, col);
+            }
+        };
+
+        // --- warp portal cylinder: centre-bright additive amber column ---
+        const float pcx = 712.0f, ptop = -12.0f, pbot = 252.0f;
+        auto column = [&](float halfW, uint32_t top, uint32_t bot) {
+            const V2 lq[4] = { { pcx - halfW, ptop }, { pcx, ptop }, { pcx, pbot }, { pcx - halfW, pbot } };
+            const uint32_t lc[4] = { WithAlpha(top, 0.0f), top, bot, WithAlpha(bot, 0.0f) };
+            DrawQuadGradient(lq, lc, true);
+            const V2 rq[4] = { { pcx, ptop }, { pcx + halfW, ptop }, { pcx + halfW, pbot }, { pcx, pbot } };
+            const uint32_t rc[4] = { top, WithAlpha(top, 0.0f), WithAlpha(bot, 0.0f), bot };
+            DrawQuadGradient(rq, rc, true);
+        };
+        column(152.0f, WithAlpha(RGBA(255, 150, 40, 255), 0.42f), WithAlpha(RGBA(255, 120, 30, 255), 0.10f));   // soft outer halo
+        column(66.0f,  WithAlpha(RGBA(255, 198, 96, 255), 0.62f), WithAlpha(RGBA(255, 150, 40, 255), 0.20f));   // bright core
+        vbar(pcx - 68, ptop, pcx - 60, pbot, WithAlpha(RGBA(255, 232, 178, 255), 0.55f), WithAlpha(RGBA(255, 232, 178, 255), 0.0f));  // tube wall L
+        vbar(pcx + 60, ptop, pcx + 68, pbot, WithAlpha(RGBA(255, 232, 178, 255), 0.55f), WithAlpha(RGBA(255, 232, 178, 255), 0.0f));  // tube wall R
+
+        // --- rune-ring stone platform at the base ---
+        const float gx = 628.0f, gy = 602.0f, grx = 148.0f, gry = 45.0f;
+        ellipse(gx, gy + 3, grx + 4, gry + 3, WithAlpha(RGBA(40, 30, 18, 255), 0.5f));   // soft drop shadow
+        ellipse(gx, gy, grx, gry, RGBA(120, 110, 92, 255));                              // outer stone rim
+        ellipse(gx, gy, grx - 9, gry - 3, RGBA(152, 140, 118, 255));                     // lit stone ring
+        ellipse(gx, gy, grx - 25, gry - 8, RGBA(68, 52, 34, 255));                       // dark rune channel
+        for (int i = 0; i < 18; ++i) {                                                   // glowing rune marks
+            float th = i * (6.2831853f / 18.0f), rx = grx - 25, ry = gry - 8;
+            float dx = gx + std::cos(th) * (rx - 4), dy = gy + std::sin(th) * (ry - 2);
+            DrawRect({ dx - 4, dy - 2 }, { dx + 4, dy + 2 }, RGBA(255, 154, 44, 255));
+        }
+        ellipse(gx, gy, grx - 44, gry - 14, RGBA(150, 138, 116, 255));                   // inner stone disc
+        ellipse(gx, gy, grx - 70, gry - 23, RGBA(60, 46, 30, 255));                      // dark centre well
+        ellipse(gx, gy, grx - 80, gry - 26, WithAlpha(RGBA(255, 150, 40, 255), 0.55f));  // centre glow
+    }
 
     // ---- thick angled gold ribbon (from the left edge, slanted right cut) +
     //      two-line chrome wordmark sitting on it ----
