@@ -49,7 +49,7 @@ const uint32_t C_RAIL_EDGE = RGBA(169, 188, 234, 255);   // bright under-edge li
 const uint32_t C_PLATE_T   = RGBA(54, 85, 146, 215);     // stat plate navy top
 const uint32_t C_PLATE_B   = RGBA(41, 61, 116, 215);     // stat plate navy bottom
 const uint32_t C_PLATE_BD  = RGBA(235, 240, 248, 255);   // plate white outline
-const uint32_t C_LABEL     = RGBA(95, 225, 115, 255);    // green italic label
+const uint32_t C_LABEL     = RGBA(190, 206, 230, 255);   // white/light-blue label (measured)
 const uint32_t C_TOTAL_T   = RGBA(66, 161, 113, 235);    // TOTAL green top
 const uint32_t C_TOTAL_B   = RGBA(40, 142, 90, 235);     // TOTAL green bottom
 const uint32_t C_TOTAL_TXT = RGBA(16, 42, 64, 255);      // navy TOTAL text
@@ -148,7 +148,7 @@ void Draw(double openSec) {
         Chrome({ wx, WM_CAPTOP - 12 }, 48.0f, "RESULTS", wmT, 1.70f);
     }
 
-    const float VAL_R = 1090;   // common right edge the value strips align to
+    const float VAL_R = 1116;   // common right edge the value strips align to (measured wider)
     const uint32_t C_VSTRIP_T = RGBA(18, 26, 44, 180), C_VSTRIP_B = RGBA(8, 14, 28, 180);
     for (int i = 0; i < N_ROWS; ++i) {
         const float rowT = (float)ComputeMotion(openSec, 26.0 + i * 5.0, 10.0);
@@ -203,16 +203,16 @@ void Draw(double openSec) {
     {
         const float rkT = (float)ComputeMotion(openSec, 178.0, 10.0);
         if (rkT > 0.0f) {
-            // wide layered teal gradient band spanning behind the rank letter
-            DrawVGradient({ 0, 470 }, { 560, 478 }, WithAlpha(RGBA(70, 168, 150, 220), rkT), WithAlpha(RGBA(70, 168, 150, 220), rkT));
-            DrawVGradient({ 0, 478 }, { 560, 572 }, WithAlpha(RGBA(40, 110, 104, 200), rkT), WithAlpha(RGBA(22, 70, 70, 200), rkT));
+            // wide layered teal band behind the rank letter (measured y~520-564)
+            DrawVGradient({ 0, 519 }, { 560, 524 }, WithAlpha(RGBA(78, 176, 158, 225), rkT), WithAlpha(RGBA(78, 176, 158, 225), rkT));
+            DrawVGradient({ 0, 524 }, { 560, 565 }, WithAlpha(RGBA(40, 110, 104, 205), rkT), WithAlpha(RGBA(24, 74, 72, 205), rkT));
             SetFont(g_fSeurat);
             SetTextShear(0.22f);
             for (int dy = -1; dy <= 1; ++dy)
                 for (int dx = -1; dx <= 1; ++dx)
                     if (dx || dy)
-                        DrawText({ 214 + dx * 1.4f, 526 + dy * 1.4f }, 24.0f, WithAlpha(RGBA(12, 30, 28, 255), rkT), "RANK");
-            DrawText({ 214, 526 }, 24.0f, WithAlpha(C_WHITE, rkT), "RANK");
+                        DrawText({ 214 + dx * 1.4f, 533 + dy * 1.4f }, 24.0f, WithAlpha(RGBA(40, 28, 6, 255), rkT), "RANK");
+            DrawTextGradient({ 214, 533 }, 24.0f, WithAlpha(RGBA(238, 210, 110, 255), rkT), WithAlpha(RGBA(196, 150, 40, 255), rkT), "RANK");
             ResetTextShear();
             ResetFont();
             // rank letter pops with an overshoot: scale 1.6 -> 1.0 about its centre
