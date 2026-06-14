@@ -99,7 +99,7 @@ void Input(const ScreenInput& in) {
     }
     if (in.left  || in.tabLeft)  SwitchAct(-1);
     if (in.right || in.tabRight) SwitchAct(+1);
-    if (in.accept) { g_popup = true; g_popupSel = 0; }    // -> Play Stage / Cancel
+    if (in.accept) { g_popup = true; g_popupSel = 1; }    // -> Play Stage / Cancel (defaults to Cancel, per capture)
     if (in.cancel) g_nav = "@back";
 }
 const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
@@ -210,15 +210,16 @@ void Draw(double openSec) {
         DrawRect({ 266, 452 }, { 412, 476 }, WithAlpha(C_LBLPLATE, panT));
         DrawText({ 276, 455 }, 16.0f, WithAlpha(RGBA(225, 228, 232, 255), panT), "RANK");
         ResetFont();
-        // stage screenshot slot (lower-right, ~330x190) + S-rank overlapping its bottom
-        DrawVGradient({ 680, 320 }, { 1010, 510 }, WithAlpha(RGBA(60, 76, 98, 255), panT), WithAlpha(RGBA(30, 40, 54, 255), panT));
-        DrawRect({ 680, 320 }, { 1010, 322 }, WithAlpha(C_BORDER, panT));
+        // stage screenshot slot (landscape ~284x183, measured from gate_stage_select)
+        // + the big metallic S-rank to its RIGHT, overlapping the photo's bottom-right
+        DrawVGradient({ 680, 320 }, { 964, 503 }, WithAlpha(RGBA(60, 76, 98, 255), panT), WithAlpha(RGBA(30, 40, 54, 255), panT));
+        DrawRect({ 680, 320 }, { 964, 322 }, WithAlpha(C_BORDER, panT));
         SetFont(g_fSeurat);
-        DrawTextAligned({ 680, 320 }, { 1010, 510 }, 13.0f, WithAlpha(RGBA(140, 156, 176, 255), panT),
+        DrawTextAligned({ 680, 320 }, { 964, 503 }, 13.0f, WithAlpha(RGBA(140, 156, 176, 255), panT),
                         "STAGE PHOTO", Align::Center, true, false);
         ResetFont();
         if (g_rankTex >= 0)
-            DrawImage(g_rankTex, { 808, 392 }, { 952, 526 },
+            DrawImage(g_rankTex, { 900, 400 }, { 1044, 534 },
                       { RANK_UV[act.rank].u0, RANK_UV[act.rank].v0 }, { RANK_UV[act.rank].u1, RANK_UV[act.rank].v1 },
                       WithAlpha(RGBA(228, 230, 236, 255), panT * 0.95f));
 
@@ -254,12 +255,12 @@ void Draw(double openSec) {
     // ---- "Play Stage / Cancel" confirm popup (the GREY dialog family, like
     //      the pause confirm — measured from gate_confirm_popup.png) ----
     if (g_popup) {
-        DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 110));
+        DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 68));
         // screen-centred, tighter TL+BR chamfered grey dialog (flatter, dimmer
-        // border — closer to the real near-borderless box)
+        // border — closer to the real near-borderless silver box)
         const float px0 = 554, py0 = 296, px1 = 740, py1 = 414, pch = 16, cx = (px0 + px1) * 0.5f;
         DrawVGradient({ px0, py0 }, { px1, py1 },
-                      RGBA(128, 130, 132, 238), RGBA(96, 98, 100, 238));
+                      RGBA(152, 154, 156, 240), RGBA(122, 124, 126, 240));
         const V2 c1[4] = { { px0, py0 }, { px0 + pch, py0 }, { px0, py0 + pch }, { px0, py0 } };
         const V2 c2[4] = { { px1 - pch, py1 }, { px1, py1 }, { px1, py1 - pch }, { px1 - pch, py1 } };
         const uint32_t dk[4] = { RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110) };
