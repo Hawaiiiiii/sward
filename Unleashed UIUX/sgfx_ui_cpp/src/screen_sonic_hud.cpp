@@ -54,6 +54,7 @@ const UV HEAD_DAY = { 0.02734f, 0.10156f, 0.47656f, 0.88281f };
 //     TIME / SCORE / COUNT / LAP TIME.)
 const UV LBL_SCORE = { 0.00781f, 0.57031f, 0.46875f, 0.64062f };   // "SCORE"
 const UV LBL_RINGS = { 0.00781f, 0.38281f, 0.42969f, 0.45312f };   // "RINGS"
+const UV LBL_TIME  = { 0.00781f, 0.47656f, 0.34375f, 0.54688f };   // "TIME" (band between RINGS and SCORE)
 
 // --- ui_ps1_gauge1 (256x128):
 //   * gold tire emblem  : tight gold box px (16,16)-(61,60)  -> uv below (~square)
@@ -88,14 +89,25 @@ float Aspect(const UV& u, float texW, float texH) {
 }
 
 // ---- layout (reference px) --------------------------------------------------
-// Top-left score/ring cluster (the old dump put these at y=-24 â€” fixed to y~46).
+// Top-left cluster. From the stage_ready_overlay READY frame + CSD info_position:
+// the Sonic-head ring emblem sits at ~(92,46) with the big ring count to its right,
+// then RINGS / TIME / SCORE stack vertically BELOW, each a small chrome label at
+// x~150 with its value to the right, sitting on a thin warm angled info-band.
 constexpr float HEAD_X = 92.0f,  HEAD_Y = 46.0f,  HEAD_H = 56.0f;   // ring emblem box height
-constexpr float CL_LABEL_X = 162.0f;                                 // labels start right of emblem
-constexpr float SCORE_LBL_Y = 50.0f, SCORE_NUM_Y = 70.0f;            // SCORE label + digits
-constexpr float RINGS_LBL_Y = 104.0f, RINGS_NUM_Y = 122.0f;          // RINGS label + digits
+// stacked readout rows (all in the TOP-LEFT — there is NO top-right cluster):
+constexpr float ROW_LABEL_X = 150.0f;        // left edge of the chrome word-labels
+constexpr float ROW_VALUE_RX = 470.0f;       // right edge the digit runs align to
+constexpr float ROW_BAND_X0 = 138.0f;        // left edge of the warm info-band
+constexpr float ROW_BAND_X1 = 486.0f;        // right edge of the warm info-band
+constexpr float ROW_BAND_H  = 26.0f;         // info-band height
+constexpr float ROW_SKEW    = 12.0f;         // parallelogram lean (px, top shifted right)
+constexpr float RINGS_ROW_Y = 110.0f;        // RINGS row centre y
+constexpr float TIME_ROW_Y  = 150.0f;        // TIME row centre y (clock)
+constexpr float SCORE_ROW_Y = 200.0f;        // SCORE row centre y (score digits)
+constexpr float ROW_LABEL_H = 16.0f;         // chrome label target height
+constexpr float ROW_VALUE_H = 24.0f;         // value digit height
 constexpr float DIGIT_H = 30.0f;                                      // on-screen digit height
 constexpr float DIGIT_GAP = 2.0f;                                     // gap between digits
-constexpr float NUM_X = 286.0f;                                       // left edge of digit run
 
 // Bottom boost gauge (the curved rainbow energy bar). In retail it sweeps along
 // the lower-left; here it is a bounded track, never an unclipped stretch.
@@ -174,6 +186,36 @@ void DrawLabel(const UV& u, float x, float y, float targetH, float t) {
     float w = targetH * Aspect(u, 128.0f, 128.0f);
     DrawImage(g_enTex, { x, y }, { x + w, y + targetH },
               { u.u0, u.v0 }, { u.u1, u.v1 }, WithAlpha(COL_WHITE, t));
+}
+
+// The thin warm angled info-band that sits behind each RINGS/TIME/SCORE value row
+// (the warm-tinted parallelogram from the READY frame). A darker base, then a
+// top->bottom warm gradient (RGBA 0xAARRGGBB: 50.255.100.50 -> 10.255.100.35),
+// drawn as a leaning quad so it reads as the angled HUD info-bar. Centred at cy.
+void DrawInfoBand(float cy, float t) {
+    if (t <= 0.0f) return;
+    const float y0 = cy - ROW_BAND_H * 0.5f;
+    const float y1 = cy + ROW_BAND_H * 0.5f;
+    const float sk = ROW_SKEW;   // top edge shifted right relative to the bottom edge
+    // corner order: TL, TR, BR, BL (top edge leans right by `sk`)
+    V2 corners[4] = {
+        { ROW_BAND_X0 + sk, y0 }, { ROW_BAND_X1 + sk, y0 },
+        { ROW_BAND_X1,      y1 }, { ROW_BAND_X0,      y1 },
+    };
+    // darker base parallelogram so the band reads over bright gameplay
+    uint32_t baseCols[4] = {
+        WithAlpha(RGBA(18, 14, 12, 150), t), WithAlpha(RGBA(18, 14, 12, 110), t),
+        WithAlpha(RGBA(10, 8, 6, 170), t),   WithAlpha(RGBA(10, 8, 6, 170), t),
+    };
+    DrawQuadGradient(corners, baseCols, /*additive*/ false);
+    // warm tint on top: top RGBA(255,100,50,50) -> bottom RGBA(255,100,35,10)
+    const uint32_t warmTop = RGBA(255, 100, 50, 50);
+    const uint32_t warmBot = RGBA(255, 100, 35, 10);
+    uint32_t warmCols[4] = {
+        WithAlpha(warmTop, t), WithAlpha(warmTop, t),
+        WithAlpha(warmBot, t), WithAlpha(warmBot, t),
+    };
+    DrawQuadGradient(corners, warmCols, /*additive*/ true);
 }
 
 // Draw an integer using the real digit atlas, right-anchored at rightX, baseline-top at y.
@@ -313,20 +355,28 @@ void Draw(double openSec) {
     // right of the Sonic head (top-left). No "RINGS" word here.
     DrawNumber(g_rings, 272.0f, 50.0f, 46.0f, clusterT);
 
-    // ---- top-right cluster: TIME (label+clock) over SCORE (label+digits),
-    //      right-anchored to the screen edge (matches the real day-stage HUD) ----
+    // ---- stacked TOP-LEFT readouts (RINGS / TIME / SCORE), below the emblem ----
+    // Each row is a small chrome word-label at ROW_LABEL_X with its value (digit
+    // atlas) right-anchored at ROW_VALUE_RX, sitting on a thin warm angled info-band
+    // (matches the READY frame: NO top-right cluster in the real day HUD).
     if (clusterT > 0.0f) {
-        const float RX = 1238.0f;
-        SetFont(g_fRodin);
-        auto rlabel = [&](const char* s, float y) {
-            float w = MeasureText(15.0f, s).x;
-            DrawTextShadow({ RX - w, y }, 15.0f, WithAlpha(COL_FOOTER, clusterT), s);
-        };
-        rlabel("TIME", 32.0f);
-        rlabel("SCORE", 96.0f);
-        ResetFont();
-        DrawGlyphString("1:23", RX, 50.0f, DIGIT_H * 0.92f, clusterT);   // stage clock M:SS
-        DrawNumber(g_score, RX, 114.0f, DIGIT_H, clusterT);
+        auto rowLabelTop = [](float cy){ return cy - ROW_LABEL_H * 0.5f; };
+        auto rowValueTop = [](float cy){ return cy - ROW_VALUE_H * 0.5f; };
+
+        // RINGS row
+        DrawInfoBand(RINGS_ROW_Y, clusterT);
+        DrawLabel(LBL_RINGS, ROW_LABEL_X, rowLabelTop(RINGS_ROW_Y), ROW_LABEL_H, clusterT);
+        DrawNumber(g_rings, ROW_VALUE_RX, rowValueTop(RINGS_ROW_Y), ROW_VALUE_H, clusterT);
+
+        // TIME row (stage clock MM:SS:FF — two colons, three two-digit groups)
+        DrawInfoBand(TIME_ROW_Y, clusterT);
+        DrawLabel(LBL_TIME, ROW_LABEL_X, rowLabelTop(TIME_ROW_Y), ROW_LABEL_H, clusterT);
+        DrawGlyphString("00:00:00", ROW_VALUE_RX, rowValueTop(TIME_ROW_Y), ROW_VALUE_H, clusterT);
+
+        // SCORE row
+        DrawInfoBand(SCORE_ROW_Y, clusterT);
+        DrawLabel(LBL_SCORE, ROW_LABEL_X, rowLabelTop(SCORE_ROW_Y), ROW_LABEL_H, clusterT);
+        DrawNumber(g_score, ROW_VALUE_RX, rowValueTop(SCORE_ROW_Y), ROW_VALUE_H, clusterT);
     }
 
     // ---- bottom boost gauge (eased fill) ----
@@ -344,11 +394,11 @@ void Draw(double openSec) {
     }
     DrawBoostGauge(displayBoost, gaugeT);
 
-    // RING ENERGY label + ring-count readout beside the boost gauge (the real HUD
-    // labels the long bar and shows a small ring count)
+    // RINGENERGY label + ring-count readout beside the boost gauge (the real HUD
+    // labels the long bar — the art is a single token, no space)
     if (gaugeT > 0.0f) {
         SetFont(g_fRodin);
-        DrawTextShadow({ TIRE_X + 44.0f, 642.0f }, 13.0f, WithAlpha(COL_FOOTER, gaugeT), "RING ENERGY");
+        DrawTextShadow({ TIRE_X + 44.0f, 642.0f }, 13.0f, WithAlpha(COL_FOOTER, gaugeT), "RINGENERGY");
         ResetFont();
         DrawNumber(g_rings % 1000, TIRE_X + 40.0f, 664.0f, DIGIT_H * 0.7f, gaugeT);
     }

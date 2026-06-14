@@ -63,12 +63,12 @@ const uint32_t C_DASH       = RGBA(34, 54, 28, 255);   // dashed underline
 const uint32_t C_LBL_T = RGBA(107, 162, 0, 255), C_LBL_B = RGBA(157, 145, 9, 255);
 const uint32_t C_LDR_L = RGBA(192, 237, 21, 255), C_LDR_R = RGBA(39, 214, 21, 255);
 // popup
-const uint32_t C_POP_FILL = RGBA(20, 83, 18, 255);
+const uint32_t C_POP_FILL = RGBA(24, 112, 22, 255);
 const uint32_t C_POP_HI_T = RGBA(118, 148, 36, 255), C_POP_HI_B = RGBA(88, 205, 45, 255);
 const uint32_t C_POP_TXT  = RGBA(236, 236, 237, 255);
 
 // ---- layout ---------------------------------------------------------------------
-constexpr float GLOBE_CX = 470, GLOBE_CY = 402, GLOBE_R = 250;
+constexpr float GLOBE_CX = 639, GLOBE_CY = 360, GLOBE_R = 190;
 constexpr float TOT_X0 = 8,  TOT_Y0 = 114, TOT_X1 = 296, TOT_Y1 = 290;
 constexpr float TROW0  = 135, TPITCH = 43;
 // stage-info panel (measured from session8)
@@ -214,13 +214,15 @@ void DrawStageLabel(float t) {
     ResetTextStretchX();
     ResetTextShear();
     ResetFont();
-    // leader rule: gradient bar + 45-degree elbow toward the cursor
+    // leader rule: gradient bar + 45-degree elbow onto the relocated globe
+    // (globe moved to GLOBE_CX/CY 639,360 r190; the marker now rides there, so the
+    //  elbow terminates on the globe's left-facing surface near the Spagonia marker)
     {
-        const V2 c[4] = { { 285.3f, 378 }, { 723.3f, 378 }, { 723.3f, 380.7f }, { 285.3f, 380.7f } };
+        const V2 c[4] = { { 285.3f, 378 }, { 590.0f, 378 }, { 590.0f, 380.7f }, { 285.3f, 380.7f } };
         const uint32_t col[4] = { WithAlpha(C_LDR_L, t), WithAlpha(C_LDR_R, t),
                                   WithAlpha(C_LDR_R, t), WithAlpha(C_LDR_L, t) };
         DrawQuadGradient(c, col);
-        const V2 e[4] = { { 723.3f, 378 }, { 752, 406.7f }, { 750, 410.7f }, { 721.3f, 382 } };
+        const V2 e[4] = { { 590.0f, 378 }, { 620, 366.7f }, { 622, 370.7f }, { 592, 382 } };
         const uint32_t ec[4] = { WithAlpha(C_LDR_R, t), WithAlpha(C_LDR_R, t),
                                  WithAlpha(C_LDR_R, t), WithAlpha(C_LDR_R, t) };
         DrawQuadGradient(e, ec);
@@ -251,6 +253,25 @@ void DrawPopup() {
 void Draw(double openSec) {
     const float t = (float)ComputeMotion(openSec, 0.0, 14.0);
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_TOP, C_BG_BOT);
+    // full-width header rail (mirrors the footer legend band)
+    DrawRect({ 0, 104 }, { REF_W, 107 }, WithAlpha(RGBA(94, 123, 88, 255), t));
+    // header art-slot placeholders (geometry only; real chrome art drops in here):
+    //   head badge [75,58,50,45] (centre 100,80), map logo [1075,54,127,53] (centre 1138,80)
+    {
+        auto slot = [&](float x0, float y0, float x1, float y1, const char* lbl) {
+            const uint32_t oc = WithAlpha(RGBA(94, 123, 88, 110), t); const float L = 1.0f;
+            DrawRect({ x0, y0 }, { x1, y0 + L }, oc);
+            DrawRect({ x0, y1 - L }, { x1, y1 }, oc);
+            DrawRect({ x0, y0 }, { x0 + L, y1 }, oc);
+            DrawRect({ x1 - L, y0 }, { x1, y1 }, oc);
+            SetFont(g_fSeurat);
+            DrawTextAligned({ x0, y0 }, { x1, y1 }, 10.0f,
+                            WithAlpha(RGBA(140, 168, 130, 160), t), lbl, Align::Center, true, false);
+            ResetFont();
+        };
+        slot(75, 58, 125, 103, "HEAD");      // [75,58,50,45]
+        slot(1075, 54, 1202, 107, "LOGO");   // [1075,54,127,53]
+    }
     uint32_t s = 0x2468ace1u;
     for (int i = 0; i < 110; ++i) { s = s*1664525u+1013904223u; float x=(float)((s>>9)%1280); s=s*1664525u+1013904223u; float y=(float)((s>>9)%720); s=s*1664525u+1013904223u; int b=50+(int)((s>>9)%160); DrawRect({x,y},{x+1,y+1}, WithAlpha(RGBA(b,b,b,255), t*0.7f)); }
 
@@ -274,7 +295,7 @@ void Draw(double openSec) {
     // ---- top-left green LED-circuit panel backing the title + counters
     //      (subtle lit-cell grid, no bright chevron border / no separators) ----
     {
-        const float gx0 = 0, gy0 = 56, gx1 = 430, gy1 = 290;
+        const float gx0 = 0, gy0 = 56, gx1 = 290, gy1 = 290;
         DrawRect({ gx0, gy0 }, { gx1, gy1 }, WithAlpha(RGBA(4, 18, 5, 230), t));
         for (float yy = gy0 + 2; yy < gy1 - 2; yy += 8.0f)
             for (float xx = gx0 + 2; xx < gx1 - 2; xx += 16.0f) {
@@ -286,7 +307,7 @@ void Draw(double openSec) {
 
     // ---- gold beveled "WORLD MAP" title (inset ~124px, bigger, wider tracking) ----
     SetFont(g_fDF);
-    SetTextStretchX(1.45f);
+    SetTextStretchX(1.34f);
     DrawTextBevel({ 124, 62 }, 42.0f, WithAlpha(C_TITLE, t), "WORLD MAP");
     ResetTextStretchX();
 

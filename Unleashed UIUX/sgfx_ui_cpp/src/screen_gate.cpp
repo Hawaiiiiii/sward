@@ -51,8 +51,6 @@ const uint32_t C_NAME_T = RGBA(96, 100, 108, 235);    // stage-name plate
 const uint32_t C_NAME_B = RGBA(52, 56, 62, 235);
 const uint32_t C_PANEL_T= RGBA(112, 116, 122, 205);   // act panel translucent grey
 const uint32_t C_PANEL_B= RGBA(64, 67, 72, 205);
-const uint32_t C_LBLPLATE = RGBA(41, 46, 51, 230);    // stat label plate
-const uint32_t C_VALUE  = RGBA(214, 216, 220, 255);   // chrome value text
 const uint32_t C_WHITE  = RGBA(255, 255, 255, 255);
 const uint32_t C_BORDER = RGBA(214, 218, 222, 255);
 const uint32_t C_SUN    = RGBA(232, 120, 40, 255);
@@ -104,18 +102,32 @@ void Input(const ScreenInput& in) {
 }
 const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
-void Chrome(V2 pos, float px, const char* s, float a) {
+// Chrome wordmark: dark-outlined chrome-gradient face. `italic` controls the
+// shear (wordmarks + stat VALUES lean; stat LABELS sit upright). `outline` is the
+// per-pass dark-halo offset (smaller for the compact stat text).
+void Chrome(V2 pos, float px, const char* s, float a, bool italic = true, float outline = 2.2f) {
     SetFont(g_fDF);
-    SetTextShear(0.26f);
+    if (italic) SetTextShear(0.26f);
     SetTextStretchX(1.35f);
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (dx || dy)
-                DrawText({ pos.x + dx * 2.2f, pos.y + dy * 2.2f }, px, WithAlpha(C_CHR_OUT, a), s);
+                DrawText({ pos.x + dx * outline, pos.y + dy * outline }, px, WithAlpha(C_CHR_OUT, a), s);
     DrawTextGradient(pos, px, WithAlpha(C_CHR_T, a), WithAlpha(C_CHR_B, a), s);
+    ResetTextStretchX();
+    if (italic) ResetTextShear();
+    ResetFont();
+}
+// right-aligned chrome value: lands the string's RIGHT edge on rx (italic face).
+void ChromeRight(float rx, float y, float px, const char* s, float a) {
+    SetFont(g_fDF);
+    SetTextShear(0.26f);
+    SetTextStretchX(1.35f);
+    float w = MeasureText(px, s).x;
     ResetTextStretchX();
     ResetTextShear();
     ResetFont();
+    Chrome({ rx - w, y }, px, s, a, true, 2.2f);
 }
 
 // grey chamfered plate: TL 45-deg chamfer, slanted (italic) right end
@@ -210,8 +222,8 @@ void Draw(double openSec) {
 
     if (panT > 0.0f) {
         const Act& act = ACTS[g_act];
-        // ---- wide act panel (x253-1058) with chamfered right corners ----
-        const float px0 = 253, py0 = 188, px1 = 1058, py1 = 540, pch = 24;
+        // ---- wide act panel (x268-1003, real borders) with chamfered right corners ----
+        const float px0 = 268, py0 = 188, px1 = 1003, py1 = 540, pch = 24;
         DrawVGradient({ px0, py0 }, { px1, py1 }, WithAlpha(C_PANEL_T, panT), WithAlpha(C_PANEL_B, panT));
         // chamfer the top-right + bottom-right corners back to the scene
         const V2 ctr[4] = { { px1 - pch, py0 }, { px1, py0 }, { px1, py0 + pch }, { px1 - pch, py0 } };
@@ -230,45 +242,54 @@ void Draw(double openSec) {
         // Act N header
         DrawText({ 280 + 1.5f, 258 + 1.5f }, 28.0f, WithAlpha(RGBA(14, 14, 16, 255), panT), act.name);
         DrawText({ 280, 258 }, 28.0f, WithAlpha(C_WHITE, panT), act.name);
-        DrawRect({ 266, 300 }, { 620, 301.5f }, WithAlpha(C_BORDER, panT * 0.6f));
         ResetFont();
-        // stat rows: label plate + chrome value (left column)
-        auto stat = [&](float y, const char* lbl, const char* val) {
-            DrawRect({ 266, y }, { 412, y + 24 }, WithAlpha(C_LBLPLATE, panT));
-            SetFont(g_fRodin);
-            DrawText({ 276, y + 3 }, 16.0f, WithAlpha(RGBA(225, 228, 232, 255), panT), lbl);
-            ResetFont();
-            Chrome({ 430, y - 4 }, 26.0f, val, panT);
+        // stat-block dividers (thin chrome rules, alpha ~0.4): under HIGH SCORE,
+        // under BEST TIME, under the medal rows.
+        const float STAT_R = 660;                       // shared value right-edge column
+        DrawRect({ 266, 349 }, { STAT_R, 350.5f }, WithAlpha(C_BORDER, panT * 0.4f));
+        DrawRect({ 266, 399 }, { STAT_R, 400.5f }, WithAlpha(C_BORDER, panT * 0.4f));
+        DrawRect({ 266, 451 }, { STAT_R, 452.5f }, WithAlpha(C_BORDER, panT * 0.4f));
+        // stat rows: outlined-chrome UPRIGHT label (left x276) + italic chrome VALUE
+        // right-aligned to STAT_R.
+        auto stat = [&](float ly, const char* lbl, float vy, const char* val) {
+            Chrome({ 276, ly }, 22.0f, lbl, panT, false, 1.4f);
+            ChromeRight(STAT_R, vy, 26.0f, val, panT);
         };
-        stat(316, "HIGH SCORE", act.hiScore);
-        stat(352, "BEST TIME", act.bestTime);
-        // medal rows
-        DrawRect({ 266, 392 }, { 412, 416 }, WithAlpha(C_LBLPLATE, panT));
-        SetFont(g_fRodin);
-        DrawText({ 276, 395 }, 16.0f, WithAlpha(RGBA(225, 228, 232, 255), panT), "MEDALS");
+        stat(326, "HIGH SCORE", 322, act.hiScore);
+        stat(376, "BEST TIME",  372, act.bestTime);
+        // medal rows: upright chrome MEDALS label, a sun/moon icon ellipse just
+        // right of the label, and the count as an italic chrome value at STAT_R.
+        Chrome({ 276, 412 }, 22.0f, "MEDALS", panT, false, 1.4f);
         char buf[16];
-        // medal counts RIGHT-aligned into the value column (right edge x600),
-        // each medal icon sitting just left of its count
-        const float MEDAL_R = 600;
-        auto medal = [&](float y, uint32_t icol, int got, int tot) {
-            snprintf(buf, sizeof buf, "%d / %d", got, tot);
-            float w = MeasureText(18.0f, buf).x;
-            float cxn = MEDAL_R - w;
-            DrawRect({ cxn - 30, y - 2 }, { cxn - 10, y + 18 }, WithAlpha(icol, panT));
-            DrawText({ cxn, y }, 18.0f, WithAlpha(C_VALUE, panT), buf);
+        // filled vertical ellipse — gold core, coloured rim per row. Height is
+        // trimmed to ~22 so both rows seat inside the measured medal band (399-451).
+        auto medalEllipse = [&](float cx, float cy, float rx, float ry, uint32_t col) {
+            const int N = 18;
+            for (int i = 0; i < N; ++i) {
+                float y0 = cy - ry + (2 * ry) * i / N, y1 = cy - ry + (2 * ry) * (i + 1) / N;
+                float ym = (y0 + y1) * 0.5f - cy;
+                float t = 1.0f - (ym * ym) / (ry * ry); if (t < 0) t = 0;
+                float hw = rx * std::sqrt(t);
+                DrawRect({ cx - hw, y0 }, { cx + hw, y1 }, col);
+            }
         };
-        medal(394, C_SUN, act.sun, act.sunMax);
-        medal(422, C_MOON, act.moon, act.moonMax);
-        // RANK label
-        DrawRect({ 266, 452 }, { 412, 476 }, WithAlpha(C_LBLPLATE, panT));
-        DrawText({ 276, 455 }, 16.0f, WithAlpha(RGBA(225, 228, 232, 255), panT), "RANK");
-        ResetFont();
-        // stage screenshot slot (landscape ~284x183, measured from gate_stage_select)
+        const uint32_t C_MEDAL_CORE = RGBA(255, 212, 96, 255);   // gold core
+        auto medal = [&](float iy, float vy, uint32_t rim, int got, int tot) {
+            snprintf(buf, sizeof buf, "%d / %d", got, tot);
+            medalEllipse(425, iy, 12.0f, 11.0f, WithAlpha(rim, panT));            // coloured rim
+            medalEllipse(425, iy, 8.0f,  7.5f, WithAlpha(C_MEDAL_CORE, panT));    // gold core
+            ChromeRight(STAT_R, vy, 26.0f, buf, panT);
+        };
+        medal(413, 401, C_SUN,  act.sun,  act.sunMax);   // sun row (gold/orange)
+        medal(437, 425, C_MOON, act.moon, act.moonMax);  // moon row (gold/blue)
+        // RANK label (upright chrome, below the medal divider)
+        Chrome({ 276, 466 }, 22.0f, "RANK", panT, false, 1.4f);
+        // stage screenshot slot (landscape 270x135, aspect 2.0 — measured stage_ss rect 702,320..972,455)
         // + the big metallic S-rank to its RIGHT, overlapping the photo's bottom-right
-        DrawVGradient({ 680, 320 }, { 964, 503 }, WithAlpha(RGBA(60, 76, 98, 255), panT), WithAlpha(RGBA(30, 40, 54, 255), panT));
-        DrawRect({ 680, 320 }, { 964, 322 }, WithAlpha(C_BORDER, panT));
+        DrawVGradient({ 702, 320 }, { 972, 455 }, WithAlpha(RGBA(60, 76, 98, 255), panT), WithAlpha(RGBA(30, 40, 54, 255), panT));
+        DrawRect({ 702, 320 }, { 972, 322 }, WithAlpha(C_BORDER, panT));
         SetFont(g_fSeurat);
-        DrawTextAligned({ 680, 320 }, { 964, 503 }, 13.0f, WithAlpha(RGBA(140, 156, 176, 255), panT),
+        DrawTextAligned({ 702, 320 }, { 972, 455 }, 13.0f, WithAlpha(RGBA(140, 156, 176, 255), panT),
                         "STAGE PHOTO", Align::Center, true, false);
         ResetFont();
         if (g_rankTex >= 0)
@@ -280,7 +301,7 @@ void Draw(double openSec) {
         if (!g_popup) {
             const float ay = 385;
             const V2 la[4] = { { 240, ay - 18 }, { 240, ay + 18 }, { 218, ay }, { 240, ay - 18 } };
-            const V2 ra[4] = { { 1042, ay - 18 }, { 1042, ay + 18 }, { 1064, ay }, { 1042, ay - 18 } };
+            const V2 ra[4] = { { 987, ay - 18 }, { 987, ay + 18 }, { 1009, ay }, { 987, ay - 18 } };
             const uint32_t arc[4] = { WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT) };
             DrawQuadGradient(la, arc); DrawQuadGradient(ra, arc);
         }
@@ -290,16 +311,17 @@ void Draw(double openSec) {
     //      (the LB/RB switch entry is hidden while the confirm popup is open) ----
     {
         SetFont(g_fRodin);
-        float hcy = 660;
+        float hcy = 636;
         auto glyph = [&](const UV& g, float x, float gh){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,a)); return x+gw+8; };
-        float hx = g_popup ? 520 : 300;
+        // measured glyph anchors: [LB] Switch [RB] -> x244, (A) Select -> x~700, (B) Back -> x~877
+        float hx = g_popup ? 520 : 244;
         if (!g_popup) {
             hx = glyph(GLYPH_LB, hx, 28);
             DrawText({ hx, hcy - 11 }, 20.0f, WithAlpha(C_WHITE, a), "Switch"); hx += 90;
-            hx = glyph(GLYPH_RB, hx, 28); hx += 60;
+            hx = glyph(GLYPH_RB, hx, 28); hx += 244;
         }
         hx = glyph(GLYPH_A, hx, 30);
-        DrawText({ hx, hcy - 11 }, 20.0f, WithAlpha(C_WHITE, a), "Select"); hx += 110;
+        DrawText({ hx, hcy - 11 }, 20.0f, WithAlpha(C_WHITE, a), "Select"); hx += 137;
         hx = glyph(GLYPH_B, hx, 30);
         DrawText({ hx, hcy - 11 }, 20.0f, WithAlpha(C_WHITE, a), "Back");
         ResetFont();
@@ -311,7 +333,7 @@ void Draw(double openSec) {
         DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 68));
         // screen-centred, tighter TL+BR chamfered grey dialog (flatter, dimmer
         // border — closer to the real near-borderless silver box)
-        const float px0 = 554, py0 = 296, px1 = 740, py1 = 414, pch = 16, cx = (px0 + px1) * 0.5f;
+        const float px0 = 531, py0 = 296, px1 = 748, py1 = 414, pch = 16, cx = (px0 + px1) * 0.5f;
         DrawVGradient({ px0, py0 }, { px1, py1 },
                       RGBA(152, 154, 156, 240), RGBA(122, 124, 126, 240));
         const V2 c1[4] = { { px0, py0 }, { px0 + pch, py0 }, { px0, py0 + pch }, { px0, py0 } };
@@ -326,15 +348,15 @@ void Draw(double openSec) {
         const char* OPT[2] = { "Play Stage", "Cancel" };
         const float rowY[2] = { py0 + 22, py0 + 66 };
         DrawVGradient({ px0 + 14, rowY[g_popupSel] - 6 }, { px1 - 14, rowY[g_popupSel] + 32 },
-                      RGBA(244, 210, 70, 250), RGBA(222, 172, 34, 250));
+                      RGBA(238, 222, 150, 250), RGBA(214, 186, 96, 250));
         SetFont(g_fRodin);
         for (int i = 0; i < 2; ++i) {
             float w = MeasureText(24.0f, OPT[i]).x;
             bool sel = (i == g_popupSel);
             DrawText({ cx - w * 0.5f + 1, rowY[i] + 1 }, 24.0f,
-                     sel ? RGBA(120, 80, 18, 255) : RGBA(20, 20, 20, 200), OPT[i]);
+                     sel ? RGBA(150, 70, 16, 255) : RGBA(20, 20, 20, 200), OPT[i]);
             DrawText({ cx - w * 0.5f, rowY[i] }, 24.0f,
-                     sel ? RGBA(40, 28, 6, 255) : RGBA(235, 235, 235, 255), OPT[i]);
+                     sel ? RGBA(232, 120, 30, 255) : RGBA(235, 235, 235, 255), OPT[i]);
         }
         ResetFont();
     }

@@ -101,7 +101,7 @@ void Starfield(float a) {
 // the game-logo SLOT (trademark art -> user branding drops in here). Anchored
 // where the real SONIC UNLEASHED wordmark sits (measured: letters ~y120-300).
 void LogoSlot(float a) {
-    const float lx0 = 326, ly0 = 118, lx1 = 906.7f, ly1 = 322;
+    const float lx0 = 385, ly0 = 214, lx1 = 906.0f, ly1 = 399;
     DrawRect({ lx0, ly0 }, { lx1, ly1 }, WithAlpha(RGBA(20, 20, 22, 255), a * 0.6f));
     uint32_t bd = WithAlpha(RGBA(90, 90, 94, 255), a);
     DrawRect({ lx0, ly0 }, { lx1, ly0 + 2 }, bd);
@@ -145,10 +145,10 @@ void PressStart(double now, float a) {
     CapsuleVGrad(484, 489, 798, 554, C_GLOW, C_GLOW, a * glowPulse * 0.10f, true);
     // metallic ring capsule (thin rim) + inner yellow capsule, both rounded ends
     // (measured pill ~325px wide @1280)
-    CapsuleVGrad(478.0f, 494.7f, 803.0f, 548.7f, C_RING_HI, C_RING, a);
-    CapsuleVGrad(487.0f, 503.0f, 794.0f, 540.0f, C_CAP_TOP, C_CAP_PEAK, a);
+    CapsuleVGrad(492.0f, 494.7f, 788.0f, 548.7f, C_RING_HI, C_RING, a);     // ring w~296, ctr 640
+    CapsuleVGrad(499.0f, 506.0f, 781.0f, 535.0f, C_CAP_TOP, C_CAP_PEAK, a); // inner yellow w~282 h~29, cy~521
     // glossy belly highlight (a brighter mid strip)
-    CapsuleVGrad(499.0f, 514.0f, 782.0f, 528.0f, C_CAP_PEAK, RGBA(255, 246, 150, 255), a * 0.6f);
+    CapsuleVGrad(509.0f, 514.0f, 771.0f, 526.0f, C_CAP_PEAK, RGBA(255, 246, 150, 255), a * 0.6f);
     // outline-style PRESS START (dark olive ring + capsule-yellow inner)
     SetFont(g_fRodin);
     const char* PS = "PRESS START";
@@ -209,13 +209,13 @@ void Carousel(float a) {
     // entry text: outlined lime caps, centred
     SetFont(g_fRodin);
     const char* E = ENTRIES[g_entry];
-    float w = MeasureText(20.0f, E).x;
-    float ex = 640 - w * 0.5f, ey = 492.0f;
+    float w = MeasureText(34.0f, E).x;
+    float ex = 640 - w * 0.5f, ey = 489.0f;   // cy ~506 with 34px caps
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (dx || dy)
-                DrawText({ ex + dx * 1.5f, ey + dy * 1.5f }, 20.0f, WithAlpha(C_ENTRY_OUT, a), E);
-    DrawText({ ex, ey }, 20.0f, WithAlpha(C_ENTRY, a), E);
+                DrawText({ ex + dx * 2.2f, ey + dy * 2.2f }, 34.0f, WithAlpha(C_ENTRY_OUT, a), E);
+    DrawText({ ex, ey }, 34.0f, WithAlpha(C_ENTRY, a), E);
     ResetFont();
     // arrows (solid green triangles) + outboard fading wedge bars
     const V2 lt[4] = { { 528.7f, 490.7f }, { 528.7f, 512.7f }, { 510.7f, 501.3f }, { 528.7f, 490.7f } };
@@ -223,10 +223,10 @@ void Carousel(float a) {
     const uint32_t ac[4] = { WithAlpha(C_ARROW, a), WithAlpha(C_ARROW, a), WithAlpha(C_ARROW, a), WithAlpha(C_ARROW, a) };
     DrawQuadGradient(lt, ac); DrawQuadGradient(rt, ac);
     {
-        const V2 lw[4] = { { 456.7f, 489.3f }, { 498.7f, 489.3f }, { 498.7f, 513.3f }, { 456.7f, 513.3f } };
+        const V2 lw[4] = { { 467.0f, 489.3f }, { 498.7f, 489.3f }, { 498.7f, 513.3f }, { 467.0f, 513.3f } };
         const uint32_t lc[4] = { WithAlpha(C_ARROW, 0.0f), WithAlpha(C_ARROW, a * 0.7f), WithAlpha(C_ARROW, a * 0.7f), WithAlpha(C_ARROW, 0.0f) };
         DrawQuadGradient(lw, lc);
-        const V2 rw[4] = { { 781.3f, 489.3f }, { 840.0f, 489.3f }, { 840.0f, 513.3f }, { 781.3f, 513.3f } };
+        const V2 rw[4] = { { 781.3f, 489.3f }, { 885.0f, 489.3f }, { 885.0f, 513.3f }, { 781.3f, 513.3f } };
         const uint32_t rc[4] = { WithAlpha(C_ARROW, a * 0.7f), WithAlpha(C_ARROW, 0.0f), WithAlpha(C_ARROW, 0.0f), WithAlpha(C_ARROW, a * 0.7f) };
         DrawQuadGradient(rw, rc);
     }

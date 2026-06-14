@@ -74,14 +74,20 @@ void Draw(double openSec) {
     ResetFont();
 
     // ---- rings counter slot (top-left HUD, title-safe inset) ----
-    DrawRect({ 250, 36 }, { 272, 58 }, WithAlpha(C_RING, a));
-    SetFont(g_fRodin);
-    DrawTextShadow({ 284, 36 }, 22.0f, WithAlpha(C_WHITE, a), "999999");
-    ResetFont();
+    {
+        // thin angled gold ring icon (art slot ~x256-273 y64-103); digits to its right
+        const V2 ring[4] = { { 259, 64 }, { 273, 64 }, { 270, 103 }, { 256, 103 } };
+        const uint32_t rc[4] = { WithAlpha(C_RING, a), WithAlpha(C_RING, a),
+                                 WithAlpha(C_RING, a), WithAlpha(C_RING, a) };
+        DrawQuadGradient(ring, rc);
+        SetFont(g_fRodin);
+        DrawTextShadow({ 291, 70 }, 22.0f, WithAlpha(C_WHITE, a), "999999");
+        ResetFont();
+    }
 
     // ---- speaker nameplate: gold rounded pill, upper-right of centre ----
     {
-        const float x0 = 768, y0 = 38, x1 = 1066, y1 = 80;
+        const float x0 = 667, y0 = 53, x1 = 1066, y1 = 117;
         DrawVGradient({ x0 + 4, y0 }, { x1 - 4, y1 }, WithAlpha(C_PILL_T, a), WithAlpha(C_PILL_B, a));
         DrawRect({ x0, y0 + 4 }, { x0 + 4, y1 - 4 }, WithAlpha(C_PILL_B, a));     // rounded-end hint
         DrawRect({ x1 - 4, y0 + 4 }, { x1, y1 - 4 }, WithAlpha(C_PILL_B, a));
@@ -89,7 +95,13 @@ void Draw(double openSec) {
         SetFont(g_fSeurat);
         const char* NAME = "Don Fachio's Apotos";
         float w = MeasureText(22.0f, NAME).x;
-        DrawText({ (x0 + x1) * 0.5f - w * 0.5f, y0 + 10 }, 22.0f, WithAlpha(C_PILL_TXT, a), NAME);
+        const float nx = (x0 + x1) * 0.5f - w * 0.5f, ny = (y0 + y1) * 0.5f - 12.0f;
+        // outlined grammar to match the dialogue 'line' lambda: dark stroke + cream fill
+        for (int dy = -1; dy <= 1; ++dy)
+            for (int dx = -1; dx <= 1; ++dx)
+                if (dx || dy)
+                    DrawText({ nx + dx * 1.4f, ny + dy * 1.4f }, 22.0f, WithAlpha(RGBA(26, 28, 34, 255), a), NAME);
+        DrawText({ nx, ny }, 22.0f, WithAlpha(RGBA(231, 225, 215, 255), a), NAME);
         ResetFont();
     }
 
@@ -128,8 +140,8 @@ void Draw(double openSec) {
         SetFont(g_fRodin);
         float hcy = 638;
         auto glyph = [&](const UV& g, float x){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,a)); return x+gw+8; };
-        float hx = 858; hx = glyph(GLYPH_A, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Select");
-        hx = 992; hx = glyph(GLYPH_B, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Back");
+        float hx = 680; hx = glyph(GLYPH_A, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Select");
+        hx = 857; hx = glyph(GLYPH_B, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Back");
         ResetFont();
     }
 }

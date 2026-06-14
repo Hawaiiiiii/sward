@@ -106,7 +106,7 @@ void DrawGlowText(float tx, float baselineY, float S, float a, const char* txt) 
 // Measured footprint: 32x32 at (1023,593) -> cell 9, step 11.5. Stays at full brightness.
 void DrawSpinner(float x0, float y0, double now) {
     static const int RING[8][2] = { {0,0},{1,0},{2,0},{2,1},{2,2},{1,2},{0,2},{0,1} };
-    const float cell = 9.0f, step = 11.5f;
+    const float cell = 8.7f, step = 10.0f;
     int head = (int)(now * 10.0) % 8;
     for (int i = 0; i < 8; ++i) {
         int cx = RING[i][0], cy = RING[i][1];
@@ -139,7 +139,7 @@ void Draw(double openSec) {
         // 1:1 path: the game's pre-rendered heavy wordmark sprite (white core +
         // green rim + dark outline), tinted with the measured bright-top ->
         // dark-bottom green shading (face g ~218 -> ~147), at the measured rect.
-        DrawImageVGradient(g_wordTex, { 651, 592 }, { 1005, 628 },
+        DrawImageVGradient(g_wordTex, { 650, 568 }, { 969, 602 },
                            { WM_U0, WM_V0 }, { WM_U1, WM_V1 },
                            WithAlpha(RGBA(76, 218, 16, 255), pulse),
                            WithAlpha(RGBA(50, 147, 10, 255), pulse));
@@ -149,7 +149,7 @@ void Draw(double openSec) {
         const float S = 2.0f;
         DrawGlowText(1003.0f - AtlasTextW(S, txt), 628.0f, S, pulse, txt);
     }
-    DrawSpinner(1023.0f, 593.0f, clock);
+    DrawSpinner(984.0f, 569.0f, clock);
 }
 
 } // namespace

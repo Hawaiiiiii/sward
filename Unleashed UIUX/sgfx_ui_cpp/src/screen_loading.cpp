@@ -40,7 +40,7 @@ const uint32_t C_GREEN    = RGBA(74, 230, 18, 255);    // NOW LOADING tint
 const uint32_t C_GREEN_B  = RGBA(50, 147, 12, 255);
 
 // screen inset (measured)
-constexpr float SC_X0 = 179, SC_Y0 = 47, SC_X1 = 1101, SC_Y1 = 661;
+constexpr float SC_X0 = 179, SC_Y0 = 107, SC_X1 = 1101, SC_Y1 = 661;
 
 void Init() { if (g_wordTex < 0) g_wordTex = gfx::loadTexture("assets/loading/mat_load_en_001.png"); }
 void Reset() {}
@@ -74,12 +74,26 @@ void DPad(float cx, float cy) {
     // round recessed base (the real Miles-Electric pads are circular clusters)
     FillDisc(cx, cy, 42, C_SHELL_DK);
     FillDisc(cx, cy, 38, RGBA(206, 172, 46, 255));
-    const float arm = 32, th = 18;
-    DrawRect({ cx - arm, cy - th * 0.5f }, { cx + arm, cy + th * 0.5f }, C_SHELL_DK);
-    DrawRect({ cx - th * 0.5f, cy - arm }, { cx + th * 0.5f, cy + arm }, C_SHELL_DK);
-    DrawRect({ cx - arm + 3, cy - th * 0.5f + 3 }, { cx + arm - 3, cy + th * 0.5f - 3 }, RGBA(228, 192, 56, 255));
-    DrawRect({ cx - th * 0.5f + 3, cy - arm + 3 }, { cx + th * 0.5f - 3, cy + arm - 3 }, RGBA(228, 192, 56, 255));
-    DrawRect({ cx - 6, cy - 6 }, { cx + 6, cy + 6 }, C_SHELL_DK);
+    // four directional wedges (trapezoid pads) separated by diagonal gaps, with a
+    // raised central hub disc — the real pad reads as 4 keys around a hub, not a '+'
+    const float hub = 9.0f, rOut = 32.0f;
+    const float halfIn = 7.0f, halfOut = 22.0f;   // gap-defining half-widths (in / out)
+    auto wedge = [&](float ax, float ay) {
+        // (ax,ay) is the unit outward direction (axis-aligned); perp is the side axis
+        float px = -ay, py = ax;
+        const V2 q[4] = {
+            { cx + ax * hub  - px * halfIn,  cy + ay * hub  - py * halfIn  },
+            { cx + ax * hub  + px * halfIn,  cy + ay * hub  + py * halfIn  },
+            { cx + ax * rOut + px * halfOut, cy + ay * rOut + py * halfOut },
+            { cx + ax * rOut - px * halfOut, cy + ay * rOut - py * halfOut },
+        };
+        const uint32_t qc[4] = { RGBA(228, 192, 56, 255), RGBA(228, 192, 56, 255),
+                                 C_SHELL_DK, C_SHELL_DK };
+        DrawQuadGradient(q, qc);
+    };
+    wedge(0, -1); wedge(1, 0); wedge(0, 1); wedge(-1, 0);
+    FillDisc(cx, cy, hub + 1, C_SHELL_DK);          // hub recess ring
+    FillDisc(cx, cy, hub - 1, RGBA(228, 192, 56, 255)); // raised central hub
 }
 
 void DrawSpinner(float x0, float y0, double now) {
@@ -105,10 +119,10 @@ void Draw(double openSec) {
     // ---- yellow device shell ----
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SHELL_T, C_SHELL_B);
     SpeakerGrille(28, 10);  SpeakerGrille(1112, 10);
-    FillDisc(640, 28, 11, C_BEZEL);                                   // round camera lens
-    FillDisc(640, 28, 8, RGBA(150, 120, 36, 255));                    // gold ring
-    FillDisc(640, 28, 5, RGBA(40, 46, 52, 255));                      // dark glass
-    FillDisc(638, 26, 1.6f, RGBA(180, 200, 210, 255));               // catch-light
+    FillDisc(640, 56, 22, C_BEZEL);                                   // round camera lens
+    FillDisc(640, 56, 16, RGBA(150, 120, 36, 255));                   // gold ring
+    FillDisc(640, 56, 10, RGBA(40, 46, 52, 255));                     // dark glass
+    FillDisc(636, 52, 3.2f, RGBA(180, 200, 210, 255));               // catch-light
     Screw(20, 20); Screw(1260, 20); Screw(20, 700); Screw(1260, 700);
     DrawRect({ 0, 280 }, { 14, 380 }, C_SHELL_DK);                     // VOL rocker
     DrawRect({ 2, 286 }, { 12, 374 }, RGBA(190, 158, 40, 255));
@@ -124,7 +138,7 @@ void Draw(double openSec) {
     DrawVGradient({ SC_X0, SC_Y0 }, { SC_X1, SC_Y1 }, C_SCREEN_T, C_SCREEN_B);
     DrawRect({ SC_X0, SC_Y1 + 6 }, { SC_X1, SC_Y1 + 8 }, RGBA(120, 122, 118, 160));   // reflection line
     SetFont(0);
-    DrawText({ SC_X1 - 96, SC_Y1 + 1 }, 10.0f, RGBA(150, 152, 148, 255), "MILES=ELECTRIC");
+    DrawText({ SC_X1 - 96, SC_Y1 + 1 }, 10.0f, RGBA(150, 152, 148, 255), "MILES ELECTRIC");
 
     // ---- perspective grid floor (converging green lines) ----
     {
@@ -142,65 +156,80 @@ void Draw(double openSec) {
         }
     }
 
-    // ---- wireframe town path (stylized loop slot) ----
+    // ---- green terrain (translucent undulating valley) + solid landmark blocks ----
+    // An open, asymmetric valley of grid-conforming quads receding toward horizonY
+    // (NOT a closed racetrack ring). Translucent green near->far, centroid ~(632,450).
     {
-        const V2 loop[8] = { { 430, 470 }, { 560, 410 }, { 760, 400 }, { 880, 450 },
-                             { 820, 520 }, { 680, 555 }, { 540, 545 }, { 440, 510 } };
-        // translucent interior fill (triangle fan from the centroid) so the loop
-        // reads as a lit platform surface, not a hollow ring
-        const V2 ctr = { 644, 478 };
-        for (int i = 0; i < 8; ++i) {
-            const V2 tri[4] = { ctr, loop[i], loop[(i + 1) % 8], ctr };
-            const uint32_t tc[4] = { WithAlpha(C_WIRE, 0.07f), WithAlpha(C_WIRE, 0.16f),
-                                     WithAlpha(C_WIRE, 0.16f), WithAlpha(C_WIRE, 0.07f) };
-            DrawQuadGradient(tri, tc, true);
-        }
-        for (int i = 0; i < 8; ++i) {
-            const V2& p0 = loop[i]; const V2& p1 = loop[(i + 1) % 8];
-            V2 n = { (p1.y - p0.y), (p0.x - p1.x) };
-            float len = std::sqrt(n.x * n.x + n.y * n.y); n.x /= len; n.y /= len;
-            // thick glowing ribbon (the ref path is a fat luminous band, not a wire)
-            const V2 g4[4] = { { p0.x - n.x * 4, p0.y - n.y * 4 }, { p1.x - n.x * 4, p1.y - n.y * 4 },
-                               { p1.x + n.x * 18, p1.y + n.y * 18 }, { p0.x + n.x * 18, p0.y + n.y * 18 } };
-            const uint32_t gc[4] = { WithAlpha(C_WIRE, 0.25f), WithAlpha(C_WIRE, 0.25f),
-                                     WithAlpha(C_WIRE, 0.25f), WithAlpha(C_WIRE, 0.25f) };
-            DrawQuadGradient(g4, gc, true);
-            const V2 q[4] = { p0, p1, { p1.x + n.x * 13, p1.y + n.y * 13 }, { p0.x + n.x * 13, p0.y + n.y * 13 } };
-            const uint32_t qc[4] = { C_WIRE, C_WIRE, WithAlpha(C_WIRE, 0.75f), WithAlpha(C_WIRE, 0.75f) };
-            DrawQuadGradient(q, qc);
-        }
-        // wireframe building hints
-        auto bld = [&](float bx, float by, float w, float h) {
-            DrawRect({ bx, by - h }, { bx + w, by - h + 2 }, C_WIRE);
-            DrawRect({ bx, by - h }, { bx + 2, by }, C_WIRE);
-            DrawRect({ bx + w - 2, by - h }, { bx + w, by }, C_WIRE);
-            DrawRect({ bx, by - 2 }, { bx + w, by }, WithAlpha(C_WIRE, 0.7f));
+        const float horizonY = 300, vanishX = 640;   // matches the perspective grid
+        const float nearY = 568;                      // near edge of the valley floor
+        // depth f in [0,1]: 0 = near (bottom), 1 = far (horizon). Quadratic ease
+        // mirrors the grid's row spacing so the terrain conforms to the floor lines.
+        auto rowY = [&](float f) { return nearY + (horizonY - nearY) * f * f; };
+        // valley half-width shrinks toward the horizon (perspective foreshortening),
+        // its center drifts left of the vanishing point near the camera so the whole
+        // mass biases toward the measured centroid (~632,450).
+        auto edges = [&](float f, float& xl, float& xr) {
+            float pull = 1.0f - f;                              // 1 near -> 0 far
+            float cxF  = vanishX + (-30.0f) * pull;             // center drifts left near
+            float halfW = 22.0f + 230.0f * pull * pull;         // wide near, pinched far
+            // undulating banks: each side waves independently so it reads organic
+            float wob = halfW * 0.18f;
+            xl = cxF - halfW - wob * std::sin(f * 7.4f + 0.6f);
+            xr = cxF + halfW + wob * std::sin(f * 6.1f + 2.1f);
         };
-        bld(620, 520, 56, 70); bld(806, 500, 44, 52);
+        const int NB = 7;
+        for (int b = 0; b < NB; ++b) {
+            float f0 = (float)b / NB, f1 = (float)(b + 1) / NB;
+            float y0 = rowY(f0), y1 = rowY(f1);
+            float l0, r0, l1, r1; edges(f0, l0, r0); edges(f1, l1, r1);
+            // brighter / more opaque near the camera, fading toward the horizon
+            float a0 = 0.22f * (1.0f - f0) + 0.05f;
+            float a1 = 0.22f * (1.0f - f1) + 0.05f;
+            const V2 q[4] = { { l1, y1 }, { r1, y1 }, { r0, y0 }, { l0, y0 } };
+            const uint32_t qc[4] = { WithAlpha(C_WIRE, a1), WithAlpha(C_WIRE, a1),
+                                     WithAlpha(C_WIRE, a0), WithAlpha(C_WIRE, a0) };
+            DrawQuadGradient(q, qc, true);
+        }
+        // solid bright-green landmark blocks rising out of the terrain.
+        // (base x, base y on the floor, width, height) — drawn as a lit front face
+        // plus a darker side sliver for a hint of volume.
+        auto block = [&](float bx, float by, float w, float h) {
+            DrawRect({ bx, by - h }, { bx + w, by }, C_WIRE);                 // front face
+            DrawRect({ bx + w, by - h + 6 }, { bx + w + 6, by }, C_WIRE_DIM); // side sliver
+            DrawRect({ bx, by - h }, { bx + w, by - h + 3 }, WithAlpha(RGBA(180,255,190,255), 0.9f)); // lit top edge
+        };
+        block(748, 472, 26, 84);   // tower near ~(760,460)
+        block(556, 506, 30, 40);   // low building, left of centre
+        // windmill hint: a slim mast block + two crossed sail bars
+        float mx = 868, my = 470;
+        DrawRect({ mx, my - 56 }, { mx + 10, my }, C_WIRE);                   // mast
+        DrawRect({ mx - 26, my - 56 }, { mx + 36, my - 52 }, C_WIRE);        // sail bar (horizontal)
+        DrawRect({ mx + 3, my - 84 }, { mx + 7, my - 28 }, C_WIRE);          // sail bar (vertical)
     }
 
     // ---- gold landmark medallion slots (round, like the real map markers) ----
     auto medallion = [&](float cx, float cy) {
-        FillDisc(cx, cy, 18, WithAlpha(RGBA(40, 30, 8, 255), 0.8f));
-        FillDisc(cx, cy, 15, C_GOLD);
-        FillDisc(cx, cy, 9, RGBA(150, 116, 36, 255));
+        FillDisc(cx, cy, 29, WithAlpha(RGBA(40, 30, 8, 255), 0.8f));
+        FillDisc(cx, cy, 24, C_GOLD);
+        FillDisc(cx, cy, 14, RGBA(150, 116, 36, 255));
     };
-    medallion(404, 432); medallion(700, 330); medallion(914, 348);
+    medallion(329, 450); medallion(535, 322); medallion(914, 348);
 
     // ---- photo inset slot (real town snapshot drops in) ----
-    DrawRect({ 270, 98 }, { 450, 202 }, RGBA(230, 232, 230, 255));
-    DrawVGradient({ 274, 102 }, { 446, 198 }, RGBA(70, 86, 104, 255), RGBA(36, 46, 58, 255));
+    // bright-green wire border framing the inset (was a solid white frame)
+    DrawRect({ 366, 145 }, { 542, 276 }, C_WIRE);
+    DrawVGradient({ 369, 148 }, { 539, 273 }, RGBA(70, 86, 104, 255), RGBA(36, 46, 58, 255));
     SetFont(0);
-    DrawTextAligned({ 274, 102 }, { 446, 198 }, 12.0f, RGBA(130, 144, 158, 255), "PHOTO", Align::Center, true, false);
+    DrawTextAligned({ 369, 148 }, { 539, 273 }, 12.0f, RGBA(130, 144, 158, 255), "PHOTO", Align::Center, true, false);
 
     // ---- NOW LOADING wordmark (real sprite) + spinner, pulsing like boot ----
     float t01 = (float)(now - std::floor(now));
     float tri = 0.5f - 0.5f * std::cos(6.2831853f * t01);
     float pulse = 0.40f + 0.60f * std::sqrt(tri);
     if (g_wordTex >= 0)
-        DrawImageVGradient(g_wordTex, { 700, 553 }, { 947, 592 }, { WM_U0, WM_V0 }, { WM_U1, WM_V1 },
+        DrawImageVGradient(g_wordTex, { 593, 547 }, { 963, 598 }, { WM_U0, WM_V0 }, { WM_U1, WM_V1 },
                            WithAlpha(RGBA(76, 218, 16, 255), pulse), WithAlpha(C_GREEN_B, pulse));
-    DrawSpinner(962, 556, now);
+    DrawSpinner(985, 558, now);
 }
 
 } // namespace

@@ -7,9 +7,9 @@
 //   * a warm-grey translucent panel centred at (389,131)-(888,586), a HEXAGON
 //     with 45 deg chamfers on the top-left + bottom-right corners (26px), a
 //     vertical near-white->dark-grey gradient;
-//   * the World-Map context menu: Resume / Status / Inventory / Skills /
-//     Go to the Lab / Options / Quit Game (first center y=203, pitch 55px); the
-//     SELECTED row gets a gold bar (inset 23px) + dark-brown text;
+//   * the TOWN context menu (pause_town_settled.png): Resume / Status /
+//     Inventory / Wait until Night / Options / Return to World Map (first center
+//     y=243, pitch 49px); the SELECTED row gets a gold bar (inset 23px) + dark-brown text;
 //   * footer: (LB) Achievements / (A) Select / (B) Back.
 // Real fonts: FOT-NewRodinPro-DB MSDF (menu items + footer), DFSoGei (PAUSE bevel).
 // =============================================================================
@@ -28,10 +28,10 @@ const UV GLYPH_A  = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
 const UV GLYPH_B  = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
 const UV GLYPH_LB = { 0.32617f, 0.00781f, 0.46094f, 0.07812f };
 
-const char* const ITEMS[] = { "Resume", "Status", "Inventory", "Skills", "Go to the Lab", "Options", "Quit Game" };
-constexpr int N_ITEMS = 7;
+const char* const ITEMS[] = { "Resume", "Status", "Inventory", "Wait until Night", "Options", "Return to World Map" };
+constexpr int N_ITEMS = 6;
 int  g_sel = 0;        // default selection on open = "Resume" (verified from PAUSE video t=13s)
-bool g_confirm = false;    // "Enter the Lab?" Yes/No dialog (opens from Go to the Lab)
+bool g_confirm = false;    // "Return to the world map?" Yes/No dialog (opens from Return to World Map)
 int  g_confirmSel = 1;     // 0 = Yes, 1 = No (the capture shows No selected by default)
 // sub-screens (measured spec: game_captures/PAUSE_SUBSCREEN_SPEC.md)
 enum SubView { SV_NONE = 0, SV_ACHIEVEMENTS, SV_INVENTORY };
@@ -41,6 +41,9 @@ int g_invSel = 2;          // selected inventory row (capture shows row 3)
 bool g_invPopup = false;   // "Give to Sonic / Give to Chip" (measured popup)
 int  g_invPopupSel = 0;
 const char* g_nav = nullptr;
+// town/main/achievements/inventory pause has a CLEAN gold banner (chrome PAUSE only);
+// the ghosted "WORLD MAP" wordmark only belongs to the world-map-context pause. OFF by default.
+bool g_showGhostWordmark = false;
 
 // palette — colours sampled from _ref_pause.png
 const uint32_t C_DIM      = RGBA(0, 0, 0, 150);          // hub dim overlay
@@ -67,9 +70,9 @@ const uint32_t C_WHITE    = RGBA(255, 255, 255, 255);
 const uint32_t C_STAR     = RGBA(170, 220, 170, 255);   // green-tinted hub starfield
 
 // panel geometry (1280x720) — measured from _ref_pause.png
-constexpr float PX0 = 389, PY0 = 131, PX1 = 888, PY1 = 586;   // centred panel rect (cx~640)
-constexpr float ITEM_C0 = 196, ITEM_PITCH = 55;               // first item CENTER y (ref row centers 195/250/...); pitch
-constexpr float CHAMFER = 26;                                  // top-left + bottom-right 45 deg cuts
+constexpr float PX0 = 441, PY0 = 181, PX1 = 837, PY1 = 537;   // centred panel rect (cx~639) — TOWN-context retarget (pause_town_settled.png)
+constexpr float ITEM_C0 = 243, ITEM_PITCH = 49;               // first item CENTER y; pitch (town menu, 6 items)
+constexpr float CHAMFER = 24;                                  // top-left + bottom-right 45 deg cuts
 
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/pause/mat_comon_x360_001.png");
@@ -82,7 +85,7 @@ void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; g_sub = SV_NONE; 
 void Input(const ScreenInput& in) {
     if (g_confirm) {
         if (in.up || in.down) g_confirmSel ^= 1;
-        if (in.accept && g_confirmSel == 0) { g_confirm = false; g_nav = "loading>mediaroom"; }   // Yes -> the lab
+        if (in.accept && g_confirmSel == 0) { g_confirm = false; g_nav = "world_map"; }   // Yes -> return to the world map
         if (in.cancel || (in.accept && g_confirmSel == 1)) { g_confirm = false; g_confirmSel = 1; }
         return;
     }
@@ -107,14 +110,14 @@ void Input(const ScreenInput& in) {
     if (in.up)   g_sel = (g_sel + N_ITEMS - 1) % N_ITEMS;
     if (in.down) g_sel = (g_sel + 1) % N_ITEMS;
     if (in.accept) {
-        switch (g_sel) {                       // the runtime pause flow
+        switch (g_sel) {                       // the TOWN-context pause flow
             case 0: g_nav = "@back"; break;                          // Resume
             case 1: g_nav = "status"; break;                         // Status
             case 2: g_sub = SV_INVENTORY; break;                     // Inventory (sub-screen)
-            case 4: g_confirm = true; g_confirmSel = 1; break;       // Go to the Lab
-            case 5: g_nav = "options"; break;                        // Options
-            case 6: g_nav = "world_map"; break;                      // Quit Game
-            default: break;                                          // Skills (not built)
+            case 3: g_nav = "@back"; break;                          // Wait until Night (no-op placeholder)
+            case 4: g_nav = "options"; break;                        // Options
+            case 5: g_confirm = true; g_confirmSel = 1; break;       // Return to World Map (confirm)
+            default: break;
         }
     }
     if (in.cancel) g_nav = "@back";                                  // B resumes, like retail
@@ -155,7 +158,8 @@ void DrawBanner(float t) {
     SetFont(g_fDF);
     SetTextShear(0.24f);
     SetTextStretchX(1.37f);   // the game's wordmark face is far wider than DFSoGei
-    DrawText({ 128, 38 }, 40.0f, WithAlpha(C_GHOST, t), "WORLD MAP");      // ghost wordmark
+    if (g_showGhostWordmark)
+        DrawText({ 128, 38 }, 40.0f, WithAlpha(C_GHOST, t), "WORLD MAP");  // ghost wordmark (world-map context only)
     {   // chrome PAUSE: 8-direction outline ring, then the gradient face
         const V2 pp = { 212.5f, 28.0f }; const float ps = 68.0f;
         for (int dy = -1; dy <= 1; ++dy)
@@ -168,7 +172,7 @@ void DrawBanner(float t) {
     ResetTextShear();
 }
 
-// "Enter the Lab?" confirm — two stacked chamfered plates (measured spec in
+// "Return to the world map?" confirm — two stacked chamfered plates (measured spec in
 // game_captures/WM_PAUSE_SUBSTATE_SPEC.md): grey back prompt plate (TL chamfer)
 // + silver front dialog (TL+BR chamfers) with engraved Yes and a gold-pill No.
 void DrawConfirm(float a) {
@@ -182,10 +186,10 @@ void DrawConfirm(float a) {
     // prompt: engraved dark grey (light bevel under dark core)
     SetFont(g_fRodin);
     {
-        const char* P = "Enter the Lab?";
-        float w = MeasureText(26.0f, P).x;
-        DrawText({ 639 - w * 0.5f + 1, 351.3f + 1 }, 26.0f, WithAlpha(RGBA(106, 105, 107, 255), a), P);
-        DrawText({ 639 - w * 0.5f, 351.3f }, 26.0f, WithAlpha(RGBA(42, 44, 44, 255), a), P);
+        const char* P = "Return to the world map?";
+        float w = MeasureText(22.0f, P).x;
+        DrawText({ 639 - w * 0.5f + 1, 353.3f + 1 }, 22.0f, WithAlpha(RGBA(106, 105, 107, 255), a), P);
+        DrawText({ 639 - w * 0.5f, 353.3f }, 22.0f, WithAlpha(RGBA(42, 44, 44, 255), a), P);
     }
     // front dialog (541.3,280.7) 196.7x157.3, chamfers TL+BR 22, silver border
     const float dx0 = 541.3f, dy0 = 280.7f, dx1 = 738.0f, dy1 = 438.0f, ch = 22.0f;
@@ -415,7 +419,7 @@ void Draw(double openSec) {
         return;
     }
 
-    // ---- "Enter the Lab?" confirm sub-state: the item list is REPLACED by the
+    // ---- "Return to the world map?" confirm sub-state: the item list is REPLACED by the
     //      dialog stack; banner dims WITH the scene (~44% black); footer stays lit
     if (g_confirm) {
         DrawBanner(1.0f);
@@ -468,6 +472,25 @@ void Draw(double openSec) {
         }
         DrawTextAligned({ PX0, cyc - 27 }, { PX1, cyc + 27 }, 28.0f,
                         WithAlpha(sel ? C_ITEM_SEL : C_ITEM, t), ITEMS[i], Align::Center, true, true);
+    }
+
+    // ---- Sun / Moon medal counters (town pause, bottom-right; measured slots) ----
+    // outlined Rodin digits "NN / NN" to the right of each medal-icon slot.
+    {
+        // shared outlined-digit drawer (8-dir white-ish outline + warm-white face)
+        auto medalCount = [&](float x, float cy, const char* s){
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                    if (dx || dy)
+                        DrawText({ x + dx * 1.4f, cy - 11 + dy * 1.4f }, 22.0f, WithAlpha(C_WHITE, t), s);
+            DrawText({ x, cy - 11 }, 22.0f, WithAlpha(C_ITEM, t), s);
+        };
+        // Sun medal slot ~(1041,495)-(1071,520), digits centered y~505
+        DrawVGradient({ 1041, 495 }, { 1071, 520 }, WithAlpha(RGBA(238, 198, 70, 255), t), WithAlpha(RGBA(196, 150, 38, 255), t));
+        medalCount(1080, 505, "00 / 00");
+        // Moon medal slot ~(1036,540)-(1071,575), digits centered y~558
+        DrawVGradient({ 1036, 540 }, { 1071, 575 }, WithAlpha(RGBA(176, 188, 214, 255), t), WithAlpha(RGBA(120, 134, 168, 255), t));
+        medalCount(1080, 558, "02 / 02");
     }
 
     // ---- footer (Achievements / Select / Back) — ref groups at x~305 / ~700 / ~895 ----

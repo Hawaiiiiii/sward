@@ -64,7 +64,7 @@ const uint32_t C_SKY_T = RGBA(96, 158, 208, 255), C_SKY_B = RGBA(176, 208, 228, 
 const uint32_t C_GROUND = RGBA(214, 216, 212, 255);
 
 // ---- measured layout (1280x720 reference) -----------------------------------
-constexpr float RAIL_Y0 = 63, RAIL_Y1 = 101, RAIL_X1 = 635;
+constexpr float RAIL_Y0 = 63, RAIL_Y1 = 114, RAIL_X1 = 635;
 constexpr float WM_X = 263, WM_CAPTOP = 72;             // wordmark target position
 constexpr float ROW_X0 = 619, ROW_W = 214;              // first label plate rect
 constexpr float ROW_TOP0 = 188, ROW_H = 41.3f, ROW_PITCH = 66.7f;
@@ -142,13 +142,14 @@ void Draw(double openSec) {
     //      top->bottom after it; tally counts ~1.2 s; rank pops after total ----
     const float wmT = (float)ComputeMotion(openSec, 0.0, 30.0);
     DrawRect({ 0, RAIL_Y0 }, { RAIL_X1, RAIL_Y1 }, WithAlpha(C_RAIL, wmT));
-    DrawRect({ 0, RAIL_Y1 + 1 }, { RAIL_X1, RAIL_Y1 + 3.5f }, WithAlpha(C_RAIL_EDGE, wmT));
+    DrawRect({ 0, RAIL_Y0 - 2 }, { RAIL_X1, RAIL_Y0 + 1 }, WithAlpha(C_RAIL_EDGE, wmT));   // ~3px top-edge highlight (y~61)
+    DrawRect({ 0, RAIL_Y1 + 1 }, { RAIL_X1, RAIL_Y1 + 3.5f }, WithAlpha(C_RAIL_EDGE, wmT));   // under-edge (y~115)
     {
         float wx = Lerp(-220.0f, WM_X, wmT);   // slides in from off-left
         Chrome({ wx, WM_CAPTOP - 12 }, 48.0f, "RESULTS", wmT, 1.70f);
     }
 
-    const float VAL_R = 1116;   // common right edge the value strips align to (measured wider)
+    const float VAL_R = 1033;   // common right edge the value strips align to (measured: shared Chrome right edge ~x1015)
     const uint32_t C_VSTRIP_T = RGBA(18, 26, 44, 180), C_VSTRIP_B = RGBA(8, 14, 28, 180);
     for (int i = 0; i < N_ROWS; ++i) {
         const float rowT = (float)ComputeMotion(openSec, 26.0 + i * 5.0, 10.0);
@@ -182,9 +183,15 @@ void Draw(double openSec) {
     {
         const float totT = (float)ComputeMotion(openSec, 50.0, 10.0);
         if (totT > 0.0f) {
-            const float x = ROW_X0 - 8;   // steps back left of the TIME row
-            const float tw = VAL_R - x - SLANT - 8;
-            Plate(x, TOT_TOP, tw, TOT_H, C_TOTAL_T, C_TOTAL_B, C_PLATE_BD, totT);
+            const float x = ROW_X0 - 8;   // steps back left of the TIME row (~611)
+            // compact green label plate (width ROW_W, green ends ~x808)
+            // dark value strip from the green plate right edge to VAL_R (mirrors the stat-row strip)
+            const float sx0 = x + ROW_W + SLANT - 6;
+            const V2 vs[4] = { { sx0 + SLANT, TOT_TOP + 4 }, { VAL_R, TOT_TOP + 4 }, { VAL_R, TOT_TOP + TOT_H - 4 }, { sx0, TOT_TOP + TOT_H - 4 } };
+            const uint32_t vsc[4] = { WithAlpha(C_VSTRIP_T, totT), WithAlpha(C_VSTRIP_T, totT), WithAlpha(C_VSTRIP_B, totT), WithAlpha(C_VSTRIP_B, totT) };
+            DrawQuadGradient(vs, vsc);
+            DrawRect({ sx0 + SLANT, TOT_TOP + 4 }, { VAL_R, TOT_TOP + 5.5f }, WithAlpha(RGBA(120, 140, 175, 200), totT));   // thin top edge
+            Plate(x, TOT_TOP, ROW_W, TOT_H, C_TOTAL_T, C_TOTAL_B, C_PLATE_BD, totT);
             SetFont(g_fRodin);
             SetTextShear(0.20f);
             DrawText({ x + 40, TOT_TOP + (TOT_H - 26) * 0.5f }, 26.0f, WithAlpha(C_TOTAL_TXT, totT), "TOTAL");
@@ -211,8 +218,8 @@ void Draw(double openSec) {
             for (int dy = -1; dy <= 1; ++dy)
                 for (int dx = -1; dx <= 1; ++dx)
                     if (dx || dy)
-                        DrawText({ 214 + dx * 1.4f, 533 + dy * 1.4f }, 24.0f, WithAlpha(RGBA(40, 28, 6, 255), rkT), "RANK");
-            DrawTextGradient({ 214, 533 }, 24.0f, WithAlpha(RGBA(238, 210, 110, 255), rkT), WithAlpha(RGBA(196, 150, 40, 255), rkT), "RANK");
+                        DrawText({ 256 + dx * 1.4f, 533 + dy * 1.4f }, 24.0f, WithAlpha(RGBA(180, 184, 106, 255), rkT), "RANK");
+            DrawTextGradient({ 256, 533 }, 24.0f, WithAlpha(RGBA(245, 225, 130, 255), rkT), WithAlpha(RGBA(205, 170, 70, 255), rkT), "RANK");
             ResetTextShear();
             ResetFont();
             // rank letter pops with an overshoot: scale 1.6 -> 1.0 about its centre
@@ -245,7 +252,7 @@ void Draw(double openSec) {
     // ---- footer: (A) Next (below the TOTAL value, ~70% / 87%) ----
     {
         const float fT = (float)ComputeMotion(openSec, 60.0, 10.0);
-        float hx = 896, hcy = 626;
+        float hx = 856, hcy = 638;   // glyph center ~876,638 (manifest btn_a x856 y618 h40)
         if (g_glyphTex >= 0) {
             float asp = ((GLYPH_A.u1 - GLYPH_A.u0) * GTW) / ((GLYPH_A.v1 - GLYPH_A.v0) * GTH), gh = 28.0f, gw = gh * asp;
             DrawImage(g_glyphTex, { hx, hcy - gh * 0.5f }, { hx + gw, hcy + gh * 0.5f },

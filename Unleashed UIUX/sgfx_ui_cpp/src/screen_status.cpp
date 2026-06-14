@@ -30,8 +30,10 @@ int g_glyphTex = -1;
 
 struct UV { float u0, v0, u1, v1; };
 constexpr float GTW = 512.0f, GTH = 512.0f;
-const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
-const UV GLYPH_B = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
+const UV GLYPH_A  = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
+const UV GLYPH_B  = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
+const UV GLYPH_LB = { 0.31250f, 0.00000f, 0.46875f, 0.07812f };   // shoulder LB (manifest btn_lb)
+const UV GLYPH_RB = { 0.46875f, 0.00000f, 0.62500f, 0.07812f };   // shoulder RB (manifest btn_rb)
 
 // ---- palette (sampled from the capture) --------------------------------------
 const uint32_t C_RAIL_D_T = RGBA(78, 104, 168, 235);    // day rail (darker navy, measured)
@@ -45,8 +47,8 @@ const uint32_t C_CHR_OUT = RGBA(22, 24, 36, 255);
 const uint32_t C_PLATE_T = RGBA(54, 50, 108, 248);      // stat plate (dark navy/indigo, measured)
 const uint32_t C_PLATE_B = RGBA(32, 28, 72, 248);
 const uint32_t C_PLATE_RIM = RGBA(225, 220, 240, 255);  // white top rim
-const uint32_t C_EXP_N_T = RGBA(232, 60, 150, 235);     // EXP plate magenta (night/Werehog)
-const uint32_t C_EXP_N_B = RGBA(160, 24, 96, 235);
+const uint32_t C_EXP_N_T = RGBA(152, 42, 184, 235);     // EXP plate violet-magenta (night/Werehog)
+const uint32_t C_EXP_N_B = RGBA(102, 68, 116, 235);
 const uint32_t C_EXP_D_T = RGBA(60, 150, 232, 235);     // EXP plate blue (day/Sonic)
 const uint32_t C_EXP_D_B = RGBA(24, 88, 168, 235);
 const uint32_t C_EXP_RIM = RGBA(176, 226, 255, 255);    // light-cyan EXP top border (day)
@@ -80,9 +82,13 @@ bool g_night = false;
 int  g_sel = 0;
 int  g_expCount = 99;
 
-// Day form spreads its 2 stat rows wide (measured real pitch ~93px); the night
-// form packs 5 rows tightly (~54). Form-dependent.
-inline float RowPitch() { return g_night ? 54.0f : 93.0f; }
+// Vertical layout is FORM-dependent. Night packs 5 rows on a uniform 64px pitch
+// (measured) anchored at the night EXP/ROW_Y0 constants. Day spreads its 2 stat
+// rows with NON-uniform gaps (EXP center 238, SPEED 339, RING 413 -> gaps 101
+// then 74); we model day with EXP_Y=218, ROW_Y0=319 and a 74px stat pitch.
+inline float RowPitch()  { return g_night ? 64.0f : 74.0f; }   // stat-row pitch
+inline float ExpTop()    { return g_night ? EXP_Y  : 218.0f; } // EXP plate top
+inline float StatTop0()  { return g_night ? ROW_Y0 : 319.0f; } // first stat-row top
 
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
@@ -223,11 +229,12 @@ void Draw(double openSec) {
 
     // ---- EXP row: magenta plate + gem slot + bar + chrome count ----
     if (rowT > 0.0f) {
-        StatRow(EXP_Y, "EXP.", 0.82f, false, rowT, true);
+        const float ey = ExpTop();
+        StatRow(ey, "EXP.", 0.82f, false, rowT, true);
         // gem slot riding the plate's right end
-        DrawRect({ PLATE_X + PLATE_W - 8, EXP_Y - 10 }, { PLATE_X + PLATE_W + 18, EXP_Y + 16 }, WithAlpha(RGBA(255, 226, 120, 230), rowT));
+        DrawRect({ PLATE_X + PLATE_W - 8, ey - 10 }, { PLATE_X + PLATE_W + 18, ey + 16 }, WithAlpha(RGBA(255, 226, 120, 230), rowT));
         char buf[8]; snprintf(buf, sizeof buf, "x%d", g_expCount);
-        Chrome({ BAR_END + 16, EXP_Y + 4 }, 30.0f, buf, rowT, C_CHR_T, C_CHR_B, 1.2f);
+        Chrome({ BAR_END + 16, ey + 4 }, 30.0f, buf, rowT, C_CHR_T, C_CHR_B, 1.2f);
     }
 
     // ---- per-form stat rows (staggered entrance) ----
@@ -235,14 +242,16 @@ void Draw(double openSec) {
     const int n = g_night ? 5 : 2;
     for (int i = 0; i < n; ++i) {
         const float rt = (float)ComputeMotion(openSec, 6.0 + i * 3.0, 8.0);
-        if (rt > 0.0f) StatRow(ROW_Y0 + i * RowPitch(), rows[i].label, rows[i].fill, i == g_sel, rt, false);
+        if (rt > 0.0f) StatRow(StatTop0() + i * RowPitch(), rows[i].label, rows[i].fill, i == g_sel, rt, false);
     }
 
     // ---- QUIT plate below the stat list (a small chamfered button + curl tail) ----
     {
         const float qt = (float)ComputeMotion(openSec, 6.0 + n * 3.0, 8.0);
         if (qt > 0.0f) {
-            const float qy = ROW_Y0 + n * RowPitch() + 6, qx = PLATE_X, qw = 132, qh = 38;
+            // QUIT plate sits at a FIXED y (retail: top y548-555) at PLATE_X for
+            // BOTH forms; this removes the day~425/night~509 drift off the stack.
+            const float qy = 548, qx = PLATE_X, qw = 132, qh = 38;
             const bool qsel = (g_sel == n);
             const float qx0 = qsel ? qx - 12 : qx;
             uint32_t qT = g_night ? RGBA(96, 64, 140, 235) : RGBA(56, 104, 168, 235);
@@ -263,16 +272,30 @@ void Draw(double openSec) {
         }
     }
 
-    // ---- footer ----
+    // ---- footer (RETAIL prompts, measured from manifest rects) ----
+    // bottom-left:  LB(244,618,80x40) + "Switch"(320,625) + RB(440,618,80x40)
+    // bottom-right: green A(836,618,40x40) + "Select"(876,625)
+    // The Q/E form-switch and Up/Down still drive Input(); only the displayed
+    // prompts change to match retail. Both forms show the identical footer.
     {
+        // glyph as an image at an exact manifest rect; falls back to a button-pill
+        // placeholder when the x360 glyph sheet is missing.
+        auto glyph = [&](const UV& g, float x, float y, float w, float h, uint32_t fill){
+            if (g_glyphTex >= 0) {
+                DrawImage(g_glyphTex, { x, y }, { x + w, y + h }, { g.u0, g.v0 }, { g.u1, g.v1 }, WithAlpha(C_WHITE, a));
+            } else {
+                DrawRect({ x, y }, { x + w, y + h }, WithAlpha(fill, a * 0.9f));
+                DrawRect({ x, y }, { x + w, y + 2 }, WithAlpha(C_WHITE, a * 0.6f));
+            }
+        };
         SetFont(g_fRodin);
-        float hcy = 688;
-        auto glyph = [&](const UV& g, float x){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=28.0f, gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,a)); return x+gw+8; };
-        float hx = 150;
-        DrawText({ hx, hcy - 12 }, 20.0f, WithAlpha(C_WHITE, a), "[Up/Down] Select"); hx += 220;
-        hx = glyph(GLYPH_A, hx); DrawText({ hx, hcy - 12 }, 20.0f, WithAlpha(C_WHITE, a), "Level Up"); hx += 130;
-        DrawText({ hx, hcy - 12 }, 20.0f, WithAlpha(C_WHITE, a), "(Q/E) Switch Form"); hx += 230;
-        hx = glyph(GLYPH_B, hx); DrawText({ hx, hcy - 12 }, 20.0f, WithAlpha(C_WHITE, a), "Back");
+        // bottom-left: switch-form cluster
+        glyph(GLYPH_LB, 244, 618, 80, 40, RGBA(64, 70, 82, 235));
+        DrawText({ 320, 625 }, 20.0f, WithAlpha(C_WHITE, a), "Switch");
+        glyph(GLYPH_RB, 440, 618, 80, 40, RGBA(64, 70, 82, 235));
+        // bottom-right: select cluster (green A)
+        glyph(GLYPH_A, 836, 618, 40, 40, RGBA(48, 168, 72, 235));
+        DrawText({ 876, 625 }, 20.0f, WithAlpha(C_WHITE, a), "Select");
         ResetFont();
     }
 }

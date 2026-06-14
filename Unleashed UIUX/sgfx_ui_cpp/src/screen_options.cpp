@@ -117,11 +117,12 @@ const uint32_t C_TAB_OFF   = RGBA(128, 135, 41, 220);  // inactive tab olive-gol
 const uint32_t C_SEL_TL    = RGBA(226, 113, 34, 200);  // selected row diagonal (gold)
 const uint32_t C_SEL_BR    = RGBA(146, 255, 49, 200);  // -> green
 const uint32_t C_LABEL     = RGBA(255, 255, 255, 255);
-const uint32_t C_VAL_BG    = RGBA(0, 130, 0, 210);
-const uint32_t C_VAL_BG_B  = RGBA(0, 96, 0, 200);
-const uint32_t C_VAL_TXT_T = RGBA(192, 255, 0, 255);
-const uint32_t C_VAL_TXT_B = RGBA(128, 170, 0, 255);
-const uint32_t C_LIGHT_ON  = RGBA(190, 196, 60, 255);  // dim olive-yellow toggle light (measured)
+const uint32_t C_VAL_BG    = RGBA(0, 70, 0, 205);
+const uint32_t C_VAL_BG_B  = RGBA(0, 52, 0, 195);
+const uint32_t C_VAL_TXT_T = RGBA(105, 140, 18, 255);
+const uint32_t C_VAL_TXT_B = RGBA(82, 108, 12, 255);
+const uint32_t C_VAL_TXT_SEL = RGBA(195, 225, 100, 255);  // selected enum row brightens (measured)
+const uint32_t C_LIGHT_ON  = RGBA(165, 172, 12, 255);  // dim olive-yellow toggle light (measured)
 const uint32_t C_LIGHT_OFF = RGBA(40, 70, 40, 255);
 const uint32_t C_CARET     = RGBA(140, 230, 60, 255);  // selected-value carets are green in ref
 const uint32_t C_DESC      = RGBA(255, 255, 255, 255);
@@ -207,11 +208,13 @@ void DrawCaret(float cx, float cy, bool right, uint32_t col) {
     for (int i = 0; i < 5; ++i) { float hh = 9.0f - i*1.8f, dx = i*2.0f; float bx = right ? (cx-6+dx) : (cx+6-dx); DrawRect({ bx, cy-hh }, { bx+2, cy+hh }, col); }
 }
 
-void DrawValueText(const char* s, float x0, float y0, float x1, float y1, float t) {
-    // the recomp's green value-text vertical gradient (192,255,0)->(128,170,0)
+void DrawValueText(const char* s, float x0, float y0, float x1, float y1, float t, bool sel = false) {
+    // the recomp's green value-text vertical gradient; selected row brightens toward the measured peak
     float w = MeasureText(20.0f, s).x;
     float px = x0 + ((x1 - x0) - w) * 0.5f, py = y0 + ((y1 - y0) - 20.0f) * 0.5f;
-    DrawTextGradient({ px, py }, 20.0f, WithAlpha(C_VAL_TXT_T, t), WithAlpha(C_VAL_TXT_B, t), s);
+    uint32_t top = sel ? C_VAL_TXT_SEL : C_VAL_TXT_T;
+    uint32_t bot = sel ? ColourLerp(C_VAL_TXT_B, C_VAL_TXT_SEL, 0.85f) : C_VAL_TXT_B;
+    DrawTextGradient({ px, py }, 20.0f, WithAlpha(top, t), WithAlpha(bot, t), s);
 }
 
 void Draw(double openSec) {
@@ -302,7 +305,7 @@ void Draw(double openSec) {
             DrawTextAligned({ lx + 18, vy0 }, { VAL_X0 + VAL_W - 8, vy1 }, 20.0f, WithAlpha(onv ? C_VAL_TXT_T : RGBA(150,160,150,255), t), onv ? "ON" : "OFF", Align::Center, true, true);
         } else {
             const char* s = (o.choices && o.val < o.choiceCount) ? o.choices[o.val] : "";
-            DrawValueText(s, VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
+            DrawValueText(s, VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t, sel);
         }
     }
 

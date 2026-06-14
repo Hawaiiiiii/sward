@@ -57,10 +57,10 @@ const uint32_t C_HDR_GOLD  = RGBA(204, 181, 89, 255);
 const uint32_t C_TITLE_T   = RGBA(244, 243, 240, 255);   // beveled title slab (white, per capture)
 const uint32_t C_TITLE_B   = RGBA(212, 206, 184, 255);   // faint warm tint, NOT gold
 const uint32_t C_TITLE_OUT = RGBA(65, 62, 39, 255);
-const uint32_t C_PLQ_GREEN = RGBA(104, 84, 52, 255);     // page counter band = parchment-frame brown (not green)
+const uint32_t C_PLQ_GREEN = RGBA(95, 91, 56, 255);      // page counter band = olive (G near R, not brown)
 const uint32_t C_PLQ_GOLD  = RGBA(228, 199, 69, 255);
-const uint32_t C_CNT_T     = RGBA(243, 235, 200, 255);   // counter digits bevel
-const uint32_t C_CNT_B     = RGBA(214, 206, 178, 255);   // warm cream (was greenish)
+const uint32_t C_CNT_T     = RGBA(238, 234, 226, 255);   // counter digits bevel (no yellow cast)
+const uint32_t C_CNT_B     = RGBA(222, 217, 208, 255);   // warm neutral cream
 const uint32_t C_CHEV      = RGBA(235, 220, 87, 255);    // page chevron gold
 const uint32_t C_CHEV_FADE = RGBA(191, 176, 139, 255);
 const uint32_t C_THUMB_BD  = RGBA(209, 204, 184, 255);   // thumb cream border
@@ -334,10 +334,13 @@ void DrawSoundtrack(float a, double now) {
         rail(x + 129.3f, y - 13.3f, x + 163.3f, y - 1.3f);
         rail(x - 13.3f, y + 82.0f, x + 20.0f, y + 97.3f);
         rail(x + 129.3f, y + 82.0f, x + 163.3f, y + 97.3f);
-        // flag badge top-left of the selected thumb
-        DrawRect({ x + 5.3f, y - 0.7f }, { x + 74.0f, y + 46.7f }, WithAlpha(C_FLAG_BLUE, a));
-        DrawRect({ x + 5.3f, y - 0.7f }, { x + 74.0f, y + 1.0f }, WithAlpha(C_WHITE, a));
-        DrawRect({ x + 20, y + 12 }, { x + 58, y + 34 }, WithAlpha(RGBA(201, 122, 101, 255), a));
+        // flag badge top-left of the selected thumb (~45x33 crest, not stripes)
+        DrawRect({ x + 5.3f, y - 0.7f }, { x + 50.0f, y + 32.0f }, WithAlpha(C_FLAG_BLUE, a));
+        DrawRect({ x + 5.3f, y - 0.7f }, { x + 50.0f, y + 1.0f }, WithAlpha(C_WHITE, a));
+        // white shield card with a tiny red+green crest hint
+        DrawRect({ x + 12, y + 5 }, { x + 43, y + 28 }, WithAlpha(RGBA(238, 235, 232, 255), a));
+        DrawRect({ x + 18, y + 9 }, { x + 27, y + 24 }, WithAlpha(RGBA(186, 54, 46, 255), a));
+        DrawRect({ x + 28, y + 9 }, { x + 37, y + 24 }, WithAlpha(RGBA(66, 132, 70, 255), a));
     }
     // maroon scrollbar (track + cream handle at the captured 61%)
     DrawRect({ 985.3f, 158.7f }, { 987.3f, 471.3f }, WithAlpha(C_PINSTRIPE, a));
@@ -376,13 +379,13 @@ void Draw(double openSec) {
     {
         SetFont(g_fSeurat);
         auto chip = [&](float cy, uint32_t icol, const char* txt) {
-            DrawRect({ 112, cy - 12 }, { 136, cy + 12 }, WithAlpha(RGBA(40, 30, 8, 230), a));
-            DrawRect({ 114, cy - 10 }, { 134, cy + 10 }, WithAlpha(icol, a));
-            DrawRect({ 119, cy - 5 }, { 129, cy + 5 }, WithAlpha(RGBA(150, 116, 36, 255), a));
-            DrawTextShadow({ 144, cy - 9 }, 16.0f, WithAlpha(RGBA(244, 240, 230, 255), a), txt);
+            DrawRect({ 131, cy - 12 }, { 155, cy + 12 }, WithAlpha(RGBA(40, 30, 8, 230), a));
+            DrawRect({ 133, cy - 10 }, { 153, cy + 10 }, WithAlpha(icol, a));
+            DrawRect({ 138, cy - 5 }, { 148, cy + 5 }, WithAlpha(RGBA(150, 116, 36, 255), a));
+            DrawTextShadow({ 163, cy - 9 }, 16.0f, WithAlpha(RGBA(244, 240, 230, 255), a), txt);
         };
-        chip(140, RGBA(214, 96, 40, 255), "Lv7 [200]");    // sun
-        chip(176, RGBA(64, 120, 210, 255), "Lv7 [200]");   // moon
+        chip(135, RGBA(214, 96, 40, 255), "Lv7 [200]");    // sun
+        chip(181, RGBA(64, 120, 210, 255), "Lv7 [200]");   // moon
         ResetFont();
     }
 }
