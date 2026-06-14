@@ -34,16 +34,16 @@ const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
 const UV GLYPH_B = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
 
 // ---- palette (sampled from the capture) --------------------------------------
-const uint32_t C_RAIL_D_T = RGBA(104, 142, 206, 235);   // day rail (blue)
-const uint32_t C_RAIL_D_B = RGBA(44, 78, 148, 235);
-const uint32_t C_RAIL_N_T = RGBA(152, 132, 186, 235);   // night rail (purple)
-const uint32_t C_RAIL_N_B = RGBA(86, 56, 126, 235);
-const uint32_t C_RAIL_EDGE = RGBA(228, 160, 220, 255);  // thin pink edge line
+const uint32_t C_RAIL_D_T = RGBA(78, 104, 168, 235);    // day rail (darker navy, measured)
+const uint32_t C_RAIL_D_B = RGBA(44, 70, 124, 235);
+const uint32_t C_RAIL_N_T = RGBA(132, 112, 168, 235);   // night rail (purple)
+const uint32_t C_RAIL_N_B = RGBA(76, 50, 112, 235);
+const uint32_t C_RAIL_EDGE = RGBA(146, 168, 210, 255);  // thin cyan/light-blue edge line (measured)
 const uint32_t C_CHR_T   = RGBA(244, 246, 250, 255);    // chrome wordmark/labels
 const uint32_t C_CHR_B   = RGBA(168, 176, 190, 255);
 const uint32_t C_CHR_OUT = RGBA(22, 24, 36, 255);
-const uint32_t C_PLATE_T = RGBA(74, 58, 110, 225);      // stat plate (dark violet)
-const uint32_t C_PLATE_B = RGBA(40, 30, 64, 225);
+const uint32_t C_PLATE_T = RGBA(54, 50, 108, 248);      // stat plate (dark navy/indigo, measured)
+const uint32_t C_PLATE_B = RGBA(32, 28, 72, 248);
 const uint32_t C_PLATE_RIM = RGBA(225, 220, 240, 255);  // white top rim
 const uint32_t C_EXP_N_T = RGBA(232, 60, 150, 235);     // EXP plate magenta (night/Werehog)
 const uint32_t C_EXP_N_B = RGBA(160, 24, 96, 235);
@@ -62,8 +62,8 @@ const uint32_t C_SKY_T = RGBA(86, 140, 210, 255), C_SKY_B = RGBA(170, 205, 235, 
 constexpr float RAIL_Y0 = 50, RAIL_Y1 = 107, RAIL_X1 = 607;
 constexpr float WM_X = 263, WM_TOP = 60;
 constexpr float EXP_Y = 168;                 // EXP row top
-constexpr float ROW_Y0 = 226;                // first stat row top
-constexpr float ROW_PITCH = 54, PLATE_H = 40;   // tight, compact stack (matches real)
+constexpr float ROW_Y0 = 233;                // first stat row top (measured: EXP@1280 ~237)
+constexpr float PLATE_H = 40;
 constexpr float PLATE_X = 180, PLATE_W = 188;
 constexpr float BAR_END = 560, SLANT = 12;
 
@@ -79,6 +79,10 @@ const Row WEREHOG_ROWS[] = {
 bool g_night = false;
 int  g_sel = 0;
 int  g_expCount = 99;
+
+// Day form spreads its 2 stat rows wide (measured real pitch ~93px); the night
+// form packs 5 rows tightly (~54). Form-dependent.
+inline float RowPitch() { return g_night ? 54.0f : 93.0f; }
 
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
@@ -171,20 +175,23 @@ void Draw(double openSec) {
                     "( character render: live 3D )", Align::Center, true, false);
     ResetFont();
 
-    // ---- form-colored header rail + swoosh + chrome STATUS ----
+    // ---- form-colored header rail (extends right with a curl/hook swash) +
+    //      cyan top+bottom edge highlights + chrome STATUS ----
     const uint32_t railT = g_night ? C_RAIL_N_T : C_RAIL_D_T;
     const uint32_t railB = g_night ? C_RAIL_N_B : C_RAIL_D_B;
-    DrawVGradient({ 0, RAIL_Y0 }, { RAIL_X1 - 60, RAIL_Y1 }, WithAlpha(railT, a), WithAlpha(railB, a));
-    {   // swoosh tail: a tapering quad + upward curl hint
-        const V2 sw[4] = { { RAIL_X1 - 60, RAIL_Y0 }, { RAIL_X1, RAIL_Y0 + 14 }, { RAIL_X1 - 18, RAIL_Y1 - 8 }, { RAIL_X1 - 60, RAIL_Y1 } };
-        const uint32_t sc[4] = { WithAlpha(railT, a), WithAlpha(C_RAIL_EDGE, a * 0.8f), WithAlpha(railB, a), WithAlpha(railB, a) };
+    const float railEnd = 1150;
+    DrawVGradient({ 0, RAIL_Y0 }, { railEnd - 70, RAIL_Y1 }, WithAlpha(railT, a), WithAlpha(railB, a));
+    {   // tapering swoosh tail + an upward curl/hook
+        const V2 sw[4] = { { railEnd - 70, RAIL_Y0 }, { railEnd, RAIL_Y0 + 16 }, { railEnd - 22, RAIL_Y1 - 10 }, { railEnd - 70, RAIL_Y1 } };
+        const uint32_t sc[4] = { WithAlpha(railT, a), WithAlpha(railT, a), WithAlpha(railB, a), WithAlpha(railB, a) };
         DrawQuadGradient(sw, sc);
-        const V2 curl[4] = { { RAIL_X1 - 8, RAIL_Y0 + 4 }, { RAIL_X1 + 16, RAIL_Y0 - 6 }, { RAIL_X1 + 10, RAIL_Y0 + 8 }, { RAIL_X1 - 12, RAIL_Y0 + 16 } };
+        const V2 curl[4] = { { railEnd - 14, RAIL_Y0 + 2 }, { railEnd + 22, RAIL_Y0 - 8 }, { railEnd + 14, RAIL_Y0 + 10 }, { railEnd - 20, RAIL_Y0 + 18 } };
         const uint32_t cc[4] = { WithAlpha(C_RAIL_EDGE, a), WithAlpha(C_RAIL_EDGE, a * 0.4f), WithAlpha(C_RAIL_EDGE, a * 0.4f), WithAlpha(C_RAIL_EDGE, a) };
         DrawQuadGradient(curl, cc);
     }
-    DrawRect({ 0, RAIL_Y0 }, { RAIL_X1 - 60, RAIL_Y0 + 1.5f }, WithAlpha(C_RAIL_EDGE, a * 0.7f));
-    Chrome({ WM_X, WM_TOP }, 46.0f, "STATUS", a, C_CHR_T, C_CHR_B, 1.5f);
+    DrawRect({ 0, RAIL_Y0 - 1 }, { railEnd - 70, RAIL_Y0 + 1.5f }, WithAlpha(C_RAIL_EDGE, a * 0.7f));   // top edge
+    DrawRect({ 0, RAIL_Y1 }, { railEnd - 70, RAIL_Y1 + 2.5f }, WithAlpha(C_RAIL_EDGE, a));              // bottom highlight
+    Chrome({ WM_X, WM_TOP - 2 }, 50.0f, "STATUS", a, C_CHR_T, C_CHR_B, 1.7f);   // bigger (measured)
 
     // ---- form wordmark slot (mid-right; SEGA art drops in) ----
     DrawRect({ 950, 470 }, { 1240, 554 }, WithAlpha(RGBA(30, 24, 48, 120), a));
@@ -194,21 +201,24 @@ void Draw(double openSec) {
                     Align::Center, true, false);
     ResetFont();
 
-    // ---- top-right medal-level gauge chips (Werehog/night form only; the day
-    //      form's top-right is empty scene) ----
+    // ---- top-right level gauges (Werehog/night form only): a "lv 7" label in a
+    //      silver capsule, then the yellow pill gauge bar (measured: no medal
+    //      square — the level label sits in the capsule) ----
     if (g_night) {
-        SetFont(g_fRodin);
-        auto lvchip = [&](float cy, uint32_t icol) {
-            // medal icon
-            DrawRect({ 928, cy - 13 }, { 954, cy + 13 }, WithAlpha(RGBA(60, 50, 70, 230), a));
-            DrawRect({ 930, cy - 11 }, { 952, cy + 11 }, WithAlpha(icol, a));
-            // grey rounded capsule frame + gold fill bar
-            DrawVGradient({ 962, cy - 11 }, { 1100, cy + 11 }, WithAlpha(RGBA(196, 200, 206, 235), a), WithAlpha(RGBA(140, 144, 150, 235), a));
-            DrawVGradient({ 966, cy - 7 }, { 1052, cy + 7 }, WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_B, a));
+        auto lvchip = [&](float cy) {
+            // silver capsule track (rounded ends) with the lv label seated left
+            DrawVGradient({ 928, cy - 12 }, { 1110, cy + 12 }, WithAlpha(RGBA(206, 210, 214, 235), a), WithAlpha(RGBA(150, 154, 160, 235), a));
+            DrawRect({ 924, cy - 6 }, { 932, cy + 6 }, WithAlpha(RGBA(180, 184, 190, 235), a));   // rounded-end hint
+            DrawRect({ 1106, cy - 6 }, { 1114, cy + 6 }, WithAlpha(RGBA(180, 184, 190, 235), a));
+            // "lv 7" label (small lv + larger 7)
+            SetFont(g_fRodin);
+            DrawTextShadow({ 936, cy - 6 }, 12.0f, WithAlpha(RGBA(70, 72, 78, 255), a), "lv");
+            DrawText({ 952, cy - 11 }, 22.0f, WithAlpha(RGBA(40, 42, 48, 255), a), "7");
+            ResetFont();
+            // yellow pill gauge fill (rounded), right of the label
+            DrawVGradient({ 974, cy - 7 }, { 1098, cy + 7 }, WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_B, a));
         };
-        lvchip(140, RGBA(214, 96, 40, 255));    // sun
-        lvchip(176, RGBA(64, 120, 210, 255));   // moon
-        ResetFont();
+        lvchip(140); lvchip(176);
     }
 
     // ---- EXP row: magenta plate + gem slot + bar + chrome count ----
@@ -225,14 +235,14 @@ void Draw(double openSec) {
     const int n = g_night ? 5 : 2;
     for (int i = 0; i < n; ++i) {
         const float rt = (float)ComputeMotion(openSec, 6.0 + i * 3.0, 8.0);
-        if (rt > 0.0f) StatRow(ROW_Y0 + i * ROW_PITCH, rows[i].label, rows[i].fill, i == g_sel, rt, false);
+        if (rt > 0.0f) StatRow(ROW_Y0 + i * RowPitch(), rows[i].label, rows[i].fill, i == g_sel, rt, false);
     }
 
     // ---- QUIT plate below the stat list (a small chamfered button + curl tail) ----
     {
         const float qt = (float)ComputeMotion(openSec, 6.0 + n * 3.0, 8.0);
         if (qt > 0.0f) {
-            const float qy = ROW_Y0 + n * ROW_PITCH + 6, qx = PLATE_X, qw = 132, qh = 38;
+            const float qy = ROW_Y0 + n * RowPitch() + 6, qx = PLATE_X, qw = 132, qh = 38;
             const bool qsel = (g_sel == n);
             const float qx0 = qsel ? qx - 12 : qx;
             uint32_t qT = g_night ? RGBA(96, 64, 140, 235) : RGBA(56, 104, 168, 235);
