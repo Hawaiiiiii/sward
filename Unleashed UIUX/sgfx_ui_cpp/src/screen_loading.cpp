@@ -46,6 +46,18 @@ void Init() { if (g_wordTex < 0) g_wordTex = gfx::loadTexture("assets/loading/ma
 void Reset() {}
 void Input(const ScreenInput&) {}
 
+// filled circle via horizontal strips (sgfxui has no circle primitive)
+void FillDisc(float cx, float cy, float r, uint32_t col) {
+    const int N = 16;
+    for (int i = 0; i < N; ++i) {
+        float y0 = cy - r + (2.0f * r) * i / N;
+        float y1 = cy - r + (2.0f * r) * (i + 1) / N;
+        float ym = (y0 + y1) * 0.5f - cy;
+        float hw = std::sqrt(std::max(0.0f, r * r - ym * ym));
+        DrawRect({ cx - hw, y0 }, { cx + hw, y1 }, col);
+    }
+}
+
 void Screw(float cx, float cy) {
     DrawRect({ cx - 9, cy - 9 }, { cx + 9, cy + 9 }, C_SHELL_DK);
     DrawRect({ cx - 6, cy - 6 }, { cx + 6, cy + 6 }, RGBA(176, 148, 38, 255));
@@ -59,11 +71,14 @@ void SpeakerGrille(float x0, float y0) {
 }
 
 void DPad(float cx, float cy) {
-    const float arm = 34, th = 20;
+    // round recessed base (the real Miles-Electric pads are circular clusters)
+    FillDisc(cx, cy, 42, C_SHELL_DK);
+    FillDisc(cx, cy, 38, RGBA(206, 172, 46, 255));
+    const float arm = 32, th = 18;
     DrawRect({ cx - arm, cy - th * 0.5f }, { cx + arm, cy + th * 0.5f }, C_SHELL_DK);
     DrawRect({ cx - th * 0.5f, cy - arm }, { cx + th * 0.5f, cy + arm }, C_SHELL_DK);
-    DrawRect({ cx - arm + 3, cy - th * 0.5f + 3 }, { cx + arm - 3, cy + th * 0.5f - 3 }, RGBA(222, 186, 52, 255));
-    DrawRect({ cx - th * 0.5f + 3, cy - arm + 3 }, { cx + th * 0.5f - 3, cy + arm - 3 }, RGBA(222, 186, 52, 255));
+    DrawRect({ cx - arm + 3, cy - th * 0.5f + 3 }, { cx + arm - 3, cy + th * 0.5f - 3 }, RGBA(228, 192, 56, 255));
+    DrawRect({ cx - th * 0.5f + 3, cy - arm + 3 }, { cx + th * 0.5f - 3, cy + arm - 3 }, RGBA(228, 192, 56, 255));
     DrawRect({ cx - 6, cy - 6 }, { cx + 6, cy + 6 }, C_SHELL_DK);
 }
 
@@ -90,8 +105,10 @@ void Draw(double openSec) {
     // ---- yellow device shell ----
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SHELL_T, C_SHELL_B);
     SpeakerGrille(28, 10);  SpeakerGrille(1112, 10);
-    DrawRect({ 632, 20 }, { 648, 36 }, C_BEZEL);                       // camera dot
-    DrawRect({ 635, 23 }, { 645, 33 }, RGBA(50, 56, 60, 255));
+    FillDisc(640, 28, 11, C_BEZEL);                                   // round camera lens
+    FillDisc(640, 28, 8, RGBA(150, 120, 36, 255));                    // gold ring
+    FillDisc(640, 28, 5, RGBA(40, 46, 52, 255));                      // dark glass
+    FillDisc(638, 26, 1.6f, RGBA(180, 200, 210, 255));               // catch-light
     Screw(20, 20); Screw(1260, 20); Screw(20, 700); Screw(1260, 700);
     DrawRect({ 0, 280 }, { 14, 380 }, C_SHELL_DK);                     // VOL rocker
     DrawRect({ 2, 286 }, { 12, 374 }, RGBA(190, 158, 40, 255));
@@ -129,6 +146,15 @@ void Draw(double openSec) {
     {
         const V2 loop[8] = { { 430, 470 }, { 560, 410 }, { 760, 400 }, { 880, 450 },
                              { 820, 520 }, { 680, 555 }, { 540, 545 }, { 440, 510 } };
+        // translucent interior fill (triangle fan from the centroid) so the loop
+        // reads as a lit platform surface, not a hollow ring
+        const V2 ctr = { 644, 478 };
+        for (int i = 0; i < 8; ++i) {
+            const V2 tri[4] = { ctr, loop[i], loop[(i + 1) % 8], ctr };
+            const uint32_t tc[4] = { WithAlpha(C_WIRE, 0.07f), WithAlpha(C_WIRE, 0.16f),
+                                     WithAlpha(C_WIRE, 0.16f), WithAlpha(C_WIRE, 0.07f) };
+            DrawQuadGradient(tri, tc, true);
+        }
         for (int i = 0; i < 8; ++i) {
             const V2& p0 = loop[i]; const V2& p1 = loop[(i + 1) % 8];
             V2 n = { (p1.y - p0.y), (p0.x - p1.x) };
@@ -153,16 +179,11 @@ void Draw(double openSec) {
         bld(620, 520, 56, 70); bld(806, 500, 44, 52);
     }
 
-    // ---- gold landmark medallion slots (rounded: stepped-octagon stack) ----
+    // ---- gold landmark medallion slots (round, like the real map markers) ----
     auto medallion = [&](float cx, float cy) {
-        auto disc = [&](float r, uint32_t col) {
-            DrawRect({ cx - r * 0.62f, cy - r }, { cx + r * 0.62f, cy + r }, col);
-            DrawRect({ cx - r, cy - r * 0.62f }, { cx + r, cy + r * 0.62f }, col);
-            DrawRect({ cx - r * 0.88f, cy - r * 0.88f }, { cx + r * 0.88f, cy + r * 0.88f }, col);
-        };
-        disc(18, WithAlpha(RGBA(40, 30, 8, 255), 0.8f));
-        disc(15, C_GOLD);
-        disc(9, RGBA(150, 116, 36, 255));
+        FillDisc(cx, cy, 18, WithAlpha(RGBA(40, 30, 8, 255), 0.8f));
+        FillDisc(cx, cy, 15, C_GOLD);
+        FillDisc(cx, cy, 9, RGBA(150, 116, 36, 255));
     };
     medallion(404, 432); medallion(700, 330); medallion(914, 348);
 
