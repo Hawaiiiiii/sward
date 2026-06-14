@@ -203,6 +203,23 @@ void DrawNumber(int value, float rightX, float y, float h, float t) {
     }
 }
 
+// Draw a digit/colon string (e.g. a "M:SS" clock) using the digit atlas,
+// right-anchored at rightX. ':' maps to glyph index 10.
+void DrawGlyphString(const char* s, float rightX, float y, float h, float t) {
+    if (g_numTex < 0 || t <= 0.0f || !s) return;
+    int len = (int)std::strlen(s);
+    float totalW = 0.0f;
+    for (int i = 0; i < len; ++i) { int g = (s[i] == ':') ? 10 : (s[i] - '0'); totalW += h * NumAspect(g) + DIGIT_GAP; }
+    float x = rightX - totalW;
+    for (int i = 0; i < len; ++i) {
+        int g = (s[i] == ':') ? 10 : (s[i] - '0');
+        const UV& u = NUM_GLYPH[g];
+        float w = h * NumAspect(g);
+        DrawImage(g_numTex, { x, y }, { x + w, y + h }, { u.u0, u.v0 }, { u.u1, u.v1 }, WithAlpha(COL_SCORE, t));
+        x += w + DIGIT_GAP;
+    }
+}
+
 // The bottom boost gauge: a bounded dim track, the rainbow energy bar clipped to the
 // current fill fraction (UV-clipped so the art is cropped, not squashed), plus the
 // gold tire emblem at the left cap. fill in [0,1].
@@ -292,21 +309,25 @@ void Draw(double openSec) {
                   WithAlpha(COL_WHITE, clusterT));
     }
 
-    // cluster order (real HUD): TIME / RINGS / SCORE, top to bottom
-    // TIME row (label drawn with the font; value is the stage clock)
-    if (clusterT > 0.0f) {
-        SetFont(g_fRodin);
-        DrawTextShadow({ CL_LABEL_X, 44.0f }, 14.0f, WithAlpha(COL_FOOTER, clusterT), "TIME");
-        ResetFont();
-        DrawNumber(0, NUM_X + 300.0f, 62.0f, DIGIT_H * 0.86f, clusterT);   // 00:00:00-style readout
-    }
-    // RINGS label + count (second row)
-    DrawLabel(LBL_RINGS, CL_LABEL_X, RINGS_LBL_Y, 14.0f, clusterT);
-    DrawNumber(g_rings, NUM_X + 300.0f, RINGS_NUM_Y, DIGIT_H, clusterT);
+    // real HUD: the emblem IS the ring label, so just the big ring count sits
+    // right of the Sonic head (top-left). No "RINGS" word here.
+    DrawNumber(g_rings, 272.0f, 50.0f, 46.0f, clusterT);
 
-    // SCORE label + digits (third row)
-    DrawLabel(LBL_SCORE, CL_LABEL_X, 158.0f, 14.0f, clusterT);
-    DrawNumber(g_score, NUM_X + 300.0f, 176.0f, DIGIT_H, clusterT);
+    // ---- top-right cluster: TIME (label+clock) over SCORE (label+digits),
+    //      right-anchored to the screen edge (matches the real day-stage HUD) ----
+    if (clusterT > 0.0f) {
+        const float RX = 1238.0f;
+        SetFont(g_fRodin);
+        auto rlabel = [&](const char* s, float y) {
+            float w = MeasureText(15.0f, s).x;
+            DrawTextShadow({ RX - w, y }, 15.0f, WithAlpha(COL_FOOTER, clusterT), s);
+        };
+        rlabel("TIME", 32.0f);
+        rlabel("SCORE", 96.0f);
+        ResetFont();
+        DrawGlyphString("1:23", RX, 50.0f, DIGIT_H * 0.92f, clusterT);   // stage clock M:SS
+        DrawNumber(g_score, RX, 114.0f, DIGIT_H, clusterT);
+    }
 
     // ---- bottom boost gauge (eased fill) ----
     float displayBoost = g_boost;
