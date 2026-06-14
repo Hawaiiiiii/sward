@@ -7,7 +7,7 @@
 //   * the speaker NAMEPLATE: a gold rounded pill top-right ("Don Fachio's
 //     Apotos") with dark text;
 //   * the rings counter top-left (HUD remnant slot);
-//   * footer (A) Next / (B) Back; the live town scene stays bright behind.
+//   * footer (A) Select / (B) Back; the live town scene stays bright behind.
 // (A) advances through the sample conversation lines; B backs out (flow).
 // =============================================================================
 #include "sgfxui.h"
@@ -123,12 +123,12 @@ void Draw(double openSec) {
         ResetFont();
     }
 
-    // ---- footer: (A) Next  (B) Back — bottom-right, under the dialogue box ----
+    // ---- footer: (A) Select  (B) Back — bottom-right, under the dialogue box ----
     {
         SetFont(g_fRodin);
         float hcy = 638;
         auto glyph = [&](const UV& g, float x){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,a)); return x+gw+8; };
-        float hx = 858; hx = glyph(GLYPH_A, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Next");
+        float hx = 858; hx = glyph(GLYPH_A, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Select");
         hx = 992; hx = glyph(GLYPH_B, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Back");
         ResetFont();
     }
