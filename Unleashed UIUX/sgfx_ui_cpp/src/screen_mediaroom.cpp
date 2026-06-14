@@ -54,19 +54,19 @@ const uint32_t C_HDR_T     = RGBA(88, 93, 70, 235);      // header green field
 const uint32_t C_HDR_B     = RGBA(56, 67, 46, 235);
 const uint32_t C_HDR_CREAM = RGBA(227, 214, 180, 255);
 const uint32_t C_HDR_GOLD  = RGBA(204, 181, 89, 255);
-const uint32_t C_TITLE_T   = RGBA(238, 236, 233, 255);   // beveled title slab
-const uint32_t C_TITLE_B   = RGBA(190, 160, 90, 255);
+const uint32_t C_TITLE_T   = RGBA(244, 243, 240, 255);   // beveled title slab (white, per capture)
+const uint32_t C_TITLE_B   = RGBA(212, 206, 184, 255);   // faint warm tint, NOT gold
 const uint32_t C_TITLE_OUT = RGBA(65, 62, 39, 255);
-const uint32_t C_PLQ_GREEN = RGBA(94, 101, 69, 255);     // page plaque field
+const uint32_t C_PLQ_GREEN = RGBA(104, 84, 52, 255);     // page counter band = parchment-frame brown (not green)
 const uint32_t C_PLQ_GOLD  = RGBA(228, 199, 69, 255);
 const uint32_t C_CNT_T     = RGBA(243, 235, 200, 255);   // counter digits bevel
-const uint32_t C_CNT_B     = RGBA(168, 175, 155, 255);
+const uint32_t C_CNT_B     = RGBA(214, 206, 178, 255);   // warm cream (was greenish)
 const uint32_t C_CHEV      = RGBA(235, 220, 87, 255);    // page chevron gold
 const uint32_t C_CHEV_FADE = RGBA(191, 176, 139, 255);
 const uint32_t C_THUMB_BD  = RGBA(209, 204, 184, 255);   // thumb cream border
 const uint32_t C_THUMB_SH  = RGBA(150, 141, 112, 255);   // sunken shadow
 const uint32_t C_SEL_W     = RGBA(240, 237, 242, 255);   // selection ring white
-const uint32_t C_SEL_G     = RGBA(250, 238, 110, 255);   // selection ring gold
+const uint32_t C_SEL_G     = RGBA(234, 198, 92, 255);    // selection ring gold (warmer, less neon than the real border)
 const uint32_t C_SEL_GLOW  = RGBA(231, 182, 111, 255);   // pulsing warm glow
 const uint32_t C_SCR_T     = RGBA(87, 35, 21, 255);      // scrollbar maroon
 const uint32_t C_SCR_B     = RGBA(34, 16, 14, 255);
@@ -118,13 +118,13 @@ void HeaderStrip(const char* title, float a) {
     // beveled slab title at the measured x (ref band ~270 wide x 29 tall):
     // olive-brown outline ring first, then the cream->gold bevel face
     SetFont(g_fDF);
-    SetTextStretchX(1.12f);
+    SetTextStretchX(1.0f);   // tighter tracking than the chunky default (per capture)
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (dx || dy)
-                DrawText({ 278.0f + dx * 1.5f, 64.0f + dy * 1.5f }, 40.0f, WithAlpha(C_TITLE_OUT, a), title);
+                DrawText({ 256.0f + dx * 1.5f, 68.0f + dy * 1.5f }, 33.0f, WithAlpha(C_TITLE_OUT, a), title);
     SetModifier(MOD_TITLE_BEVEL);
-    DrawTextGradient({ 278, 64 }, 40.0f, WithAlpha(C_TITLE_T, a), WithAlpha(C_TITLE_B, a), title);
+    DrawTextGradient({ 256, 68 }, 33.0f, WithAlpha(C_TITLE_T, a), WithAlpha(C_TITLE_B, a), title);
     ResetModifier();
     ResetTextStretchX();
     ResetFont();
