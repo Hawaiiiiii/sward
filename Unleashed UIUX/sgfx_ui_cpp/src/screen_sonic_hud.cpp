@@ -89,23 +89,24 @@ float Aspect(const UV& u, float texW, float texH) {
 }
 
 // ---- layout (reference px) --------------------------------------------------
-// Top-left cluster. From the stage_ready_overlay READY frame + CSD info_position:
-// the Sonic-head ring emblem sits at ~(92,46) with the big ring count to its right,
-// then RINGS / TIME / SCORE stack vertically BELOW, each a small chrome label at
-// x~150 with its value to the right, sitting on a thin warm angled info-band.
-constexpr float HEAD_X = 92.0f,  HEAD_Y = 46.0f,  HEAD_H = 56.0f;   // ring emblem box height
-// stacked readout rows (all in the TOP-LEFT — there is NO top-right cluster):
-constexpr float ROW_LABEL_X = 150.0f;        // left edge of the chrome word-labels
-constexpr float ROW_VALUE_RX = 470.0f;       // right edge the digit runs align to
-constexpr float ROW_BAND_X0 = 138.0f;        // left edge of the warm info-band
-constexpr float ROW_BAND_X1 = 486.0f;        // right edge of the warm info-band
-constexpr float ROW_BAND_H  = 26.0f;         // info-band height
-constexpr float ROW_SKEW    = 12.0f;         // parallelogram lean (px, top shifted right)
-constexpr float RINGS_ROW_Y = 110.0f;        // RINGS row centre y
-constexpr float TIME_ROW_Y  = 150.0f;        // TIME row centre y (clock)
-constexpr float SCORE_ROW_Y = 200.0f;        // SCORE row centre y (score digits)
-constexpr float ROW_LABEL_H = 16.0f;         // chrome label target height
-constexpr float ROW_VALUE_H = 24.0f;         // value digit height
+// Top-left cluster. From the verified stage_ready_overlay READY frame + CSD
+// info_position: the Sonic-head ring emblem sits at ~(129,72) with the big ring
+// count to its right (row 1), then a TIME band and a SCORE band stack BELOW. Each
+// band carries its LABEL ABOVE its VALUE, both LEFT-anchored at column x~128, and
+// the cool steel-blue band bleeds off the left screen edge with an angled right cap.
+constexpr float HEAD_X = 92.0f,  HEAD_Y = 72.0f,  HEAD_H = 56.0f;   // ring emblem box height (icon_position_hd ~129,72)
+// stacked label-above-value bands (all in the TOP-LEFT — there is NO top-right cluster):
+constexpr float ROW_COL_X   = 128.0f;        // left anchor column for label + value
+constexpr float ROW_BAND_X0 = 0.0f;          // band left edge bleeds off-screen-left (real bands reach x~1)
+constexpr float ROW_BAND_X1 = 320.0f;        // right edge of the steel-blue info-band (before the angled cap)
+constexpr float ROW_BAND_H  = 50.0f;         // info-band height (holds the small label above the larger value)
+constexpr float ROW_SKEW    = 16.0f;         // parallelogram lean of the right cap (px, top shifted right)
+constexpr float TIME_ROW_Y  = 150.0f;        // TIME band centre y (clock)
+constexpr float SCORE_ROW_Y = 200.0f;        // SCORE band centre y (score digits)
+constexpr float ROW_LABEL_H = 15.0f;         // chrome word-label target height (~14-16px)
+constexpr float ROW_VALUE_H = 28.0f;         // value digit height (~28px)
+constexpr float ROW_LABEL_DY = 6.0f;         // label sits this far above band centre (top = cy-DY-H)
+constexpr float ROW_VALUE_DY = 0.0f;         // value top starts at band centre (label above, value below)
 constexpr float DIGIT_H = 30.0f;                                      // on-screen digit height
 constexpr float DIGIT_GAP = 2.0f;                                     // gap between digits
 
@@ -188,34 +189,36 @@ void DrawLabel(const UV& u, float x, float y, float targetH, float t) {
               { u.u0, u.v0 }, { u.u1, u.v1 }, WithAlpha(COL_WHITE, t));
 }
 
-// The thin warm angled info-band that sits behind each RINGS/TIME/SCORE value row
-// (the warm-tinted parallelogram from the READY frame). A darker base, then a
-// top->bottom warm gradient (RGBA 0xAARRGGBB: 50.255.100.50 -> 10.255.100.35),
-// drawn as a leaning quad so it reads as the angled HUD info-bar. Centred at cy.
+// The cool steel-blue angled info-band that holds each TIME/SCORE band (label
+// above value, per the verified READY frame). It bleeds off the left screen edge
+// (left edge flush at x=0) and tapers with an angled RIGHT cap only. A cool navy
+// base, then a NON-additive top->bottom steel-blue gradient (real bands read cool,
+// B>R): top RGBA(150,170,225,90) -> bottom RGBA(70,80,120,150). Centred at cy.
 void DrawInfoBand(float cy, float t) {
     if (t <= 0.0f) return;
     const float y0 = cy - ROW_BAND_H * 0.5f;
     const float y1 = cy + ROW_BAND_H * 0.5f;
-    const float sk = ROW_SKEW;   // top edge shifted right relative to the bottom edge
-    // corner order: TL, TR, BR, BL (top edge leans right by `sk`)
+    const float sk = ROW_SKEW;   // ONLY the right cap is angled (top-right pushed out)
+    // corner order: TL, TR, BR, BL. Left edge stays flush (bleeds off-screen-left);
+    // the right cap leans so the top-right reaches further than the bottom-right.
     V2 corners[4] = {
-        { ROW_BAND_X0 + sk, y0 }, { ROW_BAND_X1 + sk, y0 },
+        { ROW_BAND_X0,      y0 }, { ROW_BAND_X1 + sk, y0 },
         { ROW_BAND_X1,      y1 }, { ROW_BAND_X0,      y1 },
     };
-    // darker base parallelogram so the band reads over bright gameplay
+    // cool navy base so the band reads over bright gameplay
     uint32_t baseCols[4] = {
-        WithAlpha(RGBA(18, 14, 12, 150), t), WithAlpha(RGBA(18, 14, 12, 110), t),
-        WithAlpha(RGBA(10, 8, 6, 170), t),   WithAlpha(RGBA(10, 8, 6, 170), t),
+        WithAlpha(RGBA(28, 34, 66, 150), t), WithAlpha(RGBA(28, 34, 66, 110), t),
+        WithAlpha(RGBA(28, 34, 66, 150), t), WithAlpha(RGBA(28, 34, 66, 150), t),
     };
     DrawQuadGradient(corners, baseCols, /*additive*/ false);
-    // warm tint on top: top RGBA(255,100,50,50) -> bottom RGBA(255,100,35,10)
-    const uint32_t warmTop = RGBA(255, 100, 50, 50);
-    const uint32_t warmBot = RGBA(255, 100, 35, 10);
-    uint32_t warmCols[4] = {
-        WithAlpha(warmTop, t), WithAlpha(warmTop, t),
-        WithAlpha(warmBot, t), WithAlpha(warmBot, t),
+    // cool steel-blue tint on top (NON-additive): top (150,170,225,90) -> bottom (70,80,120,150)
+    const uint32_t coolTop = RGBA(150, 170, 225, 90);
+    const uint32_t coolBot = RGBA(70, 80, 120, 150);
+    uint32_t coolCols[4] = {
+        WithAlpha(coolTop, t), WithAlpha(coolTop, t),
+        WithAlpha(coolBot, t), WithAlpha(coolBot, t),
     };
-    DrawQuadGradient(corners, warmCols, /*additive*/ true);
+    DrawQuadGradient(corners, coolCols, /*additive*/ false);
 }
 
 // Draw an integer using the real digit atlas, right-anchored at rightX, baseline-top at y.
@@ -253,6 +256,39 @@ void DrawGlyphString(const char* s, float rightX, float y, float h, float t) {
     float totalW = 0.0f;
     for (int i = 0; i < len; ++i) { int g = (s[i] == ':') ? 10 : (s[i] - '0'); totalW += h * NumAspect(g) + DIGIT_GAP; }
     float x = rightX - totalW;
+    for (int i = 0; i < len; ++i) {
+        int g = (s[i] == ':') ? 10 : (s[i] - '0');
+        const UV& u = NUM_GLYPH[g];
+        float w = h * NumAspect(g);
+        DrawImage(g_numTex, { x, y }, { x + w, y + h }, { u.u0, u.v0 }, { u.u1, u.v1 }, WithAlpha(COL_SCORE, t));
+        x += w + DIGIT_GAP;
+    }
+}
+
+// LEFT-anchored integer (commafied) using the digit atlas, starting at leftX.
+// Used by the re-authored label-ABOVE-value TIME/SCORE bands.
+void DrawNumberLeft(int value, float leftX, float y, float h, float t) {
+    if (g_numTex < 0 || t <= 0.0f) return;
+    char buf[24]; Commafy(value, buf, sizeof(buf));
+    int len = (int)std::strlen(buf);
+    float x = leftX;
+    for (int i = 0; i < len; ++i) {
+        char c = buf[i];
+        if (c == ',') { x += h * 0.30f; continue; }
+        int g = c - '0';
+        const UV& u = NUM_GLYPH[g];
+        float w = h * NumAspect(g);
+        DrawImage(g_numTex, { x, y }, { x + w, y + h },
+                  { u.u0, u.v0 }, { u.u1, u.v1 }, WithAlpha(COL_SCORE, t));
+        x += w + DIGIT_GAP;
+    }
+}
+
+// LEFT-anchored digit/colon string (e.g. the stage clock), starting at leftX.
+void DrawGlyphStringLeft(const char* s, float leftX, float y, float h, float t) {
+    if (g_numTex < 0 || t <= 0.0f || !s) return;
+    int len = (int)std::strlen(s);
+    float x = leftX;
     for (int i = 0; i < len; ++i) {
         int g = (s[i] == ':') ? 10 : (s[i] - '0');
         const UV& u = NUM_GLYPH[g];
@@ -352,31 +388,29 @@ void Draw(double openSec) {
     }
 
     // real HUD: the emblem IS the ring label, so just the big ring count sits
-    // right of the Sonic head (top-left). No "RINGS" word here.
-    DrawNumber(g_rings, 272.0f, 50.0f, 46.0f, clusterT);
+    // right of the Sonic head (top-left). No "RINGS" word here. (Follows the
+    // emblem down to its new (129,72) origin.)
+    DrawNumber(g_rings, 272.0f, 76.0f, 46.0f, clusterT);
 
-    // ---- stacked TOP-LEFT readouts (RINGS / TIME / SCORE), below the emblem ----
-    // Each row is a small chrome word-label at ROW_LABEL_X with its value (digit
-    // atlas) right-anchored at ROW_VALUE_RX, sitting on a thin warm angled info-band
-    // (matches the READY frame: NO top-right cluster in the real day HUD).
+    // ---- stacked TOP-LEFT bands (TIME, then SCORE), below the emblem ----
+    // Per the verified READY frame: each band carries its LABEL ABOVE its VALUE,
+    // both LEFT-anchored at column ROW_COL_X, sitting on a cool steel-blue angled
+    // info-band that bleeds off the left edge. There is NO separate RINGS row and
+    // NO top-right cluster in the real day HUD.
     if (clusterT > 0.0f) {
-        auto rowLabelTop = [](float cy){ return cy - ROW_LABEL_H * 0.5f; };
-        auto rowValueTop = [](float cy){ return cy - ROW_VALUE_H * 0.5f; };
+        // small chrome word-label on the upper part of the band, larger value digits below
+        auto labelTop = [](float cy){ return cy - ROW_LABEL_DY - ROW_LABEL_H; };
+        auto valueTop = [](float cy){ return cy + ROW_VALUE_DY; };
 
-        // RINGS row
-        DrawInfoBand(RINGS_ROW_Y, clusterT);
-        DrawLabel(LBL_RINGS, ROW_LABEL_X, rowLabelTop(RINGS_ROW_Y), ROW_LABEL_H, clusterT);
-        DrawNumber(g_rings, ROW_VALUE_RX, rowValueTop(RINGS_ROW_Y), ROW_VALUE_H, clusterT);
-
-        // TIME row (stage clock MM:SS:FF — two colons, three two-digit groups)
+        // TIME band (stage clock MM:SS:FF — two colons, three two-digit groups)
         DrawInfoBand(TIME_ROW_Y, clusterT);
-        DrawLabel(LBL_TIME, ROW_LABEL_X, rowLabelTop(TIME_ROW_Y), ROW_LABEL_H, clusterT);
-        DrawGlyphString("00:00:00", ROW_VALUE_RX, rowValueTop(TIME_ROW_Y), ROW_VALUE_H, clusterT);
+        DrawLabel(LBL_TIME, ROW_COL_X, labelTop(TIME_ROW_Y), ROW_LABEL_H, clusterT);
+        DrawGlyphStringLeft("00:00:00", ROW_COL_X, valueTop(TIME_ROW_Y), ROW_VALUE_H, clusterT);
 
-        // SCORE row
+        // SCORE band
         DrawInfoBand(SCORE_ROW_Y, clusterT);
-        DrawLabel(LBL_SCORE, ROW_LABEL_X, rowLabelTop(SCORE_ROW_Y), ROW_LABEL_H, clusterT);
-        DrawNumber(g_score, ROW_VALUE_RX, rowValueTop(SCORE_ROW_Y), ROW_VALUE_H, clusterT);
+        DrawLabel(LBL_SCORE, ROW_COL_X, labelTop(SCORE_ROW_Y), ROW_LABEL_H, clusterT);
+        DrawNumberLeft(g_score, ROW_COL_X, valueTop(SCORE_ROW_Y), ROW_VALUE_H, clusterT);
     }
 
     // ---- bottom boost gauge (eased fill) ----

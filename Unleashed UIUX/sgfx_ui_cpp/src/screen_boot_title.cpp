@@ -146,19 +146,19 @@ void PressStart(double now, float a) {
     // metallic ring capsule (thin rim) + inner yellow capsule, both rounded ends
     // (measured pill ~325px wide @1280)
     CapsuleVGrad(492.0f, 494.7f, 788.0f, 548.7f, C_RING_HI, C_RING, a);     // ring w~296, ctr 640
-    CapsuleVGrad(499.0f, 506.0f, 781.0f, 535.0f, C_CAP_TOP, C_CAP_PEAK, a); // inner yellow w~282 h~29, cy~521
+    CapsuleVGrad(502.0f, 506.0f, 778.0f, 535.0f, C_CAP_TOP, C_CAP_PEAK, a); // inner yellow w~276 h~29, cy~521 (olive rim shows both ends)
     // glossy belly highlight (a brighter mid strip)
     CapsuleVGrad(509.0f, 514.0f, 771.0f, 526.0f, C_CAP_PEAK, RGBA(255, 246, 150, 255), a * 0.6f);
     // outline-style PRESS START (dark olive ring + capsule-yellow inner)
     SetFont(g_fRodin);
     const char* PS = "PRESS START";
-    float w = MeasureText(22.0f, PS).x;
-    float px = 640 - w * 0.5f, py = 509.0f;
+    float w = MeasureText(31.5f, PS).x;
+    float px = 640 - w * 0.5f, py = 504.0f;
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (dx || dy)
-                DrawText({ px + dx * 1.6f, py + dy * 1.6f }, 22.0f, WithAlpha(C_PS_OUT, a), PS);
-    DrawText({ px, py }, 22.0f, WithAlpha(C_CAP_PEAK, a), PS);
+                DrawText({ px + dx * 2.3f, py + dy * 2.3f }, 31.5f, WithAlpha(C_PS_OUT, a), PS);
+    DrawText({ px, py }, 31.5f, WithAlpha(C_CAP_PEAK, a), PS);
     ResetFont();
 }
 
@@ -209,13 +209,13 @@ void Carousel(float a) {
     // entry text: outlined lime caps, centred
     SetFont(g_fRodin);
     const char* E = ENTRIES[g_entry];
-    float w = MeasureText(34.0f, E).x;
-    float ex = 640 - w * 0.5f, ey = 489.0f;   // cy ~506 with 34px caps
+    float w = MeasureText(19.0f, E).x;
+    float ex = 640 - w * 0.5f, ey = 496.0f;   // cy ~506 with 19px caps (caph~15)
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (dx || dy)
-                DrawText({ ex + dx * 2.2f, ey + dy * 2.2f }, 34.0f, WithAlpha(C_ENTRY_OUT, a), E);
-    DrawText({ ex, ey }, 34.0f, WithAlpha(C_ENTRY, a), E);
+                DrawText({ ex + dx * 1.2f, ey + dy * 1.2f }, 19.0f, WithAlpha(C_ENTRY_OUT, a), E);
+    DrawText({ ex, ey }, 19.0f, WithAlpha(C_ENTRY, a), E);
     ResetFont();
     // arrows (solid green triangles) + outboard fading wedge bars
     const V2 lt[4] = { { 528.7f, 490.7f }, { 528.7f, 512.7f }, { 510.7f, 501.3f }, { 528.7f, 490.7f } };
@@ -253,7 +253,7 @@ void AutosaveDialog(float a) {
     const char* L[8] = { "This game utilizes", "an autosave feature.", "Please do not turn off",
                          "the console or remove", "any storage device when", "the autosave icon",
                          "appears", "on the screen." };
-    const float fz = 26.0f, pitch = 37.0f;
+    const float fz = 26.0f, pitch = 34.0f;
     for (int i = 0; i < 8; ++i) {
         float ly = 216.0f + i * pitch;
         float w = MeasureText(fz, L[i]).x;

@@ -380,7 +380,7 @@ void DrawInventory(float a) {
         DrawRect({ px0, py1 - 2 }, { px1, py1 }, WithAlpha(RGBA(210, 212, 212, 255), a));
         const char* OPT[2] = { "Give to Sonic", "Give to Chip" };
         const float rowY[2] = { py0 + 10, py0 + 44 };
-        DrawVGradient({ px0 + 8, rowY[g_invPopupSel] - 4 }, { px1 - 8, rowY[g_invPopupSel] + 26 },
+        DrawVGradient({ px0 + 4, rowY[g_invPopupSel] - 4 }, { px1 - 4, rowY[g_invPopupSel] + 26 },
                       WithAlpha(RGBA(238, 204, 92, 250), a), WithAlpha(RGBA(206, 160, 44, 250), a));
         SetFont(g_fSeurat);
         for (int i = 0; i < 2; ++i) {
@@ -427,7 +427,7 @@ void Draw(double openSec) {
         DrawPauseBands(1.0f);
         DrawConfirm(1.0f);
         SetFont(g_fRodin);
-        float hcy = 668;
+        float hcy = 637;
         auto cg = [&](const UV& g, float x){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, C_WHITE); return x+gw+8; };
         float hx = 700; hx = cg(GLYPH_A, hx); DrawText({hx,hcy-13},24.0f,C_FOOTER,"Select");
         hx = 895; hx = cg(GLYPH_B, hx); DrawText({hx,hcy-13},24.0f,C_FOOTER,"Back");
@@ -467,7 +467,7 @@ void Draw(double openSec) {
         bool sel = (i == g_sel);
         if (sel) {
             // ref bar is ~46px tall and centered on the text (nearly fills the 55px pitch)
-            DrawVGradient({ PX0 + 23, cyc - 23 }, { PX1 - 23, cyc + 23 },
+            DrawVGradient({ PX0 + 23, cyc - 21 }, { PX1 - 23, cyc + 18 },
                           WithAlpha(C_SEL_T, t), WithAlpha(C_SEL_B, t));
         }
         DrawTextAligned({ PX0, cyc - 27 }, { PX1, cyc + 27 }, 28.0f,
@@ -488,14 +488,16 @@ void Draw(double openSec) {
         // Sun medal slot ~(1041,495)-(1071,520), digits centered y~505
         DrawVGradient({ 1041, 495 }, { 1071, 520 }, WithAlpha(RGBA(238, 198, 70, 255), t), WithAlpha(RGBA(196, 150, 38, 255), t));
         medalCount(1080, 505, "00 / 00");
+        DrawRect({ 1078, 522 }, { 1264, 523 }, WithAlpha(RGBA(150, 153, 178, 200), t));   // trailing rule under sun counter
         // Moon medal slot ~(1036,540)-(1071,575), digits centered y~558
         DrawVGradient({ 1036, 540 }, { 1071, 575 }, WithAlpha(RGBA(176, 188, 214, 255), t), WithAlpha(RGBA(120, 134, 168, 255), t));
         medalCount(1080, 558, "02 / 02");
+        DrawRect({ 1078, 572 }, { 1264, 573 }, WithAlpha(RGBA(150, 153, 178, 200), t));   // trailing rule under moon counter
     }
 
     // ---- footer (Achievements / Select / Back) — ref groups at x~305 / ~700 / ~895 ----
     {
-        float hcy = 668;
+        float hcy = 637;
         auto glyph = [&](const UV& g, float x){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,t)); return x+gw+8; };
         // Xbox 360 BACK-button glyph: light oval (the atlas' tintable white circle,
         // stretched) + a dark left-pointing arrow — the ref's Achievements glyph.

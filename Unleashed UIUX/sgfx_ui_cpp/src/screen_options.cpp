@@ -111,18 +111,18 @@ const uint32_t C_INNER     = RGBA(0, 33, 0, 255);
 const uint32_t C_LINE      = RGBA(0, 89, 0, 255);
 const uint32_t C_TAB_BG    = RGBA(0, 130, 0, 223);
 const uint32_t C_TAB_BG2   = RGBA(0, 130, 0, 150);
-const uint32_t C_TAB_TXT_T = RGBA(128, 255, 0, 255);   // tab text gradient top
-const uint32_t C_TAB_TXT_B = RGBA(255, 192, 0, 255);   // tab text gradient bottom
+const uint32_t C_TAB_TXT_T = RGBA(126, 230, 15, 255);  // tab text gradient top
+const uint32_t C_TAB_TXT_B = RGBA(199, 127, 12, 255);  // tab text gradient bottom
 const uint32_t C_TAB_OFF   = RGBA(128, 135, 41, 220);  // inactive tab olive-gold (measured ~102,108,33)
-const uint32_t C_SEL_TL    = RGBA(226, 113, 34, 200);  // selected row diagonal (gold)
-const uint32_t C_SEL_BR    = RGBA(146, 255, 49, 200);  // -> green
+const uint32_t C_SEL_TL    = RGBA(226, 113, 34, 126);  // selected row diagonal (gold)
+const uint32_t C_SEL_BR    = RGBA(146, 255, 49, 126);  // -> green
 const uint32_t C_LABEL     = RGBA(255, 255, 255, 255);
 const uint32_t C_VAL_BG    = RGBA(0, 70, 0, 205);
 const uint32_t C_VAL_BG_B  = RGBA(0, 52, 0, 195);
 const uint32_t C_VAL_TXT_T = RGBA(105, 140, 18, 255);
 const uint32_t C_VAL_TXT_B = RGBA(82, 108, 12, 255);
 const uint32_t C_VAL_TXT_SEL = RGBA(195, 225, 100, 255);  // selected enum row brightens (measured)
-const uint32_t C_LIGHT_ON  = RGBA(165, 172, 12, 255);  // dim olive-yellow toggle light (measured)
+const uint32_t C_LIGHT_ON  = RGBA(170, 182, 12, 255);  // dim olive-yellow toggle light (measured)
 const uint32_t C_LIGHT_OFF = RGBA(40, 70, 40, 255);
 const uint32_t C_CARET     = RGBA(140, 230, 60, 255);  // selected-value carets are green in ref
 const uint32_t C_DESC      = RGBA(255, 255, 255, 255);
@@ -316,7 +316,7 @@ void Draw(double openSec) {
         float ix0 = IP_X0 + 18, ix1 = IP_X1 - 17;
         // preview box: the real video thumb is 240x140 (~16:9), centred in the panel
         float pvx0 = (IP_X0 + IP_X1) * 0.5f - 120.0f, pvx1 = pvx0 + 240.0f;
-        float ty0 = IP_Y0 + 18 + 4.5f, ty1 = ty0 + 140.0f;
+        float ty0 = IP_Y0 + 27, ty1 = ty0 + 141.0f;
         DrawRect({ pvx0, ty0 }, { pvx1, ty1 }, WithAlpha(RGBA(18,28,22,255), t));   // image placeholder fill
         uint32_t gb = WithAlpha(RGBA(0,168,46,255), t); const float L = 2.0f;       // bright-green border
         DrawRect({ pvx0, ty0 }, { pvx1, ty0 + L }, gb);
@@ -353,7 +353,7 @@ void Draw(double openSec) {
             if (nl == std::string::npos) break;
             p = nl + 1;
         }
-        const float textTop = ty1 + 24, clipY0 = ty1 + 12, clipY1 = IP_Y1 - 14;
+        const float textTop = ty1 + 48, clipY0 = ty1 + 24, clipY1 = IP_Y1 - 14;
         float scroll = 0;
         const float scrollMax = lines.size() * lineH - (clipY1 - textTop);
         if (scrollMax > 0) {   // hold -> scroll down -> hold -> scroll back (ping-pong marquee)

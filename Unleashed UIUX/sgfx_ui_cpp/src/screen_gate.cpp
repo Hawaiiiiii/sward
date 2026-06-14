@@ -127,7 +127,10 @@ void ChromeRight(float rx, float y, float px, const char* s, float a) {
     ResetTextStretchX();
     ResetTextShear();
     ResetFont();
-    Chrome({ rx - w, y }, px, s, a, true, 2.2f);
+    // MeasureText omits the shear lean + the dark outline halo, so the rendered
+    // glyphs overshoot ~25-29px past rx; pull the anchor left to land the real
+    // right edge on rx (~661 target).
+    Chrome({ rx - w - 29, y }, px, s, a, true, 2.2f);
 }
 
 // grey chamfered plate: TL 45-deg chamfer, slanted (italic) right end
@@ -223,7 +226,7 @@ void Draw(double openSec) {
     if (panT > 0.0f) {
         const Act& act = ACTS[g_act];
         // ---- wide act panel (x268-1003, real borders) with chamfered right corners ----
-        const float px0 = 268, py0 = 188, px1 = 1003, py1 = 540, pch = 24;
+        const float px0 = 268, py0 = 176, px1 = 1003, py1 = 540, pch = 24;
         DrawVGradient({ px0, py0 }, { px1, py1 }, WithAlpha(C_PANEL_T, panT), WithAlpha(C_PANEL_B, panT));
         // chamfer the top-right + bottom-right corners back to the scene
         const V2 ctr[4] = { { px1 - pch, py0 }, { px1, py0 }, { px1, py0 + pch }, { px1 - pch, py0 } };
@@ -233,22 +236,22 @@ void Draw(double openSec) {
         DrawRect({ px0, py0 }, { px1 - pch, py0 + 2 }, WithAlpha(C_BORDER, panT));
 
         // stage-name plate (top-left of the panel)
-        NamePlate(273, 200, 557, 237, panT);
+        NamePlate(273, 197, 557, 234, panT);
         SetFont(g_fSeurat);
         SetTextShear(0.18f);
-        DrawText({ 300 + 1.5f, 206 + 1.5f }, 24.0f, WithAlpha(RGBA(14, 14, 16, 255), panT), "Windmill Isle");
-        DrawText({ 300, 206 }, 24.0f, WithAlpha(C_WHITE, panT), "Windmill Isle");
+        DrawText({ 300 + 1.5f, 203 + 1.5f }, 24.0f, WithAlpha(RGBA(14, 14, 16, 255), panT), "Windmill Isle");
+        DrawText({ 300, 203 }, 24.0f, WithAlpha(C_WHITE, panT), "Windmill Isle");
         ResetTextShear();
         // Act N header
-        DrawText({ 280 + 1.5f, 258 + 1.5f }, 28.0f, WithAlpha(RGBA(14, 14, 16, 255), panT), act.name);
-        DrawText({ 280, 258 }, 28.0f, WithAlpha(C_WHITE, panT), act.name);
+        DrawText({ 280 + 1.5f, 248 + 1.5f }, 28.0f, WithAlpha(RGBA(14, 14, 16, 255), panT), act.name);
+        DrawText({ 280, 248 }, 28.0f, WithAlpha(C_WHITE, panT), act.name);
         ResetFont();
         // stat-block dividers (thin chrome rules, alpha ~0.4): under HIGH SCORE,
         // under BEST TIME, under the medal rows.
         const float STAT_R = 660;                       // shared value right-edge column
         DrawRect({ 266, 349 }, { STAT_R, 350.5f }, WithAlpha(C_BORDER, panT * 0.4f));
         DrawRect({ 266, 399 }, { STAT_R, 400.5f }, WithAlpha(C_BORDER, panT * 0.4f));
-        DrawRect({ 266, 451 }, { STAT_R, 452.5f }, WithAlpha(C_BORDER, panT * 0.4f));
+        DrawRect({ 266, 501 }, { STAT_R, 502.5f }, WithAlpha(C_BORDER, panT * 0.4f));
         // stat rows: outlined-chrome UPRIGHT label (left x276) + italic chrome VALUE
         // right-aligned to STAT_R.
         auto stat = [&](float ly, const char* lbl, float vy, const char* val) {
@@ -259,10 +262,10 @@ void Draw(double openSec) {
         stat(376, "BEST TIME",  372, act.bestTime);
         // medal rows: upright chrome MEDALS label, a sun/moon icon ellipse just
         // right of the label, and the count as an italic chrome value at STAT_R.
-        Chrome({ 276, 412 }, 22.0f, "MEDALS", panT, false, 1.4f);
+        Chrome({ 276, 420 }, 22.0f, "MEDALS", panT, false, 1.4f);
         char buf[16];
-        // filled vertical ellipse — gold core, coloured rim per row. Height is
-        // trimmed to ~22 so both rows seat inside the measured medal band (399-451).
+        // filled vertical ellipse — gold core, coloured rim per row. Tall/narrow
+        // oval (~14x33, aspect 1:2.5) so both rows seat inside the medal band (~405-495).
         auto medalEllipse = [&](float cx, float cy, float rx, float ry, uint32_t col) {
             const int N = 18;
             for (int i = 0; i < N; ++i) {
@@ -276,14 +279,14 @@ void Draw(double openSec) {
         const uint32_t C_MEDAL_CORE = RGBA(255, 212, 96, 255);   // gold core
         auto medal = [&](float iy, float vy, uint32_t rim, int got, int tot) {
             snprintf(buf, sizeof buf, "%d / %d", got, tot);
-            medalEllipse(425, iy, 12.0f, 11.0f, WithAlpha(rim, panT));            // coloured rim
-            medalEllipse(425, iy, 8.0f,  7.5f, WithAlpha(C_MEDAL_CORE, panT));    // gold core
+            medalEllipse(425, iy, 7.0f, 16.0f, WithAlpha(rim, panT));             // coloured rim (tall oval ~14x33)
+            medalEllipse(425, iy, 4.5f, 11.0f, WithAlpha(C_MEDAL_CORE, panT));    // gold core
             ChromeRight(STAT_R, vy, 26.0f, buf, panT);
         };
-        medal(413, 401, C_SUN,  act.sun,  act.sunMax);   // sun row (gold/orange)
-        medal(437, 425, C_MOON, act.moon, act.moonMax);  // moon row (gold/blue)
+        medal(430, 426, C_SUN,  act.sun,  act.sunMax);   // sun row (gold/orange)
+        medal(482, 478, C_MOON, act.moon, act.moonMax);  // moon row (gold/blue)
         // RANK label (upright chrome, below the medal divider)
-        Chrome({ 276, 466 }, 22.0f, "RANK", panT, false, 1.4f);
+        Chrome({ 276, 516 }, 22.0f, "RANK", panT, false, 1.4f);
         // stage screenshot slot (landscape 270x135, aspect 2.0 — measured stage_ss rect 702,320..972,455)
         // + the big metallic S-rank to its RIGHT, overlapping the photo's bottom-right
         DrawVGradient({ 702, 320 }, { 972, 455 }, WithAlpha(RGBA(60, 76, 98, 255), panT), WithAlpha(RGBA(30, 40, 54, 255), panT));
@@ -333,7 +336,7 @@ void Draw(double openSec) {
         DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 68));
         // screen-centred, tighter TL+BR chamfered grey dialog (flatter, dimmer
         // border — closer to the real near-borderless silver box)
-        const float px0 = 531, py0 = 296, px1 = 748, py1 = 414, pch = 16, cx = (px0 + px1) * 0.5f;
+        const float px0 = 531, py0 = 281, px1 = 748, py1 = 437, pch = 16, cx = (px0 + px1) * 0.5f;
         DrawVGradient({ px0, py0 }, { px1, py1 },
                       RGBA(152, 154, 156, 240), RGBA(122, 124, 126, 240));
         const V2 c1[4] = { { px0, py0 }, { px0 + pch, py0 }, { px0, py0 + pch }, { px0, py0 } };
@@ -346,16 +349,16 @@ void Draw(double openSec) {
         DrawRect({ px0, py0 + pch }, { px0 + 1.5f, py1 }, pbd);
         DrawRect({ px1 - 1.5f, py0 }, { px1, py1 - pch }, pbd);
         const char* OPT[2] = { "Play Stage", "Cancel" };
-        const float rowY[2] = { py0 + 22, py0 + 66 };
-        DrawVGradient({ px0 + 14, rowY[g_popupSel] - 6 }, { px1 - 14, rowY[g_popupSel] + 32 },
+        const float rowY[2] = { py0 + 50, py0 + 98 };
+        DrawVGradient({ px0 + 14, rowY[g_popupSel] - 6 }, { px1 - 14, rowY[g_popupSel] + 34 },
                       RGBA(238, 222, 150, 250), RGBA(214, 186, 96, 250));
         SetFont(g_fRodin);
         for (int i = 0; i < 2; ++i) {
-            float w = MeasureText(24.0f, OPT[i]).x;
+            float w = MeasureText(27.0f, OPT[i]).x;
             bool sel = (i == g_popupSel);
-            DrawText({ cx - w * 0.5f + 1, rowY[i] + 1 }, 24.0f,
+            DrawText({ cx - w * 0.5f + 1, rowY[i] + 1 }, 27.0f,
                      sel ? RGBA(150, 70, 16, 255) : RGBA(20, 20, 20, 200), OPT[i]);
-            DrawText({ cx - w * 0.5f, rowY[i] }, 24.0f,
+            DrawText({ cx - w * 0.5f, rowY[i] }, 27.0f,
                      sel ? RGBA(232, 120, 30, 255) : RGBA(235, 235, 235, 255), OPT[i]);
         }
         ResetFont();

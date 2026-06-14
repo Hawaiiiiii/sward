@@ -36,8 +36,8 @@ const UV GLYPH_LB = { 0.31250f, 0.00000f, 0.46875f, 0.07812f };   // shoulder LB
 const UV GLYPH_RB = { 0.46875f, 0.00000f, 0.62500f, 0.07812f };   // shoulder RB (manifest btn_rb)
 
 // ---- palette (sampled from the capture) --------------------------------------
-const uint32_t C_RAIL_D_T = RGBA(78, 104, 168, 235);    // day rail (darker navy, measured)
-const uint32_t C_RAIL_D_B = RGBA(44, 70, 124, 235);
+const uint32_t C_RAIL_D_T = RGBA(46, 82, 146, 235);     // day rail (real banner core ~42,79,143)
+const uint32_t C_RAIL_D_B = RGBA(38, 66, 124, 235);
 const uint32_t C_RAIL_N_T = RGBA(132, 112, 168, 235);   // night rail (purple)
 const uint32_t C_RAIL_N_B = RGBA(76, 50, 112, 235);
 const uint32_t C_RAIL_EDGE = RGBA(146, 168, 210, 255);  // thin cyan/light-blue edge line (measured)
@@ -67,7 +67,7 @@ constexpr float EXP_Y = 168;                 // EXP row top
 constexpr float ROW_Y0 = 233;                // first stat row top (measured: EXP@1280 ~237)
 constexpr float PLATE_H = 40;
 constexpr float PLATE_X = 180, PLATE_W = 188;
-constexpr float BAR_END = 560, SLANT = 12;
+constexpr float BAR_END = 575, SLANT = 12;   // gold tail reaches ~x575 (measured)
 
 struct Row { const char* label; float fill; };   // fill 0..1 (1 = MAX)
 const Row SONIC_ROWS[] = {
@@ -181,22 +181,19 @@ void Draw(double openSec) {
                     "( character render: live 3D )", Align::Center, true, false);
     ResetFont();
 
-    // ---- form-colored header rail (extends right with a curl/hook swash) +
-    //      cyan top+bottom edge highlights + chrome STATUS ----
+    // ---- form-colored header rail (ends near the banner terminus ~x640 with a
+    //      short swoosh tail) + cyan top+bottom edge highlights + chrome STATUS ----
     const uint32_t railT = g_night ? C_RAIL_N_T : C_RAIL_D_T;
     const uint32_t railB = g_night ? C_RAIL_N_B : C_RAIL_D_B;
-    const float railEnd = 1150;
-    DrawVGradient({ 0, RAIL_Y0 }, { railEnd - 70, RAIL_Y1 }, WithAlpha(railT, a), WithAlpha(railB, a));
-    {   // tapering swoosh tail + an upward curl/hook
-        const V2 sw[4] = { { railEnd - 70, RAIL_Y0 }, { railEnd, RAIL_Y0 + 16 }, { railEnd - 22, RAIL_Y1 - 10 }, { railEnd - 70, RAIL_Y1 } };
+    const float railEnd = 640;   // rail ends near the banner terminus (real navy ends ~x640)
+    DrawVGradient({ 0, RAIL_Y0 }, { railEnd - 40, RAIL_Y1 }, WithAlpha(railT, a), WithAlpha(railB, a));
+    {   // short tapering swoosh tail terminating the banner (no long right extension)
+        const V2 sw[4] = { { railEnd - 40, RAIL_Y0 }, { railEnd, RAIL_Y0 + 12 }, { railEnd - 16, RAIL_Y1 - 8 }, { railEnd - 40, RAIL_Y1 } };
         const uint32_t sc[4] = { WithAlpha(railT, a), WithAlpha(railT, a), WithAlpha(railB, a), WithAlpha(railB, a) };
         DrawQuadGradient(sw, sc);
-        const V2 curl[4] = { { railEnd - 14, RAIL_Y0 + 2 }, { railEnd + 22, RAIL_Y0 - 8 }, { railEnd + 14, RAIL_Y0 + 10 }, { railEnd - 20, RAIL_Y0 + 18 } };
-        const uint32_t cc[4] = { WithAlpha(C_RAIL_EDGE, a), WithAlpha(C_RAIL_EDGE, a * 0.4f), WithAlpha(C_RAIL_EDGE, a * 0.4f), WithAlpha(C_RAIL_EDGE, a) };
-        DrawQuadGradient(curl, cc);
     }
-    DrawRect({ 0, RAIL_Y0 - 1 }, { railEnd - 70, RAIL_Y0 + 1.5f }, WithAlpha(C_RAIL_EDGE, a * 0.7f));   // top edge
-    DrawRect({ 0, RAIL_Y1 }, { railEnd - 70, RAIL_Y1 + 2.5f }, WithAlpha(C_RAIL_EDGE, a));              // bottom highlight
+    DrawRect({ 0, RAIL_Y0 - 1 }, { railEnd - 40, RAIL_Y0 + 1.5f }, WithAlpha(C_RAIL_EDGE, a * 0.7f));   // top edge
+    DrawRect({ 0, RAIL_Y1 }, { railEnd - 40, RAIL_Y1 + 2.5f }, WithAlpha(C_RAIL_EDGE, a));              // bottom highlight
     Chrome({ WM_X, WM_TOP - 2 }, 50.0f, "STATUS", a, C_CHR_T, C_CHR_B, 1.7f);   // bigger (measured)
 
     // ---- form wordmark slot (mid-right; SEGA art drops in) ----
@@ -230,9 +227,16 @@ void Draw(double openSec) {
     // ---- EXP row: magenta plate + gem slot + bar + chrome count ----
     if (rowT > 0.0f) {
         const float ey = ExpTop();
-        StatRow(ey, "EXP.", 0.82f, false, rowT, true);
-        // gem slot riding the plate's right end
-        DrawRect({ PLATE_X + PLATE_W - 8, ey - 10 }, { PLATE_X + PLATE_W + 18, ey + 16 }, WithAlpha(RGBA(255, 226, 120, 230), rowT));
+        StatRow(ey, "EXP.", 0.95f, false, rowT, true);   // gold nearly full (real x325-575 span)
+        // EXP gem: rotated yellow-lime diamond (measured x322-347)
+        {
+            const float gcx = 334.5f, gcy = ey + 3.0f, grx = 12.5f, gry = 13.0f;
+            const uint32_t gemT = WithAlpha(RGBA(224, 236, 140, 235), rowT);
+            const uint32_t gemB = WithAlpha(RGBA(210, 221, 108, 235), rowT);
+            const V2 gem[4] = { { gcx, gcy - gry }, { gcx + grx, gcy }, { gcx, gcy + gry }, { gcx - grx, gcy } };
+            const uint32_t gcol[4] = { gemT, gemT, gemB, gemB };
+            DrawQuadGradient(gem, gcol);
+        }
         char buf[8]; snprintf(buf, sizeof buf, "x%d", g_expCount);
         Chrome({ BAR_END + 16, ey + 4 }, 30.0f, buf, rowT, C_CHR_T, C_CHR_B, 1.2f);
     }
@@ -249,9 +253,9 @@ void Draw(double openSec) {
     {
         const float qt = (float)ComputeMotion(openSec, 6.0 + n * 3.0, 8.0);
         if (qt > 0.0f) {
-            // QUIT plate sits at a FIXED y (retail: top y548-555) at PLATE_X for
+            // QUIT plate centered near manifest decide_bg (center x316, y554) for
             // BOTH forms; this removes the day~425/night~509 drift off the stack.
-            const float qy = 548, qx = PLATE_X, qw = 132, qh = 38;
+            const float qy = 540, qx = 224, qw = 132, qh = 38;
             const bool qsel = (g_sel == n);
             const float qx0 = qsel ? qx - 12 : qx;
             uint32_t qT = g_night ? RGBA(96, 64, 140, 235) : RGBA(56, 104, 168, 235);

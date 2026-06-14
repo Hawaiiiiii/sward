@@ -111,20 +111,20 @@ void HeaderStrip(const char* title, float a) {
     DrawRect({ 0, 62.7f }, { REF_W, 64.7f }, WithAlpha(C_HDR_GOLD, a));
     DrawVGradient({ 0, 65.3f }, { REF_W, 100.7f }, WithAlpha(C_HDR_T, a), WithAlpha(C_HDR_B, a));
     DrawRect({ 0, 101.3f }, { REF_W, 104.7f }, WithAlpha(C_HDR_CREAM, a));
-    DrawRect({ 0, 108.0f }, { REF_W, 110.0f }, WithAlpha(C_HDR_GOLD, a));
+    DrawRect({ 0, 108.0f }, { REF_W, 110.0f }, WithAlpha(RGBA(186, 160, 78, 255), a));   // bottom rule darker than the bright top rule
     // left art-deco pinstripes + curl hint (procedural approximation)
     for (int i = 0; i < 3; ++i)
         DrawRect({ 8, 70.0f + i * 9 }, { 214, 71.5f + i * 9 }, WithAlpha(C_HDR_GOLD, a * 0.9f));
     // beveled slab title at the measured x (ref band ~270 wide x 29 tall):
     // olive-brown outline ring first, then the cream->gold bevel face
     SetFont(g_fDF);
-    SetTextStretchX(1.0f);   // tighter tracking than the chunky default (per capture)
+    SetTextStretchX(1.3f);   // wider glyph span to reach ~279px (per capture)
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (dx || dy)
-                DrawText({ 256.0f + dx * 1.5f, 68.0f + dy * 1.5f }, 33.0f, WithAlpha(C_TITLE_OUT, a), title);
+                DrawText({ 278.0f + dx * 1.5f, 68.0f + dy * 1.5f }, 40.0f, WithAlpha(C_TITLE_OUT, a), title);
     SetModifier(MOD_TITLE_BEVEL);
-    DrawTextGradient({ 256, 68 }, 33.0f, WithAlpha(C_TITLE_T, a), WithAlpha(C_TITLE_B, a), title);
+    DrawTextGradient({ 278, 68 }, 40.0f, WithAlpha(C_TITLE_T, a), WithAlpha(C_TITLE_B, a), title);
     ResetModifier();
     ResetTextStretchX();
     ResetFont();
@@ -215,11 +215,11 @@ void PageChevrons(float a, double now) {
     const float nudge = Breathe(now, 0.0f, 4.0f, 1.2f);   // sliding pulse
     auto chev = [&](float vx, float vy, float dir) {
         for (int i = 0; i < 3; ++i) {   // three nested arms
-            float t = 26.0f + i * 14.0f;
-            uint32_t col = (i == 0) ? C_CHEV : C_CHEV_FADE;
+            float t = 32.0f + i * 16.0f;
+            uint32_t col = (i < 2) ? C_CHEV : C_CHEV_FADE;
             float ax = vx + dir * (t * 0.55f + nudge), ay0 = vy - t, ay1 = vy + t;
-            const V2 q1[4] = { { ax, ay0 }, { ax + dir * 9, ay0 + 5 }, { vx + dir * nudge + dir * 9, vy }, { vx + dir * nudge, vy } };
-            const V2 q2[4] = { { vx + dir * nudge, vy }, { vx + dir * nudge + dir * 9, vy }, { ax + dir * 9, ay1 - 5 }, { ax, ay1 } };
+            const V2 q1[4] = { { ax, ay0 }, { ax + dir * 14, ay0 + 5 }, { vx + dir * nudge + dir * 14, vy }, { vx + dir * nudge, vy } };
+            const V2 q2[4] = { { vx + dir * nudge, vy }, { vx + dir * nudge + dir * 14, vy }, { ax + dir * 14, ay1 - 5 }, { ax, ay1 } };
             const uint32_t qc[4] = { WithAlpha(col, a), WithAlpha(col, a), WithAlpha(col, a), WithAlpha(col, a) };
             DrawQuadGradient(q1, qc); DrawQuadGradient(q2, qc);
         }
@@ -334,13 +334,13 @@ void DrawSoundtrack(float a, double now) {
         rail(x + 129.3f, y - 13.3f, x + 163.3f, y - 1.3f);
         rail(x - 13.3f, y + 82.0f, x + 20.0f, y + 97.3f);
         rail(x + 129.3f, y + 82.0f, x + 163.3f, y + 97.3f);
-        // flag badge top-left of the selected thumb (~45x33 crest, not stripes)
-        DrawRect({ x + 5.3f, y - 0.7f }, { x + 50.0f, y + 32.0f }, WithAlpha(C_FLAG_BLUE, a));
-        DrawRect({ x + 5.3f, y - 0.7f }, { x + 50.0f, y + 1.0f }, WithAlpha(C_WHITE, a));
-        // white shield card with a tiny red+green crest hint
-        DrawRect({ x + 12, y + 5 }, { x + 43, y + 28 }, WithAlpha(RGBA(238, 235, 232, 255), a));
-        DrawRect({ x + 18, y + 9 }, { x + 27, y + 24 }, WithAlpha(RGBA(186, 54, 46, 255), a));
-        DrawRect({ x + 28, y + 9 }, { x + 37, y + 24 }, WithAlpha(RGBA(66, 132, 70, 255), a));
+        // flag badge top-left of the selected thumb (~55x39 crest, not stripes)
+        DrawRect({ x + 5.3f, y - 0.7f }, { x + 55.0f, y + 39.0f }, WithAlpha(C_FLAG_BLUE, a));
+        DrawRect({ x + 5.3f, y - 0.7f }, { x + 55.0f, y + 1.0f }, WithAlpha(C_WHITE, a));
+        // white shield card (dominant element) with a tiny red+green crest hint
+        DrawRect({ x + 10, y + 3 }, { x + 50, y + 36 }, WithAlpha(RGBA(238, 235, 232, 255), a));
+        DrawRect({ x + 18, y + 9 }, { x + 30, y + 30 }, WithAlpha(RGBA(186, 54, 46, 255), a));
+        DrawRect({ x + 31, y + 9 }, { x + 43, y + 30 }, WithAlpha(RGBA(66, 132, 70, 255), a));
     }
     // maroon scrollbar (track + cream handle at the captured 61%)
     DrawRect({ 985.3f, 158.7f }, { 987.3f, 471.3f }, WithAlpha(C_PINSTRIPE, a));

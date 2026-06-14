@@ -17,6 +17,7 @@
 #include "screen.h"
 #include "loading_font.h"
 #include <cmath>
+#include <algorithm>
 
 using namespace ui;
 namespace {
@@ -101,27 +102,53 @@ void DrawGlowText(float tx, float baselineY, float S, float a, const char* txt) 
     DrawAtlasText(tx, baselineY - 3.4f, S, halo, halo, txt, true);
 }
 
-// the dot-matrix spinner: a 3x3 grid of gradient-filled green squares (center empty);
-// a lit cell walks the 8-position ring clockwise with a trailing comet fade, ~10/sec.
-// Measured footprint: 32x32 at (1023,593) -> cell 9, step 11.5. Stays at full brightness.
+// the dot-matrix spinner: a FULL 3x3 grid of gradient-filled green squares (incl.
+// the centre cell). NOT a ring walk — each of the 9 cells (img_01..09, row-major)
+// blinks on its own diagonal-cascade schedule, driven by a 4.0s loop. The retail
+// loader reads near-binary: a cell is either lit (~0.9, bright green) or dark
+// (~0.12, dim green-grey), with a short ~10-frame ramp at each window edge.
+// Measured footprint: cell 8.7, step 10 (unchanged).
+//
+// Per-cell lit windows over frame in [0,240] (4.0s * 60). Indexed by [row][col],
+// so img_01(0,0) img_02(1,0) img_03(2,0) top, img_04..06 mid, img_07..09 bottom.
+struct LitWin { float a, b; };
+struct CellSched { int n; LitWin w[5]; };
+static const CellSched SPIN_SCHED[3][3] = {
+    // row 0 (top):    img_01(0,0)            img_02(1,0)            img_03(2,0)
+    { { 2, {{0,40},{160,200}} },         { 2, {{20,60},{180,220}} },   { 2, {{40,80},{200,240}} } },
+    // row 1 (mid):    img_04(0,1)            img_05(1,1 centre)                                  img_06(2,1)
+    { { 2, {{20,60},{140,180}} },        { 5, {{0,15},{40,80},{105,135},{160,200},{225,240}} },  { 2, {{60,100},{180,220}} } },
+    // row 2 (bottom): img_07(0,2)            img_08(1,2)            img_09(2,2)
+    { { 2, {{40,80},{120,160}} },        { 2, {{60,100},{140,180}} },  { 2, {{80,120},{157,197}} } },
+};
+// dim "off" green-grey (~g30) the unlit cells settle toward
+const uint32_t C_GREEN_OFF = RGBA(20, 30, 14, 255);
+
 void DrawSpinner(float x0, float y0, double now) {
-    static const int RING[8][2] = { {0,0},{1,0},{2,0},{2,1},{2,2},{1,2},{0,2},{0,1} };
     const float cell = 8.7f, step = 10.0f;
-    int head = (int)(now * 10.0) % 8;
-    for (int i = 0; i < 8; ++i) {
-        int cx = RING[i][0], cy = RING[i][1];
-        int d = (head - i + 8) % 8;
-        // the ref ring reads near-uniform (all cells lit ~168-195 with a brighter
-        // head), so the comet trail is SHALLOW, not a deep fade-to-black
-        float k = (d == 0) ? 1.0f : (d == 1 ? 0.86f : (d == 2 ? 0.76f : 0.68f));
-        uint32_t c = ColourLerp(C_GREEN_DIM, C_GREEN, k);
-        float gx = x0 + cx * step, gy = y0 + cy * step;
+    const float frame = (float)(std::fmod(now, 4.0) * 60.0);   // 0..240 over the 4.0s loop
+    const float RAMP = 10.0f;                                  // edge ramp width (frames)
+    for (int row = 0; row < 3; ++row)
+    for (int col = 0; col < 3; ++col) {
+        const CellSched& cs = SPIN_SCHED[row][col];
+        // near-binary level: 1.0 inside a window, 0.0 outside, with a linear ~10f
+        // ramp on each edge so the blink isn't a hard pop (cheap soft on/off).
+        float lit = 0.0f;
+        for (int j = 0; j < cs.n; ++j) {
+            const LitWin& w = cs.w[j];
+            float on = std::min((frame - w.a) / RAMP, (w.b - frame) / RAMP);   // >0 within [a,b]
+            lit = std::max(lit, std::min(1.0f, std::max(0.0f, on)));
+        }
+        // lit -> ~0.9 toward C_GREEN; unlit -> ~0.12 toward the dim off green-grey
+        float k = 0.12f + 0.78f * lit;                          // 0.12 (off) .. 0.90 (on)
+        uint32_t c = ColourLerp(C_GREEN_OFF, C_GREEN, k);
+        float gx = x0 + col * step, gy = y0 + row * step;
         if (g_wordTex >= 0)   // the real cell sprite from mat_load_en_001
             DrawImage(g_wordTex, { gx, gy }, { gx + cell, gy + cell },
                       { SQ_U0, SQ_V0 }, { SQ_U1, SQ_V1 }, c);
         else
             DrawVGradient({ gx, gy }, { gx + cell, gy + cell },
-                          ColourLerp(C_GREEN_DIM, C_GREEN, std::min(1.0f, k * 1.1f + 0.08f)), c);
+                          ColourLerp(C_GREEN_OFF, C_GREEN, std::min(1.0f, k * 1.1f + 0.08f)), c);
     }
 }
 

@@ -63,12 +63,12 @@ const uint32_t C_DASH       = RGBA(34, 54, 28, 255);   // dashed underline
 const uint32_t C_LBL_T = RGBA(107, 162, 0, 255), C_LBL_B = RGBA(157, 145, 9, 255);
 const uint32_t C_LDR_L = RGBA(192, 237, 21, 255), C_LDR_R = RGBA(39, 214, 21, 255);
 // popup
-const uint32_t C_POP_FILL = RGBA(24, 112, 22, 255);
+const uint32_t C_POP_FILL = RGBA(40, 120, 36, 255);
 const uint32_t C_POP_HI_T = RGBA(118, 148, 36, 255), C_POP_HI_B = RGBA(88, 205, 45, 255);
 const uint32_t C_POP_TXT  = RGBA(236, 236, 237, 255);
 
 // ---- layout ---------------------------------------------------------------------
-constexpr float GLOBE_CX = 639, GLOBE_CY = 360, GLOBE_R = 190;
+constexpr float GLOBE_CX = 639, GLOBE_CY = 360, GLOBE_R = 180;
 constexpr float TOT_X0 = 8,  TOT_Y0 = 114, TOT_X1 = 296, TOT_Y1 = 290;
 constexpr float TROW0  = 135, TPITCH = 43;
 // stage-info panel (measured from session8)
@@ -214,15 +214,16 @@ void DrawStageLabel(float t) {
     ResetTextStretchX();
     ResetTextShear();
     ResetFont();
-    // leader rule: gradient bar + 45-degree elbow onto the relocated globe
-    // (globe moved to GLOBE_CX/CY 639,360 r190; the marker now rides there, so the
-    //  elbow terminates on the globe's left-facing surface near the Spagonia marker)
+    // leader rule: gradient bar + a DESCENDING elbow down to the Spagonia marker
+    // (globe at GLOBE_CX/CY 639,360 r180; the bar ends ~x571 and the connector
+    //  drops down-right to terminate near the marker at ~628,399)
     {
-        const V2 c[4] = { { 285.3f, 378 }, { 590.0f, 378 }, { 590.0f, 380.7f }, { 285.3f, 380.7f } };
+        const V2 c[4] = { { 285.3f, 378 }, { 571.0f, 378 }, { 571.0f, 380.7f }, { 285.3f, 380.7f } };
         const uint32_t col[4] = { WithAlpha(C_LDR_L, t), WithAlpha(C_LDR_R, t),
                                   WithAlpha(C_LDR_R, t), WithAlpha(C_LDR_L, t) };
         DrawQuadGradient(c, col);
-        const V2 e[4] = { { 590.0f, 378 }, { 620, 366.7f }, { 622, 370.7f }, { 592, 382 } };
+        // descending elbow: drops from the bar end (~571,380) down to the marker (~628,399)
+        const V2 e[4] = { { 569.0f, 378 }, { 626, 397 }, { 630, 401 }, { 573, 382 } };
         const uint32_t ec[4] = { WithAlpha(C_LDR_R, t), WithAlpha(C_LDR_R, t),
                                  WithAlpha(C_LDR_R, t), WithAlpha(C_LDR_R, t) };
         DrawQuadGradient(e, ec);
@@ -232,7 +233,7 @@ void DrawStageLabel(float t) {
 // the "Go to the village / Select stage" popup (measured)
 void DrawPopup() {
     // ~33% scene dim (black at 66%); the popup + footer stay full-bright
-    DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 168));
+    DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 124));
     SetModifier(MOD_SCANLINE);
     DrawRect({ 472, 276 }, { 808, 428 }, C_POP_FILL);
     ResetModifier();
@@ -295,7 +296,7 @@ void Draw(double openSec) {
     // ---- top-left green LED-circuit panel backing the title + counters
     //      (subtle lit-cell grid, no bright chevron border / no separators) ----
     {
-        const float gx0 = 0, gy0 = 56, gx1 = 290, gy1 = 290;
+        const float gx0 = 0, gy0 = 104, gx1 = 290, gy1 = 290;
         DrawRect({ gx0, gy0 }, { gx1, gy1 }, WithAlpha(RGBA(4, 18, 5, 230), t));
         for (float yy = gy0 + 2; yy < gy1 - 2; yy += 8.0f)
             for (float xx = gx0 + 2; xx < gx1 - 2; xx += 16.0f) {

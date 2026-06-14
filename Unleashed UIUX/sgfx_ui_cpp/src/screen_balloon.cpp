@@ -29,13 +29,13 @@ const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
 const UV GLYPH_B = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
 
 // ---- palette (sampled from balloon_npc1) --------------------------------------
-const uint32_t C_BAL_T   = RGBA(214, 216, 220, 235);   // balloon silver top
-const uint32_t C_BAL_B   = RGBA(154, 156, 162, 235);
+const uint32_t C_BAL_T   = RGBA(162, 162, 166, 235);   // balloon silver top (neutral, de-tinted)
+const uint32_t C_BAL_B   = RGBA(120, 120, 120, 235);
 const uint32_t C_BAL_BD  = RGBA(240, 242, 246, 255);
 const uint32_t C_TXT     = RGBA(245, 245, 247, 255);   // white outlined dialogue
 const uint32_t C_TXT_OUT = RGBA(26, 28, 34, 255);
-const uint32_t C_PILL_T  = RGBA(244, 204, 60, 255);    // nameplate gold
-const uint32_t C_PILL_B  = RGBA(206, 152, 22, 255);
+const uint32_t C_PILL_T  = RGBA(196, 165, 58, 255);    // nameplate gold (de-brightened top)
+const uint32_t C_PILL_B  = RGBA(178, 140, 40, 255);
 const uint32_t C_PILL_TXT= RGBA(54, 36, 6, 255);
 const uint32_t C_WHITE   = RGBA(255, 255, 255, 255);
 const uint32_t C_RING    = RGBA(232, 196, 64, 255);
@@ -75,27 +75,68 @@ void Draw(double openSec) {
 
     // ---- rings counter slot (top-left HUD, title-safe inset) ----
     {
-        // thin angled gold ring icon (art slot ~x256-273 y64-103); digits to its right
-        const V2 ring[4] = { { 259, 64 }, { 273, 64 }, { 270, 103 }, { 256, 103 } };
-        const uint32_t rc[4] = { WithAlpha(C_RING, a), WithAlpha(C_RING, a),
-                                 WithAlpha(C_RING, a), WithAlpha(C_RING, a) };
-        DrawQuadGradient(ring, rc);
+        // OPEN gold coin-ring icon, 3/4 perspective (outer ~15x37, inner hole ~7x22)
+        const float rcx = 264.5f, rcy = 83.5f;          // ring centre in the art slot
+        const float oRx = 7.5f, oRy = 18.5f;            // outer ellipse half-extents
+        const float iRx = 3.5f, iRy = 11.0f;            // inner hole half-extents
+        uint32_t rgold = WithAlpha(C_RING, a);
+        for (int yy = (int)(rcy - oRy); yy <= (int)(rcy + oRy); ++yy) {
+            float fy = yy + 0.5f, dy = fy - rcy;
+            float ohw = oRx * sqrtf(fmaxf(0.0f, 1.0f - (dy * dy) / (oRy * oRy)));
+            if (ohw <= 0.0f) continue;
+            float inHole = 1.0f - (dy * dy) / (iRy * iRy);
+            if (inHole > 0.0f) {                          // row crosses the open hole: two walls
+                float ihw = iRx * sqrtf(inHole);
+                DrawRect({ rcx - ohw, fy - 0.5f }, { rcx - ihw, fy + 0.5f }, rgold);  // left wall
+                DrawRect({ rcx + ihw, fy - 0.5f }, { rcx + ohw, fy + 0.5f }, rgold);  // right wall
+            } else {                                      // above/below the hole: solid arc
+                DrawRect({ rcx - ohw, fy - 0.5f }, { rcx + ohw, fy + 0.5f }, rgold);
+            }
+        }
         SetFont(g_fRodin);
         DrawTextShadow({ 291, 70 }, 22.0f, WithAlpha(C_WHITE, a), "999999");
         ResetFont();
     }
 
-    // ---- speaker nameplate: gold rounded pill, upper-right of centre ----
+    // ---- speaker nameplate: gold rounded CAPSULE, upper-right of centre ----
     {
-        const float x0 = 667, y0 = 53, x1 = 1066, y1 = 117;
-        DrawVGradient({ x0 + 4, y0 }, { x1 - 4, y1 }, WithAlpha(C_PILL_T, a), WithAlpha(C_PILL_B, a));
-        DrawRect({ x0, y0 + 4 }, { x0 + 4, y1 - 4 }, WithAlpha(C_PILL_B, a));     // rounded-end hint
-        DrawRect({ x1 - 4, y0 + 4 }, { x1, y1 - 4 }, WithAlpha(C_PILL_B, a));
-        DrawRect({ x0 + 4, y0 }, { x1 - 4, y0 + 2 }, WithAlpha(RGBA(252, 234, 150, 255), a));
+        const float y0 = 53, y1 = 117;                  // h64
+        const float cy = (y0 + y1) * 0.5f;              // 85
+        const float r  = (y1 - y0) * 0.5f;              // 32 (half-height)
+        const float lcx = 699;                          // left cap centre (x0 699 was 667+32)
+        const float rcx = 1050 - r;                     // right cap centre = 1018 (right edge 1050)
+        const float x0 = lcx, x1 = rcx;                 // straight-section span between cap centres
+        uint32_t pT = WithAlpha(C_PILL_T, a), pB = WithAlpha(C_PILL_B, a);
+        uint32_t rim = WithAlpha(RGBA(252, 236, 170, 255), a);
+        // straight middle section (full height) with the gold vertical gradient
+        DrawVGradient({ x0, y0 }, { x1, y1 }, pT, pB);
+        // semicircular end-caps: stacked-strip approximation, one strip per pixel row,
+        // each row's gold tone vertically lerped to match the gradient on the straight part
+        for (int yy = 0; yy < (int)(y1 - y0); ++yy) {
+            float fy = y0 + yy + 0.5f;
+            float dy = fy - cy;
+            float hw = sqrtf(fmaxf(0.0f, r * r - dy * dy));  // horizontal half-extent of the cap
+            uint32_t col = WithAlpha(ColourLerp(C_PILL_T, C_PILL_B, (fy - y0) / (y1 - y0)), a);
+            DrawRect({ lcx - hw, fy - 0.5f }, { lcx, fy + 0.5f }, col);   // left cap
+            DrawRect({ rcx, fy - 0.5f }, { rcx + hw, fy + 0.5f }, col);   // right cap
+        }
+        // ---- continuous ~2px bright rim around the WHOLE capsule ----
+        // top & bottom edges of the straight section
+        DrawRect({ x0, y0 }, { x1, y0 + 2 }, rim);
+        DrawRect({ x0, y1 - 2 }, { x1, y1 }, rim);
+        // arc rims on both rounded ends (2px-thick annulus strips, per row)
+        for (int yy = 0; yy < (int)(y1 - y0); ++yy) {
+            float fy = y0 + yy + 0.5f;
+            float dy = fy - cy;
+            float hw = sqrtf(fmaxf(0.0f, r * r - dy * dy));
+            DrawRect({ lcx - hw, fy - 0.5f }, { lcx - hw + 2, fy + 0.5f }, rim);   // left arc
+            DrawRect({ rcx + hw - 2, fy - 0.5f }, { rcx + hw, fy + 0.5f }, rim);   // right arc
+        }
         SetFont(g_fSeurat);
         const char* NAME = "Don Fachio's Apotos";
         float w = MeasureText(22.0f, NAME).x;
-        const float nx = (x0 + x1) * 0.5f - w * 0.5f, ny = (y0 + y1) * 0.5f - 12.0f;
+        const float capCx = (lcx - r + rcx + r) * 0.5f;   // visible capsule centre (~858)
+        const float nx = capCx - w * 0.5f, ny = (y0 + y1) * 0.5f - 12.0f;
         // outlined grammar to match the dialogue 'line' lambda: dark stroke + cream fill
         for (int dy = -1; dy <= 1; ++dy)
             for (int dx = -1; dx <= 1; ++dx)

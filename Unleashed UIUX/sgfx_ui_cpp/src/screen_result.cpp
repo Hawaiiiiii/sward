@@ -65,7 +65,7 @@ const uint32_t C_GROUND = RGBA(214, 216, 212, 255);
 
 // ---- measured layout (1280x720 reference) -----------------------------------
 constexpr float RAIL_Y0 = 63, RAIL_Y1 = 114, RAIL_X1 = 635;
-constexpr float WM_X = 263, WM_CAPTOP = 72;             // wordmark target position
+constexpr float WM_X = 254, WM_CAPTOP = 76;             // wordmark target position (left edge ~x258, centerY ~86.5)
 constexpr float ROW_X0 = 619, ROW_W = 214;              // first label plate rect
 constexpr float ROW_TOP0 = 188, ROW_H = 41.3f, ROW_PITCH = 66.7f;
 constexpr float ROW_XSTEP = 12;                          // diagonal cascade per row
@@ -183,15 +183,16 @@ void Draw(double openSec) {
     {
         const float totT = (float)ComputeMotion(openSec, 50.0, 10.0);
         if (totT > 0.0f) {
-            const float x = ROW_X0 - 8;   // steps back left of the TIME row (~611)
-            // compact green label plate (width ROW_W, green ends ~x808)
-            // dark value strip from the green plate right edge to VAL_R (mirrors the stat-row strip)
-            const float sx0 = x + ROW_W + SLANT - 6;
+            const float x = 625.0f;        // green plate left (real green plate x628-797)
+            const float TOT_PLATE_W = 165;  // compact green label plate (green ends ~x793)
+            // teal value strip from the green plate right edge to VAL_R (real is teal, not navy)
+            const uint32_t C_TSTRIP_T = RGBA(40, 110, 112, 200), C_TSTRIP_B = RGBA(24, 78, 82, 200);
+            const float sx0 = x + TOT_PLATE_W + SLANT - 6;
             const V2 vs[4] = { { sx0 + SLANT, TOT_TOP + 4 }, { VAL_R, TOT_TOP + 4 }, { VAL_R, TOT_TOP + TOT_H - 4 }, { sx0, TOT_TOP + TOT_H - 4 } };
-            const uint32_t vsc[4] = { WithAlpha(C_VSTRIP_T, totT), WithAlpha(C_VSTRIP_T, totT), WithAlpha(C_VSTRIP_B, totT), WithAlpha(C_VSTRIP_B, totT) };
+            const uint32_t vsc[4] = { WithAlpha(C_TSTRIP_T, totT), WithAlpha(C_TSTRIP_T, totT), WithAlpha(C_TSTRIP_B, totT), WithAlpha(C_TSTRIP_B, totT) };
             DrawQuadGradient(vs, vsc);
-            DrawRect({ sx0 + SLANT, TOT_TOP + 4 }, { VAL_R, TOT_TOP + 5.5f }, WithAlpha(RGBA(120, 140, 175, 200), totT));   // thin top edge
-            Plate(x, TOT_TOP, ROW_W, TOT_H, C_TOTAL_T, C_TOTAL_B, C_PLATE_BD, totT);
+            DrawRect({ sx0 + SLANT, TOT_TOP + 4 }, { VAL_R, TOT_TOP + 5.5f }, WithAlpha(RGBA(120, 160, 158, 200), totT));   // thin teal top edge
+            Plate(x, TOT_TOP, TOT_PLATE_W, TOT_H, C_TOTAL_T, C_TOTAL_B, C_PLATE_BD, totT);
             SetFont(g_fRodin);
             SetTextShear(0.20f);
             DrawText({ x + 40, TOT_TOP + (TOT_H - 26) * 0.5f }, 26.0f, WithAlpha(C_TOTAL_TXT, totT), "TOTAL");
@@ -225,7 +226,7 @@ void Draw(double openSec) {
             // rank letter pops with an overshoot: scale 1.6 -> 1.0 about its centre
             // measured letter bbox (331,433)-(484,609): ~153 wide x 176 tall
             const float s = 1.0f + (1.0f - rkT) * 0.6f;
-            const float cx = 407.5f, cy = 521.0f, hw = 67.0f * s, hh = 84.0f * s;
+            const float cx = 424.0f, cy = 532.0f, hw = 56.0f * s, hh = 62.0f * s;
             int ri = 0; while (ri < 5 && RANK_NAME[ri][0] != g_rank[0]) ++ri;
             if (g_rankTex >= 0) {   // the REAL metal letter art, warm-gold tinted (as captured)
                 DrawImage(g_rankTex, { cx - hw, cy - hh }, { cx + hw, cy + hh },
