@@ -98,20 +98,22 @@ void Starfield(float a) {
     }
 }
 
-// the game-logo SLOT (trademark art -> user branding drops in here)
+// the game-logo SLOT (trademark art -> user branding drops in here). Anchored
+// where the real SONIC UNLEASHED wordmark sits (measured: letters ~y120-300).
 void LogoSlot(float a) {
-    DrawRect({ 326, 213.3f }, { 906.7f, 430 }, WithAlpha(RGBA(20, 20, 22, 255), a * 0.6f));
+    const float lx0 = 326, ly0 = 118, lx1 = 906.7f, ly1 = 322;
+    DrawRect({ lx0, ly0 }, { lx1, ly1 }, WithAlpha(RGBA(20, 20, 22, 255), a * 0.6f));
     uint32_t bd = WithAlpha(RGBA(90, 90, 94, 255), a);
-    DrawRect({ 326, 213.3f }, { 906.7f, 215.3f }, bd);
-    DrawRect({ 326, 428 }, { 906.7f, 430 }, bd);
-    DrawRect({ 326, 213.3f }, { 328, 430 }, bd);
-    DrawRect({ 904.7f, 213.3f }, { 906.7f, 430 }, bd);
+    DrawRect({ lx0, ly0 }, { lx1, ly0 + 2 }, bd);
+    DrawRect({ lx0, ly1 - 2 }, { lx1, ly1 }, bd);
+    DrawRect({ lx0, ly0 }, { lx0 + 2, ly1 }, bd);
+    DrawRect({ lx1 - 2, ly0 }, { lx1, ly1 }, bd);
     SetFont(g_fDF);
-    DrawTextAligned({ 326, 260 }, { 906.7f, 330 }, 30.0f, WithAlpha(RGBA(120, 120, 124, 255), a),
+    DrawTextAligned({ lx0, ly0 + 56 }, { lx1, ly0 + 116 }, 30.0f, WithAlpha(RGBA(120, 120, 124, 255), a),
                     "GAME LOGO SLOT", Align::Center, true, false);
     SetFont(g_fRodin);
-    DrawTextAligned({ 326, 340 }, { 906.7f, 380 }, 16.0f, WithAlpha(RGBA(90, 90, 94, 255), a),
-                    "(326,213)-(907,430) - drop your wordmark here", Align::Center, true, false);
+    DrawTextAligned({ lx0, ly0 + 130 }, { lx1, ly0 + 168 }, 16.0f, WithAlpha(RGBA(90, 90, 94, 255), a),
+                    "drop your wordmark here", Align::Center, true, false);
     ResetFont();
 }
 
@@ -142,10 +144,11 @@ void PressStart(double now, float a) {
     CapsuleVGrad(478, 484, 804, 560, C_GLOW, C_GLOW, a * glowPulse * 0.07f, true);
     CapsuleVGrad(484, 489, 798, 554, C_GLOW, C_GLOW, a * glowPulse * 0.10f, true);
     // metallic ring capsule (thin rim) + inner yellow capsule, both rounded ends
-    CapsuleVGrad(490.7f, 494.7f, 790.7f, 548.7f, C_RING_HI, C_RING, a);
-    CapsuleVGrad(499.0f, 503.0f, 782.0f, 540.0f, C_CAP_TOP, C_CAP_PEAK, a);
+    // (measured pill ~325px wide @1280)
+    CapsuleVGrad(478.0f, 494.7f, 803.0f, 548.7f, C_RING_HI, C_RING, a);
+    CapsuleVGrad(487.0f, 503.0f, 794.0f, 540.0f, C_CAP_TOP, C_CAP_PEAK, a);
     // glossy belly highlight (a brighter mid strip)
-    CapsuleVGrad(510.0f, 514.0f, 771.0f, 528.0f, C_CAP_PEAK, RGBA(255, 246, 150, 255), a * 0.6f);
+    CapsuleVGrad(499.0f, 514.0f, 782.0f, 528.0f, C_CAP_PEAK, RGBA(255, 246, 150, 255), a * 0.6f);
     // outline-style PRESS START (dark olive ring + capsule-yellow inner)
     SetFont(g_fRodin);
     const char* PS = "PRESS START";
@@ -160,9 +163,26 @@ void PressStart(double now, float a) {
 }
 
 void Copyright(float a) {
+    // small "(c) SEGA" with a procedural circled-C glyph (measured ~56x11 @1280)
     SetFont(g_fRodin);
-    float w = MeasureText(14.0f, "(C) SEGA").x;
-    DrawText({ 640 - w * 0.5f, 634.7f }, 14.0f, WithAlpha(C_WHITE, a), "(C) SEGA");
+    const char* T = "SEGA";
+    const float fs = 13.0f;
+    float tw = MeasureText(fs, T).x;
+    const float r = 5.5f, total = r * 2 + 5 + tw;
+    float x = 640 - total * 0.5f, cy = 641, ccx = x + r;
+    uint32_t wc = WithAlpha(C_WHITE, a);
+    // ring of short segments
+    for (int s = 0; s < 14; ++s) {
+        float a0 = (float)s / 14.0f * 6.2831853f, a1 = (float)(s + 1) / 14.0f * 6.2831853f;
+        V2 p0 = { ccx + std::cos(a0) * r, cy + std::sin(a0) * r };
+        V2 p1 = { ccx + std::cos(a1) * r, cy + std::sin(a1) * r };
+        V2 n = { (p1.y - p0.y) * 0.22f, (p0.x - p1.x) * 0.22f };
+        const V2 q[4] = { p0, p1, { p1.x + n.x, p1.y + n.y }, { p0.x + n.x, p0.y + n.y } };
+        const uint32_t qc[4] = { wc, wc, wc, wc };
+        DrawQuadGradient(q, qc);
+    }
+    DrawText({ ccx - 2.6f, cy - r + 0.5f }, fs * 0.74f, wc, "c");
+    DrawText({ ccx + r + 5, cy - r - 1.0f }, fs, wc, T);
     ResetFont();
 }
 
@@ -228,21 +248,30 @@ void AutosaveDialog(float a) {
     DrawRect({ x0, y1 - 2.5f }, { x1 - ch, y1 }, WithAlpha(RGBA(218, 220, 218, 255), a));
     DrawRect({ x0, y0 + ch }, { x0 + 2.5f, y1 }, bd);
     DrawRect({ x1 - 2.5f, y0 }, { x1, y1 - ch }, WithAlpha(RGBA(222, 224, 222, 255), a));
-    // 8 centred outlined lines, pitch 34.3
+    // 8 centred outlined lines (measured: glyphs ~26px, not 22)
     SetFont(g_fRodin);
     const char* L[8] = { "This game utilizes", "an autosave feature.", "Please do not turn off",
                          "the console or remove", "any storage device when", "the autosave icon",
                          "appears", "on the screen." };
+    const float fz = 26.0f, pitch = 37.0f;
     for (int i = 0; i < 8; ++i) {
-        float ly = 230.7f + i * 34.3f;
-        float w = MeasureText(22.0f, L[i]).x;
+        float ly = 216.0f + i * pitch;
+        float w = MeasureText(fz, L[i]).x;
         float lx = 638.7f - w * 0.5f;
-        if (i == 6) lx += 16;   // line 7 carries the inline icon left of the word
-        DrawText({ lx + 1.3f, ly + 1.3f }, 22.0f, WithAlpha(RGBA(13, 13, 11, 255), a), L[i]);
-        DrawText({ lx, ly }, 22.0f, WithAlpha(RGBA(241, 240, 239, 255), a), L[i]);
-        if (i == 6) {   // green autosave disc icon slot
-            DrawRect({ lx - 33, ly - 2 }, { lx - 6.3f, ly + 24.7f }, WithAlpha(C_ICON_GRN, a));
-            DrawRect({ lx - 26, ly + 5 }, { lx - 13, ly + 18 }, WithAlpha(RGBA(20, 120, 20, 255), a));
+        if (i == 6) lx += 20;   // line 7 carries the inline icon left of the word
+        DrawText({ lx + 1.3f, ly + 1.3f }, fz, WithAlpha(RGBA(13, 13, 11, 255), a), L[i]);
+        DrawText({ lx, ly }, fz, WithAlpha(RGBA(241, 240, 239, 255), a), L[i]);
+        if (i == 6) {   // green autosave RING icon (hollow circle, not a filled block)
+            const float icx = lx - 20, icy = ly + 13, ir = 13;
+            for (int s = 0; s < 16; ++s) {
+                float a0 = (float)s / 16.0f * 6.2831853f, a1 = (float)(s + 1) / 16.0f * 6.2831853f;
+                V2 p0 = { icx + std::cos(a0) * ir, icy + std::sin(a0) * ir };
+                V2 p1 = { icx + std::cos(a1) * ir, icy + std::sin(a1) * ir };
+                V2 nn = { (p1.y - p0.y) * 0.30f, (p0.x - p1.x) * 0.30f };
+                const V2 q[4] = { p0, p1, { p1.x + nn.x, p1.y + nn.y }, { p0.x + nn.x, p0.y + nn.y } };
+                const uint32_t qc[4] = { WithAlpha(C_ICON_GRN, a), WithAlpha(C_ICON_GRN, a), WithAlpha(C_ICON_GRN, a), WithAlpha(C_ICON_GRN, a) };
+                DrawQuadGradient(q, qc);
+            }
         }
     }
     ResetFont();
