@@ -166,13 +166,13 @@ void Draw(double openSec) {
     // close the loop. f in [0,1]: 0 = near/bottom, 1 = far/top apex.
     {
         const float yNear = 553, yApex = 341;            // near/front edge / far apex
-        const float cxApex = 640;                        // far apex x (loop closes here; real loop is centred ~640)
+        const float cxApex = 690;                        // far apex x — drifts RIGHT of the near centre for the real diagonal sweep toward the windmill
         // centreline y by depth: ease so bands bunch toward the far apex (perspective).
         // f=0 -> near band (y~553), f=1 -> far apex (y~341); the widest band (f~0.62)
         // lands y~450-466 as measured. Power 1.4 keeps the bunching gentle.
         auto loopY  = [&](float f) { return yNear + (yApex - yNear) * std::pow(f, 1.4f); };
         // ring centre x drifts from near (573) toward the far apex (585)
-        auto loopCx = [&](float f) { return 632.0f + (cxApex - 632.0f) * f; };
+        auto loopCx = [&](float f) { return 605.0f + (cxApex - 605.0f) * f; };   // near=605 (left-heavy) -> far=690 (right)
         // OUTER ellipse half-width: small at the near lip, peaks (~216 about centre
         // ~581 -> arms 357 / 789) at the WIDEST band y~458 (f~0.66), then pinches to 0
         // at the far apex. A skewed sine cap rounds the near lip and the far apex.
@@ -185,8 +185,8 @@ void Draw(double openSec) {
         // again at the far apex; opens to ~95 through the vertical middle so the grid
         // shows through (hollow centre x~478-668 widening toward x~500-719).
         auto innerHalf = [&](float f) {
-            float g = std::sin(3.14159265f * (f - 0.16f) / 0.84f);  // shifted gate
-            if (f <= 0.16f || g <= 0.0f) return 0.0f;
+            float g = std::sin(3.14159265f * (f - 0.30f) / 0.70f);  // gate: solid front third (no V-notch)
+            if (f <= 0.30f || g <= 0.0f) return 0.0f;
             float oh = outerHalf(f);
             float hollow = 132.0f * std::pow(g, 0.85f);    // hollow grows mid-depth
             return std::max(0.0f, std::min(oh - 16.0f, hollow));    // keep an arm of >=16
