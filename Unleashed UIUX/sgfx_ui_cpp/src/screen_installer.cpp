@@ -26,6 +26,7 @@ using namespace ui;
 namespace {
 
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_glyphTex = -1;
+int g_installTex = -1, g_milesTex = -1;   // real recomp install_001.dds + miles_electric_icon.dds
 struct UV { float u0, v0, u1, v1; };
 constexpr float GTW = 512.0f, GTH = 512.0f;
 const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
@@ -73,6 +74,8 @@ void Init() {
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");      // real game MSDF
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");    // real game MSDF
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");   // real DFSoGeiStd-W7 MSDF (crisp title + buttons)
+    if (g_installTex < 0) g_installTex = gfx::loadTexture("assets/recomp/inst_install_001.png");
+    if (g_milesTex   < 0) g_milesTex   = gfx::loadTexture("assets/recomp/inst_miles_icon.png");
 }
 void Reset() { g_sel = 2; g_langSet = 2; }
 void Input(const ScreenInput& in) {
@@ -165,12 +168,16 @@ void Draw(double openSec) {
 
     DrawRect({ 0, 0 }, { REF_W, REF_H }, C_BLACK);
 
-    // ---- left install image (placeholder) ----
+    // ---- left install image: the REAL install_001.dds (512x512) ----
     if (mImg > 0) {
-        DrawRect({ IMG_X0, IMG_Y0 }, { IMG_X1, IMG_Y1 }, WithAlpha(RGBA(18,22,30,255), mImg));
-        DrawRect({ IMG_X0+8, IMG_Y0+8 }, { IMG_X1-8, IMG_Y1-8 }, WithAlpha(RGBA(28,36,52,255), mImg));
-        SetFont(g_fSeurat);
-        DrawTextAligned({ IMG_X0, (IMG_Y0+IMG_Y1)*0.5f-16 }, { IMG_X1, (IMG_Y0+IMG_Y1)*0.5f+16 }, 22.0f, WithAlpha(RGBA(120,140,170,255), mImg), "INSTALL IMAGE", Align::Center, true, true);
+        if (g_installTex >= 0) {
+            DrawImage(g_installTex, { IMG_X0, IMG_Y0 }, { IMG_X1, IMG_Y1 }, { 0, 0 }, { 1, 1 }, WithAlpha(C_WHITE, mImg));
+        } else {
+            DrawRect({ IMG_X0, IMG_Y0 }, { IMG_X1, IMG_Y1 }, WithAlpha(RGBA(18,22,30,255), mImg));
+            DrawRect({ IMG_X0+8, IMG_Y0+8 }, { IMG_X1-8, IMG_Y1-8 }, WithAlpha(RGBA(28,36,52,255), mImg));
+            SetFont(g_fSeurat);
+            DrawTextAligned({ IMG_X0, (IMG_Y0+IMG_Y1)*0.5f-16 }, { IMG_X1, (IMG_Y0+IMG_Y1)*0.5f+16 }, 22.0f, WithAlpha(RGBA(120,140,170,255), mImg), "INSTALL IMAGE", Align::Center, true, true);
+        }
     }
 
     // ---- scanline bars (grow) + divider lines ----
@@ -188,8 +195,10 @@ void Draw(double openSec) {
         divline(h); divline(REF_H - h);
     }
 
-    // ---- Miles icon (placeholder disc, zoom-in) ----
-    if (mMiles > 0) { float s = 62.0f * (2.0f - mMiles); DrawRect({ 256 - s*0.5f, 80 - s*0.5f }, { 256 + s*0.5f, 80 + s*0.5f }, WithAlpha(C_MILES, mMiles*0.9f)); }
+    // ---- Miles Electric icon: the REAL miles_electric_icon.dds (64x64), zoom-in ----
+    if (mMiles > 0) { float s = 62.0f * (2.0f - mMiles);
+        if (g_milesTex >= 0) DrawImage(g_milesTex, { 256 - s*0.5f, 80 - s*0.5f }, { 256 + s*0.5f, 80 + s*0.5f }, { 0, 0 }, { 1, 1 }, WithAlpha(C_WHITE, mMiles*0.9f));
+        else DrawRect({ 256 - s*0.5f, 80 - s*0.5f }, { 256 + s*0.5f, 80 + s*0.5f }, WithAlpha(C_MILES, mMiles*0.9f)); }
 
     // ---- title ----
     if (mTitle > 0) { SetFont(g_fDF); DrawTextBevel({ 288, 54.5f }, 48.0f, WithAlpha(C_TITLE, mTitle), "INSTALLER"); }

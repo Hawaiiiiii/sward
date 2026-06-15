@@ -181,6 +181,7 @@ const uint32_t C_WHITE     = RGBA(255, 255, 255, 255);
 // ---- footer glyph atlas -----------------------------------------------------
 struct UV { float u0, v0, u1, v1; };
 int g_glyphTex = -1;
+int g_lightTex = -1;   // real recomp light.dds (toggle on/off/glow)
 constexpr float GTW = 512.0f, GTH = 512.0f;
 const UV GLYPH_A  = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
 const UV GLYPH_B  = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
@@ -222,6 +223,7 @@ void LoadSavedValues() {
 }
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
+    if (g_lightTex < 0) g_lightTex = gfx::loadTexture("assets/recomp/light.png");   // real recomp toggle light
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");      // real game MSDF (im_font_atlas)
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");    // real game MSDF
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");   // real DFSoGeiStd-W7 MSDF (crisp title + tabs)
@@ -428,21 +430,18 @@ void Draw(double openSec) {
         if (sel) DrawSelectionArrows(VAL_X0, vy0, VAL_X0 + VAL_W, vy1, t);
         SetFont(g_fRodin);
         if (o.kind == TOGGLE) {
-            // toggle: light (left) + ON/OFF value text (centred) — the recomp draws BOTH
+            // toggle: the REAL light.dds sprite (DrawToggleLight) + ON/OFF value text.
+            // light.dds is 64x64: OFF (0,0,14,14), ON (14,0,14,14), glow (31,31,32,32).
             bool onv = o.val != 0;
             const float ls = 14.0f, lx = VAL_X0 + 14.0f, ly = vy0 + ((VAL_H - ls) * 0.5f) + 1.0f;
-            const float lcx = lx + ls*0.5f, lcy = ly + ls*0.5f;
-            if (onv) {  // additive yellow glow (255,255,0,127), 24px, offset like the source
-                const float gs = 24.0f; float gx = lx - gs*0.5f + 2.0f, gy = ly - gs*0.5f;
-                DrawRect({ gx, gy }, { gx + gs, gy + gs }, WithAlpha(RGBA(255,255,0,127), t), true);
+            if (g_lightTex >= 0) {
+                if (onv) {   // additive 24px yellow glow, offset {-glow/2+2, -glow/2}
+                    const float gs = 24.0f; float gx = lx - gs*0.5f + 2.0f, gy = ly - gs*0.5f;
+                    DrawImage(g_lightTex, { gx, gy }, { gx+gs, gy+gs }, { 0.484375f, 0.484375f }, { 0.984375f, 0.984375f }, WithAlpha(RGBA(255,255,0,127), t), true);
+                }
+                float u0 = onv ? 0.21875f : 0.0f, u1 = onv ? 0.4375f : 0.21875f;   // ON / OFF cell
+                DrawImage(g_lightTex, { lx, ly }, { lx+ls, ly+ls }, { u0, 0.0f }, { u1, 0.21875f }, WithAlpha(C_WHITE, t));
             }
-            auto disc = [&](float r, uint32_t c){      // octagon disc stand-in for g_texLight
-                float k = r * 0.4142f;
-                DrawRect({ lcx-r, lcy-k }, { lcx+r, lcy+k }, c);
-                DrawRect({ lcx-k, lcy-r }, { lcx+k, lcy+r }, c);
-                DrawRect({ lcx-r*0.78f, lcy-r*0.78f }, { lcx+r*0.78f, lcy+r*0.78f }, c);
-            };
-            disc(ls*0.5f, WithAlpha(onv ? C_LIGHT_ON : C_LIGHT_OFF, t));
             DrawValueText(onv ? "ON" : "OFF", VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
         } else if (o.kind == SLIDER) {
             // slider: channel + green fill bar + the value text ("100%"/"60") on top

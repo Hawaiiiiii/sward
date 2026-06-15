@@ -22,6 +22,12 @@ using namespace ui;
 namespace {
 
 int g_fRodin = 0, g_fSeurat = 0, g_fDF = 0, g_glyphTex = -1;
+int g_selTex = -1, g_gwTex = -1, g_trophyTex = -1;   // real recomp select / general_window / trophy sprites
+// select.dds (64x64) full 9-slice (imgui_utils DrawSelectionContainer): tl(34,0,11,24)
+// tc(45,0,8,24) tr(53,0,11,24) | cl(34,24,11,2) cc cr | bl(34,26,11,24) bc br
+NineSlice SEL_NS = { -1, 34.f/64,45.f/64, 45.f/64,53.f/64, 53.f/64,64.f/64,  0.f,24.f/64, 24.f/64,26.f/64, 26.f/64,50.f/64,  11,24,11,24 };
+// general_window.dds (128x512) 9-slice (imgui_utils DrawContainer): corners 35x35, mid 5px
+NineSlice GW_NS  = { -1, 0.f,35.f/128, 51.f/128,56.f/128, 70.f/128,105.f/128,  0.f,35.f/512, 35.f/512,270.f/512, 270.f/512,310.f/512,  35,35,35,35 };
 struct UV { float u0, v0, u1, v1; };
 constexpr float GTW = 512.0f, GTH = 512.0f;
 const UV GLYPH_A  = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
@@ -80,6 +86,9 @@ void Init() {
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");      // real game MSDF
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");      // real game MSDF (sub-screens)
     if (g_fDF    == 0) g_fDF    = LoadMsdfFont("dfsogei");
+    if (g_selTex < 0) { g_selTex = gfx::loadTexture("assets/recomp/select.png"); SEL_NS.tex = g_selTex; }
+    if (g_gwTex  < 0) { g_gwTex  = gfx::loadTexture("assets/recomp/general_window.png"); GW_NS.tex = g_gwTex; }
+    if (g_trophyTex < 0) g_trophyTex = gfx::loadTexture("assets/recomp/trophy.png");
 }
 void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; g_sub = SV_NONE; g_achSel = 0; g_invSel = 2; g_invPopup = false; g_invPopupSel = 0; g_nav = nullptr; }
 void Input(const ScreenInput& in) {
@@ -292,30 +301,24 @@ void SubFooter(bool withSelect, float a) {
 // body gradient + 2px bright border + SMALL rounded-corner notches on all four corners
 // (NOT the 24px 45deg chamfers of SubPanel). rect (251,189)-(1031,604).
 void AchPanel(float x0, float y0, float x1, float y1, float a) {
-    const float ch = 8.0f;
+    if (GW_NS.tex >= 0) { DrawNineSlice(GW_NS, { x0, y0 }, { x1, y1 }, WithAlpha(C_WHITE, a)); return; }
+    const float ch = 8.0f;   // procedural fallback if the sprite is missing
     DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(RGBA(197,194,197,205), a), WithAlpha(RGBA(115,113,115,238), a));
-    // erase a small triangle at each corner -> reads as rounded
     SolidQuad({ x0, y0 }, { x0+ch, y0 }, { x0, y0+ch }, { x0, y0 }, SUB_SCENE_DK);
     SolidQuad({ x1, y0 }, { x1-ch, y0 }, { x1, y0+ch }, { x1, y0 }, SUB_SCENE_DK);
     SolidQuad({ x0, y1 }, { x0+ch, y1 }, { x0, y1-ch }, { x0, y1 }, SUB_SCENE_DK);
     SolidQuad({ x1, y1 }, { x1-ch, y1 }, { x1, y1-ch }, { x1, y1 }, SUB_SCENE_DK);
     uint32_t bd = WithAlpha(RGBA(222,225,226,255), a);
-    DrawRect({ x0+ch, y0 }, { x1-ch, y0+2 }, bd);        // top
-    DrawRect({ x0+ch, y1-2 }, { x1-ch, y1 }, bd);        // bottom
-    DrawRect({ x0, y0+ch }, { x0+2, y1-ch }, bd);        // left
-    DrawRect({ x1-2, y0+ch }, { x1, y1-ch }, bd);        // right
-    // bright diagonal edge along each corner notch
-    SolidQuad({ x0+ch, y0 }, { x0+ch+2, y0+2 }, { x0+2, y0+ch+2 }, { x0, y0+ch }, bd);
-    SolidQuad({ x1-ch, y0 }, { x1-ch-2, y0+2 }, { x1-2, y0+ch+2 }, { x1, y0+ch }, bd);
-    SolidQuad({ x0+ch, y1 }, { x0+ch+2, y1-2 }, { x0+2, y1-ch-2 }, { x0, y1-ch }, bd);
-    SolidQuad({ x1-ch, y1 }, { x1-ch-2, y1-2 }, { x1-2, y1-ch-2 }, { x1, y1-ch }, bd);
+    DrawRect({ x0+ch, y0 }, { x1-ch, y0+2 }, bd); DrawRect({ x0+ch, y1-2 }, { x1-ch, y1 }, bd);
+    DrawRect({ x0, y0+ch }, { x0+2, y1-ch }, bd); DrawRect({ x1-2, y0+ch }, { x1, y1-ch }, bd);
 }
 
-// breathing selection: a steady warm-gold tint (stands in for the lit general_window
-// art behind) under a BREATHING white/silver outline frame (recomp DrawSelectionContainer,
-// alpha 0.55..1.0 @ ~0.92s period). NO opaque fill; title/desc keep their own colours.
+// breathing selection — the REAL select.dds 9-slice (gold glowing frame), tinted white,
+// alpha breathing 0.55..1.0 @ ~0.92s (recomp DrawSelectionContainer). The gold/bevels are
+// baked into the sprite. Procedural fallback (gold tint + white border) if the sprite's absent.
 void AchSelFrame(float x0, float y0, float x1, float y1, float a) {
     float br = Breathe(Now(), 0.55f, 1.0f, 1.087f);
+    if (SEL_NS.tex >= 0) { DrawNineSlice(SEL_NS, { x0, y0 }, { x1, y1 }, WithAlpha(C_WHITE, a * br)); return; }
     DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(RGBA(208,190,86,150), a), WithAlpha(RGBA(190,172,80,150), a));
     uint32_t fr = WithAlpha(RGBA(255,255,255,255), a * br); const float w = 3.0f;
     DrawRect({ x0, y0 }, { x1, y0+w }, fr); DrawRect({ x0, y1-w }, { x1, y1 }, fr);
@@ -344,8 +347,14 @@ void DrawAchievements(float a) {
     LabelPlate(251.3f, 136.0f, 545.6f, 192.0f, "ACHIEVEMENTS", a);
     // ---- counter + trophy, right-anchored ABOVE the panel top edge (drawn before the
     //      panel so the panel never clips them; trophy slot 45x45 gold (255,195,56)) ----
-    DrawVGradient({ 981, 139 }, { 1026, 184 }, WithAlpha(RGBA(255,205,84,255), a), WithAlpha(RGBA(214,168,56,255), a));
-    DrawRect({ 983, 141 }, { 1024, 145 }, WithAlpha(RGBA(255,232,150,235), a));   // rim highlight (trophy stand-in)
+    if (g_trophyTex >= 0) {   // real trophy.dds: 2048x1024, 8x4 grid of 256px frames, 30fps; gold tint at 50/50
+        int fi = (int)(Now() * 30.0) % 30; int cc = fi % 8, rr = fi / 8;
+        float u0 = cc * 256.f/2048, v0 = rr * 256.f/1024;
+        DrawImage(g_trophyTex, { 981, 139 }, { 1026, 184 }, { u0, v0 }, { u0 + 256.f/2048, v0 + 256.f/1024 }, WithAlpha(RGBA(255,195,56,255), a));
+    } else {
+        DrawVGradient({ 981, 139 }, { 1026, 184 }, WithAlpha(RGBA(255,205,84,255), a), WithAlpha(RGBA(214,168,56,255), a));
+        DrawRect({ 983, 141 }, { 1024, 145 }, WithAlpha(RGBA(255,232,150,235), a));
+    }
     {
         SetFont(g_fRodin);
         const char* cnt = "50 / 50"; const float cs = 20.0f, cw = MeasureText(cs, cnt).x;
