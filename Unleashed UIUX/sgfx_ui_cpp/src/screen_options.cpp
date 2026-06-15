@@ -42,53 +42,99 @@ using namespace ui;
 namespace {
 
 enum Kind { TOGGLE, ENUM, SLIDER };
-// desc = the full paragraph (word-wrapped + centred at draw time, like the recomp);
-// valDescs = optional per-choice continuation, appended after a blank line.
+// The COMPLETE option set, transcribed 1:1 from UnleashedRecomp config_def.h +
+// config_locale.cpp + options_menu.cpp DrawConfigOptions (the real recorded video shows
+// all 34 options across 4 tabs, scrolling). desc = the full paragraph; valDescs = the
+// per-choice continuation appended after a blank line for enums that define one.
+// SLIDER: val is the actual number in [sMin,sMax] (step sStep); suffix "%" or "".
 struct Option { const char* label; Kind kind; const char* const* choices; int choiceCount; int val;
+                int sMin, sMax, sStep; const char* suffix;
                 const char* desc; const char* const* valDescs; };
 
-const char* const CH_LANG[] = { "ENGLISH", "JAPANESE", "FRENCH", "GERMAN", "SPANISH", "ITALIAN" };
-const char* const CH_TOD[]  = { "XBOX", "PLAYSTATION" };
-const char* const VD_TOD[]  = {
+// enum value strings (ASCII-safe; the live default shown is always the first/English value)
+const char* const CH_LANG[]   = { "ENGLISH", "JAPANESE", "DEUTSCH", "FRANCAIS", "ESPANOL", "ITALIANO" };
+const char* const CH_VLANG[]  = { "ENGLISH", "JAPANESE" };
+const char* const CH_TOD[]    = { "XBOX", "PLAYSTATION" };
+const char* const CH_CAM[]    = { "NORMAL", "REVERSE" };
+const char* const CH_ICONS[]  = { "AUTO", "XBOX", "PLAYSTATION" };
+const char* const CH_CHAN[]   = { "STEREO", "SURROUND" };
+const char* const CH_WSIZE[]  = { "1280x720", "1600x900", "1920x1080" };
+const char* const CH_MON[]    = { "1" };
+const char* const CH_ASPECT[] = { "AUTO", "16:9", "4:3", "ORIGINAL 4:3" };
+const char* const CH_AA[]     = { "NONE", "2x MSAA", "4x MSAA", "8x MSAA" };
+const char* const CH_SHADOW[] = { "ORIGINAL", "512", "1024", "2048", "4096", "8192" };
+const char* const CH_GI[]     = { "BILINEAR", "BICUBIC" };
+const char* const CH_MBLUR[]  = { "OFF", "ORIGINAL", "ENHANCED" };
+const char* const CH_CUT[]    = { "ORIGINAL", "UNLOCKED" };
+const char* const CH_UIAL[]   = { "EDGE", "CENTER" };
+
+// per-value extra descriptions (sized == choiceCount; "" = none)
+const char* const VD_TOD[]    = {
     "Xbox: the transformation cutscene will play with artificial loading times.",
     "PlayStation: a spinning medal loading screen will be used instead." };
-const char* const CH_TYPE[] = { "TYPE A", "TYPE B", "TYPE C" };
-const char* const CH_VOL[]  = { "0", "2", "4", "6", "8", "10" };
-const char* const CH_DISP[] = { "WINDOWED", "BORDERLESS", "FULLSCREEN" };
-const char* const CH_RES[]  = { "1280x720", "1600x900", "1920x1080" };
-const char* const CH_FPS[]  = { "30", "60", "VSYNC" };
-const char* const CH_BRI[]  = { "-2", "-1", "0", "+1", "+2" };
+const char* const VD_ICONS[]  = {
+    "Auto: the game will determine which icons to use based on the current input device.", "", "" };
+const char* const VD_ASPECT[] = {
+    "Auto: the aspect ratio will dynamically adjust to the window size.",
+    "16:9: locks the game to a widescreen aspect ratio.",
+    "4:3: locks the game to a narrow aspect ratio.",
+    "Original 4:3: locks the game to a narrow aspect ratio and retains parity with the game's original implementation." };
+const char* const VD_SHADOW[] = {
+    "Original: the game will automatically determine the resolution of the shadows.", "", "", "", "", "" };
+const char* const VD_MBLUR[]  = {
+    "", "", "Enhanced: uses more samples for smoother motion blur at the cost of performance." };
+const char* const VD_CUT[]    = {
+    "Original: locks cutscenes to their original 16:9 aspect ratio.",
+    "Unlocked: allows cutscenes to adjust their aspect ratio to the window size.\n\nWARNING: this will introduce visual oddities past the original 16:9 aspect ratio." };
+const char* const VD_UIAL[]   = {
+    "Edge: the UI will align with the edges of the display.",
+    "Center: the UI will align with the center of the display." };
 
 struct Category { const char* name; Option* opts; int optCount; };
 Option OPTS_SYSTEM[] = {
-    { "Language",                  ENUM,   CH_LANG, 6, 0, "Select the on-screen text language used throughout the game.", nullptr },
-    { "Voice Language",            ENUM,   CH_LANG, 6, 0, "Select the spoken voice language for cutscenes and dialogue.", nullptr },
-    { "Subtitles",                 TOGGLE, nullptr, 0, 1, "Show subtitles during voiced dialogue and cutscenes.", nullptr },
-    { "Hints",                     TOGGLE, nullptr, 0, 1, "Display gameplay hints and tips during play.", nullptr },
-    { "Control Tutorial",          TOGGLE, nullptr, 0, 1, "Show control tutorials when new actions become available.", nullptr },
-    { "Achievement Notifications", TOGGLE, nullptr, 0, 1, "Pop a notification when an achievement is unlocked.", nullptr },
-    { "Time of Day Transition",    ENUM,   CH_TOD,  2, 0, "Change how the loading screen appears when switching time of day in the hub areas.", VD_TOD },
+    { "Language",                  ENUM,   CH_LANG,  6, 0, 0,0,0,"", "Change the language used for text and logos.", nullptr },
+    { "Voice Language",            ENUM,   CH_VLANG, 2, 0, 0,0,0,"", "Change the language used for character voices.", nullptr },
+    { "Subtitles",                 TOGGLE, nullptr,  0, 1, 0,0,0,"", "Show subtitles during dialogue.", nullptr },
+    { "Hints",                     TOGGLE, nullptr,  0, 1, 0,0,0,"", "Show hints during gameplay.", nullptr },
+    { "Control Tutorial",          TOGGLE, nullptr,  0, 1, 0,0,0,"", "Show controller hints during gameplay.\n\nThe Werehog Critical Attack prompt will be unaffected.", nullptr },
+    { "Achievement Notifications", TOGGLE, nullptr,  0, 1, 0,0,0,"", "Show notifications for unlocking achievements.\n\nAchievements will still be rewarded with notifications disabled.", nullptr },
+    { "Time of Day Transition",    ENUM,   CH_TOD,   2, 0, 0,0,0,"", "Change how the loading screen appears when switching time of day in the hub areas.", VD_TOD },
 };
 Option OPTS_INPUT[] = {
-    { "Rumble",          TOGGLE, nullptr, 0, 1, "Controller vibration feedback on impacts.", nullptr },
-    { "Invert Camera X", TOGGLE, nullptr, 0, 0, "Invert horizontal camera control.", nullptr },
-    { "Invert Camera Y", TOGGLE, nullptr, 0, 0, "Invert vertical camera control.", nullptr },
-    { "Button Layout",   ENUM,   CH_TYPE, 3, 0, "Preset controller button mapping.", nullptr },
+    { "Horizontal Camera",     ENUM,   CH_CAM,   2, 0, 0,0,0,"", "Change how the camera moves left and right.", nullptr },
+    { "Vertical Camera",       ENUM,   CH_CAM,   2, 0, 0,0,0,"", "Change how the camera moves up and down.", nullptr },
+    { "Vibration",             TOGGLE, nullptr,  0, 1, 0,0,0,"", "Toggle controller vibration.", nullptr },
+    { "Allow Background Input", TOGGLE, nullptr, 0, 0, 0,0,0,"", "Allow controller input whilst the game window is unfocused.", nullptr },
+    { "Controller Icons",      ENUM,   CH_ICONS, 3, 0, 0,0,0,"", "Change the icons to match your controller.", VD_ICONS },
 };
 Option OPTS_AUDIO[] = {
-    { "Master Volume", SLIDER, CH_VOL, 6, 5, "Overall output volume.", nullptr },
-    { "Music Volume",  SLIDER, CH_VOL, 6, 4, "Background music level.", nullptr },
-    { "SFX Volume",    SLIDER, CH_VOL, 6, 5, "Sound-effect level.", nullptr },
-    { "Voice Volume",  SLIDER, CH_VOL, 6, 5, "Character voice level.", nullptr },
+    { "Master Volume",         SLIDER, nullptr,  0, 100, 0,100,5,"%", "Adjust the overall volume.", nullptr },
+    { "Music Volume",          SLIDER, nullptr,  0, 100, 0,100,5,"%", "Adjust the volume for the music.", nullptr },
+    { "Effects Volume",        SLIDER, nullptr,  0, 100, 0,100,5,"%", "Adjust the volume for sound effects.", nullptr },
+    { "Channel Configuration", ENUM,   CH_CHAN,  2, 0,   0,0,0,"",   "Change the output mode for your audio device.", nullptr },
+    { "Music Attenuation",     TOGGLE, nullptr,  0, 0,   0,0,0,"",   "Fade out the game's music when external media is playing.", nullptr },
+    { "Battle Theme",          TOGGLE, nullptr,  0, 1,   0,0,0,"",   "Play the Werehog battle theme during combat.\n\nThis option will apply the next time you're in combat.\n\nExorcism missions and miniboss themes will be unaffected.", nullptr },
 };
 Option OPTS_VIDEO[] = {
-    { "Display Mode", ENUM,   CH_DISP, 3, 2, "How the game fills your display.", nullptr },
-    { "Resolution",   ENUM,   CH_RES,  3, 2, "Rendering resolution. Higher is sharper.", nullptr },
-    { "Frame Rate",   ENUM,   CH_FPS,  3, 1, "Target frames per second.", nullptr },
-    { "Brightness",   SLIDER, CH_BRI,  5, 2, "Adjust screen brightness.", nullptr },
+    { "Window Size",               ENUM,   CH_WSIZE,  3, 0,   0,0,0,"",   "Adjust the size of the game window in windowed mode.", nullptr },
+    { "Monitor",                   ENUM,   CH_MON,    1, 0,   0,0,0,"",   "Change which monitor to display the game on.", nullptr },
+    { "Aspect Ratio",              ENUM,   CH_ASPECT, 4, 0,   0,0,0,"",   "Change the aspect ratio.", VD_ASPECT },
+    { "Resolution Scale",          SLIDER, nullptr,   0, 100, 25,200,5,"%", "Adjust the internal resolution of the game.", nullptr },
+    { "Fullscreen",                TOGGLE, nullptr,   0, 1,   0,0,0,"",   "Toggle between borderless fullscreen or windowed mode.", nullptr },
+    { "V-Sync",                    TOGGLE, nullptr,   0, 1,   0,0,0,"",   "Synchronize the game to the refresh rate of the display to prevent screen tearing.", nullptr },
+    { "FPS",                       SLIDER, nullptr,   0, 60,  15,240,5,"",  "Set the max frame rate the game can run at.\n\nWARNING: this may introduce glitches at frame rates higher than 60 FPS.", nullptr },
+    { "Brightness",                SLIDER, nullptr,   0, 50,  0,100,5,"%", "Adjust the brightness level until the symbol on the left is barely visible.", nullptr },
+    { "Anti-Aliasing",             ENUM,   CH_AA,     4, 2,   0,0,0,"",   "Adjust the amount of smoothing applied to jagged edges.", nullptr },
+    { "Transparency Anti-Aliasing", TOGGLE, nullptr,  0, 1,   0,0,0,"",   "Apply anti-aliasing to alpha transparent textures.", nullptr },
+    { "Shadow Resolution",         ENUM,   CH_SHADOW, 6, 4,   0,0,0,"",   "Set the resolution of real-time shadows.", VD_SHADOW },
+    { "GI Texture Filtering",      ENUM,   CH_GI,     2, 1,   0,0,0,"",   "Change the quality of the filtering used for global illumination textures.", nullptr },
+    { "Motion Blur",               ENUM,   CH_MBLUR,  3, 1,   0,0,0,"",   "Change the quality of the motion blur.", VD_MBLUR },
+    { "Xbox Color Correction",     TOGGLE, nullptr,   0, 0,   0,0,0,"",   "Use the warm tint from the Xbox version of the game.", nullptr },
+    { "Cutscene Aspect Ratio",     ENUM,   CH_CUT,    2, 0,   0,0,0,"",   "Change the aspect ratio of the real-time cutscenes.", VD_CUT },
+    { "UI Alignment Mode",         ENUM,   CH_UIAL,   2, 0,   0,0,0,"",   "Change how the UI aligns with the display.", VD_UIAL },
 };
 Category CATEGORIES[] = {
-    { "SYSTEM", OPTS_SYSTEM, 7 }, { "INPUT", OPTS_INPUT, 4 }, { "AUDIO", OPTS_AUDIO, 4 }, { "VIDEO", OPTS_VIDEO, 4 },
+    { "SYSTEM", OPTS_SYSTEM, 7 }, { "INPUT", OPTS_INPUT, 5 }, { "AUDIO", OPTS_AUDIO, 6 }, { "VIDEO", OPTS_VIDEO, 16 },
 };
 constexpr int CATEGORY_COUNT = 4;
 
@@ -143,12 +189,21 @@ const UV GLYPH_LB = { 0.32617f, 0.00781f, 0.46094f, 0.07812f };
 const UV GLYPH_RB = { 0.48242f, 0.00781f, 0.61523f, 0.07812f };
 
 // ---- state ------------------------------------------------------------------
-int    g_cat = 0, g_sel = 6, g_prevSel = 6;
+int    g_cat = 0, g_sel = 0, g_prevSel = 0, g_first = 0;
 double g_moveStart = -100.0;
+constexpr int   VIS_ROWS = 7;                 // rows visible before scrolling (recomp ~7)
+constexpr float ROWS_CLIP_BOT = 589.0f;       // settings-panel inner bottom for the row list
 Category& Cat()      { return CATEGORIES[g_cat]; }
 int       OptCount() { return Cat().optCount; }
 Option&   Opt(int i) { return Cat().opts[i]; }
-int       ValMax(const Option& o) { return o.kind == TOGGLE ? 1 : std::max(0, o.choiceCount - 1); }
+int       ValMin(const Option& o) { return o.kind == SLIDER ? o.sMin : 0; }
+int       ValMax(const Option& o) { return o.kind == TOGGLE ? 1 : (o.kind == SLIDER ? o.sMax : std::max(0, o.choiceCount - 1)); }
+int       ValStep(const Option& o) { return o.kind == SLIDER ? std::max(1, o.sStep) : 1; }
+void      KeepSelVisible() {
+    if (g_sel < g_first) g_first = g_sel;
+    if (g_sel > g_first + VIS_ROWS - 1) g_first = g_sel - VIS_ROWS + 1;
+    g_first = std::clamp(g_first, 0, std::max(0, OptCount() - VIS_ROWS));
+}
 
 // The recomp's actual fonts (from C:/swardbuild, staged to assets/fonts): FOT-SeuratPro-M
 // (row labels + description), FOT-NewRodinPro-DB (values + footer + version), DFHeiStd-W7
@@ -161,8 +216,8 @@ void LoadSavedValues() {
     for (int c = 0; c < CATEGORY_COUNT; ++c)
         for (int i = 0; i < CATEGORIES[c].optCount; ++i) {
             Option& o = CATEGORIES[c].opts[i];
-            snprintf(key, sizeof key, "opt_%d_%d", c, i);
-            o.val = std::clamp(settings::GetInt(key, o.val), 0, ValMax(o));
+            snprintf(key, sizeof key, "opt9_%d_%d", c, i);
+            o.val = std::clamp(settings::GetInt(key, o.val), ValMin(o), ValMax(o));
         }
 }
 void Init() {
@@ -173,17 +228,17 @@ void Init() {
     static bool loaded = false;
     if (!loaded) { LoadSavedValues(); loaded = true; }
 }
-void Reset() { g_cat = 0; g_sel = 6; g_prevSel = 6; g_moveStart = -100.0; }
+void Reset() { g_cat = 0; g_sel = 0; g_prevSel = 0; g_first = 0; g_moveStart = -100.0; }
 void Input(const ScreenInput& in) {
-    if (in.up || in.down) { g_prevSel = g_sel; if (in.up) g_sel = std::max(0, g_sel - 1); if (in.down) g_sel = std::min(OptCount()-1, g_sel+1); g_moveStart = Now(); }
+    if (in.up || in.down) { g_prevSel = g_sel; if (in.up) g_sel = std::max(0, g_sel - 1); if (in.down) g_sel = std::min(OptCount()-1, g_sel+1); g_moveStart = Now(); KeepSelVisible(); }
     if (in.left || in.right) {
         Option& o = Opt(std::clamp(g_sel,0,OptCount()-1));
-        o.val = std::clamp(o.val + (in.right?1:-1), 0, ValMax(o));
+        o.val = std::clamp(o.val + (in.right?ValStep(o):-ValStep(o)), ValMin(o), ValMax(o));
         char key[48];
-        snprintf(key, sizeof key, "opt_%d_%d", g_cat, std::clamp(g_sel,0,OptCount()-1));
+        snprintf(key, sizeof key, "opt9_%d_%d", g_cat, std::clamp(g_sel,0,OptCount()-1));
         settings::SetInt(key, o.val);                 // persists immediately
     }
-    if (in.tabLeft || in.tabRight) { g_cat = (g_cat + (in.tabRight?1:CATEGORY_COUNT-1)) % CATEGORY_COUNT; g_sel = g_prevSel = std::min(g_sel, OptCount()-1); g_moveStart = Now(); }
+    if (in.tabLeft || in.tabRight) { g_cat = (g_cat + (in.tabRight?1:CATEGORY_COUNT-1)) % CATEGORY_COUNT; g_sel = g_prevSel = std::min(g_sel, OptCount()-1); g_first = 0; g_moveStart = Now(); KeepSelVisible(); }
 }
 
 // the green DrawContainer panel (game_window.cpp recipe)
@@ -349,20 +404,20 @@ void Draw(double openSec) {
         }
     }
 
-    // ---- selected-row gold->green diagonal bar (eased) ----
+    // ---- rows (scrolling list: VIS_ROWS visible from g_first; recomp DrawConfigOptions) ----
+    PushClip({ CLIP_X - 2, ROWS_TOP - 2 }, { SP_X1 - GRID, ROWS_CLIP_BOT });
+    // selected-row gold->green diagonal bar (eased), shifted by the scroll offset
     {
         float mt = (float)ComputeMotion(g_moveStart, 0.0, 8.0);
-        float slot = Lerp((float)g_prevSel, (float)g_sel, mt);
+        float slot = Lerp((float)g_prevSel, (float)g_sel, mt) - (float)g_first;
         float ry = ROWS_TOP + slot * ROW_PITCH;
         uint32_t gold = WithAlpha(C_SEL_TL, t), grn = WithAlpha(C_SEL_BR, t);
         uint32_t mid  = WithAlpha(ColourLerp(C_SEL_TL, C_SEL_BR, 0.5f), t);
-        DrawQuadGradient({ CLIP_X, ry }, { CLIP_X + OPT_W, ry + ROW_H }, gold, mid, grn, mid);  // TL gold -> BR green diagonal
+        DrawQuadGradient({ CLIP_X, ry }, { CLIP_X + OPT_W, ry + ROW_H }, gold, mid, grn, mid);
     }
-
-    // ---- rows ----
-    for (int i = 0; i < OptCount(); ++i) {
+    for (int i = g_first; i < OptCount() && i <= g_first + VIS_ROWS; ++i) {
         const Option& o = Opt(i);
-        float ry = ROWS_TOP + i * ROW_PITCH, cy = ry + ROW_H * 0.5f;
+        float ry = ROWS_TOP + (i - g_first) * ROW_PITCH;
         bool sel = (i == g_sel);
         SetFont(g_fSeurat);
         DrawTextAligned({ LABEL_X, ry }, { VAL_X0 - 10, ry + ROW_H }, 26.0f, WithAlpha(C_LABEL, t),
@@ -373,7 +428,7 @@ void Draw(double openSec) {
         if (sel) DrawSelectionArrows(VAL_X0, vy0, VAL_X0 + VAL_W, vy1, t);
         SetFont(g_fRodin);
         if (o.kind == TOGGLE) {
-            // toggle light: 14px lit/dark disc + 24px additive yellow glow when ON
+            // toggle: light (left) + ON/OFF value text (centred) — the recomp draws BOTH
             bool onv = o.val != 0;
             const float ls = 14.0f, lx = VAL_X0 + 14.0f, ly = vy0 + ((VAL_H - ls) * 0.5f) + 1.0f;
             const float lcx = lx + ls*0.5f, lcy = ly + ls*0.5f;
@@ -388,11 +443,11 @@ void Draw(double openSec) {
                 DrawRect({ lcx-r*0.78f, lcy-r*0.78f }, { lcx+r*0.78f, lcy+r*0.78f }, c);
             };
             disc(ls*0.5f, WithAlpha(onv ? C_LIGHT_ON : C_LIGHT_OFF, t));
+            DrawValueText(onv ? "ON" : "OFF", VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
         } else if (o.kind == SLIDER) {
-            // continuous slider (recomp DrawConfigOption isSlider, options_menu.cpp L959-994):
-            // inner channel 0,65,0 -> 0,32,0 (inset 6x/3y); fill 57,241,0 -> 2,106,0 (inset +2);
-            // factor = val/max (linear; centre-split is identity for these symmetric ranges).
-            float factor = (ValMax(o) > 0) ? (float)o.val / (float)ValMax(o) : 0.0f;
+            // slider: channel + green fill bar + the value text ("100%"/"60") on top
+            // (recomp DrawConfigOption isSlider, options_menu.cpp L959-994 + value text L1179)
+            float factor = (o.sMax > o.sMin) ? (float)(o.val - o.sMin) / (float)(o.sMax - o.sMin) : 0.0f;
             float cx0 = VAL_X0 + 6, cy0 = vy0 + 3, cx1 = VAL_X0 + VAL_W - 6, cy1 = vy1 - 3;
             SetModifier(MOD_SCANLINE_BUTTON);
             DrawQuadGradient({cx0,cy0},{cx1,cy1}, WithAlpha(RGBA(0,65,0,255),t), WithAlpha(RGBA(0,65,0,255),t),
@@ -403,10 +458,21 @@ void Draw(double openSec) {
                 DrawQuadGradient({fx0,fy0},{fx1,fy1}, WithAlpha(RGBA(57,241,0,255),t), WithAlpha(RGBA(57,241,0,255),t),
                                                       WithAlpha(RGBA(2,106,0,255),t), WithAlpha(RGBA(2,106,0,255),t));
             ResetModifier();
+            char buf[16]; snprintf(buf, sizeof buf, "%d%s", o.val, o.suffix ? o.suffix : "");
+            DrawValueText(buf, VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
         } else {
             const char* s = (o.choices && o.val < o.choiceCount) ? o.choices[o.val] : "";
             DrawValueText(s, VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
         }
+    }
+    PopClip();
+    // ---- scrollbar: green bar on the settings-panel right inner edge (when list overflows)
+    //      (recomp options_menu.cpp L1397: IM_COL32(0,128,0,255), shown only if rowCount>visible)
+    if (OptCount() > VIS_ROWS) {
+        float totalH = (ROWS_CLIP_BOT - ROWS_TOP) - 2.0f;
+        float hr = (float)VIS_ROWS / (float)OptCount();
+        float minY = ((float)g_first / (float)OptCount()) * totalH + ROWS_TOP;
+        DrawRect({ SP_X1 - GRID*2, minY }, { SP_X1 - GRID - 1, minY + totalH*hr }, WithAlpha(RGBA(0,128,0,255), t));
     }
 
     // ---- info panel: single FULL-WIDTH thumbnail slot + centred description ----
