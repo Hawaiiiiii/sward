@@ -65,7 +65,8 @@ constexpr float PILL_W = 250, PILL_H = 22, PILL_GAP = 9;
 constexpr float COLL_X0 = 522, COLL_X1 = 772, COLR_X0 = 780.5f, COLR_X1 = 1030.5f;
 
 const char* const LANGS[6] = { "FRANCAIS", "DEUTSCH", "ENGLISH", "ESPANOL", "ITALIANO", "JAPANESE" };
-int g_sel = 2;   // ENGLISH default
+int g_sel = 2;        // cursor (ENGLISH default)
+int g_langSet = 2;    // the chosen language (lit toggle); set on accept
 
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
@@ -73,12 +74,13 @@ void Init() {
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");    // real game MSDF
     if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");
 }
-void Reset() { g_sel = 2; }
+void Reset() { g_sel = 2; g_langSet = 2; }
 void Input(const ScreenInput& in) {
     if (in.up)    g_sel = (g_sel % 3 == 0) ? g_sel : g_sel - 1;
     if (in.down)  g_sel = (g_sel % 3 == 2) ? g_sel : g_sel + 1;
     if (in.left)  g_sel = std::max(0, g_sel - 3);
     if (in.right) g_sel = std::min(5, g_sel + 3);
+    if (in.accept) g_langSet = g_sel;   // commit the highlighted language (lights its toggle)
 }
 
 // a green checkerboard container (DrawContainer recipe)
@@ -89,11 +91,66 @@ void DrawContainer(float x0, float y0, float x1, float y1, uint32_t grid, float 
     if (overlay) DrawRect({ x0, y0 }, { x1, y1 }, WithAlpha(C_GRID_OV, t));
 }
 
-// a green language/NEXT pill (scanline-button)
-void DrawPill(float x0, float y0, float x1, float y1, bool sel, float t) {
-    SetModifier(MOD_SCANLINE);
-    DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(sel ? C_PILL_SEL_T : C_PILL_T, t), WithAlpha(sel ? C_PILL_SEL_B : C_PILL_B, t));
+// the SHARED button plate, ported EXACT from installer_wizard.cpp DrawButtonContainer
+// (L917): three AddRectFilledMultiColor layers under SCANLINE_BUTTON, parameterised by
+// (baser,baseg) — 0/0 for a resting button, 48/32 for the focused (hovered) one. This is
+// the same 3-layer recipe as the options value cell (screen_options.cpp DrawPlate).
+void DrawButtonPlate(float x0, float y0, float x1, float y1, int br, int bg, float a) {
+    auto A = [&](int base) { return (uint8_t)std::clamp((int)lround(base * a), 0, 255); };
+    SetModifier(MOD_SCANLINE_BUTTON);
+    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(br,bg+130,0,A(223)), RGBA(br,bg+130,0,A(178)), RGBA(br,bg+130,0,A(223)), RGBA(br,bg+130,0,A(178)));
+    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(br,bg,0,A(13)),      RGBA(br,bg,0,0),           RGBA(br,bg,0,A(55)),      RGBA(br,bg,0,A(6)));
+    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(br,bg+130,0,A(13)),  RGBA(br,bg+130,0,A(111)),  RGBA(br,bg+130,0,0),      RGBA(br,bg+130,0,A(55)));
     ResetModifier();
+}
+
+// DrawButton (installer_wizard.cpp L943): the plate + centred DFSoGei-20 label with a
+// green vertical gradient (br+192,255,0 -> br+128,bg+170,0) and a 4px outline (br,bg,0).
+void DrawButton(float x0, float y0, float x1, float y1, const char* text, bool focused, float a) {
+    const int br = focused ? 48 : 0, bg = focused ? 32 : 0;
+    DrawButtonPlate(x0, y0, x1, y1, br, bg, a);
+    SetFont(g_fDF);
+    const float sz = 20.0f; float w = MeasureText(sz, text).x; float sx = 1.0f;
+    const float boxW = x1 - x0; if (w > boxW && w > 0.0f) sx = boxW / w;
+    float dw = w * sx, px = x0 + (boxW - dw) * 0.5f, py = y0 + ((y1 - y0) - sz) * 0.5f - 1.0f;
+    if (sx != 1.0f) SetTextStretchX(sx);
+    static const float O[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+    for (auto& o : O) DrawText({ px + o[0]*1.6f, py + o[1]*1.6f }, sz, WithAlpha(RGBA(br,bg,0,255), a), text);
+    DrawTextGradient({ px, py }, sz, WithAlpha(RGBA(br+192,255,0,255), a), WithAlpha(RGBA(br+128,bg+170,0,255), a), text);
+    if (sx != 1.0f) ResetTextStretchX();
+}
+
+// toggle light (imgui_utils.cpp DrawToggleLight): 14px lit/dark dot + additive yellow glow
+void DrawTLight(float x0, float y0, bool on, float a) {
+    const float ls = 14.0f, lcx = x0 + ls*0.5f, lcy = y0 + ls*0.5f;
+    if (on) { const float gs = 24.0f; float gx = x0 - gs*0.5f + 2.0f, gy = y0 - gs*0.5f;
+              DrawRect({ gx, gy }, { gx+gs, gy+gs }, WithAlpha(C_GLOW, a), true); }
+    auto disc = [&](float r, uint32_t c){ float k = r*0.4142f;
+        DrawRect({ lcx-r, lcy-k }, { lcx+r, lcy+k }, c); DrawRect({ lcx-k, lcy-r }, { lcx+k, lcy+r }, c);
+        DrawRect({ lcx-r*0.78f, lcy-r*0.78f }, { lcx+r*0.78f, lcy+r*0.78f }, c); };
+    disc(ls*0.5f, WithAlpha(on ? C_LIGHT_ON : C_LIGHT_OFF, a));
+}
+
+// one animated container border (installer_wizard.cpp DrawHorizontal/VerticalBorder):
+// a solid mint line that fades toward its far ends and sweeps open from the centre.
+void DrawHBorder(float y, float prog) {   // prog: 0..1 entrance
+    const uint32_t SOLID = RGBA(155,200,155,255), FADE = RGBA(155,200,155,0), FADE_R = RGBA(155,225,155,0);
+    float bs = 1.0f - prog;
+    const float CX = 513.0f, CW = 526.5f, SIDE = CW*0.5f, OVER = 36.0f;
+    float midX = CX + CW/5.0f;
+    float minX = Lerp(CX - 1 - OVER, midX, bs), maxX = Lerp(CX + CW + SIDE + OVER, midX, bs);
+    DrawQuadGradient({minX,y},{midX,y+1}, FADE, SOLID, SOLID, FADE);
+    DrawQuadGradient({midX,y},{std::min(maxX,REF_W),y+1}, SOLID, FADE_R, FADE_R, SOLID);
+}
+void DrawVBorder(float x, bool right, float prog) {
+    const uint32_t SOLID = right ? RGBA(155,225,155,255) : RGBA(155,155,155,255);
+    const uint32_t FADE  = right ? RGBA(155,225,155,0)   : RGBA(155,155,155,0);
+    float bs = 1.0f - prog;
+    const float CY = 226.0f, CH = 246.0f, OVER = 36.0f;
+    float midY = CY + CH/2.0f;
+    float minY = Lerp(CY - OVER, midY, bs), maxY = Lerp(CY + CH + OVER, midY, bs);
+    DrawQuadGradient({x,minY},{x+1,midY}, FADE, FADE, SOLID, SOLID);
+    DrawQuadGradient({x,midY},{x+1,maxY}, SOLID, SOLID, FADE, FADE);
 }
 
 void Draw(double openSec) {
@@ -141,37 +198,24 @@ void Draw(double openSec) {
     if (mOuter > 0) DrawContainer(SIDE_X0, MAIN_Y0, SIDE_X1, MAIN_Y1, C_GRID, mOuter, false);
     if (mInner > 0) DrawContainer(MAIN_X0, MAIN_Y0, MAIN_X1, MAIN_Y1, C_GRID_T, mInner, true);
 
-    // ---- container borders (sweep open from centre) ----
-    if (mBord > 0) {
-        float bs = 1.0f - mBord;   // 1 -> 0
-        float midX = 618.3f, midY = 349.0f;
-        auto hbar = [&](float y){ float x0 = Lerp(476.0f, midX, bs), x1 = Lerp(1338.75f, midX, bs); DrawRect({ x0, y }, { std::min(x1, REF_W), y + 1 }, WithAlpha(C_BORDER_L, mBord)); };
-        auto vbar = [&](float x, uint32_t c){ float y0 = Lerp(190.0f, midY, bs), y1 = Lerp(508.0f, midY, bs); DrawRect({ x, y0 }, { x + 1, y1 }, WithAlpha(c, mBord)); };
-        hbar(225); hbar(472); vbar(512, C_BORDER_L); vbar(1039.5f, C_BORDER_R);
-    }
-
-    // ---- language pills (3x2) + toggle lights ----
+    // ---- language buttons (3x2) + toggle lights (installer_wizard DrawLanguagePicker) ----
     if (mInner > 0) {
         for (int i = 0; i < 6; ++i) {
             float cx0 = (i < 3) ? COLL_X0 : COLR_X0, cx1 = (i < 3) ? COLL_X1 : COLR_X1;
             int row = i % 3;
-            float py0 = (MAIN_Y0 + MAIN_Y1 - MAIN_Y0) ; // placeholder; recompute below
-            py0 = (227 + 246 - PILL_GAP - PILL_H) - (PILL_GAP + PILL_H) * row;   // 441 - 31*row
-            float py1 = py0 + PILL_H;
-            bool sel = (i == g_sel);
-            DrawPill(cx0, py0, cx1, py1, sel, mInner);
-            // toggle light
-            float lx = cx0 + 14, ly = py0 + (PILL_H - 14) * 0.5f + 1;
-            if (sel) DrawRect({ lx-5, ly-5 }, { lx+19, ly+19 }, WithAlpha(C_GLOW, mInner));
-            DrawRect({ lx, ly }, { lx + 14, ly + 14 }, WithAlpha(sel ? C_LIGHT_ON : C_LIGHT_OFF, mInner));
-            SetFont(g_fSeurat);   // MSDF: crisp at 20px (DFSoGei SDF goes blocky this small)
-            DrawTextAligned({ cx0 + 36, py0 }, { cx1 - 8, py1 }, 20.0f, WithAlpha(C_PILL_TXT, mInner), LANGS[i], Align::Left, true, true);
+            float py0 = 441.0f - (PILL_GAP + PILL_H) * row, py1 = py0 + PILL_H;   // rows 441/410/379
+            DrawButton(cx0, py0, cx1, py1, LANGS[i], i == g_sel, mInner);          // cursor = focus-brighten
+            DrawTLight(cx0 + 14, py0 + (PILL_H - 14) * 0.5f + 1, i == g_langSet, mInner);  // light = chosen language
         }
-        // NEXT pill (right-aligned under panel)
-        float nx1 = 1035.5f, ny0 = 477, ny1 = 499, nw = 118;
-        DrawPill(nx1 - nw, ny0, nx1, ny1, false, mInner);
-        SetFont(g_fSeurat);
-        DrawTextAligned({ nx1 - nw + 8, ny0 }, { nx1 - 8, ny1 }, 20.0f, WithAlpha(C_PILL_TXT, mInner), "NEXT", Align::Center, true, true);
+        // NEXT navigation button (DFSoGei, right-aligned just below the container)
+        SetFont(g_fDF); float ntw = MeasureText(20.0f, "NEXT").x, nx1 = 1035.5f;
+        DrawButton(nx1 - ntw - 28.0f, 477.0f, nx1, 499.0f, "NEXT", false, mInner);
+    }
+
+    // ---- container borders (drawn on top; mint, fading at the ends, sweep from centre) ----
+    if (mBord > 0) {
+        DrawHBorder(225.0f, mBord); DrawHBorder(472.0f, mBord);
+        DrawVBorder(512.0f, false, mBord); DrawVBorder(1039.5f, true, mBord);
     }
 
     // ---- footer (pops at ~frame 61) + version ----
