@@ -260,25 +260,13 @@ void Glyph(const UV& g, float x, float cy, float gh, float a, float* outRight = 
     if (outRight) *outRight = x + gw;
 }
 
-void FooterEncy(float a) {
-    const float cy = 640;
-    float r = 0;
-    Glyph(GLYPH_LB, 256, cy, 32, a, &r);
-    SetFont(g_fRodin);
-    DrawText({ 341, cy - 12 }, 22.0f, WithAlpha(C_WHITE, a), "Switch");
-    Glyph(GLYPH_RB, 452, cy, 32, a, &r);
-    Glyph(GLYPH_B, 858, cy, 34, a, &r);
-    DrawText({ 902, cy - 12 }, 22.0f, WithAlpha(C_WHITE, a), "Back");
-    ResetFont();
+void FooterEncy(float a) {   // [LB] Switch [RB] (left) | Back (right) — shared button-guide
+    static const GuideBtn F[] = { { "Switch", GIcon::LBRB, GAlign::Left, 115.0f }, { "Back", GIcon::B, GAlign::Right, 0.0f } };
+    DrawButtonGuide(F, 2, g_fRodin, a, 256.0f);
 }
-void FooterSound(float a) {
-    const float cy = 638;
-    SetFont(g_fRodin);
-    Glyph(GLYPH_A, 684, cy, 32, a);
-    DrawText({ 725, cy - 12 }, 22.0f, WithAlpha(C_WHITE, a), "Select");
-    Glyph(GLYPH_B, 858, cy, 34, a);
-    DrawText({ 902, cy - 12 }, 22.0f, WithAlpha(C_WHITE, a), "Back");
-    ResetFont();
+void FooterSound(float a) {   // Select | Back (right) — shared button-guide
+    static const GuideBtn F[] = { { "Select", GIcon::A, GAlign::Right, 115.0f }, { "Back", GIcon::B, GAlign::Right, 0.0f } };
+    DrawButtonGuide(F, 2, g_fRodin, a, 379.0f);
 }
 
 // ---- views ---------------------------------------------------------------------

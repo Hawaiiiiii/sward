@@ -158,4 +158,15 @@ void DrawImageVGradient(int tex, V2 min, V2 max, V2 uv0, V2 uv1,
 // progress 0 = clear, 1 = fully covered. Works symmetrically for in/out.
 void DrawChevronWipe(float progress);
 
+// ---- shared button-guide footer, ported 1:1 from ui/button_guide.cpp --------
+// Region y618..720; icons 40x40 (LB/RB 70x40) from the controller glyph atlas;
+// labels NewRodin 21.8 white + 4px black outline. Left-aligned buttons flow from
+// the left margin, right-aligned flow inward from the right. maxWidth squashes a
+// label that would otherwise overrun (FLT_MAX / 0 = no clamp). The canonical guide
+// used by every screen's footer (options uses sideMargins 250).
+enum class GIcon { A, B, X, Y, LB, RB, LBRB };
+enum class GAlign { Left, Right };
+struct GuideBtn { const char* label; GIcon icon; GAlign align; float maxWidth; };
+void DrawButtonGuide(const GuideBtn* btns, int count, int rodinFont, float alpha, float sideMargins = 379.0f);
+
 } // namespace ui

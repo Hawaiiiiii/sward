@@ -537,17 +537,18 @@ void Draw(double openSec) {
         PopClip();
     }
 
-    // ---- footer button-guide + version ----
-    // recomp footer: [LB/RB] Switch | [X] Reset | [A] Select | [B] Back ; version bottom-right.
+    // ---- footer (shared button-guide, ported from button_guide.cpp) + version ----
+    // recomp options footer (options_menu.cpp L1818): Switch[LBRB,Left] | Reset[X] |
+    // Select[A] | Back[B] (all Right), sideMargins 250.
     {
+        static const GuideBtn FOOTER[] = {
+            { "Switch", GIcon::LBRB, GAlign::Left,  115.0f },
+            { "Reset",  GIcon::X,    GAlign::Right, 110.0f },
+            { "Select", GIcon::A,    GAlign::Right, 115.0f },
+            { "Back",   GIcon::B,    GAlign::Right, 65.0f  },
+        };
+        DrawButtonGuide(FOOTER, 4, g_fRodin, t, 250.0f);
         SetFont(g_fRodin);
-        float hx = 150.0f, hcy = 634.0f;
-        auto glyph = [&](const UV& g) { if (g_glyphTex < 0) return; float asp = ((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh = 30.0f, gw = gh*asp; DrawImage(g_glyphTex, { hx, hcy-gh*0.5f }, { hx+gw, hcy+gh*0.5f }, { g.u0, g.v0 }, { g.u1, g.v1 }, WithAlpha(C_WHITE, t)); hx += gw + 8; };
-        auto word = [&](const char* w, float pad){ DrawText({ hx, hcy-13 }, 24.0f, WithAlpha(C_WHITE, t), w); hx += MeasureText(24.0f, w).x + pad; };
-        glyph(GLYPH_LB); word("Switch", 10); glyph(GLYPH_RB); hx += 18;
-        glyph(GLYPH_X);  word("Reset", 14);
-        glyph(GLYPH_A);  word("Select", 14);
-        glyph(GLYPH_B);  word("Back", 0);
         DrawTextAligned({ REF_W - 420, REF_H - 22 }, { REF_W - 4, REF_H - 6 }, 12.0f, WithAlpha(C_VERSION, t),
                         "v1.0.3.325e4d3-HEAD (RelWithDebInfo)", Align::Right, true, true);
     }

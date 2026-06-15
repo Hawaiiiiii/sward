@@ -313,21 +313,13 @@ void Draw(double openSec) {
     // ---- footer: [LB] Switch [RB]   (A) Select   (B) Back ----
     //      (the LB/RB switch entry is hidden while the confirm popup is open) ----
     {
-        SetFont(g_fRodin);
-        float hcy = 636;
-        auto glyph = [&](const UV& g, float x, float gh){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,a)); return x+gw+8; };
-        // measured glyph anchors: [LB] Switch [RB] -> x244, (A) Select -> x~700, (B) Back -> x~877
-        float hx = g_popup ? 520 : 244;
-        if (!g_popup) {
-            hx = glyph(GLYPH_LB, hx, 28);
-            DrawText({ hx, hcy - 11 }, 20.0f, WithAlpha(C_WHITE, a), "Switch"); hx += 90;
-            hx = glyph(GLYPH_RB, hx, 28); hx += 244;
+        if (g_popup) {   // confirm popup: Switch hidden, only Select / Back (right)
+            static const GuideBtn F[] = { { "Select", GIcon::A, GAlign::Right, 115.0f }, { "Back", GIcon::B, GAlign::Right, 0.0f } };
+            DrawButtonGuide(F, 2, g_fRodin, a, 379.0f);
+        } else {         // [LB] Switch [RB] (left) | Select | Back (right)
+            static const GuideBtn F[] = { { "Switch", GIcon::LBRB, GAlign::Left, 115.0f }, { "Select", GIcon::A, GAlign::Right, 115.0f }, { "Back", GIcon::B, GAlign::Right, 0.0f } };
+            DrawButtonGuide(F, 3, g_fRodin, a, 250.0f);
         }
-        hx = glyph(GLYPH_A, hx, 30);
-        DrawText({ hx, hcy - 11 }, 20.0f, WithAlpha(C_WHITE, a), "Select"); hx += 137;
-        hx = glyph(GLYPH_B, hx, 30);
-        DrawText({ hx, hcy - 11 }, 20.0f, WithAlpha(C_WHITE, a), "Back");
-        ResetFont();
     }
 
     // ---- "Play Stage / Cancel" confirm popup (the GREY dialog family, like

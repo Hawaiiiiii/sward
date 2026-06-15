@@ -218,13 +218,13 @@ void Draw(double openSec) {
         DrawVBorder(512.0f, false, mBord); DrawVBorder(1039.5f, true, mBord);
     }
 
-    // ---- footer (pops at ~frame 61) + version ----
+    // ---- footer (shared button-guide; pops at ~frame 61) + version ----
     if (mInner >= 0.999f) {
-        SetFont(g_fRodin);
-        float hx = 470, hcy = 690;
-        auto glyph = [&](const UV& g){ if (g_glyphTex<0) return; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=26.0f, gw=gh*asp; DrawImage(g_glyphTex,{hx,hcy-gh*0.5f},{hx+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,1)); hx+=gw+6; };
-        auto word=[&](const char* w,float pad){ DrawText({hx,hcy-11},20.0f,WithAlpha(C_WHITE,1),w); hx+=MeasureText(20.0f,w).x+pad; };
-        glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Quit", 10);
+        static const GuideBtn FOOTER[] = {
+            { "Select", GIcon::A, GAlign::Right, 115.0f },
+            { "Quit",   GIcon::B, GAlign::Right, 0.0f   },
+        };
+        DrawButtonGuide(FOOTER, 2, g_fRodin, 1.0f, 379.0f);
     }
     SetFont(g_fRodin);
     DrawTextAligned({ REF_W - 360, REF_H - 20 }, { REF_W - 2, REF_H - 4 }, 12.0f, WithAlpha(C_VERSION, mTitle),

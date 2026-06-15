@@ -602,4 +602,69 @@ void DrawImageVGradient(int tex, V2 min, V2 max, V2 uv0, V2 uv1,
     }
 }
 
+// ---- shared button-guide footer (ported 1:1 from ui/button_guide.cpp) -------
+void DrawButtonGuide(const GuideBtn* btns, int count, int rodinFont, float alpha, float sideMargins) {
+    static int s_iconTex = -2;
+    if (s_iconTex == -2) s_iconTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
+    struct IconUV { float u0, v0, u1, v1; };
+    // controller glyph atlas mat_comon_x360_001.png (512x512): A B X Y | LB RB
+    static const IconUV UV[6] = {
+        { 0.00000f, 0.00781f, 0.07227f, 0.07617f },  // A
+        { 0.08008f, 0.00781f, 0.15039f, 0.07422f },  // B
+        { 0.16016f, 0.00781f, 0.23047f, 0.07422f },  // X
+        { 0.24023f, 0.00781f, 0.31055f, 0.07422f },  // Y (estimated; footers rarely use Y)
+        { 0.32617f, 0.00781f, 0.46094f, 0.07812f },  // LB
+        { 0.48242f, 0.00781f, 0.61523f, 0.07812f },  // RB
+    };
+    auto iconW = [](GIcon ic) { return (ic == GIcon::LB || ic == GIcon::RB || ic == GIcon::LBRB) ? 70.0f : 40.0f; };
+    const float regMinX = sideMargins, regMaxX = REF_W - sideMargins;
+    const float regMinY = REF_H - 102.0f;            // 618
+    const float iconH = 40.0f, fontSz = 21.8f, marginX = 21.25f, iconGap = 4.0f, textY = regMinY + 9.0f;
+    const uint32_t white = WithAlpha(RGBA(255,255,255,255), alpha), black = WithAlpha(RGBA(0,0,0,255), alpha);
+    SetFont(rodinFont);
+    auto icon = [&](GIcon ic, float x) {             // draw a single glyph at [x, x+w], y618..658
+        const IconUV& u = UV[ic == GIcon::LBRB ? (int)GIcon::LB : (int)ic];
+        if (s_iconTex >= 0) DrawImage(s_iconTex, { x, regMinY }, { x + iconW(ic), regMinY + iconH }, { u.u0, u.v0 }, { u.u1, u.v1 }, white);
+    };
+    auto label = [&](const char* s, float x, float maxW) {    // outlined NewRodin label; returns drawn width
+        float tw = MeasureText(fontSz, s).x; float sx = (maxW > 0.0f && tw > maxW) ? maxW / tw : 1.0f;
+        if (sx != 1.0f) SetTextStretchX(sx);
+        static const float O[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+        for (auto& o : O) DrawText({ x + o[0]*1.6f, textY + o[1]*1.6f }, fontSz, black, s);
+        DrawText({ x, textY }, fontSz, white, s);
+        if (sx != 1.0f) ResetTextStretchX();
+        return tw * sx;
+    };
+    // left-aligned group flows left -> right from the left margin
+    float lx = regMinX;
+    for (int i = 0; i < count; ++i) {
+        if (btns[i].align != GAlign::Left) continue;
+        const GuideBtn& b = btns[i]; float w = iconW(b.icon);
+        if (b.icon == GIcon::LBRB) {
+            icon(GIcon::LB, lx); lx += w + iconGap;
+            float tw = label(b.label, lx, b.maxWidth); lx += tw + iconGap;
+            icon(GIcon::RB, lx); lx += w + marginX;
+        } else {
+            icon(b.icon, lx); lx += w + iconGap;
+            float tw = label(b.label, lx, b.maxWidth); lx += tw + marginX;
+        }
+    }
+    // right-aligned group flows right -> left (reverse order: the last button is rightmost)
+    float rx = regMaxX;
+    for (int i = count - 1; i >= 0; --i) {
+        if (btns[i].align != GAlign::Right) continue;
+        const GuideBtn& b = btns[i]; float w = iconW(b.icon);
+        float tw = MeasureText(fontSz, b.label).x; float sx = (b.maxWidth > 0.0f && tw > b.maxWidth) ? b.maxWidth / tw : 1.0f; float dtw = tw * sx;
+        if (b.icon == GIcon::LBRB) {
+            float total = w + iconGap + dtw + iconGap + w; rx -= total;
+            icon(GIcon::LB, rx); label(b.label, rx + w + iconGap, b.maxWidth); icon(GIcon::RB, rx + w + iconGap + dtw + iconGap);
+        } else {
+            float total = w + iconGap + dtw; rx -= total;
+            icon(b.icon, rx); label(b.label, rx + w + iconGap, b.maxWidth);
+        }
+        rx -= marginX;
+    }
+    ResetFont();
+}
+
 } // namespace ui
