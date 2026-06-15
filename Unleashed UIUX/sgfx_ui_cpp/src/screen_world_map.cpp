@@ -25,7 +25,7 @@
 using namespace ui;
 namespace {
 
-int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_glyphTex = -1;
+int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_glyphTex = -1, g_photoTex = -1;
 struct UV { float u0, v0, u1, v1; };
 constexpr float GTW = 512.0f, GTH = 512.0f;
 const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
@@ -85,6 +85,9 @@ const char* g_nav = nullptr;
 
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
+    // the selected stage's real screenshot (Spagonia here); the slot is a
+    // template — swap the PNG (or key it off the selected stage) to re-skin.
+    if (g_photoTex < 0) g_photoTex = gfx::loadTexture("assets/gameart/stage_spagonia_hero.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
@@ -168,18 +171,25 @@ void DrawStageInfo(float t) {
     DrawRect({ 1140.6f, 124.7f }, { 1143.3f, 135.4f }, WithAlpha(C_SIP_RAIL, t));
     DrawRect({ 853.3f, 585.3f }, { 856.0f, 596.0f }, WithAlpha(C_SIP_RAIL, t));
     DrawRect({ 1140.6f, 585.3f }, { 1143.3f, 596.0f }, WithAlpha(C_SIP_RAIL, t));
-    // stage photo slot (real screenshot drops in; 2:1 plate, flush on the fill)
-    DrawVGradient({ 863.3f, 139.3f }, { 1133.3f, 274.7f },
-                  WithAlpha(RGBA(34, 52, 70, 255), t), WithAlpha(RGBA(16, 26, 38, 255), t));
-    SetFont(g_fSeurat);
-    DrawTextAligned({ 863.3f, 139.3f }, { 1133.3f, 274.7f }, 14.0f,
-                    WithAlpha(RGBA(110, 130, 150, 255), t), "STAGE PHOTO", Align::Center, true, false);
+    // stage photo slot (2:1 plate, flush on the fill): the selected stage's real
+    // screenshot. Falls back to the dim plate + "STAGE PHOTO" label if absent.
+    if (g_photoTex >= 0) {
+        DrawImage(g_photoTex, { 863.3f, 139.3f }, { 1133.3f, 274.7f },
+                  { 0.f, 0.f }, { 1.f, 1.f }, WithAlpha(C_WHITE, t));
+    } else {
+        DrawVGradient({ 863.3f, 139.3f }, { 1133.3f, 274.7f },
+                      WithAlpha(RGBA(34, 52, 70, 255), t), WithAlpha(RGBA(16, 26, 38, 255), t));
+        SetFont(g_fSeurat);
+        DrawTextAligned({ 863.3f, 139.3f }, { 1133.3f, 274.7f }, 14.0f,
+                        WithAlpha(RGBA(110, 130, 150, 255), t), "STAGE PHOTO", Align::Center, true, false);
+    }
     // flag overlay (top-left of photo) + sun medallion (top-right)
     DrawRect({ 868, 143.3f }, { 908, 170.7f }, WithAlpha(RGBA(24, 32, 80, 255), t));
     DrawRect({ 870, 145.3f }, { 906, 168.7f }, WithAlpha(RGBA(235, 238, 240, 255), t));
     DrawRect({ 880, 150 }, { 896, 164 }, WithAlpha(RGBA(170, 50, 40, 255), t));
     DrawIconSlot(1114.7f, 158, 14.7f, RGBA(213, 143, 33, 255), true, t);
     // description (6 lines, pitch 32.9, left margin 864)
+    SetFont(g_fSeurat);
     {
         const char* L[] = { "The world's art", "capital and home", "to a university",
                             "that attracts", "those in search", "of knowledge." };

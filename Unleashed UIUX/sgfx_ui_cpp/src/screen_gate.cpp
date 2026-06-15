@@ -26,7 +26,7 @@ using namespace ui;
 namespace {
 
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
-int g_glyphTex = -1, g_rankTex = -1;
+int g_glyphTex = -1, g_rankTex = -1, g_photoTex = -1;
 
 struct UV { float u0, v0, u1, v1; };
 constexpr float GTW = 512.0f, GTH = 512.0f;
@@ -79,6 +79,9 @@ const char* g_nav = nullptr;
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
     if (g_rankTex  < 0) g_rankTex  = gfx::loadTexture("assets/result/mat_result_comon_002.png");
+    // the selected stage's real screenshot (Windmill Isle / Apotos here); swap
+    // the PNG to re-skin or key it off the selected act.
+    if (g_photoTex < 0) g_photoTex = gfx::loadTexture("assets/gameart/stage_apotos_hero.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
@@ -289,12 +292,18 @@ void Draw(double openSec) {
         Chrome({ 276, 516 }, 22.0f, "RANK", panT, false, 1.4f);
         // stage screenshot slot (landscape 270x135, aspect 2.0 — measured stage_ss rect 702,320..972,455)
         // + the big metallic S-rank to its RIGHT, overlapping the photo's bottom-right
-        DrawVGradient({ 702, 320 }, { 972, 455 }, WithAlpha(RGBA(60, 76, 98, 255), panT), WithAlpha(RGBA(30, 40, 54, 255), panT));
-        DrawRect({ 702, 320 }, { 972, 322 }, WithAlpha(C_BORDER, panT));
-        SetFont(g_fSeurat);
-        DrawTextAligned({ 702, 320 }, { 972, 455 }, 13.0f, WithAlpha(RGBA(140, 156, 176, 255), panT),
-                        "STAGE PHOTO", Align::Center, true, false);
-        ResetFont();
+        if (g_photoTex >= 0) {
+            DrawImage(g_photoTex, { 702, 320 }, { 972, 455 }, { 0.f, 0.f }, { 1.f, 1.f },
+                      WithAlpha(C_WHITE, panT));
+            DrawRect({ 702, 320 }, { 972, 322 }, WithAlpha(C_BORDER, panT));
+        } else {
+            DrawVGradient({ 702, 320 }, { 972, 455 }, WithAlpha(RGBA(60, 76, 98, 255), panT), WithAlpha(RGBA(30, 40, 54, 255), panT));
+            DrawRect({ 702, 320 }, { 972, 322 }, WithAlpha(C_BORDER, panT));
+            SetFont(g_fSeurat);
+            DrawTextAligned({ 702, 320 }, { 972, 455 }, 13.0f, WithAlpha(RGBA(140, 156, 176, 255), panT),
+                            "STAGE PHOTO", Align::Center, true, false);
+            ResetFont();
+        }
         if (g_rankTex >= 0)
             DrawImage(g_rankTex, { 900, 400 }, { 1044, 534 },
                       { RANK_UV[act.rank].u0, RANK_UV[act.rank].v0 }, { RANK_UV[act.rank].u1, RANK_UV[act.rank].v1 },
