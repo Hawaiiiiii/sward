@@ -69,11 +69,14 @@ static void ApplyKey(ScreenInput& in, SDL_Keycode k) {
 
 static int g_curBgm = -1;   // which BGM track is playing (-1 none, 0 menu, 1 title)
 
-static void OpenScreen(const ScreenDef* scr) {
+static void OpenScreen(const ScreenDef* scr, bool isBack = false) {
     if (!scr) return;
     scr->Init();
     if (scr->Reset) scr->Reset();
-    audio::Play(audio::SFX_WINOPEN);   // window-open cue (no-op if audio disabled)
+    // window cue: opening a screen plays winopen; backing out of one (a window
+    // closing) plays winclose — matches the recomp (achievement_menu.cpp fires
+    // pausewinclose on close, pausewinopen on open). No-op if audio is disabled.
+    audio::Play(isBack ? audio::SFX_WINCLOSE : audio::SFX_WINOPEN);
     // per-screen BGM: title screen gets the title theme, all menus share the menu theme.
     // Only (re)start when the track actually changes, so menu music flows across screens.
     int want = (std::strcmp(scr->id, "title") == 0) ? 1 : 0;
@@ -351,6 +354,7 @@ int main(int argc, char** argv) {
     int    transPhase = 1;                          // 0 idle, 1 fade-in, 2 fade-out (switch pending)
     double transStart = 0.0;                        // absNow when the current phase began
     const ScreenDef* transTarget = nullptr;         // screen to switch to once black
+    bool   transWasBack = false;                    // the pending switch is a back-stack pop (winclose, not winopen)
     bool   replayPending = false;
     // ---- the runtime flow: back-stack + loading chains ("loading>target") ----
     const ScreenDef* navStack[16]; int navDepth = 0;
@@ -399,7 +403,7 @@ int main(int argc, char** argv) {
         } else if (transPhase == 2) {                       // fading OUT to black
             float p = (float)((absNow - transStart) / FADE);
             if (p >= 1.0f) {                                // at full black: apply the change, then fade in
-                if (transTarget) { scr = transTarget; OpenScreen(scr); transTarget = nullptr; }
+                if (transTarget) { scr = transTarget; OpenScreen(scr, transWasBack); transTarget = nullptr; transWasBack = false; }
                 else if (replayPending) { if (scr->Reset) scr->Reset(); audio::Play(audio::SFX_WINOPEN); replayPending = false; }
                 t0 = SDL_GetPerformanceCounter();           // restart the screen intro
                 transPhase = 1; transStart = absNow; fade = 1.0f;
@@ -421,7 +425,7 @@ int main(int argc, char** argv) {
             if (const char* tgt = scr->Nav()) {
                 const ScreenDef* next = nullptr;
                 if (strcmp(tgt, "@back") == 0) {
-                    if (navDepth > 0) next = navStack[--navDepth];
+                    if (navDepth > 0) { next = navStack[--navDepth]; transWasBack = true; }  // a window closes
                 } else {
                     const char* dest = tgt;
                     if (const char* p = strchr(tgt, '>')) {            // chain: hop via the loader
