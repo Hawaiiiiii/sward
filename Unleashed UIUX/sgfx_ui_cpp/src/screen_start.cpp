@@ -89,7 +89,7 @@ void Init() {
     if (g_bannerTex < 0)
         g_bannerTex = gfx::loadTexture(std::string(ASSET_BASE) + "mat_start_en_001.png");
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");
-    if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
+    if (g_fDF    == 0) g_fDF    = LoadMsdfFont("dfsogei");
 }
 
 void Reset() { g_seqStart = -100.0; g_open = 0.0; }

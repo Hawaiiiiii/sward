@@ -112,7 +112,7 @@ void Init() {
     if (g_dangerTex < 0) g_dangerTex = gfx::loadTexture(std::string(ASSET_BASE) + "mat_qte_001.png");
     if (g_wordTex   < 0) g_wordTex   = gfx::loadTexture(std::string(ASSET_BASE) + "mat_qte_en_001.png");
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");                  // real game MSDF
-    if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");      // real DFSoGeiStd-W7 (titles)
+    if (g_fDF    == 0) g_fDF    = LoadMsdfFont("dfsogei");      // real DFSoGeiStd-W7 (titles)
 }
 
 void Reset() { g_phase = ARMED; g_armStart = -1.0; g_resolveAt = -1.0; }

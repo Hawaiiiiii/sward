@@ -91,7 +91,7 @@ void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
-    if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");
+    if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
 }
 void Reset() { g_view = VIEW_ENCY_TEXT; g_selR = 2; g_selC = 3; }
 void Input(const ScreenInput& in) {

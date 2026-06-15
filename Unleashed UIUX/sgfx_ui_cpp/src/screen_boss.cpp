@@ -140,7 +140,7 @@ void Init() {
     if (g_labelTex < 0) g_labelTex = gfx::loadTexture(std::string(ASSET_BASE) + "mat_boss_en_003.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");      // real game MSDF (im_font_atlas)
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");    // real game MSDF
-    if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");   // real DFSoGeiStd-W7 (titles)
+    if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");   // real DFSoGeiStd-W7 (titles)
 }
 
 void Reset() {

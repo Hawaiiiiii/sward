@@ -27,7 +27,7 @@ const float SQ_U0 = 0.9102f, SQ_V0 = 0.3125f, SQ_U1 = 0.9805f, SQ_V1 = 0.5859f;
 
 void Init() {
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");
-    if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
+    if (g_fDF    == 0) g_fDF    = LoadMsdfFont("dfsogei");
     if (g_wordTex < 0) g_wordTex = gfx::loadTexture("assets/loading/mat_load_en_001.png");
 }
 void Reset() { g_nav = nullptr; g_lastOpen = 0.0; }

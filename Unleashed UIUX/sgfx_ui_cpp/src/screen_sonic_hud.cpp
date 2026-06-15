@@ -159,7 +159,7 @@ void Init() {
     if (g_enTex    < 0) g_enTex    = gfx::loadTexture(std::string(ASSET_BASE) + "mat_playscreen_en_001.png");
     if (g_gaugeTex < 0) g_gaugeTex = gfx::loadTexture(std::string(ASSET_BASE) + "ui_ps1_gauge1.png");
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");
-    if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
+    if (g_fDF    == 0) g_fDF    = LoadMsdfFont("dfsogei");
 }
 
 void Reset() {

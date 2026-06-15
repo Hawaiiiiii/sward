@@ -120,7 +120,7 @@ void Init() {
     if (g_partsTex < 0) g_partsTex = gfx::loadTexture(std::string(ASSET_BASE) + "ui_mm_parts1.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
-    if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");
+    if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
 }
 
 void Reset() {

@@ -65,7 +65,7 @@ constexpr int N_ENTRIES = 3;
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");
-    if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
+    if (g_fDF    == 0) g_fDF    = LoadMsdfFont("dfsogei");
 }
 void Reset() { g_state = BT_PRESS_START; g_entry = 0; g_nav = nullptr; }
 void Input(const ScreenInput& in) {

@@ -91,7 +91,7 @@ void Init() {
     if (g_rankTex  < 0) g_rankTex  = gfx::loadTexture("assets/result/mat_result_comon_002.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
-    if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");
+    if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
 }
 
 // slanted parallelogram plate (italic lean: top edge shifted right by SLANT)

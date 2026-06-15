@@ -88,7 +88,7 @@ int makeFloor() {   // a thin slab the grid lines sit on
 
 void Init() {
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");
-    if (g_fDF    == 0) g_fDF    = LoadFont("assets/fonts/dfsoge7.ttc");
+    if (g_fDF    == 0) g_fDF    = LoadMsdfFont("dfsogei");
     if (g_cube < 0)  g_cube  = makeCube();
     if (g_floor < 0) g_floor = makeFloor();
     if (!g_model.ok) {   // the RaCo content slot: .glb preferred, .gltf fallback
