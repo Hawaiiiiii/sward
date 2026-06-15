@@ -183,6 +183,7 @@ const uint32_t C_WHITE     = RGBA(255, 255, 255, 255);
 struct UV { float u0, v0, u1, v1; };
 int g_glyphTex = -1;
 int g_lightTex = -1;   // real recomp light.dds (toggle on/off/glow)
+int g_staticTex = -1;  // real recomp options_static.dds (TV-static thumbnail reveal)
 constexpr float GTW = 512.0f, GTH = 512.0f;
 const UV GLYPH_A  = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
 const UV GLYPH_B  = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
@@ -193,6 +194,7 @@ const UV GLYPH_RB = { 0.48242f, 0.00781f, 0.61523f, 0.07812f };
 // ---- state ------------------------------------------------------------------
 int    g_cat = 0, g_sel = 0, g_prevSel = 0, g_first = 0;
 double g_moveStart = -100.0;
+double g_thumbStatic = -100.0;   // TV-static reveal timer (reset on open + option switch)
 constexpr int   VIS_ROWS = 7;                 // rows visible before scrolling (recomp ~7)
 constexpr float ROWS_CLIP_BOT = 589.0f;       // settings-panel inner bottom for the row list
 Category& Cat()      { return CATEGORIES[g_cat]; }
@@ -225,6 +227,7 @@ void LoadSavedValues() {
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
     if (g_lightTex < 0) g_lightTex = gfx::loadTexture("assets/recomp/light.png");   // real recomp toggle light
+    if (g_staticTex < 0) g_staticTex = gfx::loadTexture("assets/recomp/options_static.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");      // real game MSDF (im_font_atlas)
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");    // real game MSDF
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");   // real DFSoGeiStd-W7 MSDF (crisp title + tabs)
@@ -233,7 +236,7 @@ void Init() {
 }
 void Reset() { g_cat = 0; g_sel = 0; g_prevSel = 0; g_first = 0; g_moveStart = -100.0; }
 void Input(const ScreenInput& in) {
-    if (in.up || in.down) { g_prevSel = g_sel; if (in.up) g_sel = std::max(0, g_sel - 1); if (in.down) g_sel = std::min(OptCount()-1, g_sel+1); g_moveStart = Now(); KeepSelVisible(); }
+    if (in.up || in.down) { g_prevSel = g_sel; if (in.up) g_sel = std::max(0, g_sel - 1); if (in.down) g_sel = std::min(OptCount()-1, g_sel+1); g_moveStart = Now(); g_thumbStatic = Now(); KeepSelVisible(); }
     if (in.left || in.right) {
         Option& o = Opt(std::clamp(g_sel,0,OptCount()-1));
         o.val = std::clamp(o.val + (in.right?ValStep(o):-ValStep(o)), ValMin(o), ValMax(o));
@@ -274,27 +277,26 @@ void DrawPlate(float x0, float y0, float x1, float y1, float a) {
 }
 
 // ---- filled horizontal-pointing arrow triangle (rows approximate the fill) ---
-void FillTri(float baseX, float apexX, float y0, float y1, uint32_t col, bool add = false) {
-    const int N = 18; const float cy = (y0+y1)*0.5f, hh = (y1-y0)*0.5f;
-    for (int i = 0; i < N; ++i) {
-        float ry0 = y0 + (y1-y0)*i/N, ry1 = y0 + (y1-y0)*(i+1)/N;
-        float f = 1.0f - std::fabs(((ry0+ry1)*0.5f)-cy)/hh;     // 1 at centre -> 0 at edges
-        float xe = baseX + (apexX-baseX)*f;
-        DrawRect({ std::min(baseX,xe), ry0 }, { std::max(baseX,xe), ry1 }, col, add);
-    }
+// a CLEAN filled triangle (degenerate quad: vertical base edge at baseX[y0..y1], apex
+// collapsed at {apexX, centre}). cBase/cApex tint the base edge -> apex (set equal for flat).
+// Matches the recomp's AddTriangleFilled smooth edges, no stair-stepping.
+void FillTri(float baseX, float apexX, float y0, float y1, uint32_t cBase, uint32_t cApex, bool add = false) {
+    const float cy = (y0 + y1) * 0.5f;
+    const V2 c[4] = { { baseX, y0 }, { baseX, y1 }, { apexX, cy }, { apexX, cy } };
+    const uint32_t cols[4] = { cBase, cBase, cApex, cApex };
+    DrawQuadGradient(c, cols, add);
 }
 // selection arrows (options_menu.cpp DrawSelectionArrows): dark-green base + additive
 // magenta gradient, on the active value box. Drawn at the static (settled) state.
 void DrawSelectionArrows(float bx0, float by0, float bx1, float by1, float t) {
     const float pad = GRID, width = GRID * 2.5f;          // L: base at min-pad, apex at -width
     uint32_t base = WithAlpha(RGBA(0,97,0,255), t);
-    uint32_t mag  = WithAlpha(RGBA(255,64,255,255), 1.0f);  // additive mid of (255,0,255)->(255,128,255)
-    // left arrow: base vertical at bx0-pad, apex to the left
-    FillTri(bx0-pad, bx0-pad-width, by0, by1, base);
-    FillTri(bx0-pad, bx0-pad-width, by0, by1, WithAlpha(mag, t), true);
-    // right arrow: base vertical at bx1+pad, apex to the right
-    FillTri(bx1+pad, bx1+pad+width, by0, by1, base);
-    FillTri(bx1+pad, bx1+pad+width, by0, by1, WithAlpha(mag, t), true);
+    // additive magenta gradient (recomp): (255,0,255) at the base edge -> (255,128,255) at the apex
+    uint32_t m0 = WithAlpha(RGBA(255,0,255,255), t), m1 = WithAlpha(RGBA(255,128,255,255), t);
+    FillTri(bx0-pad, bx0-pad-width, by0, by1, base, base);            // left arrow base
+    FillTri(bx0-pad, bx0-pad-width, by0, by1, m0, m1, true);          // left additive magenta
+    FillTri(bx1+pad, bx1+pad+width, by0, by1, base, base);            // right arrow base
+    FillTri(bx1+pad, bx1+pad+width, by0, by1, m0, m1, true);          // right additive magenta
 }
 
 // value text: white base + 4px black outline + green vertical gradient fill
@@ -519,6 +521,10 @@ void Draw(double openSec) {
         int thTex = ThumbTex(ThumbName(g_cat, std::clamp(g_sel, 0, OptCount()-1), s.val));   // real recomp per-option preview
         if (thTex >= 0) {
             DrawImage(thTex, { ix0, ty0 }, { ix1, ty1 }, { 0, 0 }, { 1, 1 }, WithAlpha(C_WHITE, t));
+            // TV-static reveal: the thumbnail emerges from options_static on open + option switch
+            float sa = std::max(1.0f - t, 1.0f - (float)ComputeMotion(g_thumbStatic, 0.0, 16.0));
+            if (sa > 0.01f && g_staticTex >= 0)
+                DrawImage(g_staticTex, { ix0, ty0 }, { ix1, ty1 }, { 0, 0 }, { 1, 1 }, WithAlpha(C_WHITE, sa));
         } else {
             DrawRect({ ix0, ty0 }, { ix1, ty1 }, WithAlpha(RGBA(6,10,8,235), t));        // dark empty slot fallback
             DrawVGradient({ ix0, ty0 }, { ix1, ty1 }, WithAlpha(RGBA(0,30,0,60), t), WithAlpha(RGBA(0,0,0,90), t));
