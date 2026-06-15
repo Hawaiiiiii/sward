@@ -113,8 +113,8 @@ void DrawSpinner(float x0, float y0, double now) {
     int head = (int)(now * 10.0) % 8;
     for (int i = 0; i < 8; ++i) {
         int d = (head - i + 8) % 8;
-        float k = (d == 0) ? 1.0f : (d == 1 ? 0.86f : (d == 2 ? 0.76f : 0.68f));
-        uint32_t c = ColourLerp(RGBA(28, 92, 8, 255), C_GREEN, k);
+        float k = (d == 0) ? 1.0f : (d == 1 ? 0.86f : (d == 2 ? 0.76f : 0.78f));
+        uint32_t c = ColourLerp(RGBA(40, 150, 14, 255), C_GREEN, k);
         float gx = x0 + RING[i][0] * step, gy = y0 + RING[i][1] * step;
         if (g_wordTex >= 0)
             DrawImage(g_wordTex, { gx, gy }, { gx + cell, gy + cell }, { SQ_U0, SQ_V0 }, { SQ_U1, SQ_V1 }, c);
@@ -345,7 +345,7 @@ void Draw(double openSec) {
     // ---- NOW LOADING wordmark (real sprite) + spinner, pulsing like boot ----
     float t01 = (float)(now - std::floor(now));
     float tri = 0.5f - 0.5f * std::cos(6.2831853f * t01);
-    float pulse = 0.40f + 0.60f * std::sqrt(tri);
+    float pulse = 0.80f + 0.20f * std::sqrt(tri);
     if (g_wordTex >= 0)
         DrawImageVGradient(g_wordTex, { 593, 547 }, { 963, 598 }, { WM_U0, WM_V0 }, { WM_U1, WM_V1 },
                            WithAlpha(RGBA(76, 218, 16, 255), pulse), WithAlpha(C_GREEN_B, pulse));

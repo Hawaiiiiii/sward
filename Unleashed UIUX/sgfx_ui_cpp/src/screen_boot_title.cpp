@@ -149,16 +149,19 @@ void PressStart(double now, float a) {
     CapsuleVGrad(502.0f, 506.0f, 778.0f, 535.0f, C_CAP_TOP, C_CAP_PEAK, a); // inner yellow w~276 h~29, cy~521 (olive rim shows both ends)
     // glossy belly highlight (a brighter mid strip)
     CapsuleVGrad(509.0f, 514.0f, 771.0f, 526.0f, C_CAP_PEAK, RGBA(255, 246, 150, 255), a * 0.6f);
-    // outline-style PRESS START (dark olive ring + capsule-yellow inner)
+    // outline-style PRESS START: LIME-GREEN letters (measured core ~139,156,81) with
+    // a dark-green outline, stretched to fill the pill end-to-end (~299px @1280).
     SetFont(g_fRodin);
+    SetTextStretchX(1.35f);
     const char* PS = "PRESS START";
-    float w = MeasureText(22.0f, PS).x;
-    float px = 640 - w * 0.5f, py = 512.0f;   // ~20px caps fit the y506-534 fill with the real ~9px margin
+    float w = MeasureText(26.0f, PS).x * 1.35f;
+    float px = 640 - w * 0.5f, py = 510.0f;   // ~19px caps, fills the pill width with margin top/bottom
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (dx || dy)
-                DrawText({ px + dx * 1.2f, py + dy * 1.2f }, 22.0f, WithAlpha(C_PS_OUT, a), PS);
-    DrawText({ px, py }, 22.0f, WithAlpha(C_CAP_PEAK, a), PS);
+                DrawText({ px + dx * 1.5f, py + dy * 1.5f }, 26.0f, WithAlpha(RGBA(40, 60, 18, 255), a), PS);
+    DrawText({ px, py }, 26.0f, WithAlpha(RGBA(160, 182, 72, 255), a), PS);
+    ResetTextStretchX();
     ResetFont();
 }
 

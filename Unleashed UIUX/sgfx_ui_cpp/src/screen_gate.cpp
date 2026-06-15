@@ -212,11 +212,11 @@ void Draw(double openSec) {
     // ---- thick angled gold ribbon (from the left edge, slanted right cut) +
     //      two-line chrome wordmark sitting on it ----
     {
-        const V2 rb[4] = { { 0, 50 }, { 632, 50 }, { 590, 110 }, { 0, 110 } };
+        const V2 rb[4] = { { 0, 50 }, { 720, 50 }, { 678, 110 }, { 0, 110 } };
         const uint32_t rc[4] = { WithAlpha(C_BAND_T, a), WithAlpha(C_BAND_M, a), WithAlpha(C_BAND_B, a), WithAlpha(C_BAND_B, a) };
         DrawQuadGradient(rb, rc);
-        DrawRect({ 0, 50 }, { 632, 52.5f }, WithAlpha(RGBA(252, 236, 150, 255), a));   // bright top edge
-        const V2 sl[4] = { { 642, 50 }, { 654, 50 }, { 612, 110 }, { 600, 110 } };     // detached slash
+        DrawRect({ 0, 50 }, { 720, 52.5f }, WithAlpha(RGBA(252, 236, 150, 255), a));   // bright top edge
+        const V2 sl[4] = { { 740, 50 }, { 752, 50 }, { 710, 110 }, { 698, 110 } };     // detached slash
         const uint32_t sc[4] = { WithAlpha(C_BAND_M, a), WithAlpha(C_BAND_M, a), WithAlpha(C_BAND_B, a), WithAlpha(C_BAND_B, a) };
         DrawQuadGradient(sl, sc);
     }

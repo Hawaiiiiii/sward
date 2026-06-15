@@ -234,7 +234,7 @@ void DrawStageInfoEmpty(float t) {
 void DrawStageLabel(float t) {
     SetFont(g_fDF);
     SetTextShear(0.22f);
-    SetTextStretchX(1.65f);   // widen ~170 -> ~244 so the glyph fills the label width
+    SetTextStretchX(1.40f);   // measured real ~165px (1.65 overshot to ~194); 1.65*165/194=1.40
     const char* NAME = "SPAGONIA";
     // dark outline ring, then the lime->gold gradient face (left origin x355.3 kept;
     // font 34 -> 30 trims cap height ~23 -> ~19px)
@@ -380,7 +380,7 @@ void Draw(double openSec) {
         if (g_popup) { hx = 683; glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Back", 10); }
         // non-popup: X glyph starts ~x555, wide pad after "Pass Time" (40->95) so
         // the A(Select) green disc lands ~x875 (real span ~304px, not compressed)
-        else         { hx = 555; glyph(GLYPH_X); word("Pass Time", 95); glyph(GLYPH_A); word("Select", 10); }
+        else         { hx = 555; glyph(GLYPH_X); word("Pass Time", 128); glyph(GLYPH_A); word("Select", 10); }   // Select disc -> ~x875 (real)
         ResetFont();
     }
 

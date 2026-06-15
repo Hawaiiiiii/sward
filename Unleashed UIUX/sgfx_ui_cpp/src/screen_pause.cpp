@@ -157,11 +157,11 @@ void DrawBanner(float t) {
     }
     SetFont(g_fDF);
     SetTextShear(0.24f);
-    SetTextStretchX(1.37f);   // the game's wordmark face is far wider than DFSoGei
+    SetTextStretchX(1.17f);   // measured real PAUSE: center 375, width ~199 (was over-stretched to 231)
     if (g_showGhostWordmark)
         DrawText({ 128, 38 }, 40.0f, WithAlpha(C_GHOST, t), "WORLD MAP");  // ghost wordmark (world-map context only)
     {   // chrome PAUSE: 8-direction outline ring, then the gradient face
-        const V2 pp = { 212.5f, 28.0f }; const float ps = 68.0f;
+        const V2 pp = { 267.5f, 28.0f }; const float ps = 68.0f;   // left edge ~x276 (was ~221, 48px too far left)
         for (int dy = -1; dy <= 1; ++dy)
             for (int dx = -1; dx <= 1; ++dx)
                 if (dx || dy)

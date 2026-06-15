@@ -109,8 +109,8 @@ const uint32_t C_PANEL_BG  = RGBA(0, 0, 0, 223);
 const uint32_t C_OUTER     = RGBA(0, 49, 0, 255);
 const uint32_t C_INNER     = RGBA(0, 27, 0, 255);  // slightly darker -> fainter checkerboard (panel mean ~19, std ~9)
 const uint32_t C_LINE      = RGBA(0, 89, 0, 255);
-const uint32_t C_TAB_BG    = RGBA(10, 66, 5, 223);  // dimmed/warmed active-tab plate top (renders ~12,66,5)
-const uint32_t C_TAB_BG2   = RGBA(8, 60, 5, 160);   // flattened bottom -> near-flat gradient
+const uint32_t C_TAB_BG    = RGBA(8, 34, 4, 120);   // hard-dimmed active-tab plate top (composited green ~18-22, near real)
+const uint32_t C_TAB_BG2   = RGBA(6, 28, 4, 90);    // flattened bottom -> near-flat, barely-there gradient
 const uint32_t C_TAB_TXT_T = RGBA(126, 230, 15, 255);  // tab text gradient top
 const uint32_t C_TAB_TXT_B = RGBA(199, 127, 12, 255);  // tab text gradient bottom
 const uint32_t C_TAB_OFF   = RGBA(128, 134, 12, 220);  // inactive tab warm-olive (G>=R, low blue; renders ~92,107,9)

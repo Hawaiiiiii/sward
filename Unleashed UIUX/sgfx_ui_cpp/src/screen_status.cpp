@@ -67,7 +67,7 @@ const uint32_t C_SKY_T = RGBA(86, 140, 210, 255), C_SKY_B = RGBA(170, 205, 235, 
 constexpr float RAIL_Y0 = 50, RAIL_Y1 = 107, RAIL_X1 = 607;
 constexpr float WM_X = 263, WM_TOP = 60;
 constexpr float EXP_Y = 168;                 // EXP row top
-constexpr float ROW_Y0 = 219;                // first stat row top (raised -14 to lift the stat stack; EXP/gem unchanged)
+constexpr float ROW_Y0 = 232;                // night first stat row top (64px pitch confirmed; round-5 over-raised to 219 -> ~13px too high, restored)
 constexpr float PLATE_H = 40;
 constexpr float PLATE_X = 180, PLATE_W = 188;
 constexpr float BAR_END = 575, SLANT = 12;   // gold tail reaches ~x575 (measured)

@@ -46,7 +46,6 @@ const uint32_t C_PARCH     = RGBA(185, 176, 140, 255);   // parchment mean
 const uint32_t C_PARCH_HI  = RGBA(196, 185, 151, 255);
 const uint32_t C_PARCH_LO  = RGBA(174, 166, 132, 255);
 const uint32_t C_FRAME_BRN = RGBA(66, 44, 16, 255);      // frame band dark-brown outer
-const uint32_t C_FRAME_GOLD= RGBA(236, 221, 100, 255);   // wide bright gold band
 const uint32_t C_PINSTRIPE = RGBA(228, 212, 166, 255);   // cream pinstripe
 const uint32_t C_KEYLINE   = RGBA(236, 233, 225, 255);   // white keyline
 const uint32_t C_RULE      = RGBA(215, 206, 165, 255);   // embossed ruled line
@@ -160,14 +159,35 @@ void HeaderStrip(const char* title, float a) {
 }
 
 void ParchmentPanel(float a) {
-    // frame band, structured outward->inward (dark-brown outer -> wide bright
-    // GOLD band -> [white keyline below] -> parchment interior). The gold band
-    // is the dominant visible ring; the dark brown is only the thin outer lip.
-    DrawRect({ PNL_X0 + 4, PNL_Y0 }, { PNL_X1 - 4, PNL_Y1 }, WithAlpha(C_FRAME_BRN, a));        // dark-brown outer lip
-    DrawRect({ PNL_X0 + 14, PNL_Y0 + 10 }, { PNL_X1 - 14, PNL_Y1 - 10 }, WithAlpha(C_FRAME_GOLD, a)); // wide bright gold band
-    DrawRect({ PNL_X0 + 6, PNL_Y0 + 2 }, { PNL_X1 - 6, PNL_Y0 + 4 }, WithAlpha(C_PINSTRIPE, a));      // faint cream pinstripe over the brown lip
-    DrawRect({ PNL_X0 + 6, PNL_Y1 - 4 }, { PNL_X1 - 6, PNL_Y1 - 2 }, WithAlpha(C_PINSTRIPE, a));
-    // white keyline: outside the side bands, inside the top/bottom bands
+    // frame band, structured outward->inward. Round-5's single WIDE bright-gold
+    // band was wrong: the real frame is a DOMINANT bright WHITE keyline plus a
+    // finely-striped thin border (no saturated gold band). Outermost is a thin
+    // dark-brown lip; then 3-4 THIN (2-3px) alternating pinstripes inward
+    // (dark-brown/cream/brown/cream) whose blended mean lands near (165,153,129);
+    // a single ~2px muted-tan accent replaces the old gold band. The white
+    // keyline stays the dominant bright ring.
+    DrawRect({ PNL_X0 + 2, PNL_Y0 }, { PNL_X1 - 2, PNL_Y1 }, WithAlpha(C_FRAME_BRN, a));    // thin dark-brown outer lip
+    // finely-striped thin border: 4 alternating 2-3px pinstripes per edge, inward
+    const uint32_t STRIPE[4] = {
+        RGBA(66, 44, 16, 255),    // dark-brown
+        RGBA(195, 170, 123, 255), // cream
+        RGBA(124, 87, 26, 255),   // brown
+        RGBA(190, 172, 136, 255), // cream
+    };
+    for (int i = 0; i < 4; ++i) {
+        const float o = 4.0f + i * 2.5f;      // inward offset per stripe (~2.5px pitch)
+        const uint32_t c = WithAlpha(STRIPE[i], a);
+        DrawRect({ PNL_X0 + o, PNL_Y0 + o - 4.0f }, { PNL_X1 - o, PNL_Y0 + o - 2.0f }, c);  // top stripe
+        DrawRect({ PNL_X0 + o, PNL_Y1 - o + 2.0f }, { PNL_X1 - o, PNL_Y1 - o + 4.0f }, c);  // bottom stripe
+        DrawRect({ PNL_X0 + o - 4.0f, PNL_Y0 + o }, { PNL_X0 + o - 2.0f, PNL_Y1 - o }, c);  // left stripe
+        DrawRect({ PNL_X1 - o + 2.0f, PNL_Y0 + o }, { PNL_X1 - o + 4.0f, PNL_Y1 - o }, c);  // right stripe
+    }
+    // single ~2px muted-tan accent just inside the stripes (replaces the gold band)
+    DrawRect({ PNL_X0 + 14, PNL_Y0 + 10 }, { PNL_X1 - 14, PNL_Y0 + 12 }, WithAlpha(RGBA(190, 172, 136, 255), a));
+    DrawRect({ PNL_X0 + 14, PNL_Y1 - 12 }, { PNL_X1 - 14, PNL_Y1 - 10 }, WithAlpha(RGBA(190, 172, 136, 255), a));
+    DrawRect({ PNL_X0 + 14, PNL_Y0 + 10 }, { PNL_X0 + 16, PNL_Y1 - 10 }, WithAlpha(RGBA(190, 172, 136, 255), a));
+    DrawRect({ PNL_X1 - 16, PNL_Y0 + 10 }, { PNL_X1 - 14, PNL_Y1 - 10 }, WithAlpha(RGBA(190, 172, 136, 255), a));
+    // white keyline (DOMINANT bright ring): outside the side bands, inside top/bottom
     DrawRect({ PNL_X0, PNL_Y0 }, { PNL_X0 + 3.3f, PNL_Y1 }, WithAlpha(C_KEYLINE, a));
     DrawRect({ PNL_X1 - 3.3f, PNL_Y0 }, { PNL_X1, PNL_Y1 }, WithAlpha(C_KEYLINE, a));
     DrawRect({ PNL_X0, 134.0f }, { PNL_X1, 136.7f }, WithAlpha(C_KEYLINE, a));
@@ -276,15 +296,17 @@ void DrawEncyText(float a, double now) {
     for (int i = 0; i < 4; ++i)
         DrawRect({ 505, 178.0f + i * 8.2f }, { 559, 182.5f + i * 8.2f }, WithAlpha(C_WHITE, a * 0.9f));   // thick white stripes (~4.5px)
     DrawRect({ 501.3f, 174.7f }, { 563.3f, 176.0f }, WithAlpha(C_WHITE, a));               // flag outline hint
-    {   // white anchor glyph in the left third (shank + crossbar + curving flukes)
-        const float ax = 511.6f;                                   // anchor centre x (left third)
-        DrawRect({ ax - 1.4f, 180.0f }, { ax + 1.4f, 202.0f }, WithAlpha(C_WHITE, a));      // vertical shank
-        DrawRect({ ax - 6.0f, 182.5f }, { ax + 6.0f, 184.5f }, WithAlpha(C_WHITE, a));      // horizontal crossbar near top
-        DrawRect({ ax - 2.0f, 178.0f }, { ax + 2.0f, 181.0f }, WithAlpha(C_WHITE, a));      // ring nub atop the shank
-        for (int i = 0; i < 4; ++i) {                              // two outward-curving flukes at the bottom
-            float fy = 197.5f + i * 1.4f, dx = 3.0f + i * 1.6f;
-            DrawRect({ ax - 1.4f - dx, fy }, { ax - 1.4f - dx + 1.6f, fy + 1.6f }, WithAlpha(C_WHITE, a));
-            DrawRect({ ax + 1.4f + dx - 1.6f, fy }, { ax + 1.4f + dx, fy + 1.6f }, WithAlpha(C_WHITE, a));
+    {   // small white anchor glyph confined to the bottom-left quarter of the
+        // field (not full height): shank top lowered to ~y186, a single thin
+        // crossbar, and tightened fluke spread.
+        const float ax = 511.6f;                                   // anchor centre x (left quarter)
+        DrawRect({ ax - 1.2f, 186.0f }, { ax + 1.2f, 203.5f }, WithAlpha(C_WHITE, a));      // vertical shank (lowered top, shorter)
+        DrawRect({ ax - 4.5f, 188.0f }, { ax + 4.5f, 189.6f }, WithAlpha(C_WHITE, a));      // single thin crossbar
+        DrawRect({ ax - 1.6f, 184.2f }, { ax + 1.6f, 186.4f }, WithAlpha(C_WHITE, a));      // ring nub atop the shank
+        for (int i = 0; i < 4; ++i) {                              // two outward-curving flukes (tighter width)
+            float fy = 200.0f + i * 1.2f, dx = 2.2f + i * 1.0f;
+            DrawRect({ ax - 1.2f - dx, fy }, { ax - 1.2f - dx + 1.4f, fy + 1.4f }, WithAlpha(C_WHITE, a));
+            DrawRect({ ax + 1.2f + dx - 1.4f, fy }, { ax + 1.2f + dx, fy + 1.4f }, WithAlpha(C_WHITE, a));
         }
     }
     DrawText({ 568.7f, 178 }, 26.0f, WithAlpha(C_TEXT, a), "Alexis");

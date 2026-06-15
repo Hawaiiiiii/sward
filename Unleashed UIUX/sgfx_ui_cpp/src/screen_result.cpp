@@ -64,8 +64,8 @@ const uint32_t C_SKY_T = RGBA(96, 158, 208, 255), C_SKY_B = RGBA(176, 208, 228, 
 const uint32_t C_GROUND = RGBA(214, 216, 212, 255);
 
 // ---- measured layout (1280x720 reference) -----------------------------------
-constexpr float RAIL_Y0 = 63, RAIL_Y1 = 114, RAIL_X1 = 635;
-constexpr float WM_X = 254, WM_CAPTOP = 76;             // wordmark target position (left edge ~x258, centerY ~86.5)
+constexpr float RAIL_Y0 = 20, RAIL_Y1 = 71, RAIL_X1 = 635;   // raised near the top edge (real RESULTS is high, only a thin sky strip above)
+constexpr float WM_X = 254, WM_CAPTOP = 33;             // wordmark target position (left edge ~x258, centerY ~43)
 constexpr float ROW_X0 = 619, ROW_W = 214;              // first label plate rect
 constexpr float ROW_TOP0 = 188, ROW_H = 41.3f, ROW_PITCH = 66.7f;
 constexpr float ROW_XSTEP = 12;                          // diagonal cascade per row

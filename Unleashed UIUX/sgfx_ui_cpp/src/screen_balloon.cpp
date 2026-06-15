@@ -140,10 +140,13 @@ void Draw(double openSec) {
         // INVERTED grammar (verified vs real n1_nameplate): name is DARK letters
         // with a LIGHT/white halo on the gold pill, NOT a cream fill + dark outline.
         // offset/outline passes = light cream halo; centre fill = dark core (.###.)
-        for (int dy = -1; dy <= 1; ++dy)
-            for (int dx = -1; dx <= 1; ++dx)
-                if (dx || dy)
-                    DrawText({ nx + dx * 1.4f, ny + dy * 1.4f }, 22.0f, WithAlpha(RGBA(240, 236, 224, 255), a), NAME);
+        // 4-direction CROSS (cardinal only, skip diagonals) at a tighter 0.9f offset
+        // so the cream halo hugs the letters (~0.76x halo/letter ratio)
+        const float halo = 0.9f;
+        DrawText({ nx - halo, ny }, 22.0f, WithAlpha(RGBA(240, 236, 224, 255), a), NAME);
+        DrawText({ nx + halo, ny }, 22.0f, WithAlpha(RGBA(240, 236, 224, 255), a), NAME);
+        DrawText({ nx, ny - halo }, 22.0f, WithAlpha(RGBA(240, 236, 224, 255), a), NAME);
+        DrawText({ nx, ny + halo }, 22.0f, WithAlpha(RGBA(240, 236, 224, 255), a), NAME);
         DrawText({ nx, ny }, 22.0f, WithAlpha(RGBA(40, 34, 22, 255), a), NAME);
         ResetFont();
     }
