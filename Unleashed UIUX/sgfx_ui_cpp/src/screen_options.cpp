@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include <unordered_map>
 
 using namespace ui;
 
@@ -351,6 +352,38 @@ void DrawTitleCursor(double openSec, float ox, float oy) {
     ResetModifier();
 }
 
+// per-option info-panel thumbnail name (recomp options_menu_thumbnails.cpp), value-dependent for some
+const char* ThumbName(int cat, int row, int val) {
+    if (cat == 0) { switch (row) {                                   // SYSTEM
+        case 0: return "language"; case 1: return "voice_language"; case 2: return "default";
+        case 3: return "hints"; case 4: return "control_tutorial_xb"; case 5: return "achievement_notifications";
+        case 6: return val ? "time_transition_ps" : "time_transition_xb"; } }
+    else if (cat == 1) { switch (row) {                              // INPUT
+        case 0: return "horizontal_camera"; case 1: return "vertical_camera"; case 2: return "vibration_xb";
+        case 3: return "allow_background_input_xb"; case 4: return "controller_icons"; } }
+    else if (cat == 2) { switch (row) {                              // AUDIO
+        case 0: return "master_volume"; case 1: return "music_volume"; case 2: return "effects_volume";
+        case 3: return val ? "channel_surround" : "channel_stereo"; case 4: return "music_attenuation"; case 5: return "battle_theme"; } }
+    else { switch (row) {                                            // VIDEO
+        case 0: return "window_size"; case 1: return "monitor"; case 2: return "aspect_ratio"; case 3: return "default";
+        case 4: return "fullscreen"; case 5: return val ? "vsync_on" : "vsync_off"; case 6: return "fps"; case 7: return "brightness";
+        case 8: { static const char* A[] = {"antialiasing_none","antialiasing_2x","antialiasing_4x","antialiasing_8x"}; return A[(val>=0&&val<4)?val:0]; }
+        case 9: return val ? "transparency_antialiasing_true" : "transparency_antialiasing_false";
+        case 10:{ static const char* S[] = {"shadow_resolution_x4096","shadow_resolution_x512","shadow_resolution_x1024","shadow_resolution_x2048","shadow_resolution_x4096","shadow_resolution_x8192"}; return S[(val>=0&&val<6)?val:0]; }
+        case 11: return val ? "gi_texture_filtering_bicubic" : "gi_texture_filtering_bilinear";
+        case 12:{ static const char* M[] = {"motion_blur_off","motion_blur_original","motion_blur_enhanced"}; return M[(val>=0&&val<3)?val:1]; }
+        case 13: return "xbox_color_correction";
+        case 14: return val ? "movie_scale_fill" : "movie_scale_fit";
+        case 15: return val ? "ui_alignment_centre" : "ui_alignment_edge"; } }
+    return "default";
+}
+int ThumbTex(const char* name) {
+    static std::unordered_map<std::string, int> cache;
+    auto it = cache.find(name); if (it != cache.end()) return it->second;
+    char path[160]; snprintf(path, sizeof path, "assets/recomp/thumbnails/%s.png", name);
+    int tx = gfx::loadTexture(path); cache[name] = tx; return tx;
+}
+
 void Draw(double openSec) {
     const float t = (float)ComputeMotion(openSec, 0.0, 14.0);
     DrawRect({ 0, 0 }, { REF_W, REF_H }, C_BG);   // deep base (the live game would be behind in-game)
@@ -482,13 +515,17 @@ void Draw(double openSec) {
         // thumbnail slot: full content width, 16:9, top inset gridSize/2 (art drops here)
         const float thumbH = wrapW * 9.0f / 16.0f;
         const float ty0 = IP_Y0 + GRID*2 + GRID*0.5f, ty1 = ty0 + thumbH;
-        DrawRect({ ix0, ty0 }, { ix1, ty1 }, WithAlpha(RGBA(6,10,8,235), t));        // dark empty slot
-        DrawVGradient({ ix0, ty0 }, { ix1, ty1 }, WithAlpha(RGBA(0,30,0,60), t), WithAlpha(RGBA(0,0,0,90), t));
-        uint32_t kl = WithAlpha(RGBA(0,49,0,160), t); const float L = 1.0f;          // faint 1px slot edge
-        DrawRect({ ix0, ty0 }, { ix1, ty0+L }, kl); DrawRect({ ix0, ty1-L }, { ix1, ty1 }, kl);
-        DrawRect({ ix0, ty0 }, { ix0+L, ty1 }, kl); DrawRect({ ix1-L, ty0 }, { ix1, ty1 }, kl);
-
         const Option& s = Opt(std::clamp(g_sel, 0, OptCount() - 1));
+        int thTex = ThumbTex(ThumbName(g_cat, std::clamp(g_sel, 0, OptCount()-1), s.val));   // real recomp per-option preview
+        if (thTex >= 0) {
+            DrawImage(thTex, { ix0, ty0 }, { ix1, ty1 }, { 0, 0 }, { 1, 1 }, WithAlpha(C_WHITE, t));
+        } else {
+            DrawRect({ ix0, ty0 }, { ix1, ty1 }, WithAlpha(RGBA(6,10,8,235), t));        // dark empty slot fallback
+            DrawVGradient({ ix0, ty0 }, { ix1, ty1 }, WithAlpha(RGBA(0,30,0,60), t), WithAlpha(RGBA(0,0,0,90), t));
+            uint32_t kl = WithAlpha(RGBA(0,49,0,160), t); const float L = 1.0f;
+            DrawRect({ ix0, ty0 }, { ix1, ty0+L }, kl); DrawRect({ ix0, ty1-L }, { ix1, ty1 }, kl);
+            DrawRect({ ix0, ty0 }, { ix0+L, ty1 }, kl); DrawRect({ ix1-L, ty0 }, { ix1, ty1 }, kl);
+        }
         SetFont(g_fSeurat);
         std::string full = s.desc ? s.desc : "";
         if (s.kind == ENUM && s.valDescs && s.val < s.choiceCount && s.valDescs[s.val] && s.valDescs[s.val][0]) {
