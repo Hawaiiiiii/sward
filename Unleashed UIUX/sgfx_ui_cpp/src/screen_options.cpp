@@ -41,7 +41,7 @@ using namespace ui;
 
 namespace {
 
-enum Kind { TOGGLE, ENUM };
+enum Kind { TOGGLE, ENUM, SLIDER };
 // desc = the full paragraph (word-wrapped + centred at draw time, like the recomp);
 // valDescs = optional per-choice continuation, appended after a blank line.
 struct Option { const char* label; Kind kind; const char* const* choices; int choiceCount; int val;
@@ -76,16 +76,16 @@ Option OPTS_INPUT[] = {
     { "Button Layout",   ENUM,   CH_TYPE, 3, 0, "Preset controller button mapping.", nullptr },
 };
 Option OPTS_AUDIO[] = {
-    { "Master Volume", ENUM, CH_VOL, 6, 5, "Overall output volume.", nullptr },
-    { "Music Volume",  ENUM, CH_VOL, 6, 4, "Background music level.", nullptr },
-    { "SFX Volume",    ENUM, CH_VOL, 6, 5, "Sound-effect level.", nullptr },
-    { "Voice Volume",  ENUM, CH_VOL, 6, 5, "Character voice level.", nullptr },
+    { "Master Volume", SLIDER, CH_VOL, 6, 5, "Overall output volume.", nullptr },
+    { "Music Volume",  SLIDER, CH_VOL, 6, 4, "Background music level.", nullptr },
+    { "SFX Volume",    SLIDER, CH_VOL, 6, 5, "Sound-effect level.", nullptr },
+    { "Voice Volume",  SLIDER, CH_VOL, 6, 5, "Character voice level.", nullptr },
 };
 Option OPTS_VIDEO[] = {
-    { "Display Mode", ENUM, CH_DISP, 3, 2, "How the game fills your display.", nullptr },
-    { "Resolution",   ENUM, CH_RES,  3, 2, "Rendering resolution. Higher is sharper.", nullptr },
-    { "Frame Rate",   ENUM, CH_FPS,  3, 1, "Target frames per second.", nullptr },
-    { "Brightness",   ENUM, CH_BRI,  5, 2, "Adjust screen brightness.", nullptr },
+    { "Display Mode", ENUM,   CH_DISP, 3, 2, "How the game fills your display.", nullptr },
+    { "Resolution",   ENUM,   CH_RES,  3, 2, "Rendering resolution. Higher is sharper.", nullptr },
+    { "Frame Rate",   ENUM,   CH_FPS,  3, 1, "Target frames per second.", nullptr },
+    { "Brightness",   SLIDER, CH_BRI,  5, 2, "Adjust screen brightness.", nullptr },
 };
 Category CATEGORIES[] = {
     { "SYSTEM", OPTS_SYSTEM, 7 }, { "INPUT", OPTS_INPUT, 4 }, { "AUDIO", OPTS_AUDIO, 4 }, { "VIDEO", OPTS_VIDEO, 4 },
@@ -388,6 +388,21 @@ void Draw(double openSec) {
                 DrawRect({ lcx-r*0.78f, lcy-r*0.78f }, { lcx+r*0.78f, lcy+r*0.78f }, c);
             };
             disc(ls*0.5f, WithAlpha(onv ? C_LIGHT_ON : C_LIGHT_OFF, t));
+        } else if (o.kind == SLIDER) {
+            // continuous slider (recomp DrawConfigOption isSlider, options_menu.cpp L959-994):
+            // inner channel 0,65,0 -> 0,32,0 (inset 6x/3y); fill 57,241,0 -> 2,106,0 (inset +2);
+            // factor = val/max (linear; centre-split is identity for these symmetric ranges).
+            float factor = (ValMax(o) > 0) ? (float)o.val / (float)ValMax(o) : 0.0f;
+            float cx0 = VAL_X0 + 6, cy0 = vy0 + 3, cx1 = VAL_X0 + VAL_W - 6, cy1 = vy1 - 3;
+            SetModifier(MOD_SCANLINE_BUTTON);
+            DrawQuadGradient({cx0,cy0},{cx1,cy1}, WithAlpha(RGBA(0,65,0,255),t), WithAlpha(RGBA(0,65,0,255),t),
+                                                  WithAlpha(RGBA(0,32,0,255),t), WithAlpha(RGBA(0,32,0,255),t));
+            float fx0 = cx0 + 2, fy0 = cy0 + 2, fy1 = cy1 - 2;
+            float fx1 = fx0 + ((cx1 - 2) - fx0) * factor;
+            if (fx1 > fx0 + 0.5f)
+                DrawQuadGradient({fx0,fy0},{fx1,fy1}, WithAlpha(RGBA(57,241,0,255),t), WithAlpha(RGBA(57,241,0,255),t),
+                                                      WithAlpha(RGBA(2,106,0,255),t), WithAlpha(RGBA(2,106,0,255),t));
+            ResetModifier();
         } else {
             const char* s = (o.choices && o.val < o.choiceCount) ? o.choices[o.val] : "";
             DrawValueText(s, VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);

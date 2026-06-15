@@ -288,14 +288,74 @@ void SubFooter(bool withSelect, float a) {
     ResetFont();
 }
 
-void DrawAchievements(float a) {
-    LabelPlate(255.3f, 137.3f, 540.0f, 184.7f, "ACHIEVEMENTS", a);
-    // counter "50 / 50" + trophy slot (gold art drops in)
+// rounded silver-chrome panel (recomp general_window 9-slice approximation): silver
+// body gradient + 2px bright border + SMALL rounded-corner notches on all four corners
+// (NOT the 24px 45deg chamfers of SubPanel). rect (251,189)-(1031,604).
+void AchPanel(float x0, float y0, float x1, float y1, float a) {
+    const float ch = 8.0f;
+    DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(RGBA(197,194,197,205), a), WithAlpha(RGBA(115,113,115,238), a));
+    // erase a small triangle at each corner -> reads as rounded
+    SolidQuad({ x0, y0 }, { x0+ch, y0 }, { x0, y0+ch }, { x0, y0 }, SUB_SCENE_DK);
+    SolidQuad({ x1, y0 }, { x1-ch, y0 }, { x1, y0+ch }, { x1, y0 }, SUB_SCENE_DK);
+    SolidQuad({ x0, y1 }, { x0+ch, y1 }, { x0, y1-ch }, { x0, y1 }, SUB_SCENE_DK);
+    SolidQuad({ x1, y1 }, { x1-ch, y1 }, { x1, y1-ch }, { x1, y1 }, SUB_SCENE_DK);
+    uint32_t bd = WithAlpha(RGBA(222,225,226,255), a);
+    DrawRect({ x0+ch, y0 }, { x1-ch, y0+2 }, bd);        // top
+    DrawRect({ x0+ch, y1-2 }, { x1-ch, y1 }, bd);        // bottom
+    DrawRect({ x0, y0+ch }, { x0+2, y1-ch }, bd);        // left
+    DrawRect({ x1-2, y0+ch }, { x1, y1-ch }, bd);        // right
+    // bright diagonal edge along each corner notch
+    SolidQuad({ x0+ch, y0 }, { x0+ch+2, y0+2 }, { x0+2, y0+ch+2 }, { x0, y0+ch }, bd);
+    SolidQuad({ x1-ch, y0 }, { x1-ch-2, y0+2 }, { x1-2, y0+ch+2 }, { x1, y0+ch }, bd);
+    SolidQuad({ x0+ch, y1 }, { x0+ch+2, y1-2 }, { x0+2, y1-ch-2 }, { x0, y1-ch }, bd);
+    SolidQuad({ x1-ch, y1 }, { x1-ch-2, y1-2 }, { x1-2, y1-ch-2 }, { x1, y1-ch }, bd);
+}
+
+// breathing selection: a steady warm-gold tint (stands in for the lit general_window
+// art behind) under a BREATHING white/silver outline frame (recomp DrawSelectionContainer,
+// alpha 0.55..1.0 @ ~0.92s period). NO opaque fill; title/desc keep their own colours.
+void AchSelFrame(float x0, float y0, float x1, float y1, float a) {
+    float br = Breathe(Now(), 0.55f, 1.0f, 1.087f);
+    DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(RGBA(208,190,86,150), a), WithAlpha(RGBA(190,172,80,150), a));
+    uint32_t fr = WithAlpha(RGBA(255,255,255,255), a * br); const float w = 3.0f;
+    DrawRect({ x0, y0 }, { x1, y0+w }, fr); DrawRect({ x0, y1-w }, { x1, y1 }, fr);
+    DrawRect({ x0, y0 }, { x0+w, y1 }, fr); DrawRect({ x1-w, y0 }, { x1, y1 }, fr);
+}
+
+// 5-layer beveled date stamp, right-anchored (recomp DrawAchievement timestamp block):
+// white side bevels, dark centre, top/bottom gradient bands; NewRodin 12 + 4px outline.
+void AchDateStamp(const char* date, float rightX, float top, float bottom, float a) {
     SetFont(g_fRodin);
-    DrawTextShadow({ 888, 152 }, 22.0f, WithAlpha(C_WHITE, a), "50 / 50");
-    DrawVGradient({ 989.3f, 140 }, { 1016.7f, 182 }, WithAlpha(RGBA(195, 155, 65, 255), a), WithAlpha(RGBA(138, 127, 49, 255), a));
-    // main panel + 4 rows (pitch 94.7 from y209.3)
-    SubPanel(255.3f, 191.3f, 1023.3f, 598.7f, 24.0f, a);
+    const float sz = 13.0f, tw = MeasureText(sz, date).x, x1 = rightX, x0 = rightX - (tw + 16.0f);
+    const float bo = 6.0f;
+    DrawQuadGradient({ x0, top }, { x0+bo, bottom }, WithAlpha(RGBA(255,255,255,255),a), WithAlpha(RGBA(149,149,149,40),a), WithAlpha(RGBA(149,149,149,40),a), WithAlpha(RGBA(255,255,255,255),a));
+    DrawQuadGradient({ x1-bo, top }, { x1, bottom }, WithAlpha(RGBA(149,149,149,40),a), WithAlpha(RGBA(255,255,255,255),a), WithAlpha(RGBA(255,255,255,255),a), WithAlpha(RGBA(149,149,149,40),a));
+    DrawRect({ x0, top+bo }, { x1, bottom-bo }, WithAlpha(RGBA(38,38,38,172), a));
+    DrawQuadGradient({ x0, top }, { x1, top+bo }, WithAlpha(RGBA(16,16,16,192),a), WithAlpha(RGBA(16,16,16,192),a), WithAlpha(RGBA(38,38,38,172),a), WithAlpha(RGBA(38,38,38,172),a));
+    DrawQuadGradient({ x0, bottom-bo }, { x1, bottom }, WithAlpha(RGBA(38,40,38,169),a), WithAlpha(RGBA(38,40,38,169),a), WithAlpha(RGBA(16,16,16,192),a), WithAlpha(RGBA(16,16,16,192),a));
+    float cx = x0 + ((x1 - x0) - tw) * 0.5f, cy = top + ((bottom - top) - sz) * 0.5f;
+    static const float O[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+    for (auto& o : O) DrawText({ cx + o[0]*1.2f, cy + o[1]*1.2f }, sz, WithAlpha(RGBA(8,8,8,255), a), date);
+    DrawText({ cx, cy }, sz, WithAlpha(C_WHITE, a), date);
+}
+
+void DrawAchievements(float a) {
+    // header label (recomp DrawHeaderContainer: (251,136)-(~546,196), height 60)
+    LabelPlate(251.3f, 136.0f, 545.6f, 192.0f, "ACHIEVEMENTS", a);
+    // ---- counter + trophy, right-anchored ABOVE the panel top edge (drawn before the
+    //      panel so the panel never clips them; trophy slot 45x45 gold (255,195,56)) ----
+    DrawVGradient({ 981, 139 }, { 1026, 184 }, WithAlpha(RGBA(255,205,84,255), a), WithAlpha(RGBA(214,168,56,255), a));
+    DrawRect({ 983, 141 }, { 1024, 145 }, WithAlpha(RGBA(255,232,150,235), a));   // rim highlight (trophy stand-in)
+    {
+        SetFont(g_fRodin);
+        const char* cnt = "50 / 50"; const float cs = 20.0f, cw = MeasureText(cs, cnt).x;
+        float cx = 975.0f - cw, cy = 161.0f - cs * 0.5f;
+        static const float O[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+        for (auto& o : O) DrawText({ cx + o[0]*1.6f, cy + o[1]*1.6f }, cs, WithAlpha(RGBA(0,0,0,255), a), cnt);
+        DrawText({ cx, cy }, cs, WithAlpha(C_WHITE, a), cnt);
+    }
+    // ---- panel (251,189)-(1031,604); rows clip origin (251,209)-(1031,599) ----
+    AchPanel(251.0f, 189.0f, 1031.0f, 604.0f, a);
     struct Ach { const char* name; const char* date; const char* desc; };
     const Ach ROWS[4] = {
         { "Blue Meteor",   "2025/03/03 02:20", "Reached the Goal of Windmill Isle, Act 2 as" },
@@ -303,33 +363,29 @@ void DrawAchievements(float a) {
         { "Partly Cloudy", "2025/03/03 01:52", "Collected half of the Sun Medals" },
         { "Half Moon",     "2025/03/03 01:49", "Collected half of the Moon Medals" },
     };
+    const float RX0 = 269.0f, RX1 = 987.0f;           // row content box x
     for (int i = 0; i < 4; ++i) {
-        const float ry = 209.3f + i * 94.7f;
+        const float ry = 211.0f + i * 94.0f;          // pitch 94, origin 211
         const bool sel = (i == g_achSel);
-        if (i) DrawRect({ 268.7f, ry - 0.7f }, { 986.7f, ry + 0.7f }, WithAlpha(RGBA(175, 176, 178, 255), a));
-        if (sel) {   // opaque yellow plate filling the cell, small TL/BR chamfers
-            DrawVGradient({ 268.7f, ry }, { 986.7f, ry + 94.7f },
-                          WithAlpha(RGBA(196, 194, 90, 255), a), WithAlpha(RGBA(184, 170, 88, 255), a));
-            SolidQuad({ 268.7f, ry }, { 278.7f, ry }, { 268.7f, ry + 10 }, { 268.7f, ry }, WithAlpha(RGBA(140, 141, 144, 255), a));
-            SolidQuad({ 977.7f, ry + 94.7f }, { 986.7f, ry + 94.7f }, { 986.7f, ry + 85.7f }, { 977.7f, ry + 94.7f }, WithAlpha(RGBA(122, 120, 118, 255), a));
-        }
-        // icon slot (achievement art drops in)
-        DrawRect({ 294, ry + 19.3f }, { 354, ry + 79.3f }, WithAlpha(RGBA(29, 28, 30, 255), a));
-        // name (yellow, outlined)
+        // additive separators at row boundaries (i=1..3): (160,160,160,60), x286..976
+        if (i) DrawRect({ 286, ry - 2 }, { 976, ry - 0.7f }, WithAlpha(RGBA(160,160,160,60), a), true);
+        if (sel) AchSelFrame(RX0, ry, RX1, ry + 94.0f, a);
+        // icon slot 60x60 at (294,ry+18) (achievement art drops in)
+        DrawRect({ 294, ry + 18 }, { 354, ry + 78 }, WithAlpha(RGBA(29, 28, 30, 255), a));
+        PushClip({ RX0, ry }, { RX1, ry + 94.0f });
+        // title — GOLD (252,243,5) always, Seurat 24, black shadow offset 2
         SetFont(g_fSeurat);
-        DrawText({ 392 + 1.3f, ry + 22 + 1.3f }, 24.0f, WithAlpha(RGBA(15, 15, 15, 255), a), ROWS[i].name);
-        DrawText({ 392, ry + 22 }, 24.0f, WithAlpha(RGBA(242, 230, 18, 255), a), ROWS[i].name);
-        // date stamp plate
-        DrawRect({ 825.3f, ry + 20 }, { 976.7f, ry + 46 }, WithAlpha(RGBA(18, 18, 20, 205), a));
-        SetFont(g_fRodin);
-        DrawTextAligned({ 825.3f, ry + 20 }, { 976.7f, ry + 46 }, 15.0f, WithAlpha(RGBA(238, 238, 238, 255), a), ROWS[i].date, Align::Center, true, false);
-        // description (white; near-black on the selected plate)
-        SetFont(g_fSeurat);
-        DrawText({ 391.3f, ry + 54.7f }, 20.0f,
-                 WithAlpha(sel ? RGBA(30, 27, 20, 255) : RGBA(245, 245, 245, 255), a), ROWS[i].desc);
+        DrawText({ 390 + 2, ry + 20 + 2 }, 24.0f, WithAlpha(RGBA(0,0,0,255), a), ROWS[i].name);
+        DrawText({ 390, ry + 20 }, 24.0f, WithAlpha(RGBA(252,243,5,255), a), ROWS[i].name);
+        // description — pure WHITE always (no select recolor), Seurat 24, black shadow
+        DrawText({ 390 + 2, ry + 52 + 2 }, 24.0f, WithAlpha(RGBA(0,0,0,255), a), ROWS[i].desc);
+        DrawText({ 390, ry + 52 }, 24.0f, WithAlpha(C_WHITE, a), ROWS[i].desc);
+        PopClip();
+        // date stamp — right-anchored beveled box at x=977
+        AchDateStamp(ROWS[i].date, 977.0f, ry + 20, ry + 46, a);
     }
     ResetFont();
-    SubScrollbar(992, 209.3f, 1006, 576, 436 - g_achSel * 12.0f, 29.3f, a);
+    // scrollbar: HIDDEN for 4 rows (rowCount <= visibleRowCount=4)
     SubFooter(false, a);
 }
 
