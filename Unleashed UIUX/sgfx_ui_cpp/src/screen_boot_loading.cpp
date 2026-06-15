@@ -164,12 +164,15 @@ void Draw(double openSec) {
     float pulse = 0.40f + 0.60f * std::sqrt(tri);              // bright-biased
     if (g_wordTex >= 0) {
         // 1:1 path: the game's pre-rendered heavy wordmark sprite (white core +
-        // green rim + dark outline), tinted with the measured bright-top ->
-        // dark-bottom green shading (face g ~218 -> ~147), at the measured rect.
+        // green rim + dark outline) is a WHITE/luminance mask — the green is the
+        // in-engine material tint. Tint it with the SAME measured glyph green as
+        // the spinner + the bitmap-font fallback (C_GREEN_T 218 -> C_GREEN_B 147),
+        // so the wordmark reads the same medium-bright green as its dot spinner
+        // (matched to NOW LOADING (first booting).mp4) instead of a dim olive.
         DrawImageVGradient(g_wordTex, { 650, 568 }, { 969, 602 },
                            { WM_U0, WM_V0 }, { WM_U1, WM_V1 },
-                           WithAlpha(RGBA(48, 130, 16, 255), pulse),
-                           WithAlpha(RGBA(40, 82, 14, 255), pulse));
+                           WithAlpha(C_GREEN_T, pulse),
+                           WithAlpha(C_GREEN_B, pulse));
     } else {
         // re-skin path (custom SGFX strings): the proportional bitmap font, bolded
         const char* txt = "NOW LOADING";
