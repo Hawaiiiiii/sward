@@ -1,24 +1,29 @@
 // =============================================================================
 // screen_options.cpp — the Options menu, ported PIXEL-EXACT from UnleashedRecomp's
-// own UI source (ui/options_menu.cpp + ui/game_window.cpp), which is the literal
-// code that drew the captured video (v1.0.3 HEAD). Every rect/colour/size below is
-// transcribed from that source at the 1280x720 WIDE canvas (where Scale(n)==n,
-// GRID_SIZE=9 -> gridSize=9px). This replaces the earlier eyeballed-from-video
-// version. The options UI is CODE-DRAWN (the ui_general CSD is just a generic
-// frame), so this procedural reconstruction is the faithful path.
+// own UI source (ui/options_menu.cpp + ui/imgui_utils.cpp), the literal code that
+// drew the captured video (v1.0.3 HEAD). Every rect/colour/size below is transcribed
+// from that source at the 1280x720 WIDE canvas (where Scale(n)==n, GRID_SIZE=9 ->
+// gridSize=9px). Round-7 rewrite: the earlier "measured-from-dim-screenshot" colours
+// were a regression — the recomp draws BRIGHT green (0,130,0) plates and dims them at
+// render time via the SCANLINE_BUTTON shader (even rows half-alpha). We now use the
+// source colours + MOD_SCANLINE_BUTTON, which composites to the correct dim look.
 //
-// Exact layout (options_menu.cpp:1768-1786, DrawContainer:366-414, DrawCategories,
-// DrawConfigOption, DrawScanlineBars, DrawTitle):
-//   * settings panel (33,117)-(843,604), info panel (868,117)-(1246,604);
-//   * panel = bg(0,0,0,223) + outer border(0,49,0) gridSize wide + inner(0,33,0)
-//     + (0,89,0) 2px corner brackets; content inset 18px;
-//   * tabs band y[135..171] (DFSoGei 32, active green gradient + bevel text);
-//   * 7 rows from y=189 pitch 54; label x=60 (Seurat 26); value cell (581,+11.25)
-//     192x27 green-gradient box + value text (NewRodin 20); selected row gold->green
-//     diagonal bar; ON/OFF = lime toggle light + glow;
-//   * top/bottom 105px scanline bands (green glow 203,255,0 + vignette + feathered
-//     mint divider lines at y=105 / y=615); gold "OPTIONS" title (DFSoGei 48) @ (122,56);
-//   * footer button-guide + version string bottom-right.
+// Source map:
+//   * plate (active tab + value cell): options_menu.cpp L545-574 / L942-946 — three
+//     AddRectFilledMultiColor layers under SCANLINE_BUTTON (see DrawPlate);
+//   * tab text gradient: L590-598 — ALWAYS lime(128,255,0)->gold(255,192,0), alpha
+//     235*motion active / 128*motion inactive, 4px black outline + bevel;
+//   * value text: L1179-1199 — white base, 4px black outline, green 192,255,0->128,170,0
+//     vertical gradient fill (identical selected/unselected);
+//   * toggle light: imgui_utils.cpp DrawToggleLight L830-859 — 14px light + 24px additive
+//     yellow glow when ON (sprite stand-in: a lit/dark disc here);
+//   * selection arrows: L1010-1100 — filled triangles, base (0,97,0) + additive magenta
+//     (255,0,255)->(255,128,255), drawn on the active row;
+//   * title: L126-250 — DFSoGei natural width (NO stretch), size 48, + marching gold
+//     cursor-square on open (255,188,0, RECTANGLE_BEVEL);
+//   * info panel: L1441-1520 — single FULL-WIDTH thumbnail slot (no frame/PREVIEW/
+//     medallion), description centred Seurat 28 below it.
+//   * container: game_window.cpp — bg(0,0,0,223)+outer(0,49,0)+inner(0,33,0)+(0,89,0) brackets.
 // Interactive (LB/RB tab, Up/Down rows, Left/Right value) like the recomp.
 // =============================================================================
 #include "sgfxui.h"
@@ -30,7 +35,6 @@
 #include <string>
 #include <algorithm>
 #include <cmath>
-#include <string>
 #include <vector>
 
 using namespace ui;
@@ -107,24 +111,18 @@ constexpr float VAL_X0 = (SP_X0 + GRID * 2) + OPT_W + ((SP_X1 - GRID * 2) - (SP_
 const uint32_t C_TITLE     = RGBA(255, 190, 33, 255);
 const uint32_t C_PANEL_BG  = RGBA(0, 0, 0, 223);
 const uint32_t C_OUTER     = RGBA(0, 49, 0, 255);
-const uint32_t C_INNER     = RGBA(0, 27, 0, 255);  // slightly darker -> fainter checkerboard (panel mean ~19, std ~9)
+const uint32_t C_INNER     = RGBA(0, 33, 0, 255);  // recomp inner fill IM_COL32(0,33,0)
 const uint32_t C_LINE      = RGBA(0, 89, 0, 255);
-const uint32_t C_TAB_BG    = RGBA(8, 34, 4, 120);   // hard-dimmed active-tab plate top (composited green ~18-22, near real)
-const uint32_t C_TAB_BG2   = RGBA(6, 28, 4, 90);    // flattened bottom -> near-flat, barely-there gradient
-const uint32_t C_TAB_TXT_T = RGBA(126, 230, 15, 255);  // tab text gradient top
-const uint32_t C_TAB_TXT_B = RGBA(199, 127, 12, 255);  // tab text gradient bottom
-const uint32_t C_TAB_OFF   = RGBA(128, 134, 12, 220);  // inactive tab warm-olive (G>=R, low blue; renders ~92,107,9)
-const uint32_t C_SEL_TL    = RGBA(226, 113, 34, 126);  // selected row diagonal (gold)
-const uint32_t C_SEL_BR    = RGBA(146, 255, 49, 126);  // -> green
+const uint32_t C_TAB_G_T   = RGBA(128, 255, 0, 255);  // tab text gradient top (lime)
+const uint32_t C_TAB_G_B   = RGBA(255, 192, 0, 255);  // tab text gradient bottom (gold)
+const uint32_t C_SEL_TL    = RGBA(226, 113, 34, 128);  // selected-row diagonal (gold)
+const uint32_t C_SEL_BR    = RGBA(146, 255, 49, 128);  // -> green
 const uint32_t C_LABEL     = RGBA(255, 255, 255, 255);
-const uint32_t C_VAL_BG    = RGBA(0, 70, 0, 205);
-const uint32_t C_VAL_BG_B  = RGBA(0, 52, 0, 195);
-const uint32_t C_VAL_TXT_T = RGBA(105, 140, 18, 255);
-const uint32_t C_VAL_TXT_B = RGBA(82, 108, 12, 255);
-const uint32_t C_VAL_TXT_SEL = RGBA(195, 225, 100, 255);  // selected enum row brightens (measured)
-const uint32_t C_LIGHT_ON  = RGBA(170, 182, 12, 255);  // dim olive-yellow toggle light (measured)
-const uint32_t C_LIGHT_OFF = RGBA(40, 70, 40, 255);
-const uint32_t C_CARET     = RGBA(6, 112, 6, 255);  // selected-value carets: dark solid green (real ~4,107,4)
+const uint32_t C_VAL_G_T   = RGBA(192, 255, 0, 255);   // value text gradient top
+const uint32_t C_VAL_G_B   = RGBA(128, 170, 0, 255);   // value text gradient bottom
+const uint32_t C_LIGHT_ON  = RGBA(214, 255, 64, 255);  // lit toggle light (sprite stand-in)
+const uint32_t C_LIGHT_OFF = RGBA(30, 52, 30, 255);    // dark toggle light
+const uint32_t C_BLACK     = RGBA(0, 0, 0, 255);
 const uint32_t C_DESC      = RGBA(255, 255, 255, 255);
 const uint32_t C_VERSION   = RGBA(255, 255, 255, 70);
 const uint32_t C_GREEN_GLOW= RGBA(203, 255, 0, 55);    // scanline band glow (inner)
@@ -204,17 +202,96 @@ void DrawContainer(float x0, float y0, float x1, float y1, bool rightOutline, fl
     DrawRect({ x0+g, y1-g*2 }, { x0+g+L, y1-g }, lc); DrawRect({ x0+g, y1-g-L }, { x1-g, y1-g }, lc); DrawRect({ x1-g-L, y1-g*2 }, { x1-g, y1-g }, lc);
 }
 
-void DrawCaret(float cx, float cy, bool right, uint32_t col) {
-    for (int i = 0; i < 5; ++i) { float hh = 9.0f - i*1.8f, dx = i*1.0f; float bx = right ? (cx-6+dx) : (cx+6-dx); DrawRect({ bx, cy-hh }, { bx+2, cy+hh }, col); }
+// ---- shared 3-layer green plate (active tab + value cell) -------------------
+// options_menu.cpp L545-574 (tab) / L942-946 (value): three AddRectFilledMultiColor
+// layers under SCANLINE_BUTTON. The bright (0,130,0) is dimmed at render by the
+// even-row half-alpha scanline shader -> composites to the on-screen dim plate.
+void DrawPlate(float x0, float y0, float x1, float y1, float a) {
+    auto A = [&](int base) { return (uint8_t)std::clamp((int)lround(base * a), 0, 255); };
+    SetModifier(MOD_SCANLINE_BUTTON);
+    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(0,130,0,A(223)), RGBA(0,130,0,A(178)), RGBA(0,130,0,A(223)), RGBA(0,130,0,A(178)));
+    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(0,0,0,A(13)),    RGBA(0,0,0,0),         RGBA(0,0,0,A(55)),    RGBA(0,0,0,A(6)));
+    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(0,130,0,A(13)),  RGBA(0,130,0,A(111)),  RGBA(0,130,0,0),      RGBA(0,130,0,A(55)));
+    ResetModifier();
 }
 
-void DrawValueText(const char* s, float x0, float y0, float x1, float y1, float t, bool sel = false) {
-    // the recomp's green value-text vertical gradient; selected row brightens toward the measured peak
-    float w = MeasureText(20.0f, s).x;
-    float px = x0 + ((x1 - x0) - w) * 0.5f, py = y0 + ((y1 - y0) - 20.0f) * 0.5f;
-    uint32_t top = sel ? C_VAL_TXT_SEL : C_VAL_TXT_T;
-    uint32_t bot = sel ? ColourLerp(C_VAL_TXT_B, C_VAL_TXT_SEL, 0.85f) : C_VAL_TXT_B;
-    DrawTextGradient({ px, py }, 20.0f, WithAlpha(top, t), WithAlpha(bot, t), s);
+// ---- filled horizontal-pointing arrow triangle (rows approximate the fill) ---
+void FillTri(float baseX, float apexX, float y0, float y1, uint32_t col, bool add = false) {
+    const int N = 18; const float cy = (y0+y1)*0.5f, hh = (y1-y0)*0.5f;
+    for (int i = 0; i < N; ++i) {
+        float ry0 = y0 + (y1-y0)*i/N, ry1 = y0 + (y1-y0)*(i+1)/N;
+        float f = 1.0f - std::fabs(((ry0+ry1)*0.5f)-cy)/hh;     // 1 at centre -> 0 at edges
+        float xe = baseX + (apexX-baseX)*f;
+        DrawRect({ std::min(baseX,xe), ry0 }, { std::max(baseX,xe), ry1 }, col, add);
+    }
+}
+// selection arrows (options_menu.cpp DrawSelectionArrows): dark-green base + additive
+// magenta gradient, on the active value box. Drawn at the static (settled) state.
+void DrawSelectionArrows(float bx0, float by0, float bx1, float by1, float t) {
+    const float pad = GRID, width = GRID * 2.5f;          // L: base at min-pad, apex at -width
+    uint32_t base = WithAlpha(RGBA(0,97,0,255), t);
+    uint32_t mag  = WithAlpha(RGBA(255,64,255,255), 1.0f);  // additive mid of (255,0,255)->(255,128,255)
+    // left arrow: base vertical at bx0-pad, apex to the left
+    FillTri(bx0-pad, bx0-pad-width, by0, by1, base);
+    FillTri(bx0-pad, bx0-pad-width, by0, by1, WithAlpha(mag, t), true);
+    // right arrow: base vertical at bx1+pad, apex to the right
+    FillTri(bx1+pad, bx1+pad+width, by0, by1, base);
+    FillTri(bx1+pad, bx1+pad+width, by0, by1, WithAlpha(mag, t), true);
+}
+
+// value text: white base + 4px black outline + green vertical gradient fill
+void DrawValueText(const char* s, float x0, float y0, float x1, float y1, float t) {
+    const float boxW = x1 - x0; float w = MeasureText(20.0f, s).x; float sx = 1.0f;
+    if (w > boxW && w > 0.0f) sx = boxW / w;             // recomp squashes overflowing values
+    float dw = w * sx;
+    float px = x0 + (boxW - dw) * 0.5f, py = y0 + ((y1 - y0) - 20.0f) * 0.5f;
+    if (sx != 1.0f) SetTextStretchX(sx);
+    static const float O[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+    for (auto& o : O) DrawText({ px + o[0]*1.6f, py + o[1]*1.6f }, 20.0f, WithAlpha(C_BLACK, t), s);
+    DrawTextGradient({ px, py }, 20.0f, WithAlpha(C_VAL_G_T, t), WithAlpha(C_VAL_G_B, t), s);
+    if (sx != 1.0f) ResetTextStretchX();
+}
+
+// tab label: lime->gold gradient + 4px black outline + bevel (options_menu.cpp L590-610)
+void DrawTabText(float x, float y, const char* s, float alpha) {
+    uint8_t a = (uint8_t)std::clamp((int)lround(alpha), 0, 255);
+    static const float O[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+    for (auto& o : O) DrawText({ x + o[0]*1.6f, y + o[1]*1.6f }, 32.0f, RGBA(0,0,0,a), s);
+    SetModifier(MOD_TITLE_BEVEL);
+    DrawTextGradient({ x, y }, 32.0f, WithAlpha(C_TAB_G_T, a/255.0f), WithAlpha(C_TAB_G_B, a/255.0f), s);
+    ResetModifier();
+}
+
+// marching gold cursor-square on open (options_menu.cpp DrawTitle L186-245).
+// Steps across the title by its own width, then blinks + fades; gone once settled.
+// NB: `openSec` is the open-START TIMESTAMP (like ComputeMotion), so elapsed = Now()-openSec.
+void DrawTitleCursor(double openSec, float ox, float oy) {
+    const float e = (float)(Now() - openSec);      // seconds since the screen opened
+    if (e < 0.0f) return;
+    const float rectSize = 32.0f, rectY = -2.0f;   // y=Scale(10) below title top; title pen ~oy
+    float titleW = MeasureText(48.0f, "OPTIONS").x;
+    if (titleW <= 1.0f) return;
+    int steps = std::clamp((int)std::ceil(titleW / rectSize), 1, 12);
+    const float stepDur = 0.085f;                  // ~5 frames/step @60fps
+    const float marchEnd = stepDur * steps;
+    static const float RECT_SCALES[] = { 1.2f, 1.1f, 1.1f, 1.0f, 1.15f, 0.4f, 1.2f, 1.1f, 1.05f, 1.0f, 1.5f, 1.2f, 1.0f };
+    float a = 1.0f, rx;
+    if (e < marchEnd) {                            // marching
+        int step = std::clamp((int)(e / stepDur), 0, steps-1);
+        rx = step * rectSize;
+    } else {                                        // blink then fade out
+        float after = e - marchEnd;
+        if (after > 0.85f) return;                  // fully gone (settled state)
+        rx = (steps-1) * rectSize;
+        a = (0.55f + 0.45f*std::cos(after*22.0f)) * std::clamp(1.0f - (after-0.45f)/0.40f, 0.0f, 1.0f);
+    }
+    float sc = RECT_SCALES[((int)lround(rx / rectSize)) % (int)(sizeof(RECT_SCALES)/sizeof(float))];
+    float mx0 = ox + rx, my0 = oy + rectY, mx1 = mx0 + rectSize*sc, my1 = my0 + rectSize;
+    const float m = 2.5f;
+    DrawRect({ mx0-m, my0-m }, { mx1+m, my1+m }, WithAlpha(C_BLACK, a));     // rounded black outline
+    SetModifier(MOD_TITLE_BEVEL);
+    DrawRect({ mx0, my0 }, { mx1, my1 }, WithAlpha(RGBA(255,188,0,255), a)); // gold cursor square
+    ResetModifier();
 }
 
 void Draw(double openSec) {
@@ -223,10 +300,8 @@ void Draw(double openSec) {
 
     // ---- top & bottom scanline bands (105px) : vignette + green glow + divider ----
     auto band = [&](float yTop, float yBot, bool top) {
-        // vignette: black (outer) -> transparent (inner)
         if (top) DrawVGradient({ 0, yTop }, { REF_W, yBot }, RGBA(0,0,0,255), RGBA(0,0,0,0));
         else     DrawVGradient({ 0, yTop }, { REF_W, yBot }, RGBA(0,0,0,0), RGBA(0,0,0,255));
-        // green scanline glow: transparent (outer) -> faint green (inner)
         SetModifier(MOD_SCANLINE);
         if (top) DrawVGradient({ 0, yTop }, { REF_W, yBot }, RGBA(203,255,0,0), C_GREEN_GLOW);
         else     DrawVGradient({ 0, yTop }, { REF_W, yBot }, C_GREEN_GLOW, RGBA(203,255,0,0));
@@ -240,39 +315,38 @@ void Draw(double openSec) {
     };
     divider(105); divider(615);
 
-    // ---- title ----
+    // ---- title (DFSoGei natural width, NO stretch) + marching cursor-square ----
     SetFont(g_fDF);
-    SetTextStretchX(1.30f);   // the ref OPTIONS is ~30% wider than DFSoGei's natural set
     DrawTextBevel({ 122, 56 }, 48.0f, WithAlpha(C_TITLE, t), "OPTIONS");
-    ResetTextStretchX();
+    DrawTitleCursor(openSec, 122, 56);
 
     // ---- panels ----
     DrawContainer(SP_X0, SP_Y0, SP_X1, SP_Y1, true, t);
     DrawContainer(IP_X0, IP_Y0, IP_X1, IP_Y1, false, t);
 
-    // ---- tabs (SYSTEM/INPUT/AUDIO/VIDEO) ----
+    // ---- tabs (SYSTEM/INPUT/AUDIO/VIDEO) : natural width, shared plate, gradient text ----
     {
         SetFont(g_fDF);
-        SetTextStretchX(1.30f);   // ref tabs are wider too (MeasureText ignores stretch -> scale widths)
         float clipW = (SP_X1 - GRID*2) - CLIP_X;     // 826-51 = 775
         float widths[CATEGORY_COUNT], sum = 0;
-        for (int i = 0; i < CATEGORY_COUNT; ++i) { widths[i] = MeasureText(32.0f, CATEGORIES[i].name).x * 1.30f; sum += widths[i]; }
+        for (int i = 0; i < CATEGORY_COUNT; ++i) { widths[i] = MeasureText(32.0f, CATEGORIES[i].name).x; sum += widths[i]; }
         float pad = (clipW - sum) / (CATEGORY_COUNT + 1);
+        // pass 1: active-tab plate (drawn first so text sits on top, like the recomp)
         float x = CLIP_X + pad;
         for (int i = 0; i < CATEGORY_COUNT; ++i) {
-            bool on = (i == g_cat);
-            float tabPad = std::min(pad * 0.5f, GRID * 3);
-            if (on) {   // green active-tab button
-                DrawVGradient({ x - tabPad, TABS_Y }, { x + widths[i] + tabPad, TABS_Y + TAB_H },
-                              WithAlpha(C_TAB_BG, t), WithAlpha(C_TAB_BG2, t));
+            if (i == g_cat) {
+                float tabPad = std::min(pad * 0.5f, GRID * 3);
+                DrawPlate(x - tabPad, TABS_Y, x + widths[i] + tabPad, TABS_Y + TAB_H, t);
             }
-            // active tab text = the recomp's lime->gold vertical gradient; inactive olive-gold
-            float ty = TABS_Y + (TAB_H - 32.0f) * 0.5f;
-            if (on) DrawTextGradient({ x, ty }, 32.0f, WithAlpha(C_TAB_TXT_T, t), WithAlpha(C_TAB_TXT_B, t), CATEGORIES[i].name);
-            else    DrawText({ x, ty }, 32.0f, WithAlpha(C_TAB_OFF, t), CATEGORIES[i].name);
             x += widths[i] + pad;
         }
-        ResetTextStretchX();
+        // pass 2: tab text — ALWAYS lime->gold gradient, alpha 235 active / 128 inactive
+        x = CLIP_X + pad;
+        for (int i = 0; i < CATEGORY_COUNT; ++i) {
+            float alpha = (i == g_cat ? 235.0f : 128.0f) * t;
+            DrawTabText(x, TABS_Y, CATEGORIES[i].name, alpha);   // top-aligned at band top
+            x += widths[i] + pad;
+        }
     }
 
     // ---- selected-row gold->green diagonal bar (eased) ----
@@ -280,7 +354,9 @@ void Draw(double openSec) {
         float mt = (float)ComputeMotion(g_moveStart, 0.0, 8.0);
         float slot = Lerp((float)g_prevSel, (float)g_sel, mt);
         float ry = ROWS_TOP + slot * ROW_PITCH;
-        DrawVGradient({ CLIP_X, ry }, { CLIP_X + OPT_W, ry + ROW_H }, WithAlpha(C_SEL_TL, t), WithAlpha(C_SEL_BR, t));
+        uint32_t gold = WithAlpha(C_SEL_TL, t), grn = WithAlpha(C_SEL_BR, t);
+        uint32_t mid  = WithAlpha(ColourLerp(C_SEL_TL, C_SEL_BR, 0.5f), t);
+        DrawQuadGradient({ CLIP_X, ry }, { CLIP_X + OPT_W, ry + ROW_H }, gold, mid, grn, mid);  // TL gold -> BR green diagonal
     }
 
     // ---- rows ----
@@ -291,76 +367,60 @@ void Draw(double openSec) {
         SetFont(g_fSeurat);
         DrawTextAligned({ LABEL_X, ry }, { VAL_X0 - 10, ry + ROW_H }, 26.0f, WithAlpha(C_LABEL, t),
                         o.label, Align::Left, true, true);
-        // value cell
+        // value cell = the shared 3-layer plate
         float vy0 = ry + (ROW_H - VAL_H) * 0.5f, vy1 = vy0 + VAL_H;
-        DrawVGradient({ VAL_X0, vy0 }, { VAL_X0 + VAL_W, vy1 }, WithAlpha(C_VAL_BG, t), WithAlpha(C_VAL_BG_B, t));
-        if (sel) { DrawCaret(VAL_X0 - 24, cy, false, WithAlpha(C_CARET, t)); DrawCaret(VAL_X0 + VAL_W + 24, cy, true, WithAlpha(C_CARET, t)); }
+        DrawPlate(VAL_X0, vy0, VAL_X0 + VAL_W, vy1, t);
+        if (sel) DrawSelectionArrows(VAL_X0, vy0, VAL_X0 + VAL_W, vy1, t);
         SetFont(g_fRodin);
         if (o.kind == TOGGLE) {
+            // toggle light: 14px lit/dark disc + 24px additive yellow glow when ON
             bool onv = o.val != 0;
-            // ref: a small dim olive-yellow ~10px dot with a faint halo (x596..606)
-            float lx = VAL_X0 + 15, ly = vy0 + (VAL_H - 10) * 0.5f;
-            if (onv) DrawRect({ lx-3, ly-3 }, { lx+13, ly+13 }, WithAlpha(RGBA(255,255,0,50), t));
-            DrawRect({ lx, ly }, { lx + 10, ly + 10 }, WithAlpha(onv ? C_LIGHT_ON : C_LIGHT_OFF, t));
-            DrawTextAligned({ lx + 18, vy0 }, { VAL_X0 + VAL_W - 8, vy1 }, 20.0f, WithAlpha(onv ? C_VAL_TXT_T : RGBA(150,160,150,255), t), onv ? "ON" : "OFF", Align::Center, true, true);
+            const float ls = 14.0f, lx = VAL_X0 + 14.0f, ly = vy0 + ((VAL_H - ls) * 0.5f) + 1.0f;
+            const float lcx = lx + ls*0.5f, lcy = ly + ls*0.5f;
+            if (onv) {  // additive yellow glow (255,255,0,127), 24px, offset like the source
+                const float gs = 24.0f; float gx = lx - gs*0.5f + 2.0f, gy = ly - gs*0.5f;
+                DrawRect({ gx, gy }, { gx + gs, gy + gs }, WithAlpha(RGBA(255,255,0,127), t), true);
+            }
+            auto disc = [&](float r, uint32_t c){      // octagon disc stand-in for g_texLight
+                float k = r * 0.4142f;
+                DrawRect({ lcx-r, lcy-k }, { lcx+r, lcy+k }, c);
+                DrawRect({ lcx-k, lcy-r }, { lcx+k, lcy+r }, c);
+                DrawRect({ lcx-r*0.78f, lcy-r*0.78f }, { lcx+r*0.78f, lcy+r*0.78f }, c);
+            };
+            disc(ls*0.5f, WithAlpha(onv ? C_LIGHT_ON : C_LIGHT_OFF, t));
         } else {
             const char* s = (o.choices && o.val < o.choiceCount) ? o.choices[o.val] : "";
-            DrawValueText(s, VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t, sel);
+            DrawValueText(s, VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
         }
     }
 
-    // ---- info panel: green-bordered preview-image region + description ----
-    // The real per-value screenshot (SEGA art) drops into this bordered box; until
-    // then it shows the dark placeholder. Matches options_menu's preview thumbnail.
+    // ---- info panel: single FULL-WIDTH thumbnail slot + centred description ----
+    // (recomp DrawInfoPanel L1441-1520 — NO green frame, NO 'PREVIEW' label, NO medallion)
     {
-        float ix0 = IP_X0 + 18, ix1 = IP_X1 - 17;
-        // preview box: the real video thumb is 240x140 (~16:9), centred in the panel
-        float pvx0 = (IP_X0 + IP_X1) * 0.5f - 120.0f, pvx1 = pvx0 + 240.0f;
-        float ty0 = IP_Y0 + 27, ty1 = ty0 + 141.0f;
-        DrawRect({ pvx0, ty0 }, { pvx1, ty1 }, WithAlpha(RGBA(18,28,22,255), t));   // image placeholder fill
-        uint32_t gb = WithAlpha(RGBA(0,168,46,255), t); const float L = 2.0f;       // bright-green border
-        DrawRect({ pvx0, ty0 }, { pvx1, ty0 + L }, gb);
-        DrawRect({ pvx0, ty1 - L }, { pvx1, ty1 }, gb);
-        DrawRect({ pvx0, ty0 }, { pvx0 + L, ty1 }, gb);
-        DrawRect({ pvx1 - L, ty0 }, { pvx1, ty1 }, gb);
-        DrawTextAligned({ pvx0, ty0 }, { pvx1, ty1 }, 15.0f, WithAlpha(RGBA(110,140,116,255), t), "PREVIEW", Align::Center, true, true);
-        // ---- controller-brand medallion ANCHOR (~54px circular slot) ---------
-        // Overlaps the preview frame's bottom-left (game x~913-967,y~252-304 -> ref
-        // ~pvx0,ty1). The SEGA/Xbox medallion texture itself stays a slot per the
-        // art boundary; here we draw only the positioned dark-disc base + faint rim
-        // so the anchor exists (previously empty dark-green, zero gold px). The
-        // ENUM "Time of Day Transition" value (XBOX/PLAYSTATION) selects the art.
-        {
-            const float bcx = pvx0 + 10.0f, bcy = ty1 - 10.0f, br = 27.0f;  // ~54px circle
-            // layered-rect disc approximation (FillDisc is file-local elsewhere): base
-            auto discRect = [&](float r, uint32_t col){
-                // 3-band octagon: square + two clipped corners read as a round slot
-                float k = r * 0.4142f;  // tan(22.5) -> octagon inset
-                DrawRect({ bcx - r, bcy - k }, { bcx + r, bcy + k }, col);
-                DrawRect({ bcx - k, bcy - r }, { bcx + k, bcy + r }, col);
-                DrawRect({ bcx - r*0.78f, bcy - r*0.78f }, { bcx + r*0.78f, bcy + r*0.78f }, col);
-            };
-            discRect(br + 1.5f, WithAlpha(RGBA(0, 49, 0, 255), t));            // green rim ring (matches panel outer)
-            discRect(br - 1.0f, WithAlpha(RGBA(14, 22, 16, 255), t));         // dark medallion base
-            discRect(br - 6.0f, WithAlpha(RGBA(8, 14, 10, 235), t));          // inner recess (art drops here)
-        }
+        const float ix0 = IP_X0 + GRID*2, ix1 = IP_X1 - GRID*2;     // content clip (886..1228)
+        const float wrapW = ix1 - ix0;
+        // thumbnail slot: full content width, 16:9, top inset gridSize/2 (art drops here)
+        const float thumbH = wrapW * 9.0f / 16.0f;
+        const float ty0 = IP_Y0 + GRID*2 + GRID*0.5f, ty1 = ty0 + thumbH;
+        DrawRect({ ix0, ty0 }, { ix1, ty1 }, WithAlpha(RGBA(6,10,8,235), t));        // dark empty slot
+        DrawVGradient({ ix0, ty0 }, { ix1, ty1 }, WithAlpha(RGBA(0,30,0,60), t), WithAlpha(RGBA(0,0,0,90), t));
+        uint32_t kl = WithAlpha(RGBA(0,49,0,160), t); const float L = 1.0f;          // faint 1px slot edge
+        DrawRect({ ix0, ty0 }, { ix1, ty0+L }, kl); DrawRect({ ix0, ty1-L }, { ix1, ty1 }, kl);
+        DrawRect({ ix0, ty0 }, { ix0+L, ty1 }, kl); DrawRect({ ix1-L, ty0 }, { ix1, ty1 }, kl);
+
         const Option& s = Opt(std::clamp(g_sel, 0, OptCount() - 1));
-        // description: centred word-wrapped paragraph, Seurat 28 white, line spacing 5,
-        // per-value description appended after a blank line, clipped to the panel with
-        // an auto-marquee when it overflows — the recomp's exact recipe (options_menu).
         SetFont(g_fSeurat);
         std::string full = s.desc ? s.desc : "";
         if (s.kind == ENUM && s.valDescs && s.val < s.choiceCount && s.valDescs[s.val] && s.valDescs[s.val][0]) {
             full += "\n\n"; full += s.valDescs[s.val];
         }
-        const float fsz = 28.0f, lineH = fsz + 5.0f, wrapW = ix1 - ix0;
+        const float fsz = 28.0f, lineH = fsz + 5.0f;
         std::vector<std::string> lines;
         size_t p = 0;
         while (p <= full.size()) {
             size_t nl = full.find('\n', p);
             std::string para = full.substr(p, nl == std::string::npos ? std::string::npos : nl - p);
-            std::string cur;
-            size_t w0 = 0;
+            std::string cur; size_t w0 = 0;
             while (w0 < para.size()) {
                 size_t w1 = para.find(' ', w0); if (w1 == std::string::npos) w1 = para.size();
                 std::string word = para.substr(w0, w1 - w0);
@@ -373,7 +433,7 @@ void Draw(double openSec) {
             if (nl == std::string::npos) break;
             p = nl + 1;
         }
-        const float textTop = ty1 + 48, clipY0 = ty1 + 24, clipY1 = IP_Y1 - 14;
+        const float textTop = ty1 + 24.0f, clipY0 = ty1 + 12.0f, clipY1 = IP_Y1 - 14;
         float scroll = 0;
         const float scrollMax = lines.size() * lineH - (clipY1 - textTop);
         if (scrollMax > 0) {   // hold -> scroll down -> hold -> scroll back (ping-pong marquee)
@@ -387,25 +447,26 @@ void Draw(double openSec) {
         PushClip({ ix0 - 2, clipY0 }, { ix1 + 2, clipY1 });
         float dy = textTop - scroll;
         for (const std::string& ln : lines) {
-            // LEFT-aligned at a fixed margin (verified against the live capture)
-            if (!ln.empty() && dy + lineH > clipY0 && dy < clipY1)
-                DrawText({ ix0, dy }, fsz, WithAlpha(C_DESC, t), ln.c_str());
+            if (!ln.empty() && dy + lineH > clipY0 && dy < clipY1) {
+                float lw = MeasureText(fsz, ln.c_str()).x;               // CENTRE each wrapped line
+                DrawText({ ix0 + (wrapW - lw) * 0.5f, dy }, fsz, WithAlpha(C_DESC, t), ln.c_str());
+            }
             dy += lineH;
         }
         PopClip();
     }
 
     // ---- footer button-guide + version ----
-    // ref layout: [LB] Switch [RB] at left (x~176), (A) Select at x~816, (B) Back
-    // right-aligned ending ~1087; guide row centred at y~634, just under the divider.
+    // recomp footer: [LB/RB] Switch | [X] Reset | [A] Select | [B] Back ; version bottom-right.
     {
         SetFont(g_fRodin);
-        float hx = 176.0f, hcy = 634.0f;
+        float hx = 150.0f, hcy = 634.0f;
         auto glyph = [&](const UV& g) { if (g_glyphTex < 0) return; float asp = ((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh = 30.0f, gw = gh*asp; DrawImage(g_glyphTex, { hx, hcy-gh*0.5f }, { hx+gw, hcy+gh*0.5f }, { g.u0, g.v0 }, { g.u1, g.v1 }, WithAlpha(C_WHITE, t)); hx += gw + 8; };
         auto word = [&](const char* w, float pad){ DrawText({ hx, hcy-13 }, 24.0f, WithAlpha(C_WHITE, t), w); hx += MeasureText(24.0f, w).x + pad; };
-        glyph(GLYPH_LB); word("Switch", 8); glyph(GLYPH_RB);
-        hx = 816; glyph(GLYPH_A); word("Select", 0);
-        hx = 994; glyph(GLYPH_B); word("Back", 0);
+        glyph(GLYPH_LB); word("Switch", 10); glyph(GLYPH_RB); hx += 18;
+        glyph(GLYPH_X);  word("Reset", 14);
+        glyph(GLYPH_A);  word("Select", 14);
+        glyph(GLYPH_B);  word("Back", 0);
         DrawTextAligned({ REF_W - 420, REF_H - 22 }, { REF_W - 4, REF_H - 6 }, 12.0f, WithAlpha(C_VERSION, t),
                         "v1.0.3.325e4d3-HEAD (RelWithDebInfo)", Align::Right, true, true);
     }

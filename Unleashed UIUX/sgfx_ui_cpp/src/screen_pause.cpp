@@ -183,13 +183,14 @@ void DrawConfirm(float a) {
     DrawRect({ 497.3f, 302.7f }, { 781.3f, 304.0f }, WithAlpha(RGBA(140, 142, 144, 255), a));
     DrawRect({ 497.3f, 412.7f }, { 781.3f, 414.0f }, WithAlpha(RGBA(112, 114, 116, 255), a));
     SolidQuad({ 497.3f, 302.7f }, { 519.3f, 302.7f }, { 497.3f, 324.7f }, { 497.3f, 302.7f }, SCENE_DK);
-    // prompt: engraved dark grey (light bevel under dark core)
+    // prompt: a FAINT grey-on-grey engraving (real capture: low-contrast, barely readable,
+    // half-occluded by the front plate — light bevel just above a slightly-darker core)
     SetFont(g_fRodin);
     {
         const char* P = "Return to the world map?";
         float w = MeasureText(22.0f, P).x;
-        DrawText({ 639 - w * 0.5f + 1, 353.3f + 1 }, 22.0f, WithAlpha(RGBA(106, 105, 107, 255), a), P);
-        DrawText({ 639 - w * 0.5f, 353.3f }, 22.0f, WithAlpha(RGBA(42, 44, 44, 255), a), P);
+        DrawText({ 639 - w * 0.5f + 1, 353.3f + 1 }, 22.0f, WithAlpha(RGBA(142, 144, 146, 255), a), P);
+        DrawText({ 639 - w * 0.5f, 353.3f }, 22.0f, WithAlpha(RGBA(92, 94, 96, 255), a), P);
     }
     // front dialog (541.3,280.7) 196.7x157.3, chamfers TL+BR 22, silver border
     const float dx0 = 541.3f, dy0 = 280.7f, dx1 = 738.0f, dy1 = 438.0f, ch = 22.0f;
@@ -423,7 +424,7 @@ void Draw(double openSec) {
     //      dialog stack; banner dims WITH the scene (~44% black); footer stays lit
     if (g_confirm) {
         DrawBanner(1.0f);
-        DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 112));
+        DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 190));   // recomp message_window scrim = 190 (75% black)
         DrawPauseBands(1.0f);
         DrawConfirm(1.0f);
         SetFont(g_fRodin);
@@ -466,9 +467,11 @@ void Draw(double openSec) {
         float cyc = ITEM_C0 + i * ITEM_PITCH;   // item CENTER y
         bool sel = (i == g_sel);
         if (sel) {
-            // ref bar is ~46px tall and centered on the text (nearly fills the 55px pitch)
+            // ref bar is ~46px tall and centered on the text (nearly fills the 55px pitch);
+            // it BREATHES like retail (recomp DrawSelectionContainer: alpha 0.55..1.0 @ 0.92Hz)
+            float br = Breathe(Now(), 0.55f, 1.0f, 1.087f);
             DrawVGradient({ PX0 + 23, cyc - 21 }, { PX1 - 23, cyc + 18 },
-                          WithAlpha(C_SEL_T, t), WithAlpha(C_SEL_B, t));
+                          WithAlpha(C_SEL_T, t * br), WithAlpha(C_SEL_B, t * br));
         }
         DrawTextAligned({ PX0, cyc - 27 }, { PX1, cyc + 27 }, 28.0f,
                         WithAlpha(sel ? C_ITEM_SEL : C_ITEM, t), ITEMS[i], Align::Center, true, true);
