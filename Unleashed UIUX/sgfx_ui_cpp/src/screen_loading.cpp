@@ -74,10 +74,10 @@ void DPad(float cx, float cy) {
     // round recessed base (the real Miles-Electric pads are circular clusters)
     FillDisc(cx, cy, 50, C_SHELL_DK);
     FillDisc(cx, cy, 46, RGBA(206, 172, 46, 255));
-    // four directional wedges (trapezoid pads) separated by diagonal gaps, with a
-    // raised central hub disc — the real pad reads as 4 keys around a hub, not a '+'
-    const float hub = 9.0f, rOut = 39.0f;
-    const float halfIn = 7.0f, halfOut = 27.0f;   // gap-defining half-widths (in / out)
+    // four directional wedges (trapezoid pads) separated by NARROW diagonal gaps so
+    // the cluster reads as a ROUND 4-key pad around a centre button, not a faceted star.
+    const float hub = 11.0f, rOut = 42.0f;
+    const float halfIn = 12.0f, halfOut = 36.0f;  // wider wedges -> narrow gaps (rounder)
     auto wedge = [&](float ax, float ay) {
         // (ax,ay) is the unit outward direction (axis-aligned); perp is the side axis
         float px = -ay, py = ax;
@@ -88,12 +88,23 @@ void DPad(float cx, float cy) {
             { cx + ax * rOut - px * halfOut, cy + ay * rOut - py * halfOut },
         };
         const uint32_t qc[4] = { RGBA(228, 192, 56, 255), RGBA(228, 192, 56, 255),
-                                 C_SHELL_DK, C_SHELL_DK };
+                                 RGBA(196, 164, 44, 255), RGBA(196, 164, 44, 255) };
         DrawQuadGradient(q, qc);
+        // dark directional triangle glyph centred on the wedge, pointing outward
+        const float gd = 26.0f, gs = 8.0f;   // tip distance / base half-width
+        const V2 tri[4] = {
+            { cx + ax * (gd + 7) - px * 0.5f, cy + ay * (gd + 7) - py * 0.5f }, // tip
+            { cx + ax * gd + px * gs,         cy + ay * gd + py * gs         }, // base side
+            { cx + ax * gd - px * gs,         cy + ay * gd - py * gs         }, // base side
+            { cx + ax * (gd + 7) + px * 0.5f, cy + ay * (gd + 7) + py * 0.5f }, // tip
+        };
+        const uint32_t tc[4] = { C_SHELL_DK, C_SHELL_DK, C_SHELL_DK, C_SHELL_DK };
+        DrawQuadGradient(tri, tc);
     };
     wedge(0, -1); wedge(1, 0); wedge(0, 1); wedge(-1, 0);
-    FillDisc(cx, cy, hub + 1, C_SHELL_DK);          // hub recess ring
-    FillDisc(cx, cy, hub - 1, RGBA(228, 192, 56, 255)); // raised central hub
+    FillDisc(cx, cy, hub + 2, C_SHELL_DK);          // centre recess ring
+    FillDisc(cx, cy, hub, C_WIRE);                  // solid GREEN centre button
+    FillDisc(cx, cy, hub - 3, RGBA(96, 240, 110, 255)); // green button highlight
 }
 
 void DrawSpinner(float x0, float y0, double now) {
@@ -119,10 +130,12 @@ void Draw(double openSec) {
     // ---- yellow device shell ----
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SHELL_T, C_SHELL_B);
     SpeakerGrille(28, 10);  SpeakerGrille(1112, 10);
-    FillDisc(640, 64, 26, C_BEZEL);                                   // round camera lens
-    FillDisc(640, 64, 20, RGBA(150, 120, 36, 255));                   // gold ring
-    FillDisc(640, 64, 12, RGBA(40, 46, 52, 255));                     // dark glass
-    FillDisc(636, 60, 3.6f, RGBA(180, 200, 210, 255));               // catch-light
+    FillDisc(640, 64, 32, C_BEZEL);                                   // round camera lens housing (bigger)
+    FillDisc(640, 64, 26, RGBA(150, 120, 36, 255));                   // gold ring
+    FillDisc(640, 64, 20, RGBA(58, 60, 64, 255));                     // grey glass (outer ring)
+    FillDisc(640, 64, 13, RGBA(40, 42, 46, 255));                     // grey glass (inner ring)
+    FillDisc(640, 64, 7, RGBA(28, 30, 34, 255));                      // grey glass (core)
+    FillDisc(635, 59, 3.2f, RGBA(120, 120, 112, 200));               // dim grey catch-light
     Screw(20, 20); Screw(1260, 20); Screw(20, 700); Screw(1260, 700);
     DrawRect({ 0, 280 }, { 14, 380 }, C_SHELL_DK);                     // VOL rocker
     DrawRect({ 2, 286 }, { 12, 374 }, RGBA(190, 158, 40, 255));
@@ -173,12 +186,15 @@ void Draw(double openSec) {
         auto loopY  = [&](float f) { return yNear + (yApex - yNear) * std::pow(f, 1.4f); };
         // ring centre x drifts from near (573) toward the far apex (585)
         auto loopCx = [&](float f) { return 605.0f + (cxApex - 605.0f) * f; };   // near=605 (left-heavy) -> far=690 (right)
-        // OUTER ellipse half-width: small at the near lip, peaks (~216 about centre
-        // ~581 -> arms 357 / 789) at the WIDEST band y~458 (f~0.66), then pinches to 0
-        // at the far apex. A skewed sine cap rounds the near lip and the far apex.
+        // OUTER ellipse half-width: small at the near lip, peaks at the WIDEST band
+        // y~469 (f~0.55, up-depth in the HOLLOW band — NOT bulging at the solid bottom),
+        // then pinches to 0 at the far apex. Exponent 1.15 (was 0.60) shifts the sine
+        // peak from f~0.31 toward f~0.55, and a near-lip cap holds f<0.20 narrow so the
+        // solid front band peaks near ~400 our-px instead of bulging to ~650.
         auto outerHalf = [&](float f) {
-            float e = std::sin(3.14159265f * std::pow(f, 0.60f));  // 0 at caps, peak ~f0.62
-            return 285.0f * std::pow(e, 0.96f);   // arms reach ~357/925 about centre 640
+            float e = std::sin(3.14159265f * std::pow(f, 1.15f));  // 0 at caps, peak ~f0.55
+            float nearCap = (f < 0.20f) ? (0.60f + 2.0f * f) : 1.0f;  // hold the near lip in
+            return 285.0f * std::pow(e, 0.96f) * nearCap;
         };
         // INNER ellipse half-width: the hollow. Zero through the whole near lip
         // (f<~0.18, so the front of the loop reads SOLID across y[480-520]) and zero
@@ -225,32 +241,61 @@ void Draw(double openSec) {
         }
         // ---- landmarks: solid bright-green silhouettes with a lit top edge ----
         const uint32_t LIT = WithAlpha(RGBA(180, 255, 190, 255), 0.9f);
-        // CHURCH at base (657,432): ~59w x 91h — stepped facade + bell tower + cross.
+        // CHURCH at base (657,432): ~59w x 91h — mission-style facade with a CENTRED
+        // bell tower, arched belfry + cross finial on a ring, stepped shoulders both
+        // sides, an arched doorway, and a round podium ring beneath the nave.
         {
             const float bx = 657, by = 432, w = 59, h = 91;
-            // stepped facade (two tiers): wider lower nave, narrower upper gable
+            // round podium ring beneath the nave (the base the church sits on)
+            FillDisc(bx + w * 0.5f, by + 1, w * 0.62f, WithAlpha(C_WIRE_DIM, 0.85f));
+            FillDisc(bx + w * 0.5f, by + 1, w * 0.50f, WithAlpha(C_WIRE, 0.7f));
+            // nave body
             DrawRect({ bx, by - 52 }, { bx + w, by }, C_WIRE);                       // nave body
             DrawRect({ bx, by - 52 }, { bx + w, by - 49 }, LIT);                     // nave lit edge
-            DrawRect({ bx + 8, by - 74 }, { bx + w - 8, by - 52 }, C_WIRE);          // gable tier
-            DrawRect({ bx + 8, by - 74 }, { bx + w - 8, by - 71 }, LIT);             // gable lit edge
-            // bell tower rising on the right shoulder of the facade
-            const float tx = bx + w - 18, tw = 14;
-            DrawRect({ tx, by - h + 10 }, { tx + tw, by - 52 }, C_WIRE);             // tower shaft
-            DrawRect({ tx, by - h + 10 }, { tx + tw, by - h + 13 }, LIT);            // tower lit edge
-            DrawRect({ tx + 3, by - h + 14 }, { tx + tw - 3, by - h + 22 }, C_WIRE_DIM); // belfry opening
-            // small cross finial on top of the tower
-            const float fx = tx + tw * 0.5f;
-            DrawRect({ fx - 1.5f, by - h }, { fx + 1.5f, by - h + 10 }, C_WIRE);     // cross vertical
-            DrawRect({ fx - 4, by - h + 3 }, { fx + 4, by - h + 5 }, C_WIRE);        // cross arm
+            // stepped shoulders BOTH sides (mission-style: two tiers narrowing up)
+            DrawRect({ bx + 6,  by - 66 }, { bx + w - 6,  by - 52 }, C_WIRE);        // shoulder tier 1
+            DrawRect({ bx + 6,  by - 66 }, { bx + w - 6,  by - 63 }, LIT);
+            DrawRect({ bx + 14, by - 78 }, { bx + w - 14, by - 66 }, C_WIRE);        // shoulder tier 2 (centre gable)
+            DrawRect({ bx + 14, by - 78 }, { bx + w - 14, by - 75 }, LIT);
+            // arched doorway at the base of the nave (rounded top via narrowing strips)
+            const float dcx = bx + w * 0.5f, dw = 9.0f, dy0 = by, dy1 = by - 22;
+            for (int s = 0; s < 6; ++s) {
+                float ya = dy0 - (dy0 - dy1) * s / 6.0f, yb = dy0 - (dy0 - dy1) * (s + 1) / 6.0f;
+                float k = (float)(s + 1) / 6.0f;                          // 0 at base .. 1 at top
+                float hw = dw * std::sqrt(std::max(0.0f, 1.0f - k * k));  // round arch top
+                hw = std::max(hw, (s < 4) ? dw : hw);                    // keep jambs straight, round only the head
+                DrawRect({ dcx - hw, yb }, { dcx + hw, ya }, C_SCREEN_B);
+            }
+            // CENTRED bell tower over the nave
+            const float tw = 16, tx = bx + (w - tw) * 0.5f;
+            DrawRect({ tx, by - h + 12 }, { tx + tw, by - 78 }, C_WIRE);             // tower shaft
+            DrawRect({ tx, by - h + 12 }, { tx + tw, by - h + 15 }, LIT);            // tower lit edge
+            // arched belfry opening (rounded top via narrowing strips)
+            const float belx = tx + tw * 0.5f, belw = (tw - 6) * 0.5f;
+            const float bel0 = by - h + 22, bel1 = by - h + 12;
+            for (int s = 0; s < 5; ++s) {
+                float ya = bel0 - (bel0 - bel1) * s / 5.0f, yb = bel0 - (bel0 - bel1) * (s + 1) / 5.0f;
+                float k = (float)(s + 1) / 5.0f;
+                float hw = belw * std::sqrt(std::max(0.0f, 1.0f - k * k * 0.7f));
+                DrawRect({ belx - hw, yb }, { belx + hw, ya }, C_WIRE_DIM);
+            }
+            // cross finial on a small round ring atop the tower
+            const float fx = tx + tw * 0.5f, ry = by - h + 6;
+            FillDisc(fx, ry, 4.5f, C_WIRE);                                          // round ring
+            FillDisc(fx, ry, 2.2f, C_SCREEN_B);                                      // ring hole
+            DrawRect({ fx - 1.5f, by - h - 8 }, { fx + 1.5f, ry }, C_WIRE);          // cross vertical
+            DrawRect({ fx - 4.5f, by - h - 4 }, { fx + 4.5f, by - h - 2 }, C_WIRE);  // cross arm
         }
-        // WINDMILL at base (885,463): ~83w x 69h — round tower + domed cap + left fan.
+        // WINDMILL at base (885,463): wider/shorter round tower + domed cap + a
+        // radiating sail-wheel of 6 blades around the hub (a round windmill, not a
+        // narrow bottle).
         {
-            const float bx = 885, by = 463, w = 83, h = 69;
-            // round tower: a slightly tapered body built from stacked strips
-            const float tw_b = 30, tw_t = 22, tcx = bx + 30;
+            const float bx = 885, by = 463, h = 56;            // shorter (was 69)
+            // wider, shorter round tower: a tapered body built from stacked strips
+            const float tw_b = 42, tw_t = 30, tcx = bx + 30;   // wider (was 30/22)
             const int NS = 8;
             for (int s = 0; s < NS; ++s) {
-                float ya = by - (h - 22) * s / NS, yb = by - (h - 22) * (s + 1) / NS;
+                float ya = by - (h - 18) * s / NS, yb = by - (h - 18) * (s + 1) / NS;
                 float ka = (float)s / NS, kb = (float)(s + 1) / NS;
                 float ha = (tw_b + (tw_t - tw_b) * ka) * 0.5f;
                 float hb = (tw_b + (tw_t - tw_b) * kb) * 0.5f;
@@ -259,13 +304,26 @@ void Draw(double openSec) {
                 DrawQuadGradient(q, qc);
             }
             // domed cap on top of the tower
-            FillDisc(tcx, by - (h - 22) - 2, 14, C_WIRE);
-            DrawRect({ tcx - 13, by - h + 6 }, { tcx + 13, by - h + 9 }, LIT);       // cap lit edge
-            // small left-side fan-wheel (hub + four spokes)
-            const float fcx = tcx - 26, fcy = by - (h - 22) - 2, fr = 18;
-            FillDisc(fcx, fcy, 4, C_WIRE);                                           // hub
-            DrawRect({ fcx - 1.5f, fcy - fr }, { fcx + 1.5f, fcy + fr }, C_WIRE);    // vertical blades
-            DrawRect({ fcx - fr, fcy - 1.5f }, { fcx + fr, fcy + 1.5f }, C_WIRE);    // horizontal blades
+            FillDisc(tcx, by - (h - 18) - 2, 16, C_WIRE);
+            DrawRect({ tcx - 15, by - h + 4 }, { tcx + 15, by - h + 7 }, LIT);       // cap lit edge
+            // radiating sail-wheel: 6 thin blades around the hub
+            const float fcx = tcx, fcy = by - (h - 18) - 2, fr = 21, bw = 3.0f;
+            const int NBLD = 6;
+            for (int k = 0; k < NBLD; ++k) {
+                float ang = 6.2831853f * k / NBLD + 0.35f;   // small phase so it doesn't read as a '+'
+                float dx = std::cos(ang), dy = std::sin(ang);
+                float px = -dy, py = dx;                      // perpendicular for blade width
+                const V2 q[4] = {
+                    { fcx + px * bw,          fcy + py * bw          },
+                    { fcx - px * bw,          fcy - py * bw          },
+                    { fcx + dx * fr - px * bw, fcy + dy * fr - py * bw },
+                    { fcx + dx * fr + px * bw, fcy + dy * fr + py * bw },
+                };
+                const uint32_t qc[4] = { C_WIRE, C_WIRE, C_WIRE, C_WIRE };
+                DrawQuadGradient(q, qc);
+            }
+            FillDisc(fcx, fcy, 4.5f, C_WIRE);                                        // hub
+            FillDisc(fcx, fcy, 2.0f, C_WIRE_DIM);                                    // hub centre
         }
     }
 

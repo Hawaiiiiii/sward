@@ -45,7 +45,8 @@ const UV GLYPH_RB = { 0.48242f, 0.00781f, 0.61523f, 0.07812f };
 const uint32_t C_PARCH     = RGBA(185, 176, 140, 255);   // parchment mean
 const uint32_t C_PARCH_HI  = RGBA(196, 185, 151, 255);
 const uint32_t C_PARCH_LO  = RGBA(174, 166, 132, 255);
-const uint32_t C_FRAME_BRN = RGBA(58, 38, 14, 255);      // frame band brown
+const uint32_t C_FRAME_BRN = RGBA(66, 44, 16, 255);      // frame band dark-brown outer
+const uint32_t C_FRAME_GOLD= RGBA(236, 221, 100, 255);   // wide bright gold band
 const uint32_t C_PINSTRIPE = RGBA(228, 212, 166, 255);   // cream pinstripe
 const uint32_t C_KEYLINE   = RGBA(236, 233, 225, 255);   // white keyline
 const uint32_t C_RULE      = RGBA(215, 206, 165, 255);   // embossed ruled line
@@ -66,12 +67,14 @@ const uint32_t C_CHEV_FADE = RGBA(191, 176, 139, 255);
 const uint32_t C_THUMB_BD  = RGBA(209, 204, 184, 255);   // thumb cream border
 const uint32_t C_THUMB_SH  = RGBA(150, 141, 112, 255);   // sunken shadow
 const uint32_t C_SEL_W     = RGBA(240, 237, 242, 255);   // selection ring white
-const uint32_t C_SEL_G     = RGBA(234, 198, 92, 255);    // selection ring gold (warmer, less neon than the real border)
-const uint32_t C_SEL_GLOW  = RGBA(231, 182, 111, 255);   // pulsing warm glow
+const uint32_t C_SEL_G     = RGBA(239, 208, 40, 255);    // selection ring gold (saturated — most real saturation lives in the ring/border)
+const uint32_t C_SEL_GLOW  = RGBA(245, 210, 55, 255);    // pulsing saturated-gold glow (blue dropped for saturation)
 const uint32_t C_SCR_T     = RGBA(87, 35, 21, 255);      // scrollbar maroon
 const uint32_t C_SCR_B     = RGBA(34, 16, 14, 255);
 const uint32_t C_SCR_HND   = RGBA(214, 204, 181, 255);
-const uint32_t C_FLAG_BLUE = RGBA(50, 96, 185, 255);     // flag badge field
+const uint32_t C_FLAG_BLUE = RGBA(50, 96, 185, 255);     // flag badge field (soundtrack crest)
+const uint32_t C_FLAG_NAVY_T = RGBA(68, 68, 178, 255);   // Alexis flag navy gradient top
+const uint32_t C_FLAG_NAVY_B = RGBA(22, 21, 108, 255);   // Alexis flag navy gradient bottom
 const uint32_t C_SEAL_GRN  = RGBA(60, 80, 50, 255);      // Pickle's Room seal
 const uint32_t C_WHITE     = RGBA(255, 255, 255, 255);
 // lab-scene placeholder (the real game renders the 3D library behind)
@@ -157,12 +160,13 @@ void HeaderStrip(const char* title, float a) {
 }
 
 void ParchmentPanel(float a) {
-    // brown frame band with cream pinstripes (simplified: band + 2 stripes)
-    DrawRect({ PNL_X0 + 4, PNL_Y0 }, { PNL_X1 - 4, PNL_Y1 }, WithAlpha(C_FRAME_BRN, a));
-    DrawRect({ PNL_X0 + 6, PNL_Y0 + 2 }, { PNL_X1 - 6, PNL_Y0 + 4 }, WithAlpha(C_PINSTRIPE, a));
+    // frame band, structured outward->inward (dark-brown outer -> wide bright
+    // GOLD band -> [white keyline below] -> parchment interior). The gold band
+    // is the dominant visible ring; the dark brown is only the thin outer lip.
+    DrawRect({ PNL_X0 + 4, PNL_Y0 }, { PNL_X1 - 4, PNL_Y1 }, WithAlpha(C_FRAME_BRN, a));        // dark-brown outer lip
+    DrawRect({ PNL_X0 + 14, PNL_Y0 + 10 }, { PNL_X1 - 14, PNL_Y1 - 10 }, WithAlpha(C_FRAME_GOLD, a)); // wide bright gold band
+    DrawRect({ PNL_X0 + 6, PNL_Y0 + 2 }, { PNL_X1 - 6, PNL_Y0 + 4 }, WithAlpha(C_PINSTRIPE, a));      // faint cream pinstripe over the brown lip
     DrawRect({ PNL_X0 + 6, PNL_Y1 - 4 }, { PNL_X1 - 6, PNL_Y1 - 2 }, WithAlpha(C_PINSTRIPE, a));
-    DrawRect({ PNL_X0 + 8, PNL_Y0 + 6 }, { PNL_X0 + 10, PNL_Y1 - 6 }, WithAlpha(C_PINSTRIPE, a));
-    DrawRect({ PNL_X1 - 10, PNL_Y0 + 6 }, { PNL_X1 - 8, PNL_Y1 - 6 }, WithAlpha(C_PINSTRIPE, a));
     // white keyline: outside the side bands, inside the top/bottom bands
     DrawRect({ PNL_X0, PNL_Y0 }, { PNL_X0 + 3.3f, PNL_Y1 }, WithAlpha(C_KEYLINE, a));
     DrawRect({ PNL_X1 - 3.3f, PNL_Y0 }, { PNL_X1, PNL_Y1 }, WithAlpha(C_KEYLINE, a));
@@ -266,10 +270,23 @@ void DrawEncyText(float a, double now) {
     DrawTextAligned({ 343, 267 }, { 496, 592 }, 14.0f, WithAlpha(RGBA(130, 120, 95, 255), a), "PORTRAIT", Align::Center, true, false);
     // title band + flag icon + entry name
     DrawRect({ 496.7f, 177.3f }, { 793.3f, 212.0f }, WithAlpha(C_WHITE, a * 0.18f));
-    DrawRect({ 501.3f, 174.7f }, { 563.3f, 208.0f }, WithAlpha(C_FLAG_BLUE, a));          // flag field
+    // Alexis flag: navy vertical gradient field, thick white stripes (white is a
+    // major share of the field), and a white anchor crest in the left third.
+    DrawVGradient({ 501.3f, 174.7f }, { 563.3f, 208.0f }, WithAlpha(C_FLAG_NAVY_T, a), WithAlpha(C_FLAG_NAVY_B, a)); // flag field
     for (int i = 0; i < 4; ++i)
-        DrawRect({ 505, 179.0f + i * 7.5f }, { 559, 181.5f + i * 7.5f }, WithAlpha(C_WHITE, a * 0.85f));
+        DrawRect({ 505, 178.0f + i * 8.2f }, { 559, 182.5f + i * 8.2f }, WithAlpha(C_WHITE, a * 0.9f));   // thick white stripes (~4.5px)
     DrawRect({ 501.3f, 174.7f }, { 563.3f, 176.0f }, WithAlpha(C_WHITE, a));               // flag outline hint
+    {   // white anchor glyph in the left third (shank + crossbar + curving flukes)
+        const float ax = 511.6f;                                   // anchor centre x (left third)
+        DrawRect({ ax - 1.4f, 180.0f }, { ax + 1.4f, 202.0f }, WithAlpha(C_WHITE, a));      // vertical shank
+        DrawRect({ ax - 6.0f, 182.5f }, { ax + 6.0f, 184.5f }, WithAlpha(C_WHITE, a));      // horizontal crossbar near top
+        DrawRect({ ax - 2.0f, 178.0f }, { ax + 2.0f, 181.0f }, WithAlpha(C_WHITE, a));      // ring nub atop the shank
+        for (int i = 0; i < 4; ++i) {                              // two outward-curving flukes at the bottom
+            float fy = 197.5f + i * 1.4f, dx = 3.0f + i * 1.6f;
+            DrawRect({ ax - 1.4f - dx, fy }, { ax - 1.4f - dx + 1.6f, fy + 1.6f }, WithAlpha(C_WHITE, a));
+            DrawRect({ ax + 1.4f + dx - 1.6f, fy }, { ax + 1.4f + dx, fy + 1.6f }, WithAlpha(C_WHITE, a));
+        }
+    }
     DrawText({ 568.7f, 178 }, 26.0f, WithAlpha(C_TEXT, a), "Alexis");
     // ruled double-lines + body text (pitch 33, pairs 6.7 apart, x 507..973)
     const char* L[] = { "Lambros's son, a", "wild, unruly boy.", "",
@@ -321,7 +338,8 @@ void DrawSoundtrack(float a, double now) {
     {
         const float x = 284.0f + 176.0f * g_selC, y = 167.3f + 104.7f * g_selR;
         const float glow = Breathe(now, 0.35f, 0.9f, 1.1f);
-        DrawRect({ x - 14.7f, y - 20.7f }, { x + 164.7f, y + 96.0f }, WithAlpha(C_SEL_GLOW, a * glow * 0.35f), true);
+        DrawRect({ x - 14.7f, y - 20.7f }, { x + 164.7f, y + 96.0f }, WithAlpha(C_SEL_GLOW, a * glow * 0.5f), true);   // saturated-gold outer glow
+        DrawRect({ x - 7.0f, y - 11.0f }, { x + 157.0f, y + 86.0f }, WithAlpha(C_SEL_GLOW, a * glow * 0.45f), true);   // brighter inner pass
         auto rail = [&](float rx0, float ry0, float rx1, float ry1) {
             DrawRect({ rx0, ry0 }, { rx1, ry1 }, WithAlpha(C_SEL_G, a));
             DrawRect({ rx0, ry0 }, { rx0 + (rx1 - rx0), ry0 + 1.3f }, WithAlpha(C_SEL_W, a));

@@ -319,7 +319,7 @@ void DrawAchievements(float a) {
         DrawText({ 392 + 1.3f, ry + 22 + 1.3f }, 24.0f, WithAlpha(RGBA(15, 15, 15, 255), a), ROWS[i].name);
         DrawText({ 392, ry + 22 }, 24.0f, WithAlpha(RGBA(242, 230, 18, 255), a), ROWS[i].name);
         // date stamp plate
-        DrawRect({ 825.3f, ry + 20 }, { 976.7f, ry + 46 }, WithAlpha(RGBA(20, 20, 22, 140), a));
+        DrawRect({ 825.3f, ry + 20 }, { 976.7f, ry + 46 }, WithAlpha(RGBA(18, 18, 20, 205), a));
         SetFont(g_fRodin);
         DrawTextAligned({ 825.3f, ry + 20 }, { 976.7f, ry + 46 }, 15.0f, WithAlpha(RGBA(238, 238, 238, 255), a), ROWS[i].date, Align::Center, true, false);
         // description (white; near-black on the selected plate)
@@ -328,7 +328,7 @@ void DrawAchievements(float a) {
                  WithAlpha(sel ? RGBA(30, 27, 20, 255) : RGBA(245, 245, 245, 255), a), ROWS[i].desc);
     }
     ResetFont();
-    SubScrollbar(992, 209.3f, 1006, 576, 436 - (3 - g_achSel) * 12.0f, 29.3f, a);
+    SubScrollbar(992, 209.3f, 1006, 576, 436 - g_achSel * 12.0f, 29.3f, a);
     SubFooter(false, a);
 }
 
@@ -387,9 +387,9 @@ void DrawInventory(float a) {
             bool sel = (i == g_invPopupSel);
             float w = MeasureText(20.0f, OPT[i]).x;
             DrawText({ (px0 + px1) * 0.5f - w * 0.5f + 1, rowY[i] + 1 }, 20.0f,
-                     WithAlpha(sel ? RGBA(120, 90, 20, 255) : RGBA(24, 24, 24, 200), a), OPT[i]);
+                     WithAlpha(sel ? RGBA(52, 36, 15, 255) : RGBA(24, 24, 24, 200), a), OPT[i]);
             DrawText({ (px0 + px1) * 0.5f - w * 0.5f, rowY[i] }, 20.0f,
-                     WithAlpha(sel ? RGBA(40, 28, 4, 255) : RGBA(238, 238, 238, 255), a), OPT[i]);
+                     WithAlpha(sel ? RGBA(234, 126, 3, 255) : RGBA(238, 238, 238, 255), a), OPT[i]);
         }
         ResetFont();
     }

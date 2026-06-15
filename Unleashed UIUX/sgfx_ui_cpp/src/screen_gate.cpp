@@ -351,7 +351,7 @@ void Draw(double openSec) {
         const char* OPT[2] = { "Play Stage", "Cancel" };
         const float rowY[2] = { py0 + 50, py0 + 98 };
         DrawVGradient({ px0 + 14, rowY[g_popupSel] - 6 }, { px1 - 14, rowY[g_popupSel] + 34 },
-                      RGBA(238, 222, 150, 250), RGBA(214, 186, 96, 250));
+                      RGBA(196, 176, 104, 196), RGBA(168, 142, 72, 196));
         SetFont(g_fRodin);
         for (int i = 0; i < 2; ++i) {
             float w = MeasureText(27.0f, OPT[i]).x;

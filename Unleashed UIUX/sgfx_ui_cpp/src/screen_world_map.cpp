@@ -33,7 +33,7 @@ const UV GLYPH_B = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
 const UV GLYPH_X = { 0.16016f, 0.00781f, 0.23047f, 0.07422f };
 
 // ---- palette ------------------------------------------------------------------
-const uint32_t C_TITLE   = RGBA(255, 190, 33, 255);
+const uint32_t C_TITLE   = RGBA(232, 180, 32, 255);
 const uint32_t C_PANEL   = RGBA(0, 0, 0, 200);
 const uint32_t C_OUTER   = RGBA(0, 49, 0, 255);
 const uint32_t C_INNER   = RGBA(0, 33, 0, 235);
@@ -77,6 +77,10 @@ constexpr float GRID = 9.0f;
 
 bool g_popup = false;     // "Go to the village / Select stage"
 int  g_popupSel = 0;
+// g_showInfo: TRUE = populated stage-info panel (primary ref wm_stageinfo_spagonia,
+// the default no-input render); FALSE = hover/empty state after a cursor move
+// (left/right) — only the empty green bracket-frame + dotted left rail, no fill.
+bool g_showInfo = true;
 const char* g_nav = nullptr;
 
 void Init() {
@@ -85,7 +89,7 @@ void Init() {
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadFont("assets/fonts/dfsoge7.ttc");
 }
-void Reset() { g_popup = false; g_popupSel = 0; g_nav = nullptr; }
+void Reset() { g_popup = false; g_popupSel = 0; g_showInfo = true; g_nav = nullptr; }
 void Input(const ScreenInput& in) {
     if (g_popup) {
         if (in.up || in.down) g_popupSel ^= 1;
@@ -96,7 +100,10 @@ void Input(const ScreenInput& in) {
         if (in.cancel) { g_popup = false; g_popupSel = 0; }
         return;
     }
-    if (in.accept) { g_popup = true; g_popupSel = 0; }
+    // cursor move to a new stage -> hover/empty state (no committed stage info)
+    if (in.left || in.right) g_showInfo = false;
+    // accept opens the go-to popup = commit -> repopulate the stage-info panel
+    if (in.accept) { g_popup = true; g_popupSel = 0; g_showInfo = true; }
 }
 const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
@@ -199,18 +206,43 @@ void DrawStageInfo(float t) {
     ResetFont();
 }
 
+// hover/empty state (g_showInfo==false): only the green corner-bracket frame +
+// dotted left rail at the SIP rect, fully transparent interior so the starfield
+// shows through. No fill / photo / desc / counters / stage label.
+void DrawStageInfoEmpty(float t) {
+    const uint32_t fc = WithAlpha(C_SIP_RAIL, t);
+    const float BL = 2.7f;                 // bracket thickness
+    const float BX = 38.0f, BY = 34.0f;    // corner-bracket arm length
+    // top-left
+    DrawRect({ SIP_X0, SIP_Y0 }, { SIP_X0 + BX, SIP_Y0 + BL }, fc);
+    DrawRect({ SIP_X0, SIP_Y0 }, { SIP_X0 + BL, SIP_Y0 + BY }, fc);
+    // top-right
+    DrawRect({ SIP_X1 - BX, SIP_Y0 }, { SIP_X1, SIP_Y0 + BL }, fc);
+    DrawRect({ SIP_X1 - BL, SIP_Y0 }, { SIP_X1, SIP_Y0 + BY }, fc);
+    // bottom-left
+    DrawRect({ SIP_X0, SIP_Y1 - BL }, { SIP_X0 + BX, SIP_Y1 }, fc);
+    DrawRect({ SIP_X0, SIP_Y1 - BY }, { SIP_X0 + BL, SIP_Y1 }, fc);
+    // bottom-right
+    DrawRect({ SIP_X1 - BX, SIP_Y1 - BL }, { SIP_X1, SIP_Y1 }, fc);
+    DrawRect({ SIP_X1 - BL, SIP_Y1 - BY }, { SIP_X1, SIP_Y1 }, fc);
+    // dotted left rail (vertical dashes down the inner-left edge)
+    for (float y = SIP_Y0 + BY; y < SIP_Y1 - BY; y += 8.0f)
+        DrawRect({ SIP_X0 + 1.3f, y }, { SIP_X0 + 2.6f, y + 4.0f }, WithAlpha(C_DASH, t));
+}
+
 // the floating stage-name label + gradient leader rule (measured: SPAGONIA)
 void DrawStageLabel(float t) {
     SetFont(g_fDF);
     SetTextShear(0.22f);
-    SetTextStretchX(1.25f);
+    SetTextStretchX(1.65f);   // widen ~170 -> ~244 so the glyph fills the label width
     const char* NAME = "SPAGONIA";
-    // dark outline ring, then the lime->gold gradient face (x355..519, cap y347..371)
+    // dark outline ring, then the lime->gold gradient face (left origin x355.3 kept;
+    // font 34 -> 30 trims cap height ~23 -> ~19px)
     for (int dy = -1; dy <= 1; ++dy)
         for (int dx = -1; dx <= 1; ++dx)
             if (dx || dy)
-                DrawText({ 355.3f + dx * 2.0f, 340.0f + dy * 2.0f }, 34.0f, WithAlpha(RGBA(10, 22, 4, 255), t), NAME);
-    DrawTextGradient({ 355.3f, 340.0f }, 34.0f, WithAlpha(C_LBL_T, t), WithAlpha(C_LBL_B, t), NAME);
+                DrawText({ 355.3f + dx * 2.0f, 340.0f + dy * 2.0f }, 30.0f, WithAlpha(RGBA(10, 22, 4, 255), t), NAME);
+    DrawTextGradient({ 355.3f, 340.0f }, 30.0f, WithAlpha(C_LBL_T, t), WithAlpha(C_LBL_B, t), NAME);
     ResetTextStretchX();
     ResetTextShear();
     ResetFont();
@@ -234,9 +266,10 @@ void DrawStageLabel(float t) {
 void DrawPopup() {
     // ~33% scene dim (black at 66%); the popup + footer stay full-bright
     DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 124));
-    SetModifier(MOD_SCANLINE);
-    DrawRect({ 472, 276 }, { 808, 428 }, C_POP_FILL);
-    ResetModifier();
+    // body: faint vertical sub-gradient (no harsh scanlines) so the row-to-row
+    // green delta drops from ~43-69 toward real's ~19-20 while keeping texture
+    DrawVGradient({ 472, 276 }, { 808, 428 },
+                  RGBA(48, 130, 44, 255), RGBA(34, 108, 30, 255));
     const char* OPT[2] = { "Go to the village", "Select stage" };
     // highlight box on the selected row (smooth gradient — real game has no scanlines here)
     {
@@ -326,8 +359,13 @@ void Draw(double openSec) {
         }
     }
 
-    DrawStageLabel(t);
-    DrawStageInfo(t);
+    if (g_showInfo) {
+        DrawStageLabel(t);
+        DrawStageInfo(t);
+    } else {
+        // hover/empty state: only the green bracket-frame + dotted left rail
+        DrawStageInfoEmpty(t);
+    }
 
     // ---- bottom legend band (full-width olive gradient + bright top edge) ----
     DrawRect({ 0, 612 }, { REF_W, 614 }, WithAlpha(RGBA(140, 168, 90, 220), t));
@@ -339,8 +377,10 @@ void Draw(double openSec) {
         float hx = 598, hcy = 640;
         auto glyph = [&](const UV& g){ if (g_glyphTex<0) return; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{hx,hcy-gh*0.5f},{hx+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,t)); hx+=gw+6; };
         auto word=[&](const char* w,float pad){ DrawText({hx,hcy-12},23.0f,WithAlpha(C_WHITE,t),w); hx+=MeasureText(23.0f,w).x+pad; };
-        if (g_popup) { hx = 700; glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Back", 10); }
-        else         { glyph(GLYPH_X); word("Pass Time", 40); glyph(GLYPH_A); word("Select", 10); }
+        if (g_popup) { hx = 683; glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Back", 10); }
+        // non-popup: X glyph starts ~x555, wide pad after "Pass Time" (40->95) so
+        // the A(Select) green disc lands ~x875 (real span ~304px, not compressed)
+        else         { hx = 555; glyph(GLYPH_X); word("Pass Time", 95); glyph(GLYPH_A); word("Select", 10); }
         ResetFont();
     }
 
@@ -350,7 +390,8 @@ void Draw(double openSec) {
         // measured: footer stays FULL bright -> draw popup dim first, then redraw footer
         DrawPopup();
         SetFont(g_fRodin);
-        float hx = 700, hcy = 640;
+        // A(Select) disc starts ~x683 -> centers ~x698, widening A->B gap to ~178
+        float hx = 683, hcy = 640;
         auto glyph = [&](const UV& g){ if (g_glyphTex<0) return; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{hx,hcy-gh*0.5f},{hx+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, C_WHITE); hx+=gw+6; };
         auto word=[&](const char* w,float pad){ DrawText({hx,hcy-12},23.0f,C_WHITE,w); hx+=MeasureText(23.0f,w).x+pad; };
         glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Back", 10);

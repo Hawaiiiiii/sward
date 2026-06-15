@@ -46,12 +46,12 @@ const UV RANK_UV[6] = {
 // ---- palette (sampled from the live capture) --------------------------------
 const uint32_t C_RAIL      = RGBA(66, 84, 134, 235);     // header rail navy
 const uint32_t C_RAIL_EDGE = RGBA(169, 188, 234, 255);   // bright under-edge line
-const uint32_t C_PLATE_T   = RGBA(54, 85, 146, 215);     // stat plate navy top
-const uint32_t C_PLATE_B   = RGBA(41, 61, 116, 215);     // stat plate navy bottom
+const uint32_t C_PLATE_T   = RGBA(46, 54, 88, 235);      // stat plate navy top (darker/desat, alpha up)
+const uint32_t C_PLATE_B   = RGBA(34, 42, 74, 235);      // stat plate navy bottom (darker/desat, alpha up)
 const uint32_t C_PLATE_BD  = RGBA(235, 240, 248, 255);   // plate white outline
 const uint32_t C_LABEL     = RGBA(190, 206, 230, 255);   // white/light-blue label (measured)
-const uint32_t C_TOTAL_T   = RGBA(66, 161, 113, 235);    // TOTAL green top
-const uint32_t C_TOTAL_B   = RGBA(40, 142, 90, 235);     // TOTAL green bottom
+const uint32_t C_TOTAL_T   = RGBA(68, 158, 124, 235);    // TOTAL teal-green top (blue lifted)
+const uint32_t C_TOTAL_B   = RGBA(46, 140, 124, 235);    // TOTAL teal-green bottom (blue lifted)
 const uint32_t C_TOTAL_TXT = RGBA(16, 42, 64, 255);      // navy TOTAL text
 const uint32_t C_CHR_T     = RGBA(244, 246, 250, 255);   // chrome digits top
 const uint32_t C_CHR_B     = RGBA(170, 178, 192, 255);   // chrome digits bottom
@@ -165,7 +165,14 @@ void Draw(double openSec) {
         Plate(x, y, ROW_W, ROW_H, C_PLATE_T, C_PLATE_B, C_PLATE_BD, rowT);
         SetFont(g_fSeurat);
         SetTextShear(0.20f);
-        DrawText({ x + 38, y + (ROW_H - 24) * 0.5f }, 24.0f, WithAlpha(C_LABEL, rowT), ROWS[i].label);
+        {   // dark 8-direction outline pass behind the label (Chrome-style), then the light fill
+            const V2 lp = { x + 38, y + (ROW_H - 24) * 0.5f };
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                    if (dx || dy)
+                        DrawText({ lp.x + dx * 1.5f, lp.y + dy * 1.5f }, 24.0f, WithAlpha(RGBA(20, 28, 44, 255), rowT), ROWS[i].label);
+            DrawText(lp, 24.0f, WithAlpha(C_LABEL, rowT), ROWS[i].label);
+        }
         ResetTextShear();
         ResetFont();
         // tally value, RIGHT-aligned inside the strip to the common edge
@@ -186,7 +193,7 @@ void Draw(double openSec) {
             const float x = 625.0f;        // green plate left (real green plate x628-797)
             const float TOT_PLATE_W = 165;  // compact green label plate (green ends ~x793)
             // teal value strip from the green plate right edge to VAL_R (real is teal, not navy)
-            const uint32_t C_TSTRIP_T = RGBA(40, 110, 112, 200), C_TSTRIP_B = RGBA(24, 78, 82, 200);
+            const uint32_t C_TSTRIP_T = RGBA(72, 150, 138, 200), C_TSTRIP_B = RGBA(46, 118, 112, 200);   // brighter teal (green +~32)
             const float sx0 = x + TOT_PLATE_W + SLANT - 6;
             const V2 vs[4] = { { sx0 + SLANT, TOT_TOP + 4 }, { VAL_R, TOT_TOP + 4 }, { VAL_R, TOT_TOP + TOT_H - 4 }, { sx0, TOT_TOP + TOT_H - 4 } };
             const uint32_t vsc[4] = { WithAlpha(C_TSTRIP_T, totT), WithAlpha(C_TSTRIP_T, totT), WithAlpha(C_TSTRIP_B, totT), WithAlpha(C_TSTRIP_B, totT) };
@@ -213,7 +220,7 @@ void Draw(double openSec) {
         if (rkT > 0.0f) {
             // wide layered teal band behind the rank letter (measured y~520-564)
             DrawVGradient({ 0, 519 }, { 560, 524 }, WithAlpha(RGBA(78, 176, 158, 225), rkT), WithAlpha(RGBA(78, 176, 158, 225), rkT));
-            DrawVGradient({ 0, 524 }, { 560, 565 }, WithAlpha(RGBA(40, 110, 104, 205), rkT), WithAlpha(RGBA(24, 74, 72, 205), rkT));
+            DrawVGradient({ 0, 524 }, { 560, 565 }, WithAlpha(RGBA(64, 146, 135, 205), rkT), WithAlpha(RGBA(46, 114, 108, 205), rkT));   // brighter band body (green +~30)
             SetFont(g_fSeurat);
             SetTextShear(0.22f);
             for (int dy = -1; dy <= 1; ++dy)
@@ -226,7 +233,7 @@ void Draw(double openSec) {
             // rank letter pops with an overshoot: scale 1.6 -> 1.0 about its centre
             // measured letter bbox (331,433)-(484,609): ~153 wide x 176 tall
             const float s = 1.0f + (1.0f - rkT) * 0.6f;
-            const float cx = 424.0f, cy = 532.0f, hw = 56.0f * s, hh = 62.0f * s;
+            const float cx = 424.0f, cy = 532.0f, hw = 63.0f * s, hh = 62.0f * s;   // widen C: w~126 (real ~127)
             int ri = 0; while (ri < 5 && RANK_NAME[ri][0] != g_rank[0]) ++ri;
             if (g_rankTex >= 0) {   // the REAL metal letter art, warm-gold tinted (as captured)
                 DrawImage(g_rankTex, { cx - hw, cy - hh }, { cx + hw, cy + hh },
@@ -255,13 +262,20 @@ void Draw(double openSec) {
         const float fT = (float)ComputeMotion(openSec, 60.0, 10.0);
         float hx = 856, hcy = 638;   // glyph center ~876,638 (manifest btn_a x856 y618 h40)
         if (g_glyphTex >= 0) {
-            float asp = ((GLYPH_A.u1 - GLYPH_A.u0) * GTW) / ((GLYPH_A.v1 - GLYPH_A.v0) * GTH), gh = 28.0f, gw = gh * asp;
+            float asp = ((GLYPH_A.u1 - GLYPH_A.u0) * GTW) / ((GLYPH_A.v1 - GLYPH_A.v0) * GTH), gh = 34.0f, gw = gh * asp;   // (A) orb ~w31/h34 (was 28; matches btn_a 40px region)
             DrawImage(g_glyphTex, { hx, hcy - gh * 0.5f }, { hx + gw, hcy + gh * 0.5f },
                       { GLYPH_A.u0, GLYPH_A.v0 }, { GLYPH_A.u1, GLYPH_A.v1 }, WithAlpha(C_WHITE, fT));
             hx += gw + 8;
         }
         SetFont(g_fRodin);
-        DrawText({ hx, hcy - 12 }, 22.0f, WithAlpha(C_WHITE, fT), "Next");
+        {   // dark 8-direction outline pass behind 'Next' (Chrome-style), then the white fill
+            const V2 np = { hx, hcy - 12 };
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                    if (dx || dy)
+                        DrawText({ np.x + dx * 1.5f, np.y + dy * 1.5f }, 22.0f, WithAlpha(RGBA(20, 28, 44, 255), fT), "Next");
+            DrawText(np, 22.0f, WithAlpha(C_WHITE, fT), "Next");
+        }
         ResetFont();
     }
 }

@@ -47,7 +47,7 @@ const uint32_t C_DLG_BD   = RGBA(200, 202, 200, 255);
 const uint32_t C_ICON_GRN = RGBA(40, 188, 36, 255);
 const uint32_t C_BAND_EDGE= RGBA(123, 156, 113, 255);   // letterbox edge line
 const uint32_t C_BAND     = RGBA(44, 54, 15, 200);      // scanline band olive
-const uint32_t C_SEL_BAR  = RGBA(0, 115, 25, 190);      // carousel selector
+const uint32_t C_SEL_BAR  = RGBA(10, 140, 30, 230);     // carousel selector
 const uint32_t C_ENTRY    = RGBA(167, 211, 29, 255);    // entry lime fill
 const uint32_t C_ENTRY_OUT= RGBA(28, 55, 12, 255);
 const uint32_t C_ARROW    = RGBA(16, 130, 24, 255);
@@ -255,7 +255,7 @@ void AutosaveDialog(float a) {
                          "appears", "on the screen." };
     const float fz = 26.0f, pitch = 34.0f;
     for (int i = 0; i < 8; ++i) {
-        float ly = 216.0f + i * pitch;
+        float ly = 229.0f + i * pitch;
         float w = MeasureText(fz, L[i]).x;
         float lx = 638.7f - w * 0.5f;
         if (i == 6) lx += 20;   // line 7 carries the inline icon left of the word

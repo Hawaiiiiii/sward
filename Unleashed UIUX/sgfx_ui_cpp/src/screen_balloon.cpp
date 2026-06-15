@@ -137,12 +137,14 @@ void Draw(double openSec) {
         float w = MeasureText(22.0f, NAME).x;
         const float capCx = (lcx - r + rcx + r) * 0.5f;   // visible capsule centre (~858)
         const float nx = capCx - w * 0.5f, ny = (y0 + y1) * 0.5f - 12.0f;
-        // outlined grammar to match the dialogue 'line' lambda: dark stroke + cream fill
+        // INVERTED grammar (verified vs real n1_nameplate): name is DARK letters
+        // with a LIGHT/white halo on the gold pill, NOT a cream fill + dark outline.
+        // offset/outline passes = light cream halo; centre fill = dark core (.###.)
         for (int dy = -1; dy <= 1; ++dy)
             for (int dx = -1; dx <= 1; ++dx)
                 if (dx || dy)
-                    DrawText({ nx + dx * 1.4f, ny + dy * 1.4f }, 22.0f, WithAlpha(RGBA(26, 28, 34, 255), a), NAME);
-        DrawText({ nx, ny }, 22.0f, WithAlpha(RGBA(231, 225, 215, 255), a), NAME);
+                    DrawText({ nx + dx * 1.4f, ny + dy * 1.4f }, 22.0f, WithAlpha(RGBA(240, 236, 224, 255), a), NAME);
+        DrawText({ nx, ny }, 22.0f, WithAlpha(RGBA(40, 34, 22, 255), a), NAME);
         ResetFont();
     }
 
@@ -165,11 +167,16 @@ void Draw(double openSec) {
         SetFont(g_fSeurat);
         const Line2& L = SCRIPT[g_line];
         auto line = [&](const char* s, float ly) {
+            const float lx = x0 + 36;
+            // stronger single drop-shadow pass biased down-and-right (real centroid
+            // dY=+17.5, below-right shell dominant)
+            DrawText({ lx + 1.5f, ly + 1.5f }, 24.0f, WithAlpha(C_TXT_OUT, bT), s);
+            // thin ~1px outline ring so edges stay crisp without a heavy symmetric shell
             for (int dy = -1; dy <= 1; ++dy)
                 for (int dx = -1; dx <= 1; ++dx)
                     if (dx || dy)
-                        DrawText({ x0 + 36 + dx * 1.4f, ly + dy * 1.4f }, 24.0f, WithAlpha(C_TXT_OUT, bT), s);
-            DrawText({ x0 + 36, ly }, 24.0f, WithAlpha(C_TXT, bT), s);
+                        DrawText({ lx + dx * 1.0f, ly + dy * 1.0f }, 24.0f, WithAlpha(C_TXT_OUT, bT), s);
+            DrawText({ lx, ly }, 24.0f, WithAlpha(C_TXT, bT), s);
         };
         line(L.a, y0 + 28);
         line(L.b, y0 + 62);
@@ -181,8 +188,16 @@ void Draw(double openSec) {
         SetFont(g_fRodin);
         float hcy = 638;
         auto glyph = [&](const UV& g, float x){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,a)); return x+gw+8; };
-        float hx = 680; hx = glyph(GLYPH_A, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Select");
-        hx = 857; hx = glyph(GLYPH_B, hx); DrawText({ hx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), "Back");
+        // footer labels share the dialogue 'line' lambda's 8-way dark outline grammar
+        auto label = [&](float lx, const char* s){
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                    if (dx || dy)
+                        DrawText({ lx + dx * 1.4f, hcy - 13 + dy * 1.4f }, 22.0f, WithAlpha(C_TXT_OUT, a), s);
+            DrawText({ lx, hcy - 13 }, 22.0f, WithAlpha(C_WHITE, a), s);
+        };
+        float hx = 680; hx = glyph(GLYPH_A, hx); label(hx, "Select");
+        hx = 857; hx = glyph(GLYPH_B, hx); label(hx, "Back");
         ResetFont();
     }
 }

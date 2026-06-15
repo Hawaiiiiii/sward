@@ -107,13 +107,13 @@ constexpr float VAL_X0 = (SP_X0 + GRID * 2) + OPT_W + ((SP_X1 - GRID * 2) - (SP_
 const uint32_t C_TITLE     = RGBA(255, 190, 33, 255);
 const uint32_t C_PANEL_BG  = RGBA(0, 0, 0, 223);
 const uint32_t C_OUTER     = RGBA(0, 49, 0, 255);
-const uint32_t C_INNER     = RGBA(0, 33, 0, 255);
+const uint32_t C_INNER     = RGBA(0, 27, 0, 255);  // slightly darker -> fainter checkerboard (panel mean ~19, std ~9)
 const uint32_t C_LINE      = RGBA(0, 89, 0, 255);
-const uint32_t C_TAB_BG    = RGBA(0, 130, 0, 223);
-const uint32_t C_TAB_BG2   = RGBA(0, 130, 0, 150);
+const uint32_t C_TAB_BG    = RGBA(10, 66, 5, 223);  // dimmed/warmed active-tab plate top (renders ~12,66,5)
+const uint32_t C_TAB_BG2   = RGBA(8, 60, 5, 160);   // flattened bottom -> near-flat gradient
 const uint32_t C_TAB_TXT_T = RGBA(126, 230, 15, 255);  // tab text gradient top
 const uint32_t C_TAB_TXT_B = RGBA(199, 127, 12, 255);  // tab text gradient bottom
-const uint32_t C_TAB_OFF   = RGBA(128, 135, 41, 220);  // inactive tab olive-gold (measured ~102,108,33)
+const uint32_t C_TAB_OFF   = RGBA(128, 134, 12, 220);  // inactive tab warm-olive (G>=R, low blue; renders ~92,107,9)
 const uint32_t C_SEL_TL    = RGBA(226, 113, 34, 126);  // selected row diagonal (gold)
 const uint32_t C_SEL_BR    = RGBA(146, 255, 49, 126);  // -> green
 const uint32_t C_LABEL     = RGBA(255, 255, 255, 255);
@@ -124,7 +124,7 @@ const uint32_t C_VAL_TXT_B = RGBA(82, 108, 12, 255);
 const uint32_t C_VAL_TXT_SEL = RGBA(195, 225, 100, 255);  // selected enum row brightens (measured)
 const uint32_t C_LIGHT_ON  = RGBA(170, 182, 12, 255);  // dim olive-yellow toggle light (measured)
 const uint32_t C_LIGHT_OFF = RGBA(40, 70, 40, 255);
-const uint32_t C_CARET     = RGBA(140, 230, 60, 255);  // selected-value carets are green in ref
+const uint32_t C_CARET     = RGBA(6, 112, 6, 255);  // selected-value carets: dark solid green (real ~4,107,4)
 const uint32_t C_DESC      = RGBA(255, 255, 255, 255);
 const uint32_t C_VERSION   = RGBA(255, 255, 255, 70);
 const uint32_t C_GREEN_GLOW= RGBA(203, 255, 0, 55);    // scanline band glow (inner)
@@ -205,7 +205,7 @@ void DrawContainer(float x0, float y0, float x1, float y1, bool rightOutline, fl
 }
 
 void DrawCaret(float cx, float cy, bool right, uint32_t col) {
-    for (int i = 0; i < 5; ++i) { float hh = 9.0f - i*1.8f, dx = i*2.0f; float bx = right ? (cx-6+dx) : (cx+6-dx); DrawRect({ bx, cy-hh }, { bx+2, cy+hh }, col); }
+    for (int i = 0; i < 5; ++i) { float hh = 9.0f - i*1.8f, dx = i*1.0f; float bx = right ? (cx-6+dx) : (cx+6-dx); DrawRect({ bx, cy-hh }, { bx+2, cy+hh }, col); }
 }
 
 void DrawValueText(const char* s, float x0, float y0, float x1, float y1, float t, bool sel = false) {
@@ -324,6 +324,26 @@ void Draw(double openSec) {
         DrawRect({ pvx0, ty0 }, { pvx0 + L, ty1 }, gb);
         DrawRect({ pvx1 - L, ty0 }, { pvx1, ty1 }, gb);
         DrawTextAligned({ pvx0, ty0 }, { pvx1, ty1 }, 15.0f, WithAlpha(RGBA(110,140,116,255), t), "PREVIEW", Align::Center, true, true);
+        // ---- controller-brand medallion ANCHOR (~54px circular slot) ---------
+        // Overlaps the preview frame's bottom-left (game x~913-967,y~252-304 -> ref
+        // ~pvx0,ty1). The SEGA/Xbox medallion texture itself stays a slot per the
+        // art boundary; here we draw only the positioned dark-disc base + faint rim
+        // so the anchor exists (previously empty dark-green, zero gold px). The
+        // ENUM "Time of Day Transition" value (XBOX/PLAYSTATION) selects the art.
+        {
+            const float bcx = pvx0 + 10.0f, bcy = ty1 - 10.0f, br = 27.0f;  // ~54px circle
+            // layered-rect disc approximation (FillDisc is file-local elsewhere): base
+            auto discRect = [&](float r, uint32_t col){
+                // 3-band octagon: square + two clipped corners read as a round slot
+                float k = r * 0.4142f;  // tan(22.5) -> octagon inset
+                DrawRect({ bcx - r, bcy - k }, { bcx + r, bcy + k }, col);
+                DrawRect({ bcx - k, bcy - r }, { bcx + k, bcy + r }, col);
+                DrawRect({ bcx - r*0.78f, bcy - r*0.78f }, { bcx + r*0.78f, bcy + r*0.78f }, col);
+            };
+            discRect(br + 1.5f, WithAlpha(RGBA(0, 49, 0, 255), t));            // green rim ring (matches panel outer)
+            discRect(br - 1.0f, WithAlpha(RGBA(14, 22, 16, 255), t));         // dark medallion base
+            discRect(br - 6.0f, WithAlpha(RGBA(8, 14, 10, 235), t));          // inner recess (art drops here)
+        }
         const Option& s = Opt(std::clamp(g_sel, 0, OptCount() - 1));
         // description: centred word-wrapped paragraph, Seurat 28 white, line spacing 5,
         // per-value description appended after a blank line, clipped to the panel with

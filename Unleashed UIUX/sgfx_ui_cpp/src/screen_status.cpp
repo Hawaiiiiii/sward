@@ -44,9 +44,12 @@ const uint32_t C_RAIL_EDGE = RGBA(146, 168, 210, 255);  // thin cyan/light-blue 
 const uint32_t C_CHR_T   = RGBA(244, 246, 250, 255);    // chrome wordmark/labels
 const uint32_t C_CHR_B   = RGBA(168, 176, 190, 255);
 const uint32_t C_CHR_OUT = RGBA(22, 24, 36, 255);
-const uint32_t C_PLATE_T = RGBA(54, 50, 108, 248);      // stat plate (dark navy/indigo, measured)
+const uint32_t C_PLATE_T = RGBA(54, 50, 108, 248);      // stat plate purple (night/Werehog, measured)
 const uint32_t C_PLATE_B = RGBA(32, 28, 72, 248);
+const uint32_t C_PLATE_D_T = RGBA(60, 72, 86, 248);     // stat plate neutral gunmetal (day/Sonic; real B-R ~10-20)
+const uint32_t C_PLATE_D_B = RGBA(36, 46, 60, 248);
 const uint32_t C_PLATE_RIM = RGBA(225, 220, 240, 255);  // white top rim
+const uint32_t C_GOLD_RIM = RGBA(220, 215, 33, 255);    // gold outline rim tracing the plate
 const uint32_t C_EXP_N_T = RGBA(152, 42, 184, 235);     // EXP plate violet-magenta (night/Werehog)
 const uint32_t C_EXP_N_B = RGBA(102, 68, 116, 235);
 const uint32_t C_EXP_D_T = RGBA(60, 150, 232, 235);     // EXP plate blue (day/Sonic)
@@ -64,10 +67,22 @@ const uint32_t C_SKY_T = RGBA(86, 140, 210, 255), C_SKY_B = RGBA(170, 205, 235, 
 constexpr float RAIL_Y0 = 50, RAIL_Y1 = 107, RAIL_X1 = 607;
 constexpr float WM_X = 263, WM_TOP = 60;
 constexpr float EXP_Y = 168;                 // EXP row top
-constexpr float ROW_Y0 = 233;                // first stat row top (measured: EXP@1280 ~237)
+constexpr float ROW_Y0 = 219;                // first stat row top (raised -14 to lift the stat stack; EXP/gem unchanged)
 constexpr float PLATE_H = 40;
 constexpr float PLATE_X = 180, PLATE_W = 188;
 constexpr float BAR_END = 575, SLANT = 12;   // gold tail reaches ~x575 (measured)
+
+// filled circle via horizontal strips (sgfxui has no circle primitive)
+void FillDisc(float cx, float cy, float r, uint32_t col) {
+    const int N = 14;
+    for (int i = 0; i < N; ++i) {
+        const float y0 = cy - r + (2.0f * r) * i / N;
+        const float y1 = cy - r + (2.0f * r) * (i + 1) / N;
+        const float ym = (y0 + y1) * 0.5f - cy;
+        const float hw = std::sqrt(std::max(0.0f, r * r - ym * ym));
+        DrawRect({ cx - hw, y0 }, { cx + hw, y1 }, col);
+    }
+}
 
 struct Row { const char* label; float fill; };   // fill 0..1 (1 = MAX)
 const Row SONIC_ROWS[] = {
@@ -88,7 +103,7 @@ int  g_expCount = 99;
 // then 74); we model day with EXP_Y=218, ROW_Y0=319 and a 74px stat pitch.
 inline float RowPitch()  { return g_night ? 64.0f : 74.0f; }   // stat-row pitch
 inline float ExpTop()    { return g_night ? EXP_Y  : 218.0f; } // EXP plate top
-inline float StatTop0()  { return g_night ? ROW_Y0 : 319.0f; } // first stat-row top
+inline float StatTop0()  { return g_night ? ROW_Y0 : 304.0f; } // first stat-row top (day raised -15 to lift the stack)
 
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
@@ -130,11 +145,33 @@ void StatRow(float y, const char* label, float fill, bool sel, float a, bool exp
         pT = g_night ? C_EXP_N_T : C_EXP_D_T;
         pB = g_night ? C_EXP_N_B : C_EXP_D_B;
         rim = g_night ? C_PLATE_RIM : C_EXP_RIM;
-    } else { pT = C_PLATE_T; pB = C_PLATE_B; }
+    } else {
+        // non-EXP plate is form-dependent: gunmetal (day/Sonic) vs purple (night/Werehog)
+        pT = g_night ? C_PLATE_T : C_PLATE_D_T;
+        pB = g_night ? C_PLATE_B : C_PLATE_D_B;
+    }
     // label plate (parallelogram)
     const V2 pc[4] = { { x0 + SLANT, y }, { x0 + PLATE_W + SLANT, y }, { x0 + PLATE_W, y + PLATE_H }, { x0, y + PLATE_H } };
     const uint32_t pcol[4] = { WithAlpha(pT, a), WithAlpha(pT, a), WithAlpha(pB, a), WithAlpha(pB, a) };
     DrawQuadGradient(pc, pcol);
+    // gold rim: ~2px stroke tracing all 4 edges of the parallelogram, strongest
+    // on the active/selected row (in addition to the white top rim below)
+    {
+        const float rg = sel ? a : a * 0.55f;
+        const uint32_t gr = WithAlpha(C_GOLD_RIM, rg);
+        // top edge (along the slanted top)
+        DrawRect({ pc[0].x, pc[0].y }, { pc[1].x, pc[0].y + 2 }, gr);
+        // bottom edge
+        DrawRect({ pc[3].x, pc[2].y - 2 }, { pc[2].x, pc[2].y }, gr);
+        // left slanted edge (top-left -> bottom-left)
+        const V2 le[4] = { { pc[0].x, pc[0].y }, { pc[0].x + 2, pc[0].y }, { pc[3].x + 2, pc[3].y }, { pc[3].x, pc[3].y } };
+        const uint32_t lec[4] = { gr, gr, gr, gr };
+        DrawQuadGradient(le, lec);
+        // right slanted edge (top-right -> bottom-right)
+        const V2 re[4] = { { pc[1].x - 2, pc[1].y }, { pc[1].x, pc[1].y }, { pc[2].x, pc[2].y }, { pc[2].x - 2, pc[2].y } };
+        const uint32_t rec[4] = { gr, gr, gr, gr };
+        DrawQuadGradient(re, rec);
+    }
     DrawRect({ x0 + SLANT, y }, { x0 + PLATE_W + SLANT, y + 2 }, WithAlpha(rim, a));   // top rim
     if (sel) {   // white selection rim around the plate
         DrawRect({ x0, y + PLATE_H - 2 }, { x0 + PLATE_W, y + PLATE_H }, WithAlpha(C_WHITE, a));
@@ -204,24 +241,45 @@ void Draw(double openSec) {
                     Align::Center, true, false);
     ResetFont();
 
-    // ---- top-right level gauges (Werehog/night form only): a "lv 7" label in a
-    //      silver capsule, then the yellow pill gauge bar (measured: no medal
-    //      square — the level label sits in the capsule) ----
+    // ---- top-right level gauges (Werehog/night form only): a medal disc at the
+    //      capsule LEFT, a bold white "LV 7" label, then the yellow pill gauge
+    //      bar (measured: medal disc center ~x806, LEFT of the x814 capsule) ----
     if (g_night) {
-        auto lvchip = [&](float cy) {
+        auto lvchip = [&](float cy, bool top) {
             // silver capsule track (rounded ends) with the lv label seated left
             DrawVGradient({ 818, cy - 12 }, { 1000, cy + 12 }, WithAlpha(RGBA(206, 210, 214, 235), a), WithAlpha(RGBA(150, 154, 160, 235), a));
             DrawRect({ 814, cy - 6 }, { 822, cy + 6 }, WithAlpha(RGBA(180, 184, 190, 235), a));   // rounded-end hint
             DrawRect({ 996, cy - 6 }, { 1004, cy + 6 }, WithAlpha(RGBA(180, 184, 190, 235), a));
-            // "lv 7" label (small lv + larger 7)
+            // medal disc at the capsule LEFT (center ~x806, r~7): warm red/gold
+            // radial for the top chip, blue/teal radial for the bottom
+            {
+                const float mcx = 806.0f;
+                const uint32_t ring = top ? WithAlpha(RGBA(168, 34, 28, 235), a)
+                                          : WithAlpha(RGBA(28, 78, 150, 235), a);
+                const uint32_t core = top ? WithAlpha(RGBA(248, 196, 70, 235), a)
+                                          : WithAlpha(RGBA(96, 178, 214, 235), a);
+                FillDisc(mcx, cy, 7.5f, ring);
+                FillDisc(mcx, cy, 4.5f, core);
+            }
+            // bold "LV 7" label, white with a dark outline, seated right of the medal
             SetFont(g_fRodin);
-            DrawTextShadow({ 826, cy - 6 }, 12.0f, WithAlpha(RGBA(70, 72, 78, 255), a), "lv");
-            DrawText({ 842, cy - 11 }, 22.0f, WithAlpha(RGBA(40, 42, 48, 255), a), "7");
+            const uint32_t lvOut = WithAlpha(RGBA(28, 30, 36, 255), a);
+            const uint32_t lvFill = WithAlpha(C_WHITE, a);
+            const V2 lvP{ 826.0f, cy - 8.0f };
+            const V2 svP{ 850.0f, cy - 11.0f };
+            for (float dx = -1.5f; dx <= 1.5f; dx += 1.5f)
+                for (float dy = -1.5f; dy <= 1.5f; dy += 1.5f)
+                    if (dx != 0.0f || dy != 0.0f) {
+                        DrawText({ lvP.x + dx, lvP.y + dy }, 15.0f, lvOut, "LV");
+                        DrawText({ svP.x + dx, svP.y + dy }, 24.0f, lvOut, "7");
+                    }
+            DrawText(lvP, 15.0f, lvFill, "LV");
+            DrawText(svP, 24.0f, lvFill, "7");
             ResetFont();
             // yellow pill gauge fill (rounded), right of the label
-            DrawVGradient({ 864, cy - 7 }, { 988, cy + 7 }, WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_B, a));
+            DrawVGradient({ 872, cy - 7 }, { 988, cy + 7 }, WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_B, a));
         };
-        lvchip(140); lvchip(176);
+        lvchip(140, true); lvchip(176, false);
     }
 
     // ---- EXP row: magenta plate + gem slot + bar + chrome count ----
@@ -255,7 +313,7 @@ void Draw(double openSec) {
         if (qt > 0.0f) {
             // QUIT plate centered near manifest decide_bg (center x316, y554) for
             // BOTH forms; this removes the day~425/night~509 drift off the stack.
-            const float qy = 540, qx = 224, qw = 132, qh = 38;
+            const float qy = 540, qx = 224, qw = 190, qh = 38;   // widened (plate ~199px incl slant)
             const bool qsel = (g_sel == n);
             const float qx0 = qsel ? qx - 12 : qx;
             uint32_t qT = g_night ? RGBA(96, 64, 140, 235) : RGBA(56, 104, 168, 235);
@@ -269,8 +327,12 @@ void Draw(double openSec) {
             DrawRect({ qx0 + qw + SLANT, qy + qh * 0.4f }, { qx0 + qw + SLANT + 14, qy + qh * 0.4f + 3 }, WithAlpha(qT, qt));
             SetFont(g_fSeurat);
             SetTextShear(0.18f);
-            DrawText({ qx0 + 26 + 1.5f, qy + 8 + 1.5f }, 22.0f, WithAlpha(RGBA(14, 14, 22, 255), qt), "QUIT");
-            DrawText({ qx0 + 26, qy + 8 }, 22.0f, WithAlpha(C_WHITE, qt), "QUIT");
+            // label is center-right with a visible ~50px tail before the chevron,
+            // NOT flush right: qx0 + qw - textW - 20  (lands start ~x257-272)
+            const float qtw = MeasureText(22.0f, "QUIT").x;
+            const float qlx = qx0 + qw - qtw - 20.0f;
+            DrawText({ qlx + 1.5f, qy + 8 + 1.5f }, 22.0f, WithAlpha(RGBA(14, 14, 22, 255), qt), "QUIT");
+            DrawText({ qlx, qy + 8 }, 22.0f, WithAlpha(C_WHITE, qt), "QUIT");
             ResetTextShear();
             ResetFont();
         }

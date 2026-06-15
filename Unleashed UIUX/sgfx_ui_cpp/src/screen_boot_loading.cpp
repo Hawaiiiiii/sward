@@ -122,7 +122,7 @@ static const CellSched SPIN_SCHED[3][3] = {
     { { 2, {{40,80},{120,160}} },        { 2, {{60,100},{140,180}} },  { 2, {{80,120},{157,197}} } },
 };
 // dim "off" green-grey (~g30) the unlit cells settle toward
-const uint32_t C_GREEN_OFF = RGBA(20, 30, 14, 255);
+const uint32_t C_GREEN_OFF = RGBA(19, 28, 16, 255);
 
 void DrawSpinner(float x0, float y0, double now) {
     const float cell = 8.7f, step = 10.0f;
@@ -140,7 +140,7 @@ void DrawSpinner(float x0, float y0, double now) {
             lit = std::max(lit, std::min(1.0f, std::max(0.0f, on)));
         }
         // lit -> ~0.9 toward C_GREEN; unlit -> ~0.12 toward the dim off green-grey
-        float k = 0.12f + 0.78f * lit;                          // 0.12 (off) .. 0.90 (on)
+        float k = 0.04f + 0.86f * lit;                          // 0.04 (off) .. 0.90 (on)
         uint32_t c = ColourLerp(C_GREEN_OFF, C_GREEN, k);
         float gx = x0 + col * step, gy = y0 + row * step;
         if (g_wordTex >= 0)   // the real cell sprite from mat_load_en_001
@@ -168,8 +168,8 @@ void Draw(double openSec) {
         // dark-bottom green shading (face g ~218 -> ~147), at the measured rect.
         DrawImageVGradient(g_wordTex, { 650, 568 }, { 969, 602 },
                            { WM_U0, WM_V0 }, { WM_U1, WM_V1 },
-                           WithAlpha(RGBA(48, 130, 12, 255), pulse),
-                           WithAlpha(RGBA(34, 95, 10, 255), pulse));
+                           WithAlpha(RGBA(48, 130, 16, 255), pulse),
+                           WithAlpha(RGBA(40, 82, 14, 255), pulse));
     } else {
         // re-skin path (custom SGFX strings): the proportional bitmap font, bolded
         const char* txt = "NOW LOADING";

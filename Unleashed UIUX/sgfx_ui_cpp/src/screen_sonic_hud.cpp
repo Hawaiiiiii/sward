@@ -428,13 +428,21 @@ void Draw(double openSec) {
     }
     DrawBoostGauge(displayBoost, gaugeT);
 
-    // RINGENERGY label + ring-count readout beside the boost gauge (the real HUD
-    // labels the long bar — the art is a single token, no space)
+    // "RING ENERGY" label + ring-count readout beside the boost gauge (the real HUD
+    // labels the long bar — two words with a real word gap)
     if (gaugeT > 0.0f) {
         SetFont(g_fRodin);
-        DrawTextShadow({ TIRE_X + 44.0f, 642.0f }, 13.0f, WithAlpha(COL_FOOTER, gaugeT), "RINGENERGY");
+        // boost-gauge label: a readable bold chrome word ON / just above the steel
+        // bar (bumped 13->18px, brighter near-white chrome matching TIME/SCORE), but
+        // kept moderate so it never overpowers the bar itself.
+        DrawTextShadow({ BAR_X + 6.0f, BAR_Y - 21.0f }, 18.0f,
+                       WithAlpha(RGBA(236, 244, 252, 255), gaugeT), "RING ENERGY");
         ResetFont();
-        DrawNumber(g_rings % 1000, TIRE_X + 40.0f, 664.0f, DIGIT_H * 0.7f, gaugeT);
+        // ring-count readout: a small "RINGS" atlas label above a zero-padded
+        // 3-digit value (%03d), beside the gold ring.
+        DrawLabel(LBL_RINGS, TIRE_X + 40.0f, 650.0f, ROW_LABEL_H * 0.8f, gaugeT);
+        char ringBuf[8]; std::snprintf(ringBuf, sizeof(ringBuf), "%03d", g_rings % 1000);
+        DrawGlyphStringLeft(ringBuf, TIRE_X + 40.0f, 668.0f, DIGIT_H * 0.7f, gaugeT);
     }
     (void)footT;
 }
