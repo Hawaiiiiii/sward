@@ -57,11 +57,20 @@ struct Cast {
 
 struct Scene {
     bool        draw = true;       // "rest":false scenes are skipped (alt-state overlays)
+    bool        stateHidden = false;  // hidden in the current state (e.g. an _ev_-only scene under "so")
     std::vector<std::pair<std::string, float>> animList;   // every (animName, frames) the scene declares
     std::string restAnim;          // resolved best-pose animation (resolve_rest port)
     float       restFrame = 0;     // resolved best-pose frame
     std::vector<Cast> casts;
 };
+
+// Day/night (Sonic/Werehog) state bias for resolveRest. Sonic Unleashed CSDs
+// carry per-scene "_so_" (Sonic/day) and "_ev_" (evil/Werehog/night) animation
+// variants; with no bias resolveRest picks the fullest pose (usually the ev one),
+// so the raw render shows the day+night SUPERSET. SetState("so"/"ev") restricts
+// each scene to its matching variant and hides scenes that exist only in the
+// opposite state — yielding a clean single-state base to composite C++ on top of.
+static std::string g_state;   // "" = no bias (legacy superset); "so" = day; "ev" = night
 
 struct Doc {
     std::string id;
@@ -256,9 +265,25 @@ int poseScore(const Scene& sc, const std::string& anim, float frame) {
     return score;
 }
 void resolveRest(Scene& sc) {
+    sc.stateHidden = false;
+    std::string matchTag, oppTag;
+    if (!g_state.empty()) {
+        matchTag = "_" + g_state + "_";                          // "_so_" / "_ev_"
+        oppTag   = (g_state == "so") ? "_ev_" : "_so_";
+        bool hasMatch = false, hasOpp = false, hasNeutral = false;
+        for (const auto& [name, maxf] : sc.animList) {
+            if (name.find(matchTag) != std::string::npos)      hasMatch = true;
+            else if (name.find(oppTag) != std::string::npos)   hasOpp   = true;
+            else                                               hasNeutral = true;
+        }
+        // a scene that only exists in the opposite state (e.g. the extra Werehog
+        // stat labels under "so") is not present in this state at all.
+        if (hasOpp && !hasMatch && !hasNeutral) { sc.stateHidden = true; sc.restAnim.clear(); sc.restFrame = 0; return; }
+    }
     std::string bestAnim; float bestFrame = 0.0f;
     int best = poseScore(sc, "", 0.0f);                 // base pose (no anim) at frame 0
     for (const auto& [name, maxf] : sc.animList) {
+        if (!oppTag.empty() && name.find(oppTag) != std::string::npos) continue;   // skip opposite-state anims
         for (int k = 0; k < 9; ++k) {
             float f = (maxf > 0.0f) ? maxf * (float)k / 8.0f : 0.0f;
             int s = poseScore(sc, name, f);
@@ -380,13 +405,21 @@ bool Load(const char* id) {
 bool g_loop = false;
 void SetLoop(bool on) { g_loop = on; }
 
+// Select the day ("so") / night ("ev") cast state and re-resolve every scene's
+// resting pose to the matching variant (hiding opposite-only scenes). Pass "" to
+// clear the bias (legacy superset). Call after Load(), before Draw().
+void SetState(const char* tag) {
+    g_state = tag ? tag : "";
+    for (Scene& sc : g_doc.scenes) if (sc.draw) resolveRest(sc);
+}
+
 void Draw(double elapsedSec) {
     if (!g_loaded) return;
     bool dbg = getenv("SGFX_CSD_DEBUG") != nullptr;
     int sceneIdx = -1;
     for (const Scene& sc : g_doc.scenes) {
         ++sceneIdx;
-        if (!sc.draw) continue;
+        if (!sc.draw || sc.stateHidden) continue;
         // Play the resolved rest anim from frame 0 toward restFrame, then HOLD the
         // settled pose. g_loop replays continuously instead of holding.
         float t = (float)(elapsedSec * g_doc.framerate);

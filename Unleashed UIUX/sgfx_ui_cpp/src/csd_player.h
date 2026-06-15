@@ -14,6 +14,7 @@ namespace csd {
 bool        Load(const char* id);     // parse data/<id>.json + load its textures; false on failure
 void        Draw(double elapsedSec);  // evaluate every scene at the current animation time + emit ui quads
 void        SetLoop(bool on);         // true = loop anims (fmod); false (default) = play-once-and-hold (clamp)
+void        SetState(const char* tag); // "so"=day / "ev"=night cast state (re-resolves rest poses); ""=clear bias
 void        Unload();
 const char* LoadedId();               // id currently loaded ("" if none)
 

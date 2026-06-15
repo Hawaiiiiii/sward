@@ -21,6 +21,7 @@ void TitleInit();     void TitleDraw(double);      void TitleInput(const ScreenI
 void WorldMapInit();  void WorldMapDraw(double);   void WorldMapInput(const ScreenInput&); void WorldMapReset();
 const char* WorldMapNav();
 void StatusInit();    void StatusDraw(double);     void StatusInput(const ScreenInput&);   void StatusReset();
+const char* StatusCsdState();
 void ShopInit();      void ShopDraw(double);       void ShopInput(const ScreenInput&);     void ShopReset();
 void SonicHudInit();  void SonicHudDraw(double);   void SonicHudInput(const ScreenInput&); void SonicHudReset();
 void OptionsInit();    void OptionsDraw(double);    void OptionsInput(const ScreenInput&);    void OptionsReset();
@@ -71,7 +72,7 @@ static const ScreenDef g_screens[] = {
     { "viewport3d", &Viewport3DInit, &Viewport3DDraw, &Viewport3DInput, &Viewport3DReset, nullptr },
     { "title",     &TitleInit,    &TitleDraw,    &TitleInput,    &TitleReset,    nullptr },
     { "world_map", &WorldMapInit, &WorldMapDraw, &WorldMapInput, &WorldMapReset, &WorldMapNav },
-    { "status",    &StatusInit,   &StatusDraw,   &StatusFlowInput, &StatusReset, &WrapNav },
+    { "status",    &StatusInit,   &StatusDraw,   &StatusFlowInput, &StatusReset, &WrapNav, "status", &StatusCsdState },
     { "shop",      &ShopInit,     &ShopDraw,     &ShopFlowInput,   &ShopReset,   &WrapNav },
     { "sonic_hud", &SonicHudInit, &SonicHudDraw, &HudFlowInput,    &SonicHudReset, &WrapNav },
     { "pause",     &PauseInit,    &PauseDraw,    &PauseInput,   &PauseReset,  &PauseNav },

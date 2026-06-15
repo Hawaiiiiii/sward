@@ -17,6 +17,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "csd_player.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -386,9 +387,20 @@ void Draw(double openSec) {
     }
 }
 
+// CSD cast-state tag: the host renders the real status CSD as the base layer in
+// the matching day(Sonic)/night(Werehog) variant; this reports which to pick.
+const char* CsdState() { return g_night ? "ev" : "so"; }
+
 } // namespace
 
 void StatusInit() { Init(); }
-void StatusDraw(double openSeconds) { Draw(openSeconds); }
+// CSD-base composite: when the real status CSD is loaded (host drew it as the
+// base), the screen is the game's own layout — our Draw adds nothing yet. Only
+// when the CSD is unavailable do we fall back to the hand-authored layout.
+void StatusDraw(double openSeconds) {
+    if (std::strcmp(csd::LoadedId(), "status") == 0) return;   // CSD base IS the screen
+    Draw(openSeconds);                                          // hand-authored fallback
+}
 void StatusInput(const ScreenInput& in) { Input(in); }
 void StatusReset() { Reset(); }
+const char* StatusCsdState() { return CsdState(); }

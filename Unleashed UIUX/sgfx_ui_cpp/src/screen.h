@@ -30,6 +30,14 @@ struct ScreenDef {
     // elsewhere in the runtime game's flow ("@back" = pop to the previous
     // screen). The host drives the measured wipe transition + switch.
     const char* (*Nav)();
+    // optional (may be null): the real game CSD layout id (data/<id>.json). When
+    // set, the host renders the actual game cast/animation as the BASE layer each
+    // frame (csd_player) and the screen's Draw() composites its C++ overlay on
+    // top — the maximally-1:1 path (real game files instead of hand-authoring).
+    const char* csd = nullptr;
+    // optional (may be null): returns the CSD cast STATE tag ("so"=day/Sonic,
+    // "ev"=night/Werehog, ""=none) so day/night sub-states pick the right variant.
+    const char* (*csdState)() = nullptr;
 };
 
 const ScreenDef*  FindScreen(const char* id);

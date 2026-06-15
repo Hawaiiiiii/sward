@@ -155,6 +155,7 @@ int main(int argc, char** argv) {
         fprintf(stderr, "[warn] font not loaded; shapes will draw but text will be blank\n");
     if (csdMode) {
         if (!csd::Load(id.c_str())) { fprintf(stderr, "csd load failed for '%s'\n", id.c_str()); return 1; }
+        if (const char* st = getenv("SGFX_CSD_STATE")) csd::SetState(st);   // "so"/"ev" day/night cast filter
     } else {
         if (!shot) audio::Init();   // UI sound feedback (interactive only; off for headless shots)
         OpenScreen(scr);   // loads textures, resets state, and starts the screen's per-screen BGM
@@ -168,7 +169,24 @@ int main(int argc, char** argv) {
     // recomp's "channel change" feel.
     auto drawFrame = [&](double openSec, float fade, double absT) {
         if (csdMode) csd::Draw(openSec);   // openSec carries the CSD animation time here
-        else         scr->Draw(openSec);
+        else {
+            // CSD-base composite: screens that declare a csd id render the REAL
+            // game cast/animation as the base layer (loaded lazily on switch,
+            // state re-resolved only when day/night changes), then the screen's
+            // C++ Draw composites its overlay (live values / 3D) on top.
+            if (scr->csd) {
+                const char* st = scr->csdState ? scr->csdState() : "";
+                static std::string applied;                       // "<id>|<state>" currently resolved
+                std::string want = std::string(scr->csd) + "|" + st;
+                if (applied != want) {
+                    if (std::strcmp(csd::LoadedId(), scr->csd) != 0) { csd::Load(scr->csd); csd::SetLoop(false); }
+                    csd::SetState(st);
+                    applied = want;
+                }
+                csd::Draw(ui::Now() - openSec);                   // entrance plays from screen-open
+            }
+            scr->Draw(openSec);
+        }
         // CRT scanlines are NOT in the real runtime (they read as banding vs the
         // reference frames) — opt-in SGFX stylization via SGFX_SCANLINES=1.
         static const bool wantScan = [] { const char* e = getenv("SGFX_SCANLINES"); return e && e[0] == '1'; }();
