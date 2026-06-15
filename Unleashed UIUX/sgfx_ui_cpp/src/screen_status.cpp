@@ -26,7 +26,7 @@ using namespace ui;
 namespace {
 
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
-int g_glyphTex = -1;
+int g_glyphTex = -1, g_charDayTex = -1, g_charNightTex = -1;
 
 struct UV { float u0, v0, u1, v1; };
 constexpr float GTW = 512.0f, GTH = 512.0f;
@@ -107,6 +107,10 @@ inline float StatTop0()  { return g_night ? ROW_Y0 : 304.0f; } // first stat-row
 
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
+    // the form's real character render (live 3D in-game), background-keyed to a
+    // clean cutout so it stands on the status sky. Swap to re-skin.
+    if (g_charDayTex   < 0) g_charDayTex   = gfx::loadTexture("assets/gameart/status_sonic_day_cut.png");
+    if (g_charNightTex < 0) g_charNightTex = gfx::loadTexture("assets/gameart/status_werehog_night_cut.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
@@ -213,10 +217,22 @@ void Draw(double openSec) {
     // behind the footer prompts)
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SKY_T, C_SKY_B);
     DrawVGradient({ 0, 560 }, { REF_W, REF_H }, WithAlpha(RGBA(200, 206, 204, 255), 0.55f), WithAlpha(RGBA(150, 158, 156, 255), 0.55f));
-    SetFont(g_fSeurat);
-    DrawTextAligned({ 860, 240 }, { 1200, 560 }, 14.0f, WithAlpha(RGBA(120, 140, 165, 255), a),
-                    "( character render: live 3D )", Align::Center, true, false);
-    ResetFont();
+    // the form's character render fills the right-side slot (keyed cutout, stands
+    // on the sky); falls back to the "(character render: live 3D)" label if absent.
+    {
+        int charTex = g_night ? g_charNightTex : g_charDayTex;
+        if (charTex >= 0) {
+            const float asp = g_night ? 0.469f : 0.393f;   // cut-render W/H
+            const float ch = 332.0f, cw = ch * asp, cx = 1035.0f, by = 576.0f;
+            DrawImage(charTex, { cx - cw * 0.5f, by - ch }, { cx + cw * 0.5f, by },
+                      { 0.f, 0.f }, { 1.f, 1.f }, WithAlpha(RGBA(255, 255, 255, 255), a));
+        } else {
+            SetFont(g_fSeurat);
+            DrawTextAligned({ 860, 240 }, { 1200, 560 }, 14.0f, WithAlpha(RGBA(120, 140, 165, 255), a),
+                            "( character render: live 3D )", Align::Center, true, false);
+            ResetFont();
+        }
+    }
 
     // ---- form-colored header rail (ends near the banner terminus ~x640 with a
     //      short swoosh tail) + cyan top+bottom edge highlights + chrome STATUS ----
@@ -233,13 +249,17 @@ void Draw(double openSec) {
     DrawRect({ 0, RAIL_Y1 }, { railEnd - 40, RAIL_Y1 + 2.5f }, WithAlpha(C_RAIL_EDGE, a));              // bottom highlight
     Chrome({ WM_X, WM_TOP - 2 }, 50.0f, "STATUS", a, C_CHR_T, C_CHR_B, 1.7f);   // bigger (measured)
 
-    // ---- form wordmark slot (mid-right; SEGA art drops in) ----
-    DrawRect({ 950, 470 }, { 1240, 554 }, WithAlpha(RGBA(30, 24, 48, 120), a));
-    SetFont(g_fSeurat);
-    DrawTextAligned({ 950, 470 }, { 1240, 554 }, 14.0f, WithAlpha(RGBA(190, 180, 210, 255), a),
-                    g_night ? "SONIC THE WEREHOG (art slot)" : "SONIC THE HEDGEHOG (art slot)",
-                    Align::Center, true, false);
-    ResetFont();
+    // ---- form wordmark slot (mid-right): only shown as a labelled placeholder
+    //      when the character render is absent — with the render present the
+    //      figure itself conveys the form, so the box would just occlude it.
+    if ((g_night ? g_charNightTex : g_charDayTex) < 0) {
+        DrawRect({ 950, 470 }, { 1240, 554 }, WithAlpha(RGBA(30, 24, 48, 120), a));
+        SetFont(g_fSeurat);
+        DrawTextAligned({ 950, 470 }, { 1240, 554 }, 14.0f, WithAlpha(RGBA(190, 180, 210, 255), a),
+                        g_night ? "SONIC THE WEREHOG (art slot)" : "SONIC THE HEDGEHOG (art slot)",
+                        Align::Center, true, false);
+        ResetFont();
+    }
 
     // ---- top-right level gauges (Werehog/night form only): a medal disc at the
     //      capsule LEFT, a bold white "LV 7" label, then the yellow pill gauge
