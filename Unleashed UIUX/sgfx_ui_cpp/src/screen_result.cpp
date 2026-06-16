@@ -276,6 +276,32 @@ void Draw(double openSec) {
                 ResetTextShear();
                 ResetFont();
             }
+            // ---- title_brilliance: a gold sparkle that BURSTS as the rank letter
+            //      slams in, then fades (the Sonic-result flash). 8-point star of
+            //      tapered additive rays from the letter centre + a soft core bloom. ----
+            const float fp = (float)ComputeLinearMotion(openSec, 13.0, 30.0);   // 0..1 over the reveal slam
+            const float burst = std::sin(fp * 3.14159265f);                      // smooth 0 -> 1 -> 0 bump
+            if (burst > 0.01f) {
+                const uint32_t hot  = RGBA(255, 246, 206, 255);   // warm-white core
+                const uint32_t tipc = RGBA(255, 208, 104, 0);     // gold, transparent tip
+                const float reach = 84.0f + 168.0f * fp;          // rays grow as they fade
+                const float wid   = 17.0f * burst;
+                auto ray = [&](float ang, float len, float w) {
+                    const float c = std::cos(ang), s = std::sin(ang), px = -s, py = c;
+                    const V2 corners[4] = {
+                        { cx + px * w, cy + py * w }, { cx + c * len, cy + s * len },
+                        { cx + c * len, cy + s * len }, { cx - px * w, cy - py * w },
+                    };
+                    const uint32_t cols[4] = { WithAlpha(hot, burst), WithAlpha(tipc, burst),
+                                               WithAlpha(tipc, burst), WithAlpha(hot, burst) };
+                    DrawQuadGradient(corners, cols, true);
+                };
+                for (int k = 0; k < 4; ++k) ray(k * 1.5707963f, reach, wid);                       // + cross
+                for (int k = 0; k < 4; ++k) ray(0.7853982f + k * 1.5707963f, reach * 0.62f, wid * 0.7f);  // x cross
+                // core bloom: quadratic fade so it only shows at the peak (blended into the star),
+                // not as a soft square during the rise/fade
+                DrawRect({ cx - 38, cy - 38 }, { cx + 38, cy + 38 }, WithAlpha(RGBA(255, 240, 196, 255), burst * burst * 0.45f), true);
+            }
         }
     }
 
