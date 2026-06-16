@@ -85,9 +85,9 @@ constexpr float LED_X = 168.0f, LED_Y = 560.0f, LED_W = 988.0f, LED_H = 58.0f;
 // ---- entrance tuning (frames @60fps), tuned to the shop/status feel ----------
 constexpr double BASE_FRAMES   = 14.0;   // backdrop plate fades in first
 constexpr double TITLE_OFFSET  = 4.0,  TITLE_FRAMES = 14.0;
-constexpr double ROW_OFFSET    = 8.0,  ROW_FRAMES   = 12.0, ROW_STEP = 3.0; // cascade
+constexpr double ROW_OFFSET    = 6.0,  ROW_FRAMES   = 16.0, ROW_STEP = 4.0; // CSD: index bars slide in from the right, staggered ~4f
 constexpr double INFO_OFFSET   = 20.0, INFO_FRAMES  = 12.0;
-constexpr double SELECT_MOVE_FRAMES = 8.0;
+constexpr double SELECT_MOVE_FRAMES = 40.0;   // CSD cursor carousel is a 40f eased move (was 8f, ~5x too fast)
 constexpr float  ROW_SLIDE_PX  = 22.0f;  // rows slide in from +22px to the right
 
 // ---- palette ----------------------------------------------------------------
@@ -193,7 +193,8 @@ void Draw(double openSec) {
     // ---- "MAIN MENU" title bar (real art) -------------------------------------
     if (g_partsTex >= 0 && titleT > 0.0f) {
         float tw = TITLEBAR_W, th = tw / TitleBarAspect();
-        float tx = TITLEBAR_X, ty = TITLEBAR_Y - (1.0f - titleT) * 10.0f;
+        // CSD: the MAIN MENU bar SLIDES IN from the left (with a small overshoot settle)
+        float tx = Lerp(TITLEBAR_X - 340.0f, TITLEBAR_X, Cubic(0.0f, 1.0f, titleT)), ty = TITLEBAR_Y;
         DrawImage(g_partsTex, { tx, ty }, { tx + tw, ty + th },
                   { TITLEBAR_UV.u0, TITLEBAR_UV.v0 }, { TITLEBAR_UV.u1, TITLEBAR_UV.v1 },
                   WithAlpha(COL_WHITE, titleT));
@@ -220,7 +221,10 @@ void Draw(double openSec) {
         // a row reads as "selected" when the eased highlight is closest to it
         bool selected = (std::abs(litSlot - (float)row) < 0.5f);
         float rowFlash = (flashing && g_flashRow == row) ? flashA : 0.0f;
+        // CSD: each index bar SLIDES IN FROM THE RIGHT into place (off-right -> rest)
+        PushTransform(1.0f, 1.0f, { 0.0f, 0.0f }, { (1.0f - rt) * 330.0f, 0.0f });
         DrawRow(row, rt, selected, rowFlash);
+        PopTransform();
     }
 
     // ---- green LED readout: the machine echoes the current selection ----------
