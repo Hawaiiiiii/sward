@@ -264,17 +264,30 @@ int poseScore(const Scene& sc, const std::string& anim, float frame) {
     }
     return score;
 }
+// Is `st` ("so"/"ev") present in `name` as an underscore-delimited token? The
+// game names variants both mid-word (Intro_ev_Anim) AND as a prefix (ev_Anim),
+// so a plain "_ev_" substring test misses the prefix form — match word tokens.
+static bool animHasState(const std::string& name, const std::string& st) {
+    size_t pos = 0;
+    while ((pos = name.find(st, pos)) != std::string::npos) {
+        bool lOK = (pos == 0) || name[pos - 1] == '_';
+        size_t end = pos + st.size();
+        bool rOK = (end == name.size()) || name[end] == '_';
+        if (lOK && rOK) return true;
+        pos = end;
+    }
+    return false;
+}
 void resolveRest(Scene& sc) {
     sc.stateHidden = false;
-    std::string matchTag, oppTag;
+    std::string opp;
     if (!g_state.empty()) {
-        matchTag = "_" + g_state + "_";                          // "_so_" / "_ev_"
-        oppTag   = (g_state == "so") ? "_ev_" : "_so_";
+        opp = (g_state == "so") ? "ev" : "so";
         bool hasMatch = false, hasOpp = false, hasNeutral = false;
         for (const auto& [name, maxf] : sc.animList) {
-            if (name.find(matchTag) != std::string::npos)      hasMatch = true;
-            else if (name.find(oppTag) != std::string::npos)   hasOpp   = true;
-            else                                               hasNeutral = true;
+            if (animHasState(name, g_state))   hasMatch = true;
+            else if (animHasState(name, opp))  hasOpp   = true;
+            else                               hasNeutral = true;
         }
         // a scene that only exists in the opposite state (e.g. the extra Werehog
         // stat labels under "so") is not present in this state at all.
@@ -283,7 +296,7 @@ void resolveRest(Scene& sc) {
     std::string bestAnim; float bestFrame = 0.0f;
     int best = poseScore(sc, "", 0.0f);                 // base pose (no anim) at frame 0
     for (const auto& [name, maxf] : sc.animList) {
-        if (!oppTag.empty() && name.find(oppTag) != std::string::npos) continue;   // skip opposite-state anims
+        if (!opp.empty() && animHasState(name, opp)) continue;   // skip opposite-state anims
         for (int k = 0; k < 9; ++k) {
             float f = (maxf > 0.0f) ? maxf * (float)k / 8.0f : 0.0f;
             int s = poseScore(sc, name, f);
