@@ -351,7 +351,7 @@ void DrawGauge(float x, float y, float w, const UV& label, int pct, uint32_t fil
 }
 
 void Draw(double openSec) {
-    g_open = openSec;
+    g_open = Now();   // elapsed-since-open for the continuous PRESS-START pulse (openSec is pinned to 0)
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, COL_BG_TOP, COL_BG_BOT);
 
     const ExEntry& e = Cur();

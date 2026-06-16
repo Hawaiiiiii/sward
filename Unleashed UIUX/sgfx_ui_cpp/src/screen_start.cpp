@@ -126,7 +126,7 @@ void DrawWordFallback(const char* text, float cx, float cy, float pxSize, uint32
 }
 
 void Draw(double openSec) {
-    g_open = openSec;
+    g_open = Now();   // elapsed-since-open for the idle "PRESS START" breathe pulse (openSec is pinned to 0)
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, COL_BG_TOP, COL_BG_BOT);
 
     // faint centring rules â€” a clean, bold backdrop for the single hero plate

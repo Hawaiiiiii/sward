@@ -244,7 +244,7 @@ float DrawNumString(const char* s, float x, float yTop, float h, float t) {
 }
 
 void Draw(double openSec) {
-    g_open = openSec;
+    g_open = Now();   // elapsed-since-open: drives the prompt pulse, bar shimmer + count-up (openSec is pinned to 0)
     // NOTE: a HUD overlay â€” NO full-screen fill / chrome panel. Transparent over gameplay.
 
     const Mission& mi = Cur();
