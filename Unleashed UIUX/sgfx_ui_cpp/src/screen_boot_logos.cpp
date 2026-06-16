@@ -18,7 +18,7 @@ using namespace ui;
 namespace {
 
 int g_fRodin = 0, g_fDF = 0;
-int g_wordTex = -1;
+int g_wordTex = -1, g_segaTex = -1, g_stTex = -1;
 const char* g_nav = nullptr;
 double g_lastOpen = 0.0;
 
@@ -29,6 +29,8 @@ void Init() {
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");
     if (g_fDF    == 0) g_fDF    = LoadMsdfFont("dfsogei");
     if (g_wordTex < 0) g_wordTex = gfx::loadTexture("assets/loading/mat_load_en_001.png");
+    if (g_segaTex < 0) g_segaTex = gfx::loadTexture("assets/gameart/boot_logo_sega.png");        // real SEGA card logo
+    if (g_stTex   < 0) g_stTex   = gfx::loadTexture("assets/gameart/boot_logo_sonicteam.png");   // real SONIC TEAM card logo
 }
 void Reset() { g_nav = nullptr; g_lastOpen = 0.0; }
 void Input(const ScreenInput& in) {
@@ -43,13 +45,20 @@ float Window(double t, double t0, double t1) {
     return std::min(a, b);
 }
 
-void CardSlot(const char* small, const char* big, float a, uint32_t bigCol) {
+void CardSlot(const char* small, const char* big, float a, uint32_t bigCol, int tex) {
     SetFont(g_fRodin);
     if (small && small[0]) {
         float w = MeasureText(16.0f, small).x;
-        DrawText({ 640 - w * 0.5f, 296 }, 16.0f, WithAlpha(RGBA(208, 210, 216, 255), a), small);
+        DrawText({ 640 - w * 0.5f, 290 }, 16.0f, WithAlpha(RGBA(208, 210, 216, 255), a), small);
     }
-    SetFont(g_fDF);
+    if (tex >= 0) {   // the real card logo art (600x200, black keyed to transparent)
+        const float lw = 360.0f, lh = lw * 200.0f / 600.0f;
+        DrawImage(tex, { 640 - lw * 0.5f, 365 - lh * 0.5f }, { 640 + lw * 0.5f, 365 + lh * 0.5f },
+                  { 0.f, 0.f }, { 1.f, 1.f }, WithAlpha(RGBA(255, 255, 255, 255), a));
+        ResetFont();
+        return;
+    }
+    SetFont(g_fDF);   // fallback: stylised wordmark text + the "drop art here" hint
     SetTextStretchX(1.15f);
     float w = MeasureText(64.0f, big).x * 1.15f;
     DrawTextGradient({ 640 - w * 0.5f, 330 }, 64.0f, WithAlpha(RGBA(240, 242, 248, 255), a), WithAlpha(bigCol, a), big);
@@ -62,7 +71,9 @@ void CardSlot(const char* small, const char* big, float a, uint32_t bigCol) {
 
 void Draw(double openSec) {
     g_lastOpen = openSec;
-    const double t = openSec;
+    const double t = Now();   // ui::Now() is elapsed-since-screen-open (host resets the clock); the
+                              // boot sequence is a one-shot timeline. (Was `= openSec`, i.e. 0, so it
+                              // stuck on frame 0 and never advanced past the 'S' splash.)
 
     if (t < 9.75) {
         // dark navy stage for the logo cards; white stage for the morph
@@ -75,8 +86,8 @@ void Draw(double openSec) {
             DrawTextAligned({ 0, 320 }, { REF_W, 400 }, 76.0f, WithAlpha(RGBA(235, 240, 250, 255), a), "S", Align::Center, true, false);
             ResetFont();
         }
-        if (float a = Window(t, 1.0, 3.5); a > 0) CardSlot("P R E S E N T E D   B Y", "SEGA", a, RGBA(70, 110, 220, 255));
-        if (float a = Window(t, 4.0, 6.5); a > 0) CardSlot(nullptr, "SONIC TEAM", a, RGBA(50, 90, 200, 255));
+        if (float a = Window(t, 1.0, 3.5); a > 0) CardSlot("P R E S E N T E D   B Y", "SEGA", a, RGBA(70, 110, 220, 255), g_segaTex);
+        if (float a = Window(t, 4.0, 6.5); a > 0) CardSlot(nullptr, "SONIC TEAM", a, RGBA(50, 90, 200, 255), g_stTex);
         if (float a = Window(t, 7.0, 9.5); a > 0) {   // morph ball slot (gentle spin)
             const float cx = 640, cy = 360, r = 46;
             for (int i = 0; i < 12; ++i) {   // spiky silhouette hint
