@@ -71,6 +71,8 @@ void PushClip(V2 min, V2 max);   // scissor: clamp subsequent quads/text to this
 void PopClip();
 void PushAlpha(float a);         // global alpha multiplier (stacks/multiplies) — for entrance fades/staggers
 void PopAlpha();
+void PushTransform(float sx, float sy, V2 pivot, V2 translate);  // scale-about-pivot + translate (inflate/slide entrances)
+void PopTransform();
 void ResetModifier();
 
 // ---- primitives (append to the batch; later calls paint over earlier ones) --

@@ -155,6 +155,13 @@ void Draw(double openSec) {
     {
         const float x0 = 208, y0 = 445, x1 = 1093, y1 = 613, ch = 20;
         const float bT = (float)ComputeMotion(openSec, 2.0, 8.0);
+        // window INFLATE-POP: the real balloon scales open from ~0 about its centre
+        // (CSD XScale/YScale f0-20) BEFORE the text shows; ours used to fade the
+        // full-size plate in. Scale only the plate geometry; the text appears after.
+        const float si = (float)ComputeLinearMotion(openSec, 2.0, 16.0);
+        const float ps = Cubic(0.05f, 1.0f, si);
+        const V2 pivot = { (x0 + x1) * 0.5f, (y0 + y1) * 0.5f };
+        PushTransform(ps, ps, pivot, { 0, 0 });
         // the real dialogue plate is TRANSLUCENT (manifest balloon_sonic_balloon_position
         // alpha 0.686) — the scene/NPC composites through it; ours was fully opaque.
         const float plateA = bT * 0.686f;
@@ -169,20 +176,22 @@ void Draw(double openSec) {
         DrawRect({ x0, y1 - 2 }, { x1 - ch, y1 }, bd);
         DrawRect({ x0, y0 + ch }, { x0 + 2, y1 }, bd);
         DrawRect({ x1 - 2, y0 }, { x1, y1 - ch }, bd);
-        // two outlined dialogue lines, upper area of the window (room below for a 3rd)
+        PopTransform();
+        // two outlined dialogue lines, appearing AFTER the window inflates (full size)
+        const float bTx = (float)ComputeMotion(openSec, 16.0, 8.0);   // text fade, post-inflate
         SetFont(g_fSeurat);
         const Line2& L = SCRIPT[g_line];
         auto line = [&](const char* s, float ly) {
             const float lx = x0 + 36;
             // stronger single drop-shadow pass biased down-and-right (real centroid
             // dY=+17.5, below-right shell dominant)
-            DrawText({ lx + 1.5f, ly + 1.5f }, 24.0f, WithAlpha(C_TXT_OUT, bT), s);
+            DrawText({ lx + 1.5f, ly + 1.5f }, 24.0f, WithAlpha(C_TXT_OUT, bTx), s);
             // thin ~1px outline ring so edges stay crisp without a heavy symmetric shell
             for (int dy = -1; dy <= 1; ++dy)
                 for (int dx = -1; dx <= 1; ++dx)
                     if (dx || dy)
-                        DrawText({ lx + dx * 1.0f, ly + dy * 1.0f }, 24.0f, WithAlpha(C_TXT_OUT, bT), s);
-            DrawText({ lx, ly }, 24.0f, WithAlpha(C_TXT, bT), s);
+                        DrawText({ lx + dx * 1.0f, ly + dy * 1.0f }, 24.0f, WithAlpha(C_TXT_OUT, bTx), s);
+            DrawText({ lx, ly }, 24.0f, WithAlpha(C_TXT, bTx), s);
         };
         line(L.a, y0 + 28);
         line(L.b, y0 + 62);

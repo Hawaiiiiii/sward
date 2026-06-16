@@ -78,6 +78,18 @@ inline uint32_t applyGAlpha(uint32_t c) {
     uint32_t a = (uint32_t)((c >> 24) * g_alphaMul + 0.5f);
     return (c & 0x00FFFFFFu) | (a << 24);
 }
+
+// Global single-level transform — scale about a pivot, then translate. Drives
+// inflate/pop (XScale/YScale from 0) and slide-in entrances. Applied to quad
+// coordinates BEFORE clipping. Single-level: PushTransform sets it, PopTransform
+// clears to identity (no true nesting — entrance uses are one transform at a time).
+bool  g_xfActive = false;
+float g_xfSx = 1, g_xfSy = 1, g_xfPx = 0, g_xfPy = 0, g_xfTx = 0, g_xfTy = 0;
+inline void xf(float& x, float& y) {
+    if (!g_xfActive) return;
+    x = g_xfPx + (x - g_xfPx) * g_xfSx + g_xfTx;
+    y = g_xfPy + (y - g_xfPy) * g_xfSy + g_xfTy;
+}
 // clamp [x0..y1]/[u0..v1] to the top clip rect; returns false if fully outside.
 bool clipQuad(float& x0, float& y0, float& x1, float& y1, float& u0, float& v0, float& u1, float& v1) {
     if (g_clipStack.empty()) return true;
@@ -95,6 +107,7 @@ bool clipQuad(float& x0, float& y0, float& x1, float& y1, float& u0, float& v0, 
 void Push(float x0, float y0, float x1, float y1,
           float u0, float v0, float u1, float v1,
           uint32_t col, int tex, gfx::Blend blend) {
+    xf(x0, y0); xf(x1, y1);
     if (!clipQuad(x0, y0, x1, y1, u0, v0, u1, v1)) return;
     col = applyGAlpha(col);
     gfx::Quad q;
@@ -109,6 +122,7 @@ void Push(float x0, float y0, float x1, float y1,
 // 4-corner gradient quad (TL,TR,BR,BL) — the AddRectFilledMultiColor primitive.
 void PushQuad4(float x0, float y0, float x1, float y1,
                uint32_t cTL, uint32_t cTR, uint32_t cBR, uint32_t cBL, int tex, gfx::Blend blend) {
+    xf(x0, y0); xf(x1, y1);
     gfx::Quad q;
     q.px[0]=x0; q.py[0]=y0;  q.px[1]=x1; q.py[1]=y0;
     q.px[2]=x1; q.py[2]=y1;  q.px[3]=x0; q.py[3]=y1;
@@ -279,7 +293,7 @@ void ResetFont()    { g_curFont = 0; }
 
 void Shutdown() { g_quads.clear(); g_quads.shrink_to_fit(); g_fontReady = false; }
 
-void BeginFrame(double nowSeconds) { g_now = nowSeconds; g_quads.clear(); g_modifier = 0; g_curFont = 0; g_textShear = 0.0f; g_textStretchX = 1.0f; g_clipStack.clear(); g_alphaStack.clear(); g_alphaMul = 1.0f; }
+void BeginFrame(double nowSeconds) { g_now = nowSeconds; g_quads.clear(); g_modifier = 0; g_curFont = 0; g_textShear = 0.0f; g_textStretchX = 1.0f; g_clipStack.clear(); g_alphaStack.clear(); g_alphaMul = 1.0f; g_xfActive = false; g_xfSx = g_xfSy = 1.0f; g_xfTx = g_xfTy = 0.0f; }
 void SetModifier(uint32_t m) { g_modifier = m; }
 void ResetModifier() { g_modifier = 0; }
 void PushClip(V2 min, V2 max) { g_clipStack.push_back({ min.x, min.y, max.x, max.y }); }
@@ -289,6 +303,13 @@ void PopClip() { if (!g_clipStack.empty()) g_clipStack.pop_back(); }
 // PopAlpha() to 30%; nested pushes multiply. Used to drive entrance fades/staggers.
 void PushAlpha(float a) { a = a < 0.0f ? 0.0f : (a > 1.0f ? 1.0f : a); g_alphaStack.push_back(a); g_alphaMul *= a; }
 void PopAlpha() { if (!g_alphaStack.empty()) { g_alphaStack.pop_back(); recomputeAlpha(); } }
+
+// scale about `pivot` then translate by `translate` for subsequent draws until
+// PopTransform(). Single-level (no nesting). For inflate-pop / slide-in entrances.
+void PushTransform(float sx, float sy, V2 pivot, V2 translate) {
+    g_xfSx = sx; g_xfSy = sy; g_xfPx = pivot.x; g_xfPy = pivot.y; g_xfTx = translate.x; g_xfTy = translate.y; g_xfActive = true;
+}
+void PopTransform() { g_xfActive = false; g_xfSx = g_xfSy = 1.0f; g_xfTx = g_xfTy = 0.0f; }
 void Flush(gfx::Quad*& outQuads, int& outCount) { outQuads = g_quads.data(); outCount = (int)g_quads.size(); }
 double Now() { return g_now; }
 
@@ -338,7 +359,8 @@ void DrawImage(int tex, V2 min, V2 max, V2 uv0, V2 uv1, uint32_t col, bool addit
 void DrawImageQuad(int tex, const V2 corners[4], const V2 uvs[4], uint32_t col, bool additive) {
     gfx::Quad q;
     for (int k = 0; k < 4; ++k) {
-        q.px[k] = corners[k].x; q.py[k] = corners[k].y;
+        float cx = corners[k].x, cy = corners[k].y; xf(cx, cy);
+        q.px[k] = cx; q.py[k] = cy;
         q.u[k]  = uvs[k].x;     q.v[k]  = uvs[k].y;
     }
     q.color[0]=q.color[1]=q.color[2]=q.color[3]=applyGAlpha(col); q.texIndex = tex; q.modifier = g_modifier;
@@ -598,7 +620,8 @@ void DrawQuadGradient(const V2 corners[4], const uint32_t cols[4], bool additive
     gfx::Quad q;
     const float uvx[4] = { 0, 1, 1, 0 }, uvy[4] = { 0, 0, 1, 1 };
     for (int k = 0; k < 4; ++k) {
-        q.px[k] = corners[k].x; q.py[k] = corners[k].y;
+        float cx = corners[k].x, cy = corners[k].y; xf(cx, cy);
+        q.px[k] = cx; q.py[k] = cy;
         q.u[k] = uvx[k]; q.v[k] = uvy[k]; q.color[k] = applyGAlpha(cols[k]);
     }
     q.texIndex = -1; q.modifier = g_modifier;
