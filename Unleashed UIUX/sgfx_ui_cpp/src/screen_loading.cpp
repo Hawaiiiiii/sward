@@ -154,7 +154,10 @@ void Draw(double openSec) {
     DrawText({ SC_X1 - 96, SC_Y1 + 1 }, 10.0f, RGBA(150, 152, 148, 255), "MILES ELECTRIC");
 
     // ---- perspective grid floor (converging green lines) ----
+    // clip to the tablet SCREEN interior: the outer converging lines fan out past
+    // baseY to x~1376, well past SC_X1, and were bleeding onto the yellow chrome.
     {
+        PushClip({ SC_X0, SC_Y0 }, { SC_X1, SC_Y1 });
         const float horizonY = 300, baseY = SC_Y1 - 24, cx = 640;
         for (int i = -8; i <= 8; ++i) {
             float bx = cx + i * 92.0f, hx = cx + i * 26.0f;
@@ -167,6 +170,7 @@ void Draw(double openSec) {
             float f = i / 6.0f, y = horizonY + (baseY - horizonY) * f * f;
             DrawRect({ SC_X0 + 40, y }, { SC_X1 - 40, y + 1.2f }, WithAlpha(C_WIRE_DIM, 0.3f + 0.5f * f));
         }
+        PopClip();
     }
 
     // ---- green terrain: a CLOSED ANNULAR perspective LOOP (the real loading_miles

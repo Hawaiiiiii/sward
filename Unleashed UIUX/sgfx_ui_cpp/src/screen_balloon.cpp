@@ -155,7 +155,10 @@ void Draw(double openSec) {
     {
         const float x0 = 208, y0 = 445, x1 = 1093, y1 = 613, ch = 20;
         const float bT = (float)ComputeMotion(openSec, 2.0, 8.0);
-        DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(C_BAL_T, bT), WithAlpha(C_BAL_B, bT));
+        // the real dialogue plate is TRANSLUCENT (manifest balloon_sonic_balloon_position
+        // alpha 0.686) — the scene/NPC composites through it; ours was fully opaque.
+        const float plateA = bT * 0.686f;
+        DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(C_BAL_T, plateA), WithAlpha(C_BAL_B, plateA));
         // chamfer cuts back to the scene (approximate with sky tone)
         const V2 c1[4] = { { x0, y0 }, { x0 + ch, y0 }, { x0, y0 + ch }, { x0, y0 } };
         const V2 c2[4] = { { x1 - ch, y1 }, { x1, y1 }, { x1, y1 - ch }, { x1 - ch, y1 } };

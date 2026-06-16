@@ -301,23 +301,9 @@ void Draw(double openSec) {
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_TOP, C_BG_BOT);
     // full-width header rail (mirrors the footer legend band)
     DrawRect({ 0, 104 }, { REF_W, 107 }, WithAlpha(RGBA(94, 123, 88, 255), t));
-    // header art-slot placeholders (geometry only; real chrome art drops in here):
-    //   head badge [75,58,50,45] (centre 100,80), map logo [1075,54,127,53] (centre 1138,80)
-    {
-        auto slot = [&](float x0, float y0, float x1, float y1, const char* lbl) {
-            const uint32_t oc = WithAlpha(RGBA(94, 123, 88, 110), t); const float L = 1.0f;
-            DrawRect({ x0, y0 }, { x1, y0 + L }, oc);
-            DrawRect({ x0, y1 - L }, { x1, y1 }, oc);
-            DrawRect({ x0, y0 }, { x0 + L, y1 }, oc);
-            DrawRect({ x1 - L, y0 }, { x1, y1 }, oc);
-            SetFont(g_fSeurat);
-            DrawTextAligned({ x0, y0 }, { x1, y1 }, 10.0f,
-                            WithAlpha(RGBA(140, 168, 130, 160), t), lbl, Align::Center, true, false);
-            ResetFont();
-        };
-        slot(75, 58, 125, 103, "HEAD");      // [75,58,50,45]
-        slot(1075, 54, 1202, 107, "LOGO");   // [1075,54,127,53]
-    }
+    // head-badge [75,58,50,45] + map-logo [1075,54,127,53] art slots: the real
+    // banner shows the head icon / map logo art here, NOT labelled outline boxes
+    // (oracle vs the real capture) — leave the slots empty until that art is wired.
     uint32_t s = 0x2468ace1u;
     for (int i = 0; i < 110; ++i) { s = s*1664525u+1013904223u; float x=(float)((s>>9)%1280); s=s*1664525u+1013904223u; float y=(float)((s>>9)%720); s=s*1664525u+1013904223u; int b=50+(int)((s>>9)%160); DrawRect({x,y},{x+1,y+1}, WithAlpha(RGBA(b,b,b,255), t*0.7f)); }
 

@@ -41,9 +41,11 @@ const UV RANK_UV[6] = {   // mat_result_comon_002, same table as result/result_e
 };
 
 // ---- palette (sampled) --------------------------------------------------------
-const uint32_t C_BAND_T = RGBA(246, 232, 160, 255);   // gold band cream top
-const uint32_t C_BAND_M = RGBA(228, 178, 52, 255);
-const uint32_t C_BAND_B = RGBA(188, 124, 18, 255);
+// measured from the real _gate_banner.png (column x40 y85->155 = (208,213,115)
+// -> (209,151,63); R holds ~207-210 top-to-bottom — ours used to drop R 246->188)
+const uint32_t C_BAND_T = RGBA(210, 214, 118, 255);   // gold band cream top
+const uint32_t C_BAND_M = RGBA(206, 180, 86, 255);
+const uint32_t C_BAND_B = RGBA(209, 151, 63, 255);
 const uint32_t C_CHR_T  = RGBA(246, 248, 252, 255);   // chrome wordmark
 const uint32_t C_CHR_B  = RGBA(164, 172, 186, 255);
 const uint32_t C_CHR_OUT= RGBA(20, 24, 32, 255);
