@@ -144,6 +144,28 @@ void Draw(double openSec) {
     DrawRect({ 0, RAIL_Y0 }, { RAIL_X1, RAIL_Y1 }, WithAlpha(C_RAIL, wmT));
     DrawRect({ 0, RAIL_Y0 - 2 }, { RAIL_X1, RAIL_Y0 + 1 }, WithAlpha(C_RAIL_EDGE, wmT));   // ~3px top-edge highlight (y~61)
     DrawRect({ 0, RAIL_Y1 + 1 }, { RAIL_X1, RAIL_Y1 + 3.5f }, WithAlpha(C_RAIL_EDGE, wmT));   // under-edge (y~115)
+    // banner terminator: a blue chevron arrow + a white angled pennant flag-tail
+    // (the real RESULTS banner ends in a > chevron + pennant, not a flat cut —
+    // CSD result_csd + _z_banner_real agree). Degenerate quads = filled triangles.
+    {
+        const float cy = (RAIL_Y0 + RAIL_Y1) * 0.5f;
+        const uint32_t cBlu0 = WithAlpha(RGBA(96, 116, 182, 255), wmT);
+        const uint32_t cBlu1 = WithAlpha(RGBA(126, 146, 206, 255), wmT);
+        // blue chevron pointing right
+        const V2 ch[4] = { { RAIL_X1 - 2, RAIL_Y0 }, { RAIL_X1 - 2, RAIL_Y1 }, { RAIL_X1 + 34, cy }, { RAIL_X1 + 34, cy } };
+        const uint32_t chc[4] = { cBlu0, cBlu0, cBlu1, cBlu1 };
+        DrawQuadGradient(ch, chc);
+        // bright cyan edge along the chevron's top
+        const V2 che[4] = { { RAIL_X1 - 2, RAIL_Y0 - 2 }, { RAIL_X1 - 2, RAIL_Y0 + 2 }, { RAIL_X1 + 30, cy }, { RAIL_X1 + 30, cy - 3 } };
+        const uint32_t chec[4] = { WithAlpha(C_RAIL_EDGE, wmT), WithAlpha(C_RAIL_EDGE, wmT), WithAlpha(C_RAIL_EDGE, wmT), WithAlpha(C_RAIL_EDGE, wmT) };
+        DrawQuadGradient(che, chec);
+        // white pennant flag past the chevron tip, tilted up-right
+        const uint32_t cWht = WithAlpha(RGBA(234, 239, 248, 255), wmT);
+        const uint32_t cWhtB = WithAlpha(RGBA(150, 162, 186, 255), wmT);
+        const V2 fl[4] = { { RAIL_X1 + 22, RAIL_Y0 - 7 }, { RAIL_X1 + 56, RAIL_Y0 - 15 }, { RAIL_X1 + 48, RAIL_Y1 - 22 }, { RAIL_X1 + 14, RAIL_Y1 - 14 } };
+        const uint32_t flc[4] = { cWht, cWht, cWhtB, cWhtB };
+        DrawQuadGradient(fl, flc);
+    }
     {
         float wx = Lerp(-220.0f, WM_X, wmT);   // slides in from off-left
         Chrome({ wx, WM_CAPTOP - 12 }, 48.0f, "RESULTS", wmT, 1.70f);

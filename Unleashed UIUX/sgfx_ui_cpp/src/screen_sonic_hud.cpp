@@ -61,6 +61,7 @@ const UV LBL_TIME  = { 0.00781f, 0.47656f, 0.34375f, 0.54688f };   // "TIME" (ba
 //   * rainbow boost bar : tight box px (55,64)-(135,80)      -> 80x16 strip
 const UV GAUGE_TIRE = { 0.0625f,   0.125f, 0.23828f, 0.46875f };
 const UV GAUGE_BAR  = { 0.21484f,  0.5f,   0.52734f, 0.625f   };
+const UV GAUGE_PLATE = { 0.242f,   0.078f, 0.762f,   0.375f   };   // silver metallic gauge-backing plate
 
 // --- mat_comon_num_001 (512x64): row-0 digit cells, measured per glyph. Each
 //     digit shares the same vertical span (v 0.01562..0.4375); the ':' is index 10.
@@ -305,6 +306,13 @@ void DrawBoostGauge(float fill, float t) {
     if (t <= 0.0f) return;
     const float bx = BAR_X, by = BAR_Y, bw = BAR_W, bh = BAR_H;
 
+    // silver metallic backing plate (ui_ps1_gauge1 diagonal plate sub-sprite): the
+    // real RING ENERGY gauge sits on a continuous silver plate, not bare scene.
+    if (g_gaugeTex >= 0) {
+        const UV& p = GAUGE_PLATE;
+        DrawImage(g_gaugeTex, { bx - 12, by - 8 }, { bx + bw + 12, by + bh + 8 },
+                  { p.u0, p.v0 }, { p.u1, p.v1 }, WithAlpha(COL_WHITE, t));
+    }
     // dim empty track behind the fill (bounded rect + thin top/bottom edge lines)
     DrawRect({ bx, by }, { bx + bw, by + bh }, WithAlpha(COL_TRACK, t));
     DrawRect({ bx, by - 1 }, { bx + bw, by + 1 },       WithAlpha(COL_TRACK_EDGE, t));
