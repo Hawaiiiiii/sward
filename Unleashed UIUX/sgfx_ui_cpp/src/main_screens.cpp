@@ -67,7 +67,37 @@ static void ApplyKey(ScreenInput& in, SDL_Keycode k) {
     }
 }
 
-static int g_curBgm = -1;   // which BGM track is playing (-1 none, 0 menu, 1 title)
+// ---- Per-screen BGM slots (customization layer) -----------------------------
+// Each screen can name its own music file. This is the SOUND analogue of the art
+// slots: the game's real tracks are SEGA media and don't ship, so a screen's slot
+// file is normally ABSENT — in which case we fall back to the shipped menu theme,
+// i.e. empty slots sound exactly like today. Drop `assets/music/<name>.ogg` (or
+// .wav) in and that screen plays it. "@keep" means "leave the current track
+// playing" — for overlays (pause/options) and in-stage screens that should inherit
+// the music of the context they were opened from, matching the real game.
+static const char* g_curTrack = nullptr;            // path of the track currently playing
+static const char* const MENU_BGM  = "assets/music/bgm_sys_menu.wav";
+static const int          MENU_LOOP = 599217;
+struct BgmSlot { const char* id; const char* track; int loop; };
+static const BgmSlot kBgm[] = {
+    { "title",       "assets/music/bgm_sys_title.wav", 0 },   // shipped
+    // distinct game-music contexts -> their own customization slots:
+    { "world_map",   "assets/music/world_map.ogg", 0 },
+    { "town",        "assets/music/town.ogg",      0 },
+    { "shop",        "assets/music/shop.ogg",      0 },
+    { "sonic_hud",   "assets/music/stage.ogg",     0 },       // in-stage gameplay
+    { "boss",        "assets/music/boss.ogg",      0 },
+    { "result",      "assets/music/result.ogg",    0 },
+    { "result_ex",   "assets/music/result.ogg",    0 },
+    { "item_result", "assets/music/result.ogg",    0 },
+    { "mediaroom",   "assets/music/mediaroom.ogg", 0 },       // Prof. Pickle's lab
+    // overlays + in-stage screens: keep the music of the context they opened over:
+    { "pause", "@keep", 0 }, { "options", "@keep", 0 }, { "status", "@keep", 0 },
+    { "balloon", "@keep", 0 }, { "gate", "@keep", 0 }, { "start", "@keep", 0 },
+    { "mission", "@keep", 0 }, { "mission_screen", "@keep", 0 }, { "qte", "@keep", 0 },
+    { "exstage", "@keep", 0 },
+    // everything else (boot_*, installer, loading, world_map_help) -> default menu theme.
+};
 
 static void OpenScreen(const ScreenDef* scr, bool isBack = false) {
     if (!scr) return;
@@ -77,14 +107,22 @@ static void OpenScreen(const ScreenDef* scr, bool isBack = false) {
     // closing) plays winclose — matches the recomp (achievement_menu.cpp fires
     // pausewinclose on close, pausewinopen on open). No-op if audio is disabled.
     audio::Play(isBack ? audio::SFX_WINCLOSE : audio::SFX_WINOPEN);
-    // per-screen BGM: title screen gets the title theme, all menus share the menu theme.
-    // Only (re)start when the track actually changes, so menu music flows across screens.
-    int want = (std::strcmp(scr->id, "title") == 0) ? 1 : 0;
-    if (want != g_curBgm) {
-        bool ok = (want == 1) ? audio::PlayMusic("assets/music/bgm_sys_title.wav", 0)
-                              : audio::PlayMusic("assets/music/bgm_sys_menu.wav", 599217);
-        if (!ok && g_curBgm < 0) audio::PlayMusic("assets/music/installer.ogg");  // fallback
-        g_curBgm = want;
+    // per-screen BGM via the slot table: resolve this screen's track (default = menu
+    // theme), honour "@keep", and only (re)start when the track actually changes so
+    // music flows continuously across same-track screens.
+    const char* track = MENU_BGM; int loop = MENU_LOOP;
+    for (const BgmSlot& b : kBgm) if (std::strcmp(scr->id, b.id) == 0) { track = b.track; loop = b.loop; break; }
+    if (std::strcmp(track, "@keep") == 0) {
+        // overlay / in-stage screen: leave whatever is already playing.
+    } else if (!g_curTrack || std::strcmp(track, g_curTrack) != 0) {
+        if (audio::PlayMusic(track, loop)) {
+            g_curTrack = track;
+        } else if (!g_curTrack || std::strcmp(g_curTrack, MENU_BGM) != 0) {
+            // slot file absent -> fall back to the shipped menu theme (unless it's
+            // already playing, in which case just let it continue).
+            if (audio::PlayMusic(MENU_BGM, MENU_LOOP)) g_curTrack = MENU_BGM;
+            else if (!g_curTrack && audio::PlayMusic("assets/music/installer.ogg")) g_curTrack = MENU_BGM;
+        }
     }
 }
 
