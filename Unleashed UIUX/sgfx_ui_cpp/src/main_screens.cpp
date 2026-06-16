@@ -434,7 +434,11 @@ int main(int argc, char** argv) {
         // UI sound feedback — distinct real-game cue per action (bumpers differ from cursor)
         if (in.up || in.down || in.left || in.right) audio::Play(audio::SFX_CURSOR);
         if (in.tabLeft || in.tabRight)               audio::Play(audio::SFX_TAB);     // LB/RB: form/category switch
-        if (in.accept)                               audio::Play(audio::SFX_DECIDE);
+        // accept: the decide cue — EXCEPT in options, where A on a value option is a
+        // denied action (the recomp plays sys_actstg_stateserror, options_menu.cpp:881;
+        // our options changes values with Left/Right, so A does nothing).
+        if (in.accept) audio::Play((scr->id && std::strcmp(scr->id, "options") == 0)
+                                   ? audio::SFX_ERROR : audio::SFX_DECIDE);
         if (in.cancel)                               audio::Play(audio::SFX_CANCEL);
 
         // ---- the runtime flow: screens request navigation; the host runs the
