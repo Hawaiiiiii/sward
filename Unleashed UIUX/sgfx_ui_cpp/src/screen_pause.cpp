@@ -423,15 +423,38 @@ void DrawAchievements(double subOpen) {
     SubFooter(false, a);
 }
 
-void DrawInventory(float a) {
-    LabelPlate(228.0f, 140.0f, 427.0f, 188.0f, "INVENTORY", a);
-    // list panel + detail panel (abutting, dark seam)
-    SubPanel(230.0f, 194.0f, 769.3f, 599.3f, 23.3f, a);
-    DrawRect({ 769.3f, 194 }, { 772.0f, 417.3f }, WithAlpha(RGBA(32, 33, 35, 255), a));
-    SubPanel(772.0f, 194.0f, 1050.7f, 417.3f, 23.7f, a);
-    // item render slot in the detail panel (SEGA art drops in)
-    SetFont(g_fSeurat);
-    DrawTextAligned({ 780, 203 }, { 1011, 367 }, 15.0f, WithAlpha(RGBA(86, 88, 92, 255), a), "ITEM RENDER", Align::Center, true, false);
+void DrawInventory(double subOpen) {
+    // staged entrance mirroring DrawAchievements (it is the SAME achievement_menu
+    // sub-panel container, reached the same way via LB, so the game animates both
+    // identically): the header slides in from the left + fades (f0-15), the two
+    // list/detail panels rect-inflate from an inset + fade (f11-12), and the item
+    // rows / scrollbar / footer are HARD-GATED until the panels are fully open.
+    const float hMot    = (float)ComputeMotion(subOpen, 0.0, 15.0);
+    const float headerX = Lerp(128.0f, 228.0f, Hermite(0.0f, 1.0f, hMot));
+    const float hFade   = (float)ComputeMotion(subOpen, 5.0, 14.0);
+    const float cMot    = (float)ComputeMotion(subOpen, 11.0, 12.0);
+    const float cAlpha  = Hermite(0.0f, 1.0f, cMot);
+
+    LabelPlate(headerX, 140.0f, headerX + 199.0f, 188.0f, "INVENTORY", hFade);
+    // list panel + detail panel (abutting, dark seam) — inflate about their shared
+    // centre + fade, exactly like the achievements content panel
+    {
+        const float cx = (230.0f + 1050.7f) * 0.5f, cy = (194.0f + 599.3f) * 0.5f;
+        const float s  = Lerp(0.93f, 1.0f, cMot);
+        PushTransform(s, s, { cx, cy }, { 0, 0 });
+        PushAlpha(cAlpha);
+        SubPanel(230.0f, 194.0f, 769.3f, 599.3f, 23.3f, 1.0f);
+        DrawRect({ 769.3f, 194 }, { 772.0f, 417.3f }, RGBA(32, 33, 35, 255));
+        SubPanel(772.0f, 194.0f, 1050.7f, 417.3f, 23.7f, 1.0f);
+        // item render slot in the detail panel (SEGA art drops in)
+        SetFont(g_fSeurat);
+        DrawTextAligned({ 780, 203 }, { 1011, 367 }, 15.0f, RGBA(86, 88, 92, 255), "ITEM RENDER", Align::Center, true, false);
+        ResetFont();
+        PopAlpha();
+        PopTransform();
+    }
+    if (cMot < 1.0f) return;          // HARD GATE: no item rows until the panels are fully open
+    const float a = 1.0f;
     const char* ITEMS_INV[7] = { "Big G Steak", "Popcake", "Nuclear Taquo", "Empire Coffee",
                                  "Banana", "Tropic Juice", "Live Honker" };
     for (int i = 0; i < 7; ++i) {
@@ -506,7 +529,7 @@ void Draw(double openSec) {
         DrawPauseBands(1.0f);
         DrawBanner(1.0f);
         if (g_sub == SV_ACHIEVEMENTS) DrawAchievements(g_subOpen);
-        else                          DrawInventory(1.0f);
+        else                          DrawInventory(g_subOpen);
         return;
     }
 
