@@ -391,7 +391,9 @@ void DrawSoundtrack(float a, double now) {
 
 void Draw(double openSec) {
     const double now = Now();
-    const float a = (float)ComputeMotion(openSec, 0.0, 10.0);
+    // delayed entrance (real CSD Intro keys start at f15 and run ~10f — a brief
+    // hold, then the panel/content reveal; ours used to fade from f0 in 10f).
+    const float a = (float)ComputeMotion(openSec, 15.0, 12.0);
     // lab-scene placeholder (warm library tones; real game = live 3D room)
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_LAB_T, C_LAB_B);
     DrawRect({ 0, 540 }, { REF_W, REF_H }, RGBA(44, 32, 24, 255));
