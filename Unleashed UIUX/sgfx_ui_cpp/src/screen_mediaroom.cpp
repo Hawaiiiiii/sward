@@ -31,7 +31,7 @@
 using namespace ui;
 namespace {
 
-int g_glyphTex = -1;
+int g_glyphTex = -1, g_sunMedTex = -1, g_moonMedTex = -1;
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 
 struct UV { float u0, v0, u1, v1; };
@@ -89,6 +89,8 @@ int g_selR = 2, g_selC = 3;     // soundtrack selection (matches the capture)
 
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
+    if (g_sunMedTex  < 0) g_sunMedTex  = gfx::loadTexture("assets/gameart/medallion_sun.png");
+    if (g_moonMedTex < 0) g_moonMedTex = gfx::loadTexture("assets/gameart/medallion_moon.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
@@ -406,14 +408,19 @@ void Draw(double openSec) {
     // two stacked rows, Sun then Moon, each = medal icon + "Lv7 [200]"
     {
         SetFont(g_fSeurat);
-        auto chip = [&](float cy, uint32_t icol, const char* txt) {
-            DrawRect({ 131, cy - 12 }, { 155, cy + 12 }, WithAlpha(RGBA(40, 30, 8, 230), a));
-            DrawRect({ 133, cy - 10 }, { 153, cy + 10 }, WithAlpha(icol, a));
-            DrawRect({ 138, cy - 5 }, { 148, cy + 5 }, WithAlpha(RGBA(150, 116, 36, 255), a));
+        auto chip = [&](float cy, int medTex, uint32_t icol, const char* txt) {
+            if (medTex >= 0) {   // real Sun/Moon medallion sprite (gold ring + gem)
+                DrawImage(medTex, { 129, cy - 14 }, { 158, cy + 14 }, { 0.f, 0.f }, { 1.f, 1.f },
+                          WithAlpha(RGBA(255, 255, 255, 255), a));
+            } else {             // procedural fallback
+                DrawRect({ 131, cy - 12 }, { 155, cy + 12 }, WithAlpha(RGBA(40, 30, 8, 230), a));
+                DrawRect({ 133, cy - 10 }, { 153, cy + 10 }, WithAlpha(icol, a));
+                DrawRect({ 138, cy - 5 }, { 148, cy + 5 }, WithAlpha(RGBA(150, 116, 36, 255), a));
+            }
             DrawTextShadow({ 163, cy - 9 }, 16.0f, WithAlpha(RGBA(244, 240, 230, 255), a), txt);
         };
-        chip(135, RGBA(214, 96, 40, 255), "Lv7 [200]");    // sun
-        chip(181, RGBA(64, 120, 210, 255), "Lv7 [200]");   // moon
+        chip(135, g_sunMedTex,  RGBA(214, 96, 40, 255), "Lv7 [200]");    // sun
+        chip(181, g_moonMedTex, RGBA(64, 120, 210, 255), "Lv7 [200]");   // moon
         ResetFont();
     }
 }

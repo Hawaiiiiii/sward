@@ -23,6 +23,7 @@ namespace {
 
 int g_fRodin = 0, g_fSeurat = 0, g_fDF = 0, g_glyphTex = -1;
 int g_selTex = -1, g_gwTex = -1, g_trophyTex = -1;   // real recomp select / general_window / trophy sprites
+int g_sunMedTex = -1, g_moonMedTex = -1;             // real Sun/Moon medal emblems (give-to medal counters)
 // select.dds (64x64) full 9-slice (imgui_utils DrawSelectionContainer): tl(34,0,11,24)
 // tc(45,0,8,24) tr(53,0,11,24) | cl(34,24,11,2) cc cr | bl(34,26,11,24) bc br
 NineSlice SEL_NS = { -1, 34.f/64,45.f/64, 45.f/64,53.f/64, 53.f/64,64.f/64,  0.f,24.f/64, 24.f/64,26.f/64, 26.f/64,50.f/64,  11,24,11,24 };
@@ -89,6 +90,8 @@ void Init() {
     if (g_selTex < 0) { g_selTex = gfx::loadTexture("assets/recomp/select.png"); SEL_NS.tex = g_selTex; }
     if (g_gwTex  < 0) { g_gwTex  = gfx::loadTexture("assets/recomp/general_window.png"); GW_NS.tex = g_gwTex; }
     if (g_trophyTex < 0) g_trophyTex = gfx::loadTexture("assets/recomp/trophy.png");
+    if (g_sunMedTex  < 0) g_sunMedTex  = gfx::loadTexture("assets/gameart/medallion_sun.png");
+    if (g_moonMedTex < 0) g_moonMedTex = gfx::loadTexture("assets/gameart/medallion_moon.png");
 }
 void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; g_sub = SV_NONE; g_achSel = 0; g_invSel = 2; g_invPopup = false; g_invPopupSel = 0; g_nav = nullptr; }
 void Input(const ScreenInput& in) {
@@ -554,11 +557,13 @@ void Draw(double openSec) {
             DrawText({ x, cy - 11 }, 22.0f, WithAlpha(C_ITEM, t), s);
         };
         // Sun medal slot ~(1041,495)-(1071,520), digits centered y~505
-        DrawVGradient({ 1041, 495 }, { 1071, 520 }, WithAlpha(RGBA(238, 198, 70, 255), t), WithAlpha(RGBA(196, 150, 38, 255), t));
+        if (g_sunMedTex >= 0) DrawImage(g_sunMedTex, { 1038, 492 }, { 1073, 523 }, { 0.f, 0.f }, { 1.f, 1.f }, WithAlpha(C_WHITE, t));
+        else                  DrawVGradient({ 1041, 495 }, { 1071, 520 }, WithAlpha(RGBA(238, 198, 70, 255), t), WithAlpha(RGBA(196, 150, 38, 255), t));
         medalCount(1080, 505, "00 / 00");
         DrawRect({ 1078, 522 }, { 1264, 523 }, WithAlpha(RGBA(150, 153, 178, 200), t));   // trailing rule under sun counter
         // Moon medal slot ~(1036,540)-(1071,575), digits centered y~558
-        DrawVGradient({ 1036, 540 }, { 1071, 575 }, WithAlpha(RGBA(176, 188, 214, 255), t), WithAlpha(RGBA(120, 134, 168, 255), t));
+        if (g_moonMedTex >= 0) DrawImage(g_moonMedTex, { 1034, 538 }, { 1073, 577 }, { 0.f, 0.f }, { 1.f, 1.f }, WithAlpha(C_WHITE, t));
+        else                   DrawVGradient({ 1036, 540 }, { 1071, 575 }, WithAlpha(RGBA(176, 188, 214, 255), t), WithAlpha(RGBA(120, 134, 168, 255), t));
         medalCount(1080, 558, "02 / 02");
         DrawRect({ 1078, 572 }, { 1264, 573 }, WithAlpha(RGBA(150, 153, 178, 200), t));   // trailing rule under moon counter
     }
