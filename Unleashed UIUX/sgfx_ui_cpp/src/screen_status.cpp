@@ -28,6 +28,8 @@ namespace {
 
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 int g_glyphTex = -1, g_charDayTex = -1, g_charNightTex = -1;
+int g_sunTex = -1, g_moonTex = -1;            // medallions for the transform flash bloom
+double g_xformStart = -100.0;                 // Now() of the last day<->night transform (drives the flash)
 
 struct UV { float u0, v0, u1, v1; };
 constexpr float GTW = 512.0f, GTH = 512.0f;
@@ -112,6 +114,8 @@ void Init() {
     // clean cutout so it stands on the status sky. Swap to re-skin.
     if (g_charDayTex   < 0) g_charDayTex   = gfx::loadTexture("assets/gameart/status_sonic_day_cut.png");
     if (g_charNightTex < 0) g_charNightTex = gfx::loadTexture("assets/gameart/status_werehog_night_cut.png");
+    if (g_sunTex  < 0) g_sunTex  = gfx::loadTexture("assets/gameart/medallion_sun.png");
+    if (g_moonTex < 0) g_moonTex = gfx::loadTexture("assets/gameart/medallion_moon.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
@@ -121,7 +125,7 @@ void Input(const ScreenInput& in) {
     int n = g_night ? 5 : 2;   // stat rows; the QUIT plate is index n (selectable)
     if (in.up)   g_sel = std::max(0, g_sel - 1);
     if (in.down) g_sel = std::min(n, g_sel + 1);
-    if (in.tabLeft || in.tabRight) { g_night = !g_night; g_sel = 0; }
+    if (in.tabLeft || in.tabRight) { g_night = !g_night; g_sel = 0; g_xformStart = Now(); }   // transform!
     // (A) Level Up: stats are showcased at MAX, matching the captured save
 }
 
@@ -387,6 +391,33 @@ void Draw(double openSec) {
     }
 }
 
+// The day<->night TRANSFORMATION flash — the Unleashed signature. On a form switch
+// (LB/RB), a brilliant burst blooms over the screen: warm gold rising toward the SUN
+// (day) or cool indigo toward the MOON (night), with the matching medallion expanding
+// outward from centre and fading. A pure additive overlay over WHATEVER base is drawn
+// (CSD or hand-authored); inert outside the ~0.5s window, so it never alters the
+// settled layout.
+void DrawXformFlash() {
+    double age = Now() - g_xformStart;
+    if (age < 0.0 || age >= 0.52) return;
+    const float p    = (float)(age / 0.52);
+    const float rise = std::min(1.0f, (float)(age / 0.06));   // snap up in ~1 frame
+    const float fl   = rise * (1.0f - p);                     // flash envelope 0..1
+    // tint toward the NEW form (g_night already flipped): night = cool indigo, day = gold
+    const uint32_t tint = g_night ? RGBA(150, 165, 255, 255) : RGBA(255, 226, 140, 255);
+    DrawRect({ 0, 0 }, { REF_W, REF_H }, WithAlpha(tint, fl * 0.78f), true);   // additive bloom
+    // the medallion blooms outward from centre + fades
+    const int   med = g_night ? g_moonTex : g_sunTex;
+    const float cx = 640.0f, cy = 360.0f;
+    const float ms = 64.0f + 280.0f * p;                      // expanding radius
+    const float ma = (1.0f - p) * (1.0f - p);                // fade (eased)
+    if (med >= 0)
+        DrawImage(med, { cx - ms, cy - ms }, { cx + ms, cy + ms }, { 0, 0 }, { 1, 1 },
+                  WithAlpha(RGBA(255, 255, 255, 255), ma * 0.9f), true);
+    else
+        FillDisc(cx, cy, ms * 0.5f, WithAlpha(tint, ma * 0.5f));
+}
+
 // CSD cast-state tag: the host renders the real status CSD as the base layer in
 // the matching day(Sonic)/night(Werehog) variant; this reports which to pick.
 const char* CsdState() { return g_night ? "ev" : "so"; }
@@ -398,8 +429,10 @@ void StatusInit() { Init(); }
 // base), the screen is the game's own layout — our Draw adds nothing yet. Only
 // when the CSD is unavailable do we fall back to the hand-authored layout.
 void StatusDraw(double openSeconds) {
-    if (std::strcmp(csd::LoadedId(), "status") == 0) return;   // CSD base IS the screen
-    Draw(openSeconds);                                          // hand-authored fallback
+    // hand-authored layout draws only when the CSD base is absent; the transform
+    // flash draws OVER either base.
+    if (std::strcmp(csd::LoadedId(), "status") != 0) Draw(openSeconds);
+    DrawXformFlash();
 }
 void StatusInput(const ScreenInput& in) { Input(in); }
 void StatusReset() { Reset(); }
