@@ -153,8 +153,9 @@ void NamePlate(float x0, float y0, float x1, float y1, float a) {
 }
 
 void Draw(double openSec) {
-    const float a = (float)ComputeMotion(openSec, 0.0, 10.0);
-    const float panT = (float)ComputeMotion(openSec, 4.0, 10.0);
+    const float a = (float)ComputeMotion(openSec, 0.0, 20.0);   // header band/wordmark settle by f20
+    const float panT = (float)ComputeMotion(openSec, 10.0, 10.0);  // act panel pops in f10-20 (scale + fade)
+    const float panS = Lerp(0.83f, 1.0f, panT);                    // panel scale-pop 0.83->1.0
 
     // ---- live scene slot: Gaia-temple interior — stone walls, a glowing warp
     //      portal cylinder (upper centre, behind the panel) and an ornate rune-
@@ -225,13 +226,19 @@ void Draw(double openSec) {
         const uint32_t sc[4] = { WithAlpha(C_BAND_M, a), WithAlpha(C_BAND_M, a), WithAlpha(C_BAND_B, a), WithAlpha(C_BAND_B, a) };
         DrawQuadGradient(sl, sc);
     }
+    // header wordmark slides in from the LEFT (CSD title_bg/title_txt XPosition
+    // f0-20, ~625px travel) then settles over the gold band.
+    PushTransform(1.0f, 1.0f, { 0.0f, 0.0f }, { -625.0f * (1.0f - a), 0.0f });
     Chrome({ 250, 46 }, 40.0f, "STAGE", a);
     Chrome({ 270, 82 }, 40.0f, "SELECT", a);
+    PopTransform();
 
     if (panT > 0.0f) {
         const Act& act = ACTS[g_act];
         // ---- wide act panel (x268-1003, real borders) with chamfered right corners ----
         const float px0 = 268, py0 = 176, px1 = 1003, py1 = 540, pch = 24;
+        // the panel + its content pop in together: scale 0.83->1.0 about the panel centre
+        PushTransform(panS, panS, { (px0 + px1) * 0.5f, (py0 + py1) * 0.5f }, { 0.0f, 0.0f });
         DrawVGradient({ px0, py0 }, { px1, py1 }, WithAlpha(C_PANEL_T, panT), WithAlpha(C_PANEL_B, panT));
         // chamfer the top-right + bottom-right corners back to the scene
         const V2 ctr[4] = { { px1 - pch, py0 }, { px1, py0 }, { px1, py0 + pch }, { px1 - pch, py0 } };
@@ -310,6 +317,7 @@ void Draw(double openSec) {
             DrawImage(g_rankTex, { 900, 400 }, { 1044, 534 },
                       { RANK_UV[act.rank].u0, RANK_UV[act.rank].v0 }, { RANK_UV[act.rank].u1, RANK_UV[act.rank].v1 },
                       WithAlpha(RGBA(228, 230, 236, 255), panT * 0.95f));
+        PopTransform();   // end panel scale-pop (arrows/popup are navigation chrome, not scaled)
 
         // ---- carousel act arrows flanking the panel ----
         if (!g_popup) {

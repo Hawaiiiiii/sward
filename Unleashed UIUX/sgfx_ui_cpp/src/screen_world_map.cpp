@@ -298,7 +298,12 @@ void DrawPopup() {
 }
 
 void Draw(double openSec) {
-    const float t = (float)ComputeMotion(openSec, 0.0, 14.0);
+    // staggered entrance (CSD ~66f): bg/header/globe/counters land first, the
+    // stage-info panel floods in next, and the gold WORLD MAP title + the floating
+    // SPAGONIA stage label settle LAST (only clearly readable by ~1.5s in the CSD).
+    const float t      = (float)ComputeMotion(openSec, 0.0,  12.0);  // bg / header / counters / globe / footer
+    const float tPanel = (float)ComputeMotion(openSec, 18.0, 16.0);  // stage-info LED panel flood
+    const float tTitle = (float)ComputeMotion(openSec, 38.0, 18.0);  // WORLD MAP title + SPAGONIA label (last)
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_TOP, C_BG_BOT);
     // full-width header rail (mirrors the footer legend band)
     DrawRect({ 0, 104 }, { REF_W, 107 }, WithAlpha(RGBA(94, 123, 88, 255), t));
@@ -341,7 +346,7 @@ void Draw(double openSec) {
     // ---- gold beveled "WORLD MAP" title (inset ~124px, bigger, wider tracking) ----
     SetFont(g_fDF);
     SetTextStretchX(1.34f);
-    DrawTextBevel({ 124, 62 }, 42.0f, WithAlpha(C_TITLE, t), "WORLD MAP");
+    DrawTextBevel({ 124, 62 }, 42.0f, WithAlpha(C_TITLE, tTitle), "WORLD MAP");
     ResetTextStretchX();
 
     // ---- left totals column: icon + bright number rows, inset on the LED grid ----
@@ -362,8 +367,8 @@ void Draw(double openSec) {
     }
 
     if (g_showInfo) {
-        DrawStageLabel(t);
-        DrawStageInfo(t);
+        DrawStageLabel(tTitle);
+        DrawStageInfo(tPanel);
     } else {
         // hover/empty state: only the green bracket-frame + dotted left rail
         DrawStageInfoEmpty(t);
