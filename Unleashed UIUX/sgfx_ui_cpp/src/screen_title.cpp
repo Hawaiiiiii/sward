@@ -24,6 +24,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <string>
 #include <algorithm>
 
@@ -46,7 +47,7 @@ constexpr int ENTRY_COUNT = int(sizeof(ENTRIES) / sizeof(ENTRIES[0]));
 // ui_mm_base.png is the full 1280x720 retail title plate; ui_mm_parts1.png (1280x640)
 // packs the title bar + the index-bar slot art used for every menu row.
 const char* const ASSET_BASE = "assets/title/";
-int g_baseTex = -1, g_partsTex = -1;
+int g_baseTex = -1, g_partsTex = -1, g_dialTex = -1;
 
 // ---- real-game fonts (MSDF sweep) --------------------------------------------
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
@@ -118,6 +119,7 @@ int    g_flashRow   = -1;
 void Init() {
     if (g_baseTex  < 0) g_baseTex  = gfx::loadTexture(std::string(ASSET_BASE) + "ui_mm_base.png");
     if (g_partsTex < 0) g_partsTex = gfx::loadTexture(std::string(ASSET_BASE) + "ui_mm_parts1.png");
+    if (g_dialTex  < 0) g_dialTex  = gfx::loadTexture("assets/gameart/title_dial.png");   // the gem/gear dial, masked, for the spin overlay
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
@@ -189,6 +191,19 @@ void Draw(double openSec) {
                   WithAlpha(COL_WHITE, baseT));
     else
         DrawVGradient({ 0, 0 }, { REF_W, REF_H }, COL_BG_TOP, COL_BG_BOT);
+
+    // ---- the gem/gear dial SPINS during the entrance (CSD mm_donut 0->360 over
+    //      ~60f) then settles aligned over the baked-in dial. A masked circular
+    //      overlay rotated via DrawImageQuad corners (no global rotation needed). ----
+    if (g_dialTex >= 0 && baseT > 0.0f) {
+        const float dcx = 206.0f, dcy = 292.0f, dr = 112.0f;
+        const float ang = (1.0f - (float)ComputeLinearMotion(openSec, 0.0, 60.0)) * 6.2831853f;  // one turn, linear spin-settle
+        const float cs = std::cos(ang), sn = std::sin(ang);
+        auto rc = [&](float dx, float dy) -> V2 { return { dcx + dx * cs - dy * sn, dcy + dx * sn + dy * cs }; };
+        const V2 cor[4] = { rc(-dr, -dr), rc(dr, -dr), rc(dr, dr), rc(-dr, dr) };
+        const V2 uvs[4] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
+        DrawImageQuad(g_dialTex, cor, uvs, WithAlpha(COL_WHITE, baseT));
+    }
 
     // ---- "MAIN MENU" title bar (real art) -------------------------------------
     if (g_partsTex >= 0 && titleT > 0.0f) {
