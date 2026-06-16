@@ -124,8 +124,14 @@ void DrawSpinner(float x0, float y0, double now) {
 }
 
 void Draw(double openSec) {
-    (void)openSec;
     const double now = Now();
+    // staggered screen-content entrance (the real CSD loading intro reveals the
+    // grid -> terrain/landmarks -> medallions/photo -> wordmark over ~45 frames).
+    // The yellow device shell + bezel stay solid (the physical tablet frame).
+    const float g1 = (float)ComputeMotion(openSec, 0,  12);   // grid floor
+    const float g2 = (float)ComputeMotion(openSec, 8,  14);   // terrain loop + landmarks
+    const float g3 = (float)ComputeMotion(openSec, 20, 12);   // medallions + photo
+    const float g4 = (float)ComputeMotion(openSec, 30, 14);   // NOW LOADING wordmark + spinner
 
     // ---- yellow device shell ----
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SHELL_T, C_SHELL_B);
@@ -153,6 +159,7 @@ void Draw(double openSec) {
     SetFont(0);
     DrawText({ SC_X1 - 96, SC_Y1 + 1 }, 10.0f, RGBA(150, 152, 148, 255), "MILES ELECTRIC");
 
+    PushAlpha(g1);
     // ---- perspective grid floor (converging green lines) ----
     // clip to the tablet SCREEN interior: the outer converging lines fan out past
     // baseY to x~1376, well past SC_X1, and were bleeding onto the yellow chrome.
@@ -173,6 +180,8 @@ void Draw(double openSec) {
         PopClip();
     }
 
+    PopAlpha();
+    PushAlpha(g2);
     // ---- green terrain: a CLOSED ANNULAR perspective LOOP (the real loading_miles
     // glowing-green ring/track) — a HOLLOW perspective ellipse so the grid shows
     // through its centre. Outer bbox x[356-789] y[341-553], centroid (577,481);
@@ -331,6 +340,8 @@ void Draw(double openSec) {
         }
     }
 
+    PopAlpha();
+    PushAlpha(g3);
     // ---- gold landmark medallion slots (round, like the real map markers) ----
     auto medallion = [&](float cx, float cy) {
         FillDisc(cx, cy, 29, WithAlpha(RGBA(40, 30, 8, 255), 0.8f));
@@ -346,6 +357,8 @@ void Draw(double openSec) {
     SetFont(0);
     DrawTextAligned({ 369, 148 }, { 539, 273 }, 12.0f, RGBA(130, 144, 158, 255), "PHOTO", Align::Center, true, false);
 
+    PopAlpha();
+    PushAlpha(g4);
     // ---- NOW LOADING wordmark (real sprite) + spinner, pulsing like boot ----
     float t01 = (float)(now - std::floor(now));
     float tri = 0.5f - 0.5f * std::cos(6.2831853f * t01);
@@ -354,6 +367,7 @@ void Draw(double openSec) {
         DrawImageVGradient(g_wordTex, { 593, 547 }, { 963, 598 }, { WM_U0, WM_V0 }, { WM_U1, WM_V1 },
                            WithAlpha(RGBA(76, 218, 16, 255), pulse), WithAlpha(C_GREEN_B, pulse));
     DrawSpinner(985, 558, now);
+    PopAlpha();
 }
 
 } // namespace

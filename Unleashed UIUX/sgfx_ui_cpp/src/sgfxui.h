@@ -69,6 +69,8 @@ enum Modifier : uint32_t { MOD_NONE = 0, MOD_SCANLINE = 1, MOD_CHECKERBOARD = 2,
 void SetModifier(uint32_t m);
 void PushClip(V2 min, V2 max);   // scissor: clamp subsequent quads/text to this rect (stacks)
 void PopClip();
+void PushAlpha(float a);         // global alpha multiplier (stacks/multiplies) — for entrance fades/staggers
+void PopAlpha();
 void ResetModifier();
 
 // ---- primitives (append to the batch; later calls paint over earlier ones) --

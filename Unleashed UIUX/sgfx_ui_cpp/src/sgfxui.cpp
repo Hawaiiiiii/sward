@@ -66,6 +66,18 @@ inline uint8_t B(uint32_t c) { return uint8_t(c);       }
 // rect + remap UVs (crop, don't squash); per-glyph for text. The recomp's PushClipRect.
 struct ClipRect { float x0, y0, x1, y1; };
 std::vector<ClipRect> g_clipStack;
+
+// Global alpha multiplier stack — lets a screen fade/stagger an entrance without
+// threading an alpha through every draw call (the recomp's PushAlphaModifier).
+// Every emitted quad/glyph colour's alpha is scaled by the product of the stack.
+std::vector<float> g_alphaStack;
+float g_alphaMul = 1.0f;
+inline void recomputeAlpha() { g_alphaMul = 1.0f; for (float a : g_alphaStack) g_alphaMul *= a; }
+inline uint32_t applyGAlpha(uint32_t c) {
+    if (g_alphaMul >= 0.999f) return c;
+    uint32_t a = (uint32_t)((c >> 24) * g_alphaMul + 0.5f);
+    return (c & 0x00FFFFFFu) | (a << 24);
+}
 // clamp [x0..y1]/[u0..v1] to the top clip rect; returns false if fully outside.
 bool clipQuad(float& x0, float& y0, float& x1, float& y1, float& u0, float& v0, float& u1, float& v1) {
     if (g_clipStack.empty()) return true;
@@ -84,6 +96,7 @@ void Push(float x0, float y0, float x1, float y1,
           float u0, float v0, float u1, float v1,
           uint32_t col, int tex, gfx::Blend blend) {
     if (!clipQuad(x0, y0, x1, y1, u0, v0, u1, v1)) return;
+    col = applyGAlpha(col);
     gfx::Quad q;
     q.px[0]=x0; q.py[0]=y0;  q.px[1]=x1; q.py[1]=y0;
     q.px[2]=x1; q.py[2]=y1;  q.px[3]=x0; q.py[3]=y1;
@@ -100,7 +113,7 @@ void PushQuad4(float x0, float y0, float x1, float y1,
     q.px[0]=x0; q.py[0]=y0;  q.px[1]=x1; q.py[1]=y0;
     q.px[2]=x1; q.py[2]=y1;  q.px[3]=x0; q.py[3]=y1;
     q.u[0]=0; q.v[0]=0;  q.u[1]=1; q.v[1]=0;  q.u[2]=1; q.v[2]=1;  q.u[3]=0; q.v[3]=1;
-    q.color[0]=cTL; q.color[1]=cTR; q.color[2]=cBR; q.color[3]=cBL;
+    q.color[0]=applyGAlpha(cTL); q.color[1]=applyGAlpha(cTR); q.color[2]=applyGAlpha(cBR); q.color[3]=applyGAlpha(cBL);
     q.texIndex=tex; q.blend=blend; q.modifier=g_modifier;
     g_quads.push_back(q);
 }
@@ -266,11 +279,16 @@ void ResetFont()    { g_curFont = 0; }
 
 void Shutdown() { g_quads.clear(); g_quads.shrink_to_fit(); g_fontReady = false; }
 
-void BeginFrame(double nowSeconds) { g_now = nowSeconds; g_quads.clear(); g_modifier = 0; g_curFont = 0; g_textShear = 0.0f; g_textStretchX = 1.0f; g_clipStack.clear(); }
+void BeginFrame(double nowSeconds) { g_now = nowSeconds; g_quads.clear(); g_modifier = 0; g_curFont = 0; g_textShear = 0.0f; g_textStretchX = 1.0f; g_clipStack.clear(); g_alphaStack.clear(); g_alphaMul = 1.0f; }
 void SetModifier(uint32_t m) { g_modifier = m; }
 void ResetModifier() { g_modifier = 0; }
 void PushClip(V2 min, V2 max) { g_clipStack.push_back({ min.x, min.y, max.x, max.y }); }
 void PopClip() { if (!g_clipStack.empty()) g_clipStack.pop_back(); }
+
+// Global alpha multiplier (stacks). PushAlpha(0.3f) fades everything drawn until
+// PopAlpha() to 30%; nested pushes multiply. Used to drive entrance fades/staggers.
+void PushAlpha(float a) { a = a < 0.0f ? 0.0f : (a > 1.0f ? 1.0f : a); g_alphaStack.push_back(a); g_alphaMul *= a; }
+void PopAlpha() { if (!g_alphaStack.empty()) { g_alphaStack.pop_back(); recomputeAlpha(); } }
 void Flush(gfx::Quad*& outQuads, int& outCount) { outQuads = g_quads.data(); outCount = (int)g_quads.size(); }
 double Now() { return g_now; }
 
@@ -323,7 +341,7 @@ void DrawImageQuad(int tex, const V2 corners[4], const V2 uvs[4], uint32_t col, 
         q.px[k] = corners[k].x; q.py[k] = corners[k].y;
         q.u[k]  = uvs[k].x;     q.v[k]  = uvs[k].y;
     }
-    q.color[0]=q.color[1]=q.color[2]=q.color[3]=col; q.texIndex = tex; q.modifier = g_modifier;
+    q.color[0]=q.color[1]=q.color[2]=q.color[3]=applyGAlpha(col); q.texIndex = tex; q.modifier = g_modifier;
     q.blend = additive ? gfx::Blend::Additive : gfx::Blend::Alpha;
     g_quads.push_back(q);
 }
@@ -581,7 +599,7 @@ void DrawQuadGradient(const V2 corners[4], const uint32_t cols[4], bool additive
     const float uvx[4] = { 0, 1, 1, 0 }, uvy[4] = { 0, 0, 1, 1 };
     for (int k = 0; k < 4; ++k) {
         q.px[k] = corners[k].x; q.py[k] = corners[k].y;
-        q.u[k] = uvx[k]; q.v[k] = uvy[k]; q.color[k] = cols[k];
+        q.u[k] = uvx[k]; q.v[k] = uvy[k]; q.color[k] = applyGAlpha(cols[k]);
     }
     q.texIndex = -1; q.modifier = g_modifier;
     q.blend = additive ? gfx::Blend::Additive : gfx::Blend::Alpha;
@@ -598,7 +616,7 @@ void DrawImageVGradient(int tex, V2 min, V2 max, V2 uv0, V2 uv1,
     // re-tint by each (possibly clip-adjusted) corner's position in the ORIGINAL band
     for (int k = 0; k < 4; ++k) {
         float f = (max.y > min.y) ? (q.py[k] - min.y) / (max.y - min.y) : 0.0f;
-        q.color[k] = ColourLerp(colTop, colBottom, f);
+        q.color[k] = applyGAlpha(ColourLerp(colTop, colBottom, f));
     }
 }
 
