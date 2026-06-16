@@ -25,7 +25,7 @@
 using namespace ui;
 namespace {
 
-int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_glyphTex = -1, g_photoTex = -1, g_sunTex = -1;
+int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_glyphTex = -1, g_photoTex = -1, g_sunTex = -1, g_moonTex = -1;
 struct UV { float u0, v0, u1, v1; };
 constexpr float GTW = 512.0f, GTH = 512.0f;
 const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
@@ -89,6 +89,7 @@ void Init() {
     // template — swap the PNG (or key it off the selected stage) to re-skin.
     if (g_photoTex < 0) g_photoTex = gfx::loadTexture("assets/gameart/stage_spagonia_hero.png");
     if (g_sunTex   < 0) g_sunTex   = gfx::loadTexture("assets/gameart/medallion_sun.png");   // real day medal
+    if (g_moonTex  < 0) g_moonTex  = gfx::loadTexture("assets/gameart/medallion_moon.png");  // real night medal
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
@@ -345,14 +346,17 @@ void Draw(double openSec) {
 
     // ---- left totals column: icon + bright number rows, inset on the LED grid ----
     {
-        struct Row { uint32_t icol; bool ring; const char* val; } rows[] = {
-            { C_LIVES, false, "99" }, { C_RING, true, "999999" },
-            { C_SUN, true, "lv 7 (200)" }, { C_MOON, true, "lv 7 (200)" },
+        struct Row { uint32_t icol; bool ring; const char* val; int medTex; } rows[] = {
+            { C_LIVES, false, "99", -1 }, { C_RING, true, "999999", -1 },
+            { C_SUN, true, "lv 7 (200)", g_sunTex }, { C_MOON, true, "lv 7 (200)", g_moonTex },
         };
         SetFont(g_fRodin);
         for (int i = 0; i < 4; ++i) {
             float cy = TROW0 + i * TPITCH;
-            DrawIconSlot(140, cy, 14, rows[i].icol, rows[i].ring, t);
+            if (rows[i].medTex >= 0)   // real Sun/Moon medal emblem
+                DrawImage(rows[i].medTex, { 124, cy - 16 }, { 156, cy + 16 }, { 0.f, 0.f }, { 1.f, 1.f }, WithAlpha(C_WHITE, t));
+            else
+                DrawIconSlot(140, cy, 14, rows[i].icol, rows[i].ring, t);
             DrawText({ 178, cy - 13 }, 24.0f, WithAlpha(C_NUM, t), rows[i].val);
         }
     }
