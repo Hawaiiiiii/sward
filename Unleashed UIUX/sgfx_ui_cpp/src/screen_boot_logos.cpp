@@ -10,6 +10,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "globe3d.h"
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
@@ -88,15 +89,14 @@ void Draw(double openSec) {
         }
         if (float a = Window(t, 1.0, 3.5); a > 0) CardSlot("P R E S E N T E D   B Y", "SEGA", a, RGBA(70, 110, 220, 255), g_segaTex);
         if (float a = Window(t, 4.0, 6.5); a > 0) CardSlot(nullptr, "SONIC TEAM", a, RGBA(50, 90, 200, 255), g_stTex);
-        if (float a = Window(t, 7.0, 9.5); a > 0) {   // morph ball slot (gentle spin)
-            const float cx = 640, cy = 360, r = 46;
-            for (int i = 0; i < 12; ++i) {   // spiky silhouette hint
-                float an = (float)(i * 0.5236 + t * 2.2);
-                float sx = cx + std::cos(an) * r * 1.18f, sy = cy + std::sin(an) * r * 1.18f;
-                DrawRect({ sx - 7, sy - 7 }, { sx + 7, sy + 7 }, WithAlpha(RGBA(22, 24, 30, 255), a));
-            }
-            DrawRect({ cx - r, cy - r * 0.62f }, { cx + r, cy + r * 0.62f }, WithAlpha(RGBA(22, 24, 30, 255), a));
-            DrawRect({ cx - r * 0.62f, cy - r }, { cx + r * 0.62f, cy + r }, WithAlpha(RGBA(22, 24, 30, 255), a));
+        if (float a = Window(t, 7.0, 9.5); a > 0) {   // the morph orb — a REAL 3D sphere
+            // (the "World Adventure" planet motif). The capture shows a dark ball gently
+            // turning on white; render the globe with the sun pushed behind the camera
+            // face so the near hemisphere sits in shadow (eclipse look, a faint lit
+            // crescent on the limb), spinning ~46 deg/s. Replaces the old 2D spiky stub.
+            DrawGlobe3D(640.0f, 360.0f, 96.0f, (float)(t * 46.0),
+                        -0.5f, 0.32f, -0.62f,    // back-left sun -> dark facing hemisphere
+                        nullptr, 0, a);
         }
     } else {
         // black + the real NOW LOADING (same treatment as boot_loading)
