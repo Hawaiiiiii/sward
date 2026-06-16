@@ -25,7 +25,7 @@
 using namespace ui;
 namespace {
 
-int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_glyphTex = -1, g_photoTex = -1;
+int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_glyphTex = -1, g_photoTex = -1, g_sunTex = -1;
 struct UV { float u0, v0, u1, v1; };
 constexpr float GTW = 512.0f, GTH = 512.0f;
 const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
@@ -88,6 +88,7 @@ void Init() {
     // the selected stage's real screenshot (Spagonia here); the slot is a
     // template — swap the PNG (or key it off the selected stage) to re-skin.
     if (g_photoTex < 0) g_photoTex = gfx::loadTexture("assets/gameart/stage_spagonia_hero.png");
+    if (g_sunTex   < 0) g_sunTex   = gfx::loadTexture("assets/gameart/medallion_sun.png");   // real day medal
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
@@ -187,7 +188,8 @@ void DrawStageInfo(float t) {
     DrawRect({ 868, 143.3f }, { 908, 170.7f }, WithAlpha(RGBA(24, 32, 80, 255), t));
     DrawRect({ 870, 145.3f }, { 906, 168.7f }, WithAlpha(RGBA(235, 238, 240, 255), t));
     DrawRect({ 880, 150 }, { 896, 164 }, WithAlpha(RGBA(170, 50, 40, 255), t));
-    DrawIconSlot(1114.7f, 158, 14.7f, RGBA(213, 143, 33, 255), true, t);
+    if (g_sunTex >= 0) DrawImage(g_sunTex, { 1099.0f, 142.0f }, { 1130.0f, 175.0f }, { 0.f, 0.f }, { 1.f, 1.f }, WithAlpha(C_WHITE, t));
+    else               DrawIconSlot(1114.7f, 158, 14.7f, RGBA(213, 143, 33, 255), true, t);
     // description (6 lines, pitch 32.9, left margin 864)
     SetFont(g_fSeurat);
     {
