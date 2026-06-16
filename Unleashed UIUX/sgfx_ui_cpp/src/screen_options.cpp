@@ -247,20 +247,26 @@ void Input(const ScreenInput& in) {
     if (in.tabLeft || in.tabRight) { g_cat = (g_cat + (in.tabRight?1:CATEGORY_COUNT-1)) % CATEGORY_COUNT; g_sel = g_prevSel = std::min(g_sel, OptCount()-1); g_first = 0; g_moveStart = Now(); KeepSelVisible(); }
 }
 
-// the green DrawContainer panel (game_window.cpp recipe)
-void DrawContainer(float x0, float y0, float x1, float y1, bool rightOutline, float t) {
-    DrawRect({ x0, y0 }, { x1, y1 }, WithAlpha(C_PANEL_BG, t));               // bg
+// the green DrawContainer panel (game_window.cpp recipe) — STAGED entrance per
+// options_menu.cpp DrawContainer: the frame opens vertically from its centre
+// (lineT, f0-8), then the outer ring (f16-24), inner fill (f32-40) and dark
+// background (f48-60) fade up in sequence. Bright corner brackets ride lineT.
+void DrawContainer(float x0, float y0, float x1, float y1, bool rightOutline,
+                   float lineT, float outerT, float innerT, float bgT) {
+    PushTransform(1.0f, lineT, { (x0 + x1) * 0.5f, (y0 + y1) * 0.5f }, { 0.0f, 0.0f });   // open from vertical centre
+    DrawRect({ x0, y0 }, { x1, y1 }, WithAlpha(C_PANEL_BG, bgT));               // bg (settles last)
     SetModifier(MOD_CHECKERBOARD);
-    DrawRect({ x0, y0 + GRID }, { x0 + GRID, y1 - GRID }, WithAlpha(C_OUTER, t));                    // left
-    DrawRect({ x1 - GRID, y0 + GRID }, { x1, y1 - GRID }, WithAlpha(rightOutline ? C_OUTER : C_INNER, t)); // right
-    DrawRect({ x0, y0 }, { x1, y0 + GRID }, WithAlpha(C_OUTER, t));                                  // top
-    DrawRect({ x0, y1 - GRID }, { x1, y1 }, WithAlpha(C_OUTER, t));                                  // bottom
-    DrawRect({ x0 + GRID, y0 + GRID }, { x1 - GRID, y1 - GRID }, WithAlpha(C_INNER, t));             // inner
+    DrawRect({ x0, y0 + GRID }, { x0 + GRID, y1 - GRID }, WithAlpha(C_OUTER, outerT));                    // left
+    DrawRect({ x1 - GRID, y0 + GRID }, { x1, y1 - GRID }, WithAlpha(rightOutline ? C_OUTER : C_INNER, outerT)); // right
+    DrawRect({ x0, y0 }, { x1, y0 + GRID }, WithAlpha(C_OUTER, outerT));                                  // top
+    DrawRect({ x0, y1 - GRID }, { x1, y1 }, WithAlpha(C_OUTER, outerT));                                  // bottom
+    DrawRect({ x0 + GRID, y0 + GRID }, { x1 - GRID, y1 - GRID }, WithAlpha(C_INNER, innerT));             // inner
     ResetModifier();
     // 2px corner brackets (lineColor) — top-left/right + bottom-left/right
-    uint32_t lc = WithAlpha(C_LINE, t); const float g = GRID, L = 2.0f;
+    uint32_t lc = WithAlpha(C_LINE, lineT); const float g = GRID, L = 2.0f;
     DrawRect({ x0+g, y0+g }, { x0+g+L, y0+g*2 }, lc); DrawRect({ x0+g, y0+g }, { x1-g, y0+g+L }, lc); DrawRect({ x1-g-L, y0+g }, { x1-g, y0+g*2 }, lc);
     DrawRect({ x0+g, y1-g*2 }, { x0+g+L, y1-g }, lc); DrawRect({ x0+g, y1-g-L }, { x1-g, y1-g }, lc); DrawRect({ x1-g-L, y1-g*2 }, { x1-g, y1-g }, lc);
+    PopTransform();
 }
 
 // ---- shared 3-layer green plate (active tab + value cell) -------------------
@@ -387,7 +393,16 @@ int ThumbTex(const char* name) {
 }
 
 void Draw(double openSec) {
-    const float t = (float)ComputeMotion(openSec, 0.0, 14.0);
+    // STAGED entrance (options_menu.cpp): the container builds (line f0-8, outer
+    // f16-24, inner f32-40, bg f48-60); the OPTIONS title fades f3-31 (Hermite);
+    // tabs + option rows appear once the panel has settled (~f50). The vignette
+    // bands + dividers are opaque from frame 0 (not part of the appear cascade).
+    const float cLine  = (float)ComputeMotion(openSec, 0.0,  8.0);
+    const float cOuter = (float)ComputeMotion(openSec, 16.0, 8.0);
+    const float cInner = (float)ComputeMotion(openSec, 32.0, 8.0);
+    const float cBg    = (float)ComputeMotion(openSec, 48.0, 12.0);
+    const float titleT = Hermite(0.0f, 1.0f, (float)ComputeMotion(openSec, 3.0, 28.0));
+    const float t      = (float)ComputeMotion(openSec, 50.0, 12.0);   // tabs/rows/values: after the panel settles
     DrawRect({ 0, 0 }, { REF_W, REF_H }, C_BG);   // deep base (the live game would be behind in-game)
 
     // ---- top & bottom scanline bands (105px) : vignette + green glow + divider ----
@@ -400,21 +415,21 @@ void Draw(double openSec) {
         ResetModifier();
     };
     band(0, 105, true); band(615, 720, false);
-    auto divider = [&](float y) {
-        DrawRect({ 0, y-2 }, { REF_W, y }, WithAlpha(C_DIV_HI, t));
-        DrawRect({ 0, y+1 }, { REF_W, y+3 }, WithAlpha(C_DIV_LO, t));
-        DrawRect({ 0, y }, { REF_W, y+1 }, WithAlpha(C_DIV_CORE, t));
+    auto divider = [&](float y) {   // opaque from frame 0 (not in the appear cascade)
+        DrawRect({ 0, y-2 }, { REF_W, y }, C_DIV_HI);
+        DrawRect({ 0, y+1 }, { REF_W, y+3 }, C_DIV_LO);
+        DrawRect({ 0, y }, { REF_W, y+1 }, C_DIV_CORE);
     };
     divider(105); divider(615);
 
     // ---- title (DFSoGei natural width, NO stretch) + marching cursor-square ----
     SetFont(g_fDF);
-    DrawTextBevel({ 122, 56 }, 48.0f, WithAlpha(C_TITLE, t), "OPTIONS");
+    DrawTextBevel({ 122, 56 }, 48.0f, WithAlpha(C_TITLE, titleT), "OPTIONS");
     DrawTitleCursor(openSec, 122, 56);
 
-    // ---- panels ----
-    DrawContainer(SP_X0, SP_Y0, SP_X1, SP_Y1, true, t);
-    DrawContainer(IP_X0, IP_Y0, IP_X1, IP_Y1, false, t);
+    // ---- panels (staged build) ----
+    DrawContainer(SP_X0, SP_Y0, SP_X1, SP_Y1, true,  cLine, cOuter, cInner, cBg);
+    DrawContainer(IP_X0, IP_Y0, IP_X1, IP_Y1, false, cLine, cOuter, cInner, cBg);
 
     // ---- tabs (SYSTEM/INPUT/AUDIO/VIDEO) : natural width, shared plate, gradient text ----
     {
