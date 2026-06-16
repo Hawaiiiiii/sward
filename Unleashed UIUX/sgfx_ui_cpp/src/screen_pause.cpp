@@ -16,6 +16,8 @@
 #include "sgfxui.h"
 #include "screen.h"
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <algorithm>
 
 using namespace ui;
@@ -43,6 +45,7 @@ int  g_confirmSel = 1;     // 0 = Yes, 1 = No (the capture shows No selected by 
 // sub-screens (measured spec: game_captures/PAUSE_SUBSCREEN_SPEC.md)
 enum SubView { SV_NONE = 0, SV_ACHIEVEMENTS, SV_INVENTORY };
 int g_sub = SV_NONE;
+double g_subOpen = 0.0;   // ui::Now() when the current sub-view opened (drives its entrance)
 int g_achSel = 0;          // selected achievement row (of the 4 visible)
 int g_invSel = 2;          // selected inventory row (capture shows row 3)
 bool g_invPopup = false;   // "Give to Sonic / Give to Chip" (measured popup)
@@ -93,7 +96,11 @@ void Init() {
     if (g_sunMedTex  < 0) g_sunMedTex  = gfx::loadTexture("assets/gameart/medallion_sun.png");
     if (g_moonMedTex < 0) g_moonMedTex = gfx::loadTexture("assets/gameart/medallion_moon.png");
 }
-void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; g_sub = SV_NONE; g_achSel = 0; g_invSel = 2; g_invPopup = false; g_invPopupSel = 0; g_nav = nullptr; }
+void Reset() { g_sel = 0; g_confirm = false; g_confirmSel = 1; g_sub = SV_NONE; g_achSel = 0; g_invSel = 2; g_invPopup = false; g_invPopupSel = 0; g_nav = nullptr;
+    // headless verify hook for the input-driven sub-states: SGFX_PAUSE_SUB=ach|inv
+    // forces the sub-view open at t=0 so `--shot pause <t>` shows its entrance.
+    if (const char* e = getenv("SGFX_PAUSE_SUB")) { g_subOpen = 0.0;
+        if (!strcmp(e, "ach")) g_sub = SV_ACHIEVEMENTS; else if (!strcmp(e, "inv")) g_sub = SV_INVENTORY; } }
 void Input(const ScreenInput& in) {
     if (g_confirm) {
         if (in.up || in.down) g_confirmSel ^= 1;
@@ -125,7 +132,7 @@ void Input(const ScreenInput& in) {
         switch (g_sel) {                       // the TOWN-context pause flow
             case 0: g_nav = "@back"; break;                          // Resume
             case 1: g_nav = "status"; break;                         // Status
-            case 2: g_sub = SV_INVENTORY; break;                     // Inventory (sub-screen)
+            case 2: g_sub = SV_INVENTORY; g_subOpen = Now(); break;  // Inventory (sub-screen)
             case 3: g_nav = "@back"; break;                          // Wait until Night (no-op placeholder)
             case 4: g_nav = "options"; break;                        // Options
             case 5: g_confirm = true; g_confirmSel = 1; break;       // Return to World Map (confirm)
@@ -133,7 +140,7 @@ void Input(const ScreenInput& in) {
         }
     }
     if (in.cancel) g_nav = "@back";                                  // B resumes, like retail
-    if (in.tabLeft) g_sub = SV_ACHIEVEMENTS;                          // (Back) Achievements
+    if (in.tabLeft) { g_sub = SV_ACHIEVEMENTS; g_subOpen = Now(); }   // (Back) Achievements
 }
 const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
@@ -345,29 +352,44 @@ void AchDateStamp(const char* date, float rightX, float top, float bottom, float
     DrawText({ cx, cy }, sz, WithAlpha(C_WHITE, a), date);
 }
 
-void DrawAchievements(float a) {
-    // header label (recomp DrawHeaderContainer: (251,136)-(~546,196), height 60)
-    LabelPlate(251.3f, 136.0f, 545.6f, 192.0f, "ACHIEVEMENTS", a);
+void DrawAchievements(double subOpen) {
+    // staged entrance (recomp achievement_menu): header slides 151->251 (f0-15) +
+    // fades (f5-14); the content panel rect-inflates inset->full (f11-12) + fades;
+    // a HARD GATE keeps the rows hidden until the panel is fully open; the counter
+    // + trophy fade in (Cubic, f15-16). Plays from when the sub-view opened.
+    const float hMot    = (float)ComputeMotion(subOpen, 0.0, 15.0);
+    const float headerX = Lerp(151.0f, 251.3f, Hermite(0.0f, 1.0f, hMot));
+    const float hFade   = (float)ComputeMotion(subOpen, 5.0, 14.0);
+    const float cMot    = (float)ComputeMotion(subOpen, 11.0, 12.0);
+    const float cAlpha  = Hermite(0.0f, 1.0f, cMot);
+    const float ctA     = Cubic(0.0f, 1.0f, (float)ComputeMotion(subOpen, 15.0, 16.0));
+    // header label (slides in from the left into place)
+    LabelPlate(headerX, 136.0f, headerX + 294.3f, 192.0f, "ACHIEVEMENTS", hFade);
     // ---- counter + trophy, right-anchored ABOVE the panel top edge (drawn before the
     //      panel so the panel never clips them; trophy slot 45x45 gold (255,195,56)) ----
     if (g_trophyTex >= 0) {   // real trophy.dds: 2048x1024, 8x4 grid of 256px frames, 30fps; gold tint at 50/50
         int fi = (int)(Now() * 30.0) % 30; int cc = fi % 8, rr = fi / 8;
         float u0 = cc * 256.f/2048, v0 = rr * 256.f/1024;
-        DrawImage(g_trophyTex, { 981, 139 }, { 1026, 184 }, { u0, v0 }, { u0 + 256.f/2048, v0 + 256.f/1024 }, WithAlpha(RGBA(255,195,56,255), a));
+        DrawImage(g_trophyTex, { 981, 139 }, { 1026, 184 }, { u0, v0 }, { u0 + 256.f/2048, v0 + 256.f/1024 }, WithAlpha(RGBA(255,195,56,255), ctA));
     } else {
-        DrawVGradient({ 981, 139 }, { 1026, 184 }, WithAlpha(RGBA(255,205,84,255), a), WithAlpha(RGBA(214,168,56,255), a));
-        DrawRect({ 983, 141 }, { 1024, 145 }, WithAlpha(RGBA(255,232,150,235), a));
+        DrawVGradient({ 981, 139 }, { 1026, 184 }, WithAlpha(RGBA(255,205,84,255), ctA), WithAlpha(RGBA(214,168,56,255), ctA));
+        DrawRect({ 983, 141 }, { 1024, 145 }, WithAlpha(RGBA(255,232,150,235), ctA));
     }
     {
         SetFont(g_fRodin);
         const char* cnt = "50 / 50"; const float cs = 20.0f, cw = MeasureText(cs, cnt).x;
         float cx = 975.0f - cw, cy = 161.0f - cs * 0.5f;
         static const float O[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
-        for (auto& o : O) DrawText({ cx + o[0]*1.6f, cy + o[1]*1.6f }, cs, WithAlpha(RGBA(0,0,0,255), a), cnt);
-        DrawText({ cx, cy }, cs, WithAlpha(C_WHITE, a), cnt);
+        for (auto& o : O) DrawText({ cx + o[0]*1.6f, cy + o[1]*1.6f }, cs, WithAlpha(RGBA(0,0,0,255), ctA), cnt);
+        DrawText({ cx, cy }, cs, WithAlpha(C_WHITE, ctA), cnt);
     }
-    // ---- panel (251,189)-(1031,604); rows clip origin (251,209)-(1031,599) ----
-    AchPanel(251.0f, 189.0f, 1031.0f, 604.0f, a);
+    // ---- content panel: rect-inflates from inset (301,206)-(978,573) to full
+    //      (251,189)-(1031,604) over f11-12, fading in; the rows are HARD-GATED ----
+    const float px0 = Lerp(301.0f, 251.0f, cMot), py0 = Lerp(206.0f, 189.0f, cMot);
+    const float px1 = Lerp(978.0f, 1031.0f, cMot), py1 = Lerp(573.0f, 604.0f, cMot);
+    AchPanel(px0, py0, px1, py1, cAlpha);
+    if (cMot < 1.0f) return;          // recomp HARD GATE: no rows until the panel is fully open
+    const float a = 1.0f;             // rows pop in at full once the panel has inflated
     struct Ach { const char* name; const char* date; const char* desc; };
     const Ach ROWS[4] = {
         { "Blue Meteor",   "2025/03/03 02:20", "Reached the Goal of Windmill Isle, Act 2 as" },
@@ -483,7 +505,7 @@ void Draw(double openSec) {
         DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 128));
         DrawPauseBands(1.0f);
         DrawBanner(1.0f);
-        if (g_sub == SV_ACHIEVEMENTS) DrawAchievements(1.0f);
+        if (g_sub == SV_ACHIEVEMENTS) DrawAchievements(g_subOpen);
         else                          DrawInventory(1.0f);
         return;
     }
