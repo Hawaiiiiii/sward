@@ -140,7 +140,7 @@ void Draw(double openSec) {
 
     // ---- entrance timeline (measured): wordmark slides ~0.5 s; rows build
     //      top->bottom after it; tally counts ~1.2 s; rank pops after total ----
-    const float wmT = (float)ComputeMotion(openSec, 0.0, 30.0);
+    const float wmT = (float)ComputeMotion(openSec, 0.0, 16.0);
     DrawRect({ 0, RAIL_Y0 }, { RAIL_X1, RAIL_Y1 }, WithAlpha(C_RAIL, wmT));
     DrawRect({ 0, RAIL_Y0 - 2 }, { RAIL_X1, RAIL_Y0 + 1 }, WithAlpha(C_RAIL_EDGE, wmT));   // ~3px top-edge highlight (y~61)
     DrawRect({ 0, RAIL_Y1 + 1 }, { RAIL_X1, RAIL_Y1 + 3.5f }, WithAlpha(C_RAIL_EDGE, wmT));   // under-edge (y~115)
@@ -174,7 +174,7 @@ void Draw(double openSec) {
     const float VAL_R = 1033;   // common right edge the value strips align to (measured: shared Chrome right edge ~x1015)
     const uint32_t C_VSTRIP_T = RGBA(18, 26, 44, 180), C_VSTRIP_B = RGBA(8, 14, 28, 180);
     for (int i = 0; i < N_ROWS; ++i) {
-        const float rowT = (float)ComputeMotion(openSec, 26.0 + i * 5.0, 10.0);
+        const float rowT = (float)ComputeMotion(openSec, 26.0 + i * 8.0, 18.0);
         if (rowT <= 0.0f) continue;
         const float x = ROW_X0 + i * ROW_XSTEP;
         const float y = ROW_TOP0 + i * ROW_PITCH;
@@ -198,7 +198,7 @@ void Draw(double openSec) {
         ResetTextShear();
         ResetFont();
         // tally value, RIGHT-aligned inside the strip to the common edge
-        const float tallyT = (float)ComputeMotion(openSec, 60.0 + i * 3.0, 72.0);
+        const float tallyT = (float)ComputeMotion(openSec, 48.0 + i * 8.0, 60.0);
         char buf[24];
         FormatValue(ROWS[i], (int)std::lround(ROWS[i].value * tallyT), buf, sizeof buf);
         SetFont(g_fDF);
@@ -210,7 +210,7 @@ void Draw(double openSec) {
 
     // ---- TOTAL (one long green bar stepping LEFT, value right-aligned inside) ----
     {
-        const float totT = (float)ComputeMotion(openSec, 50.0, 10.0);
+        const float totT = (float)ComputeMotion(openSec, 66.0, 18.0);
         if (totT > 0.0f) {
             const float x = 625.0f;        // green plate left (real green plate x628-797)
             const float TOT_PLATE_W = 165;  // compact green label plate (green ends ~x793)
@@ -227,7 +227,7 @@ void Draw(double openSec) {
             DrawText({ x + 40, TOT_TOP + (TOT_H - 26) * 0.5f }, 26.0f, WithAlpha(C_TOTAL_TXT, totT), "TOTAL");
             ResetTextShear();
             ResetFont();
-            const float totTally = (float)ComputeMotion(openSec, 132.0, 40.0);
+            const float totTally = (float)ComputeMotion(openSec, 90.0, 48.0);
             char buf[16]; snprintf(buf, sizeof buf, "%d", (int)std::lround(g_total * totTally));
             SetFont(g_fDF); SetTextShear(0.24f); SetTextStretchX(1.2f);
             float vw = MeasureText(36.0f, buf).x * 1.2f;
@@ -238,7 +238,7 @@ void Draw(double openSec) {
 
     // ---- RANK reveal: wide teal band behind the big gold letter (scale pop) ----
     {
-        const float rkT = (float)ComputeMotion(openSec, 178.0, 10.0);
+        const float rkT = (float)ComputeMotion(openSec, 13.0, 80.0);
         if (rkT > 0.0f) {
             // wide layered teal band behind the rank letter (measured y~520-564)
             DrawVGradient({ 0, 519 }, { 560, 524 }, WithAlpha(RGBA(78, 176, 158, 225), rkT), WithAlpha(RGBA(78, 176, 158, 225), rkT));
@@ -281,7 +281,7 @@ void Draw(double openSec) {
 
     // ---- footer: (A) Next (below the TOTAL value, ~70% / 87%) ----
     {
-        const float fT = (float)ComputeMotion(openSec, 60.0, 10.0);
+        const float fT = (float)ComputeMotion(openSec, 0.0, 8.0);
         float hx = 856, hcy = 638;   // glyph center ~876,638 (manifest btn_a x856 y618 h40)
         if (g_glyphTex >= 0) {
             float asp = ((GLYPH_A.u1 - GLYPH_A.u0) * GTW) / ((GLYPH_A.v1 - GLYPH_A.v0) * GTH), gh = 34.0f, gw = gh * asp;   // (A) orb ~w31/h34 (was 28; matches btn_a 40px region)
