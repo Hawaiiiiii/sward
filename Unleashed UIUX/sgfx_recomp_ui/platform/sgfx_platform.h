@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "sgfx_config.h"        // the ConfigDef customization surface + the option enums
 #include "sgfx_achievements.h"  // the XDBF achievement-DB provider (host-bound)
@@ -53,3 +54,20 @@ extern std::string g_localeMissing;
 
 // ---- host SFX hook (was exports.h Game_PlaySound) ---------------------------
 void Game_PlaySound(const char* cue);
+
+// ---- app lifecycle (was app.h) — host drives these; preview leaves defaults ---
+class App
+{
+public:
+    static inline bool      s_isInit = false;            // true once the game runtime booted (in-game vs installer)
+    static inline bool      s_isMissingDLC = false;
+    static inline bool      s_isLoading = false;
+    static inline bool      s_isSaving = false;
+    static inline bool      s_isWerehog = false;
+    static inline bool      s_isSaveDataCorrupt = false;
+    static inline ELanguage s_language = ELanguage::English;
+    static inline double    s_deltaTime = 0.0;
+    static inline double    s_time = 0.0;
+    static void Restart(std::vector<std::string> restartArgs = {});
+    static void Exit();
+};

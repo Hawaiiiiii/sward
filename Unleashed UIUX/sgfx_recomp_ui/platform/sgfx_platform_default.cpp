@@ -2,6 +2,8 @@
 // build a preview harness with no host project. A real host (SGFX) replaces this TU with
 // its own bindings (config store + load/save, locale tables, input, audio, display).
 #include "sgfx_platform.h"
+#include "sgfx_sdl.h"
+#include "../render/sgfx_render.h"   // sgfx::render::Texture (g_xdbfTextureCache)
 #include <unordered_map>
 
 // ---- aspect / scale (host updates from the viewport each frame) -------------
@@ -39,6 +41,17 @@ std::string ConfigLocalise(std::string_view name, std::string_view /*kind*/, ELa
     return std::string(name);   // host binds the real localised labels
 }
 namespace Config { void Save() {} }
+
+// ---- app lifecycle ----------------------------------------------------------
+void App::Restart(std::vector<std::string>) {}
+void App::Exit() {}
+
+// ---- SDL event hub ----------------------------------------------------------
+std::vector<ISDLEventListener*>& GetEventListeners()
+{
+    static std::vector<ISDLEventListener*> listeners;
+    return listeners;
+}
 
 // ---- audio ------------------------------------------------------------------
 void Game_PlaySound(const char*) {}   // host routes to its SFX system

@@ -17,12 +17,9 @@
 #include <cmath>                // pow / abs
 #include <string>
 #include <vector>
-// SGFX-TODO(game-coupling): these provided SWA::CInputState (in-game pad read),
-// SDLEventListener + SDL_* event types/scancodes (host input), Game_PlaySound (audio),
-// App::s_isInit and the hid:: input helpers. Reported in gameStateCoupling /
-// newShimSymbols; the orchestrator binds them so the body below stays byte-identical.
-// #include <api/SWA.h>
-// #include <sdl_listener.h>
+// game coupling now bound by the shim: SWA::CInputState (sgfx_input.h via sgfx_platform.h),
+// SDLEventListener + SDL_* (sgfx_sdl.h), Game_PlaySound / App::s_isInit / hid:: (sgfx_platform.h).
+#include "../platform/sgfx_sdl.h"
 
 constexpr double OVERLAY_CONTAINER_COMMON_MOTION_START = 0;
 constexpr double OVERLAY_CONTAINER_COMMON_MOTION_END = 11;
