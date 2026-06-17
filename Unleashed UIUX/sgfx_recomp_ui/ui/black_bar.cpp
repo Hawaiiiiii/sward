@@ -35,7 +35,7 @@ void BlackBar::Draw()
         auto drawList = ImGui::GetBackgroundDrawList();
         auto& res = ImGui::GetIO().DisplaySize;
 
-        if (sgfx::g_aspectRatio > sgfx::WIDE_ASPECT_RATIO)
+        if (g_aspectRatio > WIDE_ASPECT_RATIO)
         {
             drawList->AddRectFilled(
                 { 0.0f, 0.0f },
@@ -47,7 +47,7 @@ void BlackBar::Draw()
                 res,
                 IM_COL32(0, 0, 0, g_loadingBlackBarAlpha));
         }
-        else if (sgfx::g_aspectRatio < sgfx::NARROW_ASPECT_RATIO)
+        else if (g_aspectRatio < NARROW_ASPECT_RATIO)
         {
             drawList->AddRectFilled(
                 { 0.0f, 0.0f },
