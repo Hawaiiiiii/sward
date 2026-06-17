@@ -29,11 +29,16 @@ std::string g_localeMissing = "<missing string>";
 
 std::string& Localise(const std::string_view& key)
 {
-    // identity-by-reference: stable storage per key so the returned ref outlives the call
+    // demo locale: make the keys readable (a host binds the real localised tables).
     static std::unordered_map<std::string, std::string> cache;
-    auto& s = cache[std::string(key)];
-    if (s.empty()) s = std::string(key);
-    return s;
+    auto it = cache.find(std::string(key));
+    if (it != cache.end()) return it->second;
+    std::string k(key), v = k;
+    if      (k == "Options_Header_Name")  v = "OPTIONS";
+    else if (k.rfind("Options_Category_", 0) == 0) v = k.substr(17);   // -> System / Input / Audio / Video
+    else if (k.rfind("Options_Name_", 0) == 0)     v = k.substr(13);
+    else { auto p = k.rfind('_'); if (p != std::string::npos) v = k.substr(p + 1); }   // last segment
+    return cache.emplace(std::move(k), std::move(v)).first->second;
 }
 
 // ---- config -----------------------------------------------------------------
