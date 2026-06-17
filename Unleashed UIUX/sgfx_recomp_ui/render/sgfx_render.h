@@ -33,7 +33,28 @@ struct Texture
 // The three shared UI sprites imgui_utils needs (recomp res/images/common/*). The
 // host supplies the pixels (they may be SEGA-derived, so they live with the host,
 // not the lib) and uploads them.
-enum class UISprite { GeneralWindow, Light, Select, OptionsStatic, OptionsStaticFlash, Controller, KBM };
+enum class UISprite
+{
+    // shared chrome (imgui_utils / tv_static / button_guide)
+    GeneralWindow, Light, Select, OptionsStatic, OptionsStaticFlash, Controller, KBM,
+    // achievement_menu
+    Trophy,
+    // options_menu_thumbnails — the option preview tiles (host supplies pixels; SEGA-derived)
+    ThumbDefault, ThumbControlTutorialXB, ThumbControlTutorialPS, ThumbVibrationXB, ThumbVibrationPS,
+    ThumbAllowBackgroundInputXB, ThumbAllowBackgroundInputPS, ThumbLanguage, ThumbVoiceLanguage, ThumbHints,
+    ThumbAchievementNotifications, ThumbTimeTransitionXB, ThumbTimeTransitionPS, ThumbHorizontalCamera,
+    ThumbVerticalCamera, ThumbControllerIcons, ThumbMasterVolume, ThumbMusicVolume, ThumbEffectsVolume,
+    ThumbChannelStereo, ThumbChannelSurround, ThumbMusicAttenuation, ThumbBattleTheme, ThumbWindowSize,
+    ThumbMonitor, ThumbAspectRatio, ThumbFullscreen, ThumbXboxColorCorrection, ThumbVSyncOff, ThumbVSyncOn,
+    ThumbFPS, ThumbBrightness, ThumbAntialiasingNone, ThumbAntialiasing2x, ThumbAntialiasing4x, ThumbAntialiasing8x,
+    ThumbTransparencyAntialiasingFalse, ThumbTransparencyAntialiasingTrue, ThumbShadowResolutionX512,
+    ThumbShadowResolutionX1024, ThumbShadowResolutionX2048, ThumbShadowResolutionX4096, ThumbShadowResolutionX8192,
+    ThumbGITextureFilteringBilinear, ThumbGITextureFilteringBicubic, ThumbMotionBlurOff, ThumbMotionBlurOriginal,
+    ThumbMotionBlurEnhanced, ThumbMovieScaleFit, ThumbMovieScaleFill, ThumbUIAlignmentCentre, ThumbUIAlignmentEdge,
+    // options_menu / installer_wizard
+    OptionsMilesElectric, Install001, Install002, Install003, Install004, Install005, Install006, Install007,
+    Install008, MilesElectricIcon, ArrowCircle, PulseInstall, HedgeDev,
+};
 std::unique_ptr<Texture> LoadUISprite(UISprite sprite);
 
 // General texture upload from decoded image bytes (host decodes DDS/PNG + uploads).
