@@ -13,12 +13,17 @@
 #include <vector>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>   // decode the real recomp sprite PNGs (host-supplied assets)
 
 SDL_Renderer* g_previewRenderer = nullptr;   // set by preview_main before OptionsMenu::Init()
 ImFont*       g_previewFont = nullptr;        // set by preview_main after font upload
+// the three real game fonts (set by preview_main); the recomp asks for them by file name
+ImFont*       g_fontDFSoGei = nullptr;        // DFSoGeiStd-W7 (dfsoge7.ttc) — titles/tabs/option names
+ImFont*       g_fontSeurat  = nullptr;        // FOT-SeuratPro-M
+ImFont*       g_fontNewRodin = nullptr;       // FOT-NewRodinPro-DB/UB
 
 namespace sgfx { namespace render {
 
@@ -112,8 +117,18 @@ std::unique_ptr<Texture> LoadTexture(const uint8_t* data, size_t size)
 
 }} // namespace sgfx::render
 
-// font registry: one shared font for the preview
-ImFont* ImFontAtlasSnapshot::GetFont(const char*) { return g_previewFont; }
+// font registry: the recomp fetches fonts by file name (e.g. "DFSoGeiStd-W7.otf",
+// "FOT-SeuratPro-M.otf", "FOT-NewRodinPro-DB.otf"); map each to the real game font.
+ImFont* ImFontAtlasSnapshot::GetFont(const char* name)
+{
+    if (name)
+    {
+        if (std::strstr(name, "Seurat")   && g_fontSeurat)   return g_fontSeurat;
+        if (std::strstr(name, "NewRodin") && g_fontNewRodin) return g_fontNewRodin;
+        if ((std::strstr(name, "DFSoGei") || std::strstr(name, "DFSo")) && g_fontDFSoGei) return g_fontDFSoGei;
+    }
+    return g_fontDFSoGei ? g_fontDFSoGei : g_previewFont;
+}
 
 // the custom imgui render layer's callback API — AUTHENTIC mechanism (verbatim from the
 // recomp's gpu/imgui/imgui_common.cpp): a per-frame ring of ImGuiCallbackData, each added

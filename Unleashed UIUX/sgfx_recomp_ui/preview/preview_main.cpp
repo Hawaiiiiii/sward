@@ -20,6 +20,9 @@
 
 extern SDL_Renderer* g_previewRenderer;
 extern ImFont*       g_previewFont;
+extern ImFont*       g_fontDFSoGei;   // set here, read by ImFontAtlasSnapshot::GetFont
+extern ImFont*       g_fontSeurat;
+extern ImFont*       g_fontNewRodin;
 void ResetImGuiCallbacks();
 void InitImGuiUtils();   // loads the shared 9-slice/light/select sprites used by every menu
 
@@ -111,18 +114,25 @@ int main(int argc, char** argv)
     io.DeltaTime   = 1.0f / 60.0f;
     io.IniFilename = nullptr;
 
-    // Font: the recomp renders DFSoGei via an MSDF shader (msdfgen atlas) that SDL_Renderer
-    // can't run, so a real host (SGFX / the recomp) supplies the true atlas. The preview uses
-    // the closest loadable stand-in: $SGFX_UI_FONT if set, else the bundled DynaFont gothic
-    // (DFHei — same foundry/family as DFSoGei), else Segoe UI.
-    const char* fontCandidates[] = {
-        std::getenv("SGFX_UI_FONT"),                 // host supplies the real DFSoGei (or a DynaFont gothic)
-        "C:\\Windows\\Fonts\\segoeui.ttf",           // dev fallback
+    // Fonts: load the REAL game typefaces the recomp asks for by name. DFSoGei is the
+    // title/tab/option-name face (dfsoge7.ttc), Seurat + NewRodin the body faces. $SGFX_FONT_DIR
+    // overrides the dir; default = the extracted game font set. The recomp renders these via an
+    // MSDF shader in-game; baking them as ordinary imgui atlases here is a close CPU match.
+    std::string fontDir = std::getenv("SGFX_FONT_DIR") ? std::getenv("SGFX_FONT_DIR")
+                                                       : "C:/swardbuild/sgfx_ui/assets/fonts";
+    auto loadFont = [&](const char* file, float size) -> ImFont* {
+        std::string path = fontDir + "/" + file;
+        return io.Fonts->AddFontFromFileTTF(path.c_str(), size);
     };
-    ImFont* f = nullptr;
-    for (const char* p : fontCandidates) { if (p && *p) { f = io.Fonts->AddFontFromFileTTF(p, 22.0f); if (f) break; } }
-    if (!f) f = io.Fonts->AddFontDefault();
-    g_previewFont = f;
+    g_fontDFSoGei  = loadFont("dfsoge7.ttc", 24.0f);            // DFSoGeiStd-W7 (TrueType collection)
+    g_fontSeurat   = loadFont("FOT-SeuratPro-M.otf", 22.0f);
+    g_fontNewRodin = loadFont("FOT-NewRodinPro-DB.otf", 22.0f);
+    ImFont* fallback = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 22.0f);
+    if (!fallback) fallback = io.Fonts->AddFontDefault();
+    if (!g_fontDFSoGei)  g_fontDFSoGei  = fallback;
+    if (!g_fontSeurat)   g_fontSeurat   = fallback;
+    if (!g_fontNewRodin) g_fontNewRodin = fallback;
+    g_previewFont = g_fontDFSoGei;
 
     unsigned char* pixels = nullptr; int fw = 0, fh = 0;
     io.Fonts->GetTexDataAsRGBA32(&pixels, &fw, &fh);
