@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <set>
+#include <map>
 #include <functional>
 
 // ---- option enums (were user/config.h / locale.h) ---------------------------
@@ -60,6 +61,9 @@ public:
     T DefaultValue{};
     T Value{};
     std::set<T> InaccessibleValues{};
+    // enum value -> localised label, in display order (host populates for enum options;
+    // the menu cycles it with ++/-- to switch the value). Empty for bool/int/float.
+    std::map<T, std::string> EnumTemplateReverse{};
     std::function<void(ConfigDef<T>*)> Callback;
     std::function<void(ConfigDef<T>*)> LockCallback;
     std::function<void(ConfigDef<T>*)> ApplyCallback;

@@ -41,9 +41,12 @@ namespace hid
     extern EInputDevice g_inputDevice;             // device that produced the LAST input
     bool IsInputAllowed();
     bool IsInputDeviceController();
-    void SetProhibitedInputs(uint32_t buttons = 0);
+    void SetProhibitedInputs(uint16_t wButtons = 0, bool leftStick = false, bool rightStick = false);
 }
-inline constexpr uint32_t XAMINPUT_GAMEPAD_START = 0x0010;
+inline constexpr uint16_t XAMINPUT_GAMEPAD_START = 0x0010;
+
+// gates the MusicAttenuation option's accessibility (was patches/audio_patches.h)
+namespace AudioPatches { bool CanAttenuate(); }
 
 // ---- version string (was version.h) -----------------------------------------
 extern const char* g_versionString;

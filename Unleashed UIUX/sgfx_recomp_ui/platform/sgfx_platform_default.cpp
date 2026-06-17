@@ -19,8 +19,9 @@ namespace hid {
     EInputDevice g_inputDevice           = EInputDevice::Xbox;
     bool IsInputAllowed()         { return true; }
     bool IsInputDeviceController() { return g_inputDevice == EInputDevice::Xbox || g_inputDevice == EInputDevice::PlayStation; }
-    void SetProhibitedInputs(uint32_t) {}
+    void SetProhibitedInputs(uint16_t, bool, bool) {}
 }
+namespace AudioPatches { bool CanAttenuate() { return true; } }
 
 // ---- version / locale -------------------------------------------------------
 const char* g_versionString = "sgfx_recomp_ui";

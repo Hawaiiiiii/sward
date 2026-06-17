@@ -11,7 +11,10 @@
 #include "tv_static.h"
 #include "button_guide.h"
 #include "imgui_utils.h"
+#include "game_window.h"                 // GameWindow (display modes / size for the video options)
 #include "../platform/sgfx_platform.h"
+#include "../platform/sgfx_sdl.h"        // SDLEventListener (right-stick info-panel scroll)
+#include "../platform/sgfx_window.h"     // Video + VideoConfigValueChangedCallback
 #include "../render/sgfx_render.h"
 
 #include <imgui_internal.h>

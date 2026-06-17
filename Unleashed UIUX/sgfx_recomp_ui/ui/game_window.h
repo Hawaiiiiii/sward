@@ -8,6 +8,7 @@
 // window fields and the sdl_events helpers keep their recomp names (reported as new shim
 // symbols / game-state coupling). Body byte-identical.
 #include "../platform/sgfx_platform.h"
+#include "../platform/sgfx_window.h"   // plume::RenderWindow, os::, Video, sdl_events, g_game_icon
 
 #include <SDL.h>
 #include <cstddef>
