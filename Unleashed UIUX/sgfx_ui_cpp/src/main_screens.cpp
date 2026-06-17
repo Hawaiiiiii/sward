@@ -44,6 +44,8 @@
 
 static const int W = 1280, H = 720;
 
+bool StatusOnStatRow();   // status.cpp: cursor on a stat row (A = Level Up) vs the QUIT plate
+
 static const char* FontPath() {
     if (const char* env = std::getenv("SGFX_FONT")) return env;
     // DynaFont Hei (heavy gothic) staged next to the exe — close to the recomp's
@@ -475,8 +477,15 @@ int main(int argc, char** argv) {
         // accept: the decide cue — EXCEPT in options, where A on a value option is a
         // denied action (the recomp plays sys_actstg_stateserror, options_menu.cpp:881;
         // our options changes values with Left/Right, so A does nothing).
-        if (in.accept) audio::Play((scr->id && std::strcmp(scr->id, "options") == 0)
-                                   ? audio::SFX_ERROR : audio::SFX_DECIDE);
+        // accept cue: options A = denied (ERROR); status A on a stat row = Level Up
+        // (LEVELUP jingle); everything else = the decide cue.
+        if (in.accept) {
+            const char* sid = scr->id ? scr->id : "";
+            audio::Sfx cue = audio::SFX_DECIDE;
+            if (std::strcmp(sid, "options") == 0)                         cue = audio::SFX_ERROR;
+            else if (std::strcmp(sid, "status") == 0 && StatusOnStatRow()) cue = audio::SFX_LEVELUP;
+            audio::Play(cue);
+        }
         if (in.cancel)                               audio::Play(audio::SFX_CANCEL);
 
         // ---- the runtime flow: screens request navigation; the host runs the

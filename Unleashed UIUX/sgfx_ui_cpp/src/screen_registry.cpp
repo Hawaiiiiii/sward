@@ -22,6 +22,7 @@ void WorldMapInit();  void WorldMapDraw(double);   void WorldMapInput(const Scre
 const char* WorldMapNav();
 void StatusInit();    void StatusDraw(double);     void StatusInput(const ScreenInput&);   void StatusReset();
 const char* StatusCsdState();
+bool StatusOnStatRow();   // cursor on a stat row (vs the QUIT plate) — drives (A) Level Up vs exit
 void ShopInit();      void ShopDraw(double);       void ShopInput(const ScreenInput&);     void ShopReset();
 void SonicHudInit();  void SonicHudDraw(double);   void SonicHudInput(const ScreenInput&); void SonicHudReset();
 void OptionsInit();    void OptionsDraw(double);    void OptionsInput(const ScreenInput&);    void OptionsReset();
@@ -54,7 +55,7 @@ namespace {
 const char* g_wrapNav = nullptr;
 const char* WrapNav() { const char* n = g_wrapNav; g_wrapNav = nullptr; return n; }
 void ShopFlowInput(const ScreenInput& in)    { ShopInput(in);         if (in.cancel) g_wrapNav = "@back"; }
-void StatusFlowInput(const ScreenInput& in)  { StatusInput(in);       if (in.cancel) g_wrapNav = "@back"; }
+void StatusFlowInput(const ScreenInput& in)  { StatusInput(in);       if (in.cancel || (in.accept && !StatusOnStatRow())) g_wrapNav = "@back"; }   // B, or (A) on QUIT, exits
 void OptionsFlowInput(const ScreenInput& in) { OptionsInput(in);      if (in.cancel) g_wrapNav = "@back"; }
 void MediaFlowInput(const ScreenInput& in)   { MediaRoomInput(in);    if (in.cancel) g_wrapNav = "@back"; }
 void WmHelpFlowInput(const ScreenInput& in)  { WorldMapHelpInput(in); if (in.cancel) g_wrapNav = "@back"; }

@@ -30,6 +30,8 @@ int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 int g_glyphTex = -1, g_charDayTex = -1, g_charNightTex = -1;
 int g_sunTex = -1, g_moonTex = -1;            // medallions for the transform flash bloom
 double g_xformStart = -100.0;                 // Now() of the last day<->night transform (drives the flash)
+double g_levelStart = -100.0;                 // Now() of the last (A) Level Up (drives the level-up flourish)
+int    g_levelRow   = -1;
 
 struct UV { float u0, v0, u1, v1; };
 constexpr float GTW = 512.0f, GTH = 512.0f;
@@ -126,7 +128,9 @@ void Input(const ScreenInput& in) {
     if (in.up)   g_sel = std::max(0, g_sel - 1);
     if (in.down) g_sel = std::min(n, g_sel + 1);
     if (in.tabLeft || in.tabRight) { g_night = !g_night; g_sel = 0; g_xformStart = Now(); }   // transform!
-    // (A) Level Up: stats are showcased at MAX, matching the captured save
+    // (A) on a stat row = Level Up (footer cue): trigger the gold shine + sparkles;
+    // the host reads StatusOnStatRow() to play the level-up jingle (SFX_LEVELUP).
+    if (in.accept && g_sel < n) { g_levelStart = Now(); g_levelRow = g_sel; }
 }
 
 // italic chrome text (shared recipe)
@@ -418,6 +422,46 @@ void DrawXformFlash() {
         FillDisc(cx, cy, ms * 0.5f, WithAlpha(tint, ma * 0.5f));
 }
 
+// The (A) LEVEL-UP flourish: a celebratory gold shine sweeps across the stat
+// column, a soft gold wash pulses, and sparkles rise — over ~0.6s. Layout-agnostic
+// (covers the left stat stack on either base, CSD or hand-authored). Additive
+// overlay; inert outside the window (g_levelStart starts at -100).
+void DrawLevelUp() {
+    double age = Now() - g_levelStart;
+    if (age < 0.0 || age >= 0.6) return;
+    const float lp = (float)(age / 0.6);
+    const float fade = 1.0f - lp;
+    const float x0 = 110.0f, x1 = 612.0f, y0 = 150.0f, y1 = 600.0f;   // the stat column
+    // soft additive gold wash that fades at the top/bottom edges (not a hard box),
+    // so the travelling shine + sparkles carry the effect
+    const float ym = (y0 + y1) * 0.5f, wa = fade * fade * 0.22f;
+    const uint32_t wgClr = RGBA(255, 236, 176, 0), wgGold = WithAlpha(RGBA(255, 236, 176, 255), wa);
+    { const V2 c[4] = { { x0, y0 }, { x1, y0 }, { x1, ym }, { x0, ym } };
+      const uint32_t col[4] = { wgClr, wgClr, wgGold, wgGold }; DrawQuadGradient(c, col, true); }
+    { const V2 c[4] = { { x0, ym }, { x1, ym }, { x1, y1 }, { x0, y1 } };
+      const uint32_t col[4] = { wgGold, wgGold, wgClr, wgClr }; DrawQuadGradient(c, col, true); }
+    // a bright vertical shine sweep travelling left -> right across the column
+    const float sx = x0 - 60.0f + (x1 - x0 + 120.0f) * lp;
+    const float sa = std::sin(lp * 3.14159265f);
+    const uint32_t br = RGBA(255, 252, 226, 255), cl = RGBA(255, 240, 188, 0);
+    { const V2 c[4] = { { sx - 52, y0 }, { sx, y0 }, { sx, y1 }, { sx - 52, y1 } };
+      const uint32_t col[4] = { WithAlpha(cl, sa), WithAlpha(br, sa), WithAlpha(br, sa), WithAlpha(cl, sa) };
+      DrawQuadGradient(c, col, true); }
+    { const V2 c[4] = { { sx, y0 }, { sx + 52, y0 }, { sx + 52, y1 }, { sx, y1 } };
+      const uint32_t col[4] = { WithAlpha(br, sa), WithAlpha(cl, sa), WithAlpha(cl, sa), WithAlpha(br, sa) };
+      DrawQuadGradient(c, col, true); }
+    // rising sparkles
+    for (int s = 0; s < 9; ++s) {
+        float fx = x0 + 34.0f + s * 58.0f;
+        float ph = lp * 1.25f - (s % 3) * 0.10f;
+        if (ph <= 0.0f || ph >= 1.0f) continue;
+        float sy = y1 - 40.0f - ph * 300.0f;
+        float sA = 1.0f - ph;
+        float ss = 2.5f + 3.0f * sA;
+        DrawRect({ fx - ss, sy - ss }, { fx + ss, sy + ss }, WithAlpha(RGBA(255, 250, 214, 255), sA * 0.9f), true);
+    }
+}
+
 // CSD cast-state tag: the host renders the real status CSD as the base layer in
 // the matching day(Sonic)/night(Werehog) variant; this reports which to pick.
 const char* CsdState() { return g_night ? "ev" : "so"; }
@@ -430,10 +474,14 @@ void StatusInit() { Init(); }
 // when the CSD is unavailable do we fall back to the hand-authored layout.
 void StatusDraw(double openSeconds) {
     // hand-authored layout draws only when the CSD base is absent; the transform
-    // flash draws OVER either base.
+    // flash + level-up flourish draw OVER either base.
     if (std::strcmp(csd::LoadedId(), "status") != 0) Draw(openSeconds);
     DrawXformFlash();
+    DrawLevelUp();
 }
+// TRUE when the cursor is on a stat row (not the QUIT plate) — the host plays the
+// level-up cue rather than the generic decide on (A) here.
+bool StatusOnStatRow() { return g_sel < (g_night ? 5 : 2); }
 void StatusInput(const ScreenInput& in) { Input(in); }
 void StatusReset() { Reset(); }
 const char* StatusCsdState() { return CsdState(); }
