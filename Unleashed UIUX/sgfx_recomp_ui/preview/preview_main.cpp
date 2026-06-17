@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
 
 extern SDL_Renderer* g_previewRenderer;
 extern ImFont*       g_previewFont;
@@ -110,7 +111,16 @@ int main(int argc, char** argv)
     io.DeltaTime   = 1.0f / 60.0f;
     io.IniFilename = nullptr;
 
-    ImFont* f = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 22.0f);
+    // Font: the recomp renders DFSoGei via an MSDF shader (msdfgen atlas) that SDL_Renderer
+    // can't run, so a real host (SGFX / the recomp) supplies the true atlas. The preview uses
+    // the closest loadable stand-in: $SGFX_UI_FONT if set, else the bundled DynaFont gothic
+    // (DFHei — same foundry/family as DFSoGei), else Segoe UI.
+    const char* fontCandidates[] = {
+        std::getenv("SGFX_UI_FONT"),                 // host supplies the real DFSoGei (or a DynaFont gothic)
+        "C:\\Windows\\Fonts\\segoeui.ttf",           // dev fallback
+    };
+    ImFont* f = nullptr;
+    for (const char* p : fontCandidates) { if (p && *p) { f = io.Fonts->AddFontFromFileTTF(p, 22.0f); if (f) break; } }
     if (!f) f = io.Fonts->AddFontDefault();
     g_previewFont = f;
 
