@@ -7,10 +7,11 @@ call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliar
 set ROOT=%~dp0..
 set IMGUI=C:\swardbuild\thirdparty\imgui
 set SDLINC=C:\swardbuild\thirdparty\SDL\include
+set STB=C:\swardbuild\thirdparty\stb
 set SDLLIB=C:\swardbuild\sgfx_ui\build_msvc\sdl_build\SDL2-static.lib
 
 cl /nologo /std:c++20 /EHsc /MD /O2 /DSDL_MAIN_HANDLED /D_CRT_SECURE_NO_WARNINGS ^
-  /I "%IMGUI%" /I "%ROOT%" /I "%ROOT%\compat" /I "%SDLINC%" ^
+  /I "%IMGUI%" /I "%ROOT%" /I "%ROOT%\compat" /I "%SDLINC%" /I "%STB%" ^
   "%IMGUI%\imgui.cpp" "%IMGUI%\imgui_draw.cpp" "%IMGUI%\imgui_tables.cpp" "%IMGUI%\imgui_widgets.cpp" ^
   "%ROOT%\ui\imgui_utils.cpp" "%ROOT%\ui\black_bar.cpp" "%ROOT%\ui\fader.cpp" "%ROOT%\ui\tv_static.cpp" ^
   "%ROOT%\ui\button_guide.cpp" "%ROOT%\ui\options_menu_thumbnails.cpp" "%ROOT%\ui\options_menu.cpp" ^

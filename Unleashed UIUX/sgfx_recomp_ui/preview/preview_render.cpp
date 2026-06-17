@@ -12,6 +12,10 @@
 #include <imgui.h>
 #include <vector>
 #include <cstdint>
+#include <cstdlib>
+#include <string>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>   // decode the real recomp sprite PNGs (host-supplied assets)
 
 SDL_Renderer* g_previewRenderer = nullptr;   // set by preview_main before OptionsMenu::Init()
 ImFont*       g_previewFont = nullptr;        // set by preview_main after font upload
@@ -30,15 +34,81 @@ static std::unique_ptr<Texture> MakeTile(uint32_t rgba = 0xFFFFFFFFu, int w = 64
     t->backend = tex; t->width = w; t->height = h;
     return t;
 }
+
+// Real recomp sprite PNGs, indexed by UISprite (MUST match the enum order in
+// render/sgfx_render.h). Host supplies these (SEGA-derived); the preview loads them from
+// $SGFX_SPRITE_ROOT (default = the extracted recomp set). "" = no asset -> tile fallback.
+static const char* const k_spriteFiles[] = {
+    "general_window.png", "light.png", "select.png", "options_static.png", "options_static_flash.png",
+    "controller.png", "kbm.png", "trophy.png",
+    "thumbnails/default.png", "thumbnails/control_tutorial_xb.png", "thumbnails/control_tutorial_ps.png",
+    "thumbnails/vibration_xb.png", "thumbnails/vibration_ps.png", "thumbnails/allow_background_input_xb.png",
+    "thumbnails/allow_background_input_ps.png", "thumbnails/language.png", "thumbnails/voice_language.png",
+    "thumbnails/hints.png", "thumbnails/achievement_notifications.png", "thumbnails/time_transition_xb.png",
+    "thumbnails/time_transition_ps.png", "thumbnails/horizontal_camera.png", "thumbnails/vertical_camera.png",
+    "thumbnails/controller_icons.png", "thumbnails/master_volume.png", "thumbnails/music_volume.png",
+    "thumbnails/effects_volume.png", "thumbnails/channel_stereo.png", "thumbnails/channel_surround.png",
+    "thumbnails/music_attenuation.png", "thumbnails/battle_theme.png", "thumbnails/window_size.png",
+    "thumbnails/monitor.png", "thumbnails/aspect_ratio.png", "thumbnails/fullscreen.png",
+    "thumbnails/xbox_color_correction.png", "thumbnails/vsync_off.png", "thumbnails/vsync_on.png",
+    "thumbnails/fps.png", "thumbnails/brightness.png", "thumbnails/antialiasing_none.png",
+    "thumbnails/antialiasing_2x.png", "thumbnails/antialiasing_4x.png", "thumbnails/antialiasing_8x.png",
+    "thumbnails/transparency_antialiasing_false.png", "thumbnails/transparency_antialiasing_true.png",
+    "thumbnails/shadow_resolution_x512.png", "thumbnails/shadow_resolution_x1024.png",
+    "thumbnails/shadow_resolution_x2048.png", "thumbnails/shadow_resolution_x4096.png",
+    "thumbnails/shadow_resolution_x8192.png", "thumbnails/gi_texture_filtering_bilinear.png",
+    "thumbnails/gi_texture_filtering_bicubic.png", "thumbnails/motion_blur_off.png",
+    "thumbnails/motion_blur_original.png", "thumbnails/motion_blur_enhanced.png", "thumbnails/movie_scale_fit.png",
+    "thumbnails/movie_scale_fill.png", "thumbnails/ui_alignment_centre.png", "thumbnails/ui_alignment_edge.png",
+    "miles_electric.png", "inst_install_001.png", "inst_install_002.png", "inst_install_003.png",
+    "inst_install_004.png", "inst_install_005.png", "inst_install_006.png", "inst_install_007.png",
+    "inst_install_008.png", "inst_miles_icon.png", "inst_arrow_circle.png", "inst_pulse.png",
+    "" /* HedgeDev: not extracted */,
+};
+
+static std::string SpriteRoot()
+{
+    if (const char* env = std::getenv("SGFX_SPRITE_ROOT")) return env;
+    return "C:/swardbuild/sgfx_ui/assets/recomp";   // the extracted recomp set (dev default)
+}
+
 std::unique_ptr<Texture> LoadUISprite(UISprite s)
 {
-    // GeneralWindow is the recomp's dark translucent 9-slice frame (pause/achievements/
-    // message panels). The real sprite is host-supplied; approximate it dark so those
-    // panels read like the game instead of a flat white box. ABGR8888: 0xAABBGGRR.
-    if (s == UISprite::GeneralWindow) return MakeTile(0xEB1E1814u);   // ~rgba(20,24,30,235)
+    int idx = (int)s;
+    const char* file = (idx >= 0 && idx < (int)(sizeof(k_spriteFiles) / sizeof(*k_spriteFiles))) ? k_spriteFiles[idx] : "";
+    if (file && *file)
+    {
+        std::string path = SpriteRoot() + "/" + file;
+        int w = 0, h = 0, comp = 0;
+        if (unsigned char* px = stbi_load(path.c_str(), &w, &h, &comp, 4))
+        {
+            auto t = std::make_unique<Texture>();
+            SDL_Texture* tex = SDL_CreateTexture(g_previewRenderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, w, h);
+            SDL_UpdateTexture(tex, nullptr, px, w * 4);
+            SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+            stbi_image_free(px);
+            t->backend = tex; t->width = w; t->height = h;
+            return t;
+        }
+    }
+    // fallback: GeneralWindow as a dark frame, everything else white (AddImage tints it)
+    return MakeTile(s == UISprite::GeneralWindow ? 0xEB1E1814u : 0xFFFFFFFFu);
+}
+std::unique_ptr<Texture> LoadTexture(const uint8_t* data, size_t size)
+{
+    int w = 0, h = 0, comp = 0;
+    if (unsigned char* px = stbi_load_from_memory(data, (int)size, &w, &h, &comp, 4))
+    {
+        auto t = std::make_unique<Texture>();
+        SDL_Texture* tex = SDL_CreateTexture(g_previewRenderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, w, h);
+        SDL_UpdateTexture(tex, nullptr, px, w * 4);
+        SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+        stbi_image_free(px);
+        t->backend = tex; t->width = w; t->height = h;
+        return t;
+    }
     return MakeTile();
 }
-std::unique_ptr<Texture> LoadTexture(const uint8_t*, size_t) { return MakeTile(); }
 
 }} // namespace sgfx::render
 
