@@ -33,7 +33,7 @@ struct Texture
 // The three shared UI sprites imgui_utils needs (recomp res/images/common/*). The
 // host supplies the pixels (they may be SEGA-derived, so they live with the host,
 // not the lib) and uploads them.
-enum class UISprite { GeneralWindow, Light, Select };
+enum class UISprite { GeneralWindow, Light, Select, OptionsStatic, OptionsStaticFlash };
 std::unique_ptr<Texture> LoadUISprite(UISprite sprite);
 
 // General texture upload from decoded image bytes (host decodes DDS/PNG + uploads).
