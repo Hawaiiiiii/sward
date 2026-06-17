@@ -273,11 +273,6 @@ void Draw(double openSec) {
                           WithAlpha(warn ? COL_BAR_WARN_T : COL_BAR_FILL_T, promptT),
                           WithAlpha(warn ? COL_BAR_WARN_B : COL_BAR_FILL_B, promptT));
         }
-        // "QUICK TIME EVENT" caption under the bar
-        SetFont(g_fRodin);
-        DrawTextAligned({ CX - 260.0f, by + BAR_H + 8.0f }, { CX + 260.0f, by + BAR_H + 40.0f },
-                        22.0f, WithAlpha(COL_FOOTER, promptT * footT),
-                        "QUICK TIME EVENT", Align::Center, true, true);
     } else {
         // ===== resolved: real result wordmark, scaling/fading in ============
         float age = (float)(now - g_resolveAt);
@@ -300,24 +295,25 @@ void Draw(double openSec) {
         }
     }
 
-    // ===== footer hint (real button glyphs + ASCII labels) ===================
+    // ===== footer hint (real button glyph + press prompt) ====================
+    // Single in-game prompt: the (A) button followed by "Press". No "(B) Fail"
+    // entry Ã¢â‚¬â€ that was a debug/harness label; the game never tells you to fail.
     {
         const float gh = 30.0f, cy = REF_H - 46.0f;
-        float hx = 360.0f;
-        auto hint = [&](const UV& g, float gAspect, const char* label) {
-            if (g_glyphTex >= 0) {
-                float gw = gh * gAspect;
-                DrawImage(g_glyphTex, { hx, cy - gh * 0.5f }, { hx + gw, cy + gh * 0.5f },
-                          { g.u0, g.v0 }, { g.u1, g.v1 }, WithAlpha(COL_WHITE, footT));
-                hx += gw + 8.0f;
-            }
-            DrawText({ hx, cy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, footT), label);
-            hx += MeasureText(22.0f, label).x + 40.0f;
-        };
-        const float aAsp = 0.976f, bAsp = 0.976f;   // A/B glyphs ~square
+        const float aAsp = 0.976f;   // A glyph ~square
         SetFont(g_fRodin);
-        hint(GLYPH_A_SM, aAsp, "Press");
-        hint(GLYPH_B_SM, bAsp, "Fail");
+        const char* label = "Press";
+        float gw = gh * aAsp;
+        float lw = MeasureText(22.0f, label).x;
+        // centre the glyph + label group along the footer
+        float hx = CX - (gw + 8.0f + lw) * 0.5f;
+        if (g_glyphTex >= 0) {
+            DrawImage(g_glyphTex, { hx, cy - gh * 0.5f }, { hx + gw, cy + gh * 0.5f },
+                      { GLYPH_A_SM.u0, GLYPH_A_SM.v0 }, { GLYPH_A_SM.u1, GLYPH_A_SM.v1 },
+                      WithAlpha(COL_WHITE, footT));
+            hx += gw + 8.0f;
+        }
+        DrawText({ hx, cy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, footT), label);
     }
     ResetFont();
 }

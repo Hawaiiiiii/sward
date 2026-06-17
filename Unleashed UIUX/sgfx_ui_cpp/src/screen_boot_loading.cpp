@@ -1,6 +1,6 @@
 // =============================================================================
 // screen_boot_loading.cpp — the first-boot "NOW LOADING" screen, matched 1:1 to
-// the retail/recomp reference (_ref_load.png). Black screen with bright-green
+// the retail/recomp reference (_ref_load.png). Black screen with WHITE/light
 // "NOW LOADING" bottom-right + an animated 3x3 dot-matrix spinner.
 //
 // FONT: the game's own bitmap font atlas mat_comon_txt_001.dds (256x128). It is
@@ -8,7 +8,7 @@
 // reading order. loading_font.h holds each glyph's tight atlas bbox; glyphs are
 // drawn straight from the atlas (proportional, bbox-bottom on the baseline), so
 // the wordmark is the game's exact face and is re-skinnable by changing the string.
-// Measured target: text x655..1000 (w~345), baseline ~y625; green ~ (74,230,18).
+// Measured target: text x655..1000 (w~345), baseline ~y625; fill WHITE/light.
 //
 // ANIMATION: the "NOW LOADING" text BREATHES (dims out + back) on a ~1.5s cycle
 // while the spinner keeps walking the ring — the classic Unleashed loader pulse.
@@ -23,12 +23,14 @@ using namespace ui;
 namespace {
 
 int g_txtTex = -1;   // mat_comon_txt_001 bitmap-font atlas
-// colours sampled from _ref_load_bright.png: glyphs shade bright-top -> darker-
-// bottom (g ~218 -> ~147) and the brightest pixels are soft (~111,205,73), not neon.
-const uint32_t C_GREEN     = RGBA(74, 230, 18, 255);
-const uint32_t C_GREEN_T   = RGBA(92, 218, 34, 255);    // glyph fill top
-const uint32_t C_GREEN_B   = RGBA(50, 147, 12, 255);    // glyph fill bottom
-const uint32_t C_GREEN_DIM = RGBA(28, 92, 8, 255);
+// The real game loading text is WHITE/light (not green). White wordmark/glyph
+// fill with a very slight top->bottom shade, + a dark outline for the bitmap-
+// font fallback so the white core reads against the black screen.
+const uint32_t C_WHITE_T   = RGBA(255, 255, 255, 255);  // wordmark/glyph fill top
+const uint32_t C_WHITE_B   = RGBA(225, 228, 232, 255);  // wordmark/glyph fill bottom
+const uint32_t C_OUTLINE   = RGBA(12, 14, 18, 255);     // dark outline for fallback text
+// light "off" grey the unlit spinner cells settle toward
+const uint32_t C_WHITE_OFF = RGBA(60, 64, 70, 255);
 
 int g_wordTex = -1;  // mat_load_en_001: the PRE-RENDERED heavy "NOW LOADING" wordmark
                      // + the spinner cell square — the game's actual boot-loader art.
@@ -74,18 +76,18 @@ void DrawAtlasText(float xLeft, float baselineY, float S, uint32_t colT, uint32_
         x += gw + LF_GAP * S;
     }
 }
-// the game wordmark is HEAVY + green-bloomed: an 8-direction dilation merges into
-// thick joined strokes (the ref runs are ~2x the bare atlas weight), shaded
-// bright-top -> dark-bottom, with a soft additive bloom. `a` is the breathing alpha.
+// the game wordmark is HEAVY with a dark outline: an 8-direction dilation of the
+// dark outline colour builds a thick rim so the WHITE core reads against the black
+// screen, then the white core is drawn on top. `a` is the breathing alpha.
 void DrawGlowText(float tx, float baselineY, float S, float a, const char* txt) {
     // CONCENTRIC multi-radius dilation: a single offset pass can never thicken a
     // stroke past its own width (the copies separate) — stacking radii 1.1/2.2/3.3
-    // in 8 directions merges into the ref's solid heavy slab (runs ~9-12px).
+    // in 8 directions builds the ref's solid heavy outline rim (runs ~9-12px).
+    // dark outline pass: an 8-direction offset of the dark outline colour so the
+    // white core reads against the black screen.
     for (float d = 1.1f; d < 3.5f; d += 1.1f) {
         const float dd = d * 0.7071f;
-        // the dilation body carries the same top->bottom shading as the core so the
-        // bolded letter shades as ONE form (ref: g~218 top -> ~147 bottom)
-        uint32_t sT = WithAlpha(C_GREEN_T, a), sB = WithAlpha(C_GREEN_B, a);
+        uint32_t sT = WithAlpha(C_OUTLINE, a), sB = WithAlpha(C_OUTLINE, a);
         DrawAtlasText(tx - d,  baselineY,       S, sT, sB, txt);
         DrawAtlasText(tx + d,  baselineY,       S, sT, sB, txt);
         DrawAtlasText(tx,      baselineY - d,   S, sT, sB, txt);
@@ -95,18 +97,15 @@ void DrawGlowText(float tx, float baselineY, float S, float a, const char* txt) 
         DrawAtlasText(tx - dd, baselineY + dd,  S, sT, sB, txt);
         DrawAtlasText(tx + dd, baselineY + dd,  S, sT, sB, txt);
     }
-    DrawAtlasText(tx, baselineY, S, WithAlpha(C_GREEN_T, a), WithAlpha(C_GREEN_B, a), txt);
-    uint32_t halo = WithAlpha(C_GREEN, a * 0.08f);
-    DrawAtlasText(tx - 3.4f, baselineY + 1.2f, S, halo, halo, txt, true);  // soft additive bloom
-    DrawAtlasText(tx + 3.4f, baselineY + 1.2f, S, halo, halo, txt, true);
-    DrawAtlasText(tx, baselineY - 3.4f, S, halo, halo, txt, true);
+    // white core on top, with the slight top->bottom shade
+    DrawAtlasText(tx, baselineY, S, WithAlpha(C_WHITE_T, a), WithAlpha(C_WHITE_B, a), txt);
 }
 
-// the dot-matrix spinner: a FULL 3x3 grid of gradient-filled green squares (incl.
-// the centre cell). NOT a ring walk — each of the 9 cells (img_01..09, row-major)
-// blinks on its own diagonal-cascade schedule, driven by a 4.0s loop. The retail
-// loader reads near-binary: a cell is either lit (~0.9, bright green) or dark
-// (~0.12, dim green-grey), with a short ~10-frame ramp at each window edge.
+// the dot-matrix spinner: a FULL 3x3 grid of gradient-filled white/light squares
+// (incl. the centre cell). NOT a ring walk — each of the 9 cells (img_01..09,
+// row-major) blinks on its own diagonal-cascade schedule, driven by a 4.0s loop.
+// The retail loader reads near-binary: a cell is either lit (~0.9, white) or dark
+// (~0.12, dim grey), with a short ~10-frame ramp at each window edge.
 // Measured footprint: cell 8.7, step 10 (unchanged).
 //
 // Per-cell lit windows over frame in [0,240] (4.0s * 60). Indexed by [row][col],
@@ -121,9 +120,6 @@ static const CellSched SPIN_SCHED[3][3] = {
     // row 2 (bottom): img_07(0,2)            img_08(1,2)            img_09(2,2)
     { { 2, {{40,80},{120,160}} },        { 2, {{60,100},{140,180}} },  { 2, {{80,120},{157,197}} } },
 };
-// dim "off" green-grey (~g30) the unlit cells settle toward
-const uint32_t C_GREEN_OFF = RGBA(19, 28, 16, 255);
-
 void DrawSpinner(float x0, float y0, double now) {
     const float cell = 8.7f, step = 10.0f;
     const float frame = (float)(std::fmod(now, 4.0) * 60.0);   // 0..240 over the 4.0s loop
@@ -139,16 +135,17 @@ void DrawSpinner(float x0, float y0, double now) {
             float on = std::min((frame - w.a) / RAMP, (w.b - frame) / RAMP);   // >0 within [a,b]
             lit = std::max(lit, std::min(1.0f, std::max(0.0f, on)));
         }
-        // lit -> ~0.9 toward C_GREEN; unlit -> ~0.12 toward the dim off green-grey
+        // lit -> ~0.9 toward white; unlit -> ~0.12 toward the dim off grey, to
+        // match the white loading text (the retail loader is not green).
         float k = 0.04f + 0.86f * lit;                          // 0.04 (off) .. 0.90 (on)
-        uint32_t c = ColourLerp(C_GREEN_OFF, C_GREEN, k);
+        uint32_t c = ColourLerp(C_WHITE_OFF, C_WHITE_T, k);
         float gx = x0 + col * step, gy = y0 + row * step;
         if (g_wordTex >= 0)   // the real cell sprite from mat_load_en_001
             DrawImage(g_wordTex, { gx, gy }, { gx + cell, gy + cell },
                       { SQ_U0, SQ_V0 }, { SQ_U1, SQ_V1 }, c);
         else
             DrawVGradient({ gx, gy }, { gx + cell, gy + cell },
-                          ColourLerp(C_GREEN_OFF, C_GREEN, std::min(1.0f, k * 1.1f + 0.08f)), c);
+                          ColourLerp(C_WHITE_OFF, C_WHITE_T, std::min(1.0f, k * 1.1f + 0.08f)), c);
     }
 }
 
@@ -164,15 +161,14 @@ void Draw(double openSec) {
     float pulse = 0.40f + 0.60f * std::sqrt(tri);              // bright-biased
     if (g_wordTex >= 0) {
         // 1:1 path: the game's pre-rendered heavy wordmark sprite (white core +
-        // green rim + dark outline) is a WHITE/luminance mask — the green is the
-        // in-engine material tint. Tint it with the SAME measured glyph green as
-        // the spinner + the bitmap-font fallback (C_GREEN_T 218 -> C_GREEN_B 147),
-        // so the wordmark reads the same medium-bright green as its dot spinner
-        // (matched to NOW LOADING (first booting).mp4) instead of a dim olive.
+        // dark outline) is a WHITE/luminance mask. The retail loader text is
+        // WHITE/light (not green) — so tint with white and let the sprite's own
+        // baked dark outline read through. A faint top->bottom shade keeps it
+        // from looking flat. The breathing `pulse` drives the alpha.
         DrawImageVGradient(g_wordTex, { 650, 568 }, { 969, 602 },
                            { WM_U0, WM_V0 }, { WM_U1, WM_V1 },
-                           WithAlpha(C_GREEN_T, pulse),
-                           WithAlpha(C_GREEN_B, pulse));
+                           WithAlpha(C_WHITE_T, pulse),
+                           WithAlpha(C_WHITE_B, pulse));
     } else {
         // re-skin path (custom SGFX strings): the proportional bitmap font, bolded
         const char* txt = "NOW LOADING";

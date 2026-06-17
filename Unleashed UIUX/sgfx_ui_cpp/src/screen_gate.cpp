@@ -166,13 +166,38 @@ void DrawLiveValues(float panT, bool csdBase) {
     const float panS = Lerp(0.83f, 1.0f, panT);                // same scale-pop as the panel
     const float STAT_R = 660;                                  // shared value right-edge column
     PushTransform(panS, panS, { (px0 + px1) * 0.5f, (py0 + py1) * 0.5f }, { 0.0f, 0.0f });
+    char buf[16];
+    if (csdBase) {
+        // CSD-base path: align every value to the CSD info-row slots (data/gate.json
+        // info_1..info_4). The CSD already DRAWS the medal "/" glyph (the `slash`
+        // cast, mat_comon_num_001) between its num_nume/num_deno slots, so the overlay
+        // must NOT emit its own slash for the medal rows (that double-slash is what
+        // read as garbled). We drop only the numerator + denominator DIGITS into the
+        // CSD's empty num slots, right-edges per the CSD (numerator / denominator),
+        // and seat HIGH SCORE / BEST TIME / RINGS / MEDALS on their real row Ys.
+        ChromeRight(STAT_R, 315, 26.0f, act.hiScore, panT);    // HIGH SCORE value (info_1 num row)
+        ChromeRight(STAT_R, 365, 26.0f, act.bestTime, panT);   // BEST TIME value (info_2 num row)
+        // RINGS row (info_3): numerator right-edge x=571, denominator right-edge x=665, y=395
+        snprintf(buf, sizeof buf, "%d", act.sun);
+        ChromeRight(571.0f, 395, 26.0f, buf, panT);
+        snprintf(buf, sizeof buf, "%d", act.sunMax);
+        ChromeRight(665.0f, 395, 26.0f, buf, panT);
+        // MEDALS row (info_4): numerator right-edge x=589, denominator right-edge x=665, y=417
+        snprintf(buf, sizeof buf, "%d", act.moon);
+        ChromeRight(589.0f, 417, 26.0f, buf, panT);
+        snprintf(buf, sizeof buf, "%d", act.moonMax);
+        ChromeRight(665.0f, 417, 26.0f, buf, panT);
+        PopTransform();
+        return;
+    }
+    // hand-authored (no-CSD) path: this overlay owns the whole row, so it draws the
+    // full "n / n" string itself (one clean slash) at the panel's medal-icon Ys.
     ChromeRight(STAT_R, 322, 26.0f, act.hiScore, panT);        // HIGH SCORE value
     ChromeRight(STAT_R, 372, 26.0f, act.bestTime, panT);       // BEST TIME value
-    char buf[16];
     snprintf(buf, sizeof buf, "%d / %d", act.sun,  act.sunMax);
-    ChromeRight(STAT_R, 426, 26.0f, buf, panT);                // sun medal count
+    ChromeRight(STAT_R, 426, 26.0f, buf, panT);                // sun medal count (next to medalIcon(430))
     snprintf(buf, sizeof buf, "%d / %d", act.moon, act.moonMax);
-    ChromeRight(STAT_R, 478, 26.0f, buf, panT);                // moon medal count
+    ChromeRight(STAT_R, 478, 26.0f, buf, panT);                // moon medal count (next to medalIcon(482))
     // the big metallic rank letter for the selected act (real mat_result art) —
     // the CSD base already draws the act's rank emblem, so only the no-CSD
     // hand-authored path (csdBase==false) emits it; gating it on the CSD base

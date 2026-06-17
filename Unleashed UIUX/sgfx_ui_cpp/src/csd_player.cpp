@@ -327,7 +327,19 @@ void resolveRest(Scene& sc) {
                 int s = poseScore(sc, bestAnim, (float)f); // single dropout frame (e.g. gate's preview)
                 lo = std::min(lo, s); hi = std::max(hi, s);
             }
-            if (hi > 0 && lo >= (int)(hi * 0.85f + 0.5f)) { sc.restMaxFrames = maxf; sc.loopRest = true; }
+            // ALSO require the idle to be an in-place ROTATION (a real spin, like the EXP gem)
+            // with NO SubImage cell-cycling: looping a SubImage/scale text anim scrambles its
+            // glyphs (the loading "MILES ELECTRIC" / hint list animate via cell/scale, not
+            // rotation, and looping them garbled the letters). Text/number scenes never rotate,
+            // so requiring a Rotation track + no SubImage track excludes them cleanly.
+            bool hasRot = false, hasCell = false;
+            for (const Cast& c : sc.casts) {
+                auto it = c.anims.find(bestAnim);
+                if (it == c.anims.end()) continue;
+                if (it->second.tracks.count("Rotation")) hasRot = true;
+                if (it->second.tracks.count("SubImage")) hasCell = true;
+            }
+            if (hi > 0 && lo >= (int)(hi * 0.85f + 0.5f) && hasRot && !hasCell) { sc.restMaxFrames = maxf; sc.loopRest = true; }
         }
     }
 }

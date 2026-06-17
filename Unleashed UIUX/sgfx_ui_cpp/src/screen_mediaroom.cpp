@@ -9,7 +9,7 @@
 //     curl ornaments, the "Pickle's Room" oval seal; a parchment panel
 //     (220,121)-(1060,613) with a brown pinstripe frame, a white keyline
 //     with corner hooks, and a mottled paper interior (185,176,140);
-//   * ENCYCLOPEDIA text page: portrait slot on the left half, flag icon +
+//   * ENCYCLOPEDIA text page: portrait slot on the left half, the
 //     entry title on a faint highlight band, ruled double-lines (pitch 33)
 //     with body text, a green page plaque "003 / 098" with gold curls, and
 //     gold page chevrons straddling the panel edges;
@@ -74,8 +74,6 @@ const uint32_t C_SCR_T     = RGBA(87, 35, 21, 255);      // scrollbar maroon
 const uint32_t C_SCR_B     = RGBA(34, 16, 14, 255);
 const uint32_t C_SCR_HND   = RGBA(214, 204, 181, 255);
 const uint32_t C_FLAG_BLUE = RGBA(50, 96, 185, 255);     // flag badge field (soundtrack crest)
-const uint32_t C_FLAG_NAVY_T = RGBA(68, 68, 178, 255);   // Alexis flag navy gradient top
-const uint32_t C_FLAG_NAVY_B = RGBA(22, 21, 108, 255);   // Alexis flag navy gradient bottom
 const uint32_t C_SEAL_GRN  = RGBA(60, 80, 50, 255);      // Pickle's Room seal
 const uint32_t C_WHITE     = RGBA(255, 255, 255, 255);
 // lab-scene placeholder (the real game renders the 3D library behind)
@@ -284,28 +282,12 @@ void DrawEncyText(float a, double now) {
     DrawRect({ 343, 267 }, { 496, 592 }, WithAlpha(C_PARCH_LO, a * 0.35f));
     SetFont(g_fSeurat);
     DrawTextAligned({ 343, 267 }, { 496, 592 }, 14.0f, WithAlpha(RGBA(130, 120, 95, 255), a), "PORTRAIT", Align::Center, true, false);
-    // title band + flag icon + entry name
+    // entry-title highlight band + entry name. (The small left-of-title sprite was
+    // a national flag — wrong art for a character entry, and no real per-character
+    // entry icon exists in the asset set — so it is dropped per the art/structure
+    // boundary and the name is left-anchored on the band instead of a placeholder.)
     DrawRect({ 496.7f, 177.3f }, { 793.3f, 212.0f }, WithAlpha(C_WHITE, a * 0.18f));
-    // Alexis flag: navy vertical gradient field, thick white stripes (white is a
-    // major share of the field), and a white anchor crest in the left third.
-    DrawVGradient({ 501.3f, 174.7f }, { 563.3f, 208.0f }, WithAlpha(C_FLAG_NAVY_T, a), WithAlpha(C_FLAG_NAVY_B, a)); // flag field
-    for (int i = 0; i < 4; ++i)
-        DrawRect({ 505, 178.0f + i * 8.2f }, { 559, 182.5f + i * 8.2f }, WithAlpha(C_WHITE, a * 0.9f));   // thick white stripes (~4.5px)
-    DrawRect({ 501.3f, 174.7f }, { 563.3f, 176.0f }, WithAlpha(C_WHITE, a));               // flag outline hint
-    {   // small white anchor glyph confined to the bottom-left quarter of the
-        // field (not full height): shank top lowered to ~y186, a single thin
-        // crossbar, and tightened fluke spread.
-        const float ax = 511.6f;                                   // anchor centre x (left quarter)
-        DrawRect({ ax - 1.2f, 186.0f }, { ax + 1.2f, 203.5f }, WithAlpha(C_WHITE, a));      // vertical shank (lowered top, shorter)
-        DrawRect({ ax - 4.5f, 188.0f }, { ax + 4.5f, 189.6f }, WithAlpha(C_WHITE, a));      // single thin crossbar
-        DrawRect({ ax - 1.6f, 184.2f }, { ax + 1.6f, 186.4f }, WithAlpha(C_WHITE, a));      // ring nub atop the shank
-        for (int i = 0; i < 4; ++i) {                              // two outward-curving flukes (tighter width)
-            float fy = 200.0f + i * 1.2f, dx = 2.2f + i * 1.0f;
-            DrawRect({ ax - 1.2f - dx, fy }, { ax - 1.2f - dx + 1.4f, fy + 1.4f }, WithAlpha(C_WHITE, a));
-            DrawRect({ ax + 1.2f + dx - 1.4f, fy }, { ax + 1.2f + dx, fy + 1.4f }, WithAlpha(C_WHITE, a));
-        }
-    }
-    DrawText({ 568.7f, 178 }, 26.0f, WithAlpha(C_TEXT, a), "Alexis");
+    DrawText({ 506.7f, 178 }, 26.0f, WithAlpha(C_TEXT, a), "Alexis");
     // ruled double-lines + body text (pitch 33, pairs 6.7 apart, x 507..973)
     const char* L[] = { "Lambros's son, a", "wild, unruly boy.", "",
                         "Alexis hardly ever", "sees his father,",
@@ -430,22 +412,20 @@ void DrawNowPlaying(float a, double now) {
 }
 
 void DrawMedalHud(float a) {
-    // persistent hub medal-level HUD (top-left, in front of the panel frame):
-    // two stacked rows, Sun then Moon, each = medal icon + "Lv7 [200]"
+    // persistent hub Sun/Moon medal-level chips (top-left, in front of the panel
+    // frame): two stacked rows, Sun then Moon, each = real medallion icon + a
+    // clean "Lv. 7" level label (no debug bracket count). Only drawn when the real
+    // medallion sprites are present — no procedural disc/globe placeholder, which
+    // read as a debug medal HUD.
     SetFont(g_fSeurat);
-    auto chip = [&](float cy, int medTex, uint32_t icol, const char* txt) {
-        if (medTex >= 0) {   // real Sun/Moon medallion sprite (gold ring + gem)
-            DrawImage(medTex, { 129, cy - 14 }, { 158, cy + 14 }, { 0.f, 0.f }, { 1.f, 1.f },
-                      WithAlpha(RGBA(255, 255, 255, 255), a));
-        } else {             // procedural fallback
-            DrawRect({ 131, cy - 12 }, { 155, cy + 12 }, WithAlpha(RGBA(40, 30, 8, 230), a));
-            DrawRect({ 133, cy - 10 }, { 153, cy + 10 }, WithAlpha(icol, a));
-            DrawRect({ 138, cy - 5 }, { 148, cy + 5 }, WithAlpha(RGBA(150, 116, 36, 255), a));
-        }
+    auto chip = [&](float cy, int medTex, const char* txt) {
+        if (medTex < 0) return;   // skip the row entirely if the real medal art is missing
+        DrawImage(medTex, { 129, cy - 14 }, { 158, cy + 14 }, { 0.f, 0.f }, { 1.f, 1.f },
+                  WithAlpha(RGBA(255, 255, 255, 255), a));   // real Sun/Moon medallion sprite (gold ring + gem)
         DrawTextShadow({ 163, cy - 9 }, 16.0f, WithAlpha(RGBA(244, 240, 230, 255), a), txt);
     };
-    chip(135, g_sunMedTex,  RGBA(214, 96, 40, 255), "Lv7 [200]");    // sun
-    chip(181, g_moonMedTex, RGBA(64, 120, 210, 255), "Lv7 [200]");   // moon
+    chip(135, g_sunMedTex,  "Lv. 7");    // sun
+    chip(181, g_moonMedTex, "Lv. 7");    // moon
     ResetFont();
 }
 

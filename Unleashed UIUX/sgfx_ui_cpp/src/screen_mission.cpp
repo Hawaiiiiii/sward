@@ -9,10 +9,10 @@
 // distinctive retail art is the REAL extracted atlases the screen ships with:
 //   * the gold "MISSION" wordmark              (mat_misson_en_001, top line),
 //   * the spinning gold ring frame             (mat_comon_002, frame 0),
-//   * the Xbox A / B button glyphs             (mat_comon_x360_001, top row),
-//   * the baked English word labels Back/Start (mat_comon_en_001),
 // each placed at deliberate sane rects with aspect preserved (graceful gradient /
-// ASCII fallback when an atlas is missing â€” exactly like options/world_map).
+// ASCII fallback when an atlas is missing â€” exactly like options/world_map). The
+// footer button guide reuses the shared DrawButtonGuide (real controller glyphs +
+// clean NewRodin labels), identical to options/status â€” no bracketed prompts.
 //
 // Fully interactive + stateful like the recomp's options_menu / the shop:
 //   * Up/Down move the cursor over the mission rows (eased highlight + scrollbar),
@@ -72,27 +72,17 @@ const char* const RANK_NAME[6] = { "S", "A", "B", "C", "D", "E" };
 const char* const ASSET_BASE = "assets/mission/";
 int g_titleTex = -1;   // mat_misson_en_001 (512x128) â€” "MISSION" wordmark (top line)
 int g_ringTex  = -1;   // mat_comon_002     (1024x128) â€” gold ring spin atlas
-int g_glyphTex = -1;   // mat_comon_x360_001 (512x512) â€” Xbox button glyphs
-int g_wordTex  = -1;   // mat_comon_en_001  (128x512)  â€” baked English word labels
+// Footer controller glyphs + baked word labels are drawn by the shared
+// DrawButtonGuide helper (sgfxui), so no per-screen glyph/word atlas is needed.
 
 constexpr float TITLE_TEX_W = 512.0f,  TITLE_TEX_H = 128.0f;
 constexpr float RING_TEX_W  = 1024.0f, RING_TEX_H  = 128.0f;
-constexpr float GLYPH_TEX_W = 512.0f,  GLYPH_TEX_H = 512.0f;
-constexpr float WORD_TEX_W  = 128.0f,  WORD_TEX_H  = 512.0f;
 
 // gold "MISSION" wordmark â€” top line of mat_misson_en_001, measured from alpha.
 const UV TITLE_UV = { 0.00000f, 0.00000f, 0.50195f, 0.29688f };
 
 // first ring frame (full circle) â€” top-left of mat_comon_002, measured from alpha.
 const UV RING_UV  = { 0.00098f, 0.00781f, 0.07324f, 0.50000f };
-
-// Xbox glyphs â€” top row of mat_comon_x360_001 (same UVs as options/world_map).
-const UV GLYPH_A  = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
-const UV GLYPH_B  = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
-
-// Baked English words â€” bands measured from mat_comon_en_001's alpha.
-const UV WORD_BACK  = { 0.03125f, 0.07227f, 0.52344f, 0.11523f };
-const UV WORD_START = { 0.02344f, 0.53906f, 0.53125f, 0.58398f };
 
 // ---- layout (reference px) --------------------------------------------------
 constexpr float TITLE_X = 150.0f, TITLE_Y = 50.0f, RULE_Y = 118.0f;
@@ -166,8 +156,6 @@ void Init() {
     GameFrameTex();   // lazy-load the shared chrome frame used by DrawGameWindow
     if (g_titleTex < 0) g_titleTex = gfx::loadTexture(std::string(ASSET_BASE) + "mat_misson_en_001.png");
     if (g_ringTex  < 0) g_ringTex  = gfx::loadTexture(std::string(ASSET_BASE) + "mat_comon_002.png");
-    if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture(std::string(ASSET_BASE) + "mat_comon_x360_001.png");
-    if (g_wordTex  < 0) g_wordTex  = gfx::loadTexture(std::string(ASSET_BASE) + "mat_comon_en_001.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");      // real game MSDF (im_font_atlas)
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");    // real game MSDF
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");   // real DFSoGeiStd-W7 (titles)
@@ -247,25 +235,6 @@ void DrawRingIcon(float cx, float cy, float h, float t) {
     float w = h * aspect;
     DrawImage(g_ringTex, { cx - w * 0.5f, cy - h * 0.5f }, { cx + w * 0.5f, cy + h * 0.5f },
               { RING_UV.u0, RING_UV.v0 }, { RING_UV.u1, RING_UV.v1 }, WithAlpha(COL_WHITE, t));
-}
-
-// one footer hint: real button glyph + ASCII label, laid out left-to-right.
-float DrawHint(float x, float cy, const UV& g, float gAspect, const char* token,
-               const char* label, float t) {
-    const float gh = 30.0f;
-    SetFont(g_fRodin);
-    if (g_glyphTex >= 0) {
-        float gw = gh * gAspect;
-        DrawImage(g_glyphTex, { x, cy - gh * 0.5f }, { x + gw, cy + gh * 0.5f },
-                  { g.u0, g.v0 }, { g.u1, g.v1 }, WithAlpha(COL_WHITE, t));
-        x += gw + 8.0f;
-    } else {
-        DrawText({ x, cy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, t), token);
-        x += MeasureText(22.0f, token).x + 8.0f;
-    }
-    DrawText({ x, cy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, t), label);
-    x += MeasureText(22.0f, label).x + 34.0f;
-    return x;
 }
 
 void Draw(double openSec) {
@@ -379,7 +348,7 @@ void Draw(double openSec) {
     {
         float sx = il + 140.0f, sy = ty + 11.0f;
         for (int s = 0; s < 5; ++s)
-            DrawStar(sx + s * 24.0f, sy, s < m.stars, infoT);
+            DrawStar(sx + s * 28.0f, sy, s < m.stars, infoT);   // wider pitch: stars no longer cramped
     }
     ty += 38.0f;
 
@@ -431,60 +400,17 @@ void Draw(double openSec) {
         DrawText({ il, ty }, 21.0f, WithAlpha(COL_LOCKED, infoT), "NOT YET CLEARED");
     }
 
-    // ---- footer button guide (real glyphs + real word art where it fits) ----
+    // ---- footer button guide (shared glyph-backed guide, same as every menu) ----
+    // Use the canonical DrawButtonGuide (real controller glyphs + clean NewRodin
+    // labels) instead of bracketed keyboard prompts. Up/Down list nav has no glyph
+    // in the shared icon set, so (matching the retail status footer) we show only
+    // the on-screen pad actions: A = Start, B = Back. No "[...]" placeholders.
     {
-        SetFont(g_fRodin);
-        float hx = TITLE_X, hcy = 634.0f;
-        const float aAsp = ((GLYPH_A.u1 - GLYPH_A.u0) * GLYPH_TEX_W) / ((GLYPH_A.v1 - GLYPH_A.v0) * GLYPH_TEX_H);
-        const float bAsp = ((GLYPH_B.u1 - GLYPH_B.u0) * GLYPH_TEX_W) / ((GLYPH_B.v1 - GLYPH_B.v0) * GLYPH_TEX_H);
-
-        // [Up/Down] is keyboard-only -> ASCII; the pad actions use real glyphs +
-        // baked Start/Back word art where the atlas is present.
-        DrawText({ hx, hcy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, footT), "[Up/Down] Select");
-        hx += MeasureText(22.0f, "[Up/Down] Select").x + 34.0f;
-
-        // (A) Start â€” prefer the real "Start" word art beside the glyph
-        if (g_glyphTex >= 0) {
-            float gw = 30.0f * aAsp;
-            DrawImage(g_glyphTex, { hx, hcy - 15.0f }, { hx + gw, hcy + 15.0f },
-                      { GLYPH_A.u0, GLYPH_A.v0 }, { GLYPH_A.u1, GLYPH_A.v1 }, WithAlpha(COL_WHITE, footT));
-            hx += gw + 8.0f;
-        } else {
-            DrawText({ hx, hcy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, footT), "(A)");
-            hx += MeasureText(22.0f, "(A)").x + 8.0f;
-        }
-        if (g_wordTex >= 0) {
-            float wAsp = ((WORD_START.u1 - WORD_START.u0) * WORD_TEX_W) /
-                         ((WORD_START.v1 - WORD_START.v0) * WORD_TEX_H);
-            float wh = 22.0f, ww = wh * wAsp;
-            DrawImage(g_wordTex, { hx, hcy - wh * 0.5f }, { hx + ww, hcy + wh * 0.5f },
-                      { WORD_START.u0, WORD_START.v0 }, { WORD_START.u1, WORD_START.v1 }, WithAlpha(COL_WHITE, footT));
-            hx += ww + 34.0f;
-        } else {
-            DrawText({ hx, hcy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, footT), "Start");
-            hx += MeasureText(22.0f, "Start").x + 34.0f;
-        }
-
-        // (B) Back â€” glyph + baked "Back" word art
-        if (g_glyphTex >= 0) {
-            float gw = 30.0f * bAsp;
-            DrawImage(g_glyphTex, { hx, hcy - 15.0f }, { hx + gw, hcy + 15.0f },
-                      { GLYPH_B.u0, GLYPH_B.v0 }, { GLYPH_B.u1, GLYPH_B.v1 }, WithAlpha(COL_WHITE, footT));
-            hx += gw + 8.0f;
-        } else {
-            DrawText({ hx, hcy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, footT), "(B)");
-            hx += MeasureText(22.0f, "(B)").x + 8.0f;
-        }
-        if (g_wordTex >= 0) {
-            float wAsp = ((WORD_BACK.u1 - WORD_BACK.u0) * WORD_TEX_W) /
-                         ((WORD_BACK.v1 - WORD_BACK.v0) * WORD_TEX_H);
-            float wh = 22.0f, ww = wh * wAsp;
-            DrawImage(g_wordTex, { hx, hcy - wh * 0.5f }, { hx + ww, hcy + wh * 0.5f },
-                      { WORD_BACK.u0, WORD_BACK.v0 }, { WORD_BACK.u1, WORD_BACK.v1 }, WithAlpha(COL_WHITE, footT));
-            hx += ww + 34.0f;
-        } else {
-            DrawText({ hx, hcy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, footT), "Back");
-        }
+        static const GuideBtn FOOTER[] = {
+            { "Start", GIcon::A, GAlign::Right, 90.0f },
+            { "Back",  GIcon::B, GAlign::Right, 65.0f },
+        };
+        DrawButtonGuide(FOOTER, 2, g_fRodin, footT, TITLE_X);
     }
 
     // ---- transient "start mission" flash ----

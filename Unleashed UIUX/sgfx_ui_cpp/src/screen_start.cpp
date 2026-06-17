@@ -59,7 +59,6 @@ constexpr float PROMPT_CY = 520.0f;                // pulsing PRESS-START prompt
 constexpr float FOOTER_CY = 670.0f;
 
 // ---- entrance / animation tuning (frames @60fps) ----------------------------
-constexpr double HERO_FRAMES   = 18.0;             // idle "READY" hero ease-in
 constexpr double PROMPT_OFFSET = 8.0,  PROMPT_FRAMES = 14.0;
 constexpr double FOOT_OFFSET   = 12.0, FOOT_FRAMES   = 12.0;
 
@@ -129,13 +128,6 @@ void Draw(double openSec) {
     g_open = Now();   // elapsed-since-open for the idle "PRESS START" breathe pulse (openSec is pinned to 0)
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, COL_BG_TOP, COL_BG_BOT);
 
-    // faint centring rules â€” a clean, bold backdrop for the single hero plate
-    const float rT = (float)ComputeMotion(openSec, 0.0, HERO_FRAMES);
-    DrawRect({ 120.0f, HERO_CY - HERO_H * 0.5f - 22.0f },
-             { REF_W - 120.0f, HERO_CY - HERO_H * 0.5f - 20.0f }, WithAlpha(COL_RULE, rT));
-    DrawRect({ 120.0f, HERO_CY + HERO_H * 0.5f + 20.0f },
-             { REF_W - 120.0f, HERO_CY + HERO_H * 0.5f + 22.0f }, WithAlpha(COL_RULE, rT));
-
     const bool   running = (g_seqStart > 0.0);
     const double age     = running ? (Now() - g_seqStart) : -1.0;
     const double seqEnd  = STEP_COUNT * STEP_SEC + GO_SEC;
@@ -177,15 +169,12 @@ void Draw(double openSec) {
             }
         }
     } else {
-        // ===== IDLE SPLASH: real "READY" hero + pulsing PRESS-START prompt =======
-        const float heroT   = (float)ComputeMotion(openSec, 0.0, HERO_FRAMES);
+        // ===== IDLE SPLASH: pulsing PRESS-START prompt on the clean backdrop ======
+        // (No "READY" hero / centring rules here: READY is the in-game stage-start
+        // wordmark, not a Press-Start element. The start atlas carries no PRESS-START
+        // string and no game logo, so the call-to-action is the only thing we draw.)
         const float promptT = (float)ComputeMotion(openSec, PROMPT_OFFSET, PROMPT_FRAMES);
         const float footT   = (float)ComputeMotion(openSec, FOOT_OFFSET, FOOT_FRAMES);
-
-        // hero "READY" wordmark eases in with a small downward settle
-        float heroCy = HERO_CY - (1.0f - heroT) * 18.0f;
-        if (g_bannerTex >= 0) DrawWordmark(UV_READY, CX, heroCy, READY_H, heroT);
-        else                  DrawWordFallback("READY", CX, heroCy, 86.0f, COL_TITLE, heroT);
 
         // pulsing "PRESS  START" call-to-action (procedural â€” the atlas lacks it)
         if (promptT > 0.05f) {

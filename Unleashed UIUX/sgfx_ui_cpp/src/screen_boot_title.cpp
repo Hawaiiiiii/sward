@@ -98,23 +98,12 @@ void Starfield(float a) {
     }
 }
 
-// the game-logo SLOT (trademark art -> user branding drops in here). Anchored
-// where the real SONIC UNLEASHED wordmark sits (measured: letters ~y120-300).
-void LogoSlot(float a) {
-    const float lx0 = 385, ly0 = 214, lx1 = 906.0f, ly1 = 399;
-    DrawRect({ lx0, ly0 }, { lx1, ly1 }, WithAlpha(RGBA(20, 20, 22, 255), a * 0.6f));
-    uint32_t bd = WithAlpha(RGBA(90, 90, 94, 255), a);
-    DrawRect({ lx0, ly0 }, { lx1, ly0 + 2 }, bd);
-    DrawRect({ lx0, ly1 - 2 }, { lx1, ly1 }, bd);
-    DrawRect({ lx0, ly0 }, { lx0 + 2, ly1 }, bd);
-    DrawRect({ lx1 - 2, ly0 }, { lx1, ly1 }, bd);
-    SetFont(g_fDF);
-    DrawTextAligned({ lx0, ly0 + 56 }, { lx1, ly0 + 116 }, 30.0f, WithAlpha(RGBA(120, 120, 124, 255), a),
-                    "GAME LOGO SLOT", Align::Center, true, false);
-    SetFont(g_fRodin);
-    DrawTextAligned({ lx0, ly0 + 130 }, { lx1, ly0 + 168 }, 16.0f, WithAlpha(RGBA(90, 90, 94, 255), a),
-                    "drop your wordmark here", Align::Center, true, false);
-    ResetFont();
+// the game-logo region. The SONIC UNLEASHED wordmark is SEGA trademark art that
+// this project does NOT ship, and no title-logo/wordmark texture exists in
+// assets/. Rather than render a placeholder, we leave the centre as the clean
+// starfield. If a real wordmark png is dropped in, draw it here.
+void LogoSlot(float /*a*/) {
+    // intentionally empty: no placeholder, no debug text — clean starfield.
 }
 
 // a horizontal CAPSULE (semicircular ends) with a vertical gradient, drawn as
@@ -136,31 +125,35 @@ void CapsuleVGrad(float x0, float y0, float x1, float y1, uint32_t cTop, uint32_
     }
 }
 
-// the measured PRESS START capsule button with its animated green glow
+// the PRESS START capsule button: a clean glowing gold/white prompt that gently
+// pulses (the crude thick-black-outline + flat-green-fill look was the QA tell).
 void PressStart(double now, float a) {
-    const float glowPulse = Breathe(now, 0.4f, 1.0f, 1.0f);
-    // CAPSULE-shaped green glow (additive, concentric, soft + restrained) —
-    // follows the pill closely, no heavy bloom, no rectangular backing
-    CapsuleVGrad(478, 484, 804, 560, C_GLOW, C_GLOW, a * glowPulse * 0.07f, true);
-    CapsuleVGrad(484, 489, 798, 554, C_GLOW, C_GLOW, a * glowPulse * 0.10f, true);
-    // metallic ring capsule (thin rim) + inner yellow capsule, both rounded ends
-    // (measured pill ~325px wide @1280)
-    CapsuleVGrad(492.0f, 494.7f, 788.0f, 548.7f, C_RING_HI, C_RING, a);     // ring w~296, ctr 640
-    CapsuleVGrad(502.0f, 506.0f, 778.0f, 535.0f, C_CAP_TOP, C_CAP_PEAK, a); // inner yellow w~276 h~29, cy~521 (olive rim shows both ends)
-    // glossy belly highlight (a brighter mid strip)
-    CapsuleVGrad(509.0f, 514.0f, 771.0f, 526.0f, C_CAP_PEAK, RGBA(255, 246, 150, 255), a * 0.6f);
-    // outline-style PRESS START: LIME-GREEN letters (measured core ~139,156,81) with
-    // a dark-green outline, stretched to fill the pill end-to-end (~299px @1280).
+    const float pulse = Breathe(now, 0.35f, 0.65f, 1.0f);   // 0..1 soft breathe
+    // warm GOLD glow capsule (additive, concentric, soft) — follows the pill,
+    // no heavy bloom, no rectangular backing
+    const uint32_t GOLD_GLOW = RGBA(255, 214, 96, 255);
+    CapsuleVGrad(478, 484, 804, 560, GOLD_GLOW, GOLD_GLOW, a * pulse * 0.08f, true);
+    CapsuleVGrad(486, 490, 796, 553, GOLD_GLOW, GOLD_GLOW, a * pulse * 0.12f, true);
+    // thin metallic gold rim capsule + a slim translucent dark inner well so the
+    // text reads — no flat lime fill, no chunky olive ring
+    const uint32_t RIM_HI  = RGBA(255, 232, 150, 255);
+    const uint32_t RIM_LO  = RGBA(196, 158, 60, 255);
+    CapsuleVGrad(498.0f, 496.0f, 782.0f, 546.0f, RIM_HI, RIM_LO, a * 0.85f);   // gold rim
+    CapsuleVGrad(503.0f, 500.0f, 777.0f, 542.0f, RGBA(18, 18, 22, 255), RGBA(8, 8, 10, 255), a * 0.55f); // inner well
+    // PRESS START: clean white-gold caps with a single soft dark shadow (no
+    // 8-way outline), brightness gently following the breathe.
     SetFont(g_fRodin);
     SetTextStretchX(1.35f);
     const char* PS = "PRESS START";
-    float w = MeasureText(26.0f, PS).x * 1.35f;
-    float px = 640 - w * 0.5f, py = 510.0f;   // ~19px caps, fills the pill width with margin top/bottom
-    for (int dy = -1; dy <= 1; ++dy)
-        for (int dx = -1; dx <= 1; ++dx)
-            if (dx || dy)
-                DrawText({ px + dx * 1.5f, py + dy * 1.5f }, 26.0f, WithAlpha(RGBA(40, 60, 18, 255), a), PS);
-    DrawText({ px, py }, 26.0f, WithAlpha(RGBA(160, 182, 72, 255), a), PS);
+    const float fz = 26.0f;
+    float w = MeasureText(fz, PS).x * 1.35f;
+    float px = 640 - w * 0.5f, py = 510.0f;
+    // soft drop shadow
+    DrawText({ px + 1.4f, py + 1.6f }, fz, WithAlpha(RGBA(0, 0, 0, 150), a), PS);
+    // warm gold under-glow tint then crisp near-white top — the pulse lifts it
+    int top = 232 + (int)(23.0f * pulse);   // 232..255
+    DrawText({ px, py }, fz, WithAlpha(RGBA(255, 224, 150, 255), a * 0.5f), PS);   // gold halo
+    DrawText({ px, py }, fz, WithAlpha(RGBA(top, top, 240, 255), a), PS);          // white-gold face
     ResetTextStretchX();
     ResetFont();
 }

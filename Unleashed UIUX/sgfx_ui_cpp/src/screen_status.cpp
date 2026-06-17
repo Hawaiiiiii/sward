@@ -377,6 +377,17 @@ void Draw(double openSec, bool csdBase) {
         }
         char buf[8]; snprintf(buf, sizeof buf, "x%d", g_expCount);
         Chrome({ BAR_END + 16, ey + 4 }, 30.0f, buf, rowT, C_CHR_T, C_CHR_B, 1.2f);
+      } else {
+        // The CSD's own EXP "x{count}" cluster never resolves its DIGIT casts (they
+        // carry no texture), so the bare "x" MULTIPLIER glyphs (prgs_num_1/img +
+        // prgs_num_2/img_2) were left marooned at the bar end and read as a stray
+        // red/broken "X" — those two casts are now HIDDEN at the CSD source
+        // (data/status.json: base.hide=1). With the orphan markers gone, draw the
+        // real chrome "x{count}" cleanly at the CSD bar-end marker location (FIXED
+        // ref y, same in both forms) so the EXP value still reads. Gem + gold fill
+        // stay (CSD gem + overlay fill).
+        char buf[8]; snprintf(buf, sizeof buf, "x%d", g_expCount);
+        Chrome({ 570.0f, 232.0f }, 26.0f, buf, rowT, C_CHR_T, C_CHR_B, 1.2f);
       }
     }
 

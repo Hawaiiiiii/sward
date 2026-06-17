@@ -189,13 +189,12 @@ void Draw(double openSec) {
 
     const Boss& b = Cur();
     const float titleT = (float)ComputeMotion(openSec, 0.0, TITLE_FRAMES);
-    const float labelT = (float)ComputeMotion(openSec, LABEL_OFFSET, LABEL_FRAMES);
     const float plateT = (float)ComputeMotion(openSec, 0.0, PLATE_FRAMES);
     const float nameT  = (float)ComputeMotion(openSec, NAME_OFFSET, NAME_FRAMES);
     const float hpT    = (float)ComputeMotion(openSec, HP_OFFSET, HP_FRAMES);
     const float footT  = (float)ComputeMotion(openSec, FOOT_OFFSET, FOOT_FRAMES);
 
-    // banner re-settle ease when the boss is switched (Q/E)
+    // banner re-settle ease when the boss is switched (LB/RB)
     const float switchT = (float)ComputeMotion(g_switchStart, 0.0, SWITCH_FRAMES);
 
     // ===== TITLE =============================================================
@@ -212,22 +211,8 @@ void Draw(double openSec) {
                         WithAlpha(COL_DESC, titleT), idx, Align::Right, true, true);
     }
 
-    // ===== RED "BOSS" SUBTITLE LABEL (real art, above the plate) =============
-    if (labelT > 0.0f) {
-        float ly = LABEL_Y - (1.0f - labelT) * 10.0f;
-        if (g_labelTex >= 0) {
-            float aspect = ((LABEL_UV.u1 - LABEL_UV.u0) * LABEL_TEX_W) /
-                           ((LABEL_UV.v1 - LABEL_UV.v0) * LABEL_TEX_H);
-            float lh = LABEL_H, lw = lh * aspect;
-            DrawImage(g_labelTex, { LABEL_X, ly }, { LABEL_X + lw, ly + lh },
-                      { LABEL_UV.u0, LABEL_UV.v0 }, { LABEL_UV.u1, LABEL_UV.v1 },
-                      WithAlpha(COL_WHITE, labelT));
-        } else {
-            SetFont(g_fDF);
-            DrawTextShadow({ LABEL_X, ly + 6.0f }, 34.0f,
-                           WithAlpha(RGBA(232, 64, 56, 255), labelT), "BOSS");
-        }
-    }
+    // (The redundant free-floating red "BOSS" subtitle label was removed: it sat
+    //  next to the "BOSS BATTLE" header and read as duplicate placeholder art.)
 
     // ===== CENTRAL CHROME NAME-PLATE (real silver-chrome window) =============
     const float plateSlide = (1.0f - plateT) * 22.0f;
@@ -325,7 +310,7 @@ void Draw(double openSec) {
         SetFont(g_fRodin);
         DrawTextAligned({ TITLE_X, 660.0f }, { 1130.0f, 700.0f }, 22.0f,
                         WithAlpha(COL_FOOTER, footT),
-                        "(A) Start   (Q/E) Change Boss   (B) Back", Align::Left, true, true);
+                        "(A) Start   (LB/RB) Change Boss   (B) Back", Align::Left, true, true);
     }
 
     // ===== TRANSIENT "BATTLE START" FLASH ====================================

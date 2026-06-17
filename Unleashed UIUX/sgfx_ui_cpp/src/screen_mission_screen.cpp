@@ -330,24 +330,12 @@ void Draw(double openSec) {
         DrawRect({ barX, barY }, { barRight, barY + 1.5f }, WithAlpha(RGBA(150, 180, 220, 110), hudT));
     }
 
-    // ===== CENTRED MISSION BANNER (fades after the entrance) =================
-    // "MISSION" caption + objective name, mid-screen â€” fades out so it doesn't
-    // obscure gameplay (like the in-game start-of-mission card).
-    {
-        double age = g_open;                          // seconds since the screen opened
-        float bannerFade = 1.0f;
-        if (age > 2.4) bannerFade = std::max(0.0f, (float)((3.4 - age) / 1.0));
-        float a = bannerT * bannerFade;
-        if (a > 0.01f) {
-            SetFont(g_fRodin);
-            DrawTextAligned({ 0, 250 }, { REF_W, 296 }, 26.0f,
-                            WithAlpha(COL_DESC, a), "MISSION", Align::Center, true, true);
-            SetFont(g_fDF);
-            V2 nameSz = MeasureText(56.0f, mi.nameAscii);
-            DrawTextShadow({ (REF_W - nameSz.x) * 0.5f, 304.0f }, 56.0f,
-                           WithAlpha(COL_TITLE, a), mi.nameAscii, 3.0f, COL_SHADOW);
-        }
-    }
+    // ===== CENTRED MISSION BANNER =============================================
+    // Removed: it re-printed the same objective name ("COLLECT RINGS") that the
+    // persistent top-left objective cluster already shows, producing a doubled
+    // title on the empty field. The top-left cluster is now the single source of
+    // the objective name; bannerT is still consumed above to keep the entrance.
+    (void)bannerT;
 
     // ===== "COMPLETE!" flash on reaching the goal ============================
     if (done) {
@@ -361,10 +349,12 @@ void Draw(double openSec) {
     }
 
     // ===== FOOTER PROMPT (bottom, DFHeiStd) ==================================
+    // Console button glyphs only (A collect / LB-RB switch objective / B back) â€”
+    // no PC keyboard keys on a controller HUD.
     float footT = (float)ComputeMotion(openSec, 10.0, 12.0);
     SetFont(g_fRodin);
     DrawTextShadow({ HUD_X, 666.0f }, 22.0f, WithAlpha(COL_FOOTER, footT),
-                   "(A) Collect    (Q/E) Switch Objective    (B) Back", 2.0f, COL_SHADOW);
+                   "(A) Collect    (LB/RB) Switch Objective    (B) Back", 2.0f, COL_SHADOW);
     ResetFont();
 }
 
