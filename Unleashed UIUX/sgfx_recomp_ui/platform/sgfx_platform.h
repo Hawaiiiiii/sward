@@ -23,8 +23,19 @@ inline constexpr float WIDE_ASPECT_RATIO   = 16.0f / 9.0f;
 inline constexpr float NARROW_ASPECT_RATIO = 4.0f  / 3.0f;
 extern float g_aspectRatio;        // current viewport aspect (host sets each frame)
 extern float g_aspectRatioScale;   // UI scale factor derived from the aspect/resolution
+extern float g_aspectRatioOffsetX; // letterbox/pillarbox offset (host sets each frame)
+extern float g_aspectRatioOffsetY;
 
 enum class EAspectRatio : uint32_t { Auto, Wide, Narrow, OriginalWide, OriginalNarrow };
+
+// ---- input device (was hid/hid.h) -------------------------------------------
+namespace hid
+{
+    enum class EInputDevice { Unknown, Keyboard, Mouse, Xbox, PlayStation };
+    extern EInputDevice g_inputDeviceController;   // host sets the active pad type
+}
+
+enum class EControllerIcons : uint32_t { Auto, Xbox, PlayStation };
 
 // ---- config: the customization surface (was the game's user/config.h) -------
 // The menus read these as `Config::Field`. Defined as a namespace of plain values
@@ -32,8 +43,9 @@ enum class EAspectRatio : uint32_t { Auto, Wide, Narrow, OriginalWide, OriginalN
 // read sites a plain value is equivalent). Extended as options_menu is ported.
 namespace Config
 {
-    inline bool         DisableLowResolutionFontOnCustomUI = false;
-    inline EAspectRatio AspectRatio = EAspectRatio::Wide;
+    inline bool             DisableLowResolutionFontOnCustomUI = false;
+    inline EAspectRatio     AspectRatio = EAspectRatio::Wide;
+    inline EControllerIcons ControllerIcons = EControllerIcons::Auto;
 }
 
 // ---- version string (was version.h) -----------------------------------------

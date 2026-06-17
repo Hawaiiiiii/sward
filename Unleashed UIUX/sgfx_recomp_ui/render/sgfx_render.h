@@ -33,10 +33,18 @@ struct Texture
 // The three shared UI sprites imgui_utils needs (recomp res/images/common/*). The
 // host supplies the pixels (they may be SEGA-derived, so they live with the host,
 // not the lib) and uploads them.
-enum class UISprite { GeneralWindow, Light, Select, OptionsStatic, OptionsStaticFlash };
+enum class UISprite { GeneralWindow, Light, Select, OptionsStatic, OptionsStaticFlash, Controller, KBM };
 std::unique_ptr<Texture> LoadUISprite(UISprite sprite);
 
 // General texture upload from decoded image bytes (host decodes DDS/PNG + uploads).
 std::unique_ptr<Texture> LoadTexture(const uint8_t* data, size_t size);
 
 }} // namespace sgfx::render
+
+// Font registry shim (was gpu/imgui/imgui_snapshot.h :: ImFontAtlasSnapshot). The menus
+// fetch fonts by file name; the host registers the real .otf atlases. Same symbol as the
+// recomp so the menu bodies stay unchanged.
+struct ImFontAtlasSnapshot
+{
+    static ImFont* GetFont(const char* name);
+};

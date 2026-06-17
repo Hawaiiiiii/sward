@@ -3,8 +3,12 @@
 // own bindings (its config store, its locale, its real aspect/scale each frame).
 #include "sgfx_platform.h"
 
-float g_aspectRatio      = WIDE_ASPECT_RATIO;   // host updates from the viewport each frame
-float g_aspectRatioScale = 1.0f;                // host derives from resolution
+float g_aspectRatio       = WIDE_ASPECT_RATIO;   // host updates from the viewport each frame
+float g_aspectRatioScale  = 1.0f;                // host derives from resolution
+float g_aspectRatioOffsetX = 0.0f;
+float g_aspectRatioOffsetY = 0.0f;
+
+namespace hid { EInputDevice g_inputDeviceController = EInputDevice::Xbox; }
 
 const char* g_versionString = "sgfx_recomp_ui";
 
