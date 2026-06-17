@@ -86,6 +86,8 @@ constexpr float INT_X0 = 237.3f, INT_Y0 = 139.3f, INT_X1 = 1042.0f, INT_Y1 = 594
 enum View { VIEW_ENCY_TEXT = 0, VIEW_ENCY_ART, VIEW_SOUND, VIEW_COUNT };
 int g_view = VIEW_ENCY_TEXT;
 int g_selR = 2, g_selC = 3;     // soundtrack selection (matches the capture)
+int g_playR = -1, g_playC = -1; // the track (A)-Selected = "now playing"
+double g_playStart = -100.0;    // Now() the current track started (drives the select flash)
 
 void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
@@ -95,7 +97,7 @@ void Init() {
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
 }
-void Reset() { g_view = VIEW_ENCY_TEXT; g_selR = 2; g_selC = 3; }
+void Reset() { g_view = VIEW_ENCY_TEXT; g_selR = 2; g_selC = 3; g_playR = -1; g_playC = -1; g_playStart = -100.0; }
 void Input(const ScreenInput& in) {
     if (in.tabRight) g_view = (g_view + 1) % VIEW_COUNT;
     if (in.tabLeft)  g_view = (g_view + VIEW_COUNT - 1) % VIEW_COUNT;
@@ -104,6 +106,8 @@ void Input(const ScreenInput& in) {
         if (in.right) g_selC = std::min(3, g_selC + 1);
         if (in.up)    g_selR = std::max(0, g_selR - 1);
         if (in.down)  g_selR = std::min(2, g_selR + 1);
+        // (A) Select = play the highlighted track (footer cue) — set "now playing"
+        if (in.accept) { g_playR = g_selR; g_playC = g_selC; g_playStart = Now(); }
     }
 }
 
@@ -371,6 +375,22 @@ void DrawSoundtrack(float a, double now) {
         DrawRect({ x + 10, y + 3 }, { x + 50, y + 36 }, WithAlpha(RGBA(238, 235, 232, 255), a));
         DrawRect({ x + 18, y + 9 }, { x + 30, y + 30 }, WithAlpha(RGBA(186, 54, 46, 255), a));
         DrawRect({ x + 31, y + 9 }, { x + 43, y + 30 }, WithAlpha(RGBA(66, 132, 70, 255), a));
+    }
+    // "Now Playing" marker on the (A)-selected track: a steady cyan glow + a play
+    // triangle badge; a brief brighter flash the moment it is chosen.
+    if (g_playR >= 0 && g_playC >= 0) {
+        const float px = 284.0f + 176.0f * g_playC, py = 167.3f + 104.7f * g_playR;
+        const float pg = Breathe(now, 0.5f, 0.9f, 0.85f);
+        DrawRect({ px - 6, py - 12 }, { px + 156, py + 86 }, WithAlpha(RGBA(118, 216, 255, 255), a * pg * 0.28f), true);
+        const V2 tri[4] = { { px + 128, py + 4 }, { px + 144, py + 13 }, { px + 128, py + 22 }, { px + 128, py + 4 } };
+        const uint32_t tcol = WithAlpha(RGBA(150, 236, 255, 255), a);
+        const uint32_t tc[4] = { tcol, tcol, tcol, tcol };
+        DrawQuadGradient(tri, tc, true);
+        const double fage = now - g_playStart;
+        if (fage >= 0.0 && fage < 0.4) {
+            const float ff = 1.0f - (float)(fage / 0.4);
+            DrawRect({ px - 8, py - 14 }, { px + 158, py + 88 }, WithAlpha(RGBA(206, 242, 255, 255), a * ff * 0.6f), true);
+        }
     }
     // maroon scrollbar (track + cream handle at the captured 61%)
     DrawRect({ 985.3f, 158.7f }, { 987.3f, 471.3f }, WithAlpha(C_PINSTRIPE, a));
