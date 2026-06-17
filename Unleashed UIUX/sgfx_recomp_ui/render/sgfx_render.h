@@ -62,6 +62,11 @@ std::unique_ptr<Texture> LoadTexture(const uint8_t* data, size_t size);
 
 }} // namespace sgfx::render
 
+// Per-achievement icon cache keyed by achievement ID (was a map of GuestTexture*); the
+// value is passed straight to ImGui::AddImage. Host populates it from the XDBF DB.
+#include <unordered_map>
+extern std::unordered_map<uint16_t, sgfx::render::Texture*> g_xdbfTextureCache;
+
 // Font registry shim (was gpu/imgui/imgui_snapshot.h :: ImFontAtlasSnapshot). The menus
 // fetch fonts by file name; the host registers the real .otf atlases. Same symbol as the
 // recomp so the menu bodies stay unchanged.
