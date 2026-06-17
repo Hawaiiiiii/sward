@@ -20,17 +20,24 @@ namespace sgfx { namespace render {
 
 Texture::~Texture() { if (backend) SDL_DestroyTexture((SDL_Texture*)backend); }
 
-static std::unique_ptr<Texture> MakeTile(int w = 64, int h = 64)
+static std::unique_ptr<Texture> MakeTile(uint32_t rgba = 0xFFFFFFFFu, int w = 64, int h = 64)
 {
     auto t = std::make_unique<Texture>();
     SDL_Texture* tex = SDL_CreateTexture(g_previewRenderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, w, h);
-    std::vector<uint32_t> px((size_t)w * h, 0xFFFFFFFFu);    // white -> AddImage colour tints it
+    std::vector<uint32_t> px((size_t)w * h, rgba);          // white -> AddImage colour tints it
     SDL_UpdateTexture(tex, nullptr, px.data(), w * 4);
     SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
     t->backend = tex; t->width = w; t->height = h;
     return t;
 }
-std::unique_ptr<Texture> LoadUISprite(UISprite)              { return MakeTile(); }
+std::unique_ptr<Texture> LoadUISprite(UISprite s)
+{
+    // GeneralWindow is the recomp's dark translucent 9-slice frame (pause/achievements/
+    // message panels). The real sprite is host-supplied; approximate it dark so those
+    // panels read like the game instead of a flat white box. ABGR8888: 0xAABBGGRR.
+    if (s == UISprite::GeneralWindow) return MakeTile(0xEB1E1814u);   // ~rgba(20,24,30,235)
+    return MakeTile();
+}
 std::unique_ptr<Texture> LoadTexture(const uint8_t*, size_t) { return MakeTile(); }
 
 }} // namespace sgfx::render

@@ -5,6 +5,9 @@
 *.ilk
 *.pdb
 obj/
+# raw per-run renders — only the *_screenshot.png references are tracked
 preview_gradient.png
 preview_rows.png
 preview_values.png
+preview_options.png
+preview_achievements.png

@@ -38,6 +38,11 @@ std::string& Localise(const std::string_view& key)
     if      (k == "Options_Header_Name")  v = "OPTIONS";
     else if (k.rfind("Options_Category_", 0) == 0) v = k.substr(17);   // -> System / Input / Audio / Video
     else if (k.rfind("Options_Name_", 0) == 0)     v = k.substr(13);
+    else if (k.find("_Uppercase") != std::string::npos)               // e.g. Achievements_Name_Uppercase
+    {
+        v = k.substr(0, k.find('_'));
+        for (auto& c : v) c = (char)std::toupper((unsigned char)c);   // -> ACHIEVEMENTS
+    }
     else { auto p = k.rfind('_'); if (p != std::string::npos) v = k.substr(p + 1); }   // last segment
     return cache.emplace(std::move(k), std::move(v)).first->second;
 }
@@ -102,14 +107,52 @@ namespace SWA {
     bool* SGlobals::ms_IsRenderHud = &s_renderHud;
 }
 
-// ---- achievements DB (empty demo provider; host binds the real XDBF) --------
+// ---- achievements DB (demo provider; a host binds the real XDBF) ------------
+// A representative list so the Achievements menu renders with content. The first
+// DEMO_UNLOCKED are shown unlocked (with a timestamp); the rest are locked.
+static constexpr int DEMO_UNLOCKED = 12;
+static const std::vector<Achievement>& DemoAchievements()
+{
+    static const std::vector<Achievement> list = {
+        {  1, "First Steps",        "Cleared the first stage.",            "Clear the first stage." },
+        {  2, "Night of the Werehog","Transformed into the Werehog.",      "Transform into the Werehog." },
+        {  3, "Apotos Adventurer",  "Cleared the Apotos area.",            "Clear the Apotos area." },
+        {  4, "Spagonia Sightseer", "Cleared the Spagonia area.",          "Clear the Spagonia area." },
+        {  5, "Mazuri Marathoner",  "Cleared the Mazuri area.",            "Clear the Mazuri area." },
+        {  6, "Speed Demon",        "Finished a stage in record time.",    "Finish a stage quickly." },
+        {  7, "Ring Leader",        "Collected 1000 rings.",               "Collect 1000 rings." },
+        {  8, "Medal Collector",    "Found 50 Sun and Moon Medals.",       "Find 50 Sun and Moon Medals." },
+        {  9, "Continental Champion","Cleared three continents.",          "Clear three continents." },
+        { 10, "Day and Night",      "Played both day and night stages.",   "Play day and night stages." },
+        { 11, "Gaia Guardian",      "Restored a Gaia Temple.",             "Restore a Gaia Temple." },
+        { 12, "Combo Master",       "Reached a 100-hit combo.",            "Reach a 100-hit combo." },
+        { 13, "World Traveler",     "Visited every continent.",            "Visit every continent." },
+        { 14, "Perfect Run",        "Cleared a stage without damage.",     "Clear a stage without damage." },
+        { 15, "S Rank",             "Earned an S Rank on any stage.",      "Earn an S Rank on any stage." },
+        { 16, "Eggmanland",         "Cleared Eggmanland.",                 "Clear Eggmanland." },
+        { 17, "Gaia Unleashed",     "Defeated Dark Gaia.",                 "Defeat Dark Gaia." },
+        { 18, "Completionist",      "Earned every other achievement.",     "Earn every other achievement." },
+    };
+    return list;
+}
 XdbfWrapper g_xdbfWrapper;
-Achievement              XdbfWrapper::GetAchievement(EXDBFLanguage, uint16_t id) { Achievement a; a.ID = id; a.Name = "Achievement"; return a; }
-std::vector<Achievement> XdbfWrapper::GetAchievements(EXDBFLanguage)             { return {}; }
+Achievement XdbfWrapper::GetAchievement(EXDBFLanguage, uint16_t id)
+{
+    for (auto& a : DemoAchievements()) if (a.ID == id) return a;
+    Achievement a; a.ID = id; a.Name = "Achievement"; return a;
+}
+std::vector<Achievement> XdbfWrapper::GetAchievements(EXDBFLanguage)
+{
+    auto list = DemoAchievements();
+    for (auto& a : list)   // give each achievement an icon tile so the menu draws it
+        if (g_xdbfTextureCache.find(a.ID) == g_xdbfTextureCache.end())
+            g_xdbfTextureCache[a.ID] = sgfx::render::LoadUISprite(sgfx::render::UISprite::Trophy).release();
+    return list;
+}
 namespace xdbf { std::string FixInvalidSequences(const std::string& s) { return s; } }
 namespace AchievementManager {
-    bool    IsUnlocked(uint16_t)   { return false; }
-    int64_t GetTimestamp(uint16_t) { return 0; }
-    int     GetTotalRecords()      { return 0; }
+    bool    IsUnlocked(uint16_t id)   { return id <= DEMO_UNLOCKED; }
+    int64_t GetTimestamp(uint16_t id) { return IsUnlocked(id) ? (int64_t)1700000000 : 0; }
+    int     GetTotalRecords()         { return DEMO_UNLOCKED; }
 }
 std::unordered_map<uint16_t, sgfx::render::Texture*> g_xdbfTextureCache;

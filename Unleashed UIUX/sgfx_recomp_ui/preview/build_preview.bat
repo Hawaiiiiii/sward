@@ -14,6 +14,7 @@ cl /nologo /std:c++20 /EHsc /MD /O2 /DSDL_MAIN_HANDLED /D_CRT_SECURE_NO_WARNINGS
   "%IMGUI%\imgui.cpp" "%IMGUI%\imgui_draw.cpp" "%IMGUI%\imgui_tables.cpp" "%IMGUI%\imgui_widgets.cpp" ^
   "%ROOT%\ui\imgui_utils.cpp" "%ROOT%\ui\black_bar.cpp" "%ROOT%\ui\fader.cpp" "%ROOT%\ui\tv_static.cpp" ^
   "%ROOT%\ui\button_guide.cpp" "%ROOT%\ui\options_menu_thumbnails.cpp" "%ROOT%\ui\options_menu.cpp" ^
+  "%ROOT%\ui\achievement_menu.cpp" ^
   "%ROOT%\platform\sgfx_platform_default.cpp" ^
   "%ROOT%\preview\preview_main.cpp" "%ROOT%\preview\preview_render.cpp" ^
   /Fe:"%ROOT%\preview\preview.exe" /Fo:"%ROOT%\preview\obj\\" ^

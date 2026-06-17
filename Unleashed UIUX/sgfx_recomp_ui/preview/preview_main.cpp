@@ -4,18 +4,22 @@
 // SetGradient callbacks per-vertex (the in-game pixel shader's closest CPU match). Opens
 // the options menu, renders, and screenshots it.
 #include "../ui/options_menu.h"
+#include "../ui/achievement_menu.h"
 #include "../render/sgfx_render.h"
 #include "../render/imgui_common.h"
 #include <SDL.h>
 #include <imgui.h>
 #include <vector>
+#include <string>
 #include <cstdio>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 extern SDL_Renderer* g_previewRenderer;
 extern ImFont*       g_previewFont;
 void ResetImGuiCallbacks();
+void InitImGuiUtils();   // loads the shared 9-slice/light/select sprites used by every menu
 
 static inline int ch(ImU32 c, int s) { return (c >> s) & 0xff; }
 static ImU32 Bilerp(ImU32 tl, ImU32 tr, ImU32 br, ImU32 bl, float u, float v)
@@ -117,8 +121,13 @@ int main(int argc, char** argv)
     static sgfx::render::Texture fontWrap; fontWrap.backend = fontTex; fontWrap.width = fw; fontWrap.height = fh;
     io.Fonts->SetTexID((ImTextureID)(void*)&fontWrap);
 
-    OptionsMenu::Init();
-    OptionsMenu::Open(false);
+    InitImGuiUtils();   // bind the shared sprites before any menu draws (else 9-slice = white)
+
+    // pick the screen to render: preview.exe <out.bmp> [options|achievements]
+    const char* screen = (argc > 2) ? argv[2] : "options";
+    bool achievements = std::strcmp(screen, "achievements") == 0;
+    if (achievements) { AchievementMenu::Init(); AchievementMenu::Open(); }
+    else              { OptionsMenu::Init();     OptionsMenu::Open(false); }
 
     // 150 frames @ 1/60s => ~2.5s of menu time: the container intro finishes at frame 60
     // and the category tabs + option rows settle after, so the screenshot shows the full menu.
@@ -128,7 +137,8 @@ int main(int argc, char** argv)
         ImGui::NewFrame();
         SDL_SetRenderDrawColor(r, 16, 18, 26, 255);
         SDL_RenderClear(r);
-        OptionsMenu::Draw();
+        if (achievements) AchievementMenu::Draw();
+        else              OptionsMenu::Draw();
         ImGui::Render();
         RenderImGui(ImGui::GetDrawData(), r);
         SDL_RenderPresent(r);
