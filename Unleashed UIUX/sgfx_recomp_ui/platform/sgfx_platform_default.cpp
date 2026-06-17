@@ -34,7 +34,18 @@ std::string& Localise(const std::string_view& key)
     static std::unordered_map<std::string, std::string> cache;
     auto it = cache.find(std::string(key));
     if (it != cache.end()) return it->second;
+    static const std::unordered_map<std::string, std::string> phrases = {
+        {"Installer_Page_SelectLanguage",     "Select the language to use during installation."},
+        {"Installer_Page_Introduction",       "This installer will copy the game files needed to play. The original disc and updates are required."},
+        {"Installer_Page_SelectGameAndUpdate","Add the sources for the game and its title update."},
+        {"Installer_Page_SelectDLC",          "Add the sources for any downloadable content you own. This step is optional."},
+        {"Installer_Page_CheckSpace",         "The following space is required to install. "},
+        {"Installer_Page_Installing",         "Installing. Please wait..."},
+        {"Installer_Page_InstallSucceeded",   "Installation complete. Enjoy the game!"},
+        {"Installer_Page_InstallFailed",      "Installation failed. "},
+    };
     std::string k(key), v = k;
+    if (auto it = phrases.find(k); it != phrases.end()) return cache.emplace(std::move(k), it->second).first->second;
     if      (k == "Options_Header_Name")  v = "OPTIONS";
     else if (k.rfind("Options_Category_", 0) == 0) v = k.substr(17);   // -> System / Input / Audio / Video
     else if (k.rfind("Options_Name_", 0) == 0)     v = k.substr(13);

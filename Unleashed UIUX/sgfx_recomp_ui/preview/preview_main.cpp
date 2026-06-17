@@ -5,6 +5,7 @@
 // the options menu, renders, and screenshots it.
 #include "../ui/options_menu.h"
 #include "../ui/achievement_menu.h"
+#include "../ui/installer_wizard.h"
 #include "../render/sgfx_render.h"
 #include "../render/imgui_common.h"
 #include <SDL.h>
@@ -123,11 +124,13 @@ int main(int argc, char** argv)
 
     InitImGuiUtils();   // bind the shared sprites before any menu draws (else 9-slice = white)
 
-    // pick the screen to render: preview.exe <out.bmp> [options|achievements]
+    // pick the screen to render: preview.exe <out.bmp> [options|achievements|installer]
     const char* screen = (argc > 2) ? argv[2] : "options";
     bool achievements = std::strcmp(screen, "achievements") == 0;
-    if (achievements) { AchievementMenu::Init(); AchievementMenu::Open(); }
-    else              { OptionsMenu::Init();     OptionsMenu::Open(false); }
+    bool installer    = std::strcmp(screen, "installer") == 0;
+    if      (installer)    { InstallerWizard::Init();  InstallerWizard::s_isVisible = true; }
+    else if (achievements) { AchievementMenu::Init();  AchievementMenu::Open(); }
+    else                   { OptionsMenu::Init();      OptionsMenu::Open(false); }
 
     // 150 frames @ 1/60s => ~2.5s of menu time: the container intro finishes at frame 60
     // and the category tabs + option rows settle after, so the screenshot shows the full menu.
@@ -137,8 +140,9 @@ int main(int argc, char** argv)
         ImGui::NewFrame();
         SDL_SetRenderDrawColor(r, 16, 18, 26, 255);
         SDL_RenderClear(r);
-        if (achievements) AchievementMenu::Draw();
-        else              OptionsMenu::Draw();
+        if      (installer)    InstallerWizard::Draw();
+        else if (achievements) AchievementMenu::Draw();
+        else                   OptionsMenu::Draw();
         ImGui::Render();
         RenderImGui(ImGui::GetDrawData(), r);
         SDL_RenderPresent(r);
