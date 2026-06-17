@@ -18,8 +18,8 @@ struct Achievement
 {
     uint16_t    ID = 0;
     std::string Name;
-    std::string Description;
-    std::string UnlockedDescription;
+    std::string UnlockedDesc;
+    std::string LockedDesc;
 };
 
 struct XdbfWrapper

@@ -21,6 +21,7 @@
 
 #include "sgfx_config.h"        // the ConfigDef customization surface + the option enums
 #include "sgfx_achievements.h"  // the XDBF achievement-DB provider (host-bound)
+#include "sgfx_input.h"         // the in-game input facade (SWA::CInputState)
 
 // ---- aspect ratio (was patches/aspect_ratio_patches.h) ----------------------
 inline constexpr float WIDE_ASPECT_RATIO   = 16.0f / 9.0f;

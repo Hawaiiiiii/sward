@@ -42,3 +42,26 @@ namespace Config { void Save() {} }
 
 // ---- audio ------------------------------------------------------------------
 void Game_PlaySound(const char*) {}   // host routes to its SFX system
+
+// ---- in-game input facade (neutral by default; host feeds real pad state) ---
+namespace SWA {
+    bool SPadState::IsDown(eKeyState) const     { return false; }
+    bool SPadState::IsTapped(eKeyState) const   { return false; }
+    bool SPadState::IsReleased(eKeyState) const { return false; }
+    CInputState* CInputState::GetInstance()     { static CInputState s; return &s; }
+    SPadState&   CInputState::GetPadState()      { static SPadState s; return s; }
+    static bool  s_renderHud = true;
+    bool* SGlobals::ms_IsRenderHud = &s_renderHud;
+}
+
+// ---- achievements DB (empty demo provider; host binds the real XDBF) --------
+XdbfWrapper g_xdbfWrapper;
+Achievement              XdbfWrapper::GetAchievement(EXDBFLanguage, uint16_t id) { Achievement a; a.ID = id; a.Name = "Achievement"; return a; }
+std::vector<Achievement> XdbfWrapper::GetAchievements(EXDBFLanguage)             { return {}; }
+namespace xdbf { std::string FixInvalidSequences(const std::string& s) { return s; } }
+namespace AchievementManager {
+    bool    IsUnlocked(uint16_t)   { return false; }
+    int64_t GetTimestamp(uint16_t) { return 0; }
+    int     GetTotalRecords()      { return 0; }
+}
+std::unordered_map<uint16_t, sgfx::render::Texture*> g_xdbfTextureCache;
