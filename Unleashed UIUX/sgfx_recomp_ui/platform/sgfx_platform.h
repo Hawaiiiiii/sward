@@ -17,40 +17,37 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
+
+#include "sgfx_config.h"   // the ConfigDef customization surface + the option enums
 
 // ---- aspect ratio (was patches/aspect_ratio_patches.h) ----------------------
 inline constexpr float WIDE_ASPECT_RATIO   = 16.0f / 9.0f;
 inline constexpr float NARROW_ASPECT_RATIO = 4.0f  / 3.0f;
 extern float g_aspectRatio;        // current viewport aspect (host sets each frame)
 extern float g_aspectRatioScale;   // UI scale factor derived from the aspect/resolution
+extern float g_aspectRatioNarrowScale; // 0..1 across the narrow..wide range (options info panel)
 extern float g_aspectRatioOffsetX; // letterbox/pillarbox offset (host sets each frame)
 extern float g_aspectRatioOffsetY;
-
-enum class EAspectRatio : uint32_t { Auto, Wide, Narrow, OriginalWide, OriginalNarrow };
 
 // ---- input device (was hid/hid.h) -------------------------------------------
 namespace hid
 {
     enum class EInputDevice { Unknown, Keyboard, Mouse, Xbox, PlayStation };
-    extern EInputDevice g_inputDeviceController;   // host sets the active pad type
+    extern EInputDevice g_inputDeviceController;   // active pad TYPE (icon set)
+    extern EInputDevice g_inputDevice;             // device that produced the LAST input
+    bool IsInputAllowed();
+    bool IsInputDeviceController();
+    void SetProhibitedInputs(uint32_t buttons = 0);
 }
-
-enum class EControllerIcons : uint32_t { Auto, Xbox, PlayStation };
-
-// ---- config: the customization surface (was the game's user/config.h) -------
-// The menus read these as `Config::Field`. Defined as a namespace of plain values
-// (the recomp uses ConfigDef<T> objects that implicitly convert; for the menus'
-// read sites a plain value is equivalent). Extended as options_menu is ported.
-namespace Config
-{
-    inline bool             DisableLowResolutionFontOnCustomUI = false;
-    inline EAspectRatio     AspectRatio = EAspectRatio::Wide;
-    inline EControllerIcons ControllerIcons = EControllerIcons::Auto;
-}
+inline constexpr uint32_t XAMINPUT_GAMEPAD_START = 0x0010;
 
 // ---- version string (was version.h) -----------------------------------------
 extern const char* g_versionString;
 
-// ---- localisation (was locale/locale.h) -------------------------------------
-// The menus call Localise(key). Host binds it to its strings; default = identity.
-std::string Localise(const std::string& key);
+// ---- localisation (was locale/locale.h) — BY REFERENCE (options does &Localise) --
+std::string& Localise(const std::string_view& key);
+extern std::string g_localeMissing;
+
+// ---- host SFX hook (was exports.h Game_PlaySound) ---------------------------
+void Game_PlaySound(const char* cue);
