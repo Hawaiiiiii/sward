@@ -77,6 +77,15 @@ constexpr float PLATE_H = 40;
 constexpr float PLATE_X = 180, PLATE_W = 188;
 constexpr float BAR_END = 575, SLANT = 12;   // gold tail reaches ~x575 (measured)
 
+// ---- CSD-base alignment (measured from the real status CSD render, day/Sonic) --
+// The CSD draws a rich EXP widget (groove ~x378-560 at row y) and bare floating
+// SPEED/RING labels (no plate, no track). Our overlay composites the gold value
+// FILL onto the EXP groove and as fresh bars past the SPEED/RING labels, plus a
+// selection cursor frame around the active row's label zone.
+constexpr float CSD_EXP_BAR_X0 = 378, CSD_EXP_BAR_X1 = 560;   // EXP gold fill over the CSD groove
+constexpr float CSD_STAT_BAR_X0 = 405, CSD_STAT_BAR_X1 = 600; // SPEED/RING fresh value bars (CSD has none)
+constexpr float CSD_SEL_X0 = 196, CSD_SEL_X1 = 392;           // selection cursor frame around the label zone
+
 // filled circle via horizontal strips (sgfxui has no circle primitive)
 void FillDisc(float cx, float cy, float r, uint32_t col) {
     const int N = 14;
@@ -149,8 +158,12 @@ void Chrome(V2 pos, float px, const char* s, float a, uint32_t tT, uint32_t tB, 
 }
 
 // a slanted stat plate + bar tail. sel shifts it left with a white rim.
-void StatRow(float y, const char* label, float fill, bool sel, float a, bool exp) {
-    const float xoff = sel ? -12.0f : 0.0f;
+// Under csdBase the CSD already draws the plate/label/trough/MAX, so we composite
+// ONLY the interactive selection rim + the gold value FILL on top.
+void StatRow(float y, const char* label, float fill, bool sel, float a, bool exp, bool csdBase) {
+    // Under csdBase the CSD content is static, so the overlay must NOT shift on
+    // select (only the hand-authored plate slides left when selected).
+    const float xoff = (sel && !csdBase) ? -12.0f : 0.0f;
     const float x0 = PLATE_X + xoff;
     // EXP plate colour is FORM-dependent: blue (day/Sonic) vs magenta (night/Werehog)
     uint32_t pT, pB, rim = C_PLATE_RIM;
@@ -163,7 +176,8 @@ void StatRow(float y, const char* label, float fill, bool sel, float a, bool exp
         pT = g_night ? C_PLATE_T : C_PLATE_D_T;
         pB = g_night ? C_PLATE_B : C_PLATE_D_B;
     }
-    // label plate (parallelogram)
+  if (!csdBase) {
+    // label plate (parallelogram) — CSD-provided
     const V2 pc[4] = { { x0 + SLANT, y }, { x0 + PLATE_W + SLANT, y }, { x0 + PLATE_W, y + PLATE_H }, { x0, y + PLATE_H } };
     const uint32_t pcol[4] = { WithAlpha(pT, a), WithAlpha(pT, a), WithAlpha(pB, a), WithAlpha(pB, a) };
     DrawQuadGradient(pc, pcol);
@@ -186,23 +200,51 @@ void StatRow(float y, const char* label, float fill, bool sel, float a, bool exp
         DrawQuadGradient(re, rec);
     }
     DrawRect({ x0 + SLANT, y }, { x0 + PLATE_W + SLANT, y + 2 }, WithAlpha(rim, a));   // top rim
-    if (sel) {   // white selection rim around the plate
-        DrawRect({ x0, y + PLATE_H - 2 }, { x0 + PLATE_W, y + PLATE_H }, WithAlpha(C_WHITE, a));
-        DrawRect({ x0 + 1, y }, { x0 + 3, y + PLATE_H }, WithAlpha(C_WHITE, a * 0.8f));
+  }
+    // Selection RIM — KEEP in both paths (CSD has no interactive highlight).
+    if (sel) {
+        if (csdBase) {
+            // The CSD label floats without a plate, so frame the active row's label
+            // zone with a full box — a clear, self-contained selection cursor.
+            const float rimX0 = CSD_SEL_X0 + xoff, rimX1 = CSD_SEL_X1 + xoff;
+            const float rimY0 = y, rimY1 = y + PLATE_H;
+            DrawRect({ rimX0, rimY0 }, { rimX1, rimY0 + 2 }, WithAlpha(C_WHITE, a));
+            DrawRect({ rimX0, rimY1 - 2 }, { rimX1, rimY1 }, WithAlpha(C_WHITE, a));
+            DrawRect({ rimX0, rimY0 }, { rimX0 + 2.5f, rimY1 }, WithAlpha(C_WHITE, a * 0.9f));
+            DrawRect({ rimX1 - 2.5f, rimY0 }, { rimX1, rimY1 }, WithAlpha(C_WHITE, a * 0.9f));
+        } else {
+            // hand-authored plate cursor: bottom rim + left edge (unchanged)
+            DrawRect({ x0, y + PLATE_H - 2 }, { x0 + PLATE_W, y + PLATE_H }, WithAlpha(C_WHITE, a));
+            DrawRect({ x0 + 1, y }, { x0 + 3, y + PLATE_H }, WithAlpha(C_WHITE, a * 0.8f));
+        }
     }
-    // bar tail: trough + gold fill, slanted italic end
-    const float bx0 = x0 + PLATE_W + SLANT + 4, bx1 = BAR_END + xoff;
-    const V2 tc[4] = { { bx0, y + 8 }, { bx1 + SLANT, y + 8 }, { bx1, y + PLATE_H - 6 }, { bx0 - 6, y + PLATE_H - 6 } };
-    const uint32_t tcol[4] = { WithAlpha(C_TROUGH, a), WithAlpha(C_TROUGH, a), WithAlpha(C_TROUGH, a), WithAlpha(C_TROUGH, a) };
-    DrawQuadGradient(tc, tcol);
+    // bar tail: trough + gold fill. The gold FILL is KEPT in both paths (the value
+    // the CSD lacks). Under csdBase the trough is gated PER ROW: the EXP row already
+    // has a CSD bar track (gate), but the SPEED/RING rows are bare labels (keep).
+    float bx0, bx1;
+    if (csdBase) {
+        // align to the CSD geometry: EXP fill sits on the CSD EXP groove; the
+        // SPEED/RING fills start clear of the (longest) floating CSD label.
+        bx0 = (exp ? CSD_EXP_BAR_X0 : CSD_STAT_BAR_X0) + xoff;
+        bx1 = (exp ? CSD_EXP_BAR_X1 : CSD_STAT_BAR_X1) + xoff;
+    } else {
+        bx0 = x0 + PLATE_W + SLANT + 4; bx1 = BAR_END + xoff;
+    }
+    const bool drawTrough = !csdBase || !exp;   // CSD provides only the EXP track
+    if (drawTrough) {
+        const V2 tc[4] = { { bx0, y + 8 }, { bx1 + SLANT, y + 8 }, { bx1, y + PLATE_H - 6 }, { bx0 - 6, y + PLATE_H - 6 } };
+        const uint32_t tcol[4] = { WithAlpha(C_TROUGH, a), WithAlpha(C_TROUGH, a), WithAlpha(C_TROUGH, a), WithAlpha(C_TROUGH, a) };
+        DrawQuadGradient(tc, tcol);
+    }
     if (fill > 0.0f) {
         const float fx1 = bx0 + (bx1 - bx0) * fill;
         const V2 fc[4] = { { bx0, y + 10 }, { fx1 + SLANT * fill, y + 10 }, { fx1, y + PLATE_H - 8 }, { bx0 - 4, y + PLATE_H - 8 } };
         const uint32_t fcol[4] = { WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_T, a), WithAlpha(C_GOLD_B, a), WithAlpha(C_GOLD_B, a) };
         DrawQuadGradient(fc, fcol);
     }
+  if (!csdBase) {
     // label (white outlined italic), AUTO-FIT so longer labels (RING ENERGY)
-    // never overrun the MAX badge zone
+    // never overrun the MAX badge zone — CSD-provided
     const float maxZone = (!exp && fill >= 1.0f) ? 46.0f : 12.0f;   // reserve for MAX
     const float availW = PLATE_W - 24.0f - maxZone;
     SetFont(g_fSeurat);
@@ -216,12 +258,14 @@ void StatRow(float y, const char* label, float fill, bool sel, float a, bool exp
     ResetFont();
     if (!exp && fill >= 1.0f)
         Chrome({ x0 + PLATE_W - 36, y + 6 }, 24.0f, "MAX", a, C_MAX_T, C_MAX_B, 1.1f);
+  }
 }
 
-void Draw(double openSec) {
+void Draw(double openSec, bool csdBase) {
     const float a = (float)ComputeMotion(openSec, 0.0, 10.0);
     const float rowT = (float)ComputeMotion(openSec, 4.0, 10.0);
 
+  if (!csdBase) {
     // live 3D scene slot (sky placeholder + soft ground gradient — no hard slab
     // behind the footer prompts)
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SKY_T, C_SKY_B);
@@ -310,12 +354,18 @@ void Draw(double openSec) {
         };
         lvchip(140, true); lvchip(176, false);
     }
+  } // end if(!csdBase): the blocks above are all drawn by the CSD base
 
     // ---- EXP row: magenta plate + gem slot + bar + chrome count ----
+    // Runs in BOTH paths. Under csdBase, StatRow() draws ONLY the gold fill (the
+    // CSD provides the plate/label/trough); the gem + count are CSD-absent too.
     if (rowT > 0.0f) {
         const float ey = ExpTop();
-        StatRow(ey, "EXP.", 0.95f, false, rowT, true);   // gold nearly full (real x325-575 span)
-        // EXP gem: rotated yellow-lime diamond (measured x322-347)
+        StatRow(ey, "EXP.", 0.95f, false, rowT, true, csdBase);   // gold nearly full (real x325-575 span)
+      if (!csdBase) {
+        // EXP gem: rotated yellow-lime diamond (measured x322-347).
+        // Under csdBase the CSD already renders its own EXP gem + bar + "x" count
+        // placeholder, so we skip these to avoid a doubled gem / "xx99".
         {
             const float gcx = 334.5f, gcy = ey + 3.0f, grx = 12.5f, gry = 13.0f;
             const uint32_t gemT = WithAlpha(RGBA(224, 236, 140, 235), rowT);
@@ -326,6 +376,7 @@ void Draw(double openSec) {
         }
         char buf[8]; snprintf(buf, sizeof buf, "x%d", g_expCount);
         Chrome({ BAR_END + 16, ey + 4 }, 30.0f, buf, rowT, C_CHR_T, C_CHR_B, 1.2f);
+      }
     }
 
     // ---- per-form stat rows (staggered entrance) ----
@@ -333,9 +384,10 @@ void Draw(double openSec) {
     const int n = g_night ? 5 : 2;
     for (int i = 0; i < n; ++i) {
         const float rt = (float)ComputeMotion(openSec, 6.0 + i * 3.0, 8.0);
-        if (rt > 0.0f) StatRow(StatTop0() + i * RowPitch(), rows[i].label, rows[i].fill, i == g_sel, rt, false);
+        if (rt > 0.0f) StatRow(StatTop0() + i * RowPitch(), rows[i].label, rows[i].fill, i == g_sel, rt, false, csdBase);
     }
 
+  if (!csdBase) {
     // ---- QUIT plate below the stat list (a small chamfered button + curl tail) ----
     {
         const float qt = (float)ComputeMotion(openSec, 6.0 + n * 3.0, 8.0);
@@ -393,6 +445,7 @@ void Draw(double openSec) {
         DrawText({ 876, 625 }, 20.0f, WithAlpha(C_WHITE, a), "Select");
         ResetFont();
     }
+  } // end if(!csdBase): QUIT plate + footer are drawn by the CSD base
 }
 
 // The day<->night TRANSFORMATION flash — the Unleashed signature. On a form switch
@@ -473,9 +526,14 @@ void StatusInit() { Init(); }
 // base), the screen is the game's own layout — our Draw adds nothing yet. Only
 // when the CSD is unavailable do we fall back to the hand-authored layout.
 void StatusDraw(double openSeconds) {
-    // hand-authored layout draws only when the CSD base is absent; the transform
-    // flash + level-up flourish draw OVER either base.
-    if (std::strcmp(csd::LoadedId(), "status") != 0) Draw(openSeconds);
+    // CSD-base composite: when the real status CSD is the base layer (host drew
+    // it), Draw() composites ONLY the interactive bits the CSD lacks (selection
+    // highlight + gold value fills + EXP gem/count); everything the CSD already
+    // draws is gated off inside Draw()/StatRow() via csdBase. With no CSD, Draw()
+    // renders the full hand-authored screen. The transform flash + level-up
+    // flourish draw OVER either base.
+    const bool csdBase = csd::LoadedId() && std::strcmp(csd::LoadedId(), "status") == 0;
+    Draw(openSeconds, csdBase);
     DrawXformFlash();
     DrawLevelUp();
 }
