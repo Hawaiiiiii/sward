@@ -17,6 +17,7 @@
 #include "sgfxui.h"
 #include "globe3d.h"
 #include "screen.h"
+#include "csd_player.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -297,21 +298,34 @@ void DrawPopup() {
     ResetFont();
 }
 
-void Draw(double openSec) {
-    // staggered entrance (CSD ~66f): bg/header/globe/counters land first, the
-    // stage-info panel floods in next, and the gold WORLD MAP title + the floating
-    // SPAGONIA stage label settle LAST (only clearly readable by ~1.5s in the CSD).
-    const float t      = (float)ComputeMotion(openSec, 0.0,  12.0);  // bg / header / counters / globe / footer
+// the go-to-village/select-stage POPUP overlay (dynamic sub-state). Drawn LAST in
+// both the CSD and hand-authored paths so its ~33% scene dim sits over EVERYTHING
+// (incl. the legend band) and only its own footer stays full-bright — matching the
+// original ordering exactly. Inert (no draws) unless g_popup is set.
+void DrawPopupOverlay() {
+    if (!g_popup) return;
+    // dim sits over the scene; the footer was drawn pre-dim in the real game?
+    // measured: footer stays FULL bright -> draw popup dim first, then redraw footer
+    DrawPopup();
+    SetFont(g_fRodin);
+    // A(Select) disc starts ~x683 -> centers ~x698, widening A->B gap to ~178
+    float hx = 683, hcy = 640;
+    auto glyph = [&](const UV& g){ if (g_glyphTex<0) return; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{hx,hcy-gh*0.5f},{hx+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, C_WHITE); hx+=gw+6; };
+    auto word=[&](const char* w,float pad){ DrawText({hx,hcy-12},23.0f,C_WHITE,w); hx+=MeasureText(23.0f,w).x+pad; };
+    glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Back", 10);
+    ResetFont();
+}
+
+// DYNAMIC scene content the CSD base does NOT provide — the 3D rotating Earth, the
+// live totals column (lives/rings/sun&moon counts), and the hover-vs-committed
+// stage-info panel + floating stage label/leader rule. Runs OVER either base (CSD
+// or the hand-authored chrome). No full-screen fills / header / footer band here
+// (those are CSD chrome). The popup is drawn separately (DrawPopupOverlay) so its
+// full-screen dim can land LAST over the legend band in the no-CSD path.
+void DrawDynamic(double openSec) {
+    const float t      = (float)ComputeMotion(openSec, 0.0,  12.0);  // counters / globe
     const float tPanel = (float)ComputeMotion(openSec, 18.0, 16.0);  // stage-info LED panel flood
-    const float tTitle = (float)ComputeMotion(openSec, 38.0, 18.0);  // WORLD MAP title + SPAGONIA label (last)
-    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_TOP, C_BG_BOT);
-    // full-width header rail (mirrors the footer legend band)
-    DrawRect({ 0, 104 }, { REF_W, 107 }, WithAlpha(RGBA(94, 123, 88, 255), t));
-    // head-badge [75,58,50,45] + map-logo [1075,54,127,53] art slots: the real
-    // banner shows the head icon / map logo art here, NOT labelled outline boxes
-    // (oracle vs the real capture) — leave the slots empty until that art is wired.
-    uint32_t s = 0x2468ace1u;
-    for (int i = 0; i < 110; ++i) { s = s*1664525u+1013904223u; float x=(float)((s>>9)%1280); s=s*1664525u+1013904223u; float y=(float)((s>>9)%720); s=s*1664525u+1013904223u; int b=50+(int)((s>>9)%160); DrawRect({x,y},{x+1,y+1}, WithAlpha(RGBA(b,b,b,255), t*0.7f)); }
+    const float tTitle = (float)ComputeMotion(openSec, 38.0, 18.0);  // SPAGONIA label (last)
 
     // the 3D Earth hub: real tessellated sphere, slow spin (matches the live
     // capture's idle rotation), with the continent stage-markers riding it
@@ -329,6 +343,54 @@ void Draw(double openSec) {
                     (float)(Now() * 6.0),   // ~6 deg/s idle spin
                     0.55f, 0.45f, 0.7f, MK, 7, t);
     }
+
+    // ---- left totals column: icon + bright LIVE number rows (lives/rings/sun&moon
+    //      counts). The green LED panel backing them is CSD chrome (drawn in Draw()
+    //      only); the counts themselves are dynamic and composite on either base. ----
+    {
+        struct Row { uint32_t icol; bool ring; const char* val; int medTex; } rows[] = {
+            { C_LIVES, false, "99", -1 }, { C_RING, true, "999999", -1 },
+            { C_SUN, true, "lv 7 (200)", g_sunTex }, { C_MOON, true, "lv 7 (200)", g_moonTex },
+        };
+        SetFont(g_fRodin);
+        for (int i = 0; i < 4; ++i) {
+            float cy = TROW0 + i * TPITCH;
+            if (rows[i].medTex >= 0)   // real Sun/Moon medal emblem
+                DrawImage(rows[i].medTex, { 124, cy - 16 }, { 156, cy + 16 }, { 0.f, 0.f }, { 1.f, 1.f }, WithAlpha(C_WHITE, t));
+            else
+                DrawIconSlot(140, cy, 14, rows[i].icol, rows[i].ring, t);
+            DrawText({ 178, cy - 13 }, 24.0f, WithAlpha(C_NUM, t), rows[i].val);
+        }
+        ResetFont();
+    }
+
+    // ---- hover-vs-committed stage info + floating stage label/leader rule ----
+    if (g_showInfo) {
+        DrawStageLabel(tTitle);
+        DrawStageInfo(tPanel);
+    } else {
+        // hover/empty state: only the green bracket-frame + dotted left rail
+        DrawStageInfoEmpty(t);
+    }
+}
+
+// the full hand-authored World Map render (CSD-absent fallback): draws the
+// background/header/LED panels/title/legend-band/footer CHROME, then composites
+// the DYNAMIC overlay on top so the no-CSD path is byte-for-byte the original.
+void Draw(double openSec) {
+    // staggered entrance (CSD ~66f): bg/header/globe/counters land first, the
+    // stage-info panel floods in next, and the gold WORLD MAP title + the floating
+    // SPAGONIA stage label settle LAST (only clearly readable by ~1.5s in the CSD).
+    const float t      = (float)ComputeMotion(openSec, 0.0,  12.0);  // bg / header / counters / globe / footer
+    const float tTitle = (float)ComputeMotion(openSec, 38.0, 18.0);  // WORLD MAP title (last)
+    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_TOP, C_BG_BOT);
+    // full-width header rail (mirrors the footer legend band)
+    DrawRect({ 0, 104 }, { REF_W, 107 }, WithAlpha(RGBA(94, 123, 88, 255), t));
+    // head-badge [75,58,50,45] + map-logo [1075,54,127,53] art slots: the real
+    // banner shows the head icon / map logo art here, NOT labelled outline boxes
+    // (oracle vs the real capture) — leave the slots empty until that art is wired.
+    uint32_t s = 0x2468ace1u;
+    for (int i = 0; i < 110; ++i) { s = s*1664525u+1013904223u; float x=(float)((s>>9)%1280); s=s*1664525u+1013904223u; float y=(float)((s>>9)%720); s=s*1664525u+1013904223u; int b=50+(int)((s>>9)%160); DrawRect({x,y},{x+1,y+1}, WithAlpha(RGBA(b,b,b,255), t*0.7f)); }
 
     // ---- top-left green LED-circuit panel backing the title + counters
     //      (subtle lit-cell grid, no bright chevron border / no separators) ----
@@ -348,31 +410,10 @@ void Draw(double openSec) {
     SetTextStretchX(1.34f);
     DrawTextBevel({ 124, 62 }, 42.0f, WithAlpha(C_TITLE, tTitle), "WORLD MAP");
     ResetTextStretchX();
+    ResetFont();
 
-    // ---- left totals column: icon + bright number rows, inset on the LED grid ----
-    {
-        struct Row { uint32_t icol; bool ring; const char* val; int medTex; } rows[] = {
-            { C_LIVES, false, "99", -1 }, { C_RING, true, "999999", -1 },
-            { C_SUN, true, "lv 7 (200)", g_sunTex }, { C_MOON, true, "lv 7 (200)", g_moonTex },
-        };
-        SetFont(g_fRodin);
-        for (int i = 0; i < 4; ++i) {
-            float cy = TROW0 + i * TPITCH;
-            if (rows[i].medTex >= 0)   // real Sun/Moon medal emblem
-                DrawImage(rows[i].medTex, { 124, cy - 16 }, { 156, cy + 16 }, { 0.f, 0.f }, { 1.f, 1.f }, WithAlpha(C_WHITE, t));
-            else
-                DrawIconSlot(140, cy, 14, rows[i].icol, rows[i].ring, t);
-            DrawText({ 178, cy - 13 }, 24.0f, WithAlpha(C_NUM, t), rows[i].val);
-        }
-    }
-
-    if (g_showInfo) {
-        DrawStageLabel(tTitle);
-        DrawStageInfo(tPanel);
-    } else {
-        // hover/empty state: only the green bracket-frame + dotted left rail
-        DrawStageInfoEmpty(t);
-    }
+    // ---- 3D globe + totals + stage info/label (the dynamic overlay) ----
+    DrawDynamic(openSec);
 
     // ---- bottom legend band (full-width olive gradient + bright top edge) ----
     DrawRect({ 0, 612 }, { REF_W, 614 }, WithAlpha(RGBA(140, 168, 90, 220), t));
@@ -391,25 +432,30 @@ void Draw(double openSec) {
         ResetFont();
     }
 
-    // ---- popup sub-state (drawn over everything except its own footer) ----
-    if (g_popup) {
-        // dim sits over the scene; the footer was drawn pre-dim in the real game?
-        // measured: footer stays FULL bright -> draw popup dim first, then redraw footer
-        DrawPopup();
-        SetFont(g_fRodin);
-        // A(Select) disc starts ~x683 -> centers ~x698, widening A->B gap to ~178
-        float hx = 683, hcy = 640;
-        auto glyph = [&](const UV& g){ if (g_glyphTex<0) return; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{hx,hcy-gh*0.5f},{hx+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, C_WHITE); hx+=gw+6; };
-        auto word=[&](const char* w,float pad){ DrawText({hx,hcy-12},23.0f,C_WHITE,w); hx+=MeasureText(23.0f,w).x+pad; };
-        glyph(GLYPH_A); word("Select", 40); glyph(GLYPH_B); word("Back", 10);
-        ResetFont();
-    }
+    // ---- popup sub-state (drawn over everything except its own footer): its
+    //      ~33% dim sits over the legend band, then its footer redraws full-bright ----
+    DrawPopupOverlay();
 }
 
 } // namespace
 
 void WorldMapInit() { Init(); }
-void WorldMapDraw(double openSeconds) { Draw(openSeconds); }
+// CSD-base composite: when the real world_map CSD is loaded (the host drew it as
+// the base — WORLD MAP header + green grid panels + score labels + button guide),
+// we DON'T redraw that chrome; we only composite the DYNAMIC content the CSD lacks
+// (3D globe, live totals, hover-vs-committed stage info + label, go-to popup) ON TOP.
+// With no CSD, the full hand-authored Draw() runs unchanged (the validated fallback).
+void WorldMapDraw(double openSeconds) {
+    const bool csdBase = csd::LoadedId() && std::strcmp(csd::LoadedId(), "world_map") == 0;
+    if (!csdBase) {
+        Draw(openSeconds);   // full hand-authored screen (chrome + dynamic + popup)
+    } else {
+        // CSD already drew the chrome/background; layer only the dynamic content +
+        // popup on top. NO full-screen bg fill here (it would occlude the CSD base).
+        DrawDynamic(openSeconds);
+        DrawPopupOverlay();
+    }
+}
 void WorldMapInput(const ScreenInput& in) { Input(in); }
 void WorldMapReset() { Reset(); }
 const char* WorldMapNav() { return Nav(); }

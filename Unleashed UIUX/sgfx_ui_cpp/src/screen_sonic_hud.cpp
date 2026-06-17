@@ -20,6 +20,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "csd_player.h"
 
 #include <cstdio>
 #include <cstring>
@@ -299,10 +300,10 @@ void DrawGlyphStringLeft(const char* s, float leftX, float y, float h, float t) 
     }
 }
 
-// The bottom boost gauge: a bounded dim track, the rainbow energy bar clipped to the
-// current fill fraction (UV-clipped so the art is cropped, not squashed), plus the
-// gold tire emblem at the left cap. fill in [0,1].
-void DrawBoostGauge(float fill, float t) {
+// The boost-gauge FRAME (CHROME): silver backing plate, the bounded dim empty
+// track + edge lines, and the gold tire emblem at the left cap. This is the static
+// chrome the real CSD base already provides — drawn ONLY when there is no CSD base.
+void DrawBoostGaugeFrame(float t) {
     if (t <= 0.0f) return;
     const float bx = BAR_X, by = BAR_Y, bw = BAR_W, bh = BAR_H;
 
@@ -318,6 +319,24 @@ void DrawBoostGauge(float fill, float t) {
     DrawRect({ bx, by - 1 }, { bx + bw, by + 1 },       WithAlpha(COL_TRACK_EDGE, t));
     DrawRect({ bx, by + bh - 1 }, { bx + bw, by + bh }, WithAlpha(COL_TRACK_EDGE, t));
 
+    // gold tire emblem at the left cap (square box, native aspect ~1.0)
+    if (g_gaugeTex >= 0) {
+        const UV& u = GAUGE_TIRE;
+        float aw = TIRE_H * Aspect(u, 256.0f, 128.0f);
+        float ty = TIRE_Y + (1.0f - t) * 10.0f;       // small settle slide
+        DrawImage(g_gaugeTex, { TIRE_X, ty }, { TIRE_X + aw, ty + TIRE_H },
+                  { u.u0, u.v0 }, { u.u1, u.v1 }, WithAlpha(COL_WHITE, t));
+    }
+}
+
+// The boost-gauge FILL (DYNAMIC): the eased rainbow energy bar cropped to the
+// current `fill` fraction (UV-clipped so the art is cropped, not squashed) plus a
+// soft additive leading-edge glow. This is the LIVE content the CSD base lacks, so
+// it composites OVER either base. fill in [0,1].
+void DrawBoostGaugeFill(float fill, float t) {
+    if (t <= 0.0f) return;
+    const float bx = BAR_X, by = BAR_Y, bw = BAR_W, bh = BAR_H;
+
     // rainbow energy bar, cropped to `fill` along its width via UV interpolation so
     // the gradient is the real art (red->green->blue), not a stretched smear.
     fill = std::clamp(fill, 0.0f, 1.0f);
@@ -332,15 +351,6 @@ void DrawBoostGauge(float fill, float t) {
         DrawImage(g_gaugeTex, { gx, by - 2 }, { gx + 16.0f, by + bh + 2 },
                   { uMid - 0.01f, u.v0 }, { uMid, u.v1 },
                   WithAlpha(COL_BOOST_GLOW, t * 0.55f), /*additive*/ true);
-    }
-
-    // gold tire emblem at the left cap (square box, native aspect ~1.0)
-    if (g_gaugeTex >= 0) {
-        const UV& u = GAUGE_TIRE;
-        float aw = TIRE_H * Aspect(u, 256.0f, 128.0f);
-        float ty = TIRE_Y + (1.0f - t) * 10.0f;       // small settle slide
-        DrawImage(g_gaugeTex, { TIRE_X, ty }, { TIRE_X + aw, ty + TIRE_H },
-                  { u.u0, u.v0 }, { u.u1, u.v1 }, WithAlpha(COL_WHITE, t));
     }
 }
 
@@ -377,15 +387,34 @@ void DrawReadyOverlay(double el) {
     ResetFont();
 }
 
-void Draw(double openSec) {
-    // NO background fill: the HUD is a transparent overlay over gameplay.
+// Compute the eased + (optionally) draining boost fill to display this frame.
+// Shared by the chrome and dynamic paths so the fill matches the gauge entrance.
+float DisplayBoost(double openSec) {
+    float displayBoost = g_boost;
+    // ease the fill between previous and current when it changes
+    float moveT = (float)ComputeMotion(g_boostStart, 0.0, BOOST_MOVE_FRAMES);
+    if (g_boostStart > 0.0) displayBoost = Lerp(g_boostPrev, g_boost, moveT);
+    // when "draining" is toggled on, the boost animates down over time (visible motion)
+    if (g_draining) {
+        double age = Now() - (g_boostStart > 0.0 ? g_boostStart : openSec);
+        float drained = g_boost - (float)age * 0.18f;   // ~5.5s to empty
+        displayBoost = std::clamp(std::min(displayBoost, drained), 0.0f, 1.0f);
+    }
+    return displayBoost;
+}
 
+// ---- CHROME / BACKGROUND --------------------------------------------------
+// The static frames/panels/labels/sprites the real game CSD base already draws:
+// the Sonic-head ring emblem, the steel-blue TIME/SCORE info-bands + their atlas
+// word-labels + the static clock placeholder, the boost-gauge frame (plate/track/
+// tire), and the "RING ENERGY" / "RINGS" chrome labels. Runs ONLY when there is no
+// CSD base (the validated hand-authored fallback). There is NO full-screen fill.
+void DrawChrome(double openSec) {
+    // NO background fill: the HUD is a transparent overlay over gameplay.
     const float clusterT = (float)ComputeMotion(openSec, 0.0, CLUSTER_FRAMES);
     const float gaugeT   = (float)ComputeMotion(openSec, GAUGE_OFFSET, GAUGE_FRAMES);
-    const float footT    = (float)ComputeMotion(openSec, FOOT_OFFSET, FOOT_FRAMES);
-    DrawReadyOverlay(Now() - openSec >= 0 ? (Now() - openSec) : 0.0);
 
-    // ---- top-left score / ring cluster ----
+    // ---- top-left score / ring cluster (ring emblem sprite) ----
     // Sonic-head ring emblem (real art), slides in from the left.
     if (g_headTex >= 0 && clusterT > 0.0f) {
         float hw = HEAD_H * Aspect(HEAD_DAY, 256.0f, 128.0f);
@@ -395,64 +424,74 @@ void Draw(double openSec) {
                   WithAlpha(COL_WHITE, clusterT));
     }
 
-    // real HUD: the emblem IS the ring label, so just the big ring count sits
-    // right of the Sonic head (top-left). No "RINGS" word here. (Follows the
-    // emblem down to its new (129,72) origin.)
-    DrawNumber(g_rings, 272.0f, 76.0f, 46.0f, clusterT);
-
     // ---- stacked TOP-LEFT bands (TIME, then SCORE), below the emblem ----
     // Per the verified READY frame: each band carries its LABEL ABOVE its VALUE,
     // both LEFT-anchored at column ROW_COL_X, sitting on a cool steel-blue angled
-    // info-band that bleeds off the left edge. There is NO separate RINGS row and
-    // NO top-right cluster in the real day HUD.
+    // info-band that bleeds off the left edge. The bands + labels + the static
+    // clock placeholder are chrome; the live SCORE value is drawn in DrawDynamic.
     if (clusterT > 0.0f) {
-        // small chrome word-label on the upper part of the band, larger value digits below
         auto labelTop = [](float cy){ return cy - ROW_LABEL_DY - ROW_LABEL_H; };
         auto valueTop = [](float cy){ return cy + ROW_VALUE_DY; };
 
-        // TIME band (stage clock MM:SS:FF — two colons, three two-digit groups)
+        // TIME band (stage clock MM:SS:FF — static placeholder, not a live counter)
         DrawInfoBand(TIME_ROW_Y, clusterT);
         DrawLabel(LBL_TIME, ROW_COL_X, labelTop(TIME_ROW_Y), ROW_LABEL_H, clusterT);
         DrawGlyphStringLeft("00:00:00", ROW_COL_X, valueTop(TIME_ROW_Y), ROW_VALUE_H, clusterT);
 
-        // SCORE band
+        // SCORE band (just the band + label; the live score value is dynamic)
         DrawInfoBand(SCORE_ROW_Y, clusterT);
         DrawLabel(LBL_SCORE, ROW_COL_X, labelTop(SCORE_ROW_Y), ROW_LABEL_H, clusterT);
-        DrawNumberLeft(g_score, ROW_COL_X, valueTop(SCORE_ROW_Y), ROW_VALUE_H, clusterT);
     }
 
-    // ---- bottom boost gauge (eased fill) ----
-    float displayBoost = g_boost;
-    {
-        // ease the fill between previous and current when it changes
-        float moveT = (float)ComputeMotion(g_boostStart, 0.0, BOOST_MOVE_FRAMES);
-        if (g_boostStart > 0.0) displayBoost = Lerp(g_boostPrev, g_boost, moveT);
-        // when "draining" is toggled on, the boost animates down over time (visible motion)
-        if (g_draining) {
-            double age = Now() - (g_boostStart > 0.0 ? g_boostStart : openSec);
-            float drained = g_boost - (float)age * 0.18f;   // ~5.5s to empty
-            displayBoost = std::clamp(std::min(displayBoost, drained), 0.0f, 1.0f);
-        }
-    }
-    DrawBoostGauge(displayBoost, gaugeT);
+    // ---- bottom boost-gauge FRAME (plate / dim track / gold tire) ----
+    DrawBoostGaugeFrame(gaugeT);
 
-    // "RING ENERGY" label + ring-count readout beside the boost gauge (the real HUD
-    // labels the long bar — two words with a real word gap)
+    // "RING ENERGY" label + "RINGS" atlas label beside the boost gauge (the real HUD
+    // labels the long bar — two words with a real word gap). The live ring readout
+    // value is drawn in DrawDynamic.
     if (gaugeT > 0.0f) {
         SetFont(g_fRodin);
-        // boost-gauge label: a readable bold chrome word ON / just above the steel
-        // bar (bumped 13->18px, brighter near-white chrome matching TIME/SCORE), but
-        // kept moderate so it never overpowers the bar itself.
         DrawTextShadow({ BAR_X + 6.0f, BAR_Y - 21.0f }, 18.0f,
                        WithAlpha(RGBA(236, 244, 252, 255), gaugeT), "RING ENERGY");
         ResetFont();
-        // ring-count readout: a small "RINGS" atlas label above a zero-padded
-        // 3-digit value (%03d), beside the gold ring.
         DrawLabel(LBL_RINGS, TIRE_X + 40.0f, 650.0f, ROW_LABEL_H * 0.8f, gaugeT);
+    }
+}
+
+// ---- DYNAMIC / LIVE -------------------------------------------------------
+// The live content the CSD base lacks, composited OVER either base: the time-swept
+// READY wordmark, the live score/ring counters, the eased boost-gauge fill (with
+// drain + leading-edge glow), and the live %03d ring readout beside the gauge.
+void DrawDynamic(double openSec) {
+    const float clusterT = (float)ComputeMotion(openSec, 0.0, CLUSTER_FRAMES);
+    const float gaugeT   = (float)ComputeMotion(openSec, GAUGE_OFFSET, GAUGE_FRAMES);
+
+    // the time-swept READY wordmark (sweeps through the screen at stage start)
+    DrawReadyOverlay(Now() - openSec >= 0 ? (Now() - openSec) : 0.0);
+
+    // live ring count, right of the Sonic-head emblem (top-left)
+    DrawNumber(g_rings, 272.0f, 76.0f, 46.0f, clusterT);
+
+    // live SCORE value on the SCORE band
+    if (clusterT > 0.0f) {
+        auto valueTop = [](float cy){ return cy + ROW_VALUE_DY; };
+        DrawNumberLeft(g_score, ROW_COL_X, valueTop(SCORE_ROW_Y), ROW_VALUE_H, clusterT);
+    }
+
+    // eased boost-gauge fill (rainbow energy bar + leading-edge glow)
+    DrawBoostGaugeFill(DisplayBoost(openSec), gaugeT);
+
+    // live ring-count readout: a zero-padded 3-digit value (%03d) beside the gauge
+    if (gaugeT > 0.0f) {
         char ringBuf[8]; std::snprintf(ringBuf, sizeof(ringBuf), "%03d", g_rings % 1000);
         DrawGlyphStringLeft(ringBuf, TIRE_X + 40.0f, 668.0f, DIGIT_H * 0.7f, gaugeT);
     }
-    (void)footT;
+}
+
+void Draw(double openSec) {
+    // hand-authored full render: chrome first, live content on top (no CSD base).
+    DrawChrome(openSec);
+    DrawDynamic(openSec);
 }
 
 } // namespace
@@ -461,6 +500,15 @@ void Draw(double openSec) {
 // Init/Draw are wired today; Input/Reset are provided for the interactive HUD â€”
 // the integrator can swap the registry row to { ..., &SonicHudInput, &SonicHudReset }.
 void SonicHudInit() { Init(); }
-void SonicHudDraw(double openSeconds) { Draw(openSeconds); }
+// CSD-base composite: when the real sonic_hud CSD is loaded (host drew it as the
+// base — ring emblem, info-bands, gauge frame), draw ONLY this screen's live
+// content (score/ring counters, eased boost fill + glow, the swept READY wordmark)
+// on top. With no CSD base, fall back to the full hand-authored render (chrome +
+// dynamic), which is the validated layout.
+void SonicHudDraw(double openSeconds) {
+    const bool csdBase = csd::LoadedId() && std::strcmp(csd::LoadedId(), "sonic_hud") == 0;
+    if (!csdBase) DrawChrome(openSeconds);   // chrome/background only when no CSD base
+    DrawDynamic(openSeconds);                // live content composites over either base
+}
 void SonicHudInput(const ScreenInput& in) { Input(in); }
 void SonicHudReset() { Reset(); }

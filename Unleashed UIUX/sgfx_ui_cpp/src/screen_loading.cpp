@@ -14,9 +14,11 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "csd_player.h"
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
+#include <cstring>
 
 using namespace ui;
 namespace {
@@ -373,6 +375,17 @@ void Draw(double openSec) {
 } // namespace
 
 void LoadingInit() { Init(); }
-void LoadingDraw(double openSeconds) { Draw(openSeconds); }
+void LoadingDraw(double openSeconds) {
+    // CSD-base composite: when the real game CSD layout is loaded as the base it draws
+    // the whole Miles-Electric tablet (shell + screen + film strip + NOW LOADING wordmark),
+    // so we SKIP the entire hand-authored reconstruction (which would otherwise occlude the
+    // CSD with its full-screen yellow device-shell gradient). On top of either base we still
+    // composite the one genuinely-missing live cue: the ~10Hz walking spinner. The wordmark's
+    // per-second alpha pulse is intentionally left to the CSD base (re-drawing our own wordmark
+    // over it would double-draw / mis-register the sprite — a clean CSD wordmark beats that).
+    const bool csdBase = csd::LoadedId() && std::strcmp(csd::LoadedId(), "loading") == 0;
+    if (!csdBase) Draw(openSeconds);   // full hand-authored screen ONLY when no CSD base
+    else          DrawSpinner(985, 558, Now());   // live overlay: the walking spinner on top of the CSD
+}
 void LoadingInput(const ScreenInput& in) { Input(in); }
 void LoadingReset() { Reset(); }

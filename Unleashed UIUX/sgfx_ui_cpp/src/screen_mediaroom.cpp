@@ -24,8 +24,10 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "csd_player.h"
 #include <cstdio>
 #include <cmath>
+#include <cstring>
 #include <algorithm>
 
 using namespace ui;
@@ -318,7 +320,8 @@ void DrawEncyText(float a, double now) {
             DrawText({ 513.3f, 278.0f + i * 33.0f - 22.5f }, 22.0f, WithAlpha(C_TEXT, a), L[i]);
     ResetFont();
     PagePlaque("003 / 098", a);
-    PageChevrons(a, now);
+    // (page chevrons are drawn in the dynamic overlay — DrawDynamicOverlay)
+    (void)now;
 }
 
 void DrawEncyArt(float a, double now) {
@@ -329,10 +332,12 @@ void DrawEncyArt(float a, double now) {
                     WithAlpha(RGBA(120, 134, 160, 255), a), "ARTWORK", Align::Center, true, false);
     ResetFont();
     PagePlaque("023 / 071", a);
-    PageChevrons(a, now);
+    // (page chevrons are drawn in the dynamic overlay — DrawDynamicOverlay)
+    (void)now;
 }
 
 void DrawSoundtrack(float a, double now) {
+    (void)now;   // selection ring + Now-Playing moved to the dynamic overlay
     // 3x4 grid: image 152 x 82.7, origin (284,167.3), pitch (176,104.7)
     for (int r = 0; r < 3; ++r) {
         for (int c = 0; c < 4; ++c) {
@@ -350,48 +355,9 @@ void DrawSoundtrack(float a, double now) {
             DrawRect({ x + 124, y + 46 }, { x + 127, y + 64 }, WithAlpha(RGBA(190, 157, 107, 255), a));
         }
     }
-    // selection ring on (g_selR, g_selC): rails + corner brackets + pulsing glow
-    {
-        const float x = 284.0f + 176.0f * g_selC, y = 167.3f + 104.7f * g_selR;
-        const float glow = Breathe(now, 0.35f, 0.9f, 1.1f);
-        DrawRect({ x - 14.7f, y - 20.7f }, { x + 164.7f, y + 96.0f }, WithAlpha(C_SEL_GLOW, a * glow * 0.5f), true);   // saturated-gold outer glow
-        DrawRect({ x - 7.0f, y - 11.0f }, { x + 157.0f, y + 86.0f }, WithAlpha(C_SEL_GLOW, a * glow * 0.45f), true);   // brighter inner pass
-        auto rail = [&](float rx0, float ry0, float rx1, float ry1) {
-            DrawRect({ rx0, ry0 }, { rx1, ry1 }, WithAlpha(C_SEL_G, a));
-            DrawRect({ rx0, ry0 }, { rx0 + (rx1 - rx0), ry0 + 1.3f }, WithAlpha(C_SEL_W, a));
-            DrawRect({ rx0, ry1 - 1.3f }, { rx1, ry1 }, WithAlpha(C_SEL_W, a));
-        };
-        rail(x - 8.0f, y - 13.3f, x - 0.7f, y + 97.3f);            // left rail
-        rail(x + 152.7f, y - 13.3f, x + 160.0f, y + 97.3f);        // right rail
-        // corner bracket arms (top/bottom edges open in the middle)
-        rail(x - 13.3f, y - 13.3f, x + 20.0f, y - 1.3f);
-        rail(x + 129.3f, y - 13.3f, x + 163.3f, y - 1.3f);
-        rail(x - 13.3f, y + 82.0f, x + 20.0f, y + 97.3f);
-        rail(x + 129.3f, y + 82.0f, x + 163.3f, y + 97.3f);
-        // flag badge top-left of the selected thumb (~55x39 crest, not stripes)
-        DrawRect({ x + 5.3f, y - 0.7f }, { x + 55.0f, y + 39.0f }, WithAlpha(C_FLAG_BLUE, a));
-        DrawRect({ x + 5.3f, y - 0.7f }, { x + 55.0f, y + 1.0f }, WithAlpha(C_WHITE, a));
-        // white shield card (dominant element) with a tiny red+green crest hint
-        DrawRect({ x + 10, y + 3 }, { x + 50, y + 36 }, WithAlpha(RGBA(238, 235, 232, 255), a));
-        DrawRect({ x + 18, y + 9 }, { x + 30, y + 30 }, WithAlpha(RGBA(186, 54, 46, 255), a));
-        DrawRect({ x + 31, y + 9 }, { x + 43, y + 30 }, WithAlpha(RGBA(66, 132, 70, 255), a));
-    }
-    // "Now Playing" marker on the (A)-selected track: a steady cyan glow + a play
-    // triangle badge; a brief brighter flash the moment it is chosen.
-    if (g_playR >= 0 && g_playC >= 0) {
-        const float px = 284.0f + 176.0f * g_playC, py = 167.3f + 104.7f * g_playR;
-        const float pg = Breathe(now, 0.5f, 0.9f, 0.85f);
-        DrawRect({ px - 6, py - 12 }, { px + 156, py + 86 }, WithAlpha(RGBA(118, 216, 255, 255), a * pg * 0.28f), true);
-        const V2 tri[4] = { { px + 128, py + 4 }, { px + 144, py + 13 }, { px + 128, py + 22 }, { px + 128, py + 4 } };
-        const uint32_t tcol = WithAlpha(RGBA(150, 236, 255, 255), a);
-        const uint32_t tc[4] = { tcol, tcol, tcol, tcol };
-        DrawQuadGradient(tri, tc, true);
-        const double fage = now - g_playStart;
-        if (fage >= 0.0 && fage < 0.4) {
-            const float ff = 1.0f - (float)(fage / 0.4);
-            DrawRect({ px - 8, py - 14 }, { px + 158, py + 88 }, WithAlpha(RGBA(206, 242, 255, 255), a * ff * 0.6f), true);
-        }
-    }
+    // (the live selection ring + "Now Playing" marker are drawn in the dynamic
+    //  overlay — DrawSelectionRing/DrawNowPlaying — so they composite over the real
+    //  CSD flag grid as well as this hand-authored grid.)
     // maroon scrollbar (track + cream handle at the captured 61%)
     DrawRect({ 985.3f, 158.7f }, { 987.3f, 471.3f }, WithAlpha(C_PINSTRIPE, a));
     DrawRect({ 1000.0f, 158.7f }, { 1001.3f, 471.3f }, WithAlpha(C_PINSTRIPE, a));
@@ -407,6 +373,96 @@ void DrawSoundtrack(float a, double now) {
     DrawRect({ 266.7f, 522.7f }, { 973.3f, 524.0f }, WithAlpha(C_RULE, a));
     DrawRect({ 266.7f, 548.7f }, { 973.3f, 550.0f }, WithAlpha(C_RULE, a));
     DrawRect({ 266.7f, 557.3f }, { 973.3f, 558.6f }, WithAlpha(C_RULE, a));
+}
+
+// ---- dynamic overlay (composites over EITHER base: CSD or hand-authored) -------
+// The CSD base provides the scroll frame + flag grid + title + button guide, but
+// it CANNOT show this screen's live state. These are the dynamic draws the spec
+// says to keep on top of the real CSD layout:
+//   * soundtrack selection ring + pulsing glow (g_selR/g_selC),
+//   * Now-Playing cyan glow / play-triangle + choose flash (g_play*),
+//   * the sliding page chevrons (ency views),
+//   * the persistent Sun/Moon medal-level HUD.
+// Layout-agnostic: the geometry matches the measured CSD rects so it lands on the
+// real flag grid / panel edges as well as the hand-authored layout.
+void DrawSelectionRing(float a, double now) {
+    const float x = 284.0f + 176.0f * g_selC, y = 167.3f + 104.7f * g_selR;
+    const float glow = Breathe(now, 0.35f, 0.9f, 1.1f);
+    DrawRect({ x - 14.7f, y - 20.7f }, { x + 164.7f, y + 96.0f }, WithAlpha(C_SEL_GLOW, a * glow * 0.5f), true);   // saturated-gold outer glow
+    DrawRect({ x - 7.0f, y - 11.0f }, { x + 157.0f, y + 86.0f }, WithAlpha(C_SEL_GLOW, a * glow * 0.45f), true);   // brighter inner pass
+    auto rail = [&](float rx0, float ry0, float rx1, float ry1) {
+        DrawRect({ rx0, ry0 }, { rx1, ry1 }, WithAlpha(C_SEL_G, a));
+        DrawRect({ rx0, ry0 }, { rx0 + (rx1 - rx0), ry0 + 1.3f }, WithAlpha(C_SEL_W, a));
+        DrawRect({ rx0, ry1 - 1.3f }, { rx1, ry1 }, WithAlpha(C_SEL_W, a));
+    };
+    rail(x - 8.0f, y - 13.3f, x - 0.7f, y + 97.3f);            // left rail
+    rail(x + 152.7f, y - 13.3f, x + 160.0f, y + 97.3f);        // right rail
+    // corner bracket arms (top/bottom edges open in the middle)
+    rail(x - 13.3f, y - 13.3f, x + 20.0f, y - 1.3f);
+    rail(x + 129.3f, y - 13.3f, x + 163.3f, y - 1.3f);
+    rail(x - 13.3f, y + 82.0f, x + 20.0f, y + 97.3f);
+    rail(x + 129.3f, y + 82.0f, x + 163.3f, y + 97.3f);
+    // flag badge top-left of the selected thumb (~55x39 crest, not stripes)
+    DrawRect({ x + 5.3f, y - 0.7f }, { x + 55.0f, y + 39.0f }, WithAlpha(C_FLAG_BLUE, a));
+    DrawRect({ x + 5.3f, y - 0.7f }, { x + 55.0f, y + 1.0f }, WithAlpha(C_WHITE, a));
+    // white shield card (dominant element) with a tiny red+green crest hint
+    DrawRect({ x + 10, y + 3 }, { x + 50, y + 36 }, WithAlpha(RGBA(238, 235, 232, 255), a));
+    DrawRect({ x + 18, y + 9 }, { x + 30, y + 30 }, WithAlpha(RGBA(186, 54, 46, 255), a));
+    DrawRect({ x + 31, y + 9 }, { x + 43, y + 30 }, WithAlpha(RGBA(66, 132, 70, 255), a));
+}
+
+void DrawNowPlaying(float a, double now) {
+    // "Now Playing" marker on the (A)-selected track: a steady cyan glow + a play
+    // triangle badge; a brief brighter flash the moment it is chosen.
+    if (g_playR < 0 || g_playC < 0) return;
+    const float px = 284.0f + 176.0f * g_playC, py = 167.3f + 104.7f * g_playR;
+    const float pg = Breathe(now, 0.5f, 0.9f, 0.85f);
+    DrawRect({ px - 6, py - 12 }, { px + 156, py + 86 }, WithAlpha(RGBA(118, 216, 255, 255), a * pg * 0.28f), true);
+    const V2 tri[4] = { { px + 128, py + 4 }, { px + 144, py + 13 }, { px + 128, py + 22 }, { px + 128, py + 4 } };
+    const uint32_t tcol = WithAlpha(RGBA(150, 236, 255, 255), a);
+    const uint32_t tc[4] = { tcol, tcol, tcol, tcol };
+    DrawQuadGradient(tri, tc, true);
+    const double fage = now - g_playStart;
+    if (fage >= 0.0 && fage < 0.4) {
+        const float ff = 1.0f - (float)(fage / 0.4);
+        DrawRect({ px - 8, py - 14 }, { px + 158, py + 88 }, WithAlpha(RGBA(206, 242, 255, 255), a * ff * 0.6f), true);
+    }
+}
+
+void DrawMedalHud(float a) {
+    // persistent hub medal-level HUD (top-left, in front of the panel frame):
+    // two stacked rows, Sun then Moon, each = medal icon + "Lv7 [200]"
+    SetFont(g_fSeurat);
+    auto chip = [&](float cy, int medTex, uint32_t icol, const char* txt) {
+        if (medTex >= 0) {   // real Sun/Moon medallion sprite (gold ring + gem)
+            DrawImage(medTex, { 129, cy - 14 }, { 158, cy + 14 }, { 0.f, 0.f }, { 1.f, 1.f },
+                      WithAlpha(RGBA(255, 255, 255, 255), a));
+        } else {             // procedural fallback
+            DrawRect({ 131, cy - 12 }, { 155, cy + 12 }, WithAlpha(RGBA(40, 30, 8, 230), a));
+            DrawRect({ 133, cy - 10 }, { 153, cy + 10 }, WithAlpha(icol, a));
+            DrawRect({ 138, cy - 5 }, { 148, cy + 5 }, WithAlpha(RGBA(150, 116, 36, 255), a));
+        }
+        DrawTextShadow({ 163, cy - 9 }, 16.0f, WithAlpha(RGBA(244, 240, 230, 255), a), txt);
+    };
+    chip(135, g_sunMedTex,  RGBA(214, 96, 40, 255), "Lv7 [200]");    // sun
+    chip(181, g_moonMedTex, RGBA(64, 120, 210, 255), "Lv7 [200]");   // moon
+    ResetFont();
+}
+
+void DrawDynamicOverlay(double openSec) {
+    const double now = Now();
+    const float a = (float)ComputeMotion(openSec, 15.0, 12.0);
+    switch (g_view) {
+        case VIEW_ENCY_TEXT:
+        case VIEW_ENCY_ART:
+            PageChevrons(a, now);
+            break;
+        default:   // VIEW_SOUND
+            DrawSelectionRing(a, now);
+            DrawNowPlaying(a, now);
+            break;
+    }
+    DrawMedalHud(a);
 }
 
 void Draw(double openSec) {
@@ -426,30 +482,25 @@ void Draw(double openSec) {
         case VIEW_ENCY_ART:  DrawEncyArt(a, now);  FooterEncy(a); break;
         default:             DrawSoundtrack(a, now); FooterSound(a); break;
     }
-    // persistent hub medal-level HUD (top-left, in front of the panel frame):
-    // two stacked rows, Sun then Moon, each = medal icon + "Lv7 [200]"
-    {
-        SetFont(g_fSeurat);
-        auto chip = [&](float cy, int medTex, uint32_t icol, const char* txt) {
-            if (medTex >= 0) {   // real Sun/Moon medallion sprite (gold ring + gem)
-                DrawImage(medTex, { 129, cy - 14 }, { 158, cy + 14 }, { 0.f, 0.f }, { 1.f, 1.f },
-                          WithAlpha(RGBA(255, 255, 255, 255), a));
-            } else {             // procedural fallback
-                DrawRect({ 131, cy - 12 }, { 155, cy + 12 }, WithAlpha(RGBA(40, 30, 8, 230), a));
-                DrawRect({ 133, cy - 10 }, { 153, cy + 10 }, WithAlpha(icol, a));
-                DrawRect({ 138, cy - 5 }, { 148, cy + 5 }, WithAlpha(RGBA(150, 116, 36, 255), a));
-            }
-            DrawTextShadow({ 163, cy - 9 }, 16.0f, WithAlpha(RGBA(244, 240, 230, 255), a), txt);
-        };
-        chip(135, g_sunMedTex,  RGBA(214, 96, 40, 255), "Lv7 [200]");    // sun
-        chip(181, g_moonMedTex, RGBA(64, 120, 210, 255), "Lv7 [200]");   // moon
-        ResetFont();
-    }
+    // (the persistent Sun/Moon medal-level HUD is drawn in the dynamic overlay —
+    //  DrawMedalHud — so it sits in front of EITHER base, CSD or hand-authored.)
 }
 
 } // namespace
 
 void MediaRoomInit() { Init(); }
-void MediaRoomDraw(double openSeconds) { Draw(openSeconds); }
+// CSD-base composite: when the real game CSD layout is loaded as the base (the host
+// draws data/mediaroom.json BEFORE this), it already provides the lab background,
+// the ornate scroll frame, the country-flag grid, the title and the button guide —
+// so the hand-authored chrome (Draw) is skipped. But the CSD base is static; it
+// cannot show this screen's LIVE state. So the dynamic overlay (selection ring +
+// pulsing glow, Now-Playing cyan glow / play-triangle + choose flash, the sliding
+// page chevrons, and the Sun/Moon medal-level HUD) is composited on top in BOTH
+// cases. When the CSD is absent, the full validated hand-authored layout still runs.
+void MediaRoomDraw(double openSeconds) {
+    const bool csdBase = csd::LoadedId() && std::strcmp(csd::LoadedId(), "mediaroom") == 0;
+    if (!csdBase) Draw(openSeconds);   // chrome + background only when there is no CSD base
+    DrawDynamicOverlay(openSeconds);   // live state composited over EITHER base
+}
 void MediaRoomInput(const ScreenInput& in) { Input(in); }
 void MediaRoomReset() { Reset(); }

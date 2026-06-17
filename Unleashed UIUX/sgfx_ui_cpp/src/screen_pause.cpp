@@ -15,6 +15,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "csd_player.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -509,25 +510,34 @@ void DrawInventory(double subOpen) {
     }
 }
 
-void Draw(double openSec) {
+void Draw(double openSec, bool csdBase) {
     // MEASURED open animation (live capture session8 @78s, 60fps frame terms):
     // the dim snaps in over ~2 frames; the EMPTY chamfered panel scales up
     // ~0.83 -> 1.0 while alpha-fading over ~6 frames (a translucent ghost frame
     // with no text); ALL content (banner + menu + footer) pops in at frames
     // 8..10. Total open ~= 0.15 s.
+    // csdBase: the real game CSD pause layout is drawn UNDER us this frame, so it
+    // already provides the dim scene + letterbox bands + PAUSE banner + the empty
+    // grey hexagon panel + button guide. Those CHROME draws are gated behind
+    // !csdBase; the DYNAMIC content (menu item text, selection bar, medal counters,
+    // confirm dialog, sub-screens, footer) composites on TOP in BOTH cases.
     const float dimT   = (float)ComputeMotion(openSec, 0.0, 2.0);
     const float panelT = (float)ComputeMotion(openSec, 0.0, 6.0);
     const float t      = (float)ComputeMotion(openSec, 8.0, 2.0);   // content pop
-    // stand-in for the live scene behind pause (the real game keeps rendering it)
-    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_T, C_BG_B);
-    uint32_t s = 0x1357acefu;
-    for (int i = 0; i < 70; ++i) { s = s*1664525u+1013904223u; float x=(float)((s>>9)%1280); s=s*1664525u+1013904223u; float y=(float)((s>>9)%720); DrawRect({x,y},{x+1,y+1}, WithAlpha(C_STAR, 0.5f)); }
+    if (!csdBase) {
+        // stand-in for the live scene behind pause (the real game keeps rendering it)
+        DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_T, C_BG_B);
+        uint32_t s = 0x1357acefu;
+        for (int i = 0; i < 70; ++i) { s = s*1664525u+1013904223u; float x=(float)((s>>9)%1280); s=s*1664525u+1013904223u; float y=(float)((s>>9)%720); DrawRect({x,y},{x+1,y+1}, WithAlpha(C_STAR, 0.5f)); }
+    }
 
     // ---- Achievements / Inventory sub-screens (scene dims; banner stays lit) ----
     if (g_sub != SV_NONE) {
+        // dim scrim over the scene/CSD base is intentional (semi-transparent, NOT
+        // occluding) — it darkens whatever is behind for the sub-view. Bands+banner
+        // are chrome the CSD base provides, so only redraw them with no CSD.
         DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 128));
-        DrawPauseBands(1.0f);
-        DrawBanner(1.0f);
+        if (!csdBase) { DrawPauseBands(1.0f); DrawBanner(1.0f); }
         if (g_sub == SV_ACHIEVEMENTS) DrawAchievements(g_subOpen);
         else                          DrawInventory(g_subOpen);
         return;
@@ -536,9 +546,9 @@ void Draw(double openSec) {
     // ---- "Return to the world map?" confirm sub-state: the item list is REPLACED by the
     //      dialog stack; banner dims WITH the scene (~44% black); footer stays lit
     if (g_confirm) {
-        DrawBanner(1.0f);
-        DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 190));   // recomp message_window scrim = 190 (75% black)
-        DrawPauseBands(1.0f);
+        if (!csdBase) DrawBanner(1.0f);
+        DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 190));   // recomp message_window scrim = 190 (75% black) — semi-transparent, dims the CSD base
+        if (!csdBase) DrawPauseBands(1.0f);
         DrawConfirm(1.0f);
         SetFont(g_fRodin);
         float hcy = 637;
@@ -548,31 +558,33 @@ void Draw(double openSec) {
         ResetFont();
         return;
     }
-    DrawRect({ 0, 0 }, { REF_W, REF_H }, WithAlpha(C_DIM, dimT));
-    DrawPauseBands(dimT);
+    if (!csdBase) {
+        DrawRect({ 0, 0 }, { REF_W, REF_H }, WithAlpha(C_DIM, dimT));
+        DrawPauseBands(dimT);
 
-    DrawBanner(t);
+        DrawBanner(t);
 
-    // ---- grey menu panel (hexagon: top-left + bottom-right chamfered) ----
-    // ghost-frame open: the panel scales 0.83 -> 1.0 about its centre while its
-    // alpha ramps with panelT (it appears as an empty translucent frame first).
-    const float ps9 = 0.83f + 0.17f * panelT;
-    const float pcx = (PX0 + PX1) * 0.5f, pcy = (PY0 + PY1) * 0.5f;
-    const float x0 = pcx - (pcx - PX0) * ps9, x1 = pcx + (PX1 - pcx) * ps9;
-    const float y0 = pcy - (pcy - PY0) * ps9, y1 = pcy + (PY1 - pcy) * ps9;
-    const float ch = CHAMFER * ps9;
-    DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(C_PANEL_T, panelT), WithAlpha(C_PANEL_B, panelT));
-    uint32_t bd = WithAlpha(C_PANEL_BD, panelT), bdd = WithAlpha(C_PANEL_BDD, panelT);
-    DrawRect({ x0, y0 }, { x1, y0 + 2 }, bd);      // top border
-    DrawRect({ x0, y1 - 2 }, { x1, y1 }, bdd);     // bottom border
-    DrawRect({ x0, y0 }, { x0 + 2, y1 }, bd);      // left border
-    DrawRect({ x1 - 2, y0 }, { x1, y1 }, bdd);     // right border
-    // chamfers: erase the TL + BR corner triangles back to (dimmed) background
-    SolidQuad({ x0, y0 }, { x0 + ch, y0 }, { x0, y0 + ch }, { x0, y0 }, WithAlpha(C_ERASE_T, panelT));
-    SolidQuad({ x1 - ch, y1 }, { x1, y1 }, { x1, y1 - ch }, { x1 - ch, y1 }, WithAlpha(C_ERASE_B, panelT));
-    // bright diagonal edge along each chamfer (2px)
-    SolidQuad({ x0 + ch, y0 }, { x0 + ch + 2, y0 + 2 }, { x0 + 2, y0 + ch + 2 }, { x0, y0 + ch }, bd);
-    SolidQuad({ x1 - ch, y1 }, { x1 - ch - 2, y1 - 2 }, { x1 - 2, y1 - ch - 2 }, { x1, y1 - ch }, bdd);
+        // ---- grey menu panel (hexagon: top-left + bottom-right chamfered) ----
+        // ghost-frame open: the panel scales 0.83 -> 1.0 about its centre while its
+        // alpha ramps with panelT (it appears as an empty translucent frame first).
+        const float ps9 = 0.83f + 0.17f * panelT;
+        const float pcx = (PX0 + PX1) * 0.5f, pcy = (PY0 + PY1) * 0.5f;
+        const float x0 = pcx - (pcx - PX0) * ps9, x1 = pcx + (PX1 - pcx) * ps9;
+        const float y0 = pcy - (pcy - PY0) * ps9, y1 = pcy + (PY1 - pcy) * ps9;
+        const float ch = CHAMFER * ps9;
+        DrawVGradient({ x0, y0 }, { x1, y1 }, WithAlpha(C_PANEL_T, panelT), WithAlpha(C_PANEL_B, panelT));
+        uint32_t bd = WithAlpha(C_PANEL_BD, panelT), bdd = WithAlpha(C_PANEL_BDD, panelT);
+        DrawRect({ x0, y0 }, { x1, y0 + 2 }, bd);      // top border
+        DrawRect({ x0, y1 - 2 }, { x1, y1 }, bdd);     // bottom border
+        DrawRect({ x0, y0 }, { x0 + 2, y1 }, bd);      // left border
+        DrawRect({ x1 - 2, y0 }, { x1, y1 }, bdd);     // right border
+        // chamfers: erase the TL + BR corner triangles back to (dimmed) background
+        SolidQuad({ x0, y0 }, { x0 + ch, y0 }, { x0, y0 + ch }, { x0, y0 }, WithAlpha(C_ERASE_T, panelT));
+        SolidQuad({ x1 - ch, y1 }, { x1, y1 }, { x1, y1 - ch }, { x1 - ch, y1 }, WithAlpha(C_ERASE_B, panelT));
+        // bright diagonal edge along each chamfer (2px)
+        SolidQuad({ x0 + ch, y0 }, { x0 + ch + 2, y0 + 2 }, { x0 + 2, y0 + ch + 2 }, { x0, y0 + ch }, bd);
+        SolidQuad({ x1 - ch, y1 }, { x1 - ch - 2, y1 - 2 }, { x1 - 2, y1 - ch - 2 }, { x1, y1 - ch }, bdd);
+    }
 
     // ---- menu items ----
     SetFont(g_fRodin);
@@ -614,7 +626,9 @@ void Draw(double openSec) {
     }
 
     // ---- footer (Achievements / Select / Back) — ref groups at x~305 / ~700 / ~895 ----
-    {
+    // This IS the button guide; the CSD base already draws it, so only render the
+    // hand-authored footer when there is no CSD (avoid double-drawing the chrome).
+    if (!csdBase) {
         float hcy = 637;
         auto glyph = [&](const UV& g, float x){ if (g_glyphTex<0) return x; float asp=((g.u1-g.u0)*GTW)/((g.v1-g.v0)*GTH), gh=30.0f, gw=gh*asp; DrawImage(g_glyphTex,{x,hcy-gh*0.5f},{x+gw,hcy+gh*0.5f},{g.u0,g.v0},{g.u1,g.v1}, WithAlpha(C_WHITE,t)); return x+gw+8; };
         // Xbox 360 BACK-button glyph: light oval (the atlas' tintable white circle,
@@ -641,7 +655,17 @@ void Draw(double openSec) {
 } // namespace
 
 void PauseInit() { Init(); }
-void PauseDraw(double openSeconds) { Draw(openSeconds); }
+void PauseDraw(double openSeconds) {
+    // CSD-base: when the real game CSD pause layout is drawn UNDER us this frame, it
+    // already provides the chrome (dim scene + bands + PAUSE banner + empty grey panel
+    // + button guide). We must NOT redraw that chrome (especially no full-screen fill,
+    // which would occlude the CSD). But the CSD panel is EMPTY — so we still composite
+    // this screen's DYNAMIC content ON TOP: the menu item text, the input-driven gold
+    // selection bar, Sun/Moon medal counters, the confirm dialog, and the LB sub-views.
+    // With no CSD, Draw() renders the full validated hand-authored screen unchanged.
+    const bool csdBase = csd::LoadedId() && std::strcmp(csd::LoadedId(), "pause") == 0;
+    Draw(openSeconds, csdBase);
+}
 void PauseInput(const ScreenInput& in) { Input(in); }
 void PauseReset() { Reset(); }
 const char* PauseNav() { return Nav(); }

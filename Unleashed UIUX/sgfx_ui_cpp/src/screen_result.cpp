@@ -20,6 +20,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "csd_player.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -133,14 +134,23 @@ void FormatValue(const Row& r, int v, char* buf, size_t n) {
     }
 }
 
-void Draw(double openSec) {
+// csdBase: the host already drew the real game CSD (data/result.json) as the base —
+// banner, row strips/labels, RANK letter + brilliance. When true we draw ONLY the
+// dynamic tally-counting VALUE digits (per-row + TOTAL) on top; all chrome/background
+// is gated off so it can't occlude the CSD. When false we render the full validated
+// hand-authored screen exactly as before.
+void Draw(double openSec, bool csdBase) {
     // ---- scene placeholder (live 3D goal scene slot) ----
-    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SKY_T, C_SKY_B);
-    DrawVGradient({ 0, 560 }, { REF_W, REF_H }, C_GROUND, RGBA(190, 192, 188, 255));
+    // FULL-SCREEN background fill — MUST stay gated, else it occludes the entire CSD base.
+    if (!csdBase) {
+        DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SKY_T, C_SKY_B);
+        DrawVGradient({ 0, 560 }, { REF_W, REF_H }, C_GROUND, RGBA(190, 192, 188, 255));
+    }
 
     // ---- entrance timeline (measured): wordmark slides ~0.5 s; rows build
     //      top->bottom after it; tally counts ~1.2 s; rank pops after total ----
     const float wmT = (float)ComputeMotion(openSec, 0.0, 16.0);
+    if (!csdBase) {
     DrawRect({ 0, RAIL_Y0 }, { RAIL_X1, RAIL_Y1 }, WithAlpha(C_RAIL, wmT));
     DrawRect({ 0, RAIL_Y0 - 2 }, { RAIL_X1, RAIL_Y0 + 1 }, WithAlpha(C_RAIL_EDGE, wmT));   // ~3px top-edge highlight (y~61)
     DrawRect({ 0, RAIL_Y1 + 1 }, { RAIL_X1, RAIL_Y1 + 3.5f }, WithAlpha(C_RAIL_EDGE, wmT));   // under-edge (y~115)
@@ -170,6 +180,7 @@ void Draw(double openSec) {
         float wx = Lerp(-220.0f, WM_X, wmT);   // slides in from off-left
         Chrome({ wx, WM_CAPTOP - 12 }, 48.0f, "RESULTS", wmT, 1.70f);
     }
+    }   // end !csdBase rail/banner/wordmark chrome
 
     const float VAL_R = 1033;   // common right edge the value strips align to (measured: shared Chrome right edge ~x1015)
     const uint32_t C_VSTRIP_T = RGBA(18, 26, 44, 180), C_VSTRIP_B = RGBA(8, 14, 28, 180);
@@ -178,6 +189,7 @@ void Draw(double openSec) {
         if (rowT <= 0.0f) continue;
         const float x = ROW_X0 + i * ROW_XSTEP;
         const float y = ROW_TOP0 + i * ROW_PITCH;
+        if (!csdBase) {   // CHROME: value strip + slanted plate + green label (CSD draws these)
         // long dark translucent value strip extending from the plate to VAL_R
         const float sx0 = x + ROW_W + SLANT - 6;
         const V2 vs[4] = { { sx0 + SLANT, y + 4 }, { VAL_R, y + 4 }, { VAL_R, y + ROW_H - 4 }, { sx0, y + ROW_H - 4 } };
@@ -197,7 +209,8 @@ void Draw(double openSec) {
         }
         ResetTextShear();
         ResetFont();
-        // tally value, RIGHT-aligned inside the strip to the common edge
+        }   // end !csdBase row chrome
+        // DYNAMIC: tally value, RIGHT-aligned inside the strip to the common edge
         const float tallyT = (float)ComputeMotion(openSec, 48.0 + i * 8.0, 60.0);
         char buf[24];
         FormatValue(ROWS[i], (int)std::lround(ROWS[i].value * tallyT), buf, sizeof buf);
@@ -214,6 +227,7 @@ void Draw(double openSec) {
         if (totT > 0.0f) {
             const float x = 625.0f;        // green plate left (real green plate x628-797)
             const float TOT_PLATE_W = 165;  // compact green label plate (green ends ~x793)
+            if (!csdBase) {   // CHROME: teal value strip + green plate + "TOTAL" label (CSD draws these)
             // teal value strip from the green plate right edge to VAL_R (real is teal, not navy)
             const uint32_t C_TSTRIP_T = RGBA(72, 150, 138, 200), C_TSTRIP_B = RGBA(46, 118, 112, 200);   // brighter teal (green +~32)
             const float sx0 = x + TOT_PLATE_W + SLANT - 6;
@@ -227,6 +241,8 @@ void Draw(double openSec) {
             DrawText({ x + 40, TOT_TOP + (TOT_H - 26) * 0.5f }, 26.0f, WithAlpha(C_TOTAL_TXT, totT), "TOTAL");
             ResetTextShear();
             ResetFont();
+            }   // end !csdBase TOTAL chrome
+            // DYNAMIC: TOTAL tally digits (always composite over the CSD base)
             const float totTally = (float)ComputeMotion(openSec, 90.0, 48.0);
             char buf[16]; snprintf(buf, sizeof buf, "%d", (int)std::lround(g_total * totTally));
             SetFont(g_fDF); SetTextShear(0.24f); SetTextStretchX(1.2f);
@@ -237,7 +253,8 @@ void Draw(double openSec) {
     }
 
     // ---- RANK reveal: wide teal band behind the big gold letter (scale pop) ----
-    {
+    // CHROME: the CSD base draws the RANK strip + gold letter + title_brilliance.
+    if (!csdBase) {
         const float rkT = (float)ComputeMotion(openSec, 13.0, 80.0);
         if (rkT > 0.0f) {
             // wide layered teal band behind the rank letter (measured y~520-564)
@@ -306,7 +323,8 @@ void Draw(double openSec) {
     }
 
     // ---- footer: (A) Next (below the TOTAL value, ~70% / 87%) ----
-    {
+    // CHROME: the CSD base draws the button guide.
+    if (!csdBase) {
         const float fT = (float)ComputeMotion(openSec, 0.0, 8.0);
         float hx = 856, hcy = 638;   // glyph center ~876,638 (manifest btn_a x856 y618 h40)
         if (g_glyphTex >= 0) {
@@ -331,4 +349,13 @@ void Draw(double openSec) {
 } // namespace
 
 void ResultInit() { Init(); }
-void ResultDraw(double openSeconds) { Draw(openSeconds); }
+void ResultDraw(double openSeconds) {
+    // CSD-base composite: when the real game CSD layout (data/result.json) is loaded
+    // as the base, the host already drew the banner, row strips/labels, RANK letter +
+    // brilliance. We then re-composite ONLY this screen's dynamic content on top — the
+    // per-row + TOTAL tally-counting VALUE digits. All chrome/background (including the
+    // full-screen sky/ground gradient) is gated behind !csdBase so it never occludes
+    // the CSD. When the CSD is absent we render the full validated hand-authored screen.
+    const bool csdBase = csd::LoadedId() && std::strcmp(csd::LoadedId(), "result") == 0;
+    Draw(openSeconds, csdBase);
+}

@@ -17,6 +17,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "csd_player.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -152,6 +153,80 @@ void NamePlate(float x0, float y0, float x1, float y1, float a) {
     DrawRect({ x0, y1 - 2 }, { x1 - sl + 2, y1 }, WithAlpha(C_BORDER, a));
 }
 
+// ---- the LIVE per-act VALUES (high score / best time / sun+moon medal counts /
+// rank letter) for the selected act — the only part the game's CSD base lacks (it
+// draws the banner, frames, score/time/medal LABELS, medal icons, thumbnail). Drawn
+// inside the panel scale-pop transform so the numbers seat in their measured slots
+// (STAT_R right edge) and pop in with the panel; this exact same call composites the
+// values over the CSD base. Pure overlay: no frames/labels/background here.
+void DrawLiveValues(float panT) {
+    if (panT <= 0.0f) return;
+    const Act& act = ACTS[g_act];
+    const float px0 = 268, py0 = 176, px1 = 1003, py1 = 540;   // panel rect (matches Draw)
+    const float panS = Lerp(0.83f, 1.0f, panT);                // same scale-pop as the panel
+    const float STAT_R = 660;                                  // shared value right-edge column
+    PushTransform(panS, panS, { (px0 + px1) * 0.5f, (py0 + py1) * 0.5f }, { 0.0f, 0.0f });
+    ChromeRight(STAT_R, 322, 26.0f, act.hiScore, panT);        // HIGH SCORE value
+    ChromeRight(STAT_R, 372, 26.0f, act.bestTime, panT);       // BEST TIME value
+    char buf[16];
+    snprintf(buf, sizeof buf, "%d / %d", act.sun,  act.sunMax);
+    ChromeRight(STAT_R, 426, 26.0f, buf, panT);                // sun medal count
+    snprintf(buf, sizeof buf, "%d / %d", act.moon, act.moonMax);
+    ChromeRight(STAT_R, 478, 26.0f, buf, panT);                // moon medal count
+    // the big metallic rank letter for the selected act (real mat_result art)
+    if (g_rankTex >= 0)
+        DrawImage(g_rankTex, { 900, 400 }, { 1044, 534 },
+                  { RANK_UV[act.rank].u0, RANK_UV[act.rank].v0 }, { RANK_UV[act.rank].u1, RANK_UV[act.rank].v1 },
+                  WithAlpha(RGBA(228, 230, 236, 255), panT * 0.95f));
+    PopTransform();
+}
+
+// ---- carousel act arrows flanking the panel (live navigation chrome the CSD base
+// lacks; hidden while the confirm popup is open). Pure overlay — runs on both bases. ----
+void DrawActArrows(float panT) {
+    if (panT <= 0.0f || g_popup) return;
+    const float ay = 385;
+    const V2 la[4] = { { 240, ay - 18 }, { 240, ay + 18 }, { 218, ay }, { 240, ay - 18 } };
+    const V2 ra[4] = { { 987, ay - 18 }, { 987, ay + 18 }, { 1009, ay }, { 987, ay - 18 } };
+    const uint32_t arc[4] = { WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT) };
+    DrawQuadGradient(la, arc); DrawQuadGradient(ra, arc);
+}
+
+// ---- the "Play Stage / Cancel" confirm popup (screen-centred grey dialog, absolute
+// coords) + its screen dim. Live menu state the CSD base lacks; pure overlay. ----
+void DrawConfirmPopup() {
+    if (!g_popup) return;
+    DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 68));
+    // screen-centred, tighter TL+BR chamfered grey dialog (flatter, dimmer
+    // border — closer to the real near-borderless silver box)
+    const float px0 = 531, py0 = 281, px1 = 748, py1 = 437, pch = 16, cx = (px0 + px1) * 0.5f;
+    DrawVGradient({ px0, py0 }, { px1, py1 },
+                  RGBA(152, 154, 156, 240), RGBA(122, 124, 126, 240));
+    const V2 c1[4] = { { px0, py0 }, { px0 + pch, py0 }, { px0, py0 + pch }, { px0, py0 } };
+    const V2 c2[4] = { { px1 - pch, py1 }, { px1, py1 }, { px1, py1 - pch }, { px1 - pch, py1 } };
+    const uint32_t dk[4] = { RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110) };
+    DrawQuadGradient(c1, dk); DrawQuadGradient(c2, dk);
+    uint32_t pbd = RGBA(168, 170, 172, 220);
+    DrawRect({ px0 + pch, py0 }, { px1, py0 + 1.5f }, pbd);
+    DrawRect({ px0, py1 - 1.5f }, { px1 - pch, py1 }, pbd);
+    DrawRect({ px0, py0 + pch }, { px0 + 1.5f, py1 }, pbd);
+    DrawRect({ px1 - 1.5f, py0 }, { px1, py1 - pch }, pbd);
+    const char* OPT[2] = { "Play Stage", "Cancel" };
+    const float rowY[2] = { py0 + 50, py0 + 98 };
+    DrawVGradient({ px0 + 14, rowY[g_popupSel] - 6 }, { px1 - 14, rowY[g_popupSel] + 34 },
+                  RGBA(196, 176, 104, 196), RGBA(168, 142, 72, 196));
+    SetFont(g_fRodin);
+    for (int i = 0; i < 2; ++i) {
+        float w = MeasureText(27.0f, OPT[i]).x;
+        bool sel = (i == g_popupSel);
+        DrawText({ cx - w * 0.5f + 1, rowY[i] + 1 }, 27.0f,
+                 sel ? RGBA(150, 70, 16, 255) : RGBA(20, 20, 20, 200), OPT[i]);
+        DrawText({ cx - w * 0.5f, rowY[i] }, 27.0f,
+                 sel ? RGBA(232, 120, 30, 255) : RGBA(235, 235, 235, 255), OPT[i]);
+    }
+    ResetFont();
+}
+
 void Draw(double openSec) {
     const float a = (float)ComputeMotion(openSec, 0.0, 20.0);   // header band/wordmark settle by f20
     const float panT = (float)ComputeMotion(openSec, 10.0, 10.0);  // act panel pops in f10-20 (scale + fade)
@@ -266,18 +341,13 @@ void Draw(double openSec) {
         DrawRect({ 266, 501 }, { STAT_R, 502.5f }, WithAlpha(C_BORDER, panT * 0.4f));
         // stat rows: outlined-chrome UPRIGHT label (left x276) + italic chrome VALUE
         // right-aligned to STAT_R.
-        auto stat = [&](float ly, const char* lbl, float vy, const char* val) {
-            Chrome({ 276, ly }, 22.0f, lbl, panT, false, 1.4f);
-            ChromeRight(STAT_R, vy, 26.0f, val, panT);
-        };
-        stat(326, "HIGH SCORE", 322, act.hiScore);
-        stat(376, "BEST TIME",  372, act.bestTime);
-        // medal rows: upright chrome MEDALS label, a sun/moon icon ellipse just
-        // right of the label, and the count as an italic chrome value at STAT_R.
+        Chrome({ 276, 326 }, 22.0f, "HIGH SCORE", panT, false, 1.4f);
+        Chrome({ 276, 376 }, 22.0f, "BEST TIME",  panT, false, 1.4f);
         Chrome({ 276, 420 }, 22.0f, "MEDALS", panT, false, 1.4f);
-        char buf[16];
-        // filled vertical ellipse — gold core, coloured rim per row. Tall/narrow
-        // oval (~14x33, aspect 1:2.5) so both rows seat inside the medal band (~405-495).
+        // medal icons: filled vertical ellipse — gold core, coloured rim per row.
+        // Tall/narrow oval (~14x33, aspect 1:2.5) so both rows seat inside the medal
+        // band (~405-495). (the COUNT values are drawn by DrawLiveValues, which also
+        // runs as the dynamic overlay on top of the CSD base.)
         auto medalEllipse = [&](float cx, float cy, float rx, float ry, uint32_t col) {
             const int N = 18;
             for (int i = 0; i < N; ++i) {
@@ -289,18 +359,15 @@ void Draw(double openSec) {
             }
         };
         const uint32_t C_MEDAL_CORE = RGBA(255, 212, 96, 255);   // gold core
-        auto medal = [&](float iy, float vy, uint32_t rim, int got, int tot) {
-            snprintf(buf, sizeof buf, "%d / %d", got, tot);
+        auto medalIcon = [&](float iy, uint32_t rim) {
             medalEllipse(425, iy, 7.0f, 16.0f, WithAlpha(rim, panT));             // coloured rim (tall oval ~14x33)
             medalEllipse(425, iy, 4.5f, 11.0f, WithAlpha(C_MEDAL_CORE, panT));    // gold core
-            ChromeRight(STAT_R, vy, 26.0f, buf, panT);
         };
-        medal(430, 426, C_SUN,  act.sun,  act.sunMax);   // sun row (gold/orange)
-        medal(482, 478, C_MOON, act.moon, act.moonMax);  // moon row (gold/blue)
+        medalIcon(430, C_SUN);    // sun row (gold/orange)
+        medalIcon(482, C_MOON);   // moon row (gold/blue)
         // RANK label (upright chrome, below the medal divider)
         Chrome({ 276, 516 }, 22.0f, "RANK", panT, false, 1.4f);
         // stage screenshot slot (landscape 270x135, aspect 2.0 — measured stage_ss rect 702,320..972,455)
-        // + the big metallic S-rank to its RIGHT, overlapping the photo's bottom-right
         if (g_photoTex >= 0) {
             DrawImage(g_photoTex, { 702, 320 }, { 972, 455 }, { 0.f, 0.f }, { 1.f, 1.f },
                       WithAlpha(C_WHITE, panT));
@@ -313,20 +380,14 @@ void Draw(double openSec) {
                             "STAGE PHOTO", Align::Center, true, false);
             ResetFont();
         }
-        if (g_rankTex >= 0)
-            DrawImage(g_rankTex, { 900, 400 }, { 1044, 534 },
-                      { RANK_UV[act.rank].u0, RANK_UV[act.rank].v0 }, { RANK_UV[act.rank].u1, RANK_UV[act.rank].v1 },
-                      WithAlpha(RGBA(228, 230, 236, 255), panT * 0.95f));
         PopTransform();   // end panel scale-pop (arrows/popup are navigation chrome, not scaled)
 
+        // ---- the LIVE act-carousel VALUES (high score / best time / medal counts /
+        //      rank letter) — the dynamic content the CSD base lacks. Drawn here for
+        //      the hand-authored path AND, identically, as the overlay on the CSD base. ----
+        DrawLiveValues(panT);
         // ---- carousel act arrows flanking the panel ----
-        if (!g_popup) {
-            const float ay = 385;
-            const V2 la[4] = { { 240, ay - 18 }, { 240, ay + 18 }, { 218, ay }, { 240, ay - 18 } };
-            const V2 ra[4] = { { 987, ay - 18 }, { 987, ay + 18 }, { 1009, ay }, { 987, ay - 18 } };
-            const uint32_t arc[4] = { WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT), WithAlpha(RGBA(228, 232, 238, 200), panT) };
-            DrawQuadGradient(la, arc); DrawQuadGradient(ra, arc);
-        }
+        DrawActArrows(panT);
     }
 
     // ---- footer: [LB] Switch [RB]   (A) Select   (B) Back ----
@@ -343,43 +404,34 @@ void Draw(double openSec) {
 
     // ---- "Play Stage / Cancel" confirm popup (the GREY dialog family, like
     //      the pause confirm — measured from gate_confirm_popup.png) ----
-    if (g_popup) {
-        DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 68));
-        // screen-centred, tighter TL+BR chamfered grey dialog (flatter, dimmer
-        // border — closer to the real near-borderless silver box)
-        const float px0 = 531, py0 = 281, px1 = 748, py1 = 437, pch = 16, cx = (px0 + px1) * 0.5f;
-        DrawVGradient({ px0, py0 }, { px1, py1 },
-                      RGBA(152, 154, 156, 240), RGBA(122, 124, 126, 240));
-        const V2 c1[4] = { { px0, py0 }, { px0 + pch, py0 }, { px0, py0 + pch }, { px0, py0 } };
-        const V2 c2[4] = { { px1 - pch, py1 }, { px1, py1 }, { px1, py1 - pch }, { px1 - pch, py1 } };
-        const uint32_t dk[4] = { RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110), RGBA(8, 8, 8, 110) };
-        DrawQuadGradient(c1, dk); DrawQuadGradient(c2, dk);
-        uint32_t pbd = RGBA(168, 170, 172, 220);
-        DrawRect({ px0 + pch, py0 }, { px1, py0 + 1.5f }, pbd);
-        DrawRect({ px0, py1 - 1.5f }, { px1 - pch, py1 }, pbd);
-        DrawRect({ px0, py0 + pch }, { px0 + 1.5f, py1 }, pbd);
-        DrawRect({ px1 - 1.5f, py0 }, { px1, py1 - pch }, pbd);
-        const char* OPT[2] = { "Play Stage", "Cancel" };
-        const float rowY[2] = { py0 + 50, py0 + 98 };
-        DrawVGradient({ px0 + 14, rowY[g_popupSel] - 6 }, { px1 - 14, rowY[g_popupSel] + 34 },
-                      RGBA(196, 176, 104, 196), RGBA(168, 142, 72, 196));
-        SetFont(g_fRodin);
-        for (int i = 0; i < 2; ++i) {
-            float w = MeasureText(27.0f, OPT[i]).x;
-            bool sel = (i == g_popupSel);
-            DrawText({ cx - w * 0.5f + 1, rowY[i] + 1 }, 27.0f,
-                     sel ? RGBA(150, 70, 16, 255) : RGBA(20, 20, 20, 200), OPT[i]);
-            DrawText({ cx - w * 0.5f, rowY[i] }, 27.0f,
-                     sel ? RGBA(232, 120, 30, 255) : RGBA(235, 235, 235, 255), OPT[i]);
-        }
-        ResetFont();
-    }
+    DrawConfirmPopup();
+}
+
+// The DYNAMIC overlay only: the live per-act VALUES, the carousel arrows, and the
+// confirm popup — the content the game CSD base lacks. Composites on TOP of the CSD
+// base (which already draws the banner, frames, labels, medal icons, thumbnail, and
+// button guide). NO background/chrome here, so it never occludes the CSD layout.
+void DrawDynamicOverlay(double openSec) {
+    const float panT = (float)ComputeMotion(openSec, 10.0, 10.0);   // matches Draw's panel entrance
+    DrawLiveValues(panT);
+    DrawActArrows(panT);
+    DrawConfirmPopup();
 }
 
 } // namespace
 
 void GateInit() { Init(); }
-void GateDraw(double openSeconds) { Draw(openSeconds); }
+void GateDraw(double openSeconds) {
+    // CSD-base composite: the host draws the real game CSD (data/gate.json) as the BASE
+    // — banner, act frames, score/time/medal LABELS, medal icons, stage thumbnail,
+    // button guide. We DON'T redraw any of that (the hand-authored full Draw, with its
+    // full-screen Gaia-temple background, would occlude the CSD); we only composite the
+    // LIVE content the CSD lacks (per-act values, carousel arrows, confirm popup) on top.
+    // When no CSD is loaded, fall back to the validated full hand-authored screen.
+    const bool csdBase = csd::LoadedId() && std::strcmp(csd::LoadedId(), "gate") == 0;
+    if (!csdBase) Draw(openSeconds);          // full hand-authored screen (chrome + dynamic)
+    else          DrawDynamicOverlay(openSeconds);   // dynamic overlay only, over the CSD base
+}
 void GateInput(const ScreenInput& in) { Input(in); }
 void GateReset() { Reset(); }
 const char* GateNav() { return Nav(); }
