@@ -15,9 +15,13 @@
 #include "imgui_utils.h"
 #include "button_guide.h"
 #include "message_window.h"
+#include "game_window.h"                  // GameWindow (cursor visibility / window during install)
 #include "../platform/sgfx_platform.h"
+#include "../platform/sgfx_sdl.h"         // SDLEventListener (cursor/accept navigation)
+#include "../platform/sgfx_window.h"      // Video (frame loop) + GameWindow
+#include "../platform/sgfx_installer.h"   // Installer pipeline + EmbeddedPlayer + DLC + XexPatcher + hid::GetState (host-bound)
 
-#include <nfd.h>   // Native File Dialog Extended — third-party, host-provided (see gameStateCoupling)
+#include <nfd.h>   // Native File Dialog Extended — compat shim maps to host NFD (compat/nfd.h)
 
 #include <imgui_internal.h>   // ImRotate / ImMax / ImGui internals the recomp pulled in transitively
 #include <algorithm>
