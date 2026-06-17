@@ -38,10 +38,24 @@ std::unique_ptr<Texture> LoadTexture(const uint8_t*, size_t) { return MakeTile()
 // font registry: one shared font for the preview
 ImFont* ImFontAtlasSnapshot::GetFont(const char*) { return g_previewFont; }
 
-// the custom imgui render layer's callback API — flat (no shader) for the preview
-static ImGuiCallbackData g_cbDummy;
-ImGuiCallbackData* AddImGuiCallback(ImGuiCallback) { return &g_cbDummy; }
-void ResetImGuiCallbacks() {}
+// the custom imgui render layer's callback API — AUTHENTIC mechanism (verbatim from the
+// recomp's gpu/imgui/imgui_common.cpp): a per-frame ring of ImGuiCallbackData, each added
+// to the background draw list as a sentinel callback. preview_main's render reads the
+// SetGradient sentinels and applies the gradient per-vertex (the shader does it per-pixel
+// in-game; per-vertex is a close match for the menus' tessellated geometry).
+#include <vector>
+#include <memory>
+static std::vector<std::unique_ptr<ImGuiCallbackData>> g_callbackData;
+static unsigned g_callbackDataIndex = 0;
+ImGuiCallbackData* AddImGuiCallback(ImGuiCallback callback)
+{
+    if (g_callbackDataIndex >= g_callbackData.size())
+        g_callbackData.emplace_back(std::make_unique<ImGuiCallbackData>());
+    auto& cd = g_callbackData[g_callbackDataIndex++];
+    ImGui::GetBackgroundDrawList()->AddCallback(reinterpret_cast<ImDrawCallback>(callback), cd.get());
+    return cd.get();
+}
+void ResetImGuiCallbacks() { g_callbackDataIndex = 0; }
 
 // options_menu's window/video deps (host infra; demo values)
 std::vector<SDL_DisplayMode> GameWindow::GetDisplayModes(bool, bool)

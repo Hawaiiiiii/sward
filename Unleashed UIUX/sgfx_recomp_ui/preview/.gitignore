@@ -1,0 +1,10 @@
+# build artifacts — the harness is rebuilt from source via build_preview.bat
+*.exe
+*.bmp
+*.obj
+*.ilk
+*.pdb
+obj/
+preview_gradient.png
+preview_rows.png
+preview_values.png

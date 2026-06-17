@@ -5,6 +5,7 @@
 #include "sgfx_sdl.h"
 #include "../render/sgfx_render.h"   // sgfx::render::Texture (g_xdbfTextureCache)
 #include <unordered_map>
+#include <cctype>
 
 // ---- aspect / scale (host updates from the viewport each frame) -------------
 float g_aspectRatio        = WIDE_ASPECT_RATIO;
@@ -42,9 +43,37 @@ std::string& Localise(const std::string_view& key)
 }
 
 // ---- config -----------------------------------------------------------------
-std::string ConfigLocalise(std::string_view name, std::string_view /*kind*/, ELanguage)
+// A real host binds localised tables keyed by (option, value). The demo returns readable
+// placeholders so the preview reads like the game: spaced names + realistic default values.
+static std::string SpaceCamel(std::string_view s)
 {
-    return std::string(name);   // host binds the real localised labels
+    std::string out;
+    for (size_t i = 0; i < s.size(); ++i)
+    {
+        if (i && std::isupper((unsigned char)s[i]) && !std::isupper((unsigned char)s[i - 1])) out += ' ';
+        out += s[i];
+    }
+    return out;
+}
+std::string ConfigLocalise(std::string_view name, std::string_view kind, ELanguage)
+{
+    static const std::unordered_map<std::string, std::string> values = {
+        {"Language","English"}, {"VoiceLanguage","English"}, {"Subtitles","On"}, {"Hints","On"},
+        {"ControlTutorial","On"}, {"AchievementNotifications","On"}, {"TimeOfDayTransition","Xbox"},
+        {"HorizontalCamera","Normal"}, {"VerticalCamera","Normal"}, {"Vibration","On"},
+        {"AllowBackgroundInput","Off"}, {"ControllerIcons","Auto"}, {"MasterVolume","100%"},
+        {"MusicVolume","100%"}, {"EffectsVolume","100%"}, {"ChannelConfiguration","Stereo"},
+        {"MusicAttenuation","Off"}, {"BattleTheme","On"}, {"WindowSize","1280 x 720"}, {"Monitor","1"},
+        {"AspectRatio","Wide"}, {"ResolutionScale","100%"}, {"Fullscreen","Off"}, {"VSync","On"},
+        {"FPS","60"}, {"Brightness","50%"}, {"AntiAliasing","MSAA 4x"}, {"TransparencyAntiAliasing","On"},
+        {"ShadowResolution","4096"}, {"GITextureFiltering","Bilinear"}, {"MotionBlur","Original"},
+        {"XboxColorCorrection","Off"}, {"CutsceneAspectRatio","Original"}, {"UIAlignmentMode","Edge"},
+    };
+    std::string n(name);
+    if (kind == "value")    { auto it = values.find(n); return it != values.end() ? it->second : "On"; }
+    if (kind == "desc")     return "Adjusts the " + SpaceCamel(name) + " setting.";
+    if (kind == "valuedesc") return std::string();
+    return SpaceCamel(name);   // "name": spaced camelCase, e.g. "Voice Language"
 }
 namespace Config { void Save() {} }
 
