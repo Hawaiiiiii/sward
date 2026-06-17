@@ -322,7 +322,17 @@ void DrawPopupOverlay() {
 // or the hand-authored chrome). No full-screen fills / header / footer band here
 // (those are CSD chrome). The popup is drawn separately (DrawPopupOverlay) so its
 // full-screen dim can land LAST over the legend band in the no-CSD path.
-void DrawDynamic(double openSec) {
+//
+// csdBase: when TRUE the real world_map CSD is the base and it ALREADY draws the
+// COMPLETE bright-green LED stage-info panel (x645..1010) with its HIGH SCORE /
+// BEST TIME / RANK labels + medal-counter slots. We therefore SKIP the overlay's
+// own stage-info panel (DrawStageInfo / DrawStageInfoEmpty — the LED fill, lit-cell
+// loop, accent rails, the labels, the photo plate, the description blurb, and the
+// three medal counters) to avoid a second, narrower, right-shifted panel doubling
+// over the CSD's. The 3D globe, left totals column, and floating SPAGONIA label are
+// kept either way (the CSD base lacks them). When FALSE (the hand-authored
+// fallback) every draw runs exactly as before.
+void DrawDynamic(double openSec, bool csdBase) {
     const float t      = (float)ComputeMotion(openSec, 0.0,  12.0);  // counters / globe
     const float tPanel = (float)ComputeMotion(openSec, 18.0, 16.0);  // stage-info LED panel flood
     const float tTitle = (float)ComputeMotion(openSec, 38.0, 18.0);  // SPAGONIA label (last)
@@ -364,13 +374,25 @@ void DrawDynamic(double openSec) {
         ResetFont();
     }
 
-    // ---- hover-vs-committed stage info + floating stage label/leader rule ----
-    if (g_showInfo) {
+    // ---- floating stage label/leader rule: ALWAYS drawn (the CSD base lacks the
+    //      floating SPAGONIA name + its gradient leader rule toward the marker) ----
+    if (g_showInfo)
         DrawStageLabel(tTitle);
-        DrawStageInfo(tPanel);
-    } else {
-        // hover/empty state: only the green bracket-frame + dotted left rail
-        DrawStageInfoEmpty(t);
+
+    // ---- stage-info PANEL: only on the hand-authored base. With the real world_map
+    //      CSD loaded, the CSD ALREADY draws the COMPLETE bright-green LED stage-info
+    //      panel (x645..1010) + HIGH SCORE/BEST TIME/RANK labels + medal-counter
+    //      slots; redrawing the overlay's narrower, right-shifted panel here would
+    //      double it (hard seam + duplicated counters + off-right-edge float). Skip
+    //      both the populated panel AND the empty bracket-frame so the CSD's own
+    //      panel/slots show through cleanly. ----
+    if (!csdBase) {
+        if (g_showInfo) {
+            DrawStageInfo(tPanel);
+        } else {
+            // hover/empty state: only the green bracket-frame + dotted left rail
+            DrawStageInfoEmpty(t);
+        }
     }
 }
 
@@ -413,7 +435,9 @@ void Draw(double openSec) {
     ResetFont();
 
     // ---- 3D globe + totals + stage info/label (the dynamic overlay) ----
-    DrawDynamic(openSec);
+    //      csdBase=false: this is the hand-authored fallback, so the overlay draws
+    //      its OWN stage-info panel here (no CSD panel underneath to double it).
+    DrawDynamic(openSec, false);
 
     // ---- bottom legend band (full-width olive gradient + bright top edge) ----
     DrawRect({ 0, 612 }, { REF_W, 614 }, WithAlpha(RGBA(140, 168, 90, 220), t));
@@ -450,9 +474,12 @@ void WorldMapDraw(double openSeconds) {
     if (!csdBase) {
         Draw(openSeconds);   // full hand-authored screen (chrome + dynamic + popup)
     } else {
-        // CSD already drew the chrome/background; layer only the dynamic content +
-        // popup on top. NO full-screen bg fill here (it would occlude the CSD base).
-        DrawDynamic(openSeconds);
+        // CSD already drew the chrome/background AND the complete bright-green LED
+        // stage-info panel (labels + medal-counter slots); layer only the dynamic
+        // content the CSD lacks (3D globe, live totals, floating SPAGONIA label) +
+        // popup on top. csdBase=true gates the overlay's own stage-info panel so it
+        // does NOT double over the CSD's. NO full-screen bg fill (would occlude CSD).
+        DrawDynamic(openSeconds, true);
         DrawPopupOverlay();
     }
 }

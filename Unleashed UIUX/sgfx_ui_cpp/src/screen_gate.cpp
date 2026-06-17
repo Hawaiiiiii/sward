@@ -159,7 +159,7 @@ void NamePlate(float x0, float y0, float x1, float y1, float a) {
 // inside the panel scale-pop transform so the numbers seat in their measured slots
 // (STAT_R right edge) and pop in with the panel; this exact same call composites the
 // values over the CSD base. Pure overlay: no frames/labels/background here.
-void DrawLiveValues(float panT) {
+void DrawLiveValues(float panT, bool csdBase) {
     if (panT <= 0.0f) return;
     const Act& act = ACTS[g_act];
     const float px0 = 268, py0 = 176, px1 = 1003, py1 = 540;   // panel rect (matches Draw)
@@ -173,18 +173,26 @@ void DrawLiveValues(float panT) {
     ChromeRight(STAT_R, 426, 26.0f, buf, panT);                // sun medal count
     snprintf(buf, sizeof buf, "%d / %d", act.moon, act.moonMax);
     ChromeRight(STAT_R, 478, 26.0f, buf, panT);                // moon medal count
-    // the big metallic rank letter for the selected act (real mat_result art)
-    if (g_rankTex >= 0)
+    // the big metallic rank letter for the selected act (real mat_result art) —
+    // the CSD base already draws the act's rank emblem, so only the no-CSD
+    // hand-authored path (csdBase==false) emits it; gating it on the CSD base
+    // kills the doubled 'SS' rank.
+    if (!csdBase && g_rankTex >= 0)
         DrawImage(g_rankTex, { 900, 400 }, { 1044, 534 },
                   { RANK_UV[act.rank].u0, RANK_UV[act.rank].v0 }, { RANK_UV[act.rank].u1, RANK_UV[act.rank].v1 },
                   WithAlpha(RGBA(228, 230, 236, 255), panT * 0.95f));
     PopTransform();
 }
 
-// ---- carousel act arrows flanking the panel (live navigation chrome the CSD base
-// lacks; hidden while the confirm popup is open). Pure overlay — runs on both bases. ----
-void DrawActArrows(float panT) {
+// ---- carousel act arrows flanking the panel (live navigation chrome; hidden while
+// the confirm popup is open). The CSD base already draws these arrows, so they emit
+// only on the no-CSD hand-authored path (csdBase==false). ----
+void DrawActArrows(float panT, bool csdBase) {
     if (panT <= 0.0f || g_popup) return;
+    // the CSD base already draws the two 3D carousel act-switch arrows, so only
+    // the no-CSD hand-authored path emits them; gating on the CSD base kills the
+    // doubled arrows.
+    if (csdBase) return;
     const float ay = 385;
     const V2 la[4] = { { 240, ay - 18 }, { 240, ay + 18 }, { 218, ay }, { 240, ay - 18 } };
     const V2 ra[4] = { { 987, ay - 18 }, { 987, ay + 18 }, { 1009, ay }, { 987, ay - 18 } };
@@ -385,9 +393,9 @@ void Draw(double openSec) {
         // ---- the LIVE act-carousel VALUES (high score / best time / medal counts /
         //      rank letter) — the dynamic content the CSD base lacks. Drawn here for
         //      the hand-authored path AND, identically, as the overlay on the CSD base. ----
-        DrawLiveValues(panT);
+        DrawLiveValues(panT, false);   // no-CSD path: draw rank + arrows (nothing under us)
         // ---- carousel act arrows flanking the panel ----
-        DrawActArrows(panT);
+        DrawActArrows(panT, false);
     }
 
     // ---- footer: [LB] Switch [RB]   (A) Select   (B) Back ----
@@ -413,8 +421,11 @@ void Draw(double openSec) {
 // button guide). NO background/chrome here, so it never occludes the CSD layout.
 void DrawDynamicOverlay(double openSec) {
     const float panT = (float)ComputeMotion(openSec, 10.0, 10.0);   // matches Draw's panel entrance
-    DrawLiveValues(panT);
-    DrawActArrows(panT);
+    // CSD base path: the CSD already supplies the rank emblem + the carousel
+    // act-switch arrows, so pass csdBase=true to suppress redrawing them (only the
+    // genuinely-missing live value text composites over the CSD).
+    DrawLiveValues(panT, true);
+    DrawActArrows(panT, true);
     DrawConfirmPopup();
 }
 

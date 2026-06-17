@@ -459,30 +459,42 @@ void DrawChrome(double openSec) {
 }
 
 // ---- DYNAMIC / LIVE -------------------------------------------------------
-// The live content the CSD base lacks, composited OVER either base: the time-swept
-// READY wordmark, the live score/ring counters, the eased boost-gauge fill (with
-// drain + leading-edge glow), and the live %03d ring readout beside the gauge.
-void DrawDynamic(double openSec) {
+// The live content the CSD base genuinely lacks, composited OVER either base: the
+// time-swept READY wordmark, the live score/ring counters (the CSD draws no numbers
+// there), and — ONLY when there is no CSD base — the boost-gauge fill and the %03d
+// ring readout, both of which the real CSD base already provides (gating them under
+// a real CSD base prevents the verified doubling: a second wrong-coloured gauge
+// strip over the CSD's own colored fill, and a redundant zero-padded ring readout
+// with no CSD slot / no retail counterpart).
+void DrawDynamic(double openSec, bool csdBase) {
     const float clusterT = (float)ComputeMotion(openSec, 0.0, CLUSTER_FRAMES);
     const float gaugeT   = (float)ComputeMotion(openSec, GAUGE_OFFSET, GAUGE_FRAMES);
 
-    // the time-swept READY wordmark (sweeps through the screen at stage start)
+    // the time-swept READY wordmark (sweeps through the screen at stage start) — live,
+    // always drawn; the CSD base has no swept READY overlay.
     DrawReadyOverlay(Now() - openSec >= 0 ? (Now() - openSec) : 0.0);
 
-    // live ring count, right of the Sonic-head emblem (top-left)
+    // live ring count, right of the Sonic-head emblem (top-left) — ALWAYS drawn: the
+    // CSD base draws no number here, so this is a genuinely-missing live value.
     DrawNumber(g_rings, 272.0f, 76.0f, 46.0f, clusterT);
 
-    // live SCORE value on the SCORE band
+    // live SCORE value on the SCORE band — ALWAYS drawn: the CSD base draws no number
+    // here either, so this is the other genuinely-missing live value.
     if (clusterT > 0.0f) {
         auto valueTop = [](float cy){ return cy + ROW_VALUE_DY; };
         DrawNumberLeft(g_score, ROW_COL_X, valueTop(SCORE_ROW_Y), ROW_VALUE_H, clusterT);
     }
 
-    // eased boost-gauge fill (rainbow energy bar + leading-edge glow)
-    DrawBoostGaugeFill(DisplayBoost(openSec), gaugeT);
+    // eased boost-gauge fill (rainbow energy bar + leading-edge glow) — the CSD base
+    // ALREADY draws the complete boost/ring-energy gauge INCLUDING its colored fill,
+    // so this overlay strip is suppressed under a real CSD base (avoids doubling).
+    if (!csdBase)
+        DrawBoostGaugeFill(DisplayBoost(openSec), gaugeT);
 
-    // live ring-count readout: a zero-padded 3-digit value (%03d) beside the gauge
-    if (gaugeT > 0.0f) {
+    // live ring-count readout: a zero-padded 3-digit value (%03d) beside the gauge —
+    // redundant under the CSD base (no CSD slot, no retail counterpart), so it is only
+    // drawn in the hand-authored fallback.
+    if (!csdBase && gaugeT > 0.0f) {
         char ringBuf[8]; std::snprintf(ringBuf, sizeof(ringBuf), "%03d", g_rings % 1000);
         DrawGlyphStringLeft(ringBuf, TIRE_X + 40.0f, 668.0f, DIGIT_H * 0.7f, gaugeT);
     }
@@ -491,7 +503,7 @@ void DrawDynamic(double openSec) {
 void Draw(double openSec) {
     // hand-authored full render: chrome first, live content on top (no CSD base).
     DrawChrome(openSec);
-    DrawDynamic(openSec);
+    DrawDynamic(openSec, /*csdBase*/ false);
 }
 
 } // namespace
@@ -508,7 +520,8 @@ void SonicHudInit() { Init(); }
 void SonicHudDraw(double openSeconds) {
     const bool csdBase = csd::LoadedId() && std::strcmp(csd::LoadedId(), "sonic_hud") == 0;
     if (!csdBase) DrawChrome(openSeconds);   // chrome/background only when no CSD base
-    DrawDynamic(openSeconds);                // live content composites over either base
+    DrawDynamic(openSeconds, csdBase);       // live content composites over either base
+                                             // (boost fill + %03d ring readout gated under a real CSD base)
 }
 void SonicHudInput(const ScreenInput& in) { Input(in); }
 void SonicHudReset() { Reset(); }
