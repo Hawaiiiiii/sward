@@ -20,6 +20,7 @@
 #include "csd_player.h"
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <cmath>
 #include <algorithm>
 
@@ -131,7 +132,7 @@ void Init() {
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
 }
-void Reset() { g_night = false; g_sel = 0; }
+void Reset() { g_night = (std::getenv("SGFX_STATUS_NIGHT") != nullptr); g_sel = 0; }   // debug hook: headless-render the Werehog/night form
 void Input(const ScreenInput& in) {
     int n = g_night ? 5 : 2;   // stat rows; the QUIT plate is index n (selectable)
     if (in.up)   g_sel = std::max(0, g_sel - 1);

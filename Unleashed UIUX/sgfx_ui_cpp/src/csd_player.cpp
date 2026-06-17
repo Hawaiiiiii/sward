@@ -61,6 +61,8 @@ struct Scene {
     std::vector<std::pair<std::string, float>> animList;   // every (animName, frames) the scene declares
     std::string restAnim;          // resolved best-pose animation (resolve_rest port)
     float       restFrame = 0;     // resolved best-pose frame
+    float       restMaxFrames = 0; // full frame count of restAnim (for continuous idle looping)
+    bool        loopRest = false;  // restAnim is a "Usual" idle loop (gem spin / arrow fx) -> fmod, don't hold
     std::vector<Cast> casts;
 };
 
@@ -305,6 +307,29 @@ void resolveRest(Scene& sc) {
         }
     }
     sc.restAnim = bestAnim; sc.restFrame = bestFrame;
+    // Continuous idle: if the settled pose is a "Usual" anim (the resting LOOP — the
+    // rotating EXP gem, the arrow_effect cycles), play it as a continuous fmod loop over
+    // its FULL duration instead of holding a frame. "Intro"/assembly anims still hold
+    // (so e.g. result's tally settles). Static "Usual" anims just cycle identical frames.
+    sc.restMaxFrames = 0.0f; sc.loopRest = false;
+    if (!bestAnim.empty() && bestAnim.find("Usual") != std::string::npos) {
+        float maxf = 0.0f;
+        for (const auto& [name, mf] : sc.animList) if (name == bestAnim) { maxf = mf; break; }
+        if (maxf > 0.0f) {
+            // Only loop if the scene's CONTENT stays STABLE across the whole cycle — i.e. a
+            // smooth in-place idle (the rotating EXP gem, arrow_effect cycles), where every
+            // frame shows the same casts. Anims that FADE content in/out over the cycle (e.g.
+            // gate's stage-preview, which is blank at frame 0) would visibly BLANK if looped,
+            // so those HOLD their fullest frame instead. Gate by the min/max visible-cast ratio.
+            int lo = 1 << 30, hi = 0;
+            const int last = (int)(maxf + 0.5f);
+            for (int f = 0; f <= last; ++f) {            // EVERY frame — a coarse sample misses a
+                int s = poseScore(sc, bestAnim, (float)f); // single dropout frame (e.g. gate's preview)
+                lo = std::min(lo, s); hi = std::max(hi, s);
+            }
+            if (hi > 0 && lo >= (int)(hi * 0.85f + 0.5f)) { sc.restMaxFrames = maxf; sc.loopRest = true; }
+        }
+    }
 }
 
 int texFor(const std::string& tex) {
@@ -437,7 +462,9 @@ void Draw(double elapsedSec) {
         // settled pose. g_loop replays continuously instead of holding.
         float t = (float)(elapsedSec * g_doc.framerate);
         float frame = sc.restFrame;
-        if (sc.restFrame > 0.0f)
+        if (sc.loopRest && sc.restMaxFrames > 0.0f)
+            frame = (float)std::fmod(t, sc.restMaxFrames);   // continuous idle loop (gem/arrows)
+        else if (sc.restFrame > 0.0f)
             frame = g_loop ? (float)std::fmod(t, sc.restFrame) : (t < sc.restFrame ? t : sc.restFrame);
         const int N = (int)sc.casts.size();
         std::vector<int> state(N, 0);
