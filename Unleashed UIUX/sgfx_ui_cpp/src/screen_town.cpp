@@ -55,11 +55,14 @@ constexpr float LV_TEX_W    = 32.0f,   LV_TEX_H    = 16.0f;
 constexpr float GLYPH_TEX_W = 512.0f,  GLYPH_TEX_H = 512.0f;
 
 // tight opaque boxes measured from mat_townscreen_001's alpha channel ----------
-const UV ICON_SUN    = { 0.4922f, 0.0547f, 0.6406f, 0.4453f };  // top row, 3rd icon
-const UV ICON_MOON   = { 0.6406f, 0.0547f, 0.9766f, 0.4453f };  // top row, 4th icon
-const UV ICON_CAMERA = { 0.6484f, 0.4453f, 0.9766f, 0.8125f };  // bottom row, right
-const UV ICON_RING   = { 0.0312f, 0.0234f, 0.3203f, 0.4453f };  // top row, ring/circle
-const UV ICON_TALK   = { 0.0469f, 0.4453f, 0.3047f, 0.7969f };  // bottom row, white oval (speech)
+// Tight sub-rects measured from the 128x128 atlas. (The old values cut partial/
+// overlapping cells: CAMERA pointed at the no-entry sign and MOON spanned the
+// crescent + the camera, so rows showed fragments / a no-entry glyph / collisions.)
+const UV ICON_RING   = { 0.020f, 0.025f, 0.270f, 0.225f };  // ring outline, top-left
+const UV ICON_SUN    = { 0.455f, 0.030f, 0.635f, 0.225f };  // orange sun star, top-centre
+const UV ICON_MOON   = { 0.660f, 0.030f, 0.802f, 0.220f };  // crescent moon, top-right
+const UV ICON_TALK   = { 0.030f, 0.300f, 0.270f, 0.520f };  // filled disc, mid-left
+const UV ICON_CAMERA = { 0.625f, 0.270f, 0.975f, 0.500f };  // camera, mid-right
 
 // real label art rows in mat_comon_en_002 (measured) --------------------------
 const UV LBL_PASS  = { 0.0156f, 0.0273f, 0.5078f, 0.1133f };  // "Pass Time"
