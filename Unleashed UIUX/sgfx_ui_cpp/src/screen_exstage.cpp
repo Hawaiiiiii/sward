@@ -83,9 +83,11 @@ const UV DIGIT_UV[10] = {
 };
 const UV DIGIT_SLASH = { 0.7656f, 0.4609f, 0.9844f, 0.6602f };  // r2 c3
 
-// localized EX banner â€” the "CHANCE ATTACK" row of mat_hit_en_001 (the most
-// EX-flavoured wordmark on the atlas). Measured opaque band px (4,60)-(500,122).
-const UV BANNER_UV = { 0.0078f, 0.1172f, 0.9766f, 0.2383f };
+// localized EX banner — the "CHANCE ATTACK" wordmark row of mat_hit_en_001. The
+// localized rows are stacked ~38px apart; the old band (v0.117-0.238) ran past this
+// row into the "CRITICAL" row below, which then clipped against the plate bottom.
+// Tightened the vertical band to this row only (measured opaque band y68-106).
+const UV BANNER_UV = { 0.0078f, 0.128f, 0.9766f, 0.212f };
 
 // EX stat labels in mat_ex_en_001 (128x64): "SHIELD" top-left, "ENERGY" lower-right.
 const UV LABEL_SHIELD = { 0.0156f, 0.0312f, 0.5625f, 0.3125f };  // px (2,2)-(72,20)
