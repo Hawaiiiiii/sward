@@ -84,9 +84,7 @@ static const ScreenDef g_screens[] = {
     { "mediaroom",      &MediaRoomInit,     &MediaRoomDraw,     &MediaFlowInput,     &MediaRoomReset, &WrapNav },
     { "loading",        &LoadingInit,       &LoadingDraw,       &LoadingInput,       &LoadingReset,   nullptr },
     { "start",          &StartInit,         &StartDraw,         &StartInput,         &StartReset,     nullptr },
-    { "qte",            &QteInit,           &QteDraw,           &QteInput,           &QteReset,       nullptr },
     { "balloon",        &BalloonInit,       &BalloonDraw,       &BalloonFlowInput,   &BalloonReset,   &WrapNav },
-    { "exstage",        &ExStageInit,       &ExStageDraw,       &ExStageInput,       &ExStageReset,   nullptr },
     { "world_map_help", &WorldMapHelpInit,  &WorldMapHelpDraw,  &WmHelpFlowInput,    &WorldMapHelpReset, &WrapNav },
 };
 

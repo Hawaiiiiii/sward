@@ -1,239 +1,162 @@
-﻿// =============================================================================
-// screen_installer.cpp â€” the UnleashedRecomp INSTALLER (Language-Select page),
-// ported PIXEL- and MOTION-exact from ui/installer_wizard.cpp (the literal code
-// that drew it). 1280x720 WIDE so Scale(n)==n, GRID_SIZE=9. Every rect/colour/font
-// and the full STAGGERED entrance timeline are transcribed from that source.
-//
-// Layout: black bg; left install image (161.5,103.5 512x512); two green SCANLINE
-// bars (top y0..105, bottom y615..720) capped by mint divider lines; gold beveled
-// "INSTALLER" title (DFSoGei 48 @122/288,54.5); Miles icon (256,80); right
-// CHECKERBOARD green container (main 514,227-1040,473 + side ->1280) with a 3x2
-// language-pill grid (250x22, cols x522/x780.5, rows y441/410/379, bottom-up:
-// FRANÃ‡AIS/DEUTSCH/ENGLISH | ESPAÃ‘OL/ITALIANO/æ—¥æœ¬èªž; ENGLISH default-lit) + a
-// right-aligned NEXT pill; footer Select/Quit guide; version bottom-right.
-// Entrance (frames@60, sqrt ease-out, ComputeMotion(openSec,offset,total)):
-//   scanlines 0/15, miles 10/15, title 15/30, borders 15/23, image 25/15,
-//   right-panel 38/23, inner-panel+pills+NEXT 46/15, footer pops at ~61.
-// Shaders approximated with MOD_SCANLINE/MOD_CHECKERBOARD/MOD_TITLE_BEVEL.
+// =============================================================================
+// screen_installer.cpp — the SETUP / onboarding screen. A single dark-IDE panel
+// titled "Setup" listing the tool's dependency / onboarding steps and their state
+// (found / install / set). Built from primitives + text only (no chrome art, no
+// third-party atlas) in the dark-IDE neutral aesthetic shared with screen_status.cpp
+// / screen_town.cpp / screen_options.cpp. Logo-only header (no wordmark).
+// Up/Down move the cursor; Enter continues, Esc backs out (host-driven).
+// State per row is colour-coded: green found / amber install / dim not-set.
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
 #include <cstdio>
-#include <cstring>
 #include <algorithm>
 
 using namespace ui;
 namespace {
 
-int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_glyphTex = -1;
-int g_installTex = -1, g_milesTex = -1;   // real recomp install_001.dds + miles_electric_icon.dds
-struct UV { float u0, v0, u1, v1; };
-constexpr float GTW = 512.0f, GTH = 512.0f;
-const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
-const UV GLYPH_B = { 0.08008f, 0.00781f, 0.15039f, 0.07422f };
+int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_logoTex = -1;
 
-// exact colours
-const uint32_t C_BLACK   = RGBA(0, 0, 0, 255);
-const uint32_t C_TITLE   = RGBA(255, 195, 0, 255);
-const uint32_t C_SCAN0   = RGBA(203, 255, 0, 0);
-const uint32_t C_SCAN1   = RGBA(203, 255, 0, 55);
-const uint32_t C_DIV_T   = RGBA(222, 255, 189, 65);
-const uint32_t C_DIV_B   = RGBA(173, 255, 156, 65);
-const uint32_t C_DIV_C   = RGBA(115, 178, 104, 255);
-const uint32_t C_GRID     = RGBA(0, 33, 0, 255);
-const uint32_t C_GRID_T   = RGBA(0, 33, 0, 223);
-const uint32_t C_GRID_OV  = RGBA(0, 32, 0, 128);
-const uint32_t C_BORDER_L = RGBA(155, 200, 155, 255);
-const uint32_t C_BORDER_R = RGBA(155, 225, 155, 255);
-const uint32_t C_PILL_T   = RGBA(0, 130, 0, 223);
-const uint32_t C_PILL_B   = RGBA(0, 130, 0, 150);
-const uint32_t C_PILL_SEL_T = RGBA(48, 162, 0, 235);
-const uint32_t C_PILL_SEL_B = RGBA(48, 162, 0, 160);
-const uint32_t C_PILL_TXT = RGBA(196, 245, 40, 255);
-const uint32_t C_LIGHT_ON = RGBA(206, 255, 60, 255);
-const uint32_t C_LIGHT_OFF= RGBA(36, 60, 36, 255);
-const uint32_t C_GLOW     = RGBA(255, 255, 0, 127);
-const uint32_t C_VERSION  = RGBA(255, 255, 255, 70);
+// ---- palette (dark, neutral — matches screen_status.cpp / screen_options.cpp) -
+const uint32_t C_BG_TOP   = RGBA(12, 20, 38, 255), C_BG_BOT = RGBA(5, 9, 18, 255);
+const uint32_t C_PANEL    = RGBA(16, 24, 40, 235);
+const uint32_t C_PANEL_CAP= RGBA(10, 16, 28, 255);
+const uint32_t C_SEL_TOP  = RGBA(64, 150, 235, 225), C_SEL_BOT = RGBA(28, 92, 180, 225);
+const uint32_t C_TITLE    = RGBA(255, 209, 74, 255);
+const uint32_t C_TEXT     = RGBA(214, 226, 240, 255);
+const uint32_t C_TEXT_SEL = RGBA(255, 255, 255, 255);
+const uint32_t C_RULE     = RGBA(120, 170, 230, 90);
+const uint32_t C_LABEL    = RGBA(150, 170, 196, 255);
+const uint32_t C_FOUND    = RGBA(120, 230, 140, 255);   // dependency present (green)
+const uint32_t C_INSTALL  = RGBA(235, 200, 90, 255);    // needs installing (amber)
+const uint32_t C_DIM      = RGBA(120, 138, 158, 255);   // not yet set (dim)
+const uint32_t C_FOOTER   = RGBA(190, 205, 225, 220);
 const uint32_t C_WHITE    = RGBA(255, 255, 255, 255);
-const uint32_t C_MILES    = RGBA(70, 130, 200, 255);
 
-// geometry
-constexpr float GRID = 9;
-constexpr float IMG_X0 = 161.5f, IMG_Y0 = 103.5f, IMG_X1 = 673.5f, IMG_Y1 = 615.5f;
-constexpr float MAIN_X0 = 514, MAIN_Y0 = 227, MAIN_X1 = 1040, MAIN_Y1 = 473;
-constexpr float SIDE_X0 = 1040, SIDE_X1 = 1280;
-constexpr float PILL_W = 250, PILL_H = 22, PILL_GAP = 9;
-constexpr float COLL_X0 = 522, COLL_X1 = 772, COLR_X0 = 780.5f, COLR_X1 = 1030.5f;
+// ---- onboarding step model --------------------------------------------------
+// Each step is a dependency or configuration the tool needs before a run. The
+// state drives the colour of the right-aligned status word (representative until
+// a live probe supplies the real result).
+enum State { FOUND, INSTALL, SET, NOTSET };
+struct Step { const char* label; const char* detail; State state; };
+const Step STEPS[] = {
+    { "RaConverter",        "Asset converter, required for export.",     FOUND   },
+    { "RaCoHeadless",       "Headless export runner for screenshots.",  INSTALL },
+    { "Blender",            "Used by the geometry checks.",             FOUND   },
+    { "Digital-3D-Car repo","The car-models working copy the tool reads.", SET  },
+};
+constexpr int STEP_COUNT = int(sizeof(STEPS) / sizeof(STEPS[0]));
 
-const char* const LANGS[6] = { "FRANCAIS", "DEUTSCH", "ENGLISH", "ESPANOL", "ITALIANO", "JAPANESE" };
-int g_sel = 2;        // cursor (ENGLISH default)
-int g_langSet = 2;    // the chosen language (lit toggle); set on accept
+int g_sel = 0;
+
+// ---- layout (reference px) --------------------------------------------------
+constexpr float RULE_Y = 118.0f;
+constexpr float PANEL_X = 280.0f, PANEL_Y = 158.0f, PANEL_W = 720.0f, PANEL_H = 404.0f;
+constexpr float HEADER_H = 52.0f;
+constexpr float ROW_H = 78.0f;
+constexpr float ROW_PAD = 14.0f;
+
+// ---- entrance tuning (frames @60fps) ----------------------------------------
+constexpr double TITLE_FRAMES = 14.0, PANEL_FRAMES = 16.0;
+constexpr double FOOT_OFFSET = 10.0, FOOT_FRAMES = 12.0;
+
+const char* StateWord(State s) {
+    switch (s) {
+        case FOUND:   return "found";
+        case INSTALL: return "install";
+        case SET:     return "set";
+        default:      return "not set";
+    }
+}
+uint32_t StateColour(State s) {
+    switch (s) {
+        case FOUND: case SET: return C_FOUND;
+        case INSTALL:         return C_INSTALL;
+        default:              return C_DIM;
+    }
+}
 
 void Init() {
-    if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
-    if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");      // real game MSDF
-    if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");    // real game MSDF
-    if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");   // real DFSoGeiStd-W7 MSDF (crisp title + buttons)
-    if (g_installTex < 0) g_installTex = gfx::loadTexture("assets/recomp/inst_install_001.png");
-    if (g_milesTex   < 0) g_milesTex   = gfx::loadTexture("assets/recomp/inst_miles_icon.png");
+    if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
+    if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
+    if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
+    if (g_logoTex < 0)  g_logoTex = gfx::loadTexture("assets/gameart/boot_logo.png");
 }
-void Reset() { g_sel = 2; g_langSet = 2; }
+void Reset() { g_sel = 0; }
 void Input(const ScreenInput& in) {
-    if (in.up)    g_sel = (g_sel % 3 == 0) ? g_sel : g_sel - 1;
-    if (in.down)  g_sel = (g_sel % 3 == 2) ? g_sel : g_sel + 1;
-    if (in.left)  g_sel = std::max(0, g_sel - 3);
-    if (in.right) g_sel = std::min(5, g_sel + 3);
-    if (in.accept) g_langSet = g_sel;   // commit the highlighted language (lights its toggle)
+    if (in.up)   g_sel = std::max(0, g_sel - 1);
+    if (in.down) g_sel = std::min(STEP_COUNT - 1, g_sel + 1);
 }
 
-// a green checkerboard container (DrawContainer recipe)
-void DrawContainer(float x0, float y0, float x1, float y1, uint32_t grid, float t, bool overlay) {
-    SetModifier(MOD_CHECKERBOARD);
-    DrawRect({ x0, y0 }, { x1, y1 }, WithAlpha(grid, t));
-    ResetModifier();
-    if (overlay) DrawRect({ x0, y0 }, { x1, y1 }, WithAlpha(C_GRID_OV, t));
-}
-
-// the SHARED button plate, ported EXACT from installer_wizard.cpp DrawButtonContainer
-// (L917): three AddRectFilledMultiColor layers under SCANLINE_BUTTON, parameterised by
-// (baser,baseg) — 0/0 for a resting button, 48/32 for the focused (hovered) one. This is
-// the same 3-layer recipe as the options value cell (screen_options.cpp DrawPlate).
-void DrawButtonPlate(float x0, float y0, float x1, float y1, int br, int bg, float a) {
-    auto A = [&](int base) { return (uint8_t)std::clamp((int)lround(base * a), 0, 255); };
-    SetModifier(MOD_SCANLINE_BUTTON);
-    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(br,bg+130,0,A(223)), RGBA(br,bg+130,0,A(178)), RGBA(br,bg+130,0,A(223)), RGBA(br,bg+130,0,A(178)));
-    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(br,bg,0,A(13)),      RGBA(br,bg,0,0),           RGBA(br,bg,0,A(55)),      RGBA(br,bg,0,A(6)));
-    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(br,bg+130,0,A(13)),  RGBA(br,bg+130,0,A(111)),  RGBA(br,bg+130,0,0),      RGBA(br,bg+130,0,A(55)));
-    ResetModifier();
-}
-
-// DrawButton (installer_wizard.cpp L943): the plate + centred DFSoGei-20 label with a
-// green vertical gradient (br+192,255,0 -> br+128,bg+170,0) and a 4px outline (br,bg,0).
-void DrawButton(float x0, float y0, float x1, float y1, const char* text, bool focused, float a) {
-    const int br = focused ? 48 : 0, bg = focused ? 32 : 0;
-    DrawButtonPlate(x0, y0, x1, y1, br, bg, a);
+// a neutral dark panel with a caption strip + rule (screen_town.cpp idiom).
+void DrawPanel(float x, float y, float w, float h, float t, const char* caption) {
+    DrawRect({ x, y }, { x + w, y + h }, WithAlpha(C_PANEL, t));
+    DrawRect({ x, y }, { x + w, y + HEADER_H }, WithAlpha(C_PANEL_CAP, t));
+    DrawRect({ x + 12, y + HEADER_H - 2 }, { x + w - 12, y + HEADER_H }, WithAlpha(C_RULE, t));
     SetFont(g_fDF);
-    const float sz = 20.0f; float w = MeasureText(sz, text).x; float sx = 1.0f;
-    const float boxW = x1 - x0; if (w > boxW && w > 0.0f) sx = boxW / w;
-    float dw = w * sx, px = x0 + (boxW - dw) * 0.5f, py = y0 + ((y1 - y0) - sz) * 0.5f - 1.0f;
-    if (sx != 1.0f) SetTextStretchX(sx);
-    static const float O[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
-    for (auto& o : O) DrawText({ px + o[0]*1.6f, py + o[1]*1.6f }, sz, WithAlpha(RGBA(br,bg,0,255), a), text);
-    DrawTextGradient({ px, py }, sz, WithAlpha(RGBA(br+192,255,0,255), a), WithAlpha(RGBA(br+128,bg+170,0,255), a), text);
-    if (sx != 1.0f) ResetTextStretchX();
+    DrawTextAligned({ x + 18, y }, { x + w - 14, y + HEADER_H }, 26.0f,
+                    WithAlpha(C_TITLE, t), caption, Align::Left, true, true);
+    ResetFont();
 }
 
-// toggle light (imgui_utils.cpp DrawToggleLight): 14px lit/dark dot + additive yellow glow
-void DrawTLight(float x0, float y0, bool on, float a) {
-    const float ls = 14.0f, lcx = x0 + ls*0.5f, lcy = y0 + ls*0.5f;
-    if (on) { const float gs = 24.0f; float gx = x0 - gs*0.5f + 2.0f, gy = y0 - gs*0.5f;
-              DrawRect({ gx, gy }, { gx+gs, gy+gs }, WithAlpha(C_GLOW, a), true); }
-    auto disc = [&](float r, uint32_t c){ float k = r*0.4142f;
-        DrawRect({ lcx-r, lcy-k }, { lcx+r, lcy+k }, c); DrawRect({ lcx-k, lcy-r }, { lcx+k, lcy+r }, c);
-        DrawRect({ lcx-r*0.78f, lcy-r*0.78f }, { lcx+r*0.78f, lcy+r*0.78f }, c); };
-    disc(ls*0.5f, WithAlpha(on ? C_LIGHT_ON : C_LIGHT_OFF, a));
-}
-
-// one animated container border (installer_wizard.cpp DrawHorizontal/VerticalBorder):
-// a solid mint line that fades toward its far ends and sweeps open from the centre.
-void DrawHBorder(float y, float prog) {   // prog: 0..1 entrance
-    const uint32_t SOLID = RGBA(155,200,155,255), FADE = RGBA(155,200,155,0), FADE_R = RGBA(155,225,155,0);
-    float bs = 1.0f - prog;
-    const float CX = 513.0f, CW = 526.5f, SIDE = CW*0.5f, OVER = 36.0f;
-    float midX = CX + CW/5.0f;
-    float minX = Lerp(CX - 1 - OVER, midX, bs), maxX = Lerp(CX + CW + SIDE + OVER, midX, bs);
-    DrawQuadGradient({minX,y},{midX,y+1}, FADE, SOLID, SOLID, FADE);
-    DrawQuadGradient({midX,y},{std::min(maxX,REF_W),y+1}, SOLID, FADE_R, FADE_R, SOLID);
-}
-void DrawVBorder(float x, bool right, float prog) {
-    const uint32_t SOLID = right ? RGBA(155,225,155,255) : RGBA(155,155,155,255);
-    const uint32_t FADE  = right ? RGBA(155,225,155,0)   : RGBA(155,155,155,0);
-    float bs = 1.0f - prog;
-    const float CY = 226.0f, CH = 246.0f, OVER = 36.0f;
-    float midY = CY + CH/2.0f;
-    float minY = Lerp(CY - OVER, midY, bs), maxY = Lerp(CY + CH + OVER, midY, bs);
-    DrawQuadGradient({x,minY},{x+1,midY}, FADE, FADE, SOLID, SOLID);
-    DrawQuadGradient({x,midY},{x+1,maxY}, SOLID, SOLID, FADE, FADE);
+// host logo drops into the top-left slot; if it failed to load, draw NOTHING.
+void DrawLogoSlot(float t) {
+    if (g_logoTex < 0 || t <= 0.0f) return;
+    const float w = 168.0f, h = w * 200.0f / 600.0f;
+    DrawImage(g_logoTex, { 40, 40 }, { 40 + w, 40 + h }, { 0, 0 }, { 1, 1 }, WithAlpha(C_WHITE, t));
 }
 
 void Draw(double openSec) {
-    // ---- staggered entrance motions (frames @60) ----
-    float mScan  = (float)ComputeMotion(openSec, 0.0, 15.0);
-    float mMiles = (float)ComputeMotion(openSec, 10.0, 15.0);
-    float mTitle = (float)ComputeMotion(openSec, 15.0, 30.0);
-    float mBord  = (float)ComputeMotion(openSec, 15.0, 23.0);
-    float mImg   = (float)ComputeMotion(openSec, 25.0, 15.0);
-    float mOuter = (float)ComputeMotion(openSec, 38.0, 23.0);
-    float mInner = (float)ComputeMotion(openSec, 46.0, 15.0);
+    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_TOP, C_BG_BOT);
 
-    DrawRect({ 0, 0 }, { REF_W, REF_H }, C_BLACK);
+    const float titleT = (float)ComputeMotion(openSec, 0.0, TITLE_FRAMES);
+    const float panelT = (float)ComputeMotion(openSec, 0.0, PANEL_FRAMES);
+    const float footT  = (float)ComputeMotion(openSec, FOOT_OFFSET, FOOT_FRAMES);
 
-    // ---- left install image: the REAL install_001.dds (512x512) ----
-    if (mImg > 0) {
-        if (g_installTex >= 0) {
-            DrawImage(g_installTex, { IMG_X0, IMG_Y0 }, { IMG_X1, IMG_Y1 }, { 0, 0 }, { 1, 1 }, WithAlpha(C_WHITE, mImg));
-        } else {
-            DrawRect({ IMG_X0, IMG_Y0 }, { IMG_X1, IMG_Y1 }, WithAlpha(RGBA(18,22,30,255), mImg));
-            DrawRect({ IMG_X0+8, IMG_Y0+8 }, { IMG_X1-8, IMG_Y1-8 }, WithAlpha(RGBA(28,36,52,255), mImg));
-            SetFont(g_fSeurat);
-            DrawTextAligned({ IMG_X0, (IMG_Y0+IMG_Y1)*0.5f-16 }, { IMG_X1, (IMG_Y0+IMG_Y1)*0.5f+16 }, 22.0f, WithAlpha(RGBA(120,140,170,255), mImg), "INSTALL IMAGE", Align::Center, true, true);
-        }
+    // ===== HEADER: logo slot only (no wordmark / title text) ==================
+    DrawLogoSlot(titleT);
+    DrawRect({ PANEL_X, RULE_Y }, { 1000.0f, RULE_Y + 2.0f }, WithAlpha(C_RULE, titleT));
+
+    // ===== SETUP PANEL ========================================================
+    const float px = PANEL_X, py = PANEL_Y + (1.0f - panelT) * 24.0f;
+    DrawPanel(px, py, PANEL_W, PANEL_H, panelT, "Setup");
+    const float rowsTop = py + HEADER_H + 12.0f;
+    const float rowL = px + ROW_PAD, rowR = px + PANEL_W - ROW_PAD;
+
+    // selection highlight
+    if (panelT > 0.5f) {
+        float hy = rowsTop + g_sel * ROW_H;
+        DrawVGradient({ rowL, hy + 3 }, { rowR, hy + ROW_H - 6 },
+                      WithAlpha(C_SEL_TOP, panelT), WithAlpha(C_SEL_BOT, panelT));
     }
 
-    // ---- scanline bars (grow) + divider lines ----
-    float h = 105.0f * mScan;
-    if (h > 0.5f) {
-        SetModifier(MOD_SCANLINE);
-        DrawVGradient({ 0, 0 }, { REF_W, h }, WithAlpha(C_SCAN0, mScan), WithAlpha(C_SCAN1, mScan));
-        DrawVGradient({ 0, REF_H - h }, { REF_W, REF_H }, WithAlpha(C_SCAN1, mScan), WithAlpha(C_SCAN0, mScan));
-        ResetModifier();
-        auto divline = [&](float y){
-            DrawRect({ 0, y-2 }, { REF_W, y }, WithAlpha(C_DIV_T, mScan));
-            DrawRect({ 0, y+1 }, { REF_W, y+3 }, WithAlpha(C_DIV_B, mScan));
-            DrawRect({ 0, y }, { REF_W, y+1 }, WithAlpha(C_DIV_C, mScan));
-        };
-        divline(h); divline(REF_H - h);
+    for (int i = 0; i < STEP_COUNT; ++i) {
+        float top = rowsTop + i * ROW_H;
+        bool selected = (i == g_sel);
+        const Step& s = STEPS[i];
+        // label (name) on the left
+        SetFont(g_fSeurat);
+        DrawTextAligned({ rowL + 18.0f, top + 6.0f }, { rowR - 160.0f, top + 40.0f }, 26.0f,
+                        WithAlpha(selected ? C_TEXT_SEL : C_TEXT, panelT),
+                        s.label, Align::Left, true, true);
+        // detail sub-line
+        SetFont(g_fRodin);
+        DrawTextAligned({ rowL + 18.0f, top + 40.0f }, { rowR - 160.0f, top + 70.0f }, 18.0f,
+                        WithAlpha(C_LABEL, panelT), s.detail, Align::Left, true, true);
+        // state word, right-aligned + colour-coded
+        DrawTextAligned({ rowR - 150.0f, top + 6.0f }, { rowR - 8.0f, top + ROW_H - 12.0f }, 24.0f,
+                        WithAlpha(StateColour(s.state), panelT), StateWord(s.state),
+                        Align::Right, true, true);
+        ResetFont();
     }
 
-    // ---- Miles Electric icon: the REAL miles_electric_icon.dds (64x64), zoom-in ----
-    if (mMiles > 0) { float s = 62.0f * (2.0f - mMiles);
-        if (g_milesTex >= 0) DrawImage(g_milesTex, { 256 - s*0.5f, 80 - s*0.5f }, { 256 + s*0.5f, 80 + s*0.5f }, { 0, 0 }, { 1, 1 }, WithAlpha(C_WHITE, mMiles*0.9f));
-        else DrawRect({ 256 - s*0.5f, 80 - s*0.5f }, { 256 + s*0.5f, 80 + s*0.5f }, WithAlpha(C_MILES, mMiles*0.9f)); }
-
-    // ---- title ----
-    if (mTitle > 0) { SetFont(g_fDF); DrawTextBevel({ 288, 54.5f }, 48.0f, WithAlpha(C_TITLE, mTitle), "INSTALLER"); }
-
-    // ---- right content container (checkerboard) ----
-    if (mOuter > 0) DrawContainer(SIDE_X0, MAIN_Y0, SIDE_X1, MAIN_Y1, C_GRID, mOuter, false);
-    if (mInner > 0) DrawContainer(MAIN_X0, MAIN_Y0, MAIN_X1, MAIN_Y1, C_GRID_T, mInner, true);
-
-    // ---- language buttons (3x2) + toggle lights (installer_wizard DrawLanguagePicker) ----
-    if (mInner > 0) {
-        for (int i = 0; i < 6; ++i) {
-            float cx0 = (i < 3) ? COLL_X0 : COLR_X0, cx1 = (i < 3) ? COLL_X1 : COLR_X1;
-            int row = i % 3;
-            float py0 = 441.0f - (PILL_GAP + PILL_H) * row, py1 = py0 + PILL_H;   // rows 441/410/379
-            DrawButton(cx0, py0, cx1, py1, LANGS[i], i == g_sel, mInner);          // cursor = focus-brighten
-            DrawTLight(cx0 + 14, py0 + (PILL_H - 14) * 0.5f + 1, i == g_langSet, mInner);  // light = chosen language
-        }
-        // NEXT navigation button (DFSoGei, right-aligned just below the container)
-        SetFont(g_fDF); float ntw = MeasureText(20.0f, "NEXT").x, nx1 = 1035.5f;
-        DrawButton(nx1 - ntw - 28.0f, 477.0f, nx1, 499.0f, "NEXT", false, mInner);
-    }
-
-    // ---- container borders (drawn on top; mint, fading at the ends, sweep from centre) ----
-    if (mBord > 0) {
-        DrawHBorder(225.0f, mBord); DrawHBorder(472.0f, mBord);
-        DrawVBorder(512.0f, false, mBord); DrawVBorder(1039.5f, true, mBord);
-    }
-
-    // ---- footer (shared button-guide; pops at ~frame 61) + version ----
-    if (mInner >= 0.999f) {
-        static const GuideBtn FOOTER[] = {
-            { "Select", GIcon::A, GAlign::Right, 115.0f },
-            { "Quit",   GIcon::B, GAlign::Right, 0.0f   },
-        };
-        DrawButtonGuide(FOOTER, 2, g_fRodin, 1.0f, 379.0f);
+    // ===== FOOTER =============================================================
+    {
+        SetFont(g_fRodin);
+        DrawRect({ PANEL_X, 612.0f }, { 1000.0f, 614.0f }, WithAlpha(C_RULE, footT));
+        DrawText({ PANEL_X, 628.0f }, 20.0f, WithAlpha(C_FOOTER, footT), "Enter  Continue");
+        DrawText({ PANEL_X + 250.0f, 628.0f }, 20.0f, WithAlpha(C_FOOTER, footT), "Esc  Back");
+        ResetFont();
     }
 }
 
