@@ -398,8 +398,8 @@ void DrawDynamic(double openSec, bool csdBase) {
         // the rows readable (and disambiguate the two "lv 7 (200)" medal rows, which are
         // otherwise identical) — SUN = day medals, MOON = night medals.
         struct Row { uint32_t icol; bool ring; const char* label; const char* val; int medTex; } rows[] = {
-            { C_LIVES, false, "LIVES", "99",     -1 },
-            { C_RING,  true,  "RINGS", "999999", -1 },
+            { C_LIVES, false, "LIVES", "5",    -1 },
+            { C_RING,  true,  "RINGS", "1230", -1 },
             { C_SUN,   true,  "SUN",   "lv 7 (200)", g_sunTex },
             { C_MOON,  true,  "MOON",  "lv 7 (200)", g_moonTex },
         };
@@ -411,15 +411,20 @@ void DrawDynamic(double openSec, bool csdBase) {
             else
                 DrawIconSlot(140, cy, 14, rows[i].icol, rows[i].ring, t);
             // label (dimmer green) then the bright value to its right
-            DrawText({ 178, cy - 13 }, 17.0f, WithAlpha(C_SIP_DESC, t), rows[i].label);
-            DrawText({ 178 + MeasureText(17.0f, rows[i].label).x + 8, cy - 13 }, 24.0f, WithAlpha(C_NUM, t), rows[i].val);
+            DrawText({ 178, cy - 11 }, 14.0f, WithAlpha(C_SIP_DESC, t), rows[i].label);
+            DrawText({ 178 + MeasureText(14.0f, rows[i].label).x + 8, cy - 11 }, 17.0f, WithAlpha(C_NUM, t), rows[i].val);
         }
         ResetFont();
     }
 
-    // (the CSD base draws its own gold "WORLD MAP" title; an earlier screen-local 'P'
-    //  repair patch mis-measured the CSD title position and garbled it, so it was removed
-    //  — the CSD title is left as-is.)
+    // The CSD base draws "WORLD MAP" through the dfsogei title font, whose 'P' atlas cell
+    // is corrupt — it renders as a solid block with no counter. The title sits on the dark
+    // background (above the green LED band), so mask that block with the background colour
+    // and redraw a clean rect-built 'P' in the title gold (same glyph the no-CSD path uses).
+    if (csdBase) {
+        DrawRect({ 486, 63 }, { 530, 102 }, WithAlpha(RGBA(41, 51, 39, 255), tTitle));
+        DrawGlyphP(491, 66, 33.0f, WithAlpha(RGBA(255, 235, 30, 255), tTitle));   // match the CSD title's bright gold
+    }
 
     // ---- floating stage label/leader rule: ALWAYS drawn (the CSD base lacks the
     //      floating SPAGONIA name + its gradient leader rule toward the marker) ----
