@@ -74,7 +74,7 @@ static const ScreenDef g_screens[] = {
     { "installer", &InstallerInit, &InstallerDraw, &InstallerInput, &InstallerReset, nullptr },
     { "boot_loading", &BootLoadingInit, &BootLoadingDraw, &BootLoadingInput, &BootLoadingReset, nullptr },
     { "title",     &TitleInit,    &TitleDraw,    &TitleInput,    &TitleReset,    nullptr },
-    { "world_map", &WorldMapInit, &WorldMapDraw, &WorldMapInput, &WorldMapReset, &WorldMapNav, "world_map", &CsdDay },
+    { "world_map", &WorldMapInit, &WorldMapDraw, &WorldMapInput, &WorldMapReset, &WorldMapNav },
     { "status",    &StatusInit,   &StatusDraw,   &StatusFlowInput, &StatusReset, &WrapNav, "status", &StatusCsdState },
     { "sonic_hud", &SonicHudInit, &SonicHudDraw, &HudFlowInput,    &SonicHudReset, &WrapNav },
     { "pause",     &PauseInit,    &PauseDraw,    &PauseInput,   &PauseReset,  &PauseNav },
