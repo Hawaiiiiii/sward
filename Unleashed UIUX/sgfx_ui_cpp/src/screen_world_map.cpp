@@ -12,6 +12,7 @@
 #include "sgfxui.h"
 #include "globe3d.h"
 #include "screen.h"
+#include "sgfx_data.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -87,15 +88,7 @@ const Area AREAS[] = {
 };
 constexpr int AREA_COUNT = int(sizeof(AREAS) / sizeof(AREAS[0]));
 
-// ---- hub totals (left column, global) — representative pending the live feed --
-struct Total { const char* label; const char* value; };
-const Total TOTALS[] = {
-    { "PROFILES",      "19"     },
-    { "DELIVERED",     "7 / 19" },
-    { "OPEN FINDINGS", "24"     },
-    { "IN REVIEW",     "6"      },
-};
-constexpr int TOTAL_COUNT = int(sizeof(TOTALS) / sizeof(TOTALS[0]));
+// ---- hub totals (left column): from the live data bridge, or defaults -----------
 
 // ---- state ------------------------------------------------------------------
 int g_sel = 0;
@@ -161,13 +154,15 @@ void DrawLogoSlot(float t) {
 void DrawTotals(float t) {
     DrawPanel(LP_X0, LP_Y0, LP_X1, LP_Y1, t);
     SetFont(g_fRodin);
+    const auto& totals = sgfx::Get().hubTotals;
+    const int n = (int)totals.size();
     const float rowTop = LP_Y0 + 26, pitch = 50;
-    for (int i = 0; i < TOTAL_COUNT; ++i) {
+    for (int i = 0; i < n; ++i) {
         float y = rowTop + i * pitch;
-        DrawText({ LP_X0 + 22, y }, 15.0f, WithAlpha(C_LABEL, t), TOTALS[i].label);
+        DrawText({ LP_X0 + 22, y }, 15.0f, WithAlpha(C_LABEL, t), totals[i].label.c_str());
         DrawTextAligned({ LP_X0 + 22, y + 16 }, { LP_X1 - 22, y + 40 }, 22.0f,
-                        WithAlpha(C_VALUE, t), TOTALS[i].value, Align::Left, true, false);
-        if (i < TOTAL_COUNT - 1) DrawDashes(y + 44, LP_X0 + 20, LP_X1 - 18, t);
+                        WithAlpha(C_VALUE, t), totals[i].value.c_str(), Align::Left, true, false);
+        if (i < n - 1) DrawDashes(y + 44, LP_X0 + 20, LP_X1 - 18, t);
     }
     ResetFont();
 }

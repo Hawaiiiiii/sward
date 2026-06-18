@@ -8,6 +8,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "sgfx_data.h"
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
@@ -58,6 +59,13 @@ const Profile PROFILES[] = {
     { "U12", "BMW U12 classic slice", "Classic", "Classic anchor families and",     "legacy RaCo version policy.",    "not run"      },
 };
 constexpr int PROFILE_COUNT = int(sizeof(PROFILES) / sizeof(PROFILES[0]));
+
+// the profile's last verdict: from the live data bridge (by id), or the static fallback.
+const char* ProfileVerdict(const Profile& p) {
+    for (const auto& ps : sgfx::Get().profileStatus)
+        if (ps.id == p.id) return ps.verdict.c_str();
+    return p.verdict;
+}
 
 // ---- layout -----------------------------------------------------------------
 constexpr float ID_CY = 168;                          // big id baseline band
@@ -190,7 +198,7 @@ void Draw(double openSec) {
         SetFont(g_fRodin);
         DrawText({ DP_X0 + 28, DP_Y0 + 162 }, 16.0f, WithAlpha(C_LABEL, dp), "LAST VERDICT");
         DrawTextAligned({ DP_X0 + 28, DP_Y0 + 178 }, { DP_X1 - 26, DP_Y0 + 206 }, 24.0f,
-                        WithAlpha(C_VALUE, dp), p.verdict, Align::Left, true, false);
+                        WithAlpha(C_VALUE, dp), ProfileVerdict(p), Align::Left, true, false);
         ResetFont();
     }
 

@@ -29,6 +29,8 @@ void makeDefaults(Status& s) {
         {"automatic_Doors_","baseline_candidate_ready",0}, {"welcome_animation_","needs_manual_review",310},
         {"highlighting_Doors","baseline_missing",0},
     };
+    s.hubTotals = { {"PROFILES","19"}, {"DELIVERED","7 / 19"}, {"OPEN FINDINGS","24"}, {"IN REVIEW","6"} };
+    s.profileStatus.clear();
     s.loaded = false;
 }
 
@@ -85,6 +87,17 @@ bool Load(const char* path) {
         r.filters.clear();
         for (const auto& jf : jr["battery"])
             r.filters.push_back({ jf.value("name", std::string()), jf.value("verdict", std::string("likely_ok")), jf.value("diff",0) });
+    }
+    // top-level (alongside "run")
+    if (j.contains("hubTotals") && j["hubTotals"].is_array()) {
+        g_status.hubTotals.clear();
+        for (const auto& jt : j["hubTotals"])
+            g_status.hubTotals.push_back({ jt.value("label", std::string()), jt.value("value", std::string()) });
+    }
+    if (j.contains("profiles") && j["profiles"].is_array()) {
+        g_status.profileStatus.clear();
+        for (const auto& jp : j["profiles"])
+            g_status.profileStatus.push_back({ jp.value("id", std::string()), jp.value("verdict", std::string()) });
     }
 
     g_status.loaded = true;

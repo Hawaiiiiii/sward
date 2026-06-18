@@ -104,21 +104,63 @@ def build_status(report: dict, snapshot: dict | None = None) -> dict:
     return {"run": run}
 
 
+def scan_reports(reports_dir: Path) -> tuple[list[dict], list[dict]]:
+    """Scan a directory of per-profile reports -> (profiles, hubTotals) for the hub view."""
+    profiles: list[dict] = []
+    total_err = total_warn = with_findings = clean = 0
+    for rp in sorted(reports_dir.rglob("*-report.json")):
+        try:
+            rep = json.loads(rp.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        pid = str(rep.get("context", {}).get("car_model", "")) or str(rep.get("bundle", ""))
+        if not pid:
+            continue
+        s = rep.get("summary", {})
+        e, w = int(s.get("errors", 0)), int(s.get("warnings", 0))
+        verdict = "needs review" if e else ("warnings" if w else "likely ok")
+        profiles.append({"id": pid, "verdict": verdict})
+        total_err += e
+        total_warn += w
+        with_findings += 1 if (e or w) else 0
+        clean += 0 if e else 1
+    n = len(profiles)
+    hub = [
+        {"label": "PROFILES",      "value": str(n)},
+        {"label": "PASSING",       "value": f"{clean} / {n}"},
+        {"label": "OPEN FINDINGS", "value": str(total_err + total_warn)},
+        {"label": "IN REVIEW",     "value": str(with_findings)},
+    ]
+    return profiles, hub
+
+
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description="Export a viewer status file from an SG preflight report.")
-    ap.add_argument("--report", required=True, help="the preflight report JSON the tool writes")
+    ap = argparse.ArgumentParser(description="Export a viewer status file from SG preflight output.")
+    ap.add_argument("--report", help="the preflight report JSON for the active run (the run cluster)")
+    ap.add_argument("--reports-dir", help="a directory of per-profile reports, for the hub overview")
     ap.add_argument("--snapshot", help="optional daily-snapshot JSON for the screenshot battery")
     ap.add_argument("--out", default="sgfx_status.json", help="where to write the viewer status file")
     args = ap.parse_args(argv)
+    if not args.report and not args.reports_dir:
+        ap.error("provide --report and/or --reports-dir")
 
-    report = json.loads(Path(args.report).read_text(encoding="utf-8"))
-    snapshot = json.loads(Path(args.snapshot).read_text(encoding="utf-8")) if args.snapshot else None
-    status = build_status(report, snapshot)
+    status: dict = {}
+    if args.report:
+        report = json.loads(Path(args.report).read_text(encoding="utf-8"))
+        snapshot = json.loads(Path(args.snapshot).read_text(encoding="utf-8")) if args.snapshot else None
+        status = build_status(report, snapshot)
+    if args.reports_dir:
+        profiles, hub = scan_reports(Path(args.reports_dir))
+        if profiles:
+            status["profiles"] = profiles
+        if hub:
+            status["hubTotals"] = hub
+
     Path(args.out).write_text(json.dumps(status, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-
-    r = status["run"]
-    print(f"wrote {args.out}: profile {r['activeProfile']}, {len(r['packs'])} packs, "
-          f"verdict {r['verdict']}, {len(r.get('battery', []))} battery rows")
+    r = status.get("run", {})
+    summary = (f"run {r.get('activeProfile','')}/{r.get('verdict','')}, " if r else "")
+    print(f"wrote {args.out}: {summary}"
+          f"{len(status.get('profiles', []))} profiles, {len(status.get('hubTotals', []))} hub totals")
     return 0
 
 

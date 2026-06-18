@@ -12,7 +12,10 @@
 //       "signals": [ { "label": "Errors", "value": "3" }, ... ],   // last row = total
 //       "recommendation": "...",
 //       "battery": [ { "name": "default", "verdict": "likely_ok", "diff": 0 }, ... ]
-//   } }
+//   },
+//   "hubTotals": [ { "label": "PROFILES", "value": "19" }, ... ],      // hub left panel rows
+//   "profiles":  [ { "id": "G65", "verdict": "needs review" }, ... ]   // gate per-profile verdict
+//   }
 // Any field may be omitted; the default for that field stands.
 // =============================================================================
 #pragma once
@@ -24,6 +27,7 @@ namespace sgfx {
 struct Pack   { std::string name; int err = 0, warn = 0, info = 0; };
 struct Signal { std::string label, value; };
 struct Filter { std::string name, verdict; int diff = 0; };
+struct ProfileStatus { std::string id, verdict; };   // gate: a profile's last verdict, by id
 
 struct Run {
     std::string         activeProfile = "G65";
@@ -36,6 +40,8 @@ struct Run {
 
 struct Status {
     Run  run;
+    std::vector<Signal>        hubTotals;      // hub left panel rows (label/value)
+    std::vector<ProfileStatus> profileStatus;  // gate: per-profile last verdict (overlay by id)
     bool loaded = false;   // true if a status file was parsed (else the built-in defaults)
 };
 

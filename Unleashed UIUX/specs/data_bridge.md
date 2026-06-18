@@ -20,7 +20,10 @@ example is `sgfx_ui_cpp/sgfx_status.example.json`.)
     "signals": [ { "label": "Errors", "value": "3" }, ... ],   // last row = total
     "recommendation": "...",
     "battery": [ { "name": "default", "verdict": "likely_ok", "diff": 0 }, ... ]
-} }
+  },
+  "hubTotals": [ { "label": "PROFILES", "value": "19" }, ... ],     // hub left panel rows
+  "profiles":  [ { "id": "G65", "verdict": "needs review" }, ... ]  // gate per-profile verdict
+}
 ```
 
 | Field | Drives | Notes |
@@ -31,6 +34,8 @@ example is `sgfx_ui_cpp/sgfx_status.example.json`.)
 | `signals[]` | the verdict card's signal rows | label/value pairs; the last row renders as the ruled-off total. |
 | `recommendation` | the verdict card's recommendation line | one short human line. |
 | `battery[]` | the battery-results table | one row per screenshot filter. `verdict` is an id (`likely_ok`, `needs_manual_review`, `proxy_candidate_ready`, `baseline_candidate_ready`, `baseline_missing`); `diff` is the baseline diff count. Colours: likely_ok green, baseline_missing red, the rest amber. The overall battery verdict is derived (any missing baseline → BASELINE MISSING, else any review → NEEDS REVIEW, else LIKELY OK). |
+| `hubTotals[]` (top-level) | the hub's left panel | label/value rows (e.g. PROFILES, PASSING, OPEN FINDINGS, IN REVIEW). |
+| `profiles[]` (top-level) | the profile-select last verdict | `{ id, verdict }` per profile; overlays the gate card's verdict by id (the static label / family / focus stay). |
 
 ## For the writer
 The preflight already writes a JSON report per run. The dev-side exporter
@@ -40,6 +45,8 @@ or modify the tool:
 
     python tools/export_status.py --report <run>/g65-report.json --out sgfx_status.json
 
-Write `sgfx_status.json` to the path the viewer reads (next to the exe); it picks it
+Add `--reports-dir <dir>` (a directory of per-profile reports) to also fill the hub
+overview (`hubTotals` + `profiles`); `--report` and `--reports-dir` may be given
+together or alone. Write `sgfx_status.json` to the path the viewer reads (next to the exe); it picks it
 up at next launch. The file is host/run-specific and is not committed; the example
 here documents the shape.
