@@ -605,9 +605,6 @@ void Draw(double openSec) {
             { "Back",   GIcon::B,    GAlign::Right, 65.0f  },
         };
         DrawButtonGuide(FOOTER, 4, g_fRodin, t, 250.0f);
-        SetFont(g_fRodin);
-        DrawTextAligned({ REF_W - 420, REF_H - 22 }, { REF_W - 4, REF_H - 6 }, 12.0f, WithAlpha(C_VERSION, t),
-                        "v1.0.3.325e4d3-HEAD (RelWithDebInfo)", Align::Right, true, true);
     }
     ResetFont();
 }

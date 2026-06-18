@@ -68,10 +68,7 @@ void Draw(double openSec) {
     // ---- live town scene slot ----
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SKY_T, C_SKY_B);
     DrawRect({ 0, 520 }, { REF_W, REF_H }, RGBA(214, 212, 200, 255));
-    SetFont(g_fSeurat);
-    DrawTextAligned({ 700, 180 }, { 1100, 480 }, 14.0f, WithAlpha(RGBA(120, 140, 165, 255), a),
-                    "( NPC render: live 3D )", Align::Center, true, false);
-    ResetFont();
+    // NPC portrait is an intentional empty live-3D slot (host supplies the render).
 
     // ---- rings counter slot (top-left HUD, title-safe inset) ----
     {

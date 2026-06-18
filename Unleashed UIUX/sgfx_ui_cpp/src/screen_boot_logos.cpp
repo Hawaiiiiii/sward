@@ -64,9 +64,6 @@ void CardSlot(const char* small, const char* big, float a, uint32_t bigCol, int 
     float w = MeasureText(64.0f, big).x * 1.15f;
     DrawTextGradient({ 640 - w * 0.5f, 330 }, 64.0f, WithAlpha(RGBA(240, 242, 248, 255), a), WithAlpha(bigCol, a), big);
     ResetTextStretchX();
-    SetFont(g_fRodin);
-    DrawTextAligned({ 0, 410 }, { REF_W, 430 }, 13.0f, WithAlpha(RGBA(110, 112, 120, 255), a * 0.8f),
-                    "( logo trademark slot - drop the real card art in )", Align::Center, true, false);
     ResetFont();
 }
 

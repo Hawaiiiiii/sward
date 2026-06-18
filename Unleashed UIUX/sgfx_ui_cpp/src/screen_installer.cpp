@@ -235,10 +235,6 @@ void Draw(double openSec) {
         };
         DrawButtonGuide(FOOTER, 2, g_fRodin, 1.0f, 379.0f);
     }
-    SetFont(g_fRodin);
-    DrawTextAligned({ REF_W - 360, REF_H - 20 }, { REF_W - 2, REF_H - 4 }, 12.0f, WithAlpha(C_VERSION, mTitle),
-                    "v1.0.3.325e4d3-HEAD (RelWithDebInfo)", Align::Right, true, true);
-    ResetFont();
 }
 
 } // namespace
