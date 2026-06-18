@@ -305,7 +305,7 @@ bool init(void* hwnd, int width, int height, bool headless, int msaa) {
     if (!S.device) { fprintf(stderr, "[gfx] createDevice failed\n"); return false; }
     DBG("queue/list/fence...");
     S.queue = S.device->createCommandQueue(RenderCommandListType::DIRECT);
-    S.cmd   = S.device->createCommandList(RenderCommandListType::DIRECT);
+    S.cmd   = S.queue->createCommandList();
     S.fence = S.device->createCommandFence();
 
     // pick the MSAA level the GPU actually supports
@@ -402,12 +402,25 @@ void drawQuads(const Quad* quads, int count) {
     for (int i = 0; i < count && S.pending.size() < MAX_QUADS; ++i) S.pending.push_back(quads[i]);
 }
 
+// Idle the GPU. plume's waitForCommandFence only fires the event armed by the
+// matching executeCommandLists, so a *bare* wait deadlocks: the auto-reset
+// fenceEvent was already consumed by the last paired wait and nothing re-arms it.
+// plume exposes no waitIdle, so drain by submitting an empty command list paired
+// with the fence and waiting on that.
+void gpuDrain() {
+    if (!S.queue || !S.fence || !S.cmd) return;
+    S.cmd->begin();
+    S.cmd->end();
+    S.queue->executeCommandLists(S.cmd.get(), S.fence.get());
+    S.queue->waitForCommandFence(S.fence.get());
+}
+
 void endFrame() {
     DBG("endFrame: %zu quads", S.pending.size());
     uint32_t backIdx = 0;
     RenderTexture* backTex = nullptr;
     if (!S.headless) {
-        if (S.swap->needsResize()) { S.device->waitIdle(); S.swap->resize(); }
+        if (S.swap->needsResize()) { gpuDrain(); S.swap->resize(); }
         if (!S.swap->acquireTexture(S.acquireSem.get(), &backIdx)) return;
         backTex = S.swap->getTexture(backIdx);
     }
@@ -541,7 +554,7 @@ bool readbackRGBA(uint8_t* out, int w, int h) {
 }
 
 void shutdown() {
-    if (S.device) S.device->waitIdle();
+    gpuDrain();   // idle the GPU before releasing resources (see gpuDrain)
     // Destroy in dependency order: every D3D12 resource before the device that owns it.
     S.textures.clear(); S.texViews.clear();
     S.meshes.clear(); S.meshCB.reset(); S.pMesh.reset();

@@ -15,7 +15,7 @@ endif()
 
 # vcpkg-installed DirectX-Headers + Agility SDK that the recomp built against.
 if(NOT DEFINED SGFX_VCPKG)
-    set(SGFX_VCPKG "${RECOMP_ROOT}/out/build/x64-Clang-RelWithDebInfo/vcpkg_installed/x64-windows-static")
+    set(SGFX_VCPKG "${RECOMP_ROOT}/thirdparty/vcpkg/installed/x64-windows-static")
 endif()
 set(VCPKG_INC "${SGFX_VCPKG}/include")
 set(VCPKG_LIB "${SGFX_VCPKG}/lib")
@@ -29,8 +29,8 @@ add_subdirectory("${RECOMP_ROOT}/thirdparty/SDL" sdl_build EXCLUDE_FROM_ALL)
 add_executable(sgfx_ui
     src/main.cpp
     src/gfx_d3d12.cpp
-    "${RECOMP_ROOT}/UnleashedRecomp/gpu/rhi/plume_d3d12.cpp"
-    "${RECOMP_ROOT}/thirdparty/D3D12MemoryAllocator/src/D3D12MemAlloc.cpp")
+    "${RECOMP_ROOT}/thirdparty/plume/plume_d3d12.cpp"
+    "${RECOMP_ROOT}/thirdparty/plume/contrib/D3D12MemoryAllocator/src/D3D12MemAlloc.cpp")
 
 target_compile_definitions(sgfx_ui PRIVATE
     NOMINMAX WIN32_LEAN_AND_MEAN
@@ -40,9 +40,9 @@ target_compile_definitions(sgfx_ui PRIVATE
 
 target_include_directories(sgfx_ui PRIVATE
     "${VCPKG_INC}"                                    # directx/d3d12.h, dxguids/, agility
-    "${RECOMP_ROOT}/UnleashedRecomp/gpu/rhi"          # plume_*.h
+    "${RECOMP_ROOT}/thirdparty/plume"                 # plume_*.h
     "${RECOMP_ROOT}/UnleashedRecomp/gpu/shader"       # csd_vs.hlsl.dxil.h, csd_filter_ps...
-    "${RECOMP_ROOT}/thirdparty/D3D12MemoryAllocator/include"
+    "${RECOMP_ROOT}/thirdparty/plume/contrib/D3D12MemoryAllocator/include"
     "${RECOMP_ROOT}/thirdparty/SDL/include"
     "${RECOMP_ROOT}/thirdparty/json/include"
     "${RECOMP_ROOT}/thirdparty/stb")
@@ -105,8 +105,8 @@ add_executable(sgfx_screens
     src/screen_boot_logos.cpp
     src/screen_viewport3d.cpp
     src/gfx_d3d12.cpp
-    "${RECOMP_ROOT}/UnleashedRecomp/gpu/rhi/plume_d3d12.cpp"
-    "${RECOMP_ROOT}/thirdparty/D3D12MemoryAllocator/src/D3D12MemAlloc.cpp")
+    "${RECOMP_ROOT}/thirdparty/plume/plume_d3d12.cpp"
+    "${RECOMP_ROOT}/thirdparty/plume/contrib/D3D12MemoryAllocator/src/D3D12MemAlloc.cpp")
 
 target_compile_definitions(sgfx_screens PRIVATE
     NOMINMAX WIN32_LEAN_AND_MEAN
@@ -116,9 +116,9 @@ target_compile_definitions(sgfx_screens PRIVATE
 
 target_include_directories(sgfx_screens PRIVATE
     "${VCPKG_INC}"
-    "${RECOMP_ROOT}/UnleashedRecomp/gpu/rhi"
+    "${RECOMP_ROOT}/thirdparty/plume"
     "${RECOMP_ROOT}/UnleashedRecomp/gpu/shader"
-    "${RECOMP_ROOT}/thirdparty/D3D12MemoryAllocator/include"
+    "${RECOMP_ROOT}/thirdparty/plume/contrib/D3D12MemoryAllocator/include"
     "${RECOMP_ROOT}/thirdparty/SDL/include"
     "${RECOMP_ROOT}/thirdparty/json/include"
     "${RECOMP_ROOT}/thirdparty/stb")
