@@ -79,7 +79,10 @@ void Switch(int d) { g_sel = (g_sel + PROFILE_COUNT + d) % PROFILE_COUNT; }
 void Input(const ScreenInput& in) {
     if (g_popup) {
         if (in.up || in.down) g_popupSel ^= 1;
-        if (in.accept) { g_popup = false; g_popupSel = 0; }
+        if (in.accept) {
+            if (g_popupSel == 0) g_nav = "town";   // Open -> the action hub for the profile
+            g_popup = false; g_popupSel = 0;
+        }
         if (in.cancel) { g_popup = false; g_popupSel = 0; }
         return;
     }

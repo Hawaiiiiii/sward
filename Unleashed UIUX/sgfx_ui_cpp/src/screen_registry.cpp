@@ -18,6 +18,7 @@ void PauseInit();     void PauseDraw(double);     void PauseInput(const ScreenIn
 const char* PauseNav();
 void ResultInit();    void ResultDraw(double);
 void TitleInit();     void TitleDraw(double);      void TitleInput(const ScreenInput&);    void TitleReset();
+const char* TitleNav();
 void WorldMapInit();  void WorldMapDraw(double);   void WorldMapInput(const ScreenInput&); void WorldMapReset();
 const char* WorldMapNav();
 void StatusInit();    void StatusDraw(double);     void StatusInput(const ScreenInput&);   void StatusReset();
@@ -54,13 +55,14 @@ namespace {
 const char* g_wrapNav = nullptr;
 const char* WrapNav() { const char* n = g_wrapNav; g_wrapNav = nullptr; return n; }
 void ShopFlowInput(const ScreenInput& in)    { ShopInput(in);         if (in.cancel) g_wrapNav = "@back"; }
-void StatusFlowInput(const ScreenInput& in)  { StatusInput(in);       if (in.cancel || (in.accept && !StatusOnStatRow())) g_wrapNav = "@back"; }   // B, or (A) on QUIT, exits
+void StatusFlowInput(const ScreenInput& in)  { StatusInput(in);       if (in.cancel) g_wrapNav = "@back"; else if (in.accept) g_wrapNav = "result"; }   // B backs out; A -> the verdict
 void OptionsFlowInput(const ScreenInput& in) { OptionsInput(in);      if (in.cancel) g_wrapNav = "@back"; }
 void MediaFlowInput(const ScreenInput& in)   { MediaRoomInput(in);    if (in.cancel) g_wrapNav = "@back"; }
 void WmHelpFlowInput(const ScreenInput& in)  { WorldMapHelpInput(in); if (in.cancel) g_wrapNav = "@back"; }
 void BalloonFlowInput(const ScreenInput& in) { BalloonInput(in);      if (in.cancel) g_wrapNav = "@back"; }
 void HudFlowInput(const ScreenInput& in)     { SonicHudInput(in);     if (in.cancel) g_wrapNav = "pause"; }   // Start pauses in-game
-void ResultFlowInput(const ScreenInput& in)  { if (in.accept) g_wrapNav = "loading>world_map"; }              // (A) NEXT
+void ResultFlowInput(const ScreenInput& in)  { if (in.accept) g_wrapNav = "world_map"; else if (in.cancel) g_wrapNav = "@back"; }   // A -> hub, B backs out
+void ResultExFlowInput(const ScreenInput& in){ ResultExInput(in);     if (in.cancel) g_wrapNav = "@back"; }
 void ItemResFlowInput(const ScreenInput& in) { ItemResultInput(in);   if (in.accept) g_wrapNav = "loading>world_map"; }
 } // namespace
 
@@ -69,7 +71,7 @@ static const ScreenDef g_screens[] = {
     { "boot_title", &BootTitleInit, &BootTitleDraw, &BootTitleInput, &BootTitleReset, &BootTitleNav },
     { "installer", &InstallerInit, &InstallerDraw, &InstallerInput, &InstallerReset, nullptr },
     { "boot_loading", &BootLoadingInit, &BootLoadingDraw, &BootLoadingInput, &BootLoadingReset, nullptr },
-    { "title",     &TitleInit,    &TitleDraw,    &TitleInput,    &TitleReset,    nullptr },
+    { "title",     &TitleInit,    &TitleDraw,    &TitleInput,    &TitleReset,    &TitleNav },
     { "world_map", &WorldMapInit, &WorldMapDraw, &WorldMapInput, &WorldMapReset, &WorldMapNav },
     { "status",    &StatusInit,   &StatusDraw,   &StatusFlowInput, &StatusReset, &WrapNav },
     { "sonic_hud", &SonicHudInit, &SonicHudDraw, &HudFlowInput,    &SonicHudReset, &WrapNav },
@@ -78,7 +80,7 @@ static const ScreenDef g_screens[] = {
     { "options",     &OptionsInit,    &OptionsDraw,    &OptionsFlowInput, &OptionsReset, &WrapNav },
     { "town",        &TownInit,       &TownDraw,       &TownInput,       &TownReset,    &TownNav },
     { "gate",        &GateInit,       &GateDraw,       &GateInput,       &GateReset,    &GateNav },
-    { "result_ex",   &ResultExInit,   &ResultExDraw,   &ResultExInput,   &ResultExReset, nullptr },
+    { "result_ex",   &ResultExInit,   &ResultExDraw,   &ResultExFlowInput, &ResultExReset, &WrapNav },
     { "mediaroom",      &MediaRoomInit,     &MediaRoomDraw,     &MediaFlowInput,     &MediaRoomReset, &WrapNav },
     { "loading",        &LoadingInit,       &LoadingDraw,       &LoadingInput,       &LoadingReset,   nullptr },
     { "start",          &StartInit,         &StartDraw,         &StartInput,         &StartReset,     nullptr },

@@ -66,6 +66,7 @@ const uint32_t COL_WHITE    = RGBA(255, 255, 255, 255);
 int    g_sel = 0, g_prevSel = 0;
 double g_moveStart = -100.0, g_flashStart = -100.0;
 int    g_flashRow = -1;
+const char* g_nav = nullptr;
 
 void Init() {
     if (g_logoTex < 0) g_logoTex = gfx::loadTexture("assets/gameart/boot_logo.png");
@@ -76,6 +77,7 @@ void Init() {
 void Reset() {
     g_sel = 0; g_prevSel = 0;
     g_moveStart = -100.0; g_flashStart = -100.0; g_flashRow = -1;
+    g_nav = nullptr;
 }
 
 void Input(const ScreenInput& in) {
@@ -85,9 +87,21 @@ void Input(const ScreenInput& in) {
         else       g_sel = (g_sel + 1) % ENTRY_COUNT;
         g_moveStart = Now();
     }
-    if (in.accept) { g_flashStart = Now(); g_flashRow = g_sel; }
-    // cancel: would back out of the launcher in-flow; no-op in the standalone build.
+    if (in.accept) {
+        g_flashStart = Now(); g_flashRow = g_sel;
+        static const char* const TARGET[ENTRY_COUNT] = {
+            "world_map",   // RUN      -> the QA hub
+            "world_map",   // RESUME   -> the QA hub
+            "options",     // SETTINGS
+            "mediaroom",   // EVIDENCE -> screenshot review
+            "@back",       // QUIT
+        };
+        g_nav = TARGET[g_sel];
+    }
+    if (in.cancel) g_nav = "@back";
 }
+
+const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
 float RowTop(int row) { return ROW_TOP + row * ROW_PITCH; }
 
@@ -162,3 +176,4 @@ void TitleInit() { Init(); }
 void TitleDraw(double openSeconds) { Draw(openSeconds); }
 void TitleInput(const ScreenInput& in) { Input(in); }
 void TitleReset() { Reset(); }
+const char* TitleNav() { return Nav(); }

@@ -113,7 +113,18 @@ void Reset() { g_sel = 0; g_nav = nullptr; g_msgStart = -100.0; g_msg = ""; }
 void Input(const ScreenInput& in) {
     if (in.left)  { g_sel = (g_sel + AREA_COUNT - 1) % AREA_COUNT; }
     if (in.right) { g_sel = (g_sel + 1) % AREA_COUNT; }
-    if (in.accept) { g_msg = AREAS[g_sel].name; g_msgStart = Now(); }   // open (feedback only here)
+    if (in.accept) {   // enter the focused area
+        static const char* const TARGET[AREA_COUNT] = {
+            "status",      // PREFLIGHT    -> run metrics
+            "result",      // DELIVERY     -> verdict / readiness
+            "mediaroom",   // SCREENSHOTS  -> evidence review
+            "result_ex",   // DAILY DIGEST -> battery results
+            "mediaroom",   // MANUAL REVIEW-> evidence review
+            "gate",        // PROFILES     -> profile select
+        };
+        g_nav = TARGET[g_sel];
+    }
+    if (in.cancel) g_nav = "@back";
 }
 const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 

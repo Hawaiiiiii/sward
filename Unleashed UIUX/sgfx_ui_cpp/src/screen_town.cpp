@@ -97,7 +97,20 @@ void Input(const ScreenInput& in) {
         ClampScrollToSel();
         g_moveStart = Now();
     }
-    if (in.accept) { g_msg = ACTIONS[g_sel].label; g_msgStart = Now(); }
+    if (in.accept) {
+        static const char* const TARGET[ACTION_COUNT] = {
+            "status",      // Run preflight
+            "result_ex",   // Capture screenshots
+            "result",      // Check delivery
+            "result_ex",   // Daily digest
+            "",            // Scan unused Lua (no dedicated screen -> feedback only)
+            "mediaroom",   // Manual review
+        };
+        const char* t = TARGET[g_sel];
+        if (t[0]) g_nav = t;
+        else { g_msg = ACTIONS[g_sel].label; g_msgStart = Now(); }
+    }
+    if (in.cancel) g_nav = "@back";
 }
 const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
