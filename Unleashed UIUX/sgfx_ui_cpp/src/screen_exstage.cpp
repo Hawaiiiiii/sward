@@ -89,7 +89,7 @@ const UV BANNER_UV = { 0.0078f, 0.1172f, 0.9766f, 0.2383f };
 
 // EX stat labels in mat_ex_en_001 (128x64): "SHIELD" top-left, "ENERGY" lower-right.
 const UV LABEL_SHIELD = { 0.0156f, 0.0312f, 0.5625f, 0.3125f };  // px (2,2)-(72,20)
-const UV LABEL_ENERGY = { 0.4219f, 0.4688f, 0.9688f, 0.7500f };  // px (54,30)-(124,48)
+const UV LABEL_ENERGY = { 0.4922f, 0.2969f, 0.9922f, 0.5625f };  // px (63,19)-(127,36)  (corrected: was clipped/blank)
 
 // silver MEDAL/ring badge â€” bottom-right circular icon of mat_ex_common_001.
 const UV ICON_MEDAL = { 0.8516f, 0.7031f, 0.9766f, 0.9531f };    // px (218,90)-(250,122)
@@ -440,13 +440,12 @@ void Draw(double openSec) {
     const float ix = INFO_X, iy = INFO_Y + (1.0f - infoT) * 24.0f;
     DrawWindow(ix, iy, INFO_W, INFO_H, infoT, "EX TRIAL");
 
-    // ---- EX name + sub-name (ASCII; the name wordmark grid is the localized banner
-    //      already shown on the plate, so the panel uses readable DFHeiStd text) ----
+    // ---- EX sub-name only. The EX name wordmark ("CHANCE ATTACK") is already shown
+    //      as the localized banner on the left plate, so repeating e.name here was a
+    //      duplicate -- the panel heads with the readable trial id (e.sub) instead. ----
     const float nameBoxX = ix + 22.0f, nameBoxY = iy + HEADER_H + 16.0f;
     SetFont(g_fDF);
-    DrawTextShadow({ nameBoxX, nameBoxY }, 32.0f, WithAlpha(COL_TEXT_SEL, infoT), e.name);
-    SetFont(g_fSeurat);
-    DrawText({ nameBoxX, nameBoxY + 40.0f }, 21.0f, WithAlpha(COL_DESC, infoT), e.sub);
+    DrawTextShadow({ nameBoxX, nameBoxY }, 30.0f, WithAlpha(COL_TEXT_SEL, infoT), e.sub);
 
     // ---- HI-SCORE: label + the REAL outlined digit-font readout ----
     float bx = ix + 24.0f, by = nameBoxY + 78.0f;
@@ -486,12 +485,41 @@ void Draw(double openSec) {
     // ---- START prompt: a pulsing call-to-action at the panel's foot ----
     if (infoT > 0.5f) {
         float pulse = 0.55f + 0.45f * (float)(0.5 + 0.5 * std::sin(g_open * 4.0));
-        uint32_t pc = e.unlocked ? COL_START : COL_LOCKED;
-        SetFont(g_fRodin);
-        DrawTextAligned({ ix + 20.0f, iy + INFO_H - 56.0f }, { ix + INFO_W - 20.0f, iy + INFO_H - 14.0f },
-                        34.0f, WithAlpha(pc, infoT * (e.unlocked ? pulse : 0.7f)),
-                        e.unlocked ? "PRESS  (A)  TO START" : "EX STAGE LOCKED",
-                        Align::Center, true, true);
+        const float promptL = ix + 20.0f, promptR = ix + INFO_W - 20.0f;
+        const float promptT = iy + INFO_H - 56.0f, promptB = iy + INFO_H - 14.0f;
+        if (e.unlocked) {
+            // "PRESS [A] TO START" -- use the REAL A button glyph (mirroring the footer's
+            // DrawHint) instead of a literal "(A)". Compose + center the three parts.
+            const float ts = 34.0f;
+            const float aAsp = 0.921f;          // A glyph aspect, same as the footer
+            const float gh = ts * 0.86f;        // glyph height ~ cap height
+            const float gw = (g_glyphTex >= 0) ? gh * aAsp : 0.0f;
+            const float pad = 8.0f;             // gap on each side of the glyph
+            const char* pre = "PRESS";
+            const char* post = "TO START";
+            SetFont(g_fRodin);
+            const float preW  = MeasureText(ts, pre).x;
+            const float postW = MeasureText(ts, post).x;
+            const float totalW = preW + pad + gw + pad + postW;
+            const float cy = (promptT + promptB) * 0.5f;
+            float x = (promptL + promptR) * 0.5f - totalW * 0.5f;
+            const uint32_t ta = WithAlpha(e.unlocked ? COL_START : COL_LOCKED,
+                                          infoT * pulse);
+            DrawText({ x, cy - ts * 0.5f }, ts, ta, pre);
+            x += preW + pad;
+            if (g_glyphTex >= 0) {
+                DrawImage(g_glyphTex, { x, cy - gh * 0.5f }, { x + gw, cy + gh * 0.5f },
+                          { GLYPH_A.u0, GLYPH_A.v0 }, { GLYPH_A.u1, GLYPH_A.v1 },
+                          WithAlpha(COL_WHITE, infoT * pulse));
+            }
+            x += gw + pad;
+            DrawText({ x, cy - ts * 0.5f }, ts, ta, post);
+        } else {
+            SetFont(g_fRodin);
+            DrawTextAligned({ promptL, promptT }, { promptR, promptB },
+                            34.0f, WithAlpha(COL_LOCKED, infoT * 0.7f),
+                            "EX STAGE LOCKED", Align::Center, true, true);
+        }
     }
 
     // ===== FOOTER (real button glyphs + ASCII labels) ========================

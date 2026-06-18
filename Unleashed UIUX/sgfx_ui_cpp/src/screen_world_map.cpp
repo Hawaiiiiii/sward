@@ -156,6 +156,42 @@ void DrawGlobe(float cx, float cy, float r, float t) {
     for (int i = 0; i < 24; ++i) { float xx = cx + r - i * (r/24.0f) * 0.5f; DrawRect({ xx, cy - r }, { xx + 2, cy + r }, WithAlpha(RGBA(0,0,0,255), t * (0.02f + i*0.004f))); }
 }
 
+// Clean rect-built capital "P" (the dfsogei MSDF atlas entry for 'P' is corrupt —
+// its UV points at the texture's top edge, so the font renders a solid block with a
+// black notch instead of a glyph). We compose the letter from primitive rects in the
+// title gold so the "WORLD MAP" wordmark reads correctly without touching the shared
+// font atlas. h = cap height; the proportions track the other dfsogei caps.
+void DrawGlyphP(float x, float topY, float h, uint32_t col) {
+    const float w    = h * 0.62f;        // glyph box width (matches dfsogei cap aspect)
+    const float stem = h * 0.16f;        // vertical stem / bar thickness
+    const float bowlH = h * 0.55f;       // the bowl occupies the top ~55%
+    // left vertical stem (full height)
+    DrawRect({ x, topY }, { x + stem, topY + h }, col);
+    // bowl: top bar, right bar, and the mid bar closing it
+    DrawRect({ x, topY },                 { x + w, topY + stem },          col); // top
+    DrawRect({ x + w - stem, topY },      { x + w, topY + bowlH },         col); // right
+    DrawRect({ x, topY + bowlH - stem },  { x + w, topY + bowlH },         col); // bottom of bowl
+}
+
+// the gold beveled "WORLD MAP" wordmark. Drawn through the dfsogei MSDF font, but the
+// trailing 'P' is substituted with DrawGlyphP() because that atlas glyph is corrupt.
+constexpr float TITLE_STRETCH = 1.34f;
+void DrawWorldMapTitle(float x, float topY, float px, uint32_t col) {
+    SetFont(g_fDF);
+    SetTextStretchX(TITLE_STRETCH);
+    // everything up to the broken glyph goes through the bevel font path
+    DrawTextBevel({ x, topY }, px, col, "WORLD MA");
+    // MeasureText returns the UNSTRETCHED advance; DrawText stretches glyph x about the
+    // origin x, so the real pen position after "WORLD MA" is x + width*stretch.
+    float endX = x + MeasureText(px, "WORLD MA").x * TITLE_STRETCH;
+    ResetTextStretchX();
+    ResetFont();
+    // clean 'P' sized to the cap height of the rest of the wordmark
+    const float capH = px * 0.78f;                   // measured dfsogei cap ~0.78*px
+    const float capTop = topY + (px - capH) * 0.46f; // align baseline with the font caps
+    DrawGlyphP(endX + px * 0.06f, capTop, capH, col);
+}
+
 // the measured stage-info panel: LED circuit fill + rails + photo + desc + medals
 void DrawStageInfo(float t) {
     // circuit-board fill: dark base + lit cell stripes in a 16x8 grid
@@ -358,9 +394,14 @@ void DrawDynamic(double openSec, bool csdBase) {
     //      counts). The green LED panel backing them is CSD chrome (drawn in Draw()
     //      only); the counts themselves are dynamic and composite on either base. ----
     {
-        struct Row { uint32_t icol; bool ring; const char* val; int medTex; } rows[] = {
-            { C_LIVES, false, "99", -1 }, { C_RING, true, "999999", -1 },
-            { C_SUN, true, "lv 7 (200)", g_sunTex }, { C_MOON, true, "lv 7 (200)", g_moonTex },
+        // each row: an icon/medal, a short LABEL, then the live value. The labels keep
+        // the rows readable (and disambiguate the two "lv 7 (200)" medal rows, which are
+        // otherwise identical) — SUN = day medals, MOON = night medals.
+        struct Row { uint32_t icol; bool ring; const char* label; const char* val; int medTex; } rows[] = {
+            { C_LIVES, false, "LIVES", "99",     -1 },
+            { C_RING,  true,  "RINGS", "999999", -1 },
+            { C_SUN,   true,  "SUN",   "lv 7 (200)", g_sunTex },
+            { C_MOON,  true,  "MOON",  "lv 7 (200)", g_moonTex },
         };
         SetFont(g_fRodin);
         for (int i = 0; i < 4; ++i) {
@@ -369,10 +410,16 @@ void DrawDynamic(double openSec, bool csdBase) {
                 DrawImage(rows[i].medTex, { 124, cy - 16 }, { 156, cy + 16 }, { 0.f, 0.f }, { 1.f, 1.f }, WithAlpha(C_WHITE, t));
             else
                 DrawIconSlot(140, cy, 14, rows[i].icol, rows[i].ring, t);
-            DrawText({ 178, cy - 13 }, 24.0f, WithAlpha(C_NUM, t), rows[i].val);
+            // label (dimmer green) then the bright value to its right
+            DrawText({ 178, cy - 13 }, 17.0f, WithAlpha(C_SIP_DESC, t), rows[i].label);
+            DrawText({ 178 + MeasureText(17.0f, rows[i].label).x + 8, cy - 13 }, 24.0f, WithAlpha(C_NUM, t), rows[i].val);
         }
         ResetFont();
     }
+
+    // (the CSD base draws its own gold "WORLD MAP" title; an earlier screen-local 'P'
+    //  repair patch mis-measured the CSD title position and garbled it, so it was removed
+    //  — the CSD title is left as-is.)
 
     // ---- floating stage label/leader rule: ALWAYS drawn (the CSD base lacks the
     //      floating SPAGONIA name + its gradient leader rule toward the marker) ----
@@ -427,12 +474,9 @@ void Draw(double openSec) {
         DrawRect({ gx0, gy1 - 2 }, { gx1, gy1 }, WithAlpha(RGBA(20, 81, 18, 255), t));   // bottom rail
     }
 
-    // ---- gold beveled "WORLD MAP" title (inset ~124px, bigger, wider tracking) ----
-    SetFont(g_fDF);
-    SetTextStretchX(1.34f);
-    DrawTextBevel({ 124, 62 }, 42.0f, WithAlpha(C_TITLE, tTitle), "WORLD MAP");
-    ResetTextStretchX();
-    ResetFont();
+    // ---- gold beveled "WORLD MAP" title (inset ~124px, bigger, wider tracking).
+    //      The trailing 'P' is rect-built (the dfsogei atlas 'P' glyph is corrupt). ----
+    DrawWorldMapTitle(124, 62, 42.0f, WithAlpha(C_TITLE, tTitle));
 
     // ---- 3D globe + totals + stage info/label (the dynamic overlay) ----
     //      csdBase=false: this is the hand-authored fallback, so the overlay draws

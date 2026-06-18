@@ -62,7 +62,14 @@ const UV LBL_TIME  = { 0.00781f, 0.47656f, 0.34375f, 0.54688f };   // "TIME" (ba
 //   * rainbow boost bar : tight box px (55,64)-(135,80)      -> 80x16 strip
 const UV GAUGE_TIRE = { 0.0625f,   0.125f, 0.23828f, 0.46875f };
 const UV GAUGE_BAR  = { 0.21484f,  0.5f,   0.52734f, 0.625f   };
-const UV GAUGE_PLATE = { 0.242f,   0.078f, 0.762f,   0.375f   };   // silver metallic gauge-backing plate
+// silver metallic gauge-backing plate. NOTE: only the LEFT portion of this
+// sub-sprite is a clean solid silver rectangle (atlas px x50..115, y14..47); the
+// old UV ran out to u1=0.762 (px195), which dragged in the plate's angled right
+// cap (diagonal slash lines) AND a stray white-outlined parallelogram to its
+// right. Stretched across the whole bar those produced the disconnected outline /
+// diagonal lines / bright tick floating to the RIGHT of the fill. Cropped here to
+// the clean solid box so the stretched plate reads as ONE flat silver bar.
+const UV GAUGE_PLATE = { 0.24219f, 0.10938f, 0.44922f, 0.36719f };   // solid silver only (px 62..115, 14..47)
 
 // --- mat_comon_num_001 (512x64): row-0 digit cells, measured per glyph. Each
 //     digit shares the same vertical span (v 0.01562..0.4375); the ':' is index 10.

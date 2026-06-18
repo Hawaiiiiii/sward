@@ -168,25 +168,39 @@ void DrawLiveValues(float panT, bool csdBase) {
     PushTransform(panS, panS, { (px0 + px1) * 0.5f, (py0 + py1) * 0.5f }, { 0.0f, 0.0f });
     char buf[16];
     if (csdBase) {
-        // CSD-base path: align every value to the CSD info-row slots (data/gate.json
-        // info_1..info_4). The CSD already DRAWS the medal "/" glyph (the `slash`
-        // cast, mat_comon_num_001) between its num_nume/num_deno slots, so the overlay
-        // must NOT emit its own slash for the medal rows (that double-slash is what
-        // read as garbled). We drop only the numerator + denominator DIGITS into the
-        // CSD's empty num slots, right-edges per the CSD (numerator / denominator),
-        // and seat HIGH SCORE / BEST TIME / RINGS / MEDALS on their real row Ys.
-        ChromeRight(STAT_R, 315, 26.0f, act.hiScore, panT);    // HIGH SCORE value (info_1 num row)
-        ChromeRight(STAT_R, 365, 26.0f, act.bestTime, panT);   // BEST TIME value (info_2 num row)
-        // RINGS row (info_3): numerator right-edge x=571, denominator right-edge x=665, y=395
+        // CSD-base path: seat every value on the REAL CSD info-row slots
+        // (data/gate.json info_1..info_4), whose screen-space anchor centres compute to
+        //   info_1 HIGH SCORE: num right-edge ~665, row centre y=344
+        //   info_2 BEST TIME : num right-edge ~665, row centre y=394
+        //   info_3 RINGS     : num_nume ~571 / slash ~586 / num_deno ~665, row centre y=424
+        //   info_4 MEDALS    : num_nume ~589 / slash ~604 / num_deno ~665, row centre y=446
+        // Chrome() is top-left anchored, so we draw at (centre - 16) to sit the cap on
+        // the label baseline. The CSD itself DRAWS the medal "/" glyph between its
+        // num_nume/num_deno slots, so the overlay must NOT emit its own slash for the
+        // medal rows; we drop the numerator just LEFT of the CSD slash and the
+        // denominator on the shared right column (DEN_R) so the CSD slash reads as one
+        // clean "X / Y". HIGH SCORE / BEST TIME are single values right-aligned to the
+        // same column. (Single-string draws => no internal digit gap.)
+        const float DEN_R = 665.0f;                              // shared denominator/value right column
+        ChromeRight(DEN_R, 328, 26.0f, act.hiScore, panT);       // HIGH SCORE value (info_1, y=344-16)
+        ChromeRight(DEN_R, 378, 26.0f, act.bestTime, panT);      // BEST TIME value (info_2, y=394-16)
+        // RINGS row (info_3): numerator right-edge x=580 (just left of CSD slash@586),
+        // denominator right-edge x=DEN_R, row top y=408 (centre 424 - 16).
         snprintf(buf, sizeof buf, "%d", act.sun);
-        ChromeRight(571.0f, 395, 26.0f, buf, panT);
+        ChromeRight(580.0f, 408, 26.0f, buf, panT);
         snprintf(buf, sizeof buf, "%d", act.sunMax);
-        ChromeRight(665.0f, 395, 26.0f, buf, panT);
-        // MEDALS row (info_4): numerator right-edge x=589, denominator right-edge x=665, y=417
+        ChromeRight(DEN_R, 408, 26.0f, buf, panT);
+        // MEDALS row (info_4): numerator right-edge x=598 (just left of CSD slash@604),
+        // denominator right-edge x=DEN_R, row top y=430 (centre 446 - 16).
         snprintf(buf, sizeof buf, "%d", act.moon);
-        ChromeRight(589.0f, 417, 26.0f, buf, panT);
+        ChromeRight(598.0f, 430, 26.0f, buf, panT);
         snprintf(buf, sizeof buf, "%d", act.moonMax);
-        ChromeRight(665.0f, 417, 26.0f, buf, panT);
+        ChromeRight(DEN_R, 430, 26.0f, buf, panT);
+        // info_5 is an unused (data-less) stat row in our 3-act dataset, but the CSD
+        // base still draws its bare "/" slash glyph (mat_comon_num_001 @ screen ~604,498)
+        // with no label/value beside it. Mask that orphan slash with a small panel-grey
+        // rect so it doesn't read as a stray "/" at the bottom of the stat block.
+        DrawRect({ 594, 488 }, { 616, 506 }, WithAlpha(RGBA(78, 82, 86, 255), panT));
         PopTransform();
         return;
     }

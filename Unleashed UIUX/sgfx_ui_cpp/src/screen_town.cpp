@@ -91,17 +91,17 @@ struct Action {
     const char* info2;
 };
 const Action ACTIONS[] = {
-    { ACT_PASS,    &ICON_SUN,    &LBL_PASS,  "PASS TIME",
+    { ACT_PASS,    &ICON_SUN,    &LBL_PASS,  "Pass Time",
       "Wait for the sun to rise or set.", "Switch between day and night."   },
-    { ACT_PHOTO,   &ICON_CAMERA, &LBL_PHOTO, "TAKE PHOTO",
+    { ACT_PHOTO,   &ICON_CAMERA, &LBL_PHOTO, "Take Photo",
       "Snap a picture of the town.",      "Save it to your photo album."    },
-    { ACT_TALK,    &ICON_TALK,   &LBL_TALK,  "TALK / USE",
+    { ACT_TALK,    &ICON_TALK,   &LBL_TALK,  "Talk / Use",
       "Speak with the townsfolk.",        "Hear rumors and gather hints."   },
-    { ACT_SHOP,    &ICON_RING,   nullptr,    "VISIT SHOP",
+    { ACT_SHOP,    &ICON_RING,   nullptr,    "Visit Shop",
       "Browse the local goods.",          "Spend your hard-earned rings."   },
-    { ACT_RECORDS, &ICON_MOON,   nullptr,    "RECORDS",
+    { ACT_RECORDS, &ICON_MOON,   nullptr,    "Records",
       "Review your stage records.",       "Check ranks, times and medals."  },
-    { ACT_DEPART,  &ICON_RING,   nullptr,    "DEPART",
+    { ACT_DEPART,  &ICON_RING,   nullptr,    "Depart",
       "Leave town for the world map.",    "Continue your adventure."        },
 };
 constexpr int ACTION_COUNT = int(sizeof(ACTIONS) / sizeof(ACTIONS[0]));
@@ -254,6 +254,28 @@ float DrawHint(float x, float cy, const UV& g, float gAspect, const char* label,
     return x;
 }
 
+// The D-Pad has no measured slot in mat_comon_x360_001, so (like world_map_help)
+// it is drawn as a vector button glyph: a plus/cross of two bars on a dark base.
+// Mirrors DrawHint's contract (glyph + ASCII label, returns the next x) so the
+// footer never degrades to a bracketed "[Up/Down]" placeholder.
+const uint32_t COL_BTN_BODY = RGBA(40, 46, 58, 255);    // dark button base
+const uint32_t COL_BTN_EDGE = RGBA(150, 168, 196, 255); // light rim / icon face
+float DrawDpadHint(float x, float cy, const char* label, float t) {
+    const float s   = 30.0f;                     // square footprint, matches gh
+    const float top = cy - s * 0.5f, bot = cy + s * 0.5f;
+    const float left = x, right = x + s, midX = x + s * 0.5f;
+    DrawRect({ left, top }, { right, bot }, WithAlpha(COL_BTN_BODY, t));
+    const float arm = s * 0.34f;                 // half-thickness of each bar
+    DrawRect({ midX - arm, top + 3.0f }, { midX + arm, bot - 3.0f }, WithAlpha(COL_BTN_EDGE, t));
+    DrawRect({ left + 3.0f, cy - arm }, { right - 3.0f, cy + arm }, WithAlpha(COL_BTN_EDGE, t));
+    DrawRect({ midX - arm * 0.5f, cy - arm * 0.5f }, { midX + arm * 0.5f, cy + arm * 0.5f },
+             WithAlpha(COL_BTN_BODY, t));      // dark hub for the classic D-pad read
+    x += s + 8.0f;
+    DrawText({ x, cy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, t), label);
+    x += MeasureText(22.0f, label).x + 34.0f;
+    return x;
+}
+
 void Draw(double openSec) {
     DrawVGradient({ 0, 0 }, { REF_W, REF_H }, COL_BG_TOP, COL_BG_BOT);
 
@@ -391,9 +413,9 @@ void Draw(double openSec) {
         const float aAsp = 0.921f;
         float hx = TITLE_X, hcy = 634.0f;
         DrawRect({ TITLE_X, 612.0f }, { 1130.0f, 614.0f }, WithAlpha(COL_RULE, footT));
+        hx = DrawDpadHint(hx, hcy, "Move",  footT);
         hx = DrawHint(hx, hcy, GLYPH_A, aAsp, "Select", footT);
         hx = DrawHint(hx, hcy, GLYPH_B, aAsp, "Back",   footT);
-        DrawText({ hx, hcy - 13.0f }, 22.0f, WithAlpha(COL_FOOTER, footT), "[Up/Down] Move");
     }
     ResetFont();
 }

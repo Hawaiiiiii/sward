@@ -33,7 +33,7 @@
 using namespace ui;
 namespace {
 
-int g_glyphTex = -1, g_sunMedTex = -1, g_moonMedTex = -1;
+int g_glyphTex = -1, g_sunMedTex = -1, g_moonMedTex = -1, g_portraitTex = -1;
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 
 struct UV { float u0, v0, u1, v1; };
@@ -93,6 +93,7 @@ void Init() {
     if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
     if (g_sunMedTex  < 0) g_sunMedTex  = gfx::loadTexture("assets/gameart/medallion_sun.png");
     if (g_moonMedTex < 0) g_moonMedTex = gfx::loadTexture("assets/gameart/medallion_moon.png");
+    if (g_portraitTex < 0) g_portraitTex = gfx::loadTexture("assets/gameart/mediaroom_portrait_apotos_boy.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
@@ -277,16 +278,24 @@ void FooterSound(float a) {   // Select | Back (right) — shared button-guide
 
 // ---- views ---------------------------------------------------------------------
 void DrawEncyText(float a, double now) {
-    // portrait slot (user art drops in): contact shadow + faint slot hint
-    DrawRect({ 360, 565 }, { 480, 592 }, WithAlpha(RGBA(120, 110, 84, 255), a * 0.45f));
+    // portrait slot: the real character portrait art (Alexis / Apotos boy) drawn into
+    // the measured slot rect, over a faint parchment backing. If the texture is missing
+    // the backing alone keeps the slot readable (no "PORTRAIT" placeholder label).
     DrawRect({ 343, 267 }, { 496, 592 }, WithAlpha(C_PARCH_LO, a * 0.35f));
-    SetFont(g_fSeurat);
-    DrawTextAligned({ 343, 267 }, { 496, 592 }, 14.0f, WithAlpha(RGBA(130, 120, 95, 255), a), "PORTRAIT", Align::Center, true, false);
+    if (g_portraitTex >= 0)
+        DrawImage(g_portraitTex, { 343, 267 }, { 496, 592 }, { 0.f, 0.f }, { 1.f, 1.f },
+                  WithAlpha(C_WHITE, a));
     // entry-title highlight band + entry name. (The small left-of-title sprite was
     // a national flag — wrong art for a character entry, and no real per-character
     // entry icon exists in the asset set — so it is dropped per the art/structure
     // boundary and the name is left-anchored on the band instead of a placeholder.)
-    DrawRect({ 496.7f, 177.3f }, { 793.3f, 212.0f }, WithAlpha(C_WHITE, a * 0.18f));
+    // subtle styled name plate: a soft highlight->parchment gradient with thin
+    // embossed keyline rules top/bottom (instead of the old flat gray fill).
+    DrawVGradient({ 496.7f, 177.3f }, { 793.3f, 212.0f },
+                  WithAlpha(C_WHITE, a * 0.22f), WithAlpha(C_PARCH_HI, a * 0.16f));
+    DrawRect({ 496.7f, 177.3f }, { 793.3f, 178.6f }, WithAlpha(C_KEYLINE, a * 0.55f));
+    DrawRect({ 496.7f, 210.7f }, { 793.3f, 212.0f }, WithAlpha(C_RULE, a * 0.55f));
+    SetFont(g_fSeurat);   // name + body text render in the entry face (paired with ResetFont below)
     DrawText({ 506.7f, 178 }, 26.0f, WithAlpha(C_TEXT, a), "Alexis");
     // ruled double-lines + body text (pitch 33, pairs 6.7 apart, x 507..973)
     const char* L[] = { "Lambros's son, a", "wild, unruly boy.", "",
