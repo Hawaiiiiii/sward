@@ -1,64 +1,55 @@
-# Town hub menu — layout & interaction spec
+# Operator action hub — layout & interaction spec
 
-Internal id: `town`. A two-panel hub menu: a scrolling list of context actions on
-the left and a live description of the focused action on the right. This is the
-template for any "list of actions + detail pane" menu. Coordinates are in the
-**1280 × 720** canvas, origin top-left, in pixels. Reference render:
-`screenshots/town.png`.
+Internal id: `town`. A two-panel hub: a scrolling list of operator actions on the
+left, a live detail of the focused action on the right. This is the template for
+any "list of actions + detail pane" menu. Built from primitives + text only — no
+chrome art. Coordinates are in the **1280 × 720** canvas, origin top-left, in
+pixels. Reference render: `screenshots/town.png`.
 
 ## Purpose
-The operator stands in a hub and picks an action from a list; the right pane
-explains the focused action; some actions change global state (here, time of day).
+The operator picks an action to run; the right pane explains the focused action.
+The actions run against the active profile shown top-right.
 
 ## Regions
-
 | Element | Rect (x,y,w,h) | Notes |
 |---|---|---|
-| Title | "TOWN" at x≈150, y≈50 | Plain title text. A `lv NN` chip sits centre-top; a `DAY`/`NIGHT` label + a rotating sun/moon medallion sit top-right. |
-| Title rule | y≈118 | Horizontal divider under the title. |
-| Actions panel | x=150, y=158, w=600, h=404 | Dark rounded panel. A caption strip "ACTIONS" (height ≈52) tops it; the action rows fill the rest. |
-| Info panel | x=780, y=158, w=350, h=404 | Same panel styling, caption "INFO". Shows the focused action's large icon + a two-line description. |
-| Footer | y≈690 | `(↕)` Move, `(A)` Select, `(B)` Back — button glyphs. |
+| Logo slot | (40, 40), ≈168×56 | Host-supplied; empty = clean field, no header text. |
+| Profile chip | top-right, ends x≈1130 | `PROFILE` label (dim green) over the active profile id (gold). |
+| Header rule | y≈118 | Divider under the header. |
+| Actions panel | (150, 158, 600, 404) | Dark panel; caption strip "ACTIONS" (height ≈52); action rows fill the rest. |
+| Info panel | (780, 158, 350, 404) | Same styling, caption "INFO"; a small accent bar, the focused action name, and a two-line description. |
+| Footer | y≈628 | `Up/Down` Move, `Enter` Run, `Esc` Back — plain text hints. |
 
 ## Action rows
-Row height ≈60, inner pad ≈14, **5 rows visible** (the list scrolls when there are
-more). Each row: a square **icon cell** on the left, then the action label. The
-focused row gets an eased blue highlight bar spanning the panel width.
+Row height ≈60, **5 rows visible** (the list scrolls; a scrollbar appears on the
+right when there are more). Each row is the action label, left-aligned. The focused
+row gets an eased blue highlight bar spanning the panel width; its label brightens.
 
-Default action set (icon → label):
+Default action set (label → detail):
 
-| Icon | Label | Detail (2 lines) |
-|---|---|---|
-| sun (→ moon at night) | Pass Time | wait for sun to rise/set; switch day↔night |
-| camera | Take Photo | snap a picture; save to album |
-| filled disc | Talk / Use | speak with townsfolk; gather hints |
-| ring | Visit Shop | browse goods; spend rings |
-| crescent moon | Records | review stage records; ranks/times/medals |
-| ring | Depart | leave town for the world map |
-
-## Icon-atlas note
-Action icons come from one small (128×128) icon atlas; each icon is a sub-rect
-**aspect-fit** into the square row cell. Measure each sub-rect tightly around its
-glyph — a sub-rect that overruns its cell pulls in a neighbouring glyph (e.g. a
-camera + a no-entry sign, or a moon overlapping the camera) and the row reads as a
-fragment or the wrong icon. Verify every row's icon against the atlas, not just one.
+| Action | Detail (2 lines) |
+|---|---|
+| Run preflight | full SG-side checks: anchors, constants, carpaints |
+| Capture screenshots | export via the BMW pipeline; snap the test views |
+| Check delivery | readiness across the car models and their changelogs |
+| Daily digest | run every live profile; summarise the morning state |
+| Scan unused Lua | find Lua files that survived into the project root |
+| Manual review | open the queue of items awaiting a human verdict |
 
 ## Interaction
 - **Up / Down** — move the cursor between rows with an eased highlight; the list
-  scrolls when the cursor passes the visible window; the info pane updates to the
-  focused action.
-- **A (Select)** — perform the focused action. **Pass Time** toggles the day/night
-  cycle: the header medallion swaps sun↔moon and the `DAY`/`NIGHT` label changes.
-  The other actions open their respective sub-flows (shop, records, etc.).
-- **B (Back)** — close the menu (back to free-roam).
+  scrolls when the cursor passes the visible window; the info pane updates.
+- **Enter (Run / accept)** — run the focused action against the active profile (a
+  transient "Running <action> on <profile>" confirmation here; wires to the real
+  work in-flow).
+- **Esc (Back)** — leave the hub.
 
 ## Colours
-- Panels: dark navy plate with a subtle lit grid; caption text in gold.
-- Focus highlight: blue gradient bar.
-- Labels: white with a dark outline.
+- Panels: dark navy plate; caption text in gold; blue focus highlight.
+- Labels: light text, brighter when lit; descriptions dimmer.
 
 ## Notes for reimplementation
-- Icons, medallion art and the level chip are content slots.
-- The info pane mirrors the focused row — keep its icon and the row icon sourced
-  from the same atlas entry so they always agree.
-- Day/night is global state owned by this screen; other screens read it.
+- The info pane mirrors the focused row — keep them sourced from the same action.
+- Actions are the tool's real verbs; the active profile and any per-action counts
+  are content (representative until a live feed supplies them).
+- The logo is a content slot; an empty slot renders nothing (no placeholder text).
