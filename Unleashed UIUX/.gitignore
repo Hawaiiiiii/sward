@@ -9,3 +9,6 @@ _preview/
 sgfx_ui_cpp/assets/
 *.zip
 .image-slots.state.json
+
+# Per-screen spec reference renders are SEGA-derived — text specs are tracked, images are not
+specs/screenshots/
