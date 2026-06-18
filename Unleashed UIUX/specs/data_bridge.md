@@ -33,7 +33,13 @@ example is `sgfx_ui_cpp/sgfx_status.example.json`.)
 | `battery[]` | the battery-results table | one row per screenshot filter. `verdict` is an id (`likely_ok`, `needs_manual_review`, `proxy_candidate_ready`, `baseline_candidate_ready`, `baseline_missing`); `diff` is the baseline diff count. Colours: likely_ok green, baseline_missing red, the rest amber. The overall battery verdict is derived (any missing baseline → BASELINE MISSING, else any review → NEEDS REVIEW, else LIKELY OK). |
 
 ## For the writer
-The tool produces this file from its existing run state — the same vocabulary it
-already uses (profiles, packs, verdicts, battery filters). Write it once per run (or
-on demand) to the path the viewer reads; the viewer picks it up at next launch. The
-file is host/run-specific and is not committed; the example here documents the shape.
+The preflight already writes a JSON report per run. The dev-side exporter
+`sgfx_ui_cpp/tools/export_status.py` maps that report (and an optional daily-snapshot
+for the battery) straight to this status file — a pure consumer that does not import
+or modify the tool:
+
+    python tools/export_status.py --report <run>/g65-report.json --out sgfx_status.json
+
+Write `sgfx_status.json` to the path the viewer reads (next to the exe); it picks it
+up at next launch. The file is host/run-specific and is not committed; the example
+here documents the shape.
