@@ -81,7 +81,7 @@ static const ScreenDef g_screens[] = {
     { "result",    &ResultInit,   &ResultDraw,   &ResultFlowInput, nullptr,    &WrapNav, "result", &CsdDay },
     { "options",     &OptionsInit,    &OptionsDraw,    &OptionsFlowInput, &OptionsReset, &WrapNav },
     { "town",        &TownInit,       &TownDraw,       &TownInput,       &TownReset,    &TownNav },
-    { "gate",        &GateInit,       &GateDraw,       &GateInput,       &GateReset,    &GateNav, "gate" },
+    { "gate",        &GateInit,       &GateDraw,       &GateInput,       &GateReset,    &GateNav },
     { "result_ex",   &ResultExInit,   &ResultExDraw,   &ResultExInput,   &ResultExReset, nullptr },
     { "mediaroom",      &MediaRoomInit,     &MediaRoomDraw,     &MediaFlowInput,     &MediaRoomReset, &WrapNav },
     { "loading",        &LoadingInit,       &LoadingDraw,       &LoadingInput,       &LoadingReset,   nullptr },
