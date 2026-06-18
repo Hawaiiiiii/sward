@@ -197,8 +197,8 @@ void Input(const ScreenInput& in) {
         if (a.kind == ACT_PASS) {
             g_night = !g_night;
             g_msg = g_night ? "Night falls over the town." : "The sun rises over the town.";
-        } else if (a.kind == ACT_SHOP)   { g_nav = "shop"; }              // the runtime flow
-        else if (a.kind == ACT_TALK)     { g_nav = "balloon"; }
+        } else if (a.kind == ACT_TALK)     { g_nav = "balloon"; }
+        // (ACT_SHOP falls through to the info message — the standalone shop screen was removed)
         else if (a.kind == ACT_DEPART)   { g_nav = "loading>world_map"; }
         else {
             g_msg = a.info1;
