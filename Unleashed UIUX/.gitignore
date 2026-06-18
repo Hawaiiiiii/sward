@@ -1,0 +1,11 @@
+# ---- art/structure boundary (this repo is PUBLIC) ---------------------------
+# Engineering (code, layouts, rects, tooling) is committed; extracted SEGA art,
+# audio, and commercial fonts are NOT — they come from the user's own game copy
+# and are dropped into these ignored folders locally.
+assets/
+fonts/
+dist/
+_preview/
+sgfx_ui_cpp/assets/
+*.zip
+.image-slots.state.json

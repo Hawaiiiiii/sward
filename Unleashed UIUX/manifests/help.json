@@ -1,0 +1,82 @@
+{
+  "screen": "help",
+  "stem": "ui_help",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/help/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_help"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "help_nametag_nametag_position",
+      "tex": "mat_talk_comon_003.png",
+      "rect": [
+        224,
+        496,
+        47,
+        46
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.15234,
+        0.59375,
+        0.25781,
+        0.95312
+      ]
+    },
+    {
+      "id": "help_chara_1_name_txt",
+      "tex": "mat_talk_comon_002.png",
+      "rect": [
+        252,
+        502,
+        100,
+        31
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.25,
+        0.39062,
+        0.37109
+      ]
+    },
+    {
+      "id": "help_window",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        222,
+        514,
+        75,
+        206
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.63086,
+        0.20117,
+        0.66504,
+        0.66016
+      ]
+    },
+    {
+      "id": "help_text_area_btn",
+      "tex": "mat_comon_007.png",
+      "rect": [
+        1003,
+        633,
+        32,
+        32
+      ],
+      "z": 2,
+      "fit": "fill"
+    }
+  ]
+}

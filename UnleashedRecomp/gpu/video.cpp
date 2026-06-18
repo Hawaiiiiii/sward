@@ -17,6 +17,7 @@
 #include <res/font/im_font_atlas.dds.h>
 #include <shader/shader_cache.h>
 #include <SWA.h>
+#include <patches/csd_capture.h>
 #include <ui/achievement_menu.h>
 #include <ui/achievement_overlay.h>
 #include <ui/button_guide.h>
@@ -190,6 +191,10 @@ static uint32_t g_pixelShaderConstants[0x380];
 static SharedConstants g_sharedConstants;
 static GuestTexture* g_textures[16];
 static RenderSamplerDesc g_samplerDescs[16];
+
+// Exposed for the optional CSD capture (patches/csd_capture.cpp): the texture bound to
+// sampler slot 0 at draw time. CSD binds its picture's texture right before the draw.
+const void* SWA_CsdBoundTexture0() { return g_textures[0]; }
 static bool g_scissorTestEnable = false;
 static RenderRect g_scissorRect;
 static RenderVertexBufferView g_vertexBufferViews[16];
@@ -6469,6 +6474,10 @@ static void MakePictureData(GuestPictureData* pictureData, uint8_t* data, uint32
 
             pictureData->texture = g_memory.MapVirtual(g_userHeap.AllocPhysical<GuestTexture>(std::move(texture)));
             pictureData->type = 0;
+
+            // Record GuestTexture* -> name for the optional CSD capture (inert unless enabled).
+            CsdCapture::RegisterTexture(g_memory.Translate(pictureData->texture),
+                reinterpret_cast<const char*>(g_memory.Translate(pictureData->name + 2)));
         }
     }
 }

@@ -1,0 +1,106 @@
+{
+  "screen": "loading",
+  "stem": "ui_loading",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/loading/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_loading"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "bg_1_arrow",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "pda_pda",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        569,
+        0,
+        490,
+        703
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.22422,
+        0.16944,
+        0.45703,
+        0.86667
+      ]
+    },
+    {
+      "id": "pda",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        180,
+        116,
+        921,
+        514
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.8125,
+        0.30417,
+        0.81406,
+        0.5125
+      ]
+    },
+    {
+      "id": "n_2_d_n_d_move",
+      "tex": "mat_load_d_n_change.png",
+      "rect": [
+        602,
+        382,
+        75,
+        75
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.125,
+        0.23438
+      ]
+    },
+    {
+      "id": "pda_txt",
+      "tex": "mat_load_en_001.png",
+      "rect": [
+        458,
+        567,
+        557,
+        37
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        1.0,
+        0.28906
+      ]
+    }
+  ]
+}

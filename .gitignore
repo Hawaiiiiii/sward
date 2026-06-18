@@ -441,3 +441,15 @@ FodyWeavers.xsd
 /SONIC UNLEASHED/
 /Match SU OG source code folders and locations.txt
 /Research SU.txt
+
+# ---- local media / personal capture material (not engineering) --------------
+.claude/
+*.mp4
+*.otf
+*.ttc
+Screenshot*.png
+Unleashed UIUX.zip
+
+# ---- runtime-generated + personal notes (kept local) ------------------------
+sgfx_settings.ini
+**/sgfx_settings.ini

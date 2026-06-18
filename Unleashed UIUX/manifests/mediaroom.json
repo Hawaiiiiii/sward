@@ -1,0 +1,467 @@
+{
+  "screen": "mediaroom",
+  "stem": "ui_mediaroom",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/mediaroom/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_mediaroom"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "header_frame",
+      "tex": "mat_media_common_001.png",
+      "rect": [
+        0,
+        0,
+        1280,
+        177
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.85156,
+        0.2168,
+        0.85547,
+        0.5625
+      ]
+    },
+    {
+      "id": "header_bg",
+      "tex": "mat_media_common_001.png",
+      "rect": [
+        0,
+        0,
+        1280,
+        109
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.0,
+        0.50391,
+        0.21289
+      ]
+    },
+    {
+      "id": "img_box",
+      "tex": "mat_media_common_003.png",
+      "rect": [
+        0,
+        0,
+        298,
+        162
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.99414,
+        0.00781,
+        0.99609,
+        0.78906
+      ]
+    },
+    {
+      "id": "header_img_1",
+      "tex": "mat_media_common_001.png",
+      "rect": [
+        894,
+        25,
+        153,
+        108
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.53516,
+        0.56445,
+        0.99609,
+        0.72656
+      ]
+    },
+    {
+      "id": "header_title",
+      "tex": "mat_media_en_001.png",
+      "rect": [
+        200,
+        62,
+        614,
+        53
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.63086,
+        1.0,
+        0.7168
+      ]
+    },
+    {
+      "id": "window_bg",
+      "tex": "mat_media_common_002.png",
+      "rect": [
+        254,
+        132,
+        772,
+        471
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.07812,
+        0.07812,
+        0.57812,
+        0.57812
+      ]
+    },
+    {
+      "id": "thumbnail_cursor",
+      "tex": "mat_media_common_002.png",
+      "rect": [
+        266,
+        147,
+        188,
+        121
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.82422,
+        0.38672,
+        0.99609,
+        0.63281
+      ]
+    },
+    {
+      "id": "scrollbar",
+      "tex": "mat_media_common_001.png",
+      "rect": [
+        981,
+        160,
+        26,
+        310
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.54297,
+        0.81055,
+        0.64453,
+        0.8125
+      ]
+    },
+    {
+      "id": "thumbnail_2_flag",
+      "tex": "mat_worldmap_ss_002.png",
+      "rect": [
+        375,
+        165,
+        530,
+        296
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.55664,
+        0.37305,
+        0.83008,
+        0.55469
+      ]
+    },
+    {
+      "id": "detail_parts_2",
+      "tex": "mat_media_common_001.png",
+      "rect": [
+        194,
+        177,
+        891,
+        443
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.48828,
+        0.56836,
+        0.49219,
+        0.66211
+      ]
+    },
+    {
+      "id": "book_btn_btn",
+      "tex": "mat_media_common_002.png",
+      "rect": [
+        415,
+        234,
+        450,
+        60
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.11328,
+        0.66016,
+        0.11719,
+        0.89453
+      ]
+    },
+    {
+      "id": "book_btn_1",
+      "tex": "mat_media_en_002.png",
+      "rect": [
+        384,
+        241,
+        512,
+        44
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0918,
+        1.0,
+        0.17773
+      ]
+    },
+    {
+      "id": "book_btn_4",
+      "tex": "mat_media_en_002.png",
+      "rect": [
+        384,
+        289,
+        512,
+        44
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.7207,
+        1.0,
+        0.80664
+      ]
+    },
+    {
+      "id": "book_btn_2",
+      "tex": "mat_media_en_002.png",
+      "rect": [
+        384,
+        339,
+        512,
+        44
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.18164,
+        1.0,
+        0.26758
+      ]
+    },
+    {
+      "id": "book_btn_5",
+      "tex": "mat_media_en_002.png",
+      "rect": [
+        384,
+        389,
+        512,
+        44
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.81055,
+        1.0,
+        0.89648
+      ]
+    },
+    {
+      "id": "book_cursor",
+      "tex": "mat_media_common_002.png",
+      "rect": [
+        313,
+        420,
+        655,
+        88
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.67578,
+        0.0,
+        0.98438,
+        0.32812
+      ]
+    },
+    {
+      "id": "book_btn_3",
+      "tex": "mat_media_en_002.png",
+      "rect": [
+        384,
+        439,
+        512,
+        44
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.27148,
+        1.0,
+        0.35742
+      ]
+    },
+    {
+      "id": "book_border",
+      "tex": "mat_media_common_002.png",
+      "rect": [
+        280,
+        535,
+        721,
+        55
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.73047,
+        0.34375,
+        0.73438,
+        0.36328
+      ],
+      "alpha": 0.482
+    },
+    {
+      "id": "footer_btn_a",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        680,
+        617,
+        40,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.07812,
+        0.07812
+      ]
+    },
+    {
+      "id": "footer_btn_b",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        856,
+        617,
+        40,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.07812,
+        0.0,
+        0.15625,
+        0.07812
+      ]
+    },
+    {
+      "id": "footer_btn_lb",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        244,
+        618,
+        80,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.3125,
+        0.0,
+        0.46875,
+        0.07812
+      ]
+    },
+    {
+      "id": "footer_btn_rb",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        440,
+        618,
+        80,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.46875,
+        0.0,
+        0.625,
+        0.07812
+      ]
+    },
+    {
+      "id": "footer_txt_lbrb",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        320,
+        624,
+        128,
+        30
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.29883,
+        1.0,
+        0.35742
+      ]
+    },
+    {
+      "id": "footer_txt_a",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        720,
+        624,
+        128,
+        30
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.00586,
+        1.0,
+        0.06445
+      ]
+    },
+    {
+      "id": "footer_txt_b",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        896,
+        624,
+        128,
+        30
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.06445,
+        1.0,
+        0.12305
+      ]
+    }
+  ]
+}

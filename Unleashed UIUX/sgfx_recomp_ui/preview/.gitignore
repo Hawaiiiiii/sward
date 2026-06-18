@@ -1,0 +1,15 @@
+# build artifacts — the harness is rebuilt from source via build_preview.bat
+*.exe
+*.bmp
+*.obj
+*.ilk
+*.pdb
+obj/
+# raw per-run renders — only the *_screenshot.png references are tracked
+preview_gradient.png
+preview_rows.png
+preview_values.png
+preview_options.png
+preview_achievements.png
+preview_installer.png
+preview_ach.png

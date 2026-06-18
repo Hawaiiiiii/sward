@@ -1,0 +1,385 @@
+{
+  "screen": "shop",
+  "stem": "runtime",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/shop/",
+  "generated_by": "tools/runtime_capture_to_manifest.py",
+  "notes": "Built from a RUNTIME UI-draw capture: rects are the elements' true on-screen positions (incl. runtime-anchored / runtime-text elements that static .yncp extraction cannot place). Slots are named after the bound textures; UV-cropped and alpha-dimmed to match the drawn frame.",
+  "nodes": [
+    {
+      "id": "ui_shop_footer_shop_footer_btn_a",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        680,
+        618,
+        40,
+        40
+      ],
+      "z": 0,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.07812,
+        0.07812
+      ]
+    },
+    {
+      "id": "ui_shop_footer_shop_footer_img_a",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        720,
+        626,
+        128,
+        25
+      ],
+      "z": 1,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.00977,
+        1.0,
+        0.05859
+      ]
+    },
+    {
+      "id": "ui_shop_footer_shop_footer_btn_b",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        858,
+        618,
+        40,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.07812,
+        0.0,
+        0.15625,
+        0.07812
+      ]
+    },
+    {
+      "id": "ui_shop_footer_shop_footer_img_b",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        898,
+        626,
+        128,
+        25
+      ],
+      "z": 3,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.06836,
+        1.0,
+        0.11719
+      ]
+    },
+    {
+      "id": "ui_shop_header_ring_ring",
+      "tex": "mat_comon_002.png",
+      "rect": [
+        242,
+        62,
+        45,
+        45
+      ],
+      "z": 4,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.05859,
+        0.46875
+      ]
+    },
+    {
+      "id": "ui_shop_header_ring_num",
+      "tex": "mat_comon_num_001.png",
+      "rect": [
+        287,
+        70,
+        23,
+        29
+      ],
+      "z": 5,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_shop_header_shop_nametag_nametag_position_bg_center",
+      "tex": "mat_talk_comon_003.png",
+      "rect": [
+        707,
+        49,
+        330,
+        76
+      ],
+      "z": 6,
+      "fit": "fill",
+      "uv": [
+        0.14062,
+        0.0,
+        0.14453,
+        0.59375
+      ]
+    },
+    {
+      "id": "ui_shop_header_shop_nametag_nametag_position_bg_center_bg_left",
+      "tex": "mat_talk_comon_003.png",
+      "rect": [
+        1037,
+        49,
+        19,
+        76
+      ],
+      "z": 7,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.0,
+        0.07812,
+        0.59375
+      ]
+    },
+    {
+      "id": "ui_shop_header_shop_nametag_nametag_position_bg_center_bg_left_line_left",
+      "tex": "mat_talk_comon_003.png",
+      "rect": [
+        1037,
+        49,
+        15,
+        76
+      ],
+      "z": 8,
+      "fit": "fill",
+      "uv": [
+        0.41406,
+        0.0,
+        0.47266,
+        0.59375
+      ]
+    },
+    {
+      "id": "ui_shop_header_shop_nametag_nametag_position_bg_center_bg_right",
+      "tex": "mat_talk_comon_003.png",
+      "rect": [
+        662,
+        49,
+        45,
+        76
+      ],
+      "z": 9,
+      "fit": "fill",
+      "uv": [
+        0.23438,
+        0.0,
+        0.41016,
+        0.59375
+      ]
+    },
+    {
+      "id": "ui_shop_header_shop_nametag_nametag_position_bg_center_bg_right_line_right",
+      "tex": "mat_talk_comon_003.png",
+      "rect": [
+        668,
+        49,
+        39,
+        76
+      ],
+      "z": 10,
+      "fit": "fill",
+      "uv": [
+        0.62891,
+        0.0,
+        0.78125,
+        0.59375
+      ]
+    },
+    {
+      "id": "ui_shop_header_shop_nametag_nametag_position_bg_center_line_center",
+      "tex": "mat_talk_comon_003.png",
+      "rect": [
+        707,
+        49,
+        330,
+        76
+      ],
+      "z": 11,
+      "fit": "fill",
+      "uv": [
+        0.55859,
+        0.0,
+        0.5625,
+        0.59375
+      ]
+    },
+    {
+      "id": "ui_shop_window_1_bg_4_position_center",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        260,
+        490,
+        760,
+        94
+      ],
+      "z": 12,
+      "fit": "fill",
+      "uv": [
+        0.6123,
+        0.20117,
+        0.61719,
+        0.66016
+      ]
+    },
+    {
+      "id": "ui_shop_window_1_bg_4_position_center_top_l",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        225,
+        455,
+        35,
+        35
+      ],
+      "z": 13,
+      "fit": "fill",
+      "uv": [
+        0.5625,
+        0.13281,
+        0.59668,
+        0.20117
+      ]
+    },
+    {
+      "id": "ui_shop_window_1_bg_4_position_center_top_center",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        260,
+        455,
+        760,
+        35
+      ],
+      "z": 14,
+      "fit": "fill",
+      "uv": [
+        0.6123,
+        0.13281,
+        0.61719,
+        0.20117
+      ]
+    },
+    {
+      "id": "ui_shop_window_1_bg_4_position_center_top_r",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        1020,
+        455,
+        35,
+        35
+      ],
+      "z": 15,
+      "fit": "fill",
+      "uv": [
+        0.63086,
+        0.13281,
+        0.66504,
+        0.20117
+      ]
+    },
+    {
+      "id": "ui_shop_window_1_bg_4_position_center_middle_l",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        225,
+        490,
+        35,
+        94
+      ],
+      "z": 16,
+      "fit": "fill",
+      "uv": [
+        0.5625,
+        0.20117,
+        0.59668,
+        0.66016
+      ]
+    },
+    {
+      "id": "ui_shop_window_1_bg_4_position_center_middle_r",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        1020,
+        490,
+        35,
+        94
+      ],
+      "z": 17,
+      "fit": "fill",
+      "uv": [
+        0.63086,
+        0.20117,
+        0.66504,
+        0.66016
+      ]
+    },
+    {
+      "id": "ui_shop_window_1_bg_4_position_center_bottom_l",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        225,
+        584,
+        35,
+        40
+      ],
+      "z": 18,
+      "fit": "fill",
+      "uv": [
+        0.5625,
+        0.66016,
+        0.59668,
+        0.73828
+      ]
+    },
+    {
+      "id": "ui_shop_window_1_bg_4_position_center_bottom_center",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        260,
+        584,
+        760,
+        40
+      ],
+      "z": 19,
+      "fit": "fill",
+      "uv": [
+        0.6123,
+        0.66016,
+        0.61719,
+        0.73828
+      ]
+    },
+    {
+      "id": "ui_shop_window_1_bg_4_position_center_bottom_r",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        1020,
+        584,
+        35,
+        40
+      ],
+      "z": 20,
+      "fit": "fill",
+      "uv": [
+        0.63086,
+        0.66016,
+        0.66504,
+        0.73828
+      ]
+    }
+  ]
+}

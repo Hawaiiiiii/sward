@@ -1,0 +1,391 @@
+{
+  "screen": "town",
+  "stem": "runtime",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/town/",
+  "generated_by": "tools/runtime_capture_to_manifest.py",
+  "notes": "Built from a RUNTIME UI-draw capture: rects are the elements' true on-screen positions (incl. runtime-anchored / runtime-text elements that static .yncp extraction cannot place). Slots are named after the bound textures; UV-cropped and alpha-dimmed to match the drawn frame.",
+  "nodes": [
+    {
+      "id": "ui_townscreen_info_position_1_ring_position_ring",
+      "tex": "mat_comon_002.png",
+      "rect": [
+        121,
+        68,
+        44,
+        44
+      ],
+      "z": 0,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.05859,
+        0.46875
+      ]
+    },
+    {
+      "id": "ui_townscreen_info_position_1_ring_position_ring_num",
+      "tex": "mat_comon_002.png",
+      "rect": [
+        168,
+        78,
+        18,
+        22
+      ],
+      "z": 1,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_townscreen_info_position_1_s_medal_position_medal",
+      "tex": "mat_comon_002.png",
+      "rect": [
+        121,
+        113,
+        44,
+        44
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.05859,
+        0.46875
+      ]
+    },
+    {
+      "id": "ui_townscreen_info_position_1_s_medal_position_s_medal_num",
+      "tex": "mat_comon_num_001.png",
+      "rect": [
+        202,
+        122,
+        12,
+        23
+      ],
+      "z": 3,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_townscreen_info_position_1_m_medal_position_medal",
+      "tex": "mat_comon_num_001.png",
+      "rect": [
+        121,
+        158,
+        44,
+        44
+      ],
+      "z": 4,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.05859,
+        0.46875
+      ]
+    },
+    {
+      "id": "ui_townscreen_info_position_1_s_medal_position_s_medal_lv_num",
+      "tex": "mat_comon_num_001.png",
+      "rect": [
+        184,
+        123,
+        18,
+        22
+      ],
+      "z": 5,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_townscreen_info_position_1_m_medal_position_m_medal_lv_num",
+      "tex": "mat_comon_num_001.png",
+      "rect": [
+        184,
+        168,
+        18,
+        22
+      ],
+      "z": 6,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_townscreen_info_position_1_m_medal_position_m_medal_num",
+      "tex": "mat_comon_num_001.png",
+      "rect": [
+        202,
+        167,
+        12,
+        23
+      ],
+      "z": 7,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_townscreen_info_position_1_s_medal_position_img",
+      "tex": "mat_townscreen_en_001.png",
+      "rect": [
+        154,
+        129,
+        32,
+        16
+      ],
+      "z": 8,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_townscreen_info_position_1_m_medal_position_img",
+      "tex": "mat_townscreen_en_001.png",
+      "rect": [
+        154,
+        174,
+        32,
+        16
+      ],
+      "z": 9,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_townscreen_cam_position_2_cam_position_cam",
+      "tex": "mat_townscreen_001.png",
+      "rect": [
+        1056,
+        73,
+        44,
+        30
+      ],
+      "z": 10,
+      "fit": "fill",
+      "uv": [
+        0.64062,
+        0.25,
+        0.98438,
+        0.48438
+      ]
+    },
+    {
+      "id": "ui_townscreen_cam_position_2_cam_position_cam_x",
+      "tex": "mat_townscreen_001.png",
+      "rect": [
+        1059,
+        69,
+        38,
+        39
+      ],
+      "z": 12,
+      "fit": "fill",
+      "uv": [
+        0.67188,
+        0.51562,
+        0.96875,
+        0.82031
+      ]
+    },
+    {
+      "id": "ui_townscreen_cam_position_2_cam_position_cam_num_nume",
+      "tex": "mat_comon_num_001.png",
+      "rect": [
+        1102,
+        78,
+        18,
+        22
+      ],
+      "z": 13,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_townscreen_cam_position_2_cam_position_slash",
+      "tex": "mat_comon_num_001.png",
+      "rect": [
+        1119,
+        78,
+        16,
+        22
+      ],
+      "z": 14,
+      "fit": "fill",
+      "uv": [
+        0.49023,
+        0.51562,
+        0.5293,
+        0.95312
+      ]
+    },
+    {
+      "id": "ui_townscreen_cam_position_2_cam_position_cam_num_deno",
+      "tex": "mat_comon_num_001.png",
+      "rect": [
+        1133,
+        78,
+        18,
+        22
+      ],
+      "z": 15,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_townscreen_footer_position_talk_img_btn",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        984,
+        618,
+        40,
+        40
+      ],
+      "z": 16,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.07812,
+        0.07812
+      ]
+    },
+    {
+      "id": "ui_townscreen_footer_position_talk_img_btn_position_1_img_1",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        1003,
+        585,
+        53,
+        53
+      ],
+      "z": 18,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.00781,
+        0.12109,
+        0.24219
+      ]
+    },
+    {
+      "id": "ui_townscreen_footer_position_talk_img_btn_position_1_img_2",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        951,
+        585,
+        53,
+        53
+      ],
+      "z": 19,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.00781,
+        0.12109,
+        0.24219
+      ]
+    },
+    {
+      "id": "ui_townscreen_footer_position_talk_img_btn_position_1_img_3",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        951,
+        638,
+        53,
+        53
+      ],
+      "z": 20,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.00781,
+        0.12109,
+        0.24219
+      ]
+    },
+    {
+      "id": "ui_townscreen_footer_position_talk_img_btn_position_1_img_4",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        1003,
+        638,
+        53,
+        53
+      ],
+      "z": 21,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.00781,
+        0.12109,
+        0.24219
+      ]
+    },
+    {
+      "id": "ui_townscreen_footer_position_talk_img_btn_position_2_img_2",
+      "tex": "mat_ex_common_002.png",
+      "rect": [
+        951,
+        585,
+        53,
+        53
+      ],
+      "z": 23,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.00781,
+        0.12109,
+        0.24219
+      ]
+    },
+    {
+      "id": "ui_townscreen_footer_position_talk_img_btn_position_2_img_3",
+      "tex": "mat_ex_common_002.png",
+      "rect": [
+        951,
+        638,
+        53,
+        53
+      ],
+      "z": 24,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.00781,
+        0.12109,
+        0.24219
+      ]
+    },
+    {
+      "id": "ui_townscreen_footer_position_talk_img_btn_position_2_img_4",
+      "tex": "mat_ex_common_002.png",
+      "rect": [
+        1003,
+        638,
+        53,
+        53
+      ],
+      "z": 25,
+      "fit": "fill",
+      "uv": [
+        0.00391,
+        0.00781,
+        0.12109,
+        0.24219
+      ]
+    },
+    {
+      "id": "ui_townscreen_footer_position_talk_img_txt",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        1024,
+        627,
+        128,
+        23
+      ],
+      "z": 26,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.59766,
+        1.0,
+        0.64258
+      ]
+    }
+  ]
+}

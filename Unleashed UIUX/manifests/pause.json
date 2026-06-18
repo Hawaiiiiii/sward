@@ -1,0 +1,178 @@
+{
+  "screen": "pause",
+  "stem": "ui_pause",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/pause/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_pause"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "bg_1",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        325,
+        227,
+        631,
+        270
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.6123,
+        0.20117,
+        0.61719,
+        0.66016
+      ]
+    },
+    {
+      "id": "bg_1_select",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        340,
+        310,
+        600,
+        50
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.69141,
+        0.3125,
+        0.70215,
+        0.41016
+      ]
+    },
+    {
+      "id": "footer_b_btn_lb",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        244,
+        618,
+        80,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.3125,
+        0.0,
+        0.46875,
+        0.07812
+      ]
+    },
+    {
+      "id": "footer_b_btn_rb",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        440,
+        618,
+        80,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.46875,
+        0.0,
+        0.625,
+        0.07812
+      ]
+    },
+    {
+      "id": "footer_a_btn_a",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        680,
+        618,
+        40,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.07812,
+        0.07812
+      ]
+    },
+    {
+      "id": "footer_a_btn_b",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        857,
+        618,
+        40,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.07812,
+        0.0,
+        0.15625,
+        0.07812
+      ]
+    },
+    {
+      "id": "footer_b_txt_2",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        320,
+        625,
+        128,
+        25
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.30273,
+        1.0,
+        0.35156
+      ]
+    },
+    {
+      "id": "footer_a_txt",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        720,
+        625,
+        128,
+        25
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.00977,
+        1.0,
+        0.05859
+      ]
+    },
+    {
+      "id": "footer_a_txt_3",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        897,
+        625,
+        128,
+        25
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.06836,
+        1.0,
+        0.11719
+      ]
+    }
+  ]
+}

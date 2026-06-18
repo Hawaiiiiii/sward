@@ -1,0 +1,331 @@
+{
+  "screen": "boss",
+  "stem": "runtime",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/boss/",
+  "generated_by": "tools/runtime_capture_to_manifest.py",
+  "notes": "Built from a RUNTIME UI-draw capture: rects are the elements' true on-screen positions (incl. runtime-anchored / runtime-text elements that static .yncp extraction cannot place). Slots are named after the bound textures; UV-cropped and alpha-dimmed to match the drawn frame.",
+  "nodes": [
+    {
+      "id": "ui_boss_name_name_so_position_02_egg",
+      "tex": "mat_boss_en_001.png",
+      "rect": [
+        582,
+        461,
+        142,
+        40
+      ],
+      "z": 7,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.27734,
+        0.07812
+      ]
+    },
+    {
+      "id": "ui_boss_name_name_so_position_02_ray",
+      "tex": "mat_boss_en_001.png",
+      "rect": [
+        716,
+        461,
+        186,
+        40
+      ],
+      "z": 9,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.15625,
+        0.36328,
+        0.23438
+      ]
+    },
+    {
+      "id": "ui_boss_name_name_so_position_02_fish",
+      "tex": "mat_boss_en_001.png",
+      "rect": [
+        904,
+        461,
+        143,
+        40
+      ],
+      "z": 11,
+      "fit": "fill",
+      "uv": [
+        0.38477,
+        0.15625,
+        0.66406,
+        0.23438
+      ]
+    },
+    {
+      "id": "ui_boss_name_name_so_position_03_lancer",
+      "tex": "mat_boss_en_001.png",
+      "rect": [
+        717,
+        461,
+        264,
+        40
+      ],
+      "z": 15,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.23438,
+        0.51562,
+        0.3125
+      ]
+    },
+    {
+      "id": "ui_boss_name_name_so_position_04_dragoon",
+      "tex": "mat_boss_en_001.png",
+      "rect": [
+        717,
+        461,
+        308,
+        40
+      ],
+      "z": 19,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.3125,
+        0.60156,
+        0.39062
+      ]
+    },
+    {
+      "id": "ui_boss_name_name_so_position_05_egg",
+      "tex": "mat_boss_en_001.png",
+      "rect": [
+        559,
+        461,
+        142,
+        40
+      ],
+      "z": 21,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.27734,
+        0.07812
+      ]
+    },
+    {
+      "id": "ui_boss_name_name_so_position_05_dragoon",
+      "tex": "mat_boss_en_001.png",
+      "rect": [
+        698,
+        461,
+        344,
+        40
+      ],
+      "z": 23,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.39062,
+        0.67188,
+        0.46875
+      ]
+    },
+    {
+      "id": "ui_boss_gauge_gauge_bg_position_hd_positon",
+      "tex": "positon.png",
+      "rect": [
+        753,
+        72,
+        400,
+        60
+      ],
+      "z": 28,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_boss_gauge_gauge_bg_position_hd_frame_position_img_1",
+      "tex": "mat_boss_common_001.png",
+      "rect": [
+        1136,
+        70,
+        24,
+        66
+      ],
+      "z": 32,
+      "fit": "fill",
+      "uv": [
+        0.8125,
+        0.0,
+        1.0,
+        0.51562
+      ]
+    },
+    {
+      "id": "ui_boss_gauge_gauge_bg_position_hd_frame_position_img_1_img_2_adjustable",
+      "tex": "mat_boss_common_001.png",
+      "rect": [
+        1089,
+        70,
+        47,
+        66
+      ],
+      "z": 33,
+      "fit": "fill",
+      "uv": [
+        0.61719,
+        0.0,
+        0.625,
+        0.51562
+      ]
+    },
+    {
+      "id": "ui_boss_gauge_gauge_bg_position_hd_frame_position_img_1_img_2_adjustable_img_3",
+      "tex": "mat_boss_common_001.png",
+      "rect": [
+        1060,
+        70,
+        29,
+        66
+      ],
+      "z": 34,
+      "fit": "fill",
+      "uv": [
+        0.21875,
+        0.0,
+        0.44531,
+        0.51562
+      ]
+    },
+    {
+      "id": "ui_boss_gauge_gauge_bg_position_hd_frame_position_img_1_img_2_adjustable_img_3_size_img_4_adjustable",
+      "tex": "mat_boss_common_001.png",
+      "rect": [
+        770,
+        70,
+        290,
+        66
+      ],
+      "z": 35,
+      "fit": "fill",
+      "uv": [
+        0.1875,
+        0.0,
+        0.19531,
+        0.51562
+      ]
+    },
+    {
+      "id": "ui_boss_gauge_gauge_bg_position_hd_frame_position_img_1_img_2_adjustable_img_3_size_img_4_adjustable_img_5",
+      "tex": "mat_boss_common_001.png",
+      "rect": [
+        750,
+        70,
+        20,
+        66
+      ],
+      "z": 36,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.15625,
+        0.51562
+      ]
+    },
+    {
+      "id": "ui_boss_gauge_gauge_bg_position_hd_tag_position_img",
+      "tex": "mat_boss_common_001.png",
+      "rect": [
+        1078,
+        102,
+        68,
+        22
+      ],
+      "z": 37,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.53125,
+        0.34375
+      ]
+    },
+    {
+      "id": "ui_boss_gauge_gauge_2_position_hd_position_size_center",
+      "tex": "mat_boss_en_003.png",
+      "rect": [
+        819,
+        79,
+        323,
+        18
+      ],
+      "z": 38,
+      "fit": "fill",
+      "uv": [
+        0.11719,
+        0.57812,
+        0.125,
+        0.71875
+      ]
+    },
+    {
+      "id": "ui_boss_gauge_gauge_2_position_hd_position_size_center_l",
+      "tex": "mat_boss_common_001.png",
+      "rect": [
+        817,
+        79,
+        2,
+        18
+      ],
+      "z": 39,
+      "fit": "fill",
+      "uv": [
+        0.07812,
+        0.57812,
+        0.09375,
+        0.71875
+      ]
+    },
+    {
+      "id": "ui_boss_gauge_gauge_2_position_hd_position_size_center_r",
+      "tex": "mat_boss_common_001.png",
+      "rect": [
+        1142,
+        79,
+        2,
+        18
+      ],
+      "z": 40,
+      "fit": "fill",
+      "uv": [
+        0.85938,
+        0.57812,
+        0.875,
+        0.71875
+      ]
+    },
+    {
+      "id": "ui_boss_gauge_gauge_1_position_hd_position_size_center",
+      "tex": "mat_boss_common_001.png",
+      "rect": [
+        819,
+        79,
+        323,
+        18
+      ],
+      "z": 41,
+      "fit": "fill",
+      "uv": [
+        0.11719,
+        0.57812,
+        0.125,
+        0.71875
+      ]
+    }
+  ]
+}

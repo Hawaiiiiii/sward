@@ -1,0 +1,124 @@
+{
+  "screen": "qte",
+  "stem": "ui_qte",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/qte/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_qte"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "chaser",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        367,
+        216,
+        317,
+        378
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.64453,
+        0.47266,
+        0.81445,
+        0.64258
+      ]
+    },
+    {
+      "id": "boost",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        561,
+        298,
+        158,
+        185
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.72461,
+        0.69141,
+        0.98242,
+        0.99219
+      ]
+    },
+    {
+      "id": "qs_l",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        352,
+        316,
+        87,
+        87
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.64453,
+        0.47266,
+        0.81445,
+        0.64258
+      ]
+    },
+    {
+      "id": "qs_r",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        841,
+        316,
+        87,
+        87
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.64453,
+        0.47266,
+        0.81445,
+        0.64258
+      ]
+    },
+    {
+      "id": "door",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        597,
+        317,
+        86,
+        86
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.5,
+        0.80664,
+        0.66797,
+        0.97461
+      ]
+    },
+    {
+      "id": "qte_txt_1",
+      "tex": "mat_qte_en_001.png",
+      "rect": [
+        512,
+        336,
+        256,
+        47
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.00391,
+        1.0,
+        0.1875
+      ]
+    }
+  ]
+}

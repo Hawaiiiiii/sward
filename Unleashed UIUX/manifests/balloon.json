@@ -1,0 +1,353 @@
+{
+  "screen": "balloon",
+  "stem": "ui_balloon",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/balloon/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_balloon"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "item_num",
+      "tex": "mat_comon_num_003.png",
+      "rect": [
+        0,
+        0,
+        382,
+        50
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.55859,
+        0.57812,
+        0.60352,
+        0.9375
+      ]
+    },
+    {
+      "id": "balloon_think_balloon_position",
+      "tex": "mat_talk_comon_001.png",
+      "rect": [
+        192,
+        104,
+        666,
+        193
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0293,
+        0.0,
+        0.66406,
+        0.20508
+      ]
+    },
+    {
+      "id": "hint_window_info_position",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        226,
+        139,
+        75,
+        310
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.63086,
+        0.20117,
+        0.66504,
+        0.66016
+      ]
+    },
+    {
+      "id": "scroll_bar",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        1014,
+        170,
+        19,
+        400
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.6748,
+        0.17773,
+        0.69336,
+        0.17969
+      ]
+    },
+    {
+      "id": "balloon_shout_balloon_position",
+      "tex": "mat_talk_comon_001.png",
+      "rect": [
+        433,
+        178,
+        666,
+        240
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0293,
+        0.20801,
+        0.66406,
+        0.43848
+      ]
+    },
+    {
+      "id": "balloon_nomal_balloon_position",
+      "tex": "mat_talk_comon_001.png",
+      "rect": [
+        417,
+        180,
+        666,
+        210
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0293,
+        0.0,
+        0.66406,
+        0.20508
+      ]
+    },
+    {
+      "id": "item_window_info_position",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        226,
+        192,
+        75,
+        310
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.63086,
+        0.20117,
+        0.66504,
+        0.66016
+      ]
+    },
+    {
+      "id": "item_window_model_position",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        768,
+        192,
+        75,
+        310
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.63086,
+        0.20117,
+        0.66504,
+        0.66016
+      ]
+    },
+    {
+      "id": "select",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        0,
+        219,
+        1280,
+        50
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.69141,
+        0.3125,
+        0.70215,
+        0.41016
+      ]
+    },
+    {
+      "id": "balloon_txt_area_balloon_position",
+      "tex": "mat_comon_007.png",
+      "rect": [
+        757,
+        252,
+        32,
+        32
+      ],
+      "z": 2,
+      "fit": "fill"
+    },
+    {
+      "id": "balloon_nomal_arrow_position",
+      "tex": "mat_talk_comon_001.png",
+      "rect": [
+        678,
+        275,
+        50,
+        79
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.7207,
+        0.00879,
+        0.81836,
+        0.08594
+      ]
+    },
+    {
+      "id": "balloon_shout_arrow_position",
+      "tex": "mat_talk_comon_001.png",
+      "rect": [
+        594,
+        277,
+        60,
+        163
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.70898,
+        0.21484,
+        0.82617,
+        0.37402
+      ]
+    },
+    {
+      "id": "balloon_think_arrow_position",
+      "tex": "mat_talk_comon_001.png",
+      "rect": [
+        662,
+        277,
+        147,
+        96
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.7207,
+        0.00879,
+        0.81836,
+        0.08594
+      ]
+    },
+    {
+      "id": "balloon_sonic_balloon_position",
+      "tex": "mat_talk_comon_001.png",
+      "rect": [
+        335,
+        475,
+        610,
+        210
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19531,
+        0.7041,
+        0.20508,
+        0.70898
+      ],
+      "alpha": 0.686
+    },
+    {
+      "id": "balloon_sonic_select_select_01",
+      "tex": "mat_talk_comon_001.png",
+      "rect": [
+        78,
+        494,
+        1068,
+        56
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.19531,
+        0.64941,
+        0.68164,
+        0.7041
+      ]
+    },
+    {
+      "id": "footer_btn_a",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        680,
+        618,
+        40,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.07812,
+        0.07812
+      ]
+    },
+    {
+      "id": "footer_btn_b",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        857,
+        618,
+        40,
+        40
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.07812,
+        0.0,
+        0.15625,
+        0.07812
+      ]
+    },
+    {
+      "id": "footer_txt_a",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        720,
+        625,
+        128,
+        25
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.00977,
+        1.0,
+        0.05859
+      ]
+    },
+    {
+      "id": "footer_txt_b",
+      "tex": "mat_comon_en_001.png",
+      "rect": [
+        897,
+        625,
+        128,
+        25
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.06836,
+        1.0,
+        0.11719
+      ]
+    }
+  ]
+}

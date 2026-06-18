@@ -1,0 +1,2311 @@
+{
+  "screen": "loading",
+  "stem": "runtime",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/loading/",
+  "generated_by": "tools/runtime_capture_to_manifest.py",
+  "notes": "Built from a RUNTIME UI-draw capture: rects are the elements' true on-screen positions (incl. runtime-anchored / runtime-text elements that static .yncp extraction cannot place). Slots are named after the bound textures; UV-cropped and alpha-dimmed to match the drawn frame.",
+  "nodes": [
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_y_y1",
+      "tex": "y1.png",
+      "rect": [
+        483,
+        342,
+        33,
+        46
+      ],
+      "z": 0,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_y_y2",
+      "tex": "y2.png",
+      "rect": [
+        515,
+        342,
+        23,
+        2
+      ],
+      "z": 1,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_x_x1",
+      "tex": "x1.png",
+      "rect": [
+        479,
+        380,
+        33,
+        33
+      ],
+      "z": 2,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_x_x2",
+      "tex": "x2.png",
+      "rect": [
+        511,
+        380,
+        27,
+        2
+      ],
+      "z": 3,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_x_x3",
+      "tex": "x3.png",
+      "rect": [
+        465,
+        411,
+        16,
+        2
+      ],
+      "z": 4,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_b_b1",
+      "tex": "b1.png",
+      "rect": [
+        520,
+        411,
+        11,
+        11
+      ],
+      "z": 5,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_b_b2",
+      "tex": "b2.png",
+      "rect": [
+        509,
+        411,
+        13,
+        2
+      ],
+      "z": 6,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_b_b3",
+      "tex": "b3.png",
+      "rect": [
+        530,
+        420,
+        9,
+        2
+      ],
+      "z": 7,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_a_a1",
+      "tex": "a1.png",
+      "rect": [
+        485,
+        436,
+        27,
+        20
+      ],
+      "z": 8,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_a_a2",
+      "tex": "a2.png",
+      "rect": [
+        511,
+        454,
+        27,
+        2
+      ],
+      "z": 9,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_ana_r_b1",
+      "tex": "b1.png",
+      "rect": [
+        442,
+        463,
+        21,
+        48
+      ],
+      "z": 10,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_ana_l_a1",
+      "tex": "a1.png",
+      "rect": [
+        338,
+        455,
+        27,
+        57
+      ],
+      "z": 11,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_rb_rb1",
+      "tex": "rb1.png",
+      "rect": [
+        461,
+        337,
+        19,
+        17
+      ],
+      "z": 12,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_rb_rb2",
+      "tex": "rb2.png",
+      "rect": [
+        460,
+        273,
+        21,
+        35
+      ],
+      "z": 13,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_lb_lb1",
+      "tex": "lb1.png",
+      "rect": [
+        327,
+        337,
+        19,
+        18
+      ],
+      "z": 14,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_lb_lb2",
+      "tex": "lb2.png",
+      "rect": [
+        327,
+        272,
+        22,
+        34
+      ],
+      "z": 15,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_lt_lt1",
+      "tex": "lt1.png",
+      "rect": [
+        338,
+        218,
+        19,
+        18
+      ],
+      "z": 16,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_line_rt_rt1",
+      "tex": "rt1.png",
+      "rect": [
+        452,
+        218,
+        19,
+        17
+      ],
+      "z": 17,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_controller_ps3",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        276,
+        226,
+        255,
+        289
+      ],
+      "z": 18,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.79375,
+        0.90312
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_l_t",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        297,
+        219,
+        64,
+        48
+      ],
+      "z": 19,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.0,
+        1.0,
+        0.15
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_r_t",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        446,
+        219,
+        64,
+        48
+      ],
+      "z": 20,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.0,
+        1.0,
+        0.15
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_l_b1",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        296,
+        252,
+        64,
+        32
+      ],
+      "z": 21,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.15,
+        1.0,
+        0.25
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_l_b2",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        295,
+        339,
+        64,
+        32
+      ],
+      "z": 22,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.25,
+        1.0,
+        0.35
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_r_b1",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        448,
+        252,
+        64,
+        32
+      ],
+      "z": 23,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.15,
+        1.0,
+        0.25
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_r_b2",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        447,
+        339,
+        64,
+        32
+      ],
+      "z": 24,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.25,
+        1.0,
+        0.35
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_ana_l",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        333,
+        420,
+        64,
+        64
+      ],
+      "z": 25,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.55,
+        1.0,
+        0.75
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_ana_r",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        412,
+        420,
+        64,
+        64
+      ],
+      "z": 26,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.55,
+        1.0,
+        0.75
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_y",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        464,
+        377,
+        32,
+        32
+      ],
+      "z": 27,
+      "fit": "fill",
+      "uv": [
+        0.9,
+        0.35,
+        1.0,
+        0.45
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_x",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        445,
+        397,
+        32,
+        32
+      ],
+      "z": 28,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.35,
+        0.9,
+        0.45
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_b",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        484,
+        397,
+        32,
+        32
+      ],
+      "z": 29,
+      "fit": "fill",
+      "uv": [
+        0.9,
+        0.45,
+        1.0,
+        0.55
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_ps3_a",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        464,
+        417,
+        32,
+        32
+      ],
+      "z": 30,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.45,
+        0.9,
+        0.55
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_x_360_x1",
+      "tex": "x1.png",
+      "rect": [
+        479,
+        377,
+        26,
+        26
+      ],
+      "z": 31,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_x_360_x2",
+      "tex": "x2.png",
+      "rect": [
+        504,
+        377,
+        34,
+        2
+      ],
+      "z": 32,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_x_360_x3",
+      "tex": "x3.png",
+      "rect": [
+        465,
+        401,
+        16,
+        2
+      ],
+      "z": 33,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_b_360_b1",
+      "tex": "b1.png",
+      "rect": [
+        504,
+        405,
+        25,
+        22
+      ],
+      "z": 34,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_b_360_b3",
+      "tex": "b3.png",
+      "rect": [
+        527,
+        425,
+        12,
+        2
+      ],
+      "z": 35,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_a_360_a1",
+      "tex": "a1.png",
+      "rect": [
+        484,
+        427,
+        32,
+        31
+      ],
+      "z": 36,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_a_360_a2",
+      "tex": "a2.png",
+      "rect": [
+        515,
+        456,
+        23,
+        2
+      ],
+      "z": 37,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_ana_r_360_b1",
+      "tex": "b1.png",
+      "rect": [
+        442,
+        463,
+        2,
+        13
+      ],
+      "z": 38,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_ana_l_360_a1",
+      "tex": "a1.png",
+      "rect": [
+        300,
+        408,
+        19,
+        27
+      ],
+      "z": 39,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_rb_360_rb1",
+      "tex": "rb1.png",
+      "rect": [
+        460,
+        340,
+        21,
+        19
+      ],
+      "z": 40,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_lb_360_lb1",
+      "tex": "lb1.png",
+      "rect": [
+        327,
+        340,
+        21,
+        19
+      ],
+      "z": 42,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_controller_360",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        277,
+        223,
+        255,
+        313
+      ],
+      "z": 46,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.79063,
+        0.97813
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_lt",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        318,
+        215,
+        32,
+        48
+      ],
+      "z": 47,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.0,
+        0.9,
+        0.15
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_rt",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        457,
+        215,
+        32,
+        48
+      ],
+      "z": 48,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.0,
+        0.9,
+        0.15
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_lb2",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        295,
+        345,
+        64,
+        32
+      ],
+      "z": 50,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.25,
+        1.0,
+        0.35
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_rb2",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        450,
+        345,
+        64,
+        32
+      ],
+      "z": 52,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.25,
+        1.0,
+        0.35
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_y_360_y1",
+      "tex": "y1.png",
+      "rect": [
+        477,
+        345,
+        39,
+        42
+      ],
+      "z": 53,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_line_y_360_y2",
+      "tex": "y2.png",
+      "rect": [
+        515,
+        345,
+        23,
+        2
+      ],
+      "z": 54,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_y",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        464,
+        367,
+        32,
+        32
+      ],
+      "z": 55,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.35,
+        0.9,
+        0.45
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_b",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        485,
+        386,
+        32,
+        32
+      ],
+      "z": 56,
+      "fit": "fill",
+      "uv": [
+        0.9,
+        0.35,
+        1.0,
+        0.45
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_x",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        444,
+        386,
+        32,
+        32
+      ],
+      "z": 57,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.45,
+        0.9,
+        0.55
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_a",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        465,
+        407,
+        32,
+        32
+      ],
+      "z": 58,
+      "fit": "fill",
+      "uv": [
+        0.9,
+        0.45,
+        1.0,
+        0.55
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_ana_l",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        293,
+        379,
+        64,
+        48
+      ],
+      "z": 59,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.6,
+        1.0,
+        0.75
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_controller_360_ana_r",
+      "tex": "mat_loadinfo_controller_360.png",
+      "rect": [
+        411,
+        424,
+        64,
+        48
+      ],
+      "z": 60,
+      "fit": "fill",
+      "uv": [
+        0.8,
+        0.6,
+        1.0,
+        0.75
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_sonic_y",
+      "tex": "mat_loadinfo_text_sonic_e.png",
+      "rect": [
+        540,
+        332,
+        240,
+        26
+      ],
+      "z": 61,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.08125,
+        1.0,
+        0.1625
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_sonic_x",
+      "tex": "mat_loadinfo_text_sonic_e.png",
+      "rect": [
+        539,
+        360,
+        240,
+        52
+      ],
+      "z": 62,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.1625,
+        1.0,
+        0.325
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_sonic_x_boost",
+      "tex": "mat_loadinfo_text_sonic_e.png",
+      "rect": [
+        540,
+        362,
+        240,
+        24
+      ],
+      "z": 63,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.24375,
+        1.0,
+        0.31875
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_sonic_b",
+      "tex": "mat_loadinfo_text_sonic_e.png",
+      "rect": [
+        540,
+        406,
+        240,
+        26
+      ],
+      "z": 64,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.325,
+        1.0,
+        0.40625
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_sonic_b2",
+      "tex": "mat_loadinfo_text_sonic_e.png",
+      "rect": [
+        540,
+        427,
+        240,
+        26
+      ],
+      "z": 65,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.40625,
+        1.0,
+        0.4875
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_sonic_a",
+      "tex": "mat_loadinfo_text_sonic_e.png",
+      "rect": [
+        539,
+        448,
+        240,
+        26
+      ],
+      "z": 66,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.4875,
+        1.0,
+        0.56875
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_sonic_ana_r",
+      "tex": "mat_loadinfo_text_sonic_e.png",
+      "rect": [
+        401,
+        477,
+        240,
+        26
+      ],
+      "z": 67,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.56875,
+        1.0,
+        0.65
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_sonic_ana_l",
+      "tex": "mat_loadinfo_text_sonic_e.png",
+      "rect": [
+        257,
+        438,
+        96,
+        52
+      ],
+      "z": 68,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.65,
+        0.4,
+        0.8125
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_sonic_ana_l_move",
+      "tex": "mat_loadinfo_text_sonic_e.png",
+      "rect": [
+        239,
+        412,
+        128,
+        26
+      ],
+      "z": 69,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.8125,
+        0.53333,
+        0.89375
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_sonic_lb",
+      "tex": "mat_loadinfo_text_sonic_e.png",
+      "rect": [
+        344,
+        311,
+        240,
+        26
+      ],
+      "z": 70,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        1.0,
+        0.08125
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_evil_lt_rt",
+      "tex": "mat_loadinfo_text_evil_e.png",
+      "rect": [
+        376,
+        192,
+        240,
+        26
+      ],
+      "z": 71,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        1.0,
+        0.08125
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_evil_lb",
+      "tex": "mat_loadinfo_text_evil_e.png",
+      "rect": [
+        316,
+        310,
+        240,
+        26
+      ],
+      "z": 72,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.08125,
+        1.0,
+        0.1625
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_evil_rb",
+      "tex": "mat_loadinfo_text_evil_e.png",
+      "rect": [
+        421,
+        310,
+        240,
+        26
+      ],
+      "z": 73,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.1625,
+        1.0,
+        0.24375
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_evil_y",
+      "tex": "mat_loadinfo_text_evil_e.png",
+      "rect": [
+        541,
+        330,
+        240,
+        26
+      ],
+      "z": 74,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.24375,
+        1.0,
+        0.325
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_evil_x",
+      "tex": "mat_loadinfo_text_evil_e.png",
+      "rect": [
+        540,
+        360,
+        240,
+        52
+      ],
+      "z": 75,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.325,
+        1.0,
+        0.4875
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_evil_b",
+      "tex": "mat_loadinfo_text_evil_e.png",
+      "rect": [
+        539,
+        410,
+        240,
+        26
+      ],
+      "z": 76,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.4875,
+        1.0,
+        0.56875
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_evil_a",
+      "tex": "mat_loadinfo_text_evil_e.png",
+      "rect": [
+        538,
+        439,
+        240,
+        52
+      ],
+      "z": 77,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.56875,
+        1.0,
+        0.73125
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_text_evil_ana_l",
+      "tex": "mat_loadinfo_text_evil_e.png",
+      "rect": [
+        234,
+        387,
+        96,
+        52
+      ],
+      "z": 78,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.73125,
+        0.4,
+        0.89375
+      ]
+    },
+    {
+      "id": "ui_loading_loadinfo_pos_character_imgbox_character",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        772,
+        143,
+        326,
+        460
+      ],
+      "z": 79,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.14375,
+        1.0
+      ]
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box",
+      "tex": "txt_box.png",
+      "rect": [
+        192,
+        179,
+        898,
+        387
+      ],
+      "z": 80,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_1",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        542,
+        188,
+        13,
+        20
+      ],
+      "z": 81,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_2",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        352,
+        213,
+        13,
+        20
+      ],
+      "z": 82,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_3",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        332,
+        238,
+        13,
+        20
+      ],
+      "z": 83,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_4",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        392,
+        263,
+        13,
+        20
+      ],
+      "z": 84,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_5",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        302,
+        288,
+        13,
+        20
+      ],
+      "z": 85,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_6",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        202,
+        313,
+        13,
+        20
+      ],
+      "z": 86,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_7",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        302,
+        338,
+        13,
+        20
+      ],
+      "z": 87,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_8",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        312,
+        363,
+        13,
+        20
+      ],
+      "z": 88,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_9",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        292,
+        388,
+        13,
+        20
+      ],
+      "z": 89,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_10",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        712,
+        413,
+        13,
+        20
+      ],
+      "z": 90,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_11",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        822,
+        438,
+        13,
+        20
+      ],
+      "z": 91,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_12",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        352,
+        463,
+        13,
+        20
+      ],
+      "z": 92,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_13",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        352,
+        488,
+        13,
+        20
+      ],
+      "z": 93,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_14",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        332,
+        513,
+        13,
+        20
+      ],
+      "z": 94,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_box_txt_box_source_15",
+      "tex": "mat_comon_txt_001.png",
+      "rect": [
+        322,
+        538,
+        13,
+        20
+      ],
+      "z": 95,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_1_img_1",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        0,
+        0,
+        300,
+        240
+      ],
+      "z": 96,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_1_img_2",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        37,
+        0,
+        300,
+        240
+      ],
+      "z": 97,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_1_img_3",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        214,
+        0,
+        300,
+        240
+      ],
+      "z": 98,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_1_img_4",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        391,
+        0,
+        300,
+        240
+      ],
+      "z": 99,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_1_img_5",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        568,
+        0,
+        300,
+        240
+      ],
+      "z": 100,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_1_img_6",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        745,
+        0,
+        300,
+        240
+      ],
+      "z": 101,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_1_img_7",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        922,
+        0,
+        300,
+        240
+      ],
+      "z": 102,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_1_img_8",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        1099,
+        0,
+        181,
+        240
+      ],
+      "z": 103,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_2_img_1",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        1120,
+        240,
+        160,
+        240
+      ],
+      "z": 104,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_2_img_2",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        942,
+        240,
+        300,
+        240
+      ],
+      "z": 105,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_2_img_3",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        765,
+        240,
+        300,
+        240
+      ],
+      "z": 106,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_2_img_4",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        588,
+        240,
+        300,
+        240
+      ],
+      "z": 107,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_2_img_5",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        411,
+        240,
+        300,
+        240
+      ],
+      "z": 108,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_2_img_6",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        234,
+        240,
+        300,
+        240
+      ],
+      "z": 109,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_2_img_7",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        57,
+        240,
+        300,
+        240
+      ],
+      "z": 110,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_2_img_8",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        0,
+        240,
+        300,
+        240
+      ],
+      "z": 111,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_3_img_1",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        0,
+        480,
+        300,
+        240
+      ],
+      "z": 112,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_3_img_2",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        37,
+        480,
+        300,
+        240
+      ],
+      "z": 113,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_3_img_3",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        214,
+        480,
+        300,
+        240
+      ],
+      "z": 114,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_3_img_4",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        391,
+        480,
+        300,
+        240
+      ],
+      "z": 115,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_3_img_5",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        568,
+        480,
+        300,
+        240
+      ],
+      "z": 116,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_3_img_6",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        745,
+        480,
+        300,
+        240
+      ],
+      "z": 117,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_3_img_7",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        922,
+        480,
+        300,
+        240
+      ],
+      "z": 118,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_bg_1_arrow_row_3_img_8",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        1099,
+        480,
+        181,
+        240
+      ],
+      "z": 119,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.16806,
+        0.69922,
+        0.50139
+      ]
+    },
+    {
+      "id": "ui_loading_pda_display_img",
+      "tex": "img.png",
+      "rect": [
+        182,
+        113,
+        916,
+        520
+      ],
+      "z": 120,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_loading_pda_display_contens_bg",
+      "tex": "bg.png",
+      "rect": [
+        180,
+        116,
+        920,
+        60
+      ],
+      "z": 121,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.64306,
+        0.47266,
+        0.72639
+      ]
+    },
+    {
+      "id": "ui_loading_pda_display_contens_bg_img",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        180,
+        569,
+        920,
+        60
+      ],
+      "z": 122,
+      "fit": "fill",
+      "uv": [
+        0.46484,
+        0.64306,
+        0.47266,
+        0.72639
+      ]
+    },
+    {
+      "id": "ui_loading_pda_display_shade_lt",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        184,
+        116,
+        50,
+        50
+      ],
+      "z": 123,
+      "fit": "fill",
+      "uv": [
+        0.14453,
+        0.1625,
+        0.18359,
+        0.23194
+      ]
+    },
+    {
+      "id": "ui_loading_pda_display_shade_ct",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        234,
+        116,
+        812,
+        50
+      ],
+      "z": 124,
+      "fit": "fill",
+      "uv": [
+        0.18438,
+        0.1625,
+        0.18594,
+        0.23194
+      ]
+    },
+    {
+      "id": "ui_loading_pda_display_shade_ct_cb",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        234,
+        580,
+        812,
+        50
+      ],
+      "z": 125,
+      "fit": "fill",
+      "uv": [
+        0.18438,
+        0.80417,
+        0.18594,
+        0.87361
+      ]
+    },
+    {
+      "id": "ui_loading_pda_display_shade_lm",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        184,
+        166,
+        50,
+        414
+      ],
+      "z": 126,
+      "fit": "fill",
+      "uv": [
+        0.14453,
+        0.23333,
+        0.18359,
+        0.23611
+      ]
+    },
+    {
+      "id": "ui_loading_pda_display_shade_lm_rm",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        1046,
+        166,
+        50,
+        414
+      ],
+      "z": 127,
+      "fit": "fill",
+      "uv": [
+        0.81641,
+        0.23333,
+        0.85547,
+        0.23611
+      ]
+    },
+    {
+      "id": "ui_loading_pda_display_shade_rt",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        1046,
+        116,
+        50,
+        50
+      ],
+      "z": 128,
+      "fit": "fill",
+      "uv": [
+        0.81641,
+        0.1625,
+        0.85547,
+        0.23194
+      ]
+    },
+    {
+      "id": "ui_loading_pda_display_shade_lb",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        184,
+        580,
+        50,
+        50
+      ],
+      "z": 129,
+      "fit": "fill",
+      "uv": [
+        0.14453,
+        0.80417,
+        0.18359,
+        0.87361
+      ]
+    },
+    {
+      "id": "ui_loading_pda_display_shade_rb",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        1046,
+        580,
+        50,
+        50
+      ],
+      "z": 130,
+      "fit": "fill",
+      "uv": [
+        0.81641,
+        0.80417,
+        0.85547,
+        0.87361
+      ]
+    },
+    {
+      "id": "ui_loading_pda_pda_frame_l",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        0,
+        0,
+        184,
+        720
+      ],
+      "z": 131,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.14375,
+        1.0
+      ]
+    },
+    {
+      "id": "ui_loading_pda_pda_frame_ct",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        184,
+        0,
+        912,
+        116
+      ],
+      "z": 132,
+      "fit": "fill",
+      "uv": [
+        0.14375,
+        0.0,
+        0.85625,
+        0.16111
+      ]
+    },
+    {
+      "id": "ui_loading_pda_pda_frame_r",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        1096,
+        0,
+        184,
+        720
+      ],
+      "z": 133,
+      "fit": "fill",
+      "uv": [
+        0.85625,
+        0.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "id": "ui_loading_pda_pda_frame_cb",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        184,
+        630,
+        912,
+        90
+      ],
+      "z": 134,
+      "fit": "fill",
+      "uv": [
+        0.14375,
+        0.875,
+        0.85625,
+        1.0
+      ]
+    },
+    {
+      "id": "ui_loading_pda_pda_frame_lamp_l",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        154,
+        0,
+        22,
+        48
+      ],
+      "z": 135,
+      "fit": "fill",
+      "uv": [
+        0.46797,
+        0.50556,
+        0.48516,
+        0.57222
+      ]
+    },
+    {
+      "id": "ui_loading_pda_pda_frame_lamp_r",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        180,
+        0,
+        21,
+        48
+      ],
+      "z": 137,
+      "fit": "fill",
+      "uv": [
+        0.4875,
+        0.50556,
+        0.50391,
+        0.57222
+      ]
+    },
+    {
+      "id": "ui_loading_pda_pda_img",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        390,
+        214,
+        502,
+        298
+      ],
+      "z": 139,
+      "fit": "fill",
+      "uv": [
+        0.22422,
+        0.16944,
+        0.45703,
+        0.86667
+      ]
+    },
+    {
+      "id": "ui_loading_pda_pda_img_img",
+      "tex": "mat_load_comon_001.png",
+      "rect": [
+        495,
+        162,
+        290,
+        52
+      ],
+      "z": 140,
+      "fit": "fill",
+      "uv": [
+        0.18359,
+        0.31806,
+        0.22422,
+        0.72083
+      ]
+    },
+    {
+      "id": "ui_loading_pda_txt_display_contens_txt_cursor_now_loading_now",
+      "tex": "mat_load_en_001.png",
+      "rect": [
+        458,
+        567,
+        512,
+        37
+      ],
+      "z": 141,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        1.0,
+        0.28906
+      ]
+    },
+    {
+      "id": "ui_loading_pda_txt_display_contens_txt_cursor_cursor_img_01",
+      "tex": "mat_load_en_001.png",
+      "rect": [
+        984,
+        569,
+        11,
+        11
+      ],
+      "z": 142,
+      "fit": "fill",
+      "uv": [
+        0.9082,
+        0.3125,
+        0.98242,
+        0.60156
+      ]
+    },
+    {
+      "id": "ui_loading_pda_txt_display_contens_txt_cursor_cursor_img_02",
+      "tex": "mat_load_en_001.png",
+      "rect": [
+        994,
+        569,
+        11,
+        11
+      ],
+      "z": 143,
+      "fit": "fill",
+      "uv": [
+        0.9082,
+        0.3125,
+        0.98242,
+        0.60156
+      ]
+    },
+    {
+      "id": "ui_loading_pda_txt_display_contens_txt_cursor_cursor_img_03",
+      "tex": "mat_load_en_001.png",
+      "rect": [
+        1004,
+        569,
+        11,
+        11
+      ],
+      "z": 144,
+      "fit": "fill",
+      "uv": [
+        0.9082,
+        0.3125,
+        0.98242,
+        0.60156
+      ]
+    },
+    {
+      "id": "ui_loading_pda_txt_display_contens_txt_cursor_cursor_img_04",
+      "tex": "mat_load_en_001.png",
+      "rect": [
+        984,
+        579,
+        11,
+        11
+      ],
+      "z": 145,
+      "fit": "fill",
+      "uv": [
+        0.9082,
+        0.3125,
+        0.98242,
+        0.60156
+      ]
+    },
+    {
+      "id": "ui_loading_pda_txt_display_contens_txt_cursor_cursor_img_05",
+      "tex": "mat_load_en_001.png",
+      "rect": [
+        994,
+        579,
+        11,
+        11
+      ],
+      "z": 146,
+      "fit": "fill",
+      "uv": [
+        0.9082,
+        0.3125,
+        0.98242,
+        0.60156
+      ]
+    },
+    {
+      "id": "ui_loading_pda_txt_display_contens_txt_cursor_cursor_img_06",
+      "tex": "mat_load_en_001.png",
+      "rect": [
+        1004,
+        579,
+        11,
+        11
+      ],
+      "z": 147,
+      "fit": "fill",
+      "uv": [
+        0.9082,
+        0.3125,
+        0.98242,
+        0.60156
+      ]
+    },
+    {
+      "id": "ui_loading_pda_txt_display_contens_txt_cursor_cursor_img_07",
+      "tex": "mat_load_en_001.png",
+      "rect": [
+        984,
+        589,
+        11,
+        11
+      ],
+      "z": 148,
+      "fit": "fill",
+      "uv": [
+        0.9082,
+        0.3125,
+        0.98242,
+        0.60156
+      ]
+    },
+    {
+      "id": "ui_loading_pda_txt_display_contens_txt_cursor_cursor_img_08",
+      "tex": "mat_load_en_001.png",
+      "rect": [
+        994,
+        589,
+        11,
+        11
+      ],
+      "z": 149,
+      "fit": "fill",
+      "uv": [
+        0.9082,
+        0.3125,
+        0.98242,
+        0.60156
+      ]
+    },
+    {
+      "id": "ui_loading_pda_txt_display_contens_txt_cursor_cursor_img_09",
+      "tex": "mat_load_en_001.png",
+      "rect": [
+        1004,
+        589,
+        11,
+        11
+      ],
+      "z": 150,
+      "fit": "fill",
+      "uv": [
+        0.9082,
+        0.3125,
+        0.98242,
+        0.60156
+      ]
+    },
+    {
+      "id": "ui_loading_pda_txt_saveicon_position_cast_0329",
+      "tex": "Cast_0329.png",
+      "rect": [
+        1020,
+        560,
+        51,
+        51
+      ],
+      "z": 151,
+      "fit": "fill"
+    }
+  ]
+}

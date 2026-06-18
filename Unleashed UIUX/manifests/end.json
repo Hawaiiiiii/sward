@@ -1,0 +1,15 @@
+{
+  "screen": "end",
+  "stem": "ui_end",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/end/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_end"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": []
+}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SWARD — UI Screen Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@300;400;500;600;700;800&family=Saira+Condensed:wght@500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="root"></div>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+    <rect width="256" height="256" fill="#0b0e14" />
+    <rect x="78" y="78" width="100" height="100" rx="10" fill="none" stroke="#3ddc97" stroke-width="6" />
+    <rect x="98" y="104" width="60" height="10" rx="5" fill="#3ddc97" />
+    <rect x="98" y="124" width="42" height="8" rx="4" fill="#5b6472" />
+    <rect x="98" y="140" width="50" height="8" rx="4" fill="#5b6472" />
+    <circle cx="168" cy="150" r="7" fill="#ff5d5d" />
+  </svg>
+</template>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- ?v bumped to force fresh loads after edits (in-browser Babel/XHR caches otherwise) -->
+<script src="contracts.js?v=4"></script>
+<script src="image-slot.js?v=4"></script>
+<script src="recomp-im.js?v=4"></script>
+<script src="recomp-csd-player.js?v=4"></script>
+<script src="game-db.js?v=4"></script>
+<script src="router.js?v=4"></script>
+<script src="native-overlays.js?v=4"></script>
+<script type="text/babel" src="screens-frontend.jsx?v=4"></script>
+<script type="text/babel" src="screens-ingame.jsx?v=4"></script>
+<script type="text/babel" src="qa-shell.jsx?v=4"></script>
+<script type="text/babel" src="manifest-screen.jsx?v=4"></script>
+<script type="text/babel" src="viewer.jsx?v=4"></script>
+<script type="text/babel" src="main.jsx?v=4"></script>
+</body>
+</html>

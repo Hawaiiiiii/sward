@@ -1,0 +1,223 @@
+{
+  "screen": "options",
+  "stem": "runtime",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/options/",
+  "generated_by": "tools/runtime_capture_to_manifest.py",
+  "notes": "Built from a RUNTIME UI-draw capture: rects are the elements' true on-screen positions (incl. runtime-anchored / runtime-text elements that static .yncp extraction cannot place). Slots are named after the bound textures; UV-cropped and alpha-dimmed to match the drawn frame.",
+  "nodes": [
+    {
+      "id": "ui_general_bg_img",
+      "tex": "img.png",
+      "rect": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "z": 0,
+      "fit": "fill"
+    },
+    {
+      "id": "ui_general_window_position_center",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        449,
+        224,
+        382,
+        272
+      ],
+      "z": 1,
+      "fit": "fill",
+      "uv": [
+        0.6123,
+        0.20117,
+        0.61719,
+        0.66016
+      ]
+    },
+    {
+      "id": "ui_general_window_position_center_top_l",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        414,
+        189,
+        35,
+        35
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.5625,
+        0.13281,
+        0.59668,
+        0.20117
+      ]
+    },
+    {
+      "id": "ui_general_window_position_center_top_c",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        449,
+        189,
+        382,
+        35
+      ],
+      "z": 3,
+      "fit": "fill",
+      "uv": [
+        0.6123,
+        0.13281,
+        0.61719,
+        0.20117
+      ]
+    },
+    {
+      "id": "ui_general_window_position_center_top_r",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        831,
+        189,
+        35,
+        35
+      ],
+      "z": 4,
+      "fit": "fill",
+      "uv": [
+        0.63086,
+        0.13281,
+        0.66504,
+        0.20117
+      ]
+    },
+    {
+      "id": "ui_general_window_position_center_middle_l",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        414,
+        224,
+        35,
+        272
+      ],
+      "z": 5,
+      "fit": "fill",
+      "uv": [
+        0.5625,
+        0.20117,
+        0.59668,
+        0.66016
+      ]
+    },
+    {
+      "id": "ui_general_window_position_center_middle_r",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        831,
+        224,
+        35,
+        272
+      ],
+      "z": 6,
+      "fit": "fill",
+      "uv": [
+        0.63086,
+        0.20117,
+        0.66504,
+        0.66016
+      ]
+    },
+    {
+      "id": "ui_general_window_position_center_bottom_l",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        414,
+        496,
+        35,
+        40
+      ],
+      "z": 7,
+      "fit": "fill",
+      "uv": [
+        0.5625,
+        0.66016,
+        0.59668,
+        0.73828
+      ]
+    },
+    {
+      "id": "ui_general_window_position_center_bottom_c",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        449,
+        496,
+        382,
+        40
+      ],
+      "z": 8,
+      "fit": "fill",
+      "uv": [
+        0.6123,
+        0.66016,
+        0.61719,
+        0.73828
+      ]
+    },
+    {
+      "id": "ui_general_window_position_center_bottom_r",
+      "tex": "mat_result_comon_001.png",
+      "rect": [
+        831,
+        496,
+        35,
+        40
+      ],
+      "z": 9,
+      "fit": "fill",
+      "uv": [
+        0.63086,
+        0.66016,
+        0.66504,
+        0.73828
+      ]
+    },
+    {
+      "id": "ui_general_footer_btn_3",
+      "tex": "fte_ConverseMain_000.png",
+      "rect": [
+        857,
+        618,
+        40,
+        40
+      ],
+      "z": 10,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.0,
+        0.07812,
+        0.07812
+      ]
+    },
+    {
+      "id": "ui_general_footer_btn_3_next",
+      "tex": "mat_comon_x360_001.png",
+      "rect": [
+        897,
+        626,
+        128,
+        25
+      ],
+      "z": 11,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.18555,
+        1.0,
+        0.23438
+      ]
+    }
+  ]
+}

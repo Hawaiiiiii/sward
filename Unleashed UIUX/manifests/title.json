@@ -1,0 +1,537 @@
+{
+  "screen": "title",
+  "stem": "ui_mainmenu",
+  "ref": [
+    1280,
+    720
+  ],
+  "assetBase": "assets/title/",
+  "generated_by": "tools/csd_to_manifest.py",
+  "source_stems": [
+    "ui_mainmenu"
+  ],
+  "notes": "Region rects resolved from the parsed CSD layout (layout_deep_analysis.json) in real 1280x720 space. Each node is a top-level container; its slot is named after the real texture so it auto-loads once you run the DDS->PNG extractor.",
+  "nodes": [
+    {
+      "id": "mm_base_base",
+      "tex": "ui_mm_base.png",
+      "rect": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "z": 2,
+      "fit": "fill"
+    },
+    {
+      "id": "mm_title_usual_title_bar_pos",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        0,
+        0,
+        974,
+        79
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.63594,
+        0.76094,
+        0.75938
+      ]
+    },
+    {
+      "id": "mm_bg_usual_piston3",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        101,
+        67,
+        32,
+        191
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.66875,
+        0.25469,
+        0.69375,
+        0.3625
+      ]
+    },
+    {
+      "id": "mm_bg_usual_gear2",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        0,
+        71,
+        151,
+        171
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.6,
+        0.50625,
+        0.65,
+        0.60625
+      ]
+    },
+    {
+      "id": "mm_bg_usual_black3",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        15,
+        75,
+        368,
+        464
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.7,
+        0.525,
+        0.7125,
+        0.55
+      ]
+    },
+    {
+      "id": "mm_bg_usual_crank_big",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        0,
+        80,
+        616,
+        432
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.6,
+        0.60781,
+        0.675,
+        0.63281
+      ]
+    },
+    {
+      "id": "mm_bg_usual_piston",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        33,
+        86,
+        32,
+        191
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.66875,
+        0.25469,
+        0.69375,
+        0.3625
+      ]
+    },
+    {
+      "id": "mm_contentsitem_idle_index_bar1",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        464,
+        104,
+        766,
+        81
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.50781,
+        0.59844,
+        0.63438
+      ]
+    },
+    {
+      "id": "mm_contentsitem_idle_index_bg",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        432,
+        137,
+        848,
+        320
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.00078,
+        0.00156,
+        0.66328,
+        0.50156
+      ]
+    },
+    {
+      "id": "mm_donut_idle_inner_donut",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        88,
+        168,
+        240,
+        240
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.69453,
+        0.06406,
+        0.86797,
+        0.41094
+      ]
+    },
+    {
+      "id": "mm_bg_usual_crank2",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        0,
+        173,
+        176,
+        16
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.6,
+        0.60781,
+        0.675,
+        0.63281
+      ]
+    },
+    {
+      "id": "mm_contentsitem_idle_index_bar2",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        464,
+        184,
+        766,
+        81
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.50781,
+        0.59844,
+        0.63438
+      ]
+    },
+    {
+      "id": "mm_front_usual_ball_line",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        154,
+        234,
+        107,
+        115
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.69375,
+        0.4625,
+        0.73516,
+        0.62969
+      ]
+    },
+    {
+      "id": "mm_contentsitem_idle_index_bar3",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        464,
+        264,
+        766,
+        81
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.50781,
+        0.59844,
+        0.63438
+      ]
+    },
+    {
+      "id": "mm_contentsitem_idle_index_light_a",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        523,
+        264,
+        676,
+        64
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.66328,
+        0.575,
+        0.67422,
+        0.6
+      ]
+    },
+    {
+      "id": "mm_contentsitem_idle_index_light_b",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        477,
+        272,
+        48,
+        48
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.65625,
+        0.5125,
+        0.68125,
+        0.5625
+      ],
+      "alpha": 0.667
+    },
+    {
+      "id": "mm_bg_usual_circle",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        332,
+        336,
+        57,
+        54
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.61719,
+        0.54219,
+        0.63203,
+        0.57031
+      ],
+      "alpha": 0.784
+    },
+    {
+      "id": "mm_contentsitem_idle_index_bar4",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        464,
+        344,
+        766,
+        81
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.50781,
+        0.59844,
+        0.63438
+      ]
+    },
+    {
+      "id": "mm_bg_usual_piston2",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        327,
+        346,
+        32,
+        191
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.66875,
+        0.25469,
+        0.69375,
+        0.3625
+      ]
+    },
+    {
+      "id": "mm_bg_usual_gear1",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        270,
+        355,
+        151,
+        171
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.6,
+        0.50625,
+        0.65,
+        0.60625
+      ]
+    },
+    {
+      "id": "mm_contentsitem_idle_index_bar5",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        464,
+        424,
+        766,
+        81
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.0,
+        0.50781,
+        0.59844,
+        0.63438
+      ]
+    },
+    {
+      "id": "mm_bg_usual_nixie_tube",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        45,
+        453,
+        142,
+        46
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.66641,
+        0.44062,
+        0.68281,
+        0.5125
+      ]
+    },
+    {
+      "id": "mm_bg_usual_black",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        236,
+        466,
+        144,
+        48
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.7,
+        0.525,
+        0.7125,
+        0.55
+      ]
+    },
+    {
+      "id": "mm_bg_usual_crank",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        248,
+        475,
+        176,
+        16
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.6,
+        0.60781,
+        0.675,
+        0.63281
+      ]
+    },
+    {
+      "id": "mm_front_usual_info_lamp1",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        1176,
+        532,
+        64,
+        64
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.65625,
+        0.5125,
+        0.68125,
+        0.5625
+      ]
+    },
+    {
+      "id": "mm_front_usual_info_disp_light",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        152,
+        537,
+        1012,
+        5
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.66328,
+        0.575,
+        0.67422,
+        0.6
+      ]
+    },
+    {
+      "id": "mm_base_info_lamp1_base",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        1184,
+        540,
+        48,
+        48
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.65625,
+        0.5125,
+        0.68125,
+        0.5625
+      ],
+      "alpha": 0.482
+    },
+    {
+      "id": "mm_front_usual_info_lamp2",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        1176,
+        579,
+        64,
+        64
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.65625,
+        0.5125,
+        0.68125,
+        0.5625
+      ],
+      "alpha": 0.235
+    },
+    {
+      "id": "mm_base_info_lamp2_base",
+      "tex": "ui_mm_parts1.png",
+      "rect": [
+        1184,
+        587,
+        48,
+        48
+      ],
+      "z": 2,
+      "fit": "fill",
+      "uv": [
+        0.65625,
+        0.5125,
+        0.68125,
+        0.5625
+      ],
+      "alpha": 0.235
+    }
+  ]
+}
