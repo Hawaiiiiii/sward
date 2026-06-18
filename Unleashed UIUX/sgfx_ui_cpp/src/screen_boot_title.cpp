@@ -20,12 +20,8 @@
 using namespace ui;
 namespace {
 
-int g_glyphTex = -1;
+int g_logoTex = -1;   // host-supplied logo; -1 = empty slot (clean starfield)
 int g_fRodin = 0, g_fDF = 0;
-
-struct UV { float u0, v0, u1, v1; };
-constexpr float GTW = 512.0f, GTH = 512.0f;
-const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
 
 // ---- palette (measured) -------------------------------------------------------
 const uint32_t C_STAR_G   = RGBA(233, 255, 246, 255);
@@ -47,7 +43,7 @@ const char* const ENTRIES[] = { "RESUME", "NEW RUN", "SETTINGS" };
 constexpr int N_ENTRIES = 3;
 
 void Init() {
-    if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
+    if (g_logoTex < 0) g_logoTex = gfx::loadTexture("assets/gameart/boot_logo.png");
     if (g_fRodin == 0) g_fRodin = LoadMsdfFont("rodin_db");
     if (g_fDF    == 0) g_fDF    = LoadMsdfFont("dfsogei");
 }
@@ -84,8 +80,11 @@ void Starfield(float a) {
 
 // the centred logo slot. The host's own logo drops in here; with no asset the
 // slot stays empty — a clean starfield, no placeholder or debug text.
-void LogoSlot(float /*a*/) {
-    // intentionally empty: no placeholder, no debug text — clean starfield.
+void LogoSlot(float a) {
+    if (g_logoTex < 0 || a <= 0.0f) return;   // empty = clean starfield, no placeholder
+    const float lw = 420.0f, lh = lw * 200.0f / 600.0f;
+    DrawImage(g_logoTex, { 640 - lw * 0.5f, 250 - lh * 0.5f }, { 640 + lw * 0.5f, 250 + lh * 0.5f },
+              { 0.f, 0.f }, { 1.f, 1.f }, WithAlpha(RGBA(255, 255, 255, 255), a));
 }
 
 // a horizontal CAPSULE (semicircular ends) with a vertical gradient, drawn as
@@ -193,7 +192,6 @@ void Draw(double openSec) {
     if (g_state == BT_MENU) {
         Earth(a);
         LetterboxBands(a);
-        LogoSlot(a);
         Carousel(a);
         return;
     }
