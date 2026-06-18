@@ -53,9 +53,6 @@ void Viewport3DInit();    void Viewport3DDraw(double);    void Viewport3DInput(c
 namespace {
 const char* g_wrapNav = nullptr;
 const char* WrapNav() { const char* n = g_wrapNav; g_wrapNav = nullptr; return n; }
-// world_map + result carry day("_so_")/night("_ev_") CSD variants; bias to day so the
-// base resolves to a clean single state (a live host can swap to "ev" per time-of-day).
-const char* CsdDay() { return "so"; }
 void ShopFlowInput(const ScreenInput& in)    { ShopInput(in);         if (in.cancel) g_wrapNav = "@back"; }
 void StatusFlowInput(const ScreenInput& in)  { StatusInput(in);       if (in.cancel || (in.accept && !StatusOnStatRow())) g_wrapNav = "@back"; }   // B, or (A) on QUIT, exits
 void OptionsFlowInput(const ScreenInput& in) { OptionsInput(in);      if (in.cancel) g_wrapNav = "@back"; }
@@ -77,7 +74,7 @@ static const ScreenDef g_screens[] = {
     { "status",    &StatusInit,   &StatusDraw,   &StatusFlowInput, &StatusReset, &WrapNav },
     { "sonic_hud", &SonicHudInit, &SonicHudDraw, &HudFlowInput,    &SonicHudReset, &WrapNav },
     { "pause",     &PauseInit,    &PauseDraw,    &PauseInput,   &PauseReset,  &PauseNav },
-    { "result",    &ResultInit,   &ResultDraw,   &ResultFlowInput, nullptr,    &WrapNav, "result", &CsdDay },
+    { "result",    &ResultInit,   &ResultDraw,   &ResultFlowInput, nullptr,    &WrapNav },
     { "options",     &OptionsInit,    &OptionsDraw,    &OptionsFlowInput, &OptionsReset, &WrapNav },
     { "town",        &TownInit,       &TownDraw,       &TownInput,       &TownReset,    &TownNav },
     { "gate",        &GateInit,       &GateDraw,       &GateInput,       &GateReset,    &GateNav },

@@ -1,361 +1,148 @@
 // =============================================================================
-// screen_result.cpp — the day-stage RESULTS tally, re-authored 1:1 from LIVE
-// capture (session11 @66-192s; spec stills result_settled_fullres /
-// result_rank_settled; geometry measured frame-by-frame, footage px / 1.5):
-//   * the LIVE 3D scene stays behind (Sonic + Chip posing) — here a sky/scene
-//     placeholder slot;
-//   * top rail: navy band (66,84,134) y63..101 from the left edge to x635 with
-//     a bright blue-white edge line under it; italic chrome "RESULTS" wordmark
-//     on the rail (x263..536, cap y72..92), SLIDES IN left->right (~0.5 s);
-//   * five stat rows (TIME/RINGS/SPEED/ENEMY/TRICKS): slanted navy
-//     parallelogram label plates (white outline, green italic label) in a
-//     DIAGONAL CASCADE (each row +12 px right), h 41.3, pitch 66.7, first top
-//     y188; value digits italic chrome, LEFT-aligned ~17 px after each plate;
-//     rows build top->bottom (~0.4 s) after the wordmark; values TALLY-count;
-//   * TOTAL row: green gradient plate (40,142,90)->(66,161,113), navy text,
-//     at y512 (taller, ~58), counts after the stat tally;
-//   * RANK: green strip + a BIG gold rank letter at (331,433)-(484,609),
-//     scale-pop reveal after the total lands;
-//   * footer: (A) Next, bottom-right.
+// screen_result.cpp — the QA verdict card. The outcome of a run: a colour-coded
+// verdict emblem, a breakdown of the signals behind it, and a one-line
+// recommendation. Built from primitives + text only — no chrome art. The verdict
+// and counts are representative (real vocabulary) until a live feed supplies them.
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
-#include "csd_player.h"
 #include <cstdio>
-#include <cstring>
-#include <cmath>
 #include <algorithm>
 
 using namespace ui;
 namespace {
 
-int g_glyphTex = -1;   // controller glyph atlas (for the (A) footer glyph)
-int g_rankTex  = -1;   // mat_result_comon_002: the REAL metal rank letters (2x3 grid)
-int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
+int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_logoTex = -1;
 
-struct UV { float u0, v0, u1, v1; };
-const UV GLYPH_A = { 0.00000f, 0.00781f, 0.07227f, 0.07617f };
-constexpr float GTW = 512.0f, GTH = 512.0f;
-// tight sub-rects measured from the atlas alpha (same table as result_ex)
-const char* const RANK_NAME[6] = { "S", "A", "B", "C", "D", "E" };
-const UV RANK_UV[6] = {
-    { 0.0293f, 0.0234f, 0.2656f, 0.2695f }, { 0.3203f, 0.0254f, 0.5625f, 0.2676f },
-    { 0.0273f, 0.3262f, 0.2617f, 0.5566f }, { 0.3125f, 0.3203f, 0.5703f, 0.5625f },
-    { 0.0293f, 0.6113f, 0.2656f, 0.8438f }, { 0.3281f, 0.6191f, 0.5547f, 0.8379f },
+const char* const ACTIVE_PROFILE = "G65";
+
+// ---- palette ----------------------------------------------------------------
+const uint32_t C_BG_TOP = RGBA(8, 12, 24, 255), C_BG_BOT = RGBA(3, 5, 12, 255);
+const uint32_t C_PANEL  = RGBA(16, 24, 40, 235);
+const uint32_t C_CAP    = RGBA(10, 16, 28, 255);
+const uint32_t C_TITLE  = RGBA(255, 209, 74, 255);
+const uint32_t C_TEXT   = RGBA(214, 226, 240, 255);
+const uint32_t C_LABEL  = RGBA(150, 170, 196, 255);
+const uint32_t C_VALUE  = RGBA(230, 238, 248, 255);
+const uint32_t C_RULE   = RGBA(120, 170, 230, 90);
+const uint32_t C_FOOTER = RGBA(190, 205, 225, 220);
+const uint32_t C_WHITE  = RGBA(255, 255, 255, 255);
+const uint32_t C_CHIP   = RGBA(150, 196, 150, 255);
+const uint32_t C_ERR    = RGBA(235, 96, 84, 255);
+const uint32_t C_WARN   = RGBA(235, 200, 90, 255);
+const uint32_t C_OKV    = RGBA(120, 230, 140, 255);
+
+// ---- the verdict (representative; real vocabulary) --------------------------
+// kind: 0 = likely ok, 1 = needs review, 2 = blocked
+constexpr int VERDICT = 1;
+const char* VerdictText() { return VERDICT == 0 ? "LIKELY OK" : VERDICT == 1 ? "NEEDS REVIEW" : "BLOCKED"; }
+uint32_t VerdictColor()   { return VERDICT == 0 ? C_OKV : VERDICT == 1 ? C_WARN : C_ERR; }
+
+struct Signal { const char* label; const char* value; };
+const Signal SIGNALS[] = {
+    { "Errors",           "3"  },
+    { "Warnings",         "12" },
+    { "Screenshot diffs", "5"  },
+    { "Review items",     "6"  },
+    { "Total findings",   "44" },
 };
+constexpr int SIGNAL_COUNT = int(sizeof(SIGNALS) / sizeof(SIGNALS[0]));
+const char* const RECOMMENDATION = "Resolve the 3 constants errors, then re-run before delivery.";
 
-// ---- palette (sampled from the live capture) --------------------------------
-const uint32_t C_RAIL      = RGBA(66, 84, 134, 235);     // header rail navy
-const uint32_t C_RAIL_EDGE = RGBA(169, 188, 234, 255);   // bright under-edge line
-const uint32_t C_PLATE_T   = RGBA(46, 54, 88, 235);      // stat plate navy top (darker/desat, alpha up)
-const uint32_t C_PLATE_B   = RGBA(34, 42, 74, 235);      // stat plate navy bottom (darker/desat, alpha up)
-const uint32_t C_PLATE_BD  = RGBA(235, 240, 248, 255);   // plate white outline
-const uint32_t C_LABEL     = RGBA(190, 206, 230, 255);   // white/light-blue label (measured)
-const uint32_t C_TOTAL_T   = RGBA(68, 158, 124, 235);    // TOTAL teal-green top (blue lifted)
-const uint32_t C_TOTAL_B   = RGBA(46, 140, 124, 235);    // TOTAL teal-green bottom (blue lifted)
-const uint32_t C_TOTAL_TXT = RGBA(16, 42, 64, 255);      // navy TOTAL text
-const uint32_t C_CHR_T     = RGBA(244, 246, 250, 255);   // chrome digits top
-const uint32_t C_CHR_B     = RGBA(170, 178, 192, 255);   // chrome digits bottom
-const uint32_t C_CHR_OUT   = RGBA(20, 24, 34, 255);      // digit outline
-const uint32_t C_RANK_GOLD_T = RGBA(238, 196, 92, 255);  // rank letter gold
-const uint32_t C_RANK_GOLD_B = RGBA(168, 116, 28, 255);
-const uint32_t C_WHITE     = RGBA(255, 255, 255, 255);
-// scene placeholder (the real game keeps the 3D goal scene live behind)
-const uint32_t C_SKY_T = RGBA(96, 158, 208, 255), C_SKY_B = RGBA(176, 208, 228, 255);
-const uint32_t C_GROUND = RGBA(214, 216, 212, 255);
-
-// ---- measured layout (1280x720 reference) -----------------------------------
-constexpr float RAIL_Y0 = 20, RAIL_Y1 = 71, RAIL_X1 = 635;   // raised near the top edge (real RESULTS is high, only a thin sky strip above)
-constexpr float WM_X = 254, WM_CAPTOP = 33;             // wordmark target position (left edge ~x258, centerY ~43)
-constexpr float ROW_X0 = 619, ROW_W = 214;              // first label plate rect
-constexpr float ROW_TOP0 = 188, ROW_H = 41.3f, ROW_PITCH = 66.7f;
-constexpr float ROW_XSTEP = 12;                          // diagonal cascade per row
-constexpr float VAL_GAP = 17;                            // digits start after plate
-constexpr float TOT_TOP = 512, TOT_H = 58;
-constexpr float SLANT = 10;                              // plate edge slant (px over h)
-constexpr int   N_ROWS = 5;
-
-struct Row { const char* label; int value; const char* fmt; };
-// sample data = the captured run, so renders diff directly against the footage
-Row ROWS[N_ROWS] = {
-    { "TIME",   18176, "time" },   // 03:01.76 stored as CENTISECONDS (valid mid-tally)
-    { "RINGS",  10100, "num" },
-    { "SPEED",   9162, "num" },
-    { "ENEMY",   4800, "num" },
-    { "TRICKS",  9451, "num" },
-};
-int g_total = 90336;
-const char* g_rank = "C";
+// ---- layout -----------------------------------------------------------------
+constexpr float EM_X0 = 150, EM_Y0 = 150, EM_X1 = 560, EM_Y1 = 470;     // verdict emblem
+constexpr float SG_X0 = 600, SG_Y0 = 150, SG_X1 = 1130, SG_Y1 = 470;    // signal list
+constexpr float RC_X0 = 150, RC_Y0 = 496, RC_X1 = 1130, RC_Y1 = 566;    // recommendation
 
 void Init() {
-    if (g_glyphTex < 0) g_glyphTex = gfx::loadTexture("assets/options/mat_comon_x360_001.png");
-    if (g_rankTex  < 0) g_rankTex  = gfx::loadTexture("assets/result/mat_result_comon_002.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
+    if (g_logoTex < 0)  g_logoTex = gfx::loadTexture("assets/gameart/boot_logo.png");
 }
 
-// slanted parallelogram plate (italic lean: top edge shifted right by SLANT)
-void Plate(float x, float y, float w, float h, uint32_t cT, uint32_t cB, uint32_t bd, float a) {
-    const V2 c[4] = { { x + SLANT, y }, { x + w + SLANT, y }, { x + w, y + h }, { x, y + h } };
-    const uint32_t col[4] = { WithAlpha(cT, a), WithAlpha(cT, a), WithAlpha(cB, a), WithAlpha(cB, a) };
-    DrawQuadGradient(c, col);
-    auto edge = [&](V2 p0, V2 p1, V2 p2, V2 p3) {
-        const V2 e[4] = { p0, p1, p2, p3 };
-        const uint32_t ec[4] = { WithAlpha(bd, a), WithAlpha(bd, a), WithAlpha(bd, a), WithAlpha(bd, a) };
-        DrawQuadGradient(e, ec);
-    };
-    edge({ x + SLANT, y }, { x + w + SLANT, y }, { x + w + SLANT - 0.4f, y + 2 }, { x + SLANT - 0.4f, y + 2 });
-    edge({ x + 0.4f, y + h - 2 }, { x + w + 0.4f, y + h - 2 }, { x + w, y + h }, { x, y + h });
-    edge({ x + SLANT, y }, { x + SLANT + 2, y }, { x + 2, y + h }, { x, y + h });
-    edge({ x + w + SLANT - 2, y }, { x + w + SLANT, y }, { x + w, y + h }, { x + w - 2, y + h });
+void DrawLogoSlot(float t) {
+    if (g_logoTex < 0 || t <= 0.0f) return;
+    const float w = 168.0f, h = w * 200.0f / 600.0f;
+    DrawImage(g_logoTex, { 40, 40 }, { 40 + w, 40 + h }, { 0, 0 }, { 1, 1 }, WithAlpha(C_WHITE, t));
 }
 
-// italic chrome text (the game's wordmark/digit treatment)
-void Chrome(V2 pos, float px, const char* s, float a, float stretch = 1.2f) {
-    SetFont(g_fDF);
-    SetTextShear(0.24f);
-    SetTextStretchX(stretch);
-    for (int dy = -1; dy <= 1; ++dy)
-        for (int dx = -1; dx <= 1; ++dx)
-            if (dx || dy)
-                DrawText({ pos.x + dx * 2.0f, pos.y + dy * 2.0f }, px, WithAlpha(C_CHR_OUT, a), s);
-    DrawTextGradient(pos, px, WithAlpha(C_CHR_T, a), WithAlpha(C_CHR_B, a), s);
-    ResetTextStretchX();
-    ResetTextShear();
+void Draw(double openSec) {
+    const float a  = (float)ComputeMotion(openSec, 0.0, 12.0);
+    const float sg = (float)ComputeMotion(openSec, 8.0, 14.0);
+    uint32_t vcol = VerdictColor();
+
+    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_TOP, C_BG_BOT);
+    DrawLogoSlot(a);
+    SetFont(g_fRodin);
+    DrawTextAligned({ 910, 52 }, { 1130, 76 }, 16.0f, WithAlpha(C_CHIP, a), "PROFILE", Align::Right, true, true);
+    DrawTextAligned({ 910, 74 }, { 1130, 104 }, 24.0f, WithAlpha(C_TITLE, a), ACTIVE_PROFILE, Align::Right, true, true);
     ResetFont();
-}
 
-void FormatValue(const Row& r, int v, char* buf, size_t n) {
-    if (!strcmp(r.fmt, "time")) {   // v = centiseconds -> mm:ss:cc (always valid mid-tally)
-        snprintf(buf, n, "%02d:%02d:%02d", v / 6000, (v / 100) % 60, v % 100);
-    } else {
-        snprintf(buf, n, "%d", v);
-    }
-}
-
-// csdBase: the host already drew the real game CSD (data/result.json) as the base —
-// banner, row strips/labels, RANK letter + brilliance. When true we draw ONLY the
-// dynamic tally-counting VALUE digits (per-row + TOTAL) on top; all chrome/background
-// is gated off so it can't occlude the CSD. When false we render the full validated
-// hand-authored screen exactly as before.
-void Draw(double openSec, bool csdBase) {
-    // ---- scene placeholder (live 3D goal scene slot) ----
-    // FULL-SCREEN background fill — MUST stay gated, else it occludes the entire CSD base.
-    if (!csdBase) {
-        DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_SKY_T, C_SKY_B);
-        DrawVGradient({ 0, 560 }, { REF_W, REF_H }, C_GROUND, RGBA(190, 192, 188, 255));
-    }
-
-    // ---- entrance timeline (measured): wordmark slides ~0.5 s; rows build
-    //      top->bottom after it; tally counts ~1.2 s; rank pops after total ----
-    const float wmT = (float)ComputeMotion(openSec, 0.0, 16.0);
-    if (!csdBase) {
-    DrawRect({ 0, RAIL_Y0 }, { RAIL_X1, RAIL_Y1 }, WithAlpha(C_RAIL, wmT));
-    DrawRect({ 0, RAIL_Y0 - 2 }, { RAIL_X1, RAIL_Y0 + 1 }, WithAlpha(C_RAIL_EDGE, wmT));   // ~3px top-edge highlight (y~61)
-    DrawRect({ 0, RAIL_Y1 + 1 }, { RAIL_X1, RAIL_Y1 + 3.5f }, WithAlpha(C_RAIL_EDGE, wmT));   // under-edge (y~115)
-    // banner terminator: a blue chevron arrow + a white angled pennant flag-tail
-    // (the real RESULTS banner ends in a > chevron + pennant, not a flat cut —
-    // CSD result_csd + _z_banner_real agree). Degenerate quads = filled triangles.
+    // ===== VERDICT EMBLEM ====================================================
+    DrawRect({ EM_X0, EM_Y0 }, { EM_X1, EM_Y1 }, WithAlpha(C_PANEL, a));
+    DrawRect({ EM_X0, EM_Y0 }, { EM_X1, EM_Y0 + 8 }, WithAlpha(vcol, a));    // colour bar
+    SetFont(g_fRodin);
+    DrawTextAligned({ EM_X0, EM_Y0 + 40 }, { EM_X1, EM_Y0 + 66 }, 18.0f, WithAlpha(C_LABEL, a), "VERDICT", Align::Center, true, true);
+    ResetFont();
     {
-        const float cy = (RAIL_Y0 + RAIL_Y1) * 0.5f;
-        const uint32_t cBlu0 = WithAlpha(RGBA(96, 116, 182, 255), wmT);
-        const uint32_t cBlu1 = WithAlpha(RGBA(126, 146, 206, 255), wmT);
-        // blue chevron pointing right
-        const V2 ch[4] = { { RAIL_X1 - 2, RAIL_Y0 }, { RAIL_X1 - 2, RAIL_Y1 }, { RAIL_X1 + 34, cy }, { RAIL_X1 + 34, cy } };
-        const uint32_t chc[4] = { cBlu0, cBlu0, cBlu1, cBlu1 };
-        DrawQuadGradient(ch, chc);
-        // bright cyan edge along the chevron's top
-        const V2 che[4] = { { RAIL_X1 - 2, RAIL_Y0 - 2 }, { RAIL_X1 - 2, RAIL_Y0 + 2 }, { RAIL_X1 + 30, cy }, { RAIL_X1 + 30, cy - 3 } };
-        const uint32_t chec[4] = { WithAlpha(C_RAIL_EDGE, wmT), WithAlpha(C_RAIL_EDGE, wmT), WithAlpha(C_RAIL_EDGE, wmT), WithAlpha(C_RAIL_EDGE, wmT) };
-        DrawQuadGradient(che, chec);
-        // white pennant flag past the chevron tip, tilted up-right
-        const uint32_t cWht = WithAlpha(RGBA(234, 239, 248, 255), wmT);
-        const uint32_t cWhtB = WithAlpha(RGBA(150, 162, 186, 255), wmT);
-        const V2 fl[4] = { { RAIL_X1 + 22, RAIL_Y0 - 7 }, { RAIL_X1 + 56, RAIL_Y0 - 15 }, { RAIL_X1 + 48, RAIL_Y1 - 22 }, { RAIL_X1 + 14, RAIL_Y1 - 14 } };
-        const uint32_t flc[4] = { cWht, cWht, cWhtB, cWhtB };
-        DrawQuadGradient(fl, flc);
-    }
-    {
-        float wx = Lerp(-220.0f, WM_X, wmT);   // slides in from off-left
-        Chrome({ wx, WM_CAPTOP - 12 }, 48.0f, "RESULTS", wmT, 1.70f);
-    }
-    }   // end !csdBase rail/banner/wordmark chrome
-
-    const float VAL_R = 1033;   // common right edge the value strips align to (measured: shared Chrome right edge ~x1015)
-    const uint32_t C_VSTRIP_T = RGBA(18, 26, 44, 180), C_VSTRIP_B = RGBA(8, 14, 28, 180);
-    for (int i = 0; i < N_ROWS; ++i) {
-        const float rowT = (float)ComputeMotion(openSec, 26.0 + i * 8.0, 18.0);
-        if (rowT <= 0.0f) continue;
-        const float x = ROW_X0 + i * ROW_XSTEP;
-        const float y = ROW_TOP0 + i * ROW_PITCH;
-        if (!csdBase) {   // CHROME: value strip + slanted plate + green label (CSD draws these)
-        // long dark translucent value strip extending from the plate to VAL_R
-        const float sx0 = x + ROW_W + SLANT - 6;
-        const V2 vs[4] = { { sx0 + SLANT, y + 4 }, { VAL_R, y + 4 }, { VAL_R, y + ROW_H - 4 }, { sx0, y + ROW_H - 4 } };
-        const uint32_t vsc[4] = { WithAlpha(C_VSTRIP_T, rowT), WithAlpha(C_VSTRIP_T, rowT), WithAlpha(C_VSTRIP_B, rowT), WithAlpha(C_VSTRIP_B, rowT) };
-        DrawQuadGradient(vs, vsc);
-        DrawRect({ sx0 + SLANT, y + 4 }, { VAL_R, y + 5.5f }, WithAlpha(RGBA(120, 140, 175, 200), rowT));   // thin top edge
-        Plate(x, y, ROW_W, ROW_H, C_PLATE_T, C_PLATE_B, C_PLATE_BD, rowT);
-        SetFont(g_fSeurat);
-        SetTextShear(0.20f);
-        {   // dark 8-direction outline pass behind the label (Chrome-style), then the light fill
-            const V2 lp = { x + 38, y + (ROW_H - 24) * 0.5f };
-            for (int dy = -1; dy <= 1; ++dy)
-                for (int dx = -1; dx <= 1; ++dx)
-                    if (dx || dy)
-                        DrawText({ lp.x + dx * 1.5f, lp.y + dy * 1.5f }, 24.0f, WithAlpha(RGBA(20, 28, 44, 255), rowT), ROWS[i].label);
-            DrawText(lp, 24.0f, WithAlpha(C_LABEL, rowT), ROWS[i].label);
-        }
-        ResetTextShear();
-        ResetFont();
-        }   // end !csdBase row chrome
-        // DYNAMIC: tally value, RIGHT-aligned inside the strip to the common edge
-        const float tallyT = (float)ComputeMotion(openSec, 48.0 + i * 8.0, 60.0);
-        char buf[24];
-        FormatValue(ROWS[i], (int)std::lround(ROWS[i].value * tallyT), buf, sizeof buf);
+        float cx = (EM_X0 + EM_X1) * 0.5f, cy = (EM_Y0 + EM_Y1) * 0.5f + 6;
+        float rw = 150, rh = 70;
+        DrawRect({ cx - rw, cy - rh }, { cx + rw, cy - rh + 3 }, WithAlpha(vcol, a));
+        DrawRect({ cx - rw, cy + rh - 3 }, { cx + rw, cy + rh }, WithAlpha(vcol, a));
+        DrawRect({ cx - rw, cy - rh }, { cx - rw + 3, cy + rh }, WithAlpha(vcol, a));
+        DrawRect({ cx + rw - 3, cy - rh }, { cx + rw, cy + rh }, WithAlpha(vcol, a));
         SetFont(g_fDF);
-        SetTextShear(0.24f); SetTextStretchX(1.2f);
-        float vw = MeasureText(32.0f, buf).x * 1.2f;
-        ResetTextStretchX(); ResetTextShear(); ResetFont();
-        Chrome({ VAL_R - vw - 18, y + ROW_H * 0.5f - 16 }, 32.0f, buf, rowT);
-    }
-
-    // ---- TOTAL (one long green bar stepping LEFT, value right-aligned inside) ----
-    {
-        const float totT = (float)ComputeMotion(openSec, 66.0, 18.0);
-        if (totT > 0.0f) {
-            const float x = 625.0f;        // green plate left (real green plate x628-797)
-            const float TOT_PLATE_W = 165;  // compact green label plate (green ends ~x793)
-            if (!csdBase) {   // CHROME: teal value strip + green plate + "TOTAL" label (CSD draws these)
-            // teal value strip from the green plate right edge to VAL_R (real is teal, not navy)
-            const uint32_t C_TSTRIP_T = RGBA(72, 150, 138, 200), C_TSTRIP_B = RGBA(46, 118, 112, 200);   // brighter teal (green +~32)
-            const float sx0 = x + TOT_PLATE_W + SLANT - 6;
-            const V2 vs[4] = { { sx0 + SLANT, TOT_TOP + 4 }, { VAL_R, TOT_TOP + 4 }, { VAL_R, TOT_TOP + TOT_H - 4 }, { sx0, TOT_TOP + TOT_H - 4 } };
-            const uint32_t vsc[4] = { WithAlpha(C_TSTRIP_T, totT), WithAlpha(C_TSTRIP_T, totT), WithAlpha(C_TSTRIP_B, totT), WithAlpha(C_TSTRIP_B, totT) };
-            DrawQuadGradient(vs, vsc);
-            DrawRect({ sx0 + SLANT, TOT_TOP + 4 }, { VAL_R, TOT_TOP + 5.5f }, WithAlpha(RGBA(120, 160, 158, 200), totT));   // thin teal top edge
-            Plate(x, TOT_TOP, TOT_PLATE_W, TOT_H, C_TOTAL_T, C_TOTAL_B, C_PLATE_BD, totT);
-            SetFont(g_fRodin);
-            SetTextShear(0.20f);
-            DrawText({ x + 40, TOT_TOP + (TOT_H - 26) * 0.5f }, 26.0f, WithAlpha(C_TOTAL_TXT, totT), "TOTAL");
-            ResetTextShear();
-            ResetFont();
-            }   // end !csdBase TOTAL chrome
-            // DYNAMIC: TOTAL tally digits (always composite over the CSD base)
-            const float totTally = (float)ComputeMotion(openSec, 90.0, 48.0);
-            char buf[16]; snprintf(buf, sizeof buf, "%d", (int)std::lround(g_total * totTally));
-            SetFont(g_fDF); SetTextShear(0.24f); SetTextStretchX(1.2f);
-            float vw = MeasureText(36.0f, buf).x * 1.2f;
-            ResetTextStretchX(); ResetTextShear(); ResetFont();
-            Chrome({ VAL_R - vw - 18, TOT_TOP + TOT_H * 0.5f - 18 }, 36.0f, buf, totT);
-        }
-    }
-
-    // ---- RANK reveal: wide teal band behind the big gold letter (scale pop) ----
-    // CHROME: the CSD base draws the RANK strip + gold letter + title_brilliance.
-    if (!csdBase) {
-        const float rkT = (float)ComputeMotion(openSec, 13.0, 80.0);
-        if (rkT > 0.0f) {
-            // wide layered teal band behind the rank letter (measured y~520-564)
-            DrawVGradient({ 0, 519 }, { 560, 524 }, WithAlpha(RGBA(78, 176, 158, 225), rkT), WithAlpha(RGBA(78, 176, 158, 225), rkT));
-            DrawVGradient({ 0, 524 }, { 560, 565 }, WithAlpha(RGBA(64, 146, 135, 205), rkT), WithAlpha(RGBA(46, 114, 108, 205), rkT));   // brighter band body (green +~30)
-            SetFont(g_fSeurat);
-            SetTextShear(0.22f);
-            for (int dy = -1; dy <= 1; ++dy)
-                for (int dx = -1; dx <= 1; ++dx)
-                    if (dx || dy)
-                        DrawText({ 256 + dx * 1.4f, 533 + dy * 1.4f }, 24.0f, WithAlpha(RGBA(180, 184, 106, 255), rkT), "RANK");
-            DrawTextGradient({ 256, 533 }, 24.0f, WithAlpha(RGBA(245, 225, 130, 255), rkT), WithAlpha(RGBA(205, 170, 70, 255), rkT), "RANK");
-            ResetTextShear();
-            ResetFont();
-            // rank letter pops with an overshoot: scale 1.6 -> 1.0 about its centre
-            // measured letter bbox (331,433)-(484,609): ~153 wide x 176 tall
-            const float s = 1.0f + (1.0f - rkT) * 0.6f;
-            const float cx = 424.0f, cy = 532.0f, hw = 63.0f * s, hh = 62.0f * s;   // widen C: w~126 (real ~127)
-            int ri = 0; while (ri < 5 && RANK_NAME[ri][0] != g_rank[0]) ++ri;
-            if (g_rankTex >= 0) {   // the REAL metal letter art, warm-gold tinted (as captured)
-                DrawImage(g_rankTex, { cx - hw, cy - hh }, { cx + hw, cy + hh },
-                          { RANK_UV[ri].u0, RANK_UV[ri].v0 }, { RANK_UV[ri].u1, RANK_UV[ri].v1 },
-                          WithAlpha(RGBA(255, 194, 84, 255), rkT));   // stronger warm-gold tint (was washed-out silver)
-            } else {                // fallback: chrome-recipe letter
-                SetFont(g_fDF);
-                SetTextShear(0.10f);
-                SetTextStretchX(1.25f);
-                const float ps = hh * 2.0f * 1.42f;
-                const V2 rp = { cx - hh * 0.9f, cy + hh - hh * 2.0f * 1.28f };
-                for (int dy = -1; dy <= 1; ++dy)
-                    for (int dx = -1; dx <= 1; ++dx)
-                        if (dx || dy)
-                            DrawText({ rp.x + dx * 3.0f, rp.y + dy * 3.0f }, ps, WithAlpha(RGBA(60, 36, 6, 255), rkT), g_rank);
-                DrawTextGradient(rp, ps, WithAlpha(C_RANK_GOLD_T, rkT), WithAlpha(C_RANK_GOLD_B, rkT), g_rank);
-                ResetTextStretchX();
-                ResetTextShear();
-                ResetFont();
-            }
-            // ---- title_brilliance: a gold sparkle that BURSTS as the rank letter
-            //      slams in, then fades (the Sonic-result flash). 8-point star of
-            //      tapered additive rays from the letter centre + a soft core bloom. ----
-            const float fp = (float)ComputeLinearMotion(openSec, 13.0, 30.0);   // 0..1 over the reveal slam
-            const float burst = std::sin(fp * 3.14159265f);                      // smooth 0 -> 1 -> 0 bump
-            if (burst > 0.01f) {
-                const uint32_t hot  = RGBA(255, 246, 206, 255);   // warm-white core
-                const uint32_t tipc = RGBA(255, 208, 104, 0);     // gold, transparent tip
-                const float reach = 84.0f + 168.0f * fp;          // rays grow as they fade
-                const float wid   = 17.0f * burst;
-                auto ray = [&](float ang, float len, float w) {
-                    const float c = std::cos(ang), s = std::sin(ang), px = -s, py = c;
-                    const V2 corners[4] = {
-                        { cx + px * w, cy + py * w }, { cx + c * len, cy + s * len },
-                        { cx + c * len, cy + s * len }, { cx - px * w, cy - py * w },
-                    };
-                    const uint32_t cols[4] = { WithAlpha(hot, burst), WithAlpha(tipc, burst),
-                                               WithAlpha(tipc, burst), WithAlpha(hot, burst) };
-                    DrawQuadGradient(corners, cols, true);
-                };
-                for (int k = 0; k < 4; ++k) ray(k * 1.5707963f, reach, wid);                       // + cross
-                for (int k = 0; k < 4; ++k) ray(0.7853982f + k * 1.5707963f, reach * 0.62f, wid * 0.7f);  // x cross
-                // core bloom: quadratic fade so it only shows at the peak (blended into the star),
-                // not as a soft square during the rise/fade
-                DrawRect({ cx - 38, cy - 38 }, { cx + 38, cy + 38 }, WithAlpha(RGBA(255, 240, 196, 255), burst * burst * 0.45f), true);
-            }
-        }
-    }
-
-    // ---- footer: (A) Next (below the TOTAL value, ~70% / 87%) ----
-    // CHROME: the CSD base draws the button guide.
-    if (!csdBase) {
-        const float fT = (float)ComputeMotion(openSec, 0.0, 8.0);
-        float hx = 856, hcy = 638;   // glyph center ~876,638 (manifest btn_a x856 y618 h40)
-        if (g_glyphTex >= 0) {
-            float asp = ((GLYPH_A.u1 - GLYPH_A.u0) * GTW) / ((GLYPH_A.v1 - GLYPH_A.v0) * GTH), gh = 34.0f, gw = gh * asp;   // (A) orb ~w31/h34 (was 28; matches btn_a 40px region)
-            DrawImage(g_glyphTex, { hx, hcy - gh * 0.5f }, { hx + gw, hcy + gh * 0.5f },
-                      { GLYPH_A.u0, GLYPH_A.v0 }, { GLYPH_A.u1, GLYPH_A.v1 }, WithAlpha(C_WHITE, fT));
-            hx += gw + 8;
-        }
-        SetFont(g_fRodin);
-        {   // dark 8-direction outline pass behind 'Next' (Chrome-style), then the white fill
-            const V2 np = { hx, hcy - 12 };
-            for (int dy = -1; dy <= 1; ++dy)
-                for (int dx = -1; dx <= 1; ++dx)
-                    if (dx || dy)
-                        DrawText({ np.x + dx * 1.5f, np.y + dy * 1.5f }, 22.0f, WithAlpha(RGBA(20, 28, 44, 255), fT), "Next");
-            DrawText(np, 22.0f, WithAlpha(C_WHITE, fT), "Next");
-        }
+        SetTextStretchX(1.05f);
+        float w = MeasureText(34.0f, VerdictText()).x * 1.05f;
+        DrawTextShadow({ cx - w * 0.5f, cy - 22 }, 34.0f, WithAlpha(vcol, a), VerdictText());
+        ResetTextStretchX();
         ResetFont();
     }
+
+    // ===== SIGNAL BREAKDOWN ==================================================
+    if (sg > 0.0f) {
+        DrawRect({ SG_X0, SG_Y0 }, { SG_X1, SG_Y1 }, WithAlpha(C_PANEL, sg));
+        DrawRect({ SG_X0, SG_Y0 }, { SG_X1, SG_Y0 + 44 }, WithAlpha(C_CAP, sg));
+        SetFont(g_fDF);
+        DrawTextAligned({ SG_X0 + 22, SG_Y0 }, { SG_X1 - 18, SG_Y0 + 44 }, 24.0f,
+                        WithAlpha(C_TITLE, sg), "SIGNALS", Align::Left, true, true);
+        ResetFont();
+        const float top = SG_Y0 + 64, pitch = 48;
+        for (int i = 0; i < SIGNAL_COUNT; ++i) {
+            float y = top + i * pitch;
+            bool isTotal = (i == SIGNAL_COUNT - 1);
+            if (isTotal) DrawRect({ SG_X0 + 22, y - 8 }, { SG_X1 - 22, y - 6 }, WithAlpha(C_RULE, sg));
+            SetFont(g_fSeurat);
+            DrawText({ SG_X0 + 26, y }, isTotal ? 24.0f : 22.0f,
+                     WithAlpha(isTotal ? C_TITLE : C_TEXT, sg), SIGNALS[i].label);
+            ResetFont();
+            SetFont(g_fRodin);
+            DrawTextAligned({ SG_X1 - 140, y - 2 }, { SG_X1 - 26, y + 28 }, isTotal ? 26.0f : 24.0f,
+                            WithAlpha(isTotal ? C_TITLE : C_VALUE, sg), SIGNALS[i].value, Align::Right, true, false);
+            ResetFont();
+        }
+    }
+
+    // ===== RECOMMENDATION ====================================================
+    DrawRect({ RC_X0, RC_Y0 }, { RC_X1, RC_Y1 }, WithAlpha(C_PANEL, a));
+    DrawRect({ RC_X0, RC_Y0 }, { RC_X0 + 6, RC_Y1 }, WithAlpha(vcol, a));
+    SetFont(g_fRodin);
+    DrawText({ RC_X0 + 22, RC_Y0 + 12 }, 14.0f, WithAlpha(C_LABEL, a), "RECOMMENDATION");
+    ResetFont();
+    SetFont(g_fSeurat);
+    DrawText({ RC_X0 + 22, RC_Y0 + 34 }, 20.0f, WithAlpha(C_TEXT, a), RECOMMENDATION);
+    ResetFont();
+
+    // ===== FOOTER ============================================================
+    SetFont(g_fRodin);
+    DrawRect({ 150, 612 }, { 1130, 614 }, WithAlpha(C_RULE, a));
+    DrawText({ 158, 628 }, 20.0f, WithAlpha(C_FOOTER, a), "Enter  Continue");
+    DrawText({ 470, 628 }, 20.0f, WithAlpha(C_FOOTER, a), "Esc  Back");
+    ResetFont();
 }
 
 } // namespace
 
 void ResultInit() { Init(); }
-void ResultDraw(double openSeconds) {
-    // CSD-base composite: when the real game CSD layout (data/result.json) is loaded
-    // as the base, the host already drew the banner, row strips/labels, RANK letter +
-    // brilliance. We then re-composite ONLY this screen's dynamic content on top — the
-    // per-row + TOTAL tally-counting VALUE digits. All chrome/background (including the
-    // full-screen sky/ground gradient) is gated behind !csdBase so it never occludes
-    // the CSD. When the CSD is absent we render the full validated hand-authored screen.
-    const bool csdBase = csd::LoadedId() && std::strcmp(csd::LoadedId(), "result") == 0;
-    Draw(openSeconds, csdBase);
-}
+void ResultDraw(double openSeconds) { Draw(openSeconds); }
