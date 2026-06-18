@@ -444,3 +444,8 @@ FodyWeavers.xsd
 *.ttc
 Screenshot*.png
 Unleashed UIUX.zip
+
+# ---- runtime-generated + personal notes (kept local) ------------------------
+sgfx_settings.ini
+**/sgfx_settings.ini
+Research SU.txt

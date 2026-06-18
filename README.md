@@ -49,6 +49,19 @@ This project keeps a documented, versioned R&D environment for studying:
 
 The codebase includes a snapshot of the open-source Unleashed Recompiled integration layer plus research automation that helps index readable UI code, patch hooks, and local research outputs.
 
+## <img src="./docs/assets/branding/icon_extra.png" width="30" alt="SWARD icon"/> The Native-C++ UI Reconstruction (`Unleashed UIUX/`)
+
+The headline engineering deliverable lives under [`Unleashed UIUX/`](./Unleashed%20UIUX): a clean, native-C++ reconstruction of the game's UI/UX, built to be **customizable templates** for original projects rather than a copy of the game. It has two halves:
+
+- **`sgfx_recomp_ui/`** — the menu layer. UnleashedRecomp's authentic `ui/*.cpp` (Options, Achievements, Installer, the `imgui_utils` keystone, button guide, fader, etc.) **decoupled** from the game runtime into a reusable library + an SDL2 preview harness. Only the game-runtime `#include`s are swapped for a thin `platform/` shim, so the menu bodies stay byte-identical to the recomp; the recomp's gradient/outline render layer is reproduced on the harness side. Options, Achievements, and the Installer wizard render standalone, 1:1, with real fonts and the extracted UI sprites. See [`sgfx_recomp_ui/ARCHITECTURE.md`](./Unleashed%20UIUX/sgfx_recomp_ui/ARCHITECTURE.md) and [`CONTRACT.md`](./Unleashed%20UIUX/sgfx_recomp_ui/CONTRACT.md).
+- **`sgfx_ui_cpp/`** (the `sgfx_screens` viewer) — the in-game screens (HUD, pause, status, world map, result, stage select, encyclopedia, loading, NPC dialogue, title, boot, …). Each screen renders either from the game's **real CSD layout** (`data/<id>.json`, drawn by `csd_player.cpp` with a thin C++ overlay for live values) or from a **measured 1:1 hand-authored** reconstruction. It boots the full screen flow with measured transitions, per-screen BGM/SFX, day/night state, and a rotating 3D Earth.
+
+> [!NOTE]
+> This layer ships **code only**. The SEGA-derived fonts, sprites, audio, and CSD-resolved art it loads at runtime stay local — supply them from your own legally acquired files. A runtime build is assembled separately as a self-contained package (exe + DLLs + a curated local asset set + the CSD data).
+
+> [!TIP]
+> Reuse model: `sgfx_recomp_ui` is a drop-in, readable menu library for SGFX and other engines; `sgfx_ui_cpp` is a screen browser / behavior reference. Both are MSVC-built (`_msvc.bat sgfx_screens`; `sgfx_recomp_ui/preview/build_preview.bat`).
+
 ## <img src="./docs/assets/branding/icon_debug.png" width="30" alt="SWARD icon"/> What Lives Here
 
 - Open-source handwritten runtime, UI, and patch code from the Unleashed Recompiled layer
@@ -131,6 +144,7 @@ The goal here is different from the upstream end-user distribution goal. This re
 
 ```text
 .
+|-- Unleashed UIUX/                  # native-C++ UI reconstruction (sgfx_recomp_ui + sgfx_screens)
 |-- UnleashedRecomp/                 # open-source runtime, UI, and patch layer
 |-- UnleashedRecompLib/              # config plus local-only private/generated dirs
 |-- docs/                            # build and local acquisition guidance

@@ -9,6 +9,15 @@ Project history for **Project Sonic World Adventure R&D / SWARD**.
 > [!NOTE]
 > This changelog tracks the publishable repo layer. Local-only extracted assets, generated PPC output, staged tools, and private inputs stay outside git history by design.
 
+## 2026-06-18
+
+### Native-C++ UI reconstruction: decoupled recomp menus + in-game CSD viewer
+
+- **`Unleashed UIUX/sgfx_recomp_ui/`** — decoupled UnleashedRecomp's authentic `ui/*.cpp` (Options, Achievements, Installer, the `imgui_utils` keystone, button guide, fader, tv static, message window, achievement overlay) from the game runtime into a clean reusable C++ library; only the game `#include`s were swapped for a `platform/` shim (menu bodies byte-identical). Added the SDL2 preview harness that reproduces the recomp gradient/outline render layer and renders Options / Achievements / Installer standalone, 1:1, with the real game fonts (`dfsoge7.ttc` DFSoGei + Seurat + NewRodin) and the extracted UI sprites. Shim contract documented in `CONTRACT.md` / `ARCHITECTURE.md`.
+- **`Unleashed UIUX/sgfx_ui_cpp/`** (the `sgfx_screens` viewer) — rolled the CSD-base architecture across the in-game fleet: `status`, `result`, `gate`, and `world_map` now render the game's real CSD layout (`data/<id>.json` via `csd_player`) with a thin C++ overlay for the live values the CSD lacks (selection cursors, value numbers, the 3D globe, the EXP gem). Added a text-safe continuous-idle loop (in-place rotation only). The other screens stay on their measured 1:1 hand-authored reconstructions.
+- **Full-fleet adversarial audit + remediation** — audited every screen against the real game and fixed the shipped defects: removed leftover placeholder/debug strings (`GAME LOGO SLOT`, `QUICK TIME EVENT`, `(Q/E)` keyboard prompts), recolored / repaired broken widgets, wired the real character portrait into the encyclopedia, fixed garbled text and value alignment, and removed six non-canonical screens (shop / boss / item-result / mission / mission-screen / dev viewport) so the viewer only browses real Sonic Unleashed screens.
+- `.gitignore` hardening for runtime-generated settings and personal notes; README gains a `Unleashed UIUX/` section describing the reconstruction.
+
 ## 2026-04-24
 
 ### Phase 46 sequence and item source deepening
