@@ -2,11 +2,12 @@
 // screen_status.cpp — the run metrics. The result of a preflight pass over a
 // profile: an overall verdict + totals, then a row per check pack with its error /
 // warning / info counts. Up/Down move between packs. Built from primitives + text
-// only — no chrome art. Counts are representative (real pack names and shape) until
-// a live feed supplies the run.
+// only — no chrome art. Counts come from the live data bridge (sgfx_status.json),
+// falling back to representative defaults when no status file is present.
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "sgfx_data.h"
 #include <cstdio>
 #include <algorithm>
 
@@ -14,8 +15,6 @@ using namespace ui;
 namespace {
 
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_logoTex = -1;
-
-const char* const ACTIVE_PROFILE = "G65";
 
 // ---- palette ----------------------------------------------------------------
 const uint32_t C_BG_TOP   = RGBA(12, 20, 38, 255), C_BG_BOT = RGBA(5, 9, 18, 255);
@@ -36,15 +35,9 @@ const uint32_t C_FOOTER   = RGBA(190, 205, 225, 220);
 const uint32_t C_WHITE    = RGBA(255, 255, 255, 255);
 const uint32_t C_CHIP     = RGBA(150, 196, 150, 255);
 
-// ---- the check packs (representative run) -----------------------------------
-struct Pack { const char* name; int err, warn, info; };
-const Pack PACKS[] = {
-    { "anchors",        0, 2, 5 },
-    { "constants",      3, 4, 6 },
-    { "carpaints",      0, 1, 2 },
-    { "project_sanity", 0, 5, 5 },
-};
-constexpr int PACK_COUNT = int(sizeof(PACKS) / sizeof(PACKS[0]));
+// ---- the check packs: from the live data bridge (sgfx_status.json) or defaults --
+const std::vector<sgfx::Pack>& packs() { return sgfx::Get().run.packs; }
+int packCount() { return (int)packs().size(); }
 
 int g_sel = 0;
 
@@ -56,7 +49,7 @@ constexpr float COL_PACK = TBL_X + 28, COL_ERR = TBL_X + 600, COL_WARN = TBL_X +
 
 void Totals(int& e, int& w, int& i) {
     e = w = i = 0;
-    for (int k = 0; k < PACK_COUNT; ++k) { e += PACKS[k].err; w += PACKS[k].warn; i += PACKS[k].info; }
+    for (const auto& p : packs()) { e += p.err; w += p.warn; i += p.info; }
 }
 
 void Init() {
@@ -68,7 +61,7 @@ void Init() {
 void Reset() { g_sel = 0; }
 void Input(const ScreenInput& in) {
     if (in.up)   g_sel = std::max(0, g_sel - 1);
-    if (in.down) g_sel = std::min(PACK_COUNT - 1, g_sel + 1);
+    if (in.down) g_sel = std::min(std::max(0, packCount() - 1), g_sel + 1);
 }
 
 void DrawLogoSlot(float t) {
@@ -98,7 +91,7 @@ void Draw(double openSec) {
     // profile chip top-right
     SetFont(g_fRodin);
     DrawTextAligned({ 910, 52 }, { 1130, 76 }, 16.0f, WithAlpha(C_CHIP, a), "PROFILE", Align::Right, true, true);
-    DrawTextAligned({ 910, 74 }, { 1130, 104 }, 24.0f, WithAlpha(C_TITLE, a), ACTIVE_PROFILE, Align::Right, true, true);
+    DrawTextAligned({ 910, 74 }, { 1130, 104 }, 24.0f, WithAlpha(C_TITLE, a), sgfx::Get().run.activeProfile.c_str(), Align::Right, true, true);
     ResetFont();
 
     // ===== SUMMARY: verdict + totals =========================================
@@ -133,7 +126,8 @@ void Draw(double openSec) {
     ResetFont();
 
     const float rowsTop = TBL_Y + HEAD_H + 6;
-    for (int k = 0; k < PACK_COUNT; ++k) {
+    for (int k = 0; k < packCount(); ++k) {
+        const sgfx::Pack& p = packs()[k];
         float y = rowsTop + k * ROW_H;
         bool sel = (k == g_sel);
         if (sel && tb > 0.5f)
@@ -141,12 +135,12 @@ void Draw(double openSec) {
                           WithAlpha(C_SEL_TOP, tb), WithAlpha(C_SEL_BOT, tb));
         SetFont(g_fSeurat);
         DrawTextAligned({ COL_PACK, y }, { COL_ERR - 110, y + ROW_H }, 26.0f,
-                        WithAlpha(sel ? C_TEXT_SEL : C_TEXT, tb), PACKS[k].name, Align::Left, true, true);
+                        WithAlpha(sel ? C_TEXT_SEL : C_TEXT, tb), p.name.c_str(), Align::Left, true, true);
         ResetFont();
         float cy = y + (ROW_H - 30) * 0.5f;
-        Count(COL_ERR,  cy, PACKS[k].err,  C_ERR,  tb);
-        Count(COL_WARN, cy, PACKS[k].warn, C_WARN, tb);
-        Count(COL_INFO, cy, PACKS[k].info, C_INFO, tb);
+        Count(COL_ERR,  cy, p.err,  C_ERR,  tb);
+        Count(COL_WARN, cy, p.warn, C_WARN, tb);
+        Count(COL_INFO, cy, p.info, C_INFO, tb);
     }
 
     // ===== FOOTER ============================================================

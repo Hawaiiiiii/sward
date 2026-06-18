@@ -8,6 +8,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "sgfx_data.h"
 #include <cstdio>
 #include <algorithm>
 
@@ -15,8 +16,6 @@ using namespace ui;
 namespace {
 
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_logoTex = -1;
-
-const char* const ACTIVE_PROFILE = "G65";
 
 // ---- palette ----------------------------------------------------------------
 const uint32_t C_BG_TOP   = RGBA(12, 20, 38, 255), C_BG_BOT = RGBA(5, 9, 18, 255);
@@ -37,48 +36,39 @@ const uint32_t C_WHITE    = RGBA(255, 255, 255, 255);
 const uint32_t C_CHIP     = RGBA(150, 196, 150, 255);
 
 // ---- verdicts ---------------------------------------------------------------
-// Colour bucket for the verdict: green = clean, amber = attention, red = blocked.
-enum Verdict {
-    V_LIKELY_OK,               // green
-    V_NEEDS_MANUAL_REVIEW,     // amber
-    V_PROXY_CANDIDATE_READY,   // amber
-    V_BASELINE_CANDIDATE_READY,// amber
-    V_BASELINE_MISSING,        // red
-};
-const char* VerdictLabel(Verdict v) {
-    switch (v) {
-        case V_LIKELY_OK:                return "LIKELY OK";
-        case V_NEEDS_MANUAL_REVIEW:      return "NEEDS REVIEW";
-        case V_PROXY_CANDIDATE_READY:    return "PROXY READY";
-        case V_BASELINE_CANDIDATE_READY: return "BASELINE READY";
-        case V_BASELINE_MISSING:         return "BASELINE MISSING";
-    }
-    return "";
+// The battery filters come from the live data bridge (sgfx_status.json) or
+// defaults; each filter carries a STRING verdict id. We map that id to a display
+// label, a colour, and a totals bucket. Colour bucket for the verdict: green =
+// clean (REVIEWED), amber = attention (NEED-REVIEW), red = blocked (NO-BASELINE).
+enum Bucket { B_REVIEWED, B_NEED_REVIEW, B_NO_BASELINE };
+
+Bucket VerdictBucket(const std::string& v) {
+    if (v == "likely_ok")        return B_REVIEWED;
+    if (v == "baseline_missing") return B_NO_BASELINE;
+    return B_NEED_REVIEW;   // needs_manual_review / proxy_candidate_ready / baseline_candidate_ready / any other
 }
-uint32_t VerdictColour(Verdict v) {
-    switch (v) {
-        case V_LIKELY_OK:                return C_GREEN;
-        case V_BASELINE_MISSING:         return C_RED;
-        default:                         return C_AMBER;   // needs-review / proxy / candidate
+const char* VerdictLabel(const std::string& v) {
+    if (v == "likely_ok")                return "LIKELY OK";
+    if (v == "needs_manual_review")      return "NEEDS REVIEW";
+    if (v == "proxy_candidate_ready")    return "PROXY READY";
+    if (v == "baseline_candidate_ready") return "BASELINE READY";
+    if (v == "baseline_missing")         return "BASELINE MISSING";
+    return v.c_str();   // any other id: show it as-is
+}
+uint32_t VerdictColour(const std::string& v) {
+    switch (VerdictBucket(v)) {
+        case B_REVIEWED:    return C_GREEN;
+        case B_NO_BASELINE: return C_RED;
+        default:            return C_AMBER;   // need-review bucket
     }
 }
 
-// ---- the battery filters (representative run) -------------------------------
-// One row per screenshot-battery filter: its verdict and the pixel/region diff
+// ---- the battery filters: from the live data bridge or defaults --------------
+// One row per screenshot-battery filter: its verdict id and the pixel/region diff
 // count against the stored baseline (0 when there is no baseline yet).
-struct Filter { const char* name; Verdict verdict; int diff; };
-const Filter FILTERS[] = {
-    { "default",            V_LIKELY_OK,                 0 },
-    { "lights_drl_front",   V_LIKELY_OK,                 0 },
-    { "lights_LowBeam",     V_NEEDS_MANUAL_REVIEW,     142 },
-    { "lights_HighBeam",    V_NEEDS_MANUAL_REVIEW,      88 },
-    { "lights_OnlyCones",   V_PROXY_CANDIDATE_READY,     0 },
-    { "openAllDoors_",      V_BASELINE_MISSING,          0 },
-    { "automatic_Doors_",   V_BASELINE_CANDIDATE_READY,  0 },
-    { "welcome_animation_", V_NEEDS_MANUAL_REVIEW,     310 },
-    { "highlighting_Doors", V_BASELINE_MISSING,          0 },
-};
-constexpr int FILTER_COUNT = int(sizeof(FILTERS) / sizeof(FILTERS[0]));
+const std::vector<sgfx::Filter>& filters() { return sgfx::Get().run.filters; }
+int filterCount() { return (int)filters().size(); }
+const char* ActiveProfile() { return sgfx::Get().run.activeProfile.c_str(); }
 
 int g_sel = 0;
 
@@ -91,11 +81,11 @@ constexpr float COL_FILTER = TBL_X + 28, COL_VERDICT = TBL_X + 560, COL_DIFF = T
 // totals across the battery: reviewed (green), need review (amber), baseline-missing (red)
 void Totals(int& ok, int& review, int& missing) {
     ok = review = missing = 0;
-    for (int k = 0; k < FILTER_COUNT; ++k) {
-        switch (FILTERS[k].verdict) {
-            case V_LIKELY_OK:        ++ok;      break;
-            case V_BASELINE_MISSING: ++missing; break;
-            default:                 ++review;  break;
+    for (const auto& f : filters()) {
+        switch (VerdictBucket(f.verdict)) {
+            case B_REVIEWED:    ++ok;      break;
+            case B_NO_BASELINE: ++missing; break;
+            default:            ++review;  break;
         }
     }
 }
@@ -109,7 +99,7 @@ void Init() {
 void Reset() { g_sel = 0; }
 void Input(const ScreenInput& in) {
     if (in.up)   g_sel = std::max(0, g_sel - 1);
-    if (in.down) g_sel = std::min(FILTER_COUNT - 1, g_sel + 1);
+    if (in.down) g_sel = std::min(std::max(0, filterCount() - 1), g_sel + 1);
 }
 
 void DrawLogoSlot(float t) {
@@ -142,7 +132,7 @@ void Draw(double openSec) {
     // profile chip top-right
     SetFont(g_fRodin);
     DrawTextAligned({ 910, 52 }, { 1130, 76 }, 16.0f, WithAlpha(C_CHIP, a), "PROFILE", Align::Right, true, true);
-    DrawTextAligned({ 910, 74 }, { 1130, 104 }, 24.0f, WithAlpha(C_TITLE, a), ACTIVE_PROFILE, Align::Right, true, true);
+    DrawTextAligned({ 910, 74 }, { 1130, 104 }, 24.0f, WithAlpha(C_TITLE, a), ActiveProfile(), Align::Right, true, true);
     ResetFont();
 
     // ===== SUMMARY: overall verdict + totals =================================
@@ -175,8 +165,12 @@ void Draw(double openSec) {
     DrawTextAligned({ COL_DIFF - 90, TBL_Y + 12 }, { COL_DIFF, TBL_Y + 36 }, 16.0f, WithAlpha(C_LABEL, tb), "DIFF", Align::Right, true, true);
     ResetFont();
 
+    const auto& rows = filters();
+    const int rowCount = (int)rows.size();
+    if (rowCount > 0) g_sel = std::clamp(g_sel, 0, rowCount - 1);
     const float rowsTop = TBL_Y + HEAD_H + 6;
-    for (int k = 0; k < FILTER_COUNT; ++k) {
+    for (int k = 0; k < rowCount; ++k) {
+        const sgfx::Filter& f = rows[k];
         float y = rowsTop + k * ROW_H;
         bool sel = (k == g_sel);
         if (sel && tb > 0.5f)
@@ -184,16 +178,16 @@ void Draw(double openSec) {
                           WithAlpha(C_SEL_TOP, tb), WithAlpha(C_SEL_BOT, tb));
         SetFont(g_fSeurat);
         DrawTextAligned({ COL_FILTER, y }, { COL_VERDICT - 20, y + ROW_H }, 22.0f,
-                        WithAlpha(sel ? C_TEXT_SEL : C_TEXT, tb), FILTERS[k].name, Align::Left, true, true);
+                        WithAlpha(sel ? C_TEXT_SEL : C_TEXT, tb), f.name.c_str(), Align::Left, true, true);
         ResetFont();
         // colour-coded verdict label
         SetFont(g_fRodin);
         DrawTextAligned({ COL_VERDICT, y }, { COL_DIFF - 110, y + ROW_H }, 16.0f,
-                        WithAlpha(VerdictColour(FILTERS[k].verdict), tb),
-                        VerdictLabel(FILTERS[k].verdict), Align::Left, true, true);
+                        WithAlpha(VerdictColour(f.verdict), tb),
+                        VerdictLabel(f.verdict), Align::Left, true, true);
         ResetFont();
         float cy = y + (ROW_H - 30) * 0.5f;
-        DiffCount(COL_DIFF, cy, FILTERS[k].diff, tb);
+        DiffCount(COL_DIFF, cy, f.diff, tb);
     }
 
     // ===== FOOTER ============================================================

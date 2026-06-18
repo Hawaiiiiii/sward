@@ -29,6 +29,7 @@
 #include "audio.h"
 #include "settings.h"
 #include "csd_player.h"
+#include "sgfx_data.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -175,6 +176,7 @@ int main(int argc, char** argv) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) { fprintf(stderr, "SDL init: %s\n", SDL_GetError()); return 1; }
     // ---- persistent window placement: display / fullscreen / size ----
     settings::Load();
+    sgfx::Load();   // live data bridge: populate screens from sgfx_status.json if present
     int dispCount = SDL_GetNumVideoDisplays();
     int disp = settings::GetInt("display", 0);
     if (disp < 0 || disp >= dispCount) disp = 0;

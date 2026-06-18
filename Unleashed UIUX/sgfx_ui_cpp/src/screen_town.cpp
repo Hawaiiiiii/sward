@@ -7,6 +7,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "sgfx_data.h"
 
 #include <cstdio>
 #include <cstring>
@@ -28,8 +29,8 @@ const Action ACTIONS[] = {
 };
 constexpr int ACTION_COUNT = int(sizeof(ACTIONS) / sizeof(ACTIONS[0]));
 
-// the profile the actions run against (representative until a live feed supplies it)
-const char* const ACTIVE_PROFILE = "G65";
+// the profile the actions run against — from the live data bridge (or defaults)
+const char* ActiveProfile() { return sgfx::Get().run.activeProfile.c_str(); }
 
 int g_logoTex = -1;
 
@@ -147,7 +148,7 @@ void Draw(double openSec) {
         DrawTextAligned({ cx - 220, 52 }, { cx, 78 }, 16.0f, WithAlpha(COL_CHIP, titleT),
                         "PROFILE", Align::Right, true, true);
         DrawTextAligned({ cx - 220, 74 }, { cx, 104 }, 24.0f, WithAlpha(COL_TITLE, titleT),
-                        ACTIVE_PROFILE, Align::Right, true, true);
+                        ActiveProfile(), Align::Right, true, true);
         ResetFont();
     }
     DrawRect({ LIST_X, RULE_Y }, { 1130.0f, RULE_Y + 2.0f }, WithAlpha(COL_RULE, titleT));
@@ -207,7 +208,7 @@ void Draw(double openSec) {
     double age = Now() - g_msgStart;
     if (g_msgStart > 0.0 && age < 1.6) {
         float ma = std::min(1.0f, (float)((1.6 - age) / 0.4));
-        char line[80]; std::snprintf(line, sizeof(line), "Running %s on %s", g_msg, ACTIVE_PROFILE);
+        char line[80]; std::snprintf(line, sizeof(line), "Running %s on %s", g_msg, ActiveProfile());
         SetFont(g_fSeurat);
         DrawTextAligned({ LIST_X, 572.0f }, { 1130.0f, 604.0f }, 24.0f,
                         WithAlpha(COL_OK, ma), line, Align::Center, true, true);

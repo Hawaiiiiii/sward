@@ -6,6 +6,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "sgfx_data.h"
 #include <cstdio>
 #include <algorithm>
 
@@ -13,8 +14,6 @@ using namespace ui;
 namespace {
 
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_logoTex = -1;
-
-const char* const ACTIVE_PROFILE = "G65";
 
 // ---- palette ----------------------------------------------------------------
 const uint32_t C_BG_TOP = RGBA(8, 12, 24, 255), C_BG_BOT = RGBA(3, 5, 12, 255);
@@ -32,22 +31,19 @@ const uint32_t C_ERR    = RGBA(235, 96, 84, 255);
 const uint32_t C_WARN   = RGBA(235, 200, 90, 255);
 const uint32_t C_OKV    = RGBA(120, 230, 140, 255);
 
-// ---- the verdict (representative; real vocabulary) --------------------------
-// kind: 0 = likely ok, 1 = needs review, 2 = blocked
-constexpr int VERDICT = 1;
-const char* VerdictText() { return VERDICT == 0 ? "LIKELY OK" : VERDICT == 1 ? "NEEDS REVIEW" : "BLOCKED"; }
-uint32_t VerdictColor()   { return VERDICT == 0 ? C_OKV : VERDICT == 1 ? C_WARN : C_ERR; }
+// ---- the verdict: from the live data bridge (sgfx_status.json) or defaults ---
+const char* VerdictText() { return sgfx::Get().run.verdict.c_str(); }
+uint32_t VerdictColor() {
+    const std::string& v = sgfx::Get().run.verdict;
+    if (v.find("OK")    != std::string::npos) return C_OKV;
+    if (v.find("BLOCK") != std::string::npos) return C_ERR;
+    return C_WARN;
+}
 
-struct Signal { const char* label; const char* value; };
-const Signal SIGNALS[] = {
-    { "Errors",           "3"  },
-    { "Warnings",         "12" },
-    { "Screenshot diffs", "5"  },
-    { "Review items",     "6"  },
-    { "Total findings",   "44" },
-};
-constexpr int SIGNAL_COUNT = int(sizeof(SIGNALS) / sizeof(SIGNALS[0]));
-const char* const RECOMMENDATION = "Resolve the 3 constants errors, then re-run before delivery.";
+// ---- the signal rows: from the live data bridge (the last row is the total) --
+const std::vector<sgfx::Signal>& signals() { return sgfx::Get().run.signals; }
+const char* Recommendation()   { return sgfx::Get().run.recommendation.c_str(); }
+const char* ActiveProfile()    { return sgfx::Get().run.activeProfile.c_str(); }
 
 // ---- layout -----------------------------------------------------------------
 constexpr float EM_X0 = 150, EM_Y0 = 150, EM_X1 = 560, EM_Y1 = 470;     // verdict emblem
@@ -76,7 +72,7 @@ void Draw(double openSec) {
     DrawLogoSlot(a);
     SetFont(g_fRodin);
     DrawTextAligned({ 910, 52 }, { 1130, 76 }, 16.0f, WithAlpha(C_CHIP, a), "PROFILE", Align::Right, true, true);
-    DrawTextAligned({ 910, 74 }, { 1130, 104 }, 24.0f, WithAlpha(C_TITLE, a), ACTIVE_PROFILE, Align::Right, true, true);
+    DrawTextAligned({ 910, 74 }, { 1130, 104 }, 24.0f, WithAlpha(C_TITLE, a), ActiveProfile(), Align::Right, true, true);
     ResetFont();
 
     // ===== VERDICT EMBLEM ====================================================
@@ -109,17 +105,19 @@ void Draw(double openSec) {
                         WithAlpha(C_TITLE, sg), "SIGNALS", Align::Left, true, true);
         ResetFont();
         const float top = SG_Y0 + 64, pitch = 48;
-        for (int i = 0; i < SIGNAL_COUNT; ++i) {
+        const auto& rows = signals();
+        const int count = (int)rows.size();
+        for (int i = 0; i < count; ++i) {
             float y = top + i * pitch;
-            bool isTotal = (i == SIGNAL_COUNT - 1);
+            bool isTotal = (i == count - 1);
             if (isTotal) DrawRect({ SG_X0 + 22, y - 8 }, { SG_X1 - 22, y - 6 }, WithAlpha(C_RULE, sg));
             SetFont(g_fSeurat);
             DrawText({ SG_X0 + 26, y }, isTotal ? 24.0f : 22.0f,
-                     WithAlpha(isTotal ? C_TITLE : C_TEXT, sg), SIGNALS[i].label);
+                     WithAlpha(isTotal ? C_TITLE : C_TEXT, sg), rows[i].label.c_str());
             ResetFont();
             SetFont(g_fRodin);
             DrawTextAligned({ SG_X1 - 140, y - 2 }, { SG_X1 - 26, y + 28 }, isTotal ? 26.0f : 24.0f,
-                            WithAlpha(isTotal ? C_TITLE : C_VALUE, sg), SIGNALS[i].value, Align::Right, true, false);
+                            WithAlpha(isTotal ? C_TITLE : C_VALUE, sg), rows[i].value.c_str(), Align::Right, true, false);
             ResetFont();
         }
     }
@@ -131,7 +129,7 @@ void Draw(double openSec) {
     DrawText({ RC_X0 + 22, RC_Y0 + 12 }, 14.0f, WithAlpha(C_LABEL, a), "RECOMMENDATION");
     ResetFont();
     SetFont(g_fSeurat);
-    DrawText({ RC_X0 + 22, RC_Y0 + 34 }, 20.0f, WithAlpha(C_TEXT, a), RECOMMENDATION);
+    DrawText({ RC_X0 + 22, RC_Y0 + 34 }, 20.0f, WithAlpha(C_TEXT, a), Recommendation());
     ResetFont();
 
     // ===== FOOTER ============================================================

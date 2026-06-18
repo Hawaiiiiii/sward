@@ -11,6 +11,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "sgfx_data.h"
 
 #include <cstdio>
 #include <cstring>
@@ -41,8 +42,8 @@ const Pair PAIRS[] = {
 };
 constexpr int PAIR_COUNT = int(sizeof(PAIRS) / sizeof(PAIRS[0]));
 
-// the profile the run was captured against (representative until a live feed supplies it)
-const char* const ACTIVE_PROFILE = "G65";
+// the profile the run was captured against — from the live data bridge (or defaults)
+const char* ActiveProfile() { return sgfx::Get().run.activeProfile.c_str(); }
 
 int g_logoTex = -1, g_baseTex = -1, g_candTex = -1;
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
@@ -208,7 +209,7 @@ void Draw(double openSec) {
         DrawTextAligned({ cx - 220, 52 }, { cx, 78 }, 16.0f, WithAlpha(COL_CHIP, titleT),
                         "PROFILE", Align::Right, true, true);
         DrawTextAligned({ cx - 220, 74 }, { cx, 104 }, 24.0f, WithAlpha(COL_TITLE, titleT),
-                        ACTIVE_PROFILE, Align::Right, true, true);
+                        ActiveProfile(), Align::Right, true, true);
         ResetFont();
     }
     DrawRect({ LIST_X, RULE_Y }, { 1130.0f, RULE_Y + 2.0f }, WithAlpha(COL_RULE, titleT));

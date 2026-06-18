@@ -75,6 +75,7 @@ add_executable(sgfx_screens
     src/settings.cpp
     src/audio.cpp
     src/csd_player.cpp
+    src/sgfx_data.cpp
     "${RECOMP_ROOT}/thirdparty/stb/stb_vorbis.c"
     src/screen_registry.cpp
     src/screen_pause.cpp

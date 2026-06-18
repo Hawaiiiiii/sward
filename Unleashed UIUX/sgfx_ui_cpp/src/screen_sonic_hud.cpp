@@ -12,6 +12,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "sgfx_data.h"
 
 #include <cstdio>
 #include <cstring>
@@ -57,8 +58,8 @@ const uint32_t C_RUNNING    = RGBA(120, 200, 255, 255);  // pulsing "running" to
 const uint32_t C_FOOTER     = RGBA(210, 220, 235, 220);
 const uint32_t C_RULE       = RGBA(120, 170, 230, 90);
 
-// the profile + action this run is reporting on (representative until a live feed supplies it)
-const char* const ACTIVE_PROFILE = "G65";
+// the profile + action this run is reporting on (action representative until a live feed supplies it)
+const char* ActiveProfile() { return sgfx::Get().run.activeProfile.c_str(); }   // from the live data bridge
 const char* const ACTION_LABEL   = "PREFLIGHT";
 
 // ---- interactive state ------------------------------------------------------
@@ -118,7 +119,7 @@ void DrawProfileChip(float t) {
     DrawTextAligned({ x0, y0 + 8 }, { x1, y0 + 26 }, 13.0f, WithAlpha(C_LABEL, t), "PROFILE", Align::Center, true, true);
     ResetFont();
     SetFont(g_fDF);
-    DrawTextAligned({ x0, y0 + 26 }, { x1, y1 - 6 }, 30.0f, WithAlpha(C_TITLE, t), ACTIVE_PROFILE, Align::Left, true, true);
+    DrawTextAligned({ x0, y0 + 26 }, { x1, y1 - 6 }, 30.0f, WithAlpha(C_TITLE, t), ActiveProfile(), Align::Left, true, true);
     ResetFont();
 }
 
