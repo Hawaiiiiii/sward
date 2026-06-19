@@ -51,6 +51,7 @@ const char* BootLogosNav();
 void Viewport3DInit();    void Viewport3DDraw(double);    void Viewport3DInput(const ScreenInput&);    void Viewport3DReset();
 void CarViewInit();       void CarViewDraw(double);       void CarViewInput(const ScreenInput&);       void CarViewReset();
 void AmbientInit();       void AmbientDraw(double);       void AmbientInput(const ScreenInput&);       void AmbientReset();
+void FleetInit();         void FleetDraw(double);         void FleetInput(const ScreenInput&);         void FleetReset();
 
 // ---- flow wrappers: forward to the screen's own Input, surface the edge -----
 namespace {
@@ -66,6 +67,7 @@ void ResultFlowInput(const ScreenInput& in)  { if (in.accept) g_wrapNav = "world
 void ResultExFlowInput(const ScreenInput& in){ ResultExInput(in);     if (in.cancel) g_wrapNav = "@back"; }
 void CarViewFlowInput(const ScreenInput& in) { CarViewInput(in);      if (in.cancel) g_wrapNav = "@back"; }
 void AmbientFlowInput(const ScreenInput& in) { AmbientInput(in);      if (in.cancel) g_wrapNav = "@back"; }
+void FleetFlowInput(const ScreenInput& in)   { FleetInput(in);        if (in.cancel) g_wrapNav = "@back"; }
 } // namespace
 
 static const ScreenDef g_screens[] = {
@@ -90,6 +92,7 @@ static const ScreenDef g_screens[] = {
     { "world_map_help", &WorldMapHelpInit,  &WorldMapHelpDraw,  &WmHelpFlowInput,    &WorldMapHelpReset, &WrapNav },
     { "carview",        &CarViewInit,       &CarViewDraw,       &CarViewFlowInput,   &CarViewReset,      &WrapNav },
     { "ambient",        &AmbientInit,       &AmbientDraw,       &AmbientFlowInput,   &AmbientReset,      &WrapNav },
+    { "fleet",          &FleetInit,         &FleetDraw,         &FleetFlowInput,     &FleetReset,        &WrapNav },
 };
 
 const ScreenDef* AllScreens(int& count) {
