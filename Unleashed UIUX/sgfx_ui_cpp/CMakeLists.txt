@@ -81,8 +81,10 @@ add_executable(sgfx_screens
     src/green_chrome.cpp
     src/viewer3d.cpp
     src/al_coverage.cpp
+    src/fleet.cpp
     src/screen_carview.cpp
     src/screen_ambient.cpp
+    src/screen_fleet.cpp
     src/screen_pause.cpp
     src/screen_result.cpp
     src/screen_title.cpp

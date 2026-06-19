@@ -32,6 +32,7 @@ const Action ACTIONS[] = {
     { "Manual review",       "Open the queue of items",      "awaiting a human verdict."      },
     { "Live 3D car",         "Open the live 3D view of",     "this profile's car."            },
     { "Ambient tests",       "Screenshot-test coverage for", "the Ambient Layer scenes."      },
+    { "Fleet readiness",     "Export + QA-camera state",     "across every car in the repo."  },
 };
 constexpr int ACTION_COUNT = int(sizeof(ACTIONS) / sizeof(ACTIONS[0]));
 
@@ -73,7 +74,7 @@ void Input(const ScreenInput& in) {
     }
     if (in.accept) {
         static const char* const TARGET[ACTION_COUNT] = {
-            "loading>sonic_hud", "result_ex", "result", "result_ex", "balloon", "mediaroom", "carview", "ambient",
+            "loading>sonic_hud", "result_ex", "result", "result_ex", "balloon", "mediaroom", "carview", "ambient", "fleet",
         };
         const char* t = TARGET[g_sel];
         if (t[0]) g_nav = t;

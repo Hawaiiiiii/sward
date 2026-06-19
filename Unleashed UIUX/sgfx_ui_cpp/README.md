@@ -66,6 +66,13 @@ read-only, it runs nothing. Point it at your checkout with `al_assets_root` in
 `viewer3d.json`; unset shows a hint. Structure read:
 `<root>/assets/<group>/<brand>/export_<screen>/tests/{expected,actuals,diff}`.
 
+## Fleet readiness
+The "Fleet" screen (action hub → Fleet readiness) lists every car in the 3D-car models
+repo with its export state (`export/exported.ramses` present) and how many QA
+camera-perspective sets it has (`perspectives_*.json`) — at a glance, which cars can be
+rendered / screenshot-tested and how completely their QA cameras are set up. Read-only,
+straight from `bmw_git_root` (the same root the 3D viewer renders from). Up/Down scroll.
+
 ## Ship a runtime drop
     python tools/package.py --build build --out drop --zip
 
