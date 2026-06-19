@@ -80,7 +80,6 @@ add_executable(sgfx_screens
     src/screen_registry.cpp
     src/green_chrome.cpp
     src/viewer3d.cpp
-    src/viewer_embed.cpp
     src/screen_carview.cpp
     src/screen_pause.cpp
     src/screen_result.cpp

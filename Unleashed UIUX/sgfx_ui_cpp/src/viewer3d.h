@@ -34,8 +34,5 @@ std::string SnapshotPath();
 // returns; the shell polls SnapshotPath for the result. Returns a short status line.
 std::string RenderSnapshot(const std::string& profileId, const std::string& view = "", const std::string& entry = "");
 
-// build the exe + args for an EMBEDDED live view of <profile> (the caller spawns and
-// embeds it into a pane). The embed orbits the car. Returns false if not configured.
-bool EmbedCommand(const std::string& profileId, std::string& exeOut, std::string& argsOut);
 
 } // namespace viewer3d

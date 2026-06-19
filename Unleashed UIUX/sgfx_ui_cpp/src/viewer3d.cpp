@@ -162,7 +162,7 @@ std::string Launch(const std::string& profileId, const std::string& view, const 
     std::string scene = ResolveScene(c.repoRoot, profileId);
     if (scene.empty()) return "No 3D export found for " + profileId;
 
-    std::string args = "--scene \"" + scene + "\" " + c.extraArgs;
+    std::string args = "--scene-file \"" + scene + "\" " + c.extraArgs;
     std::string label = profileId;
     if (view == "orbit") { args += " --orbit"; label += " (orbit)"; }
     else if (!view.empty() && view != "authored") {
@@ -190,26 +190,15 @@ std::string RenderSnapshot(const std::string& profileId, const std::string& view
     if (scene.empty()) return "No 3D export found for " + profileId;
 
     std::string out = SnapshotPath();
-    std::string args = "--scene \"" + scene + "\" --readback --screenshot \"" + out
+    std::string args = "--scene-file \"" + scene + "\" --readback --screenshot \"" + out
                      + "\" --frames 80 --width 1280 --height 720";
     if (!view.empty() && view != "authored" && view != "orbit") {
         std::string pa = PerspectiveArgs(CarDir(c, profileId), view, entry);
         if (!pa.empty()) args += pa;
     }
+    // default ("" / "authored"): the export's authored QA camera (the documented framing)
     if (!Spawn(c.viewerExe, args)) return "Could not start the 3D render";
     return "Rendering " + profileId + " ...";
-}
-
-bool EmbedCommand(const std::string& profileId, std::string& exeOut, std::string& argsOut) {
-    Config c = LoadConfig();
-    if (!c.loaded) return false;
-    std::error_code ec;
-    if (!fs::exists(c.viewerExe, ec)) return false;
-    std::string scene = ResolveScene(c.repoRoot, profileId);
-    if (scene.empty()) return false;
-    exeOut = c.viewerExe;
-    argsOut = "--scene \"" + scene + "\" --orbit --frames 360000";
-    return true;
 }
 
 } // namespace viewer3d

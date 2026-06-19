@@ -2,17 +2,20 @@
 // screen_carview.cpp — the in-shell 3D-car viewport, in the green operator look. A
 // green viewport pane shows a rendered frame of the ACTUAL car: the external Ramses
 // viewer renders it to a snapshot PNG (--readback --screenshot) and this screen
-// displays it, with a side panel for the profile + QA view and controls. Left/Right
-// pick the QA perspective; Enter renders it; LB/RB opens the live external window;
-// Esc backs out. Additive — it touches no other screen, and uses our green chrome
-// (not the deprecated cinematic look). The only texture is the car snapshot.
+// displays it (composited as a D3D12 texture), with a side panel for the profile +
+// QA view and controls. Left/Right pick the QA perspective; Enter renders it; LB
+// opens the live external window; Esc backs out. Additive — touches no other screen,
+// uses our green chrome. The only texture is the car snapshot (one reused slot).
+//
+// NOTE: a live car rendered *inside* the pane (not a still) needs Ramses rendered to
+// a texture in-process; a re-parented child window does not compose over the shell's
+// flip-model D3D12 swapchain. That in-process path is the planned next step.
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
 #include "sgfx_data.h"
 #include "green_chrome.h"
 #include "viewer3d.h"
-#include "viewer_embed.h"
 
 #include <cstdio>
 #include <string>
@@ -64,32 +67,21 @@ void Init() {
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
 }
 void Reset() {
-    viewer_embed::Stop();   // never carry a live embed across an entry
     g_profile = sgfx::Get().run.activeProfile;
     g_views.clear(); g_views.push_back("Authored");
     for (const auto& s : viewer3d::ListPerspectiveSets(g_profile)) g_views.push_back(s);
     g_viewIdx = 0;
     g_status.clear(); g_rendering = false; g_spawnStart = -100.0;
     LoadCar();       // g_carTex persists across entries; reused, not re-allocated
-    StartRender();   // refresh on entry (authored)
+    StartRender();   // render the car on entry (authored)
 }
 void Input(const ScreenInput& in) {
     const int n = (int)g_views.size();
     if (n > 0 && in.left)  g_viewIdx = (g_viewIdx + n - 1) % n;   // pick a QA view (no render yet)
     if (n > 0 && in.right) g_viewIdx = (g_viewIdx + 1) % n;
     if (in.accept) StartRender();                                // render the selected view
-    if (in.tabLeft)                                              // open the live car in a separate window
+    if (in.tabLeft || in.tabRight)                               // open the live car in a separate window
         g_status = viewer3d::Launch(g_profile, g_viewIdx > 0 ? CurView() : "authored");
-    if (in.tabRight) {                                           // toggle the live car embedded in the pane
-        if (viewer_embed::Active()) { viewer_embed::Stop(); g_status = "Embedded view stopped"; }
-        else {
-            std::string exe, args;
-            if (viewer3d::EmbedCommand(g_profile, exe, args) && viewer_embed::Start(exe, args))
-                g_status = "Embedding live car ...";
-            else g_status = "Could not embed (see viewer3d.json)";
-        }
-    }
-    if (in.cancel) viewer_embed::Stop();                         // tear down before leaving
 }
 
 void Draw(double openSec) {
@@ -99,7 +91,7 @@ void Draw(double openSec) {
     chrome::Container(VP_X0, VP_Y0, VP_X1, VP_Y1, true,  b.line, b.outer, b.inner, b.bg);
     chrome::Container(IP_X0, IP_Y0, IP_X1, IP_Y1, false, b.line, b.outer, b.inner, b.bg);
 
-    // poll: when the snapshot is rewritten by the viewer, (re)load it
+    // poll: when the snapshot is rewritten by the viewer, (re)load it into the pane
     if (g_rendering) {
         if (Mtime() > g_preMtime) { LoadCar(); g_rendering = false; }
         else if (Now() - g_spawnStart > 18.0) g_rendering = false;
@@ -107,9 +99,7 @@ void Draw(double openSec) {
 
     // viewport: the car frame, fit (16:9) and centred in the pane
     const float px0 = VP_X0 + GRID*2, py0 = VP_Y0 + GRID*2, px1 = VP_X1 - GRID*2, py1 = VP_Y1 - GRID*2;
-    if (viewer_embed::Active()) {
-        viewer_embed::Place((int)px0, (int)py0, (int)px1, (int)py1);   // the live child window fills the pane
-    } else if (g_carTex >= 0) {
+    if (g_carTex >= 0) {
         const float pw = px1 - px0, ph = py1 - py0, ar = 16.0f / 9.0f;
         float fw = pw, fh = pw / ar; if (fh > ph) { fh = ph; fw = ph * ar; }
         const float cx = (px0 + px1) * 0.5f, cy = (py0 + py1) * 0.5f;
@@ -133,21 +123,19 @@ void Draw(double openSec) {
     DrawTextAligned({ ix, IP_Y0 + 114 }, { iw, IP_Y0 + 134 }, 14.0f, WithAlpha(RGBA(150,190,150,255), t), "QA VIEW", Align::Left, true, true);
     DrawTextAligned({ ix, IP_Y0 + 132 }, { iw, IP_Y0 + 164 }, 22.0f, WithAlpha(chrome::C_DESC, t), CurView().c_str(), Align::Left, true, false);
     DrawText({ ix, IP_Y0 + 170 }, 15.0f, WithAlpha(chrome::C_DIM, t), "< >  change view");
-    const bool live = viewer_embed::Active();
     DrawText({ ix, IP_Y0 + 204 }, 18.0f,
-             WithAlpha(live ? RGBA(146,255,49,255) : (g_rendering ? RGBA(255,200,90,255) : (g_carTex >= 0 ? chrome::C_OK : chrome::C_DIM)), t),
-             live ? "LIVE (embedded)" : (g_rendering ? "Rendering ..." : (g_carTex >= 0 ? "Ready" : "No frame yet")));
+             WithAlpha(g_rendering ? RGBA(255,200,90,255) : (g_carTex >= 0 ? chrome::C_OK : chrome::C_DIM), t),
+             g_rendering ? "Rendering ..." : (g_carTex >= 0 ? "Ready" : "No frame yet"));
     if (!g_status.empty() && !g_rendering)
         DrawText({ ix, IP_Y0 + 230 }, 15.0f, WithAlpha(chrome::C_DIM, t), g_status.c_str());
     ResetFont();
 
     // footer
     SetFont(g_fRodin);
-    DrawText({ 130, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "< >  View");
-    DrawText({ 300, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Enter  Render");
-    DrawText({ 520, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "LB  Window");
-    DrawText({ 700, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "RB  Embed");
-    DrawText({ 870, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Esc  Back");
+    DrawText({ 180, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "< >  View");
+    DrawText({ 360, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Enter  Render");
+    DrawText({ 580, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "LB/RB  Live window");
+    DrawText({ 830, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Esc  Back");
     ResetFont();
 }
 
