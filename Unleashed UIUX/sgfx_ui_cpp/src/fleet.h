@@ -33,6 +33,11 @@ struct Roster {
 
 Roster Scan();   // reads viewer3d.json "bmw_git_root"; empty if unset
 
+// per-test detail for one car: each baseline test (export/tests/expected/<name>.png) and
+// whether the latest run differs from it (a diff/<name>_*.png exists). Differing first.
+struct TestResult { std::string name; bool differs = false; };
+std::vector<TestResult> CarTests(const std::string& id);
+
 // one-shot car hand-off: the Fleet screen sets the picked car on Enter, the 3D view
 // consumes it on entry (then it clears, so the next entry uses the active profile).
 void SetSelected(const std::string& id);

@@ -81,8 +81,10 @@ The "QA Tests" screen (action hub → Car tests) is the 3D-car screenshot-test b
 core QA-Hero workflow. For each car it reads `export/tests/{expected,actuals,diff}` and
 reports whether the latest local run matches the committed baseline, differs (needs
 review), or has not run, with the count of differing tests (channel-split diffs are
-collapsed per test). Regressions sort to the top. Read-only — it reports what a run left
-on disk; `expected` is the committed golden, `actuals`/`diff` are gitignored local output.
+collapsed per test). Regressions sort to the top. **Enter on a car opens its per-test
+detail** — every baseline test and whether it differs, the actionable answer to which
+views regressed. Read-only — it reports what a run left on disk; `expected` is the
+committed golden, `actuals`/`diff` are gitignored local output.
 
 ## Delivery changelogs
 The "Changelogs" screen (action hub → Changelogs) reads each car's `CHANGELOG.md` and

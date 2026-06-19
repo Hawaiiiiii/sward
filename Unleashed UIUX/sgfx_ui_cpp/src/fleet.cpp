@@ -116,4 +116,33 @@ static std::string g_selected;
 void SetSelected(const std::string& id) { g_selected = id; }
 std::string TakeSelected() { std::string s = g_selected; g_selected.clear(); return s; }
 
+std::vector<TestResult> CarTests(const std::string& id) {
+    std::vector<TestResult> out;
+    const std::string root = LoadRoot();
+    if (root.empty() || id.empty()) return out;
+    std::error_code ec;
+    const fs::path cars = fs::path(root) / "cars";
+    fs::path tdir;
+    for (const auto& brand : fs::directory_iterator(cars, ec)) {       // find the car under any brand
+        if (!brand.is_directory()) continue;
+        fs::path p = brand.path() / id / "export" / "tests";
+        if (fs::is_directory(p, ec)) { tdir = p; break; }
+    }
+    if (tdir.empty()) return out;
+    const fs::path diff = tdir / "diff";
+    for (const auto& f : fs::directory_iterator(tdir / "expected", ec)) {
+        if (f.path().extension() != ".png") continue;
+        const std::string name = f.path().stem().string();
+        const bool d = fs::exists(diff / (name + "_color.png"), ec)
+                    || fs::exists(diff / (name + "_alpha.png"), ec)
+                    || fs::exists(diff / (name + ".png"), ec);
+        out.push_back({ name, d });
+    }
+    std::sort(out.begin(), out.end(), [](const TestResult& a, const TestResult& b) {
+        if (a.differs != b.differs) return a.differs > b.differs;       // differing tests first
+        return a.name < b.name;
+    });
+    return out;
+}
+
 } // namespace fleet
