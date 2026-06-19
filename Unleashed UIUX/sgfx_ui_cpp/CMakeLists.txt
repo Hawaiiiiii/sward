@@ -89,6 +89,7 @@ add_executable(sgfx_screens
     src/screen_qatests.cpp
     src/screen_changelogs.cpp
     src/screen_testdetail.cpp
+    src/screen_delivery.cpp
     src/screen_pause.cpp
     src/screen_result.cpp
     src/screen_title.cpp

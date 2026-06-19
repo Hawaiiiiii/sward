@@ -13,6 +13,8 @@ struct Car {
     std::string id;          // G65_EVO, F70, ...
     bool exported = false;   // export/exported.ramses present
     int  perspSets = 0;      // perspectives_*.json count (QA camera configs)
+    long long ramsesBytes = 0;   // export/exported.ramses size (the delivery's "Ramses Size")
+    long long logicBytes  = 0;   // export/exported.rlogic size ("Logic Size")
     // screenshot tests (export/tests/{expected,actuals,diff})
     int  testExpected = 0;   // baseline screenshots
     int  testDiff     = 0;   // regression diffs (>0 = a visual change)

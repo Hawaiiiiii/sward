@@ -89,6 +89,11 @@ Roster Scan() {
             if (persp == 0 && !exp) continue;                // licenses/meta/noise
 
             Car c; c.brand = bn; c.id = cn; c.exported = exp; c.perspSets = persp;
+            if (exp) {
+                c.ramsesBytes = (long long)fs::file_size(car.path() / "export" / "exported.ramses", ec);
+                const fs::path rl = car.path() / "export" / "exported.rlogic";
+                if (fs::exists(rl, ec)) c.logicBytes = (long long)fs::file_size(rl, ec);
+            }
             const fs::path tdir = car.path() / "export" / "tests";
             c.testExpected = CountPng(tdir / "expected");
             c.testDiff     = CountUniqueDiffs(tdir / "diff");
