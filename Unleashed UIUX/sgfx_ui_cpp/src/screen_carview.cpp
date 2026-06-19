@@ -2,10 +2,10 @@
 // screen_carview.cpp — the in-shell 3D-car viewport, in the green operator look. A
 // green viewport pane shows a rendered frame of the ACTUAL car: the external Ramses
 // viewer renders it to a snapshot PNG (--readback --screenshot) and this screen
-// displays it, with a side panel for the profile and controls. Enter re-renders;
-// LB/RB opens the live external window; Esc backs out. Additive — it touches no
-// other screen, and uses our green chrome (not the deprecated cinematic look). The
-// only texture is the car snapshot; no game art.
+// displays it, with a side panel for the profile + QA view and controls. Left/Right
+// pick the QA perspective; Enter renders it; LB/RB opens the live external window;
+// Esc backs out. Additive — it touches no other screen, and uses our green chrome
+// (not the deprecated cinematic look). The only texture is the car snapshot.
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
@@ -15,6 +15,7 @@
 
 #include <cstdio>
 #include <string>
+#include <vector>
 #include <filesystem>
 #include <system_error>
 
@@ -29,11 +30,15 @@ bool g_rendering = false;
 double g_spawnStart = -100.0;
 fs::file_time_type g_preMtime = fs::file_time_type::min();
 std::string g_status, g_profile;
+std::vector<std::string> g_views;   // "Authored" + the car's QA perspective sets
+int g_viewIdx = 0;
 
 constexpr float GRID  = chrome::GRID;
 constexpr float VP_X0 = 33,  VP_Y0 = 130, VP_X1 = 900,  VP_Y1 = 600;   // viewport pane
 constexpr float IP_X0 = 918, IP_Y0 = 130, IP_X1 = 1246, IP_Y1 = 600;   // info panel
 const char* SNAP = "carview.png";
+
+const std::string& CurView() { static const std::string a = "Authored"; return g_views.empty() ? a : g_views[g_viewIdx]; }
 
 fs::file_time_type Mtime() {
     std::error_code ec;
@@ -45,7 +50,8 @@ void LoadIfPresent() {
 }
 void StartRender() {
     g_preMtime = Mtime();
-    g_status = viewer3d::RenderSnapshot(g_profile);
+    const std::string view = (g_viewIdx > 0) ? CurView() : "";   // idx 0 = authored
+    g_status = viewer3d::RenderSnapshot(g_profile, view);
     g_rendering = (g_status.rfind("Rendering", 0) == 0);
     g_spawnStart = Now();
 }
@@ -57,13 +63,20 @@ void Init() {
 }
 void Reset() {
     g_profile = sgfx::Get().run.activeProfile;
+    g_views.clear(); g_views.push_back("Authored");
+    for (const auto& s : viewer3d::ListPerspectiveSets(g_profile)) g_views.push_back(s);
+    g_viewIdx = 0;
     g_carTex = -1; g_status.clear(); g_rendering = false; g_spawnStart = -100.0;
     LoadIfPresent();
-    StartRender();   // refresh the car on entry
+    StartRender();   // refresh on entry (authored)
 }
 void Input(const ScreenInput& in) {
-    if (in.accept) StartRender();                                  // re-render the in-pane car
-    if (in.tabLeft || in.tabRight) g_status = viewer3d::Launch(g_profile);  // live external window
+    const int n = (int)g_views.size();
+    if (n > 0 && in.left)  g_viewIdx = (g_viewIdx + n - 1) % n;   // pick a QA view (no render yet)
+    if (n > 0 && in.right) g_viewIdx = (g_viewIdx + 1) % n;
+    if (in.accept) StartRender();                                // render the selected view
+    if (in.tabLeft || in.tabRight)                               // open the live external window
+        g_status = viewer3d::Launch(g_profile, g_viewIdx > 0 ? CurView() : "authored");
 }
 
 void Draw(double openSec) {
@@ -76,7 +89,7 @@ void Draw(double openSec) {
     // poll: when the snapshot is rewritten by the viewer, (re)load it
     if (g_rendering) {
         if (Mtime() > g_preMtime) { g_carTex = gfx::loadTexture(SNAP); g_rendering = false; }
-        else if (Now() - g_spawnStart > 18.0) g_rendering = false;   // give up waiting
+        else if (Now() - g_spawnStart > 18.0) g_rendering = false;
     }
 
     // viewport: the car frame, fit (16:9) and centred in the pane
@@ -102,18 +115,21 @@ void Draw(double openSec) {
     DrawTextAligned({ ix, IP_Y0 + 46 }, { iw, IP_Y0 + 82 }, 30.0f, WithAlpha(chrome::C_TITLE, t), g_profile.c_str(), Align::Left, true, true);
     DrawRect({ ix, IP_Y0 + 96 }, { iw, IP_Y0 + 97 }, WithAlpha(RGBA(0,89,0,180), t));
     SetFont(g_fSeurat);
-    DrawText({ ix, IP_Y0 + 118 }, 20.0f, WithAlpha(chrome::C_DESC, t), "Authored camera view.");
-    DrawText({ ix, IP_Y0 + 152 }, 18.0f,
+    DrawTextAligned({ ix, IP_Y0 + 114 }, { iw, IP_Y0 + 134 }, 14.0f, WithAlpha(RGBA(150,190,150,255), t), "QA VIEW", Align::Left, true, true);
+    DrawTextAligned({ ix, IP_Y0 + 132 }, { iw, IP_Y0 + 164 }, 22.0f, WithAlpha(chrome::C_DESC, t), CurView().c_str(), Align::Left, true, false);
+    DrawText({ ix, IP_Y0 + 170 }, 15.0f, WithAlpha(chrome::C_DIM, t), "< >  change view");
+    DrawText({ ix, IP_Y0 + 204 }, 18.0f,
              WithAlpha(g_rendering ? RGBA(255,200,90,255) : (g_carTex >= 0 ? chrome::C_OK : chrome::C_DIM), t),
              g_rendering ? "Rendering ..." : (g_carTex >= 0 ? "Ready" : "No frame yet"));
     if (!g_status.empty() && !g_rendering)
-        DrawText({ ix, IP_Y0 + 182 }, 16.0f, WithAlpha(chrome::C_DIM, t), g_status.c_str());
+        DrawText({ ix, IP_Y0 + 230 }, 15.0f, WithAlpha(chrome::C_DIM, t), g_status.c_str());
     ResetFont();
 
     // footer
     SetFont(g_fRodin);
-    DrawText({ 250, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Enter  Render");
-    DrawText({ 470, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "LB/RB  Live window");
+    DrawText({ 150, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "< >  View");
+    DrawText({ 320, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Enter  Render");
+    DrawText({ 540, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "LB/RB  Live");
     DrawText({ 720, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Esc  Back");
     ResetFont();
 }
