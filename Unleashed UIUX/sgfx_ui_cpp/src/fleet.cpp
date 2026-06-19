@@ -112,4 +112,8 @@ Roster Scan() {
     return r;
 }
 
+static std::string g_selected;
+void SetSelected(const std::string& id) { g_selected = id; }
+std::string TakeSelected() { std::string s = g_selected; g_selected.clear(); return s; }
+
 } // namespace fleet

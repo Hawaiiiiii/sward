@@ -44,14 +44,19 @@ Config LoadConfig() {
     return c;
 }
 
-// <repo>/cars/BMW/<id>/export/exported.ramses, trying the id and common suffixes.
+// <repo>/cars/<brand>/<id>/export/exported.ramses, searching every brand and trying the
+// id with common suffixes (so it resolves any car, not just BMW).
 std::string ResolveScene(const std::string& root, const std::string& id) {
     if (root.empty() || id.empty()) return "";
     const std::string bases[] = { id, id + "_EVO", id + "_evo" };
     std::error_code ec;
-    for (const auto& b : bases) {
-        fs::path p = fs::path(root) / "cars" / "BMW" / b / "export" / "exported.ramses";
-        if (fs::exists(p, ec)) return p.string();
+    const fs::path cars = fs::path(root) / "cars";
+    for (const auto& brand : fs::directory_iterator(cars, ec)) {
+        if (!brand.is_directory()) continue;
+        for (const auto& b : bases) {
+            fs::path p = brand.path() / b / "export" / "exported.ramses";
+            if (fs::exists(p, ec)) return p.string();
+        }
     }
     return "";
 }

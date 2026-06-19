@@ -69,7 +69,7 @@ void ResultFlowInput(const ScreenInput& in)  { if (in.accept) g_wrapNav = "world
 void ResultExFlowInput(const ScreenInput& in){ ResultExInput(in);     if (in.cancel) g_wrapNav = "@back"; }
 void CarViewFlowInput(const ScreenInput& in) { CarViewInput(in);      if (in.cancel) g_wrapNav = "@back"; }
 void AmbientFlowInput(const ScreenInput& in) { AmbientInput(in);      if (in.cancel) g_wrapNav = "@back"; }
-void FleetFlowInput(const ScreenInput& in)   { FleetInput(in);        if (in.cancel) g_wrapNav = "@back"; }
+void FleetFlowInput(const ScreenInput& in)   { FleetInput(in);        if (in.accept) g_wrapNav = "carview"; else if (in.cancel) g_wrapNav = "@back"; }
 void QaTestsFlowInput(const ScreenInput& in) { QaTestsInput(in);      if (in.cancel) g_wrapNav = "@back"; }
 void ChangelogsFlowInput(const ScreenInput& in) { ChangelogsInput(in); if (in.cancel) g_wrapNav = "@back"; }
 } // namespace

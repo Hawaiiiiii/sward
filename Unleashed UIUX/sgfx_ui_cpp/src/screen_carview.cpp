@@ -16,6 +16,7 @@
 #include "sgfx_data.h"
 #include "green_chrome.h"
 #include "viewer3d.h"
+#include "fleet.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -33,6 +34,7 @@ int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 int g_carTex = -1;
 float g_carAspect = 16.0f / 9.0f;
 bool g_rendering = false;
+bool g_renderFailed = false;   // the current profile has no render -> don't show a stale image
 double g_spawnStart = -100.0;
 fs::file_time_type g_preMtime = fs::file_time_type::min();
 std::string g_status, g_profile;
@@ -70,6 +72,7 @@ void StartRender() {
     const std::string view = (g_viewIdx > 0) ? CurView() : "";   // idx 0 = authored
     g_status = viewer3d::RenderSnapshot(g_profile, view);
     g_rendering = (g_status.rfind("Rendering", 0) == 0);
+    g_renderFailed = !g_rendering;   // an error status -> nothing will render for this car
     g_spawnStart = Now();
 }
 
@@ -80,7 +83,8 @@ void Init() {
 }
 void Reset() {
     viewer3d::LiveStop();   // never carry a live render across an entry
-    g_profile = sgfx::Get().run.activeProfile;
+    const std::string picked = fleet::TakeSelected();   // a car chosen in the Fleet board, else the active profile
+    g_profile = picked.empty() ? sgfx::Get().run.activeProfile : picked;
     g_views.clear(); g_views.push_back("Authored");
     for (const auto& s : viewer3d::ListPerspectiveSets(g_profile)) g_views.push_back(s);
     g_viewIdx = 0;
@@ -88,7 +92,7 @@ void Reset() {
     LoadCar();       // g_carTex persists across entries; reused, not re-allocated
     if (std::getenv("SGFX_LIVE")) {   // demo / CI: go straight to the live orbit (no still first)
         g_preMtime = Mtime();
-        g_status = viewer3d::LiveStart(g_profile) ? "Live - orbiting" : "Live start failed";
+        const bool ok = viewer3d::LiveStart(g_profile); g_renderFailed = !ok; g_status = ok ? "Live - orbiting" : "Live start failed";
     } else {
         StartRender();   // render the still car on entry (authored)
     }
@@ -103,7 +107,7 @@ void Input(const ScreenInput& in) {
         g_status = viewer3d::Launch(g_profile, g_viewIdx > 0 ? CurView() : "authored");
     if (in.tabRight) {                                           // RB: live orbiting car IN the pane
         if (viewer3d::LiveActive()) { viewer3d::LiveStop(); StartRender(); }   // back to the still
-        else { g_preMtime = Mtime(); g_status = viewer3d::LiveStart(g_profile) ? "Live - orbiting" : "Could not start live (see viewer3d.json)"; }
+        else { g_preMtime = Mtime(); const bool ok = viewer3d::LiveStart(g_profile); g_renderFailed = !ok; g_status = ok ? "Live - orbiting" : "Could not start live (see viewer3d.json)"; }
     }
     if (in.cancel) viewer3d::LiveStop();                         // tear down before leaving
 }
@@ -117,15 +121,15 @@ void Draw(double openSec) {
 
     // poll: reload the pane texture when the viewer writes a new frame
     if (viewer3d::LiveActive()) {
-        if (Mtime() > g_preMtime) { LoadCar(); g_preMtime = Mtime(); }   // live: each new orbit frame
+        if (Mtime() > g_preMtime) { LoadCar(); g_preMtime = Mtime(); g_renderFailed = false; }   // live: each new orbit frame
     } else if (g_rendering) {
-        if (Mtime() > g_preMtime) { LoadCar(); g_rendering = false; }    // still: the one snapshot
+        if (Mtime() > g_preMtime) { LoadCar(); g_rendering = false; g_renderFailed = false; }    // still: the one snapshot
         else if (Now() - g_spawnStart > 18.0) g_rendering = false;
     }
 
     // viewport: the car frame, fit (16:9) and centred in the pane
     const float px0 = VP_X0 + GRID*2, py0 = VP_Y0 + GRID*2, px1 = VP_X1 - GRID*2, py1 = VP_Y1 - GRID*2;
-    if (g_carTex >= 0) {
+    if (g_carTex >= 0 && !g_renderFailed) {
         const float pw = px1 - px0, ph = py1 - py0, ar = g_carAspect;
         float fw = pw, fh = pw / ar; if (fh > ph) { fh = ph; fw = ph * ar; }
         const float cx = (px0 + px1) * 0.5f, cy = (py0 + py1) * 0.5f;
@@ -134,7 +138,8 @@ void Draw(double openSec) {
     } else {
         SetFont(g_fSeurat);
         DrawTextAligned({ px0, py0 }, { px1, py1 }, 26.0f, WithAlpha(chrome::C_DIM, t),
-                        g_rendering ? "Rendering the car ..." : "Press Enter to render the car",
+                        g_renderFailed ? g_status.c_str()
+                        : g_rendering ? "Rendering the car ..." : "Press Enter to render the car",
                         Align::Center, true, true);
         ResetFont();
     }
@@ -150,9 +155,10 @@ void Draw(double openSec) {
     DrawTextAligned({ ix, IP_Y0 + 132 }, { iw, IP_Y0 + 164 }, 22.0f, WithAlpha(chrome::C_DESC, t), CurView().c_str(), Align::Left, true, false);
     DrawText({ ix, IP_Y0 + 170 }, 15.0f, WithAlpha(chrome::C_DIM, t), "< >  change view");
     const bool live = viewer3d::LiveActive();
+    const bool ready = (g_carTex >= 0 && !g_renderFailed);
     DrawText({ ix, IP_Y0 + 204 }, 18.0f,
-             WithAlpha(live ? RGBA(146,255,49,255) : (g_rendering ? RGBA(255,200,90,255) : (g_carTex >= 0 ? chrome::C_OK : chrome::C_DIM)), t),
-             live ? "LIVE - orbiting" : (g_rendering ? "Rendering ..." : (g_carTex >= 0 ? "Ready" : "No frame yet")));
+             WithAlpha(live ? RGBA(146,255,49,255) : (g_rendering ? RGBA(255,200,90,255) : (g_renderFailed ? RGBA(255,150,90,255) : (ready ? chrome::C_OK : chrome::C_DIM))), t),
+             live ? "LIVE - orbiting" : (g_rendering ? "Rendering ..." : (g_renderFailed ? "Unavailable" : (ready ? "Ready" : "No frame yet"))));
     if (!g_status.empty() && !g_rendering)
         DrawText({ ix, IP_Y0 + 230 }, 15.0f, WithAlpha(chrome::C_DIM, t), g_status.c_str());
     ResetFont();
