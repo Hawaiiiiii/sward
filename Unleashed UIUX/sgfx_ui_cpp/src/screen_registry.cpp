@@ -54,7 +54,6 @@ void Viewport3DInit();    void Viewport3DDraw(double);    void Viewport3DInput(c
 namespace {
 const char* g_wrapNav = nullptr;
 const char* WrapNav() { const char* n = g_wrapNav; g_wrapNav = nullptr; return n; }
-void ShopFlowInput(const ScreenInput& in)    { ShopInput(in);         if (in.cancel) g_wrapNav = "@back"; }
 void StatusFlowInput(const ScreenInput& in)  { StatusInput(in);       if (in.cancel) g_wrapNav = "@back"; else if (in.accept) g_wrapNav = "result"; }   // B backs out; A -> the verdict
 void OptionsFlowInput(const ScreenInput& in) { OptionsInput(in);      if (in.cancel) g_wrapNav = "@back"; }
 void MediaFlowInput(const ScreenInput& in)   { MediaRoomInput(in);    if (in.cancel) g_wrapNav = "@back"; }
@@ -63,7 +62,6 @@ void BalloonFlowInput(const ScreenInput& in) { BalloonInput(in);      if (in.can
 void HudFlowInput(const ScreenInput& in)     { SonicHudInput(in);     if (in.cancel) g_wrapNav = "pause"; }   // Start pauses in-game
 void ResultFlowInput(const ScreenInput& in)  { if (in.accept) g_wrapNav = "world_map"; else if (in.cancel) g_wrapNav = "@back"; }   // A -> hub, B backs out
 void ResultExFlowInput(const ScreenInput& in){ ResultExInput(in);     if (in.cancel) g_wrapNav = "@back"; }
-void ItemResFlowInput(const ScreenInput& in) { ItemResultInput(in);   if (in.accept) g_wrapNav = "loading>world_map"; }
 } // namespace
 
 static const ScreenDef g_screens[] = {

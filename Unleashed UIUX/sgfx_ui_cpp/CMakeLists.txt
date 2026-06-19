@@ -83,28 +83,20 @@ add_executable(sgfx_screens
     src/screen_title.cpp
     src/screen_world_map.cpp
     src/screen_status.cpp
-    src/screen_shop.cpp
     src/screen_sonic_hud.cpp
     src/screen_options.cpp
     src/screen_town.cpp
     src/screen_gate.cpp
-    src/screen_boss.cpp
-    src/screen_item_result.cpp
     src/screen_result_ex.cpp
     src/screen_mediaroom.cpp
     src/screen_loading.cpp
     src/screen_start.cpp
-    src/screen_mission.cpp
-    src/screen_mission_screen.cpp
-    src/screen_qte.cpp
     src/screen_balloon.cpp
-    src/screen_exstage.cpp
     src/screen_world_map_help.cpp
     src/screen_installer.cpp
     src/screen_boot_loading.cpp
     src/screen_boot_title.cpp
     src/screen_boot_logos.cpp
-    src/screen_viewport3d.cpp
     src/gfx_d3d12.cpp
     "${RECOMP_ROOT}/thirdparty/plume/plume_d3d12.cpp"
     "${RECOMP_ROOT}/thirdparty/plume/contrib/D3D12MemoryAllocator/src/D3D12MemAlloc.cpp")
