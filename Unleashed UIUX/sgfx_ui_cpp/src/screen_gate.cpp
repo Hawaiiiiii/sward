@@ -81,6 +81,7 @@ const char* g_nav = nullptr;
 std::string g_previewMsg; double g_previewStart = -100.0;
 bool g_perspPopup = false; int g_perspSel = 0, g_perspFirst = 0;
 std::vector<std::string> g_perspList;
+int g_perspLevel = 0; std::string g_perspSet;   // 0 = sets, 1 = the chosen set's named views
 
 void Init() {
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
@@ -88,7 +89,7 @@ void Init() {
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
     if (g_logoTex < 0)  g_logoTex = gfx::loadTexture("assets/gameart/boot_logo.png");
 }
-void Reset() { g_sel = 0; g_popup = false; g_popupSel = 0; g_perspPopup = false; g_perspSel = 0; g_perspFirst = 0; g_nav = nullptr; }
+void Reset() { g_sel = 0; g_popup = false; g_popupSel = 0; g_perspPopup = false; g_perspSel = 0; g_perspFirst = 0; g_perspLevel = 0; g_nav = nullptr; }
 void Switch(int d) { g_sel = (g_sel + PROFILE_COUNT + d) % PROFILE_COUNT; }
 void Input(const ScreenInput& in) {
     if (g_perspPopup) {
@@ -98,13 +99,32 @@ void Input(const ScreenInput& in) {
         if (g_perspSel < g_perspFirst)     g_perspFirst = g_perspSel;
         if (g_perspSel > g_perspFirst + 6) g_perspFirst = g_perspSel - 6;
         if (in.accept && n > 0) {
-            std::string view = g_perspSel == 0 ? "authored"
-                             : g_perspSel == 1 ? "orbit" : g_perspList[g_perspSel];
-            g_previewMsg = viewer3d::Launch(PROFILES[g_sel].id, view);
-            g_previewStart = Now();
-            g_perspPopup = false;
+            if (g_perspLevel == 0) {
+                if (g_perspSel <= 1) {                                  // Authored / Free orbit -> launch
+                    g_previewMsg = viewer3d::Launch(PROFILES[g_sel].id, g_perspSel == 0 ? "authored" : "orbit");
+                    g_previewStart = Now(); g_perspPopup = false;
+                } else {                                                // a set -> drill into its named views
+                    g_perspSet = g_perspList[g_perspSel];
+                    g_perspList = viewer3d::ListPerspectiveEntries(PROFILES[g_sel].id, g_perspSet);
+                    if (g_perspList.empty()) {                          // no entries -> launch the set's default
+                        g_previewMsg = viewer3d::Launch(PROFILES[g_sel].id, g_perspSet);
+                        g_previewStart = Now(); g_perspPopup = false;
+                    } else { g_perspLevel = 1; g_perspSel = 0; g_perspFirst = 0; }
+                }
+            } else {                                                    // a named view -> launch it
+                g_previewMsg = viewer3d::Launch(PROFILES[g_sel].id, g_perspSet, g_perspList[g_perspSel]);
+                g_previewStart = Now(); g_perspPopup = false;
+            }
         }
-        if (in.cancel) g_perspPopup = false;
+        if (in.cancel) {
+            if (g_perspLevel == 1) {                                    // back to the set list
+                g_perspLevel = 0; g_perspSel = 0; g_perspFirst = 0;
+                g_perspList.clear();
+                g_perspList.push_back("Authored");
+                g_perspList.push_back("Free orbit");
+                for (const auto& s : viewer3d::ListPerspectiveSets(PROFILES[g_sel].id)) g_perspList.push_back(s);
+            } else g_perspPopup = false;
+        }
         return;
     }
     if (g_popup) {
@@ -117,7 +137,7 @@ void Input(const ScreenInput& in) {
                 g_perspList.push_back("Authored");
                 g_perspList.push_back("Free orbit");
                 for (const auto& s : viewer3d::ListPerspectiveSets(PROFILES[g_sel].id)) g_perspList.push_back(s);
-                g_perspPopup = true; g_perspSel = 0; g_perspFirst = 0;
+                g_perspPopup = true; g_perspSel = 0; g_perspFirst = 0; g_perspLevel = 0;
             }
             g_popup = false; g_popupSel = 0;
         }
@@ -179,30 +199,35 @@ void DrawConfirm() {
     ResetFont();
 }
 
-// the 3D-preview QA-view picker: Authored / Free orbit / the car's perspective sets.
+// the 3D-preview QA-view picker: level 0 = Authored / Free orbit / the car's
+// perspective sets; level 1 = the chosen set's named views.
 void DrawPerspPopup() {
     if (!g_perspPopup) return;
     DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 140));
-    const float x0 = 470, y0 = 188, x1 = 810, y1 = 540, cx = (x0 + x1) * 0.5f;
+    const float x0 = 420, y0 = 180, x1 = 860, y1 = 548, cx = (x0 + x1) * 0.5f;
     DrawRect({ x0, y0 }, { x1, y1 }, C_POP_FILL);
     DrawRect({ x0, y0 }, { x1, y0 + 2 }, RGBA(64, 150, 235, 200));
-    char head[48]; std::snprintf(head, sizeof head, "Preview %s in 3D", PROFILES[g_sel].id);
+    char head[80];
+    if (g_perspLevel == 0) std::snprintf(head, sizeof head, "Preview %s in 3D", PROFILES[g_sel].id);
+    else                   std::snprintf(head, sizeof head, "%s  -  %s", PROFILES[g_sel].id, g_perspSet.c_str());
     SetFont(g_fRodin);
-    DrawTextAligned({ x0, y0 + 14 }, { x1, y0 + 44 }, 24.0f, C_WHITE, head, Align::Center, true, true);
+    DrawTextAligned({ x0, y0 + 14 }, { x1, y0 + 44 }, 23.0f, C_WHITE, head, Align::Center, true, true);
     DrawRect({ x0 + 16, y0 + 50 }, { x1 - 16, y0 + 52 }, RGBA(90, 130, 180, 120));
     const int VIS = 7; const float rowsTop = y0 + 64, rowH = 40;
+    const float fsz = (g_perspLevel == 1) ? 18.0f : 22.0f;
     const int n = (int)g_perspList.size();
     for (int row = 0; row < VIS && g_perspFirst + row < n; ++row) {
         int idx = g_perspFirst + row;
-        float ry = rowsTop + row * rowH;
+        float ry = rowsTop + row * rowH + (g_perspLevel == 1 ? 3.0f : 0.0f);
         bool sel = (idx == g_perspSel);
         if (sel) DrawVGradient({ x0 + 14, ry - 4 }, { x1 - 14, ry + rowH - 10 }, C_POP_HI_T, C_POP_HI_B);
         const char* txt = g_perspList[idx].c_str();
-        float w = MeasureText(22.0f, txt).x;
-        DrawText({ cx - w * 0.5f, ry }, 22.0f, sel ? C_WHITE : RGBA(200, 214, 230, 255), txt);
+        float w = MeasureText(fsz, txt).x;
+        DrawText({ cx - w * 0.5f, ry }, fsz, sel ? C_WHITE : RGBA(200, 214, 230, 255), txt);
     }
-    if (n > VIS)
-        DrawTextAligned({ x0, y1 - 28 }, { x1, y1 - 8 }, 15.0f, RGBA(150, 170, 196, 255), "Up/Down  scroll", Align::Center, true, true);
+    DrawTextAligned({ x0, y1 - 26 }, { x1, y1 - 8 }, 15.0f, RGBA(150, 170, 196, 255),
+                    g_perspLevel == 1 ? "Up/Down  scroll       Esc  back to sets" : "Up/Down  scroll",
+                    Align::Center, true, true);
     ResetFont();
 }
 

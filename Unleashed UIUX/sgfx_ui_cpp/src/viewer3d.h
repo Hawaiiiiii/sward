@@ -15,11 +15,15 @@ bool Available();
 // read from the car's perspectives_*.json. Empty if none / not configured.
 std::vector<std::string> ListPerspectiveSets(const std::string& profileId);
 
+// the named views inside one set (e.g. "CID_CARHUB_ALL_GOOD", "CID_CARHUB_LEFT_DOOR").
+std::vector<std::string> ListPerspectiveEntries(const std::string& profileId, const std::string& set);
+
 // Resolve <profile>'s exported.ramses under the configured repo and spawn the viewer.
 //   view = "" / "authored" -> the export's authored camera
 //   view = "orbit"         -> free orbit
-//   view = <set name>      -> that QA perspective's camera (extracted from its json)
+//   view = <set name>      -> that QA perspective's camera; entry picks the named view
+//                            within the set ("" = the set's representative entry).
 // Returns a short status line for the UI — success or the reason it could not launch.
-std::string Launch(const std::string& profileId, const std::string& view = "");
+std::string Launch(const std::string& profileId, const std::string& view = "", const std::string& entry = "");
 
 } // namespace viewer3d

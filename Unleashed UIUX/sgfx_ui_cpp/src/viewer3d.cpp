@@ -67,14 +67,17 @@ float Num(const json& o, const char* k, float def) {
     return (o.contains(k) && o[k].is_number()) ? o[k].get<float>() : def;
 }
 
-// build the --qa-perspective-* args from a set's representative ("all good") entry.
-std::string PerspectiveArgs(const fs::path& carDir, const std::string& set) {
+// build the --qa-perspective-* args from a set entry (entryOverride, else the
+// representative "all good" entry, else the first).
+std::string PerspectiveArgs(const fs::path& carDir, const std::string& set, const std::string& entryOverride) {
     std::ifstream f(carDir / ("perspectives_" + set + ".json"));
     if (!f) return "";
     json j; try { f >> j; } catch (const std::exception&) { return ""; }
     if (!j.is_object() || j.empty()) return "";
 
-    std::string id = j.contains("CID_CARHUB_ALL_GOOD") ? "CID_CARHUB_ALL_GOOD" : j.begin().key();
+    std::string id = (!entryOverride.empty() && j.contains(entryOverride)) ? entryOverride
+                   : j.contains("CID_CARHUB_ALL_GOOD") ? "CID_CARHUB_ALL_GOOD"
+                   : j.begin().key();
     const json& e = j[id];
     std::ostringstream a;
     a << " --qa-perspective-name " << id;
@@ -136,7 +139,21 @@ std::vector<std::string> ListPerspectiveSets(const std::string& profileId) {
     return sets;
 }
 
-std::string Launch(const std::string& profileId, const std::string& view) {
+std::vector<std::string> ListPerspectiveEntries(const std::string& profileId, const std::string& set) {
+    std::vector<std::string> entries;
+    Config c = LoadConfig();
+    if (!c.loaded) return entries;
+    fs::path carDir = CarDir(c, profileId);
+    if (carDir.empty()) return entries;
+    std::ifstream f(carDir / ("perspectives_" + set + ".json"));
+    if (!f) return entries;
+    json j; try { f >> j; } catch (const std::exception&) { return entries; }
+    if (!j.is_object()) return entries;
+    for (auto it = j.begin(); it != j.end(); ++it) entries.push_back(it.key());
+    return entries;
+}
+
+std::string Launch(const std::string& profileId, const std::string& view, const std::string& entry) {
     Config c = LoadConfig();
     if (!c.loaded) return "3D viewer not configured (see viewer3d.json)";
     std::error_code ec;
@@ -149,9 +166,10 @@ std::string Launch(const std::string& profileId, const std::string& view) {
     std::string label = profileId;
     if (view == "orbit") { args += " --orbit"; label += " (orbit)"; }
     else if (!view.empty() && view != "authored") {
-        std::string pa = PerspectiveArgs(CarDir(c, profileId), view);
+        std::string pa = PerspectiveArgs(CarDir(c, profileId), view, entry);
         if (pa.empty()) return "Could not read perspective " + view;
-        args += pa; label += " (" + view + ")";
+        args += pa;
+        label += " (" + view + (entry.empty() ? "" : " / " + entry) + ")";
     }
 
     if (!Spawn(c.viewerExe, args)) return "Could not start the 3D viewer";
