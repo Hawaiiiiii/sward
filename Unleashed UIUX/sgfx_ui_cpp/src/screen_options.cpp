@@ -2,15 +2,15 @@
 // screen_options.cpp — the settings screen in the cinematic green look: a tabbed
 // container (RUN / REVIEW / LINKS / DISPLAY), a scrolling option list with value
 // plates, toggle lights and sliders, and a right info panel with a description.
-// The green container / plates / scanline shading / gradients / staged entrance are
-// the original menu's look, drawn entirely from primitives + the kept fonts — no
-// game sprite art (the toggle light, the info slot and the footer are primitives /
-// text, so nothing game-derived ships). The options are the tool's own, profile-
-// agnostic settings; values persist to sgfx_settings.ini.
+// The green chrome (container, plates, backdrop, palette) is shared via
+// green_chrome.h so the settings-family screens read as one console. Drawn from
+// primitives + the bundled fonts only (no game sprite art). The options are the
+// tool's own, profile-agnostic settings; values persist to sgfx_settings.ini.
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
 #include "settings.h"
+#include "green_chrome.h"
 
 #include <cstdio>
 #include <cstring>
@@ -65,7 +65,7 @@ Category CATEGORIES[] = {
 constexpr int CATEGORY_COUNT = 4;
 
 // ---- geometry (1280x720) ----------------------------------------------------
-constexpr float GRID = 9.0f;
+constexpr float GRID = chrome::GRID;
 constexpr float SP_X0 = 33, SP_Y0 = 117, SP_X1 = 843, SP_Y1 = 604;
 constexpr float IP_X0 = 868, IP_Y0 = 117, IP_X1 = 1246, IP_Y1 = 604;
 constexpr float CLIP_X = SP_X0 + GRID * 2;
@@ -79,30 +79,10 @@ constexpr float LABEL_X = SP_X0 + GRID * 2 + GRID;
 constexpr float VAL_W = 192, VAL_H = GRID * 3;
 constexpr float VAL_X0 = (SP_X0 + GRID * 2) + OPT_W + ((SP_X1 - GRID * 2) - (SP_X0 + GRID * 2) - OPT_W - VAL_W) / 2.0f - 4.0f;
 
-// ---- colours (the original menu's IM_COL32 values) --------------------------
-const uint32_t C_TITLE     = RGBA(255, 190, 33, 255);
-const uint32_t C_PANEL_BG  = RGBA(0, 0, 0, 223);
-const uint32_t C_OUTER     = RGBA(0, 49, 0, 255);
-const uint32_t C_INNER     = RGBA(0, 33, 0, 255);
-const uint32_t C_LINE      = RGBA(0, 89, 0, 255);
-const uint32_t C_TAB_G_T   = RGBA(128, 255, 0, 255);
-const uint32_t C_TAB_G_B   = RGBA(255, 192, 0, 255);
-const uint32_t C_SEL_TL    = RGBA(226, 113, 34, 128);
-const uint32_t C_SEL_BR    = RGBA(146, 255, 49, 128);
-const uint32_t C_LABEL     = RGBA(255, 255, 255, 255);
-const uint32_t C_VAL_G_T   = RGBA(192, 255, 0, 255);
-const uint32_t C_VAL_G_B   = RGBA(128, 170, 0, 255);
-const uint32_t C_LIGHT_ON  = RGBA(214, 255, 64, 255);
-const uint32_t C_LIGHT_OFF = RGBA(30, 52, 30, 255);
-const uint32_t C_BLACK     = RGBA(0, 0, 0, 255);
-const uint32_t C_DESC      = RGBA(255, 255, 255, 255);
-const uint32_t C_GREEN_GLOW= RGBA(203, 255, 0, 55);
-const uint32_t C_DIV_HI    = RGBA(222, 255, 189, 65);
-const uint32_t C_DIV_LO    = RGBA(173, 255, 156, 65);
-const uint32_t C_DIV_CORE  = RGBA(115, 178, 104, 255);
-const uint32_t C_BG        = RGBA(2, 6, 3, 255);
-const uint32_t C_WHITE     = RGBA(255, 255, 255, 255);
-const uint32_t C_FOOTER    = RGBA(206, 226, 206, 220);
+// tab gradient (options-specific)
+const uint32_t C_TAB_G_T = RGBA(128, 255, 0, 255);
+const uint32_t C_TAB_G_B = RGBA(255, 192, 0, 255);
+const uint32_t C_SLOT_LBL= RGBA(150, 190, 150, 255);
 
 // ---- state ------------------------------------------------------------------
 int    g_cat = 0, g_sel = 0, g_prevSel = 0, g_first = 0;
@@ -151,64 +131,7 @@ void Input(const ScreenInput& in) {
     if (in.tabLeft || in.tabRight) { g_cat = (g_cat + (in.tabRight?1:CATEGORY_COUNT-1)) % CATEGORY_COUNT; g_sel = g_prevSel = 0; g_first = 0; g_moveStart = Now(); KeepSelVisible(); }
 }
 
-// the green container panel: staged build (line -> outer ring -> inner fill -> bg).
-void DrawContainer(float x0, float y0, float x1, float y1, bool rightOutline,
-                   float lineT, float outerT, float innerT, float bgT) {
-    PushTransform(1.0f, lineT, { (x0 + x1) * 0.5f, (y0 + y1) * 0.5f }, { 0.0f, 0.0f });
-    DrawRect({ x0, y0 }, { x1, y1 }, WithAlpha(C_PANEL_BG, bgT));
-    SetModifier(MOD_CHECKERBOARD);
-    DrawRect({ x0, y0 + GRID }, { x0 + GRID, y1 - GRID }, WithAlpha(C_OUTER, outerT));
-    DrawRect({ x1 - GRID, y0 + GRID }, { x1, y1 - GRID }, WithAlpha(rightOutline ? C_OUTER : C_INNER, outerT));
-    DrawRect({ x0, y0 }, { x1, y0 + GRID }, WithAlpha(C_OUTER, outerT));
-    DrawRect({ x0, y1 - GRID }, { x1, y1 }, WithAlpha(C_OUTER, outerT));
-    DrawRect({ x0 + GRID, y0 + GRID }, { x1 - GRID, y1 - GRID }, WithAlpha(C_INNER, innerT));
-    ResetModifier();
-    uint32_t lc = WithAlpha(C_LINE, lineT); const float g = GRID, L = 2.0f;
-    DrawRect({ x0+g, y0+g }, { x0+g+L, y0+g*2 }, lc); DrawRect({ x0+g, y0+g }, { x1-g, y0+g+L }, lc); DrawRect({ x1-g-L, y0+g }, { x1-g, y0+g*2 }, lc);
-    DrawRect({ x0+g, y1-g*2 }, { x0+g+L, y1-g }, lc); DrawRect({ x0+g, y1-g-L }, { x1-g, y1-g }, lc); DrawRect({ x1-g-L, y1-g*2 }, { x1-g, y1-g }, lc);
-    PopTransform();
-}
-
-// shared 3-layer green plate (active tab + value cell), under the scanline shader.
-void DrawPlate(float x0, float y0, float x1, float y1, float a) {
-    auto A = [&](int base) { return (uint8_t)std::clamp((int)lround(base * a), 0, 255); };
-    SetModifier(MOD_SCANLINE_BUTTON);
-    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(0,130,0,A(223)), RGBA(0,130,0,A(178)), RGBA(0,130,0,A(223)), RGBA(0,130,0,A(178)));
-    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(0,0,0,A(13)),    RGBA(0,0,0,0),         RGBA(0,0,0,A(55)),    RGBA(0,0,0,A(6)));
-    DrawQuadGradient({x0,y0},{x1,y1}, RGBA(0,130,0,A(13)),  RGBA(0,130,0,A(111)),  RGBA(0,130,0,0),      RGBA(0,130,0,A(55)));
-    ResetModifier();
-}
-
-void FillTri(float baseX, float apexX, float y0, float y1, uint32_t cBase, uint32_t cApex, bool add = false) {
-    const float cy = (y0 + y1) * 0.5f;
-    const V2 c[4] = { { baseX, y0 }, { baseX, y1 }, { apexX, cy }, { apexX, cy } };
-    const uint32_t cols[4] = { cBase, cBase, cApex, cApex };
-    DrawQuadGradient(c, cols, add);
-}
-void DrawSelectionArrows(float bx0, float by0, float bx1, float by1, float t) {
-    const float pad = GRID, width = GRID * 2.5f;
-    uint32_t base = WithAlpha(RGBA(0,97,0,255), t);
-    uint32_t m0 = WithAlpha(RGBA(255,0,255,255), t), m1 = WithAlpha(RGBA(255,128,255,255), t);
-    FillTri(bx0-pad, bx0-pad-width, by0, by1, base, base);
-    FillTri(bx0-pad, bx0-pad-width, by0, by1, m0, m1, true);
-    FillTri(bx1+pad, bx1+pad+width, by0, by1, base, base);
-    FillTri(bx1+pad, bx1+pad+width, by0, by1, m0, m1, true);
-}
-
-// value text: white base + black outline + green vertical gradient fill
-void DrawValueText(const char* s, float x0, float y0, float x1, float y1, float t) {
-    const float boxW = x1 - x0; float w = MeasureText(20.0f, s).x; float sx = 1.0f;
-    if (w > boxW && w > 0.0f) sx = boxW / w;
-    float dw = w * sx;
-    float px = x0 + (boxW - dw) * 0.5f, py = y0 + ((y1 - y0) - 20.0f) * 0.5f;
-    if (sx != 1.0f) SetTextStretchX(sx);
-    static const float O[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
-    for (auto& o : O) DrawText({ px + o[0]*1.6f, py + o[1]*1.6f }, 20.0f, WithAlpha(C_BLACK, t), s);
-    DrawTextGradient({ px, py }, 20.0f, WithAlpha(C_VAL_G_T, t), WithAlpha(C_VAL_G_B, t), s);
-    if (sx != 1.0f) ResetTextStretchX();
-}
-
-// tab label: lime->gold gradient + black outline + bevel
+// tab label: lime->gold gradient + black outline + bevel (options-specific)
 void DrawTabText(float x, float y, const char* s, float alpha) {
     uint8_t a = (uint8_t)std::clamp((int)lround(alpha), 0, 255);
     static const float O[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
@@ -218,46 +141,13 @@ void DrawTabText(float x, float y, const char* s, float alpha) {
     ResetModifier();
 }
 
-// primitive toggle light (no sprite): a small lit/dark square, additive glow when on.
-void DrawToggleLight(float lx, float ly, float ls, bool on, float t) {
-    if (on) {
-        const float gs = ls + 12.0f, gx = lx - 6.0f, gy = ly - 6.0f;
-        DrawRect({ gx, gy }, { gx + gs, gy + gs }, WithAlpha(RGBA(255,255,0,70), t), true);
-    }
-    DrawRect({ lx-1, ly-1 }, { lx+ls+1, ly+ls+1 }, WithAlpha(C_BLACK, t));
-    DrawRect({ lx, ly }, { lx+ls, ly+ls }, WithAlpha(on ? C_LIGHT_ON : C_LIGHT_OFF, t));
-}
-
 void Draw(double openSec) {
-    const float cLine  = (float)ComputeMotion(openSec, 0.0,  8.0);
-    const float cOuter = (float)ComputeMotion(openSec, 16.0, 8.0);
-    const float cInner = (float)ComputeMotion(openSec, 32.0, 8.0);
-    const float cBg    = (float)ComputeMotion(openSec, 48.0, 12.0);
-    const float titleT = Hermite(0.0f, 1.0f, (float)ComputeMotion(openSec, 3.0, 28.0));
-    const float t      = (float)ComputeMotion(openSec, 50.0, 12.0);
-    DrawRect({ 0, 0 }, { REF_W, REF_H }, C_BG);
+    const chrome::Build b = chrome::Stage(openSec);
+    const float t = b.t;
+    chrome::Backdrop(g_fDF, b.title, "SETTINGS");
 
-    auto band = [&](float yTop, float yBot, bool top) {
-        if (top) DrawVGradient({ 0, yTop }, { REF_W, yBot }, RGBA(0,0,0,255), RGBA(0,0,0,0));
-        else     DrawVGradient({ 0, yTop }, { REF_W, yBot }, RGBA(0,0,0,0), RGBA(0,0,0,255));
-        SetModifier(MOD_SCANLINE);
-        if (top) DrawVGradient({ 0, yTop }, { REF_W, yBot }, RGBA(203,255,0,0), C_GREEN_GLOW);
-        else     DrawVGradient({ 0, yTop }, { REF_W, yBot }, C_GREEN_GLOW, RGBA(203,255,0,0));
-        ResetModifier();
-    };
-    band(0, 105, true); band(615, 720, false);
-    auto divider = [&](float y) {
-        DrawRect({ 0, y-2 }, { REF_W, y }, C_DIV_HI);
-        DrawRect({ 0, y+1 }, { REF_W, y+3 }, C_DIV_LO);
-        DrawRect({ 0, y }, { REF_W, y+1 }, C_DIV_CORE);
-    };
-    divider(105); divider(615);
-
-    SetFont(g_fDF);
-    DrawTextBevel({ 122, 56 }, 48.0f, WithAlpha(C_TITLE, titleT), "SETTINGS");
-
-    DrawContainer(SP_X0, SP_Y0, SP_X1, SP_Y1, true,  cLine, cOuter, cInner, cBg);
-    DrawContainer(IP_X0, IP_Y0, IP_X1, IP_Y1, false, cLine, cOuter, cInner, cBg);
+    chrome::Container(SP_X0, SP_Y0, SP_X1, SP_Y1, true,  b.line, b.outer, b.inner, b.bg);
+    chrome::Container(IP_X0, IP_Y0, IP_X1, IP_Y1, false, b.line, b.outer, b.inner, b.bg);
 
     // tabs (RUN/REVIEW/LINKS/DISPLAY)
     {
@@ -268,7 +158,7 @@ void Draw(double openSec) {
         float pad = (clipW - sum) / (CATEGORY_COUNT + 1);
         float x = CLIP_X + pad;
         for (int i = 0; i < CATEGORY_COUNT; ++i) {
-            if (i == g_cat) { float tabPad = std::min(pad * 0.5f, GRID * 3); DrawPlate(x - tabPad, TABS_Y, x + widths[i] + tabPad, TABS_Y + TAB_H, t); }
+            if (i == g_cat) { float tabPad = std::min(pad * 0.5f, GRID * 3); chrome::Plate(x - tabPad, TABS_Y, x + widths[i] + tabPad, TABS_Y + TAB_H, t); }
             x += widths[i] + pad;
         }
         x = CLIP_X + pad;
@@ -281,8 +171,8 @@ void Draw(double openSec) {
         float mt = (float)ComputeMotion(g_moveStart, 0.0, 8.0);
         float slot = Lerp((float)g_prevSel, (float)g_sel, mt) - (float)g_first;
         float ry = ROWS_TOP + slot * ROW_PITCH;
-        uint32_t gold = WithAlpha(C_SEL_TL, t), grn = WithAlpha(C_SEL_BR, t);
-        uint32_t mid  = WithAlpha(ColourLerp(C_SEL_TL, C_SEL_BR, 0.5f), t);
+        uint32_t gold = WithAlpha(chrome::C_SEL_TL, t), grn = WithAlpha(chrome::C_SEL_BR, t);
+        uint32_t mid  = WithAlpha(ColourLerp(chrome::C_SEL_TL, chrome::C_SEL_BR, 0.5f), t);
         DrawQuadGradient({ CLIP_X, ry }, { CLIP_X + OPT_W, ry + ROW_H }, gold, mid, grn, mid);
     }
     for (int i = g_first; i < OptCount() && i <= g_first + VIS_ROWS; ++i) {
@@ -290,16 +180,16 @@ void Draw(double openSec) {
         float ry = ROWS_TOP + (i - g_first) * ROW_PITCH;
         bool sel = (i == g_sel);
         SetFont(g_fSeurat);
-        DrawTextAligned({ LABEL_X, ry }, { VAL_X0 - 10, ry + ROW_H }, 26.0f, WithAlpha(C_LABEL, t), o.label, Align::Left, true, true);
+        DrawTextAligned({ LABEL_X, ry }, { VAL_X0 - 10, ry + ROW_H }, 26.0f, WithAlpha(chrome::C_LABEL, t), o.label, Align::Left, true, true);
         float vy0 = ry + (ROW_H - VAL_H) * 0.5f, vy1 = vy0 + VAL_H;
-        DrawPlate(VAL_X0, vy0, VAL_X0 + VAL_W, vy1, t);
-        if (sel) DrawSelectionArrows(VAL_X0, vy0, VAL_X0 + VAL_W, vy1, t);
+        chrome::Plate(VAL_X0, vy0, VAL_X0 + VAL_W, vy1, t);
+        if (sel) chrome::SelectionArrows(VAL_X0, vy0, VAL_X0 + VAL_W, vy1, t);
         SetFont(g_fRodin);
         if (o.kind == TOGGLE) {
             bool onv = o.val != 0;
             const float ls = 15.0f, lx = VAL_X0 + 14.0f, ly = vy0 + ((VAL_H - ls) * 0.5f);
-            DrawToggleLight(lx, ly, ls, onv, t);
-            DrawValueText(onv ? "ON" : "OFF", VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
+            chrome::ToggleLight(lx, ly, ls, onv, t);
+            chrome::ValueText(onv ? "ON" : "OFF", VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
         } else if (o.kind == SLIDER) {
             float factor = (o.sMax > o.sMin) ? (float)(o.val - o.sMin) / (float)(o.sMax - o.sMin) : 0.0f;
             float cx0 = VAL_X0 + 6, cy0 = vy0 + 3, cx1 = VAL_X0 + VAL_W - 6, cy1 = vy1 - 3;
@@ -310,10 +200,10 @@ void Draw(double openSec) {
                 DrawQuadGradient({fx0,fy0},{fx1,fy1}, WithAlpha(RGBA(57,241,0,255),t), WithAlpha(RGBA(57,241,0,255),t), WithAlpha(RGBA(2,106,0,255),t), WithAlpha(RGBA(2,106,0,255),t));
             ResetModifier();
             char buf[16]; snprintf(buf, sizeof buf, "%d%s", o.val, o.suffix ? o.suffix : "");
-            DrawValueText(buf, VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
+            chrome::ValueText(buf, VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
         } else {
             const char* s = (o.choices && o.val < o.choiceCount) ? o.choices[o.val] : "";
-            DrawValueText(s, VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
+            chrome::ValueText(s, VAL_X0 + 6, vy0, VAL_X0 + VAL_W - 6, vy1, t);
         }
     }
     PopClip();
@@ -331,20 +221,18 @@ void Draw(double openSec) {
         const float thumbH = wrapW * 9.0f / 16.0f;
         const float ty0 = IP_Y0 + GRID*2 + GRID*0.5f, ty1 = ty0 + thumbH;
         const Option& s = Opt(std::clamp(g_sel, 0, OptCount() - 1));
-        // slot (primitive, green-framed)
         DrawRect({ ix0, ty0 }, { ix1, ty1 }, WithAlpha(RGBA(4,12,6,235), t));
         DrawVGradient({ ix0, ty0 }, { ix1, ty1 }, WithAlpha(RGBA(0,40,0,70), t), WithAlpha(RGBA(0,0,0,90), t));
         uint32_t kl = WithAlpha(RGBA(0,89,0,200), t); const float L = 1.0f;
         DrawRect({ ix0, ty0 }, { ix1, ty0+L }, kl); DrawRect({ ix0, ty1-L }, { ix1, ty1 }, kl);
         DrawRect({ ix0, ty0 }, { ix0+L, ty1 }, kl); DrawRect({ ix1-L, ty0 }, { ix1, ty1 }, kl);
-        // current state, large + centred in the slot
         char val[24];
         if (s.kind == TOGGLE)      snprintf(val, sizeof val, "%s", s.val ? "ON" : "OFF");
         else if (s.kind == SLIDER) snprintf(val, sizeof val, "%d%s", s.val, s.suffix ? s.suffix : "");
         else                       snprintf(val, sizeof val, "%s", (s.choices && s.val < s.choiceCount) ? s.choices[s.val] : "");
         SetFont(g_fDF);
-        DrawTextAligned({ ix0, ty0 + 18 }, { ix1, ty0 + 46 }, 16.0f, WithAlpha(RGBA(150,190,150,255), t), s.label, Align::Center, true, true);
-        DrawValueText(val, ix0, ty0 + thumbH*0.45f - 4, ix1, ty0 + thumbH*0.45f + 30, t);
+        DrawTextAligned({ ix0, ty0 + 18 }, { ix1, ty0 + 46 }, 16.0f, WithAlpha(C_SLOT_LBL, t), s.label, Align::Center, true, true);
+        chrome::ValueText(val, ix0, ty0 + thumbH*0.45f - 4, ix1, ty0 + thumbH*0.45f + 30, t);
 
         SetFont(g_fSeurat);
         std::string full = s.desc ? s.desc : "";
@@ -364,16 +252,16 @@ void Draw(double openSec) {
         float dy = ty1 + 24.0f;
         for (const std::string& ln : lines) {
             float lw = MeasureText(fsz, ln.c_str()).x;
-            DrawText({ ix0 + (wrapW - lw) * 0.5f, dy }, fsz, WithAlpha(C_DESC, t), ln.c_str());
+            DrawText({ ix0 + (wrapW - lw) * 0.5f, dy }, fsz, WithAlpha(chrome::C_DESC, t), ln.c_str());
             dy += lineH;
         }
     }
 
     // footer (text; no glyph atlas)
     SetFont(g_fRodin);
-    DrawText({ 250, 662 }, 20.0f, WithAlpha(C_FOOTER, t), "LB/RB  Switch tab");
-    DrawText({ 470, 662 }, 20.0f, WithAlpha(C_FOOTER, t), "Left/Right  Change");
-    DrawText({ 700, 662 }, 20.0f, WithAlpha(C_FOOTER, t), "Esc  Back");
+    DrawText({ 250, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "LB/RB  Switch tab");
+    DrawText({ 470, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Left/Right  Change");
+    DrawText({ 700, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Esc  Back");
     ResetFont();
 }
 

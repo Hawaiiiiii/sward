@@ -78,6 +78,7 @@ add_executable(sgfx_screens
     src/sgfx_data.cpp
     "${RECOMP_ROOT}/thirdparty/stb/stb_vorbis.c"
     src/screen_registry.cpp
+    src/green_chrome.cpp
     src/screen_pause.cpp
     src/screen_result.cpp
     src/screen_title.cpp

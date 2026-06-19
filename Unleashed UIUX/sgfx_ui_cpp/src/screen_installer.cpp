@@ -1,86 +1,60 @@
 // =============================================================================
-// screen_installer.cpp — the SETUP / onboarding screen. A single dark-IDE panel
-// titled "Setup" listing the tool's dependency / onboarding steps and their state
-// (found / install / set). Built from primitives + text only (no chrome art, no
-// third-party atlas) in the dark-IDE neutral aesthetic shared with screen_status.cpp
-// / screen_town.cpp / screen_options.cpp. Logo-only header (no wordmark).
-// Up/Down move the cursor; Enter continues, Esc backs out (host-driven).
-// State per row is colour-coded: green found / amber install / dim not-set.
+// screen_installer.cpp — the SETUP / onboarding screen, in the cinematic green
+// look shared with the settings screen (green_chrome.h): a green container listing
+// the tool's dependencies and their state, plus a right info panel for the focused
+// step. State is colour-coded (green found/set, amber needs-install, dim not-set).
+// Up/Down move; Enter continues, Esc backs out (host-driven). Primitives + fonts
+// only — no game art.
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "green_chrome.h"
 #include <cstdio>
+#include <cstring>
+#include <string>
+#include <vector>
 #include <algorithm>
+#include <cmath>
 
 using namespace ui;
 namespace {
 
-int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0, g_logoTex = -1;
+int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 
-// ---- palette (dark, neutral — matches screen_status.cpp / screen_options.cpp) -
-const uint32_t C_BG_TOP   = RGBA(12, 20, 38, 255), C_BG_BOT = RGBA(5, 9, 18, 255);
-const uint32_t C_PANEL    = RGBA(16, 24, 40, 235);
-const uint32_t C_PANEL_CAP= RGBA(10, 16, 28, 255);
-const uint32_t C_SEL_TOP  = RGBA(64, 150, 235, 225), C_SEL_BOT = RGBA(28, 92, 180, 225);
-const uint32_t C_TITLE    = RGBA(255, 209, 74, 255);
-const uint32_t C_TEXT     = RGBA(214, 226, 240, 255);
-const uint32_t C_TEXT_SEL = RGBA(255, 255, 255, 255);
-const uint32_t C_RULE     = RGBA(120, 170, 230, 90);
-const uint32_t C_LABEL    = RGBA(150, 170, 196, 255);
-const uint32_t C_FOUND    = RGBA(120, 230, 140, 255);   // dependency present (green)
-const uint32_t C_INSTALL  = RGBA(235, 200, 90, 255);    // needs installing (amber)
-const uint32_t C_DIM      = RGBA(120, 138, 158, 255);   // not yet set (dim)
-const uint32_t C_FOOTER   = RGBA(190, 205, 225, 220);
-const uint32_t C_WHITE    = RGBA(255, 255, 255, 255);
+const uint32_t C_LABEL    = RGBA(236, 244, 236, 255);
+const uint32_t C_DETAIL   = RGBA(150, 178, 150, 255);
+const uint32_t C_SLOT_LBL = RGBA(150, 190, 150, 255);
 
-// ---- onboarding step model --------------------------------------------------
-// Each step is a dependency or configuration the tool needs before a run. The
-// state drives the colour of the right-aligned status word (representative until
-// a live probe supplies the real result).
 enum State { FOUND, INSTALL, SET, NOTSET };
-struct Step { const char* label; const char* detail; State state; };
+struct Step { const char* label; const char* detail; const char* help; State state; };
 const Step STEPS[] = {
-    { "RaConverter",        "Asset converter, required for export.",     FOUND   },
-    { "RaCoHeadless",       "Headless export runner for screenshots.",  INSTALL },
-    { "Blender",            "Used by the geometry checks.",             FOUND   },
-    { "Digital-3D-Car repo","The car-models working copy the tool reads.", SET  },
+    { "RaConverter",         "Asset converter, required for export.",   "Found on this machine. Nothing to do.",                 FOUND   },
+    { "RaCoHeadless",        "Headless export runner for screenshots.", "Not found. Press Enter to fetch and install it.",       INSTALL },
+    { "Blender",             "Used by the geometry checks.",            "Found on this machine. Nothing to do.",                 FOUND   },
+    { "Digital-3D-Car repo", "The car-models working copy the tool reads.", "Path is set and reachable.",                       SET     },
 };
 constexpr int STEP_COUNT = int(sizeof(STEPS) / sizeof(STEPS[0]));
-
 int g_sel = 0;
 
-// ---- layout (reference px) --------------------------------------------------
-constexpr float RULE_Y = 118.0f;
-constexpr float PANEL_X = 280.0f, PANEL_Y = 158.0f, PANEL_W = 720.0f, PANEL_H = 404.0f;
-constexpr float HEADER_H = 52.0f;
-constexpr float ROW_H = 78.0f;
-constexpr float ROW_PAD = 14.0f;
+// geometry: the settings-family container (matches the options screen)
+constexpr float GRID = chrome::GRID;
+constexpr float SP_X0 = 33, SP_Y0 = 117, SP_X1 = 843, SP_Y1 = 604;
+constexpr float IP_X0 = 868, IP_Y0 = 117, IP_X1 = 1246, IP_Y1 = 604;
+constexpr float CLIP_X = SP_X0 + GRID * 2;
+constexpr float ROWS_TOP = SP_Y0 + GRID * 2 + 30.0f;
+constexpr float ROW_H = 100.0f;
+constexpr float OPT_W = GRID * 54;
+constexpr float LABEL_X = SP_X0 + GRID * 2 + GRID;
+constexpr float VAL_W = 168, VAL_H = GRID * 3.5f;
+constexpr float VAL_X0 = SP_X1 - GRID * 2 - VAL_W - 18.0f;
 
-// ---- entrance tuning (frames @60fps) ----------------------------------------
-constexpr double TITLE_FRAMES = 14.0, PANEL_FRAMES = 16.0;
-constexpr double FOOT_OFFSET = 10.0, FOOT_FRAMES = 12.0;
-
-const char* StateWord(State s) {
-    switch (s) {
-        case FOUND:   return "found";
-        case INSTALL: return "install";
-        case SET:     return "set";
-        default:      return "not set";
-    }
-}
-uint32_t StateColour(State s) {
-    switch (s) {
-        case FOUND: case SET: return C_FOUND;
-        case INSTALL:         return C_INSTALL;
-        default:              return C_DIM;
-    }
-}
+const char* StateWord(State s) { return s == FOUND ? "found" : s == INSTALL ? "install" : s == SET ? "set" : "not set"; }
+uint32_t StateCol(State s) { return (s == FOUND || s == SET) ? chrome::C_OK : (s == INSTALL ? chrome::C_WARN : chrome::C_DIM); }
 
 void Init() {
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
-    if (g_logoTex < 0)  g_logoTex = gfx::loadTexture("assets/gameart/boot_logo.png");
 }
 void Reset() { g_sel = 0; }
 void Input(const ScreenInput& in) {
@@ -88,76 +62,83 @@ void Input(const ScreenInput& in) {
     if (in.down) g_sel = std::min(STEP_COUNT - 1, g_sel + 1);
 }
 
-// a neutral dark panel with a caption strip + rule (screen_town.cpp idiom).
-void DrawPanel(float x, float y, float w, float h, float t, const char* caption) {
-    DrawRect({ x, y }, { x + w, y + h }, WithAlpha(C_PANEL, t));
-    DrawRect({ x, y }, { x + w, y + HEADER_H }, WithAlpha(C_PANEL_CAP, t));
-    DrawRect({ x + 12, y + HEADER_H - 2 }, { x + w - 12, y + HEADER_H }, WithAlpha(C_RULE, t));
-    SetFont(g_fDF);
-    DrawTextAligned({ x + 18, y }, { x + w - 14, y + HEADER_H }, 26.0f,
-                    WithAlpha(C_TITLE, t), caption, Align::Left, true, true);
-    ResetFont();
-}
-
-// host logo drops into the top-left slot; if it failed to load, draw NOTHING.
-void DrawLogoSlot(float t) {
-    if (g_logoTex < 0 || t <= 0.0f) return;
-    const float w = 168.0f, h = w * 200.0f / 600.0f;
-    DrawImage(g_logoTex, { 40, 40 }, { 40 + w, 40 + h }, { 0, 0 }, { 1, 1 }, WithAlpha(C_WHITE, t));
+// the state word, centred on a value plate: black outline + the state colour.
+void DrawStateWord(const char* s, uint32_t col, float x0, float y0, float x1, float y1, float t) {
+    float w = MeasureText(20.0f, s).x;
+    float px = x0 + ((x1 - x0) - w) * 0.5f, py = y0 + ((y1 - y0) - 20.0f) * 0.5f;
+    static const float O[8][2] = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+    for (auto& o : O) DrawText({ px + o[0]*1.6f, py + o[1]*1.6f }, 20.0f, WithAlpha(chrome::C_BLACK, t), s);
+    DrawText({ px, py }, 20.0f, WithAlpha(col, t), s);
 }
 
 void Draw(double openSec) {
-    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, C_BG_TOP, C_BG_BOT);
+    const chrome::Build b = chrome::Stage(openSec);
+    const float t = b.t;
+    chrome::Backdrop(g_fDF, b.title, "SETUP");
+    chrome::Container(SP_X0, SP_Y0, SP_X1, SP_Y1, true,  b.line, b.outer, b.inner, b.bg);
+    chrome::Container(IP_X0, IP_Y0, IP_X1, IP_Y1, false, b.line, b.outer, b.inner, b.bg);
 
-    const float titleT = (float)ComputeMotion(openSec, 0.0, TITLE_FRAMES);
-    const float panelT = (float)ComputeMotion(openSec, 0.0, PANEL_FRAMES);
-    const float footT  = (float)ComputeMotion(openSec, FOOT_OFFSET, FOOT_FRAMES);
-
-    // ===== HEADER: logo slot only (no wordmark / title text) ==================
-    DrawLogoSlot(titleT);
-    DrawRect({ PANEL_X, RULE_Y }, { 1000.0f, RULE_Y + 2.0f }, WithAlpha(C_RULE, titleT));
-
-    // ===== SETUP PANEL ========================================================
-    const float px = PANEL_X, py = PANEL_Y + (1.0f - panelT) * 24.0f;
-    DrawPanel(px, py, PANEL_W, PANEL_H, panelT, "Setup");
-    const float rowsTop = py + HEADER_H + 12.0f;
-    const float rowL = px + ROW_PAD, rowR = px + PANEL_W - ROW_PAD;
-
-    // selection highlight
-    if (panelT > 0.5f) {
-        float hy = rowsTop + g_sel * ROW_H;
-        DrawVGradient({ rowL, hy + 3 }, { rowR, hy + ROW_H - 6 },
-                      WithAlpha(C_SEL_TOP, panelT), WithAlpha(C_SEL_BOT, panelT));
+    // selection bar (gold->green) on the focused row
+    if (t > 0.4f) {
+        float ry = ROWS_TOP + g_sel * ROW_H;
+        uint32_t gold = WithAlpha(chrome::C_SEL_TL, t), grn = WithAlpha(chrome::C_SEL_BR, t);
+        uint32_t mid  = WithAlpha(ColourLerp(chrome::C_SEL_TL, chrome::C_SEL_BR, 0.5f), t);
+        DrawQuadGradient({ CLIP_X, ry }, { CLIP_X + OPT_W, ry + ROW_H - 12.0f }, gold, mid, grn, mid);
     }
 
     for (int i = 0; i < STEP_COUNT; ++i) {
-        float top = rowsTop + i * ROW_H;
-        bool selected = (i == g_sel);
         const Step& s = STEPS[i];
-        // label (name) on the left
+        float top = ROWS_TOP + i * ROW_H;
+        bool sel = (i == g_sel);
         SetFont(g_fSeurat);
-        DrawTextAligned({ rowL + 18.0f, top + 6.0f }, { rowR - 160.0f, top + 40.0f }, 26.0f,
-                        WithAlpha(selected ? C_TEXT_SEL : C_TEXT, panelT),
-                        s.label, Align::Left, true, true);
-        // detail sub-line
+        DrawTextAligned({ LABEL_X, top + 14.0f }, { VAL_X0 - 16.0f, top + 50.0f }, 28.0f,
+                        WithAlpha(C_LABEL, t), s.label, Align::Left, true, true);
         SetFont(g_fRodin);
-        DrawTextAligned({ rowL + 18.0f, top + 40.0f }, { rowR - 160.0f, top + 70.0f }, 18.0f,
-                        WithAlpha(C_LABEL, panelT), s.detail, Align::Left, true, true);
-        // state word, right-aligned + colour-coded
-        DrawTextAligned({ rowR - 150.0f, top + 6.0f }, { rowR - 8.0f, top + ROW_H - 12.0f }, 24.0f,
-                        WithAlpha(StateColour(s.state), panelT), StateWord(s.state),
-                        Align::Right, true, true);
-        ResetFont();
+        DrawTextAligned({ LABEL_X, top + 50.0f }, { VAL_X0 - 16.0f, top + 80.0f }, 19.0f,
+                        WithAlpha(C_DETAIL, t), s.detail, Align::Left, true, true);
+        // value cell: plate + state light + state word
+        float vy0 = top + (ROW_H - 12.0f - VAL_H) * 0.5f, vy1 = vy0 + VAL_H;
+        chrome::Plate(VAL_X0, vy0, VAL_X0 + VAL_W, vy1, t);
+        if (sel) chrome::SelectionArrows(VAL_X0, vy0, VAL_X0 + VAL_W, vy1, t);
+        const float ls = 13.0f, lx = VAL_X0 + 14.0f, ly = vy0 + (VAL_H - ls) * 0.5f;
+        if (s.state == FOUND || s.state == SET) { const float gs = ls+12, gx = lx-6, gy = ly-6; DrawRect({gx,gy},{gx+gs,gy+gs}, WithAlpha(RGBA(120,255,80,70), t), true); }
+        DrawRect({ lx-1, ly-1 }, { lx+ls+1, ly+ls+1 }, WithAlpha(chrome::C_BLACK, t));
+        DrawRect({ lx, ly }, { lx+ls, ly+ls }, WithAlpha(StateCol(s.state), t));
+        SetFont(g_fRodin);
+        DrawStateWord(StateWord(s.state), StateCol(s.state), VAL_X0 + 22.0f, vy0, VAL_X0 + VAL_W - 4.0f, vy1, t);
     }
 
-    // ===== FOOTER =============================================================
+    // right info panel: the focused step
     {
+        const float ix0 = IP_X0 + GRID*2, ix1 = IP_X1 - GRID*2;
+        const float wrapW = ix1 - ix0;
+        const Step& s = STEPS[std::clamp(g_sel, 0, STEP_COUNT - 1)];
+        SetFont(g_fDF);
+        DrawTextAligned({ ix0, IP_Y0 + 40.0f }, { ix1, IP_Y0 + 78.0f }, 30.0f, WithAlpha(chrome::C_TITLE, t), s.label, Align::Left, true, true);
         SetFont(g_fRodin);
-        DrawRect({ PANEL_X, 612.0f }, { 1000.0f, 614.0f }, WithAlpha(C_RULE, footT));
-        DrawText({ PANEL_X, 628.0f }, 20.0f, WithAlpha(C_FOOTER, footT), "Enter  Continue");
-        DrawText({ PANEL_X + 250.0f, 628.0f }, 20.0f, WithAlpha(C_FOOTER, footT), "Esc  Back");
-        ResetFont();
+        DrawText({ ix0, IP_Y0 + 92.0f }, 22.0f, WithAlpha(StateCol(s.state), t), StateWord(s.state));
+        // help text, wrapped
+        SetFont(g_fSeurat);
+        std::string full = s.help ? s.help : "";
+        const float fsz = 24.0f, lineH = fsz + 6.0f;
+        std::vector<std::string> lines; std::string cur; size_t w0 = 0;
+        while (w0 <= full.size()) {
+            size_t w1 = full.find(' ', w0); if (w1 == std::string::npos) w1 = full.size();
+            std::string word = full.substr(w0, w1 - w0), trial = cur.empty() ? word : cur + " " + word;
+            if (!cur.empty() && MeasureText(fsz, trial.c_str()).x > wrapW) { lines.push_back(cur); cur = word; } else cur = trial;
+            if (w1 >= full.size()) break; w0 = w1 + 1;
+        }
+        if (!cur.empty()) lines.push_back(cur);
+        float dy = IP_Y0 + 150.0f;
+        for (const std::string& ln : lines) { DrawText({ ix0, dy }, fsz, WithAlpha(chrome::C_DESC, t), ln.c_str()); dy += lineH; }
     }
+
+    // footer
+    SetFont(g_fRodin);
+    DrawText({ 250, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Up/Down  Select");
+    DrawText({ 470, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Enter  Install / Continue");
+    DrawText({ 760, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Esc  Back");
+    ResetFont();
 }
 
 } // namespace
