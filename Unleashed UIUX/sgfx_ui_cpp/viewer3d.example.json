@@ -1,0 +1,6 @@
+{
+  "_comment": "Operator-local config for the 3D-car preview. Copy to viewer3d.json beside the exe and set the paths for this machine. Nothing here is committed with real paths.",
+  "viewer_exe": "C:/path/to/sg-preflight/cpp/build/vs2022-ramses-28.16/Release/sgfx_cine_ramses_real_scene.exe",
+  "bmw_git_root": "C:/path/to/digital-3d-car-models",
+  "extra_args": "--orbit --frames 360000"
+}

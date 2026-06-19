@@ -9,8 +9,10 @@
 #include "sgfxui.h"
 #include "screen.h"
 #include "sgfx_data.h"
+#include "viewer3d.h"
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <algorithm>
 
 using namespace ui;
@@ -75,6 +77,7 @@ constexpr float GRID = 9.0f;
 int g_sel = 0;          // default focus: first profile (no car privileged)
 bool g_popup = false; int g_popupSel = 0;
 const char* g_nav = nullptr;
+std::string g_previewMsg; double g_previewStart = -100.0;
 
 void Init() {
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
@@ -86,9 +89,14 @@ void Reset() { g_sel = 0; g_popup = false; g_popupSel = 0; g_nav = nullptr; }
 void Switch(int d) { g_sel = (g_sel + PROFILE_COUNT + d) % PROFILE_COUNT; }
 void Input(const ScreenInput& in) {
     if (g_popup) {
-        if (in.up || in.down) g_popupSel ^= 1;
+        if (in.down) g_popupSel = (g_popupSel + 1) % 3;
+        if (in.up)   g_popupSel = (g_popupSel + 2) % 3;
         if (in.accept) {
-            if (g_popupSel == 0) g_nav = "town";   // Open -> the action hub for the profile
+            if (g_popupSel == 0) g_nav = "town";                       // Open -> the action hub
+            else if (g_popupSel == 1) {                                // Preview in 3D -> the Ramses viewer
+                g_previewMsg = viewer3d::Launch(PROFILES[g_sel].id);
+                g_previewStart = Now();
+            }
             g_popup = false; g_popupSel = 0;
         }
         if (in.cancel) { g_popup = false; g_popupSel = 0; }
@@ -133,15 +141,15 @@ void DrawArrow(float cx, float cy, int dir, float t) {
 void DrawConfirm() {
     if (!g_popup) return;
     DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 120));
-    const float x0 = 520, y0 = 286, x1 = 760, y1 = 432, cx = (x0 + x1) * 0.5f;
+    const float x0 = 500, y0 = 276, x1 = 780, y1 = 462, cx = (x0 + x1) * 0.5f;
     DrawRect({ x0, y0 }, { x1, y1 }, C_POP_FILL);
     DrawRect({ x0, y0 }, { x1, y0 + 2 }, RGBA(64, 150, 235, 200));
     char head[48]; std::snprintf(head, sizeof(head), "Open %s", PROFILES[g_sel].id);
-    const char* OPT[2] = { head, "Cancel" };
-    const float rowY[2] = { y0 + 44, y0 + 92 };
+    const char* OPT[3] = { head, "Preview in 3D", "Cancel" };
+    const float rowY[3] = { y0 + 42, y0 + 90, y0 + 138 };
     DrawVGradient({ x0 + 14, rowY[g_popupSel] - 6 }, { x1 - 14, rowY[g_popupSel] + 34 }, C_POP_HI_T, C_POP_HI_B);
     SetFont(g_fRodin);
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < 3; ++i) {
         float w = MeasureText(26.0f, OPT[i]).x;
         DrawText({ cx - w * 0.5f, rowY[i] }, 26.0f,
                  (i == g_popupSel) ? C_WHITE : RGBA(200, 214, 230, 255), OPT[i]);
@@ -213,6 +221,16 @@ void Draw(double openSec) {
         DrawText({ 700, 628 }, 20.0f, WithAlpha(C_FOOTER, a), "Esc  Back");
     }
     ResetFont();
+
+    // transient 3D-preview launch feedback
+    double pa = Now() - g_previewStart;
+    if (g_previewStart > 0.0 && pa < 2.4 && !g_previewMsg.empty()) {
+        float ma = std::min(1.0f, (float)((2.4 - pa) / 0.5));
+        SetFont(g_fRodin);
+        DrawTextAligned({ 150, 566 }, { 1130, 596 }, 22.0f, WithAlpha(RGBA(146,255,49,255), ma),
+                        g_previewMsg.c_str(), Align::Center, true, true);
+        ResetFont();
+    }
 
     DrawConfirm();
 }
