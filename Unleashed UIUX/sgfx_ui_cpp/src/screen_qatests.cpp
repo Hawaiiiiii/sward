@@ -24,6 +24,7 @@ int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 fleet::Roster g_r;
 std::vector<const fleet::Car*> g_rows;   // tested cars, regressions first
 int g_off = 0;
+int g_cursor = 0;
 
 constexpr int ROWS = 13;
 
@@ -57,11 +58,16 @@ void Reset() {
         if (pa != pb) return pa < pb;
         return a->brand != b->brand ? a->brand < b->brand : a->id < b->id;
     });
-    g_off = 0;
+    g_off = 0; g_cursor = 0;
 }
 void Input(const ScreenInput& in) {
-    if (in.down && g_off < MaxOff()) ++g_off;
-    if (in.up   && g_off > 0)        --g_off;
+    const int total = (int)g_rows.size();
+    if (total == 0) return;
+    if (in.down) g_cursor = std::min(g_cursor + 1, total - 1);
+    if (in.up)   g_cursor = std::max(g_cursor - 1, 0);
+    if (g_cursor < g_off)         g_off = g_cursor;
+    if (g_cursor >= g_off + ROWS) g_off = g_cursor - ROWS + 1;
+    if (in.accept) fleet::SetSelected(g_rows[g_cursor]->id);   // hand off to the test detail
 }
 
 void Draw(double openSec) {
@@ -102,9 +108,14 @@ void Draw(double openSec) {
     for (int row = 0; row < ROWS && (g_off + row) < total; ++row) {
         const fleet::Car* c = g_rows[g_off + row];
         const float ry = y0 + rowH * (float)row;
+        const bool sel = (g_off + row == g_cursor);
+        if (sel) {
+            chrome::Plate(x0 - 10, ry - 3, 1185, ry + rowH - 7, t * 0.6f);
+            DrawRect({ x0 - 10, ry - 3 }, { x0 - 7, ry + rowH - 7 }, WithAlpha(chrome::C_TITLE, t));
+        }
         const uint32_t col = StatusColor(c->testStatus);
         char label[80]; std::snprintf(label, sizeof label, "%s/%s", c->brand.c_str(), c->id.c_str());
-        DrawText({ x0, ry }, 16.0f, WithAlpha(chrome::C_DESC, t), label);
+        DrawText({ x0, ry }, 16.0f, WithAlpha(sel ? chrome::C_LABEL : chrome::C_DESC, t), label);
         DrawText({ x0 + 360, ry }, 16.0f, WithAlpha(col, t), StatusTag(c->testStatus));
         char eb[16]; std::snprintf(eb, sizeof eb, "%d", c->testExpected);
         DrawText({ x0 + 560, ry }, 16.0f, WithAlpha(chrome::C_DIM, t), eb);
@@ -121,8 +132,7 @@ void Draw(double openSec) {
     }
 
     SetFont(g_fRodin);
-    DrawText({ 150, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t),
-             MaxOff() > 0 ? "Up / Down  Scroll        Esc  Back" : "Esc  Back");
+    DrawText({ 150, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Up / Down  Move        Enter  Which tests        Esc  Back");
     ResetFont();
 }
 

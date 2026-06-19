@@ -54,6 +54,7 @@ void AmbientInit();       void AmbientDraw(double);       void AmbientInput(cons
 void FleetInit();         void FleetDraw(double);         void FleetInput(const ScreenInput&);         void FleetReset();
 void QaTestsInit();       void QaTestsDraw(double);       void QaTestsInput(const ScreenInput&);       void QaTestsReset();
 void ChangelogsInit();    void ChangelogsDraw(double);    void ChangelogsInput(const ScreenInput&);    void ChangelogsReset();
+void TestDetailInit();    void TestDetailDraw(double);    void TestDetailInput(const ScreenInput&);    void TestDetailReset();
 
 // ---- flow wrappers: forward to the screen's own Input, surface the edge -----
 namespace {
@@ -70,8 +71,9 @@ void ResultExFlowInput(const ScreenInput& in){ ResultExInput(in);     if (in.can
 void CarViewFlowInput(const ScreenInput& in) { CarViewInput(in);      if (in.cancel) g_wrapNav = "@back"; }
 void AmbientFlowInput(const ScreenInput& in) { AmbientInput(in);      if (in.cancel) g_wrapNav = "@back"; }
 void FleetFlowInput(const ScreenInput& in)   { FleetInput(in);        if (in.accept) g_wrapNav = "carview"; else if (in.cancel) g_wrapNav = "@back"; }
-void QaTestsFlowInput(const ScreenInput& in) { QaTestsInput(in);      if (in.cancel) g_wrapNav = "@back"; }
+void QaTestsFlowInput(const ScreenInput& in) { QaTestsInput(in);      if (in.accept) g_wrapNav = "testdetail"; else if (in.cancel) g_wrapNav = "@back"; }
 void ChangelogsFlowInput(const ScreenInput& in) { ChangelogsInput(in); if (in.cancel) g_wrapNav = "@back"; }
+void TestDetailFlowInput(const ScreenInput& in) { TestDetailInput(in); if (in.cancel) g_wrapNav = "@back"; }
 } // namespace
 
 static const ScreenDef g_screens[] = {
@@ -99,6 +101,7 @@ static const ScreenDef g_screens[] = {
     { "fleet",          &FleetInit,         &FleetDraw,         &FleetFlowInput,     &FleetReset,        &WrapNav },
     { "qatests",        &QaTestsInit,       &QaTestsDraw,       &QaTestsFlowInput,   &QaTestsReset,      &WrapNav },
     { "changelogs",     &ChangelogsInit,    &ChangelogsDraw,    &ChangelogsFlowInput, &ChangelogsReset,  &WrapNav },
+    { "testdetail",     &TestDetailInit,    &TestDetailDraw,    &TestDetailFlowInput, &TestDetailReset,  &WrapNav },
 };
 
 const ScreenDef* AllScreens(int& count) {
