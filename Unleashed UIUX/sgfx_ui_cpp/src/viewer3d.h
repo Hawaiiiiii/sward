@@ -34,5 +34,12 @@ std::string SnapshotPath();
 // returns; the shell polls SnapshotPath for the result. Returns a short status line.
 std::string RenderSnapshot(const std::string& profileId, const std::string& view = "", const std::string& entry = "");
 
+// continuous LIVE render: a managed viewer process orbits the car and writes a frame
+// repeatedly (atomically) to SnapshotPath, so the shell can poll + reload it for a live
+// in-pane preview. LiveStop terminates it; LiveActive() is false once it exits.
+bool LiveStart(const std::string& profileId);
+void LiveStop();
+bool LiveActive();
+
 
 } // namespace viewer3d

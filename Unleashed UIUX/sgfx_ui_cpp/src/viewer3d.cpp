@@ -191,7 +191,7 @@ std::string RenderSnapshot(const std::string& profileId, const std::string& view
 
     std::string out = SnapshotPath();
     std::string args = "--scene-file \"" + scene + "\" --readback --screenshot \"" + out
-                     + "\" --frames 240 --width 1280 --height 720";   // enough frames that the scene is Rendered before readback
+                     + "\" --frames 240";   // scene's authored resolution = the true framing; 240 frames so it's Rendered before readback
     if (!view.empty() && view != "authored" && view != "orbit") {
         std::string pa = PerspectiveArgs(CarDir(c, profileId), view, entry);
         if (!pa.empty()) args += pa;
@@ -199,6 +199,38 @@ std::string RenderSnapshot(const std::string& profileId, const std::string& view
     // default ("" / "authored"): the export's authored QA camera (the documented framing)
     if (!Spawn(c.viewerExe, args)) return "Could not start the 3D render";
     return "Rendering " + profileId + " ...";
+}
+
+static HANDLE g_liveProc = nullptr;
+
+bool LiveStart(const std::string& profileId) {
+    LiveStop();
+    Config c = LoadConfig();
+    if (!c.loaded) return false;
+    std::error_code ec;
+    if (!fs::exists(c.viewerExe, ec)) return false;
+    std::string scene = ResolveScene(c.repoRoot, profileId);
+    if (scene.empty()) return false;
+
+    std::string cmd = "\"" + c.viewerExe + "\" --scene-file \"" + scene
+                    + "\" --orbit --readback-loop --readback-every 6 --screenshot \"" + SnapshotPath()
+                    + "\" --frames 5400000";   // scene's authored resolution (full-car framing, profile-agnostic)
+    std::string workdir = fs::path(c.viewerExe).parent_path().string();
+    STARTUPINFOA si{}; si.cb = sizeof si;
+    PROCESS_INFORMATION pi{};
+    if (!CreateProcessA(nullptr, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, workdir.c_str(), &si, &pi))
+        return false;
+    CloseHandle(pi.hThread);
+    g_liveProc = pi.hProcess;
+    return true;
+}
+void LiveStop() {
+    if (g_liveProc) { TerminateProcess(g_liveProc, 0); CloseHandle(g_liveProc); g_liveProc = nullptr; }
+}
+bool LiveActive() {
+    if (!g_liveProc) return false;
+    if (WaitForSingleObject(g_liveProc, 0) == WAIT_OBJECT_0) { CloseHandle(g_liveProc); g_liveProc = nullptr; return false; }
+    return true;
 }
 
 } // namespace viewer3d
