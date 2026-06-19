@@ -30,6 +30,7 @@
 #include "settings.h"
 #include "csd_player.h"
 #include "sgfx_data.h"
+#include "viewer_embed.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -191,6 +192,7 @@ int main(int argc, char** argv) {
     void* hwnd = nullptr;
     SDL_SysWMinfo wm; SDL_VERSION(&wm.version);
     if (SDL_GetWindowWMInfo(win, &wm)) hwnd = (void*)wm.info.win.window;
+    viewer_embed::SetHostWindow(hwnd);   // lets the 3D-car view embed the live viewer into a pane
 
     if (!gfx::init(hwnd, W, H, shot, 4)) { fprintf(stderr, "gfx init failed\n"); return 1; }
     if (!ui::Init(FontPath()))

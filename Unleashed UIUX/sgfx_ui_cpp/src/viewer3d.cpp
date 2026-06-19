@@ -200,4 +200,16 @@ std::string RenderSnapshot(const std::string& profileId, const std::string& view
     return "Rendering " + profileId + " ...";
 }
 
+bool EmbedCommand(const std::string& profileId, std::string& exeOut, std::string& argsOut) {
+    Config c = LoadConfig();
+    if (!c.loaded) return false;
+    std::error_code ec;
+    if (!fs::exists(c.viewerExe, ec)) return false;
+    std::string scene = ResolveScene(c.repoRoot, profileId);
+    if (scene.empty()) return false;
+    exeOut = c.viewerExe;
+    argsOut = "--scene \"" + scene + "\" --orbit --frames 360000";
+    return true;
+}
+
 } // namespace viewer3d
