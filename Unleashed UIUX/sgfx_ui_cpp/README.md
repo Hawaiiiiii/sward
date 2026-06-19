@@ -44,8 +44,9 @@ The "3D Car" screen (action hub → Live 3D car) renders the actual production c
 inside the shell via the external Ramses/RaCo viewer: it asks the viewer to render a
 frame of the car to a snapshot and displays it (composited as a D3D12 texture).
 Left/Right pick the documented QA perspective (read from the car's
-`perspectives_*.json`); LB/RB opens the live rotating car in a separate window. The
-profile picker (gate) also offers "Preview in 3D" with a two-level set→view picker.
+`perspectives_*.json`); RB shows the car live *inside* the pane (the viewer orbits and
+writes a readback from a Ramses offscreen buffer, which the screen reloads), LB opens
+it in a separate window. The gate also offers "Preview in 3D" with a set→view picker.
 
 Paths are operator-local in `viewer3d.json` beside the exe (copy `viewer3d.example.json`):
 
@@ -55,6 +56,15 @@ Paths are operator-local in `viewer3d.json` beside the exe (copy `viewer3d.examp
 The shell resolves `<profile>` → `<repo>/cars/BMW/<id>/export/exported.ramses` and
 spawns the viewer with `--scene-file`. With no config the 3D actions show a clear
 "not configured" status; everything else runs.
+
+## Ambient Layer coverage
+The "Ambient" screen (action hub → Ambient tests) shows a brand × screen readiness
+matrix for the Ambient Layer screenshot tests. It reads the AL assets repo's per-scene
+`tests/{expected,actuals,diff}` folders (the test workflow's own outputs) and reports
+each cell as PASS, DIFF (a visual change since the baseline), not run, or no baseline —
+read-only, it runs nothing. Point it at your checkout with `al_assets_root` in
+`viewer3d.json`; unset shows a hint. Structure read:
+`<root>/assets/<group>/<brand>/export_<screen>/tests/{expected,actuals,diff}`.
 
 ## Ship a runtime drop
     python tools/package.py --build build --out drop --zip
