@@ -325,7 +325,7 @@ int main(int argc, char** argv) {
                startMem, warmup, steady, peakMem);
         printf("[soak] steady-state growth %.2f MB/min -> verdict: %s\n", steadyPerMin,
                (steady < 4.0) ? "STABLE (no leak; bounded warm-up then flat)" : "REVIEW (memory still climbing post-warm-up)");
-        audio::Shutdown(); ui::Shutdown(); gfx::shutdown(); SDL_DestroyWindow(win); SDL_Quit();
+        audio::Shutdown(); ui::Shutdown(); viewer_embed::Stop(); gfx::shutdown(); SDL_DestroyWindow(win); SDL_Quit();
         return 0;
     }
 
@@ -381,7 +381,7 @@ int main(int argc, char** argv) {
         stbi_write_png(out.c_str(), W, H, 4, px.data(), W * 4);
         printf("wrote %s (%s=%s t=%.2fs, %d quads, MSAA x%d)\n",
                out.c_str(), csdMode ? "csd" : "screen", id.c_str(), shotSec, n, gfx::sampleCount());
-        csd::Unload(); ui::Shutdown(); gfx::shutdown(); SDL_DestroyWindow(win); SDL_Quit();
+        csd::Unload(); ui::Shutdown(); viewer_embed::Stop(); gfx::shutdown(); SDL_DestroyWindow(win); SDL_Quit();
         return 0;
     }
 
@@ -402,7 +402,7 @@ int main(int argc, char** argv) {
             ui::BeginFrame(now);
             drawFrame(now, 0.0f, now);
         }
-        csd::Unload(); ui::Shutdown(); gfx::shutdown(); SDL_DestroyWindow(win); SDL_Quit();
+        csd::Unload(); ui::Shutdown(); viewer_embed::Stop(); gfx::shutdown(); SDL_DestroyWindow(win); SDL_Quit();
         return 0;
     }
 
@@ -525,6 +525,6 @@ int main(int argc, char** argv) {
         int cw, chh; SDL_GetWindowSize(win, &cw, &chh);
         settings::SetInt("win_w", cw); settings::SetInt("win_h", chh);
     }
-    audio::Shutdown(); ui::Shutdown(); gfx::shutdown(); SDL_DestroyWindow(win); SDL_Quit();
+    audio::Shutdown(); ui::Shutdown(); viewer_embed::Stop(); gfx::shutdown(); SDL_DestroyWindow(win); SDL_Quit();
     return 0;
 }
