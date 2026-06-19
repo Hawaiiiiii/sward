@@ -54,13 +54,16 @@ def main(argv: list[str]) -> int:
 
     repo = Path(__file__).resolve().parents[1]
     copy(repo / "sgfx_status.example.json", out / "sgfx_status.example.json")
+    copy(repo / "viewer3d.example.json", out / "viewer3d.example.json")
     (out / "README.txt").write_text(
         "Operator UI runtime drop.\n\n"
         "Run sgfx_screens.exe. With no sgfx_status.json present it shows representative\n"
         "defaults. To show a real run, produce sgfx_status.json with export_status.py\n"
         "(or launch.py) and place it beside the exe. Drop your own logo at\n"
-        "assets/gameart/boot_logo.png. Game art atlases, layout data and music are\n"
-        "intentionally excluded; only the fonts and the D3D12 runtime ship.\n",
+        "assets/gameart/boot_logo.png. For the 3D-car preview, copy\n"
+        "viewer3d.example.json to viewer3d.json and set the paths for this machine.\n"
+        "Game art atlases, layout data and music are intentionally excluded; only the\n"
+        "fonts and the D3D12 runtime ship.\n",
         encoding="utf-8",
     )
 
