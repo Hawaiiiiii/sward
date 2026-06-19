@@ -1,23 +1,27 @@
 // =============================================================================
-// screen_town.cpp — the operator action hub. A two-panel menu: a scrolling list
-// of actions on the left, a live detail of the focused action on the right. Built
-// from primitives + text only (no chrome art, no third-party atlas) so it ships on
-// its own. The actions are the tool's real verbs; running one shows a transient
-// confirmation here (it wires to the real work in-flow).
+// screen_town.cpp — the operator action hub, in the cinematic green look shared
+// with the settings family (green_chrome.h): a green container listing the tool's
+// actions with a play affordance, and a right info panel describing the focused one
+// (and the profile it runs against, from the live data bridge). Adapted for actions
+// rather than settings — a run affordance, not cycling value cells. Primitives +
+// fonts only. Running an action navigates in-flow (the nav targets are unchanged).
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
 #include "sgfx_data.h"
+#include "green_chrome.h"
 
 #include <cstdio>
 #include <cstring>
+#include <string>
+#include <vector>
 #include <algorithm>
+#include <cmath>
 
 using namespace ui;
 
 namespace {
 
-// ---- action model -----------------------------------------------------------
 struct Action { const char* label; const char* info1; const char* info2; };
 const Action ACTIONS[] = {
     { "Run preflight",       "Full SG-side checks across",   "anchors, constants, carpaints." },
@@ -29,83 +33,45 @@ const Action ACTIONS[] = {
 };
 constexpr int ACTION_COUNT = int(sizeof(ACTIONS) / sizeof(ACTIONS[0]));
 
-// the profile the actions run against — from the live data bridge (or defaults)
 const char* ActiveProfile() { return sgfx::Get().run.activeProfile.c_str(); }
 
-int g_logoTex = -1;
+const uint32_t C_LABEL  = RGBA(236, 244, 236, 255);
+const uint32_t C_DESC   = RGBA(190, 210, 190, 255);
+const uint32_t C_PLAY   = RGBA(0, 150, 0, 255);
+const uint32_t C_RUNMSG = RGBA(146, 255, 49, 255);
 
-// ---- layout (reference px) --------------------------------------------------
-constexpr float RULE_Y = 118.0f;
-constexpr float LIST_X = 150.0f, LIST_Y = 158.0f, LIST_W = 600.0f, LIST_H = 404.0f;
-constexpr float INFO_X = 780.0f, INFO_Y = 158.0f, INFO_W = 350.0f, INFO_H = 404.0f;
-constexpr float HEADER_H = 52.0f;
-constexpr float ROW_H = 60.0f;
-constexpr int   VISIBLE_ROWS = 5;
-constexpr float ROW_PAD = 14.0f;
+// geometry: the settings-family containers
+constexpr float GRID = chrome::GRID;
+constexpr float SP_X0 = 33, SP_Y0 = 117, SP_X1 = 843, SP_Y1 = 604;
+constexpr float IP_X0 = 868, IP_Y0 = 117, IP_X1 = 1246, IP_Y1 = 604;
+constexpr float CLIP_X = SP_X0 + GRID * 2;
+constexpr float ROWS_TOP = SP_Y0 + GRID * 2 + 22.0f;
+constexpr float ROW_H = 66.0f;
+constexpr float OPT_W = GRID * 80;          // full inner width (no value column)
+constexpr float LABEL_X = SP_X0 + GRID * 2 + GRID;
 
-// ---- entrance tuning (frames @60fps) ----------------------------------------
-constexpr double TITLE_FRAMES = 14.0, LIST_FRAMES = 16.0;
-constexpr double INFO_OFFSET = 5.0, INFO_FRAMES = 14.0;
-constexpr double FOOT_OFFSET = 10.0, FOOT_FRAMES = 12.0;
-constexpr double SELECT_MOVE_FRAMES = 8.0;
-
-// ---- palette (dark, neutral) ------------------------------------------------
-const uint32_t COL_BG_TOP   = RGBA(12, 20, 38, 255);
-const uint32_t COL_BG_BOT   = RGBA(5, 9, 18, 255);
-const uint32_t COL_PANEL    = RGBA(16, 24, 40, 235);
-const uint32_t COL_PANEL_CAP= RGBA(10, 16, 28, 255);
-const uint32_t COL_SEL_TOP  = RGBA(64, 150, 235, 225);
-const uint32_t COL_SEL_BOT  = RGBA(28, 92, 180, 225);
-const uint32_t COL_TITLE    = RGBA(255, 209, 74, 255);
-const uint32_t COL_TEXT     = RGBA(214, 226, 240, 255);
-const uint32_t COL_TEXT_SEL = RGBA(255, 255, 255, 255);
-const uint32_t COL_DESC     = RGBA(178, 194, 214, 255);
-const uint32_t COL_RULE     = RGBA(120, 170, 230, 90);
-const uint32_t COL_OK       = RGBA(120, 230, 140, 255);
-const uint32_t COL_FOOTER   = RGBA(190, 205, 225, 220);
-const uint32_t COL_WHITE    = RGBA(255, 255, 255, 255);
-const uint32_t COL_CHIP     = RGBA(150, 196, 150, 255);
-
-// ---- interactive state ------------------------------------------------------
-int    g_sel = 0, g_prevSel = 0, g_scroll = 0;
+int    g_sel = 0, g_prevSel = 0;
 double g_moveStart = -100.0, g_msgStart = -100.0;
 const char* g_msg = "";
 const char* g_nav = nullptr;
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 
-float ScrollLimit() { return (float)std::max(0, ACTION_COUNT - VISIBLE_ROWS); }
-void ClampScrollToSel() {
-    if (g_sel < g_scroll) g_scroll = g_sel;
-    if (g_sel > g_scroll + VISIBLE_ROWS - 1) g_scroll = g_sel - VISIBLE_ROWS + 1;
-    g_scroll = std::clamp(g_scroll, 0, (int)ScrollLimit());
-}
-
 void Init() {
-    if (g_logoTex < 0) g_logoTex = gfx::loadTexture("assets/gameart/boot_logo.png");
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
 }
-void Reset() {
-    g_sel = 0; g_prevSel = 0; g_scroll = 0;
-    g_moveStart = -100.0; g_msgStart = -100.0; g_msg = ""; g_nav = nullptr;
-}
+void Reset() { g_sel = 0; g_prevSel = 0; g_moveStart = -100.0; g_msgStart = -100.0; g_msg = ""; g_nav = nullptr; }
 void Input(const ScreenInput& in) {
     if (in.up || in.down) {
         g_prevSel = g_sel;
         if (in.up)   g_sel = std::max(0, g_sel - 1);
         if (in.down) g_sel = std::min(ACTION_COUNT - 1, g_sel + 1);
-        ClampScrollToSel();
         g_moveStart = Now();
     }
     if (in.accept) {
         static const char* const TARGET[ACTION_COUNT] = {
-            "loading>sonic_hud", // Run preflight -> the run (loading -> live HUD -> metrics)
-            "result_ex",   // Capture screenshots
-            "result",      // Check delivery
-            "result_ex",   // Daily digest
-            "balloon",     // Scan unused Lua -> notification
-            "mediaroom",   // Manual review
+            "loading>sonic_hud", "result_ex", "result", "result_ex", "balloon", "mediaroom",
         };
         const char* t = TARGET[g_sel];
         if (t[0]) g_nav = t;
@@ -115,115 +81,75 @@ void Input(const ScreenInput& in) {
 }
 const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
-// a neutral dark panel with a caption strip + rule.
-void DrawPanel(float x, float y, float w, float h, float t, const char* caption) {
-    DrawRect({ x, y }, { x + w, y + h }, WithAlpha(COL_PANEL, t));
-    DrawRect({ x, y }, { x + w, y + HEADER_H }, WithAlpha(COL_PANEL_CAP, t));
-    DrawRect({ x + 12, y + HEADER_H - 2 }, { x + w - 12, y + HEADER_H }, WithAlpha(COL_RULE, t));
-    SetFont(g_fDF);
-    DrawTextAligned({ x + 18, y }, { x + w - 14, y + HEADER_H }, 26.0f,
-                    WithAlpha(COL_TITLE, t), caption, Align::Left, true, true);
-    ResetFont();
-}
-
-void DrawLogoSlot(float t) {
-    if (g_logoTex < 0 || t <= 0.0f) return;
-    const float w = 168.0f, h = w * 200.0f / 600.0f;
-    DrawImage(g_logoTex, { 40, 40 }, { 40 + w, 40 + h }, { 0, 0 }, { 1, 1 }, WithAlpha(COL_WHITE, t));
+// a filled play triangle (run affordance) pointing right.
+void PlayTri(float x, float cy, float h, uint32_t c, bool add = false) {
+    const float w = h * 0.85f;
+    const V2 v[4] = { { x, cy - h*0.5f }, { x, cy + h*0.5f }, { x + w, cy }, { x + w, cy } };
+    const uint32_t cc[4] = { c, c, c, c };
+    DrawQuadGradient(v, cc, add);
 }
 
 void Draw(double openSec) {
-    DrawVGradient({ 0, 0 }, { REF_W, REF_H }, COL_BG_TOP, COL_BG_BOT);
+    const chrome::Build b = chrome::Stage(openSec);
+    const float t = b.t;
+    chrome::Backdrop(g_fDF, b.title, "ACTIONS");
+    chrome::Container(SP_X0, SP_Y0, SP_X1, SP_Y1, true,  b.line, b.outer, b.inner, b.bg);
+    chrome::Container(IP_X0, IP_Y0, IP_X1, IP_Y1, false, b.line, b.outer, b.inner, b.bg);
 
-    const float titleT = (float)ComputeMotion(openSec, 0.0, TITLE_FRAMES);
-    const float listT  = (float)ComputeMotion(openSec, 0.0, LIST_FRAMES);
-    const float infoT  = (float)ComputeMotion(openSec, INFO_OFFSET, INFO_FRAMES);
-    const float footT  = (float)ComputeMotion(openSec, FOOT_OFFSET, FOOT_FRAMES);
-
-    // ===== HEADER: logo slot (left) + active-profile chip (right) =============
-    DrawLogoSlot(titleT);
-    {
-        SetFont(g_fRodin);
-        float cx = 1130.0f;
-        DrawTextAligned({ cx - 220, 52 }, { cx, 78 }, 16.0f, WithAlpha(COL_CHIP, titleT),
-                        "PROFILE", Align::Right, true, true);
-        DrawTextAligned({ cx - 220, 74 }, { cx, 104 }, 24.0f, WithAlpha(COL_TITLE, titleT),
-                        ActiveProfile(), Align::Right, true, true);
-        ResetFont();
-    }
-    DrawRect({ LIST_X, RULE_Y }, { 1130.0f, RULE_Y + 2.0f }, WithAlpha(COL_RULE, titleT));
-
-    // ===== LEFT: ACTION LIST =================================================
-    const float lx = LIST_X, ly = LIST_Y + (1.0f - listT) * 24.0f;
-    DrawPanel(lx, ly, LIST_W, LIST_H, listT, "ACTIONS");
-    const float rowsTop = ly + HEADER_H + 10.0f;
-    const float rowL = lx + ROW_PAD, rowR = lx + LIST_W - ROW_PAD;
-
-    if (listT > 0.5f) {
-        float moveT = (float)ComputeMotion(g_moveStart, 0.0, SELECT_MOVE_FRAMES);
-        float prevSlot = std::clamp((float)(g_prevSel - g_scroll), 0.0f, (float)(VISIBLE_ROWS - 1));
-        float curSlot  = std::clamp((float)(g_sel     - g_scroll), 0.0f, (float)(VISIBLE_ROWS - 1));
-        float slot = Lerp(prevSlot, curSlot, moveT);
-        float hy = rowsTop + slot * ROW_H;
-        DrawVGradient({ rowL, hy + 3 }, { rowR, hy + ROW_H - 5 },
-                      WithAlpha(COL_SEL_TOP, listT), WithAlpha(COL_SEL_BOT, listT));
+    // selection bar (eased gold->green)
+    if (t > 0.4f) {
+        float mt = (float)ComputeMotion(g_moveStart, 0.0, 8.0);
+        float slot = Lerp((float)g_prevSel, (float)g_sel, mt);
+        float ry = ROWS_TOP + slot * ROW_H;
+        uint32_t gold = WithAlpha(chrome::C_SEL_TL, t), grn = WithAlpha(chrome::C_SEL_BR, t);
+        uint32_t mid  = WithAlpha(ColourLerp(chrome::C_SEL_TL, chrome::C_SEL_BR, 0.5f), t);
+        DrawQuadGradient({ CLIP_X, ry + 3 }, { CLIP_X + OPT_W, ry + ROW_H - 6 }, gold, mid, grn, mid);
     }
 
-    for (int row = 0; row < VISIBLE_ROWS; ++row) {
-        int idx = g_scroll + row;
-        if (idx >= ACTION_COUNT) break;
-        float top = rowsTop + row * ROW_H;
-        bool selected = (idx == g_sel);
+    for (int i = 0; i < ACTION_COUNT; ++i) {
+        float top = ROWS_TOP + i * ROW_H;
+        bool sel = (i == g_sel);
         SetFont(g_fSeurat);
-        DrawTextAligned({ rowL + 18.0f, top }, { rowR - 12.0f, top + ROW_H }, 28.0f,
-                        WithAlpha(selected ? COL_TEXT_SEL : COL_TEXT, listT),
-                        ACTIONS[idx].label, Align::Left, true, true);
-        ResetFont();
+        DrawTextAligned({ LABEL_X, top }, { SP_X1 - GRID*4 - 40, top + ROW_H }, 28.0f,
+                        WithAlpha(C_LABEL, t), ACTIONS[i].label, Align::Left, true, true);
+        // play affordance, right edge — brighter on the focused row
+        float cy = top + ROW_H * 0.5f, px = SP_X1 - GRID*2 - 34.0f;
+        if (sel) { PlayTri(px - 2, cy, 22.0f, WithAlpha(RGBA(255,128,255,255), t), true); }   // magenta halo
+        PlayTri(px, cy, 18.0f, WithAlpha(sel ? chrome::C_OK : C_PLAY, t));
     }
 
-    // scrollbar (when the list overflows)
-    if (ACTION_COUNT > VISIBLE_ROWS && listT > 0.5f) {
-        float trackX = lx + LIST_W - 7.0f, trackTop = rowsTop, trackH = VISIBLE_ROWS * ROW_H;
-        DrawRect({ trackX, trackTop }, { trackX + 3, trackTop + trackH }, WithAlpha(COL_RULE, listT));
-        float thumbH = trackH * (float)VISIBLE_ROWS / (float)ACTION_COUNT;
-        float denom = ScrollLimit(); if (denom < 1.0f) denom = 1.0f;
-        float thumbY = trackTop + (trackH - thumbH) * ((float)g_scroll / denom);
-        DrawRect({ trackX, thumbY }, { trackX + 3, thumbY + thumbH }, WithAlpha(COL_SEL_TOP, listT));
+    // right info panel: the focused action + the profile it runs against
+    {
+        const float ix0 = IP_X0 + GRID*2, ix1 = IP_X1 - GRID*2;
+        const Action& s = ACTIONS[std::clamp(g_sel, 0, ACTION_COUNT - 1)];
+        SetFont(g_fRodin);
+        DrawTextAligned({ ix0, IP_Y0 + 26.0f }, { ix1, IP_Y0 + 48.0f }, 15.0f, WithAlpha(RGBA(150,190,150,255), t), "PROFILE", Align::Left, true, true);
+        DrawTextAligned({ ix0, IP_Y0 + 46.0f }, { ix1, IP_Y0 + 78.0f }, 26.0f, WithAlpha(chrome::C_TITLE, t), ActiveProfile(), Align::Left, true, true);
+        DrawRect({ ix0, IP_Y0 + 96.0f }, { ix1, IP_Y0 + 97.0f }, WithAlpha(RGBA(0,89,0,180), t));
+        SetFont(g_fDF);
+        DrawTextAligned({ ix0, IP_Y0 + 120.0f }, { ix1, IP_Y0 + 156.0f }, 30.0f, WithAlpha(chrome::C_TITLE, t), s.label, Align::Left, true, true);
+        SetFont(g_fSeurat);
+        DrawText({ ix0, IP_Y0 + 170.0f }, 22.0f, WithAlpha(C_DESC, t), s.info1);
+        DrawText({ ix0, IP_Y0 + 198.0f }, 22.0f, WithAlpha(C_DESC, t), s.info2);
+        DrawText({ ix0, IP_Y0 + 250.0f }, 20.0f, WithAlpha(chrome::C_OK, t), "Press Enter to run.");
     }
 
-    // ===== RIGHT: INFO (tracks the selection) ================================
-    const float ix = INFO_X, iy = INFO_Y + (1.0f - infoT) * 24.0f;
-    DrawPanel(ix, iy, INFO_W, INFO_H, infoT, "INFO");
-    const Action& sel = ACTIONS[std::clamp(g_sel, 0, ACTION_COUNT - 1)];
-    float textTop = iy + HEADER_H + 28.0f;
-    DrawRect({ ix + 24.0f, textTop - 10.0f }, { ix + 60.0f, textTop - 6.0f }, WithAlpha(COL_SEL_TOP, infoT)); // accent
-    SetFont(g_fSeurat);
-    DrawTextAligned({ ix + 24.0f, textTop }, { ix + INFO_W - 18.0f, textTop + 40.0f }, 30.0f,
-                    WithAlpha(COL_TEXT_SEL, infoT), sel.label, Align::Left, true, true);
-    DrawText({ ix + 26.0f, textTop + 58.0f }, 20.0f, WithAlpha(COL_DESC, infoT), sel.info1);
-    DrawText({ ix + 26.0f, textTop + 86.0f }, 20.0f, WithAlpha(COL_DESC, infoT), sel.info2);
-    ResetFont();
-
-    // ===== TRANSIENT FEEDBACK ===============================================
+    // transient "running" feedback for the no-nav action
     double age = Now() - g_msgStart;
     if (g_msgStart > 0.0 && age < 1.6) {
         float ma = std::min(1.0f, (float)((1.6 - age) / 0.4));
-        char line[80]; std::snprintf(line, sizeof(line), "Running %s on %s", g_msg, ActiveProfile());
+        char line[96]; std::snprintf(line, sizeof line, "Running %s on %s", g_msg, ActiveProfile());
         SetFont(g_fSeurat);
-        DrawTextAligned({ LIST_X, 572.0f }, { 1130.0f, 604.0f }, 24.0f,
-                        WithAlpha(COL_OK, ma), line, Align::Center, true, true);
+        DrawTextAligned({ SP_X0, 628.0f }, { SP_X1, 654.0f }, 22.0f, WithAlpha(C_RUNMSG, ma), line, Align::Center, true, true);
         ResetFont();
     }
 
-    // ===== FOOTER ===========================================================
-    {
-        SetFont(g_fRodin);
-        DrawRect({ LIST_X, 612.0f }, { 1130.0f, 614.0f }, WithAlpha(COL_RULE, footT));
-        DrawText({ LIST_X, 628.0f }, 20.0f, WithAlpha(COL_FOOTER, footT), "Up/Down  Move");
-        DrawText({ LIST_X + 230.0f, 628.0f }, 20.0f, WithAlpha(COL_FOOTER, footT), "Enter  Run");
-        DrawText({ LIST_X + 420.0f, 628.0f }, 20.0f, WithAlpha(COL_FOOTER, footT), "Esc  Back");
-        ResetFont();
-    }
+    // footer
+    SetFont(g_fRodin);
+    DrawText({ 250, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Up/Down  Move");
+    DrawText({ 470, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Enter  Run");
+    DrawText({ 660, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Esc  Back");
+    ResetFont();
 }
 
 } // namespace
