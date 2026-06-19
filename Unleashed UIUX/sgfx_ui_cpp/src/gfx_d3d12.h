@@ -41,6 +41,7 @@ void shutdown();
 
 // Load a PNG into the bindless texture heap; returns its slot index (-1 on fail).
 int  loadTexture(const std::string& pngPath);
+int  reloadTexture(int slot, const std::string& pngPath);   // re-upload into an existing slot (no new slot)
 // Upload a tight RGBA buffer (w*h*4, 8-bit straight alpha) into the bindless heap;
 // returns its slot index (-1 on fail). Used for the hand-built font atlas and any
 // procedurally generated art, so the clean-UI layer needs no PNG round-trip.

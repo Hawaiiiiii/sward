@@ -45,9 +45,10 @@ fs::file_time_type Mtime() {
     std::error_code ec;
     return fs::exists(SNAP, ec) ? fs::last_write_time(SNAP, ec) : fs::file_time_type::min();
 }
-void LoadIfPresent() {
+void LoadCar() {   // reuse one texture slot across reloads (no per-render slot leak)
     std::error_code ec;
-    if (fs::exists(SNAP, ec)) g_carTex = gfx::loadTexture(SNAP);
+    if (!fs::exists(SNAP, ec)) return;
+    g_carTex = (g_carTex >= 0) ? gfx::reloadTexture(g_carTex, SNAP) : gfx::loadTexture(SNAP);
 }
 void StartRender() {
     g_preMtime = Mtime();
@@ -68,8 +69,8 @@ void Reset() {
     g_views.clear(); g_views.push_back("Authored");
     for (const auto& s : viewer3d::ListPerspectiveSets(g_profile)) g_views.push_back(s);
     g_viewIdx = 0;
-    g_carTex = -1; g_status.clear(); g_rendering = false; g_spawnStart = -100.0;
-    LoadIfPresent();
+    g_status.clear(); g_rendering = false; g_spawnStart = -100.0;
+    LoadCar();       // g_carTex persists across entries; reused, not re-allocated
     StartRender();   // refresh on entry (authored)
 }
 void Input(const ScreenInput& in) {
@@ -100,7 +101,7 @@ void Draw(double openSec) {
 
     // poll: when the snapshot is rewritten by the viewer, (re)load it
     if (g_rendering) {
-        if (Mtime() > g_preMtime) { g_carTex = gfx::loadTexture(SNAP); g_rendering = false; }
+        if (Mtime() > g_preMtime) { LoadCar(); g_rendering = false; }
         else if (Now() - g_spawnStart > 18.0) g_rendering = false;
     }
 

@@ -114,7 +114,7 @@ uint32_t packColor(uint32_t argb) {
 }
 
 // Upload pixels (tight RGBA, w*h*4) into a fresh sampled Texture2D; returns slot.
-int uploadTexture(const uint8_t* rgba, int w, int h) {
+int uploadTexture(const uint8_t* rgba, int w, int h, int reuseSlot = -1) {
     auto tex = S.device->createTexture(RenderTextureDesc::Texture2D(w, h, 1, TEX_FMT));
     uint32_t rowBytes = alignUp((uint32_t)w * 4, 256);
     auto up = S.device->createBuffer(RenderBufferDesc::UploadBuffer((uint64_t)rowBytes * h));
@@ -131,11 +131,13 @@ int uploadTexture(const uint8_t* rgba, int w, int h) {
     S.queue->executeCommandLists(S.cmd.get(), S.fence.get());
     S.queue->waitForCommandFence(S.fence.get());
 
-    int slot = (int)S.textures.size();
     auto view = tex->createTextureView(RenderTextureViewDesc::Texture2D(TEX_FMT));
+    const bool reuse = (reuseSlot >= 0 && reuseSlot < (int)S.textures.size());
+    int slot = reuse ? reuseSlot : (int)S.textures.size();
+    if (slot >= (int)MAX_TEX) return 0;   // descriptor table full: keep the default white texel
     if (S.texSet) S.texSet->setTexture(slot, tex.get(), RenderTextureLayout::SHADER_READ, view.get());
-    S.textures.push_back(std::move(tex));
-    S.texViews.push_back(std::move(view));
+    if (reuse) { S.textures[slot] = std::move(tex); S.texViews[slot] = std::move(view); }   // swap in place (no leak)
+    else       { S.textures.push_back(std::move(tex)); S.texViews.push_back(std::move(view)); }
     return slot;
 }
 
@@ -366,6 +368,16 @@ int loadTexture(const std::string& path) {
     int slot = uploadTexture(px, w, h);
     stbi_image_free(px);
     return slot;
+}
+
+int reloadTexture(int slot, const std::string& path) {
+    if (!S.canDraw) return slot;
+    if (slot < 0 || slot >= (int)S.textures.size()) return loadTexture(path);   // no slot yet -> allocate one
+    int w, h, ch; unsigned char* px = stbi_load(path.c_str(), &w, &h, &ch, 4);
+    if (!px) return slot;   // keep the current texture on a failed load
+    int s = uploadTexture(px, w, h, slot);
+    stbi_image_free(px);
+    return s;
 }
 
 int loadTextureRGBA(const uint8_t* rgba, int w, int h) {
