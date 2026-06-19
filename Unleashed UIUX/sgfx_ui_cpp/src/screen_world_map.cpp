@@ -81,8 +81,8 @@ const Area AREAS[] = {
       { { "QUEUE", "6" }, { "P0", "1" }, { "P1", "3" } },
       140.0f, 34.0f },
     { "PROFILES",
-      { "Pick a car slice to work:", "G70, G65, G45 and the wider",
-        "IDCevo and classic families.", nullptr },
+      { "Pick a car slice to work", "across every IDCevo and",
+        "classic car family.", nullptr },
       { { "TOTAL", "19" }, { "IDCEVO", "9" }, { "CLASSIC", "10" } },
       40.0f, -30.0f },
 };

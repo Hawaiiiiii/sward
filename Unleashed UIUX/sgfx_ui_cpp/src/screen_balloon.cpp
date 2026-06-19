@@ -12,6 +12,7 @@
 // =============================================================================
 #include "sgfxui.h"
 #include "screen.h"
+#include "sgfx_data.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -35,15 +36,14 @@ const uint32_t C_FOOTER   = RGBA(190, 205, 225, 220);
 const uint32_t C_WHITE    = RGBA(255, 255, 255, 255);
 const uint32_t C_CHIP     = RGBA(150, 196, 150, 255);
 
-// the profile the toasts report on (representative until a live feed supplies it)
-const char* const ACTIVE_PROFILE = "G65";
+// the profile chip reads the live data bridge; the toast copy stays profile-agnostic
 
 // sample notifications (representative tool vocabulary)
 struct Toast { const char* title; const char* a; const char* b; };
 const Toast TOASTS[] = {
-    { "Preflight complete", "G65 - 3 errors, 12 warnings.", "Open the verdict?" },
-    { "Screenshots captured", "G65 - 4 of 4 test views snapped.", "Ready for review." },
-    { "Delivery checked", "G65 - changelog and Ramses size", "look in range." },
+    { "Preflight complete", "3 errors, 12 warnings logged.", "Open the verdict?" },
+    { "Screenshots captured", "4 of 4 test views snapped.", "Ready for review." },
+    { "Delivery checked", "Changelog and Ramses size", "look in range." },
 };
 constexpr int TOAST_N = int(sizeof(TOASTS) / sizeof(TOASTS[0]));
 int g_idx = 0;
@@ -74,7 +74,7 @@ void Draw(double openSec) {
     // profile chip top-right
     SetFont(g_fRodin);
     DrawTextAligned({ 910, 52 }, { 1130, 76 }, 16.0f, WithAlpha(C_CHIP, a), "PROFILE", Align::Right, true, true);
-    DrawTextAligned({ 910, 74 }, { 1130, 104 }, 24.0f, WithAlpha(C_TITLE, a), ACTIVE_PROFILE, Align::Right, true, true);
+    DrawTextAligned({ 910, 74 }, { 1130, 104 }, 24.0f, WithAlpha(C_TITLE, a), sgfx::Get().run.activeProfile.c_str(), Align::Right, true, true);
     ResetFont();
 
     // ---- the notification toast: rounded dark panel, lower-centre ----

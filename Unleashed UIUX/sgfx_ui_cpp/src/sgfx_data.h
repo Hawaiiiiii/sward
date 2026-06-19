@@ -30,7 +30,7 @@ struct Filter { std::string name, verdict; int diff = 0; };
 struct ProfileStatus { std::string id, verdict; };   // gate: a profile's last verdict, by id
 
 struct Run {
-    std::string         activeProfile = "G65";
+    std::string         activeProfile = "SAMPLE";
     std::vector<Pack>   packs;          // preflight packs: anchors/constants/carpaints/project_sanity
     std::string         verdict;        // "LIKELY OK" | "NEEDS REVIEW" | "BLOCKED"
     std::vector<Signal> signals;        // verdict-card rows (the last row is the total)

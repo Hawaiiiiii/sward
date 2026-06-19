@@ -17,7 +17,7 @@ bool   g_inited = false;
 
 void makeDefaults(Status& s) {
     Run& r = s.run;
-    r.activeProfile = "G65";
+    r.activeProfile = "SAMPLE";   // profile-agnostic placeholder; a real run names its own car
     r.packs = { {"anchors",0,2,5}, {"constants",3,4,6}, {"carpaints",0,1,2}, {"project_sanity",0,5,5} };
     r.verdict = "NEEDS REVIEW";
     r.signals = { {"Errors","3"}, {"Warnings","12"}, {"Screenshot diffs","5"}, {"Review items","6"}, {"Total findings","44"} };

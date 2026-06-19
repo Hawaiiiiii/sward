@@ -105,7 +105,7 @@ float DisplayProgress() {
     return std::clamp(p, 0.0f, 1.0f);
 }
 
-// ---- the profile chip: a small rounded dark panel holding "G65" -------------
+// ---- the profile chip: a small rounded dark panel holding the active profile ----
 void DrawProfileChip(float t) {
     if (t <= 0.0f) return;
     const float x0 = CHIP_X, y0 = CHIP_Y, x1 = CHIP_X + CHIP_W, y1 = CHIP_Y + CHIP_H;

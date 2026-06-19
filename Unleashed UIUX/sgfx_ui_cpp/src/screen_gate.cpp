@@ -38,9 +38,9 @@ const uint32_t C_POP_HI_T = RGBA(64, 150, 235, 235), C_POP_HI_B = RGBA(28, 92, 1
 struct Profile { const char* id; const char* label; const char* family;
                  const char* f1; const char* f2; const char* verdict; };
 const Profile PROFILES[] = {
-    { "G70", "BMW G70 live slice",    "IDCevo",  "Cross-car references and unused", "Lua; shared CarPaint catalog.",  "needs review" },
-    { "G65", "BMW G65 live slice",    "IDCevo",  "Pivot_Master versus exported",    "Module_constants drift.",        "likely ok"    },
-    { "G45", "BMW G45 classic slice", "Classic", "Classic anchor families and",     "legacy project sanity.",         "likely ok"    },
+    { "G70", "BMW G70 live slice",    "IDCevo",  "Cross-car references and unused", "Lua; shared CarPaint catalog.",  "not run"      },
+    { "G65", "BMW G65 live slice",    "IDCevo",  "Pivot_Master versus exported",    "Module_constants drift.",        "not run"      },
+    { "G45", "BMW G45 classic slice", "Classic", "Classic anchor families and",     "legacy project sanity.",         "not run"      },
     { "G50", "BMW G50 live slice",    "IDCevo",  "Anchor sanity, constants drift,", "shared carpaint signal.",        "not run"      },
     { "G78", "BMW G78 live slice",    "IDCevo",  "Anchor sanity, constants drift,", "shared carpaint signal.",        "not run"      },
     { "NA0", "BMW NA0 live slice",    "IDCevo",  "Anchor sanity, constants drift,", "shared carpaint signal.",        "not run"      },
@@ -72,7 +72,7 @@ constexpr float ID_CY = 168;                          // big id baseline band
 constexpr float DP_X0 = 340, DP_Y0 = 268, DP_X1 = 940, DP_Y1 = 520;   // detail panel
 constexpr float GRID = 9.0f;
 
-int g_sel = 1;          // default focus: G65
+int g_sel = 0;          // default focus: first profile (no car privileged)
 bool g_popup = false; int g_popupSel = 0;
 const char* g_nav = nullptr;
 
@@ -82,7 +82,7 @@ void Init() {
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
     if (g_logoTex < 0)  g_logoTex = gfx::loadTexture("assets/gameart/boot_logo.png");
 }
-void Reset() { g_sel = 1; g_popup = false; g_popupSel = 0; g_nav = nullptr; }
+void Reset() { g_sel = 0; g_popup = false; g_popupSel = 0; g_nav = nullptr; }
 void Switch(int d) { g_sel = (g_sel + PROFILE_COUNT + d) % PROFILE_COUNT; }
 void Input(const ScreenInput& in) {
     if (g_popup) {
