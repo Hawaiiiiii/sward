@@ -20,7 +20,8 @@ namespace {
 
 int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 fleet::Roster g_r;
-int g_off = 0;   // grid-row scroll offset
+int g_off = 0;       // grid-row scroll offset
+int g_cursor = 0;    // selected car index
 
 constexpr int COLS = 3;
 constexpr int ROWS = 12;
@@ -35,10 +36,18 @@ void Init() {
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
 }
-void Reset() { g_r = fleet::Scan(); g_off = 0; }
+void Reset() { g_r = fleet::Scan(); g_off = 0; g_cursor = 0; }
 void Input(const ScreenInput& in) {
-    if (in.down && g_off < MaxOff()) ++g_off;
-    if (in.up   && g_off > 0)        --g_off;
+    const int total = (int)g_r.cars.size();
+    if (total == 0) return;
+    if (in.right) g_cursor = std::min(g_cursor + 1, total - 1);
+    if (in.left)  g_cursor = std::max(g_cursor - 1, 0);
+    if (in.down)  g_cursor = std::min(g_cursor + COLS, total - 1);
+    if (in.up)    g_cursor = std::max(g_cursor - COLS, 0);
+    const int crow = g_cursor / COLS;                       // keep the cursor row in view
+    if (crow < g_off)            g_off = crow;
+    if (crow >= g_off + ROWS)    g_off = crow - ROWS + 1;
+    if (in.accept) fleet::SetSelected(g_r.cars[g_cursor].id);   // hand off to the 3D view
 }
 
 void Draw(double openSec) {
@@ -81,8 +90,13 @@ void Draw(double openSec) {
             const fleet::Car& c = g_r.cars[idx];
             const float cx = x0 + colW * (float)col;
             const float cy = y0 + rowH * (float)row;
+            const bool sel = (idx == g_cursor);
+            if (sel) {
+                chrome::Plate(cx - 8, cy - 3, cx + colW - 16, cy + rowH - 9, t * 0.6f);
+                DrawRect({ cx - 8, cy - 3 }, { cx - 5, cy + rowH - 9 }, WithAlpha(chrome::C_TITLE, t));
+            }
             char label[80]; std::snprintf(label, sizeof label, "%s/%s", c.brand.c_str(), c.id.c_str());
-            DrawText({ cx, cy }, 15.0f, WithAlpha(chrome::C_DESC, t), label);
+            DrawText({ cx, cy }, 15.0f, WithAlpha(sel ? chrome::C_LABEL : chrome::C_DESC, t), label);
             DrawRect({ cx + 250, cy + 4 }, { cx + 260, cy + 14 },
                      WithAlpha(c.exported ? chrome::C_OK : RGBA(80, 100, 80, 255), t));
             char pc[8]; std::snprintf(pc, sizeof pc, "%d", c.perspSets);
@@ -101,8 +115,7 @@ void Draw(double openSec) {
     }
 
     SetFont(g_fRodin);
-    DrawText({ 150, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t),
-             MaxOff() > 0 ? "Up / Down  Scroll        Esc  Back" : "Esc  Back");
+    DrawText({ 150, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Move  arrows        Enter  Live 3D        Esc  Back");
     ResetFont();
 }
 

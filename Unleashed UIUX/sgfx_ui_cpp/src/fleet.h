@@ -33,4 +33,9 @@ struct Roster {
 
 Roster Scan();   // reads viewer3d.json "bmw_git_root"; empty if unset
 
+// one-shot car hand-off: the Fleet screen sets the picked car on Enter, the 3D view
+// consumes it on entry (then it clears, so the next entry uses the active profile).
+void SetSelected(const std::string& id);
+std::string TakeSelected();
+
 } // namespace fleet

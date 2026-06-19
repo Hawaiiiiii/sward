@@ -71,7 +71,10 @@ The "Fleet" screen (action hub → Fleet readiness) lists every car in the 3D-ca
 repo with its export state (`export/exported.ramses` present) and how many QA
 camera-perspective sets it has (`perspectives_*.json`) — at a glance, which cars can be
 rendered / screenshot-tested and how completely their QA cameras are set up. Read-only,
-straight from `bmw_git_root` (the same root the 3D viewer renders from). Up/Down scroll.
+straight from `bmw_git_root` (the same root the 3D viewer renders from). Arrow keys move
+the cursor; **Enter opens the picked car live in the 3D view** (any brand — the scene
+resolver searches every brand, not just BMW). A car with no export shows "Unavailable"
+rather than a stale image.
 
 ## Screenshot-test state
 The "QA Tests" screen (action hub → Car tests) is the 3D-car screenshot-test board — the
