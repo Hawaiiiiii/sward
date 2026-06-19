@@ -17,6 +17,12 @@ import, or modify the tool. Schema: `../../specs/data_bridge.md`.
 
       python launch.py <run-folder> --profile G65 --exe path/to/sgfx_screens.exe
 
+- **`package.py`** — assemble a clean runtime drop (exe + the D3D12 runtime + fonts +
+  the host logo-slot folder), leaving out the game art atlases, layout data and music
+  the screens don't load.
+
+      python package.py --build <build_dir> --out <drop_dir> --zip
+
 - **`test_export_status.py`** — unit tests for the mapping.
 
       python -m unittest test_export_status
