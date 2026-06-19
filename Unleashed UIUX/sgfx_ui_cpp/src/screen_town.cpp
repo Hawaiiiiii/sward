@@ -100,11 +100,11 @@ void Input(const ScreenInput& in) {
     }
     if (in.accept) {
         static const char* const TARGET[ACTION_COUNT] = {
-            "status",      // Run preflight
+            "loading>sonic_hud", // Run preflight -> the run (loading -> live HUD -> metrics)
             "result_ex",   // Capture screenshots
             "result",      // Check delivery
             "result_ex",   // Daily digest
-            "",            // Scan unused Lua (no dedicated screen -> feedback only)
+            "balloon",     // Scan unused Lua -> notification
             "mediaroom",   // Manual review
         };
         const char* t = TARGET[g_sel];

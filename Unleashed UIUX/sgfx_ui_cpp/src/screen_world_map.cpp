@@ -108,7 +108,7 @@ void Input(const ScreenInput& in) {
     if (in.right) { g_sel = (g_sel + 1) % AREA_COUNT; }
     if (in.accept) {   // enter the focused area
         static const char* const TARGET[AREA_COUNT] = {
-            "status",      // PREFLIGHT    -> run metrics
+            "loading>sonic_hud", // PREFLIGHT -> the run (loading -> live HUD -> metrics)
             "result",      // DELIVERY     -> verdict / readiness
             "mediaroom",   // SCREENSHOTS  -> evidence review
             "result_ex",   // DAILY DIGEST -> battery results
@@ -118,6 +118,7 @@ void Input(const ScreenInput& in) {
         g_nav = TARGET[g_sel];
     }
     if (in.cancel) g_nav = "@back";
+    if (in.tabLeft || in.tabRight) g_nav = "world_map_help";   // LB/RB -> hub help
 }
 const char* Nav() { const char* n = g_nav; g_nav = nullptr; return n; }
 
@@ -218,6 +219,7 @@ void DrawFooter(float t) {
     DrawRect({ 40, 648 }, { 1240, 650 }, WithAlpha(C_RAIL, t));
     DrawText({ 48, y }, 19.0f, WithAlpha(C_FOOTER, t), "< >  Select area");
     DrawText({ 300, y }, 19.0f, WithAlpha(C_FOOTER, t), "Enter  Open");
+    DrawText({ 470, y }, 19.0f, WithAlpha(C_FOOTER, t), "LB/RB  Help");
     // transient open feedback
     double age = Now() - g_msgStart;
     if (g_msgStart > 0.0 && age < 1.6) {

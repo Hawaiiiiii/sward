@@ -22,8 +22,8 @@ namespace {
 // ---- menu entries -----------------------------------------------------------
 struct Entry { const char* label; const char* blurb; };
 const Entry ENTRIES[] = {
-    { "RUN",      "Start a new preflight run."      },
-    { "RESUME",   "Pick up the last session."       },
+    { "RUN",      "Open the QA hub."                },
+    { "SETUP",    "Check tools and dependencies."   },
     { "SETTINGS", "Adjust paths and preferences."   },
     { "EVIDENCE", "Review screenshots and reports." },
     { "QUIT",     "Close the tool."                 },
@@ -91,7 +91,7 @@ void Input(const ScreenInput& in) {
         g_flashStart = Now(); g_flashRow = g_sel;
         static const char* const TARGET[ENTRY_COUNT] = {
             "world_map",   // RUN      -> the QA hub
-            "world_map",   // RESUME   -> the QA hub
+            "installer",   // SETUP    -> tools / dependency onboarding
             "options",     // SETTINGS
             "mediaroom",   // EVIDENCE -> screenshot review
             "@back",       // QUIT

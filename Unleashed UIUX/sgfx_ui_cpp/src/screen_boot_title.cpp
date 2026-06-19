@@ -53,8 +53,9 @@ void Input(const ScreenInput& in) {
         if (g_state < BT_MENU) {
             g_state = BT_MENU;        // splash -> menu (no console-storage notice)
         } else {   // carousel accept -> the runtime flow
-            if (g_entry == 2) g_nav = "options";    // SETTINGS
-            else              g_nav = "world_map";   // RESUME / NEW RUN -> the hub
+            if (g_entry == 0)      g_nav = "world_map";   // RESUME  -> the hub
+            else if (g_entry == 1) g_nav = "title";       // NEW RUN -> the launcher menu
+            else                   g_nav = "options";     // SETTINGS
         }
     }
     if (in.cancel) g_state = BT_PRESS_START;

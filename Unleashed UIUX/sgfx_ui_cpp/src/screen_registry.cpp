@@ -59,7 +59,7 @@ void OptionsFlowInput(const ScreenInput& in) { OptionsInput(in);      if (in.can
 void MediaFlowInput(const ScreenInput& in)   { MediaRoomInput(in);    if (in.cancel) g_wrapNav = "@back"; }
 void WmHelpFlowInput(const ScreenInput& in)  { WorldMapHelpInput(in); if (in.cancel) g_wrapNav = "@back"; }
 void BalloonFlowInput(const ScreenInput& in) { BalloonInput(in);      if (in.cancel) g_wrapNav = "@back"; }
-void HudFlowInput(const ScreenInput& in)     { SonicHudInput(in);     if (in.cancel) g_wrapNav = "pause"; }   // Start pauses in-game
+void HudFlowInput(const ScreenInput& in)     { SonicHudInput(in);     if (in.cancel) g_wrapNav = "pause"; else if (in.accept) g_wrapNav = "status"; }   // Esc pauses; Enter -> metrics
 void ResultFlowInput(const ScreenInput& in)  { if (in.accept) g_wrapNav = "world_map"; else if (in.cancel) g_wrapNav = "@back"; }   // A -> hub, B backs out
 void ResultExFlowInput(const ScreenInput& in){ ResultExInput(in);     if (in.cancel) g_wrapNav = "@back"; }
 } // namespace
