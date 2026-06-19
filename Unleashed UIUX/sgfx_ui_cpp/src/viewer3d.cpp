@@ -191,7 +191,7 @@ std::string RenderSnapshot(const std::string& profileId, const std::string& view
 
     std::string out = SnapshotPath();
     std::string args = "--scene-file \"" + scene + "\" --readback --screenshot \"" + out
-                     + "\" --frames 80 --width 1280 --height 720";
+                     + "\" --frames 240 --width 1280 --height 720";   // enough frames that the scene is Rendered before readback
     if (!view.empty() && view != "authored" && view != "orbit") {
         std::string pa = PerspectiveArgs(CarDir(c, profileId), view, entry);
         if (!pa.empty()) args += pa;
