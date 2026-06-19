@@ -81,6 +81,11 @@ review), or has not run, with the count of differing tests (channel-split diffs 
 collapsed per test). Regressions sort to the top. Read-only — it reports what a run left
 on disk; `expected` is the committed golden, `actuals`/`diff` are gitignored local output.
 
+## Delivery changelogs
+The "Changelogs" screen (action hub → Changelogs) reads each car's `CHANGELOG.md` and
+lists its latest delivered version, date, and change count, newest delivery first — the
+delivery record across the fleet. Read-only, straight from `bmw_git_root`.
+
 ## Ship a runtime drop
     python tools/package.py --build build --out drop --zip
 
