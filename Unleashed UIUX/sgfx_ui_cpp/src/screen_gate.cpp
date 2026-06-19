@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 #include <algorithm>
 
 using namespace ui;
@@ -78,6 +79,8 @@ int g_sel = 0;          // default focus: first profile (no car privileged)
 bool g_popup = false; int g_popupSel = 0;
 const char* g_nav = nullptr;
 std::string g_previewMsg; double g_previewStart = -100.0;
+bool g_perspPopup = false; int g_perspSel = 0, g_perspFirst = 0;
+std::vector<std::string> g_perspList;
 
 void Init() {
     if (g_fSeurat == 0) g_fSeurat = LoadMsdfFont("seurat");
@@ -85,17 +88,36 @@ void Init() {
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
     if (g_logoTex < 0)  g_logoTex = gfx::loadTexture("assets/gameart/boot_logo.png");
 }
-void Reset() { g_sel = 0; g_popup = false; g_popupSel = 0; g_nav = nullptr; }
+void Reset() { g_sel = 0; g_popup = false; g_popupSel = 0; g_perspPopup = false; g_perspSel = 0; g_perspFirst = 0; g_nav = nullptr; }
 void Switch(int d) { g_sel = (g_sel + PROFILE_COUNT + d) % PROFILE_COUNT; }
 void Input(const ScreenInput& in) {
+    if (g_perspPopup) {
+        const int n = (int)g_perspList.size();
+        if (in.down) g_perspSel = std::min(n - 1, g_perspSel + 1);
+        if (in.up)   g_perspSel = std::max(0, g_perspSel - 1);
+        if (g_perspSel < g_perspFirst)     g_perspFirst = g_perspSel;
+        if (g_perspSel > g_perspFirst + 6) g_perspFirst = g_perspSel - 6;
+        if (in.accept && n > 0) {
+            std::string view = g_perspSel == 0 ? "authored"
+                             : g_perspSel == 1 ? "orbit" : g_perspList[g_perspSel];
+            g_previewMsg = viewer3d::Launch(PROFILES[g_sel].id, view);
+            g_previewStart = Now();
+            g_perspPopup = false;
+        }
+        if (in.cancel) g_perspPopup = false;
+        return;
+    }
     if (g_popup) {
         if (in.down) g_popupSel = (g_popupSel + 1) % 3;
         if (in.up)   g_popupSel = (g_popupSel + 2) % 3;
         if (in.accept) {
             if (g_popupSel == 0) g_nav = "town";                       // Open -> the action hub
-            else if (g_popupSel == 1) {                                // Preview in 3D -> the Ramses viewer
-                g_previewMsg = viewer3d::Launch(PROFILES[g_sel].id);
-                g_previewStart = Now();
+            else if (g_popupSel == 1) {                                // Preview in 3D -> choose a QA view
+                g_perspList.clear();
+                g_perspList.push_back("Authored");
+                g_perspList.push_back("Free orbit");
+                for (const auto& s : viewer3d::ListPerspectiveSets(PROFILES[g_sel].id)) g_perspList.push_back(s);
+                g_perspPopup = true; g_perspSel = 0; g_perspFirst = 0;
             }
             g_popup = false; g_popupSel = 0;
         }
@@ -157,6 +179,33 @@ void DrawConfirm() {
     ResetFont();
 }
 
+// the 3D-preview QA-view picker: Authored / Free orbit / the car's perspective sets.
+void DrawPerspPopup() {
+    if (!g_perspPopup) return;
+    DrawRect({ 0, 0 }, { REF_W, REF_H }, RGBA(0, 0, 0, 140));
+    const float x0 = 470, y0 = 188, x1 = 810, y1 = 540, cx = (x0 + x1) * 0.5f;
+    DrawRect({ x0, y0 }, { x1, y1 }, C_POP_FILL);
+    DrawRect({ x0, y0 }, { x1, y0 + 2 }, RGBA(64, 150, 235, 200));
+    char head[48]; std::snprintf(head, sizeof head, "Preview %s in 3D", PROFILES[g_sel].id);
+    SetFont(g_fRodin);
+    DrawTextAligned({ x0, y0 + 14 }, { x1, y0 + 44 }, 24.0f, C_WHITE, head, Align::Center, true, true);
+    DrawRect({ x0 + 16, y0 + 50 }, { x1 - 16, y0 + 52 }, RGBA(90, 130, 180, 120));
+    const int VIS = 7; const float rowsTop = y0 + 64, rowH = 40;
+    const int n = (int)g_perspList.size();
+    for (int row = 0; row < VIS && g_perspFirst + row < n; ++row) {
+        int idx = g_perspFirst + row;
+        float ry = rowsTop + row * rowH;
+        bool sel = (idx == g_perspSel);
+        if (sel) DrawVGradient({ x0 + 14, ry - 4 }, { x1 - 14, ry + rowH - 10 }, C_POP_HI_T, C_POP_HI_B);
+        const char* txt = g_perspList[idx].c_str();
+        float w = MeasureText(22.0f, txt).x;
+        DrawText({ cx - w * 0.5f, ry }, 22.0f, sel ? C_WHITE : RGBA(200, 214, 230, 255), txt);
+    }
+    if (n > VIS)
+        DrawTextAligned({ x0, y1 - 28 }, { x1, y1 - 8 }, 15.0f, RGBA(150, 170, 196, 255), "Up/Down  scroll", Align::Center, true, true);
+    ResetFont();
+}
+
 void Draw(double openSec) {
     const float a  = (float)ComputeMotion(openSec, 0.0, 12.0);
     const float dp = (float)ComputeMotion(openSec, 10.0, 14.0);
@@ -213,7 +262,7 @@ void Draw(double openSec) {
     // footer
     SetFont(g_fRodin);
     DrawRect({ 150, 612 }, { 1130, 614 }, WithAlpha(C_RAIL, a));
-    if (g_popup) {
+    if (g_popup || g_perspPopup) {
         DrawTextAligned({ 150, 628 }, { 1130, 656 }, 20.0f, WithAlpha(C_FOOTER, a), "Enter  Confirm     Esc  Cancel", Align::Right, true, true);
     } else {
         DrawText({ 158, 628 }, 20.0f, WithAlpha(C_FOOTER, a), "< >  Switch profile");
@@ -233,6 +282,7 @@ void Draw(double openSec) {
     }
 
     DrawConfirm();
+    DrawPerspPopup();
 }
 
 } // namespace

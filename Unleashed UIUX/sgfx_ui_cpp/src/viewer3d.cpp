@@ -3,7 +3,9 @@
 // viewer3d.h). Reads operator-local paths from viewer3d.json beside the exe, maps
 // the profile id to its exported.ramses under the car-models repo, and starts the
 // viewer with ShellExecute (its DLLs sit beside it, so the working dir is its own
-// folder). No window or render work happens here — this only spawns the viewer.
+// folder). A QA perspective set is applied by reading the car's perspectives_*.json
+// and passing the chosen view's camera as --qa-perspective-* args. No window or
+// render work happens here — this only spawns the viewer.
 // =============================================================================
 #include "viewer3d.h"
 
@@ -12,8 +14,10 @@
 
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <sstream>
 #include <filesystem>
 #include <system_error>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 using nlohmann::json;
@@ -32,7 +36,7 @@ Config LoadConfig() {
             json j; f >> j;
             c.viewerExe = j.value("viewer_exe", "");
             c.repoRoot  = j.value("bmw_git_root", "");
-            c.extraArgs = j.value("extra_args", "--orbit --frames 360000");
+            c.extraArgs = j.value("extra_args", "--frames 360000");
             c.loaded    = !c.viewerExe.empty();
         } catch (const std::exception&) { /* malformed config -> treated as absent */ }
         break;
@@ -52,6 +56,59 @@ std::string ResolveScene(const std::string& root, const std::string& id) {
     return "";
 }
 
+// the car directory (.../<id>/) that holds export/ and perspectives_*.json
+fs::path CarDir(const Config& c, const std::string& id) {
+    std::string scene = ResolveScene(c.repoRoot, id);
+    if (scene.empty()) return {};
+    return fs::path(scene).parent_path().parent_path();
+}
+
+float Num(const json& o, const char* k, float def) {
+    return (o.contains(k) && o[k].is_number()) ? o[k].get<float>() : def;
+}
+
+// build the --qa-perspective-* args from a set's representative ("all good") entry.
+std::string PerspectiveArgs(const fs::path& carDir, const std::string& set) {
+    std::ifstream f(carDir / ("perspectives_" + set + ".json"));
+    if (!f) return "";
+    json j; try { f >> j; } catch (const std::exception&) { return ""; }
+    if (!j.is_object() || j.empty()) return "";
+
+    std::string id = j.contains("CID_CARHUB_ALL_GOOD") ? "CID_CARHUB_ALL_GOOD" : j.begin().key();
+    const json& e = j[id];
+    std::ostringstream a;
+    a << " --qa-perspective-name " << id;
+    if (e.contains("CraneGimbal")) {
+        const json& g = e["CraneGimbal"];
+        a << " --qa-perspective-distance " << Num(g, "Distance", 10.0f)
+          << " --qa-perspective-yaw "      << Num(g, "Yaw", 0.0f)
+          << " --qa-perspective-pitch "    << Num(g, "Pitch", 0.0f)
+          << " --qa-perspective-roll "     << Num(g, "Roll", 0.0f);
+    }
+    if (e.contains("Frustum")) {
+        const json& fr = e["Frustum"];
+        a << " --qa-perspective-horizontal-fov " << Num(fr, "HorizontalFOV", 35.0f)
+          << " --qa-perspective-aspect-ratio "   << Num(fr, "AspectRatio", 1.0f)
+          << " --qa-perspective-near-plane "     << Num(fr, "NearPlane", 0.5f)
+          << " --qa-perspective-far-plane "      << Num(fr, "FarPlane", 100.0f);
+    }
+    if (e.contains("Scale") && e["Scale"].is_number())
+        a << " --qa-perspective-scale " << e["Scale"].get<float>();
+    if (e.contains("Origin") && e["Origin"].is_array() && e["Origin"].size() == 3)
+        a << " --qa-perspective-origin-x " << e["Origin"][0].get<float>()
+          << " --qa-perspective-origin-y " << e["Origin"][1].get<float>()
+          << " --qa-perspective-origin-z " << e["Origin"][2].get<float>();
+    a << " --qa-perspective-aspect-from-resolution "
+      << (e.value("AspectFromResolution_isEnabled", true) ? "true" : "false");
+    return a.str();
+}
+
+bool Spawn(const std::string& exe, const std::string& args) {
+    std::string workdir = fs::path(exe).parent_path().string();
+    HINSTANCE r = ShellExecuteA(nullptr, "open", exe.c_str(), args.c_str(), workdir.c_str(), SW_SHOWNORMAL);
+    return reinterpret_cast<INT_PTR>(r) > 32;
+}
+
 } // namespace
 
 bool Available() {
@@ -61,7 +118,25 @@ bool Available() {
     return fs::exists(c.viewerExe, ec);
 }
 
-std::string Launch(const std::string& profileId, const std::string& perspective) {
+std::vector<std::string> ListPerspectiveSets(const std::string& profileId) {
+    std::vector<std::string> sets;
+    Config c = LoadConfig();
+    if (!c.loaded) return sets;
+    fs::path carDir = CarDir(c, profileId);
+    if (carDir.empty()) return sets;
+    std::error_code ec;
+    for (const auto& de : fs::directory_iterator(carDir, ec)) {
+        if (de.path().extension() != ".json") continue;
+        std::string fn = de.path().filename().string();
+        const std::string pre = "perspectives_";
+        if (fn.rfind(pre, 0) != 0) continue;
+        sets.push_back(fn.substr(pre.size(), fn.size() - pre.size() - 5));   // strip prefix + ".json"
+    }
+    std::sort(sets.begin(), sets.end());
+    return sets;
+}
+
+std::string Launch(const std::string& profileId, const std::string& view) {
     Config c = LoadConfig();
     if (!c.loaded) return "3D viewer not configured (see viewer3d.json)";
     std::error_code ec;
@@ -71,13 +146,16 @@ std::string Launch(const std::string& profileId, const std::string& perspective)
     if (scene.empty()) return "No 3D export found for " + profileId;
 
     std::string args = "--scene \"" + scene + "\" " + c.extraArgs;
-    if (!perspective.empty()) args += " --qa-perspective-name " + perspective;
+    std::string label = profileId;
+    if (view == "orbit") { args += " --orbit"; label += " (orbit)"; }
+    else if (!view.empty() && view != "authored") {
+        std::string pa = PerspectiveArgs(CarDir(c, profileId), view);
+        if (pa.empty()) return "Could not read perspective " + view;
+        args += pa; label += " (" + view + ")";
+    }
 
-    std::string workdir = fs::path(c.viewerExe).parent_path().string();
-    HINSTANCE r = ShellExecuteA(nullptr, "open", c.viewerExe.c_str(), args.c_str(),
-                                workdir.c_str(), SW_SHOWNORMAL);
-    if (reinterpret_cast<INT_PTR>(r) <= 32) return "Could not start the 3D viewer";
-    return "Launching 3D preview - " + profileId;
+    if (!Spawn(c.viewerExe, args)) return "Could not start the 3D viewer";
+    return "Launching 3D preview - " + label;
 }
 
 } // namespace viewer3d
