@@ -91,6 +91,15 @@ The "Changelogs" screen (action hub → Changelogs) reads each car's `CHANGELOG.
 lists its latest delivered version, date, and change count, newest delivery first — the
 delivery record across the fleet. Read-only, straight from `bmw_git_root`.
 
+## Delivery workbook
+The "Delivery workbook" screen (action hub → Delivery workbook) lays each car out in the
+official 3D-car workbook shape: version + date (from `CHANGELOG.md`), Ramses size +
+Logic size (the `exported.ramses` / `exported.rlogic` file sizes), and the screenshot
+state — joining the changelog and fleet scans, newest delivery first. (SVN revision and
+the free-text comment are external and stay out of this read-only view.) Logic size
+shows "-" until a real export populates `exported.rlogic` (a 0-byte placeholder in a
+fresh checkout).
+
 ## Ship a runtime drop
     python tools/package.py --build build --out drop --zip
 

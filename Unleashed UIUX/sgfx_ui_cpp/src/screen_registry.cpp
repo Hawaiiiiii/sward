@@ -55,6 +55,7 @@ void FleetInit();         void FleetDraw(double);         void FleetInput(const 
 void QaTestsInit();       void QaTestsDraw(double);       void QaTestsInput(const ScreenInput&);       void QaTestsReset();
 void ChangelogsInit();    void ChangelogsDraw(double);    void ChangelogsInput(const ScreenInput&);    void ChangelogsReset();
 void TestDetailInit();    void TestDetailDraw(double);    void TestDetailInput(const ScreenInput&);    void TestDetailReset();
+void DeliveryInit();      void DeliveryDraw(double);      void DeliveryInput(const ScreenInput&);      void DeliveryReset();
 
 // ---- flow wrappers: forward to the screen's own Input, surface the edge -----
 namespace {
@@ -74,6 +75,7 @@ void FleetFlowInput(const ScreenInput& in)   { FleetInput(in);        if (in.acc
 void QaTestsFlowInput(const ScreenInput& in) { QaTestsInput(in);      if (in.accept) g_wrapNav = "testdetail"; else if (in.cancel) g_wrapNav = "@back"; }
 void ChangelogsFlowInput(const ScreenInput& in) { ChangelogsInput(in); if (in.cancel) g_wrapNav = "@back"; }
 void TestDetailFlowInput(const ScreenInput& in) { TestDetailInput(in); if (in.cancel) g_wrapNav = "@back"; }
+void DeliveryFlowInput(const ScreenInput& in) { DeliveryInput(in);    if (in.cancel) g_wrapNav = "@back"; }
 } // namespace
 
 static const ScreenDef g_screens[] = {
@@ -102,6 +104,7 @@ static const ScreenDef g_screens[] = {
     { "qatests",        &QaTestsInit,       &QaTestsDraw,       &QaTestsFlowInput,   &QaTestsReset,      &WrapNav },
     { "changelogs",     &ChangelogsInit,    &ChangelogsDraw,    &ChangelogsFlowInput, &ChangelogsReset,  &WrapNav },
     { "testdetail",     &TestDetailInit,    &TestDetailDraw,    &TestDetailFlowInput, &TestDetailReset,  &WrapNav },
+    { "delivery",       &DeliveryInit,      &DeliveryDraw,      &DeliveryFlowInput,   &DeliveryReset,    &WrapNav },
 };
 
 const ScreenDef* AllScreens(int& count) {
