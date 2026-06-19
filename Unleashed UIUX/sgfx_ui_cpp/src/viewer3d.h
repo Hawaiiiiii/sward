@@ -26,4 +26,12 @@ std::vector<std::string> ListPerspectiveEntries(const std::string& profileId, co
 // Returns a short status line for the UI — success or the reason it could not launch.
 std::string Launch(const std::string& profileId, const std::string& view = "", const std::string& entry = "");
 
+// where the in-shell car snapshot PNG is written / read (absolute, beside the shell exe).
+std::string SnapshotPath();
+
+// render ONE car frame for <profile> (view/entry like Launch) to SnapshotPath via the
+// viewer's --readback --screenshot, so the shell can display it in a pane. Spawns and
+// returns; the shell polls SnapshotPath for the result. Returns a short status line.
+std::string RenderSnapshot(const std::string& profileId, const std::string& view = "", const std::string& entry = "");
+
 } // namespace viewer3d

@@ -49,6 +49,7 @@ const char* BootTitleNav();
 void BootLogosInit();     void BootLogosDraw(double);     void BootLogosInput(const ScreenInput&);     void BootLogosReset();
 const char* BootLogosNav();
 void Viewport3DInit();    void Viewport3DDraw(double);    void Viewport3DInput(const ScreenInput&);    void Viewport3DReset();
+void CarViewInit();       void CarViewDraw(double);       void CarViewInput(const ScreenInput&);       void CarViewReset();
 
 // ---- flow wrappers: forward to the screen's own Input, surface the edge -----
 namespace {
@@ -62,6 +63,7 @@ void BalloonFlowInput(const ScreenInput& in) { BalloonInput(in);      if (in.can
 void HudFlowInput(const ScreenInput& in)     { SonicHudInput(in);     if (in.cancel) g_wrapNav = "pause"; else if (in.accept) g_wrapNav = "status"; }   // Esc pauses; Enter -> metrics
 void ResultFlowInput(const ScreenInput& in)  { if (in.accept) g_wrapNav = "world_map"; else if (in.cancel) g_wrapNav = "@back"; }   // A -> hub, B backs out
 void ResultExFlowInput(const ScreenInput& in){ ResultExInput(in);     if (in.cancel) g_wrapNav = "@back"; }
+void CarViewFlowInput(const ScreenInput& in) { CarViewInput(in);      if (in.cancel) g_wrapNav = "@back"; }
 } // namespace
 
 static const ScreenDef g_screens[] = {
@@ -84,6 +86,7 @@ static const ScreenDef g_screens[] = {
     { "start",          &StartInit,         &StartDraw,         &StartInput,         &StartReset,     nullptr },
     { "balloon",        &BalloonInit,       &BalloonDraw,       &BalloonFlowInput,   &BalloonReset,   &WrapNav },
     { "world_map_help", &WorldMapHelpInit,  &WorldMapHelpDraw,  &WmHelpFlowInput,    &WorldMapHelpReset, &WrapNav },
+    { "carview",        &CarViewInit,       &CarViewDraw,       &CarViewFlowInput,   &CarViewReset,      &WrapNav },
 };
 
 const ScreenDef* AllScreens(int& count) {

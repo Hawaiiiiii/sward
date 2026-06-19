@@ -176,4 +176,28 @@ std::string Launch(const std::string& profileId, const std::string& view, const 
     return "Launching 3D preview - " + label;
 }
 
+std::string SnapshotPath() {
+    std::error_code ec;
+    return fs::absolute("carview.png", ec).string();
+}
+
+std::string RenderSnapshot(const std::string& profileId, const std::string& view, const std::string& entry) {
+    Config c = LoadConfig();
+    if (!c.loaded) return "3D viewer not configured (see viewer3d.json)";
+    std::error_code ec;
+    if (!fs::exists(c.viewerExe, ec)) return "3D viewer not found at the configured path";
+    std::string scene = ResolveScene(c.repoRoot, profileId);
+    if (scene.empty()) return "No 3D export found for " + profileId;
+
+    std::string out = SnapshotPath();
+    std::string args = "--scene \"" + scene + "\" --readback --screenshot \"" + out
+                     + "\" --frames 80 --width 1280 --height 720";
+    if (!view.empty() && view != "authored" && view != "orbit") {
+        std::string pa = PerspectiveArgs(CarDir(c, profileId), view, entry);
+        if (!pa.empty()) args += pa;
+    }
+    if (!Spawn(c.viewerExe, args)) return "Could not start the 3D render";
+    return "Rendering " + profileId + " ...";
+}
+
 } // namespace viewer3d

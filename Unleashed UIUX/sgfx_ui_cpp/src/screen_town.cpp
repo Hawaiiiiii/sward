@@ -30,6 +30,7 @@ const Action ACTIONS[] = {
     { "Daily digest",        "Run every live profile and",   "summarise the morning state."   },
     { "Scan unused Lua",     "Find Lua files that survived", "into the project root."         },
     { "Manual review",       "Open the queue of items",      "awaiting a human verdict."      },
+    { "Live 3D car",         "Open the live 3D view of",     "this profile's car."            },
 };
 constexpr int ACTION_COUNT = int(sizeof(ACTIONS) / sizeof(ACTIONS[0]));
 
@@ -71,7 +72,7 @@ void Input(const ScreenInput& in) {
     }
     if (in.accept) {
         static const char* const TARGET[ACTION_COUNT] = {
-            "loading>sonic_hud", "result_ex", "result", "result_ex", "balloon", "mediaroom",
+            "loading>sonic_hud", "result_ex", "result", "result_ex", "balloon", "mediaroom", "carview",
         };
         const char* t = TARGET[g_sel];
         if (t[0]) g_nav = t;
