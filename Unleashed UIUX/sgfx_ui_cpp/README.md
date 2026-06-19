@@ -73,6 +73,14 @@ camera-perspective sets it has (`perspectives_*.json`) — at a glance, which ca
 rendered / screenshot-tested and how completely their QA cameras are set up. Read-only,
 straight from `bmw_git_root` (the same root the 3D viewer renders from). Up/Down scroll.
 
+## Screenshot-test state
+The "QA Tests" screen (action hub → Car tests) is the 3D-car screenshot-test board — the
+core QA-Hero workflow. For each car it reads `export/tests/{expected,actuals,diff}` and
+reports whether the latest local run matches the committed baseline, differs (needs
+review), or has not run, with the count of differing tests (channel-split diffs are
+collapsed per test). Regressions sort to the top. Read-only — it reports what a run left
+on disk; `expected` is the committed golden, `actuals`/`diff` are gitignored local output.
+
 ## Ship a runtime drop
     python tools/package.py --build build --out drop --zip
 

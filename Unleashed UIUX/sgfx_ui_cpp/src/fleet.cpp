@@ -29,6 +29,35 @@ std::string LoadRoot() {
     return "";
 }
 
+int CountPng(const fs::path& dir) {
+    std::error_code ec; int n = 0;
+    if (!fs::is_directory(dir, ec)) return 0;
+    for (const auto& f : fs::directory_iterator(dir, ec)) {
+        std::string ext = f.path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return (char)std::tolower(c); });
+        if (ext == ".png") ++n;
+    }
+    return n;
+}
+
+// distinct tests that differ from baseline: diffs are split per channel
+// (<test>_alpha.png + <test>_color.png), so collapse the channel suffix.
+int CountUniqueDiffs(const fs::path& dir) {
+    std::error_code ec;
+    if (!fs::is_directory(dir, ec)) return 0;
+    std::vector<std::string> stems;
+    for (const auto& f : fs::directory_iterator(dir, ec)) {
+        if (f.path().extension() != ".png") continue;
+        std::string s = f.path().stem().string();
+        for (const char* suf : { "_alpha", "_color" }) {
+            const size_t n = std::char_traits<char>::length(suf);
+            if (s.size() > n && s.compare(s.size() - n, n, suf) == 0) { s.erase(s.size() - n); break; }
+        }
+        if (std::find(stems.begin(), stems.end(), s) == stems.end()) stems.push_back(s);
+    }
+    return (int)stems.size();
+}
+
 } // namespace
 
 Roster Scan() {
@@ -60,6 +89,15 @@ Roster Scan() {
             if (persp == 0 && !exp) continue;                // licenses/meta/noise
 
             Car c; c.brand = bn; c.id = cn; c.exported = exp; c.perspSets = persp;
+            const fs::path tdir = car.path() / "export" / "tests";
+            c.testExpected = CountPng(tdir / "expected");
+            c.testDiff     = CountUniqueDiffs(tdir / "diff");
+            c.testActuals  = CountPng(tdir / "actuals") > 0;
+            if (c.testExpected == 0) c.testStatus = "none";
+            else { ++r.tested;
+                   if (c.testDiff > 0)     { c.testStatus = "diff";   ++r.testDiff; }
+                   else if (c.testActuals) { c.testStatus = "pass";   ++r.testPass; }
+                   else                    { c.testStatus = "notrun"; ++r.testNotrun; } }
             if (exp) ++r.exportedCount;
             if (persp > 0) ++r.withPersp;
             r.cars.push_back(std::move(c));
