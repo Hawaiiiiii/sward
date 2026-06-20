@@ -83,6 +83,7 @@ add_executable(sgfx_screens
     src/al_coverage.cpp
     src/fleet.cpp
     src/changelog.cpp
+    src/variants.cpp
     src/screen_carview.cpp
     src/screen_ambient.cpp
     src/screen_fleet.cpp
@@ -90,6 +91,7 @@ add_executable(sgfx_screens
     src/screen_changelogs.cpp
     src/screen_testdetail.cpp
     src/screen_delivery.cpp
+    src/screen_variants.cpp
     src/screen_pause.cpp
     src/screen_result.cpp
     src/screen_title.cpp
