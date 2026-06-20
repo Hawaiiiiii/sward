@@ -28,8 +28,6 @@ void SonicHudInit();  void SonicHudDraw(double);   void SonicHudInput(const Scre
 void OptionsInit();    void OptionsDraw(double);    void OptionsInput(const ScreenInput&);    void OptionsReset();
 void TownInit();       void TownDraw(double);       void TownInput(const ScreenInput&);       void TownReset();
 const char* TownNav();
-void GateInit();       void GateDraw(double);       void GateInput(const ScreenInput&);       void GateReset();
-const char* GateNav();
 void BossInit();       void BossDraw(double);       void BossInput(const ScreenInput&);       void BossReset();
 void ItemResultInit(); void ItemResultDraw(double); void ItemResultInput(const ScreenInput&); void ItemResultReset();
 void ResultExInit();   void ResultExDraw(double);   void ResultExInput(const ScreenInput&);   void ResultExReset();
@@ -93,7 +91,6 @@ static const ScreenDef g_screens[] = {
     { "result",    &ResultInit,   &ResultDraw,   &ResultFlowInput, nullptr,    &WrapNav },
     { "options",     &OptionsInit,    &OptionsDraw,    &OptionsFlowInput, &OptionsReset, &WrapNav },
     { "town",        &TownInit,       &TownDraw,       &TownInput,       &TownReset,    &TownNav },
-    { "gate",        &GateInit,       &GateDraw,       &GateInput,       &GateReset,    &GateNav },
     { "result_ex",   &ResultExInit,   &ResultExDraw,   &ResultExFlowInput, &ResultExReset, &WrapNav },
     { "mediaroom",      &MediaRoomInit,     &MediaRoomDraw,     &MediaFlowInput,     &MediaRoomReset, &WrapNav },
     { "loading",        &LoadingInit,       &LoadingDraw,       &LoadingInput,       &LoadingReset,   nullptr },

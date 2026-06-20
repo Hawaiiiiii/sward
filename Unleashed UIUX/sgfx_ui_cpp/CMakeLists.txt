@@ -100,7 +100,6 @@ add_executable(sgfx_screens
     src/screen_sonic_hud.cpp
     src/screen_options.cpp
     src/screen_town.cpp
-    src/screen_gate.cpp
     src/screen_result_ex.cpp
     src/screen_mediaroom.cpp
     src/screen_loading.cpp
