@@ -41,5 +41,13 @@ bool LiveStart(const std::string& profileId);
 void LiveStop();
 bool LiveActive();
 
+// Re-export a car's Ramses scene for real: RaCoHeadless -p <car>/export/*.rca -e
+// <car>/export/exported (config "raco_exe"). It's a heavy scene serialize (~1-2 min),
+// run as a managed subprocess: ExportActive() is true while it runs, ExportOk() is the
+// last run's exit==0, ExportCar() is which car.
+bool ExportStart(const std::string& profileId);
+bool ExportActive();
+bool ExportOk();
+std::string ExportCar();
 
 } // namespace viewer3d

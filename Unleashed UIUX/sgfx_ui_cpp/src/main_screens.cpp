@@ -422,6 +422,7 @@ int main(int argc, char** argv) {
     const ScreenDef* afterLoading = nullptr;        // destination once the loader has run
 
     while (run) {
+        if (viewer3d::ExportActive()) SDL_Delay(100);   // yield CPU to the heavy (CPU-bound) RaCoHeadless export
         double absNow = (SDL_GetPerformanceCounter() - tStart) / freq;
         ScreenInput in;          // this frame's edge-triggered presses
         SDL_Event e;

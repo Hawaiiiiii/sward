@@ -25,7 +25,7 @@ using nlohmann::json;
 namespace viewer3d {
 namespace {
 
-struct Config { std::string viewerExe, repoRoot, extraArgs; bool loaded = false; };
+struct Config { std::string viewerExe, repoRoot, extraArgs, racoExe; bool loaded = false; };
 
 Config LoadConfig() {
     Config c;
@@ -37,6 +37,7 @@ Config LoadConfig() {
             c.viewerExe = j.value("viewer_exe", "");
             c.repoRoot  = j.value("bmw_git_root", "");
             c.extraArgs = j.value("extra_args", "--frames 360000");
+            c.racoExe   = j.value("raco_exe", "");
             c.loaded    = !c.viewerExe.empty();
         } catch (const std::exception&) { /* malformed config -> treated as absent */ }
         break;
@@ -237,5 +238,59 @@ bool LiveActive() {
     if (WaitForSingleObject(g_liveProc, 0) == WAIT_OBJECT_0) { CloseHandle(g_liveProc); g_liveProc = nullptr; return false; }
     return true;
 }
+
+// ---- real export: RaCoHeadless -p <car>/export/*.rca -e <car>/export/exported ------
+static HANDLE g_exportProc = nullptr;
+static DWORD  g_exportExit = STILL_ACTIVE;
+static std::string g_exportCar;
+
+static fs::path FindCarDir(const std::string& root, const std::string& id) {
+    std::error_code ec;
+    for (const auto& brand : fs::directory_iterator(fs::path(root) / "cars", ec)) {
+        if (!brand.is_directory()) continue;
+        fs::path p = brand.path() / id;
+        if (fs::is_directory(p, ec)) return p;
+    }
+    return {};
+}
+
+bool ExportStart(const std::string& profileId) {
+    if (g_exportProc) { CloseHandle(g_exportProc); g_exportProc = nullptr; }
+    Config c = LoadConfig();
+    std::error_code ec;
+    if (c.racoExe.empty() || !fs::exists(c.racoExe, ec)) return false;
+    const fs::path carDir = FindCarDir(c.repoRoot, profileId);
+    if (carDir.empty()) return false;
+    const fs::path exportDir = carDir / "export";
+    if (!fs::is_directory(exportDir, ec)) return false;
+    fs::path rca;
+    for (const auto& f : fs::directory_iterator(exportDir, ec))
+        if (f.path().extension() == ".rca") { rca = f.path(); break; }
+    if (rca.empty()) return false;
+
+    std::string cmd = "\"" + c.racoExe + "\" -p \"" + rca.string() + "\" -e \""
+                    + (exportDir / "exported").string() + "\" -l 2";
+    std::string workdir = fs::path(c.racoExe).parent_path().string();
+    STARTUPINFOA si{}; si.cb = sizeof si;
+    PROCESS_INFORMATION pi{};
+    if (!CreateProcessA(nullptr, cmd.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, workdir.c_str(), &si, &pi))
+        return false;
+    CloseHandle(pi.hThread);
+    g_exportProc = pi.hProcess;
+    g_exportExit = STILL_ACTIVE;
+    g_exportCar  = profileId;
+    return true;
+}
+bool ExportActive() {
+    if (!g_exportProc) return false;
+    if (WaitForSingleObject(g_exportProc, 0) == WAIT_OBJECT_0) {
+        GetExitCodeProcess(g_exportProc, &g_exportExit);
+        CloseHandle(g_exportProc); g_exportProc = nullptr;
+        return false;
+    }
+    return true;
+}
+bool ExportOk() { return g_exportExit == 0; }
+std::string ExportCar() { return g_exportCar; }
 
 } // namespace viewer3d
