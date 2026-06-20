@@ -108,12 +108,12 @@ void Input(const ScreenInput& in) {
     if (in.right) { g_sel = (g_sel + 1) % AREA_COUNT; }
     if (in.accept) {   // enter the focused area
         static const char* const TARGET[AREA_COUNT] = {
-            "loading>sonic_hud", // PREFLIGHT -> the run (loading -> live HUD -> metrics)
-            "result",      // DELIVERY     -> verdict / readiness
-            "mediaroom",   // SCREENSHOTS  -> evidence review
-            "result_ex",   // DAILY DIGEST -> battery results
+            "fleet",       // PREFLIGHT    -> fleet readiness (export + QA cameras)
+            "delivery",    // DELIVERY     -> the delivery workbook
+            "qatests",     // SCREENSHOTS  -> screenshot-test state
+            "changelogs",  // DAILY DIGEST -> recent delivered versions
             "mediaroom",   // MANUAL REVIEW-> evidence review
-            "gate",        // PROFILES     -> profile select
+            "fleet",       // PROFILES     -> the real car list / live-3D launcher
         };
         g_nav = TARGET[g_sel];
     }
