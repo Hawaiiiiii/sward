@@ -97,7 +97,7 @@ static const BgmSlot kBgm[] = {
     { "mediaroom",   "assets/music/mediaroom.ogg", 0 },       // Prof. Pickle's lab
     // overlays + in-stage screens: keep the music of the context they opened over:
     { "pause", "@keep", 0 }, { "options", "@keep", 0 }, { "status", "@keep", 0 },
-    { "balloon", "@keep", 0 }, { "gate", "@keep", 0 }, { "start", "@keep", 0 },
+    { "balloon", "@keep", 0 }, { "start", "@keep", 0 },
     { "mission", "@keep", 0 }, { "mission_screen", "@keep", 0 }, { "qte", "@keep", 0 },
     { "exstage", "@keep", 0 },
     // everything else (boot_*, installer, loading, world_map_help) -> default menu theme.
