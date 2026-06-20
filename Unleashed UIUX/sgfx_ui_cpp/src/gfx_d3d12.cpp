@@ -361,11 +361,41 @@ void clearTextures() {
     if (S.canDraw) { const uint8_t white[4] = {255,255,255,255}; uploadTexture(white, 1, 1); }
 }
 
+// Cap an oversized RGBA image to TEX_CAP on the long side (box average) before upload,
+// so e.g. a 3340x1440 car render does not become an 18 MB GPU texture for an ~800px
+// pane (and churn the device on weak GPUs). Returns the buffer + dims to upload; the
+// original when already small enough. Profile-agnostic — it caps whatever it's given.
+static const uint8_t* CapImage(const uint8_t* px, int w, int h, int& ow, int& oh) {
+    constexpr int TEX_CAP = 1280;
+    if (w <= TEX_CAP && h <= TEX_CAP) { ow = w; oh = h; return px; }
+    const int dw = (w >= h) ? TEX_CAP : std::max(1, w * TEX_CAP / h);
+    const int dh = (w >= h) ? std::max(1, h * TEX_CAP / w) : TEX_CAP;
+    static std::vector<uint8_t> buf;
+    buf.assign((size_t)dw * dh * 4, 0);
+    for (int y = 0; y < dh; ++y) {
+        const int sy0 = y * h / dh, sy1 = std::max(sy0 + 1, (y + 1) * h / dh);
+        for (int x = 0; x < dw; ++x) {
+            const int sx0 = x * w / dw, sx1 = std::max(sx0 + 1, (x + 1) * w / dw);
+            unsigned r = 0, g = 0, b = 0, a = 0, n = 0;
+            for (int sy = sy0; sy < sy1; ++sy)
+                for (int sx = sx0; sx < sx1; ++sx) {
+                    const uint8_t* p = px + ((size_t)sy * w + sx) * 4;
+                    r += p[0]; g += p[1]; b += p[2]; a += p[3]; ++n;
+                }
+            uint8_t* d = &buf[((size_t)y * dw + x) * 4];
+            d[0] = (uint8_t)(r / n); d[1] = (uint8_t)(g / n); d[2] = (uint8_t)(b / n); d[3] = (uint8_t)(a / n);
+        }
+    }
+    ow = dw; oh = dh;
+    return buf.data();
+}
+
 int loadTexture(const std::string& path) {
     if (!S.canDraw) return -1;
     int w, h, ch; unsigned char* px = stbi_load(path.c_str(), &w, &h, &ch, 4);
     if (!px) return -1;
-    int slot = uploadTexture(px, w, h);
+    int cw, cht; const uint8_t* up = CapImage(px, w, h, cw, cht);
+    int slot = uploadTexture(up, cw, cht);
     stbi_image_free(px);
     return slot;
 }
@@ -375,7 +405,8 @@ int reloadTexture(int slot, const std::string& path) {
     if (slot < 0 || slot >= (int)S.textures.size()) return loadTexture(path);   // no slot yet -> allocate one
     int w, h, ch; unsigned char* px = stbi_load(path.c_str(), &w, &h, &ch, 4);
     if (!px) return slot;   // keep the current texture on a failed load
-    int s = uploadTexture(px, w, h, slot);
+    int cw, cht; const uint8_t* up = CapImage(px, w, h, cw, cht);
+    int s = uploadTexture(up, cw, cht, slot);
     stbi_image_free(px);
     return s;
 }

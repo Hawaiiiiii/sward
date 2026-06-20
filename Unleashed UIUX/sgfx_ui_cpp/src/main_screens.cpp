@@ -448,9 +448,12 @@ int main(int argc, char** argv) {
                     replayPending = true; transPhase = 2; transStart = absNow;
                     audio::Play(audio::SFX_CANCEL);
                 }
-                else if (k >= SDLK_1 && k <= SDLK_9) {      // switch screen (fades)
-                    int idx = k - SDLK_1, n; const ScreenDef* a = AllScreens(n);
-                    if (idx < n && &a[idx] != scr) { transTarget = &a[idx]; transPhase = 2; transStart = absNow; }
+                else if (k >= SDLK_1 && k <= SDLK_9) {      // debug-only screen jump (SGFX_DEBUG_NAV=1)
+                    static const bool dbgNav = [] { const char* e = getenv("SGFX_DEBUG_NAV"); return e && e[0] == '1'; }();
+                    if (dbgNav) {
+                        int idx = k - SDLK_1, n; const ScreenDef* a = AllScreens(n);
+                        if (idx < n && &a[idx] != scr) { transTarget = &a[idx]; transPhase = 2; transStart = absNow; }
+                    }
                 }
                 else { ApplyKey(in, k); }                   // navigation -> active screen
             }
