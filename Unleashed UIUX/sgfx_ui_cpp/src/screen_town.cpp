@@ -53,7 +53,7 @@ constexpr float SP_X0 = 33, SP_Y0 = 117, SP_X1 = 843, SP_Y1 = 604;
 constexpr float IP_X0 = 868, IP_Y0 = 117, IP_X1 = 1246, IP_Y1 = 604;
 constexpr float CLIP_X = SP_X0 + GRID * 2;
 constexpr float ROWS_TOP = SP_Y0 + GRID * 2 + 22.0f;
-constexpr float ROW_H = 66.0f;
+constexpr float ROW_H = 34.0f;          // compact: fits the full action list without scrolling
 constexpr float OPT_W = GRID * 80;          // full inner width (no value column)
 constexpr float LABEL_X = SP_X0 + GRID * 2 + GRID;
 
@@ -117,12 +117,12 @@ void Draw(double openSec) {
         float top = ROWS_TOP + i * ROW_H;
         bool sel = (i == g_sel);
         SetFont(g_fSeurat);
-        DrawTextAligned({ LABEL_X, top }, { SP_X1 - GRID*4 - 40, top + ROW_H }, 28.0f,
+        DrawTextAligned({ LABEL_X, top }, { SP_X1 - GRID*4 - 40, top + ROW_H }, 21.0f,
                         WithAlpha(C_LABEL, t), ACTIONS[i].label, Align::Left, true, true);
         // play affordance, right edge — brighter on the focused row
         float cy = top + ROW_H * 0.5f, px = SP_X1 - GRID*2 - 34.0f;
-        if (sel) { PlayTri(px - 2, cy, 22.0f, WithAlpha(RGBA(255,128,255,255), t), true); }   // magenta halo
-        PlayTri(px, cy, 18.0f, WithAlpha(sel ? chrome::C_OK : C_PLAY, t));
+        if (sel) { PlayTri(px - 2, cy, 15.0f, WithAlpha(RGBA(255,128,255,255), t), true); }   // magenta halo
+        PlayTri(px, cy, 12.0f, WithAlpha(sel ? chrome::C_OK : C_PLAY, t));
     }
 
     // right info panel: the focused action + the profile it runs against
