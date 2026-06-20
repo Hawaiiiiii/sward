@@ -1,7 +1,7 @@
 {
   "_comment": "Example of the live status file the tool writes for the viewer. Save the real one as sgfx_status.json next to the exe (or in data/). With no file present the viewer falls back to built-in representative defaults. See specs/data_bridge.md.",
   "run": {
-    "activeProfile": "G70",
+    "activeProfile": "SAMPLE",
     "packs": [
       { "name": "anchors",        "err": 0, "warn": 0, "info": 3 },
       { "name": "constants",      "err": 0, "warn": 1, "info": 4 },
