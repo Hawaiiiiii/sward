@@ -24,19 +24,13 @@ namespace {
 
 struct Action { const char* label; const char* info1; const char* info2; };
 const Action ACTIONS[] = {
-    { "Run preflight",       "Full SG-side checks across",   "anchors, constants, carpaints." },
-    { "Capture screenshots", "Export via the BMW pipeline",  "and snap the test views."       },
-    { "Check delivery",      "Readiness across the car",     "models and their changelogs."   },
-    { "Daily digest",        "Run every live profile and",   "summarise the morning state."   },
-    { "Scan unused Lua",     "Find Lua files that survived", "into the project root."         },
-    { "Manual review",       "Open the queue of items",      "awaiting a human verdict."      },
-    { "Live 3D car",         "Open the live 3D view of",     "this profile's car."            },
-    { "Ambient tests",       "Screenshot-test coverage for", "the Ambient Layer scenes."      },
-    { "Fleet readiness",     "Export + QA-camera state",     "across every car in the repo."  },
-    { "Car tests",           "Screenshot-test state across", "the exported cars."             },
-    { "Changelogs",          "Latest delivered version",     "and date for every car."        },
+    { "Fleet readiness",     "Export + QA cameras; Enter",   "renders a car live in 3D."      },
+    { "Car tests",           "Screenshot-test state, down",  "to which views differ."         },
     { "Delivery workbook",   "Version, sizes + screenshot",  "state in the workbook shape."   },
+    { "Changelogs",          "Latest delivered version",     "and date for every car."        },
     { "Model variants",      "Powertrains + trim counts",    "for every model."               },
+    { "Ambient tests",       "Screenshot-test coverage for", "the Ambient Layer scenes."      },
+    { "Manual review",       "Open the queue of items",      "awaiting a human verdict."      },
 };
 constexpr int ACTION_COUNT = int(sizeof(ACTIONS) / sizeof(ACTIONS[0]));
 
@@ -53,7 +47,7 @@ constexpr float SP_X0 = 33, SP_Y0 = 117, SP_X1 = 843, SP_Y1 = 604;
 constexpr float IP_X0 = 868, IP_Y0 = 117, IP_X1 = 1246, IP_Y1 = 604;
 constexpr float CLIP_X = SP_X0 + GRID * 2;
 constexpr float ROWS_TOP = SP_Y0 + GRID * 2 + 22.0f;
-constexpr float ROW_H = 34.0f;          // compact: fits the full action list without scrolling
+constexpr float ROW_H = 48.0f;          // spacious rows for the focused real-action list
 constexpr float OPT_W = GRID * 80;          // full inner width (no value column)
 constexpr float LABEL_X = SP_X0 + GRID * 2 + GRID;
 
@@ -78,7 +72,7 @@ void Input(const ScreenInput& in) {
     }
     if (in.accept) {
         static const char* const TARGET[ACTION_COUNT] = {
-            "loading>sonic_hud", "result_ex", "result", "result_ex", "balloon", "mediaroom", "carview", "ambient", "fleet", "qatests", "changelogs", "delivery", "variants",
+            "fleet", "qatests", "delivery", "changelogs", "variants", "ambient", "mediaroom",
         };
         const char* t = TARGET[g_sel];
         if (t[0]) g_nav = t;
@@ -117,12 +111,12 @@ void Draw(double openSec) {
         float top = ROWS_TOP + i * ROW_H;
         bool sel = (i == g_sel);
         SetFont(g_fSeurat);
-        DrawTextAligned({ LABEL_X, top }, { SP_X1 - GRID*4 - 40, top + ROW_H }, 21.0f,
+        DrawTextAligned({ LABEL_X, top }, { SP_X1 - GRID*4 - 40, top + ROW_H }, 26.0f,
                         WithAlpha(C_LABEL, t), ACTIONS[i].label, Align::Left, true, true);
         // play affordance, right edge — brighter on the focused row
         float cy = top + ROW_H * 0.5f, px = SP_X1 - GRID*2 - 34.0f;
-        if (sel) { PlayTri(px - 2, cy, 15.0f, WithAlpha(RGBA(255,128,255,255), t), true); }   // magenta halo
-        PlayTri(px, cy, 12.0f, WithAlpha(sel ? chrome::C_OK : C_PLAY, t));
+        if (sel) { PlayTri(px - 2, cy, 18.0f, WithAlpha(RGBA(255,128,255,255), t), true); }   // magenta halo
+        PlayTri(px, cy, 15.0f, WithAlpha(sel ? chrome::C_OK : C_PLAY, t));
     }
 
     // right info panel: the focused action + the profile it runs against
