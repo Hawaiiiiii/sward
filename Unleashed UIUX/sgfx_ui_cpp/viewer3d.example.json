@@ -3,5 +3,6 @@
   "viewer_exe": "C:/path/to/sg-preflight/cpp/build/vs2022-ramses-28.16/Release/sgfx_cine_ramses_real_scene.exe",
   "bmw_git_root": "C:/path/to/digital-3d-car-models",
   "extra_args": "--frames 360000",
-  "al_assets_root": "C:/path/to/ambient-layer-assets"
+  "al_assets_root": "C:/path/to/ambient-layer-assets",
+  "raco_exe": "C:/path/to/RamsesComposer/bin/RelWithDebInfo/RaCoHeadless.exe"
 }

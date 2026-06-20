@@ -9,8 +9,10 @@
 #include "screen.h"
 #include "green_chrome.h"
 #include "fleet.h"
+#include "viewer3d.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <algorithm>
 
@@ -22,6 +24,8 @@ int g_fSeurat = 0, g_fRodin = 0, g_fDF = 0;
 fleet::Roster g_r;
 int g_off = 0;       // grid-row scroll offset
 int g_cursor = 0;    // selected car index
+bool g_exporting = false;
+std::string g_exportMsg;
 
 constexpr int COLS = 3;
 constexpr int ROWS = 12;
@@ -36,7 +40,11 @@ void Init() {
     if (g_fRodin  == 0) g_fRodin  = LoadMsdfFont("rodin_db");
     if (g_fDF     == 0) g_fDF     = LoadMsdfFont("dfsogei");
 }
-void Reset() { g_r = fleet::Scan(); g_off = 0; g_cursor = 0; }
+void Reset() {
+    g_r = fleet::Scan(); g_off = 0; g_cursor = 0;
+    if (const char* ex = std::getenv("SGFX_EXPORT"))   // automation/demo: auto re-export <car> on entry
+        if (ex[0] && viewer3d::ExportStart(ex)) { g_exporting = true; g_exportMsg = std::string("Re-exporting ") + ex + " (~2-3 min) ..."; }
+}
 void Input(const ScreenInput& in) {
     const int total = (int)g_r.cars.size();
     if (total == 0) return;
@@ -48,6 +56,10 @@ void Input(const ScreenInput& in) {
     if (crow < g_off)            g_off = crow;
     if (crow >= g_off + ROWS)    g_off = crow - ROWS + 1;
     if (in.accept) fleet::SetSelected(g_r.cars[g_cursor].id);   // hand off to the 3D view
+    if (in.tabRight && !viewer3d::ExportActive()) {             // RB: re-export this car for real (RaCoHeadless)
+        if (viewer3d::ExportStart(g_r.cars[g_cursor].id)) { g_exporting = true; g_exportMsg = "Re-exporting " + g_r.cars[g_cursor].id + " (~2-3 min) ..."; }
+        else g_exportMsg = "Re-export needs raco_exe in viewer3d.json";
+    }
 }
 
 void Draw(double openSec) {
@@ -55,6 +67,13 @@ void Draw(double openSec) {
     const float t = b.t;
     chrome::Backdrop(g_fDF, b.title, "FLEET");
     chrome::Container(33, 130, 1246, 600, true, b.line, b.outer, b.inner, b.bg);
+
+    if (g_exporting && !viewer3d::ExportActive()) {            // the real RaCoHeadless export finished
+        g_exporting = false;
+        g_exportMsg = viewer3d::ExportOk() ? ("Re-exported " + viewer3d::ExportCar() + "  (RaCoHeadless exit 0)")
+                                           : ("Export failed for " + viewer3d::ExportCar());
+        g_r = fleet::Scan();                                  // refresh: the export dot turns green
+    }
 
     if (!g_r.configured || !g_r.rootExists || g_r.cars.empty()) {
         SetFont(g_fSeurat);
@@ -114,8 +133,16 @@ void Draw(double openSec) {
         ResetFont();
     }
 
+    if (!g_exportMsg.empty()) {
+        SetFont(g_fSeurat);
+        const uint32_t mc = g_exporting ? RGBA(255, 200, 90, 255)
+                          : (g_exportMsg.rfind("Re-exported", 0) == 0 ? chrome::C_OK : RGBA(255, 130, 110, 255));
+        DrawTextAligned({ 70, 612 }, { 1210, 636 }, 16.0f, WithAlpha(mc, t), g_exportMsg.c_str(), Align::Left, true, true);
+        ResetFont();
+    }
+
     SetFont(g_fRodin);
-    DrawText({ 150, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Move  arrows        Enter  Live 3D        Esc  Back");
+    DrawText({ 150, 662 }, 20.0f, WithAlpha(chrome::C_FOOTER, t), "Move  arrows      Enter  Live 3D      RB  Re-export      Esc  Back");
     ResetFont();
 }
 
