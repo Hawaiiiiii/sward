@@ -100,6 +100,12 @@ the free-text comment are external and stay out of this read-only view.) Logic s
 shows "-" until a real export populates `exported.rlogic` (a 0-byte placeholder in a
 fresh checkout).
 
+## Model variants
+The "Model variants" screen (action hub → Model variants) reads `cars/model_variants.json`
+and draws a model × powertrain matrix (ICE / PHEV / HEV / FCEV / BEV), each cell the trim-
+variant count for that model + powertrain (a dot where the powertrain doesn't exist). The
+variant-coverage picture across the line-up. Read-only, straight from `bmw_git_root`.
+
 ## Ship a runtime drop
     python tools/package.py --build build --out drop --zip
 
